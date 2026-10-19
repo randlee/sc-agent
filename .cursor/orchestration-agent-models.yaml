@@ -1,0 +1,53 @@
+# Cursor orchestration default models for Task spawns.
+#
+# Read from `.cursor/` skills, commands, and agents only (cursor-orchestration).
+# Pass `model:` explicitly on each Task spawn.
+#
+# Precedence:
+#   1. User-named model override for a role
+#   2. Entry in this file
+#   3. Agent frontmatter default (avoid — prefer explicit Task model)
+#
+# Contextual overrides (e.g. phase-ending review) stay in cursor-orchestration
+# prose, not in this table.
+
+version: 1
+
+agents:
+  rust-developer:
+    model: cursor-grok-4.6-high-fast
+    alternates:
+      - composer-2.5-fast
+    notes: Implement/fix loops; default grok unless user prefers composer
+
+  cursor-quality-mgr:
+    model: composer-2.5-fast
+    notes: QA enforcer only — verify spawn proof, aggregate fenced JSON, publish PR report; no Task spawns
+
+  req-qa:
+    model: composer-2.5-fast
+    notes: Structured deliverable checklist
+
+  arch-qa:
+    model: cursor-grok-4.6-high-fast
+    notes: Precision / boundary gate; Grok per team preference (Phase H orchestration)
+
+  rust-qa-agent:
+    model: cursor-grok-4.6-high-fast
+    notes: Normal QA rounds; see phase-ending override in cursor-quality-mgr.md
+
+  rust-best-practices-agent:
+    model: composer-2.5-fast
+    notes: Practice-id sweeps
+
+  rust-service-hardening-agent:
+    model: composer-2.5-fast
+    notes: Often fast-exit / checklist
+
+  flaky-test-qa:
+    model: composer-2.5-fast
+    notes: Narrow flaky-test contract
+
+  qa-triage:
+    model: inherit
+    notes: Use agent frontmatter default (haiku)
