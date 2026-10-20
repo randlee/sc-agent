@@ -58,3 +58,10 @@ tmp/
 # sc-publish kit bootstrap cache (pinned clone, see release/sc-publish-pin.toml)
 .sc-publish-kit/
 **/.sc-compose/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*
