@@ -1,0 +1,318 @@
+//! `JevError` is the only CLI and PyO3 error-id source (ADR-SAG-0001).
+//!
+//! Variant codes match `tests/fixtures/jev/README-contract/errors.json`.
+
+use crate::ids::{BackendKeyId, SessionId};
+
+/// Stable error ids and fix text for Jev, check, extraction, and the CLI.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum JevError {
+    /// `check.toml` or a packaged asset failed validation.
+    #[error("config is invalid: {detail}")]
+    ConfigInvalid {
+        /// What failed validation.
+        detail: String,
+    },
+    /// No credential was found for a backend.
+    #[error("API key for {backend} is missing")]
+    KeyMissing {
+        /// Backend whose credential is missing.
+        backend: BackendKeyId,
+    },
+    /// The check input exceeds the single-request byte cap.
+    #[error("input is {actual_bytes} bytes; limit is {limit_bytes}")]
+    InputTooLarge {
+        /// Maximum accepted payload size.
+        limit_bytes: u64,
+        /// Measured input size.
+        actual_bytes: u64,
+    },
+    /// The check input contained no usable content.
+    #[error("input is empty")]
+    InputEmpty,
+    /// The check input did not match the expected shape.
+    #[error("input is invalid: {detail}")]
+    InputInvalid {
+        /// What about the input is wrong.
+        detail: String,
+    },
+    /// Extraction succeeded and produced zero subjects.
+    #[error("extraction produced no subjects")]
+    ExtractionEmpty,
+    /// A subject span contains a parse error.
+    #[error("parse error in {path}:{line}")]
+    ExtractionParseError {
+        /// Source path that failed to parse.
+        path: String,
+        /// 1-based line of the parse error.
+        line: u32,
+    },
+    /// Extractor stdout was not a valid subjects document.
+    #[error("extraction output is invalid: {detail}")]
+    ExtractionInvalid {
+        /// What about the artifact is wrong.
+        detail: String,
+    },
+    /// The extractor process failed.
+    #[error("extraction failed: {detail}")]
+    ExtractionFailed {
+        /// Producer failure detail.
+        detail: String,
+    },
+    /// The extractor exceeded its time limit.
+    #[error("extraction timed out after {timeout_seconds}s")]
+    ExtractionTimeout {
+        /// Limit that was exceeded.
+        timeout_seconds: u64,
+    },
+    /// The requested grammar is not built into `sc-treesitter`.
+    #[error("language {language} is unavailable")]
+    LanguageUnavailable {
+        /// Requested language id.
+        language: String,
+    },
+    /// A tree-sitter query failed to compile.
+    #[error("query is invalid: {detail}")]
+    QueryInvalid {
+        /// Query compiler detail.
+        detail: String,
+    },
+    /// The named query asset does not exist.
+    #[error("query {query} was not found")]
+    QueryNotFound {
+        /// Query name that was requested.
+        query: String,
+    },
+    /// An input path does not exist.
+    #[error("input path {path} is missing")]
+    InputMissing {
+        /// Path that could not be read.
+        path: String,
+    },
+    /// A judge response failed validation.
+    #[error("response is invalid: {detail}")]
+    ResponseInvalid {
+        /// What about the response is wrong.
+        detail: String,
+    },
+    /// A backend transport failed.
+    #[error("network error: {detail}")]
+    NetworkError {
+        /// Transport failure detail, with secrets removed.
+        detail: String,
+    },
+    /// An LLM system-prompt file could not be read.
+    #[error("prompt file {path} is missing")]
+    PromptFileMissing {
+        /// Path that could not be read.
+        path: String,
+    },
+    /// The session id does not exist in the store.
+    #[error("session {session_id} was not found")]
+    SessionNotFound {
+        /// Id that was requested.
+        session_id: SessionId,
+    },
+    /// The session is past its TTL.
+    #[error("session {session_id} has expired")]
+    SessionExpired {
+        /// Id that expired.
+        session_id: SessionId,
+    },
+}
+
+impl JevError {
+    /// Returns the stable machine-readable id for this error.
+    ///
+    /// Ids match `tests/fixtures/jev/README-contract/errors.json` and are the
+    /// only values CLI and PyO3 may emit in the `error` field.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::ConfigInvalid { .. } => "CONFIG_INVALID",
+            Self::KeyMissing { .. } => "KEY_MISSING",
+            Self::InputTooLarge { .. } => "INPUT_TOO_LARGE",
+            Self::InputEmpty => "INPUT_EMPTY",
+            Self::InputInvalid { .. } => "INPUT_INVALID",
+            Self::ExtractionEmpty => "EXTRACTION_EMPTY",
+            Self::ExtractionParseError { .. } => "EXTRACTION_PARSE_ERROR",
+            Self::ExtractionInvalid { .. } => "EXTRACTION_INVALID",
+            Self::ExtractionFailed { .. } => "EXTRACTION_FAILED",
+            Self::ExtractionTimeout { .. } => "EXTRACTION_TIMEOUT",
+            Self::LanguageUnavailable { .. } => "LANGUAGE_UNAVAILABLE",
+            Self::QueryInvalid { .. } => "QUERY_INVALID",
+            Self::QueryNotFound { .. } => "QUERY_NOT_FOUND",
+            Self::InputMissing { .. } => "INPUT_MISSING",
+            Self::ResponseInvalid { .. } => "RESPONSE_INVALID",
+            Self::NetworkError { .. } => "NETWORK_ERROR",
+            Self::PromptFileMissing { .. } => "PROMPT_FILE_MISSING",
+            Self::SessionNotFound { .. } => "SESSION_NOT_FOUND",
+            Self::SessionExpired { .. } => "SESSION_EXPIRED",
+        }
+    }
+
+    /// Returns the actionable fix text for this error.
+    ///
+    /// The CLI copies this string into the stderr `message` field.
+    #[must_use]
+    pub fn fix_hint(&self) -> String {
+        match self {
+            Self::ConfigInvalid { .. } => {
+                "Fix the check.toml field or packaged jev.toml entry named in the error, then retry."
+                    .to_owned()
+            }
+            Self::KeyMissing { backend } => format!(
+                "Provide a credential for {backend} via the process environment, the repo-root .env file, or the keyring, then retry."
+            ),
+            Self::InputTooLarge { limit_bytes, .. } => format!(
+                "Shrink the check input to at most {limit_bytes} bytes. One check is one request and is never split."
+            ),
+            Self::InputEmpty => "Provide a non-empty input and retry.".to_owned(),
+            Self::InputInvalid { .. } => {
+                "Correct the input so it matches the expected schema, then retry.".to_owned()
+            }
+            Self::ExtractionEmpty => {
+                "Change the query or input so extraction emits at least one subject.".to_owned()
+            }
+            Self::ExtractionParseError { path, line } => format!(
+                "Fix the syntax error at {path}:{line} and run extraction again."
+            ),
+            Self::ExtractionInvalid { .. } => {
+                "Emit a valid sc/subjects/1 document on stdout and retry.".to_owned()
+            }
+            Self::ExtractionFailed { .. } => {
+                "Fix the producer failure named in the error and run extraction again.".to_owned()
+            }
+            Self::ExtractionTimeout { timeout_seconds } => format!(
+                "Raise timeout_seconds above {timeout_seconds} or reduce the input so extraction finishes in time."
+            ),
+            Self::LanguageUnavailable { language } => format!(
+                "Use a language built into sc-treesitter instead of {language}."
+            ),
+            Self::QueryInvalid { .. } => {
+                "Fix the tree-sitter query syntax and retry.".to_owned()
+            }
+            Self::QueryNotFound { query } => format!(
+                "Choose a query asset that exists for this language instead of {query}."
+            ),
+            Self::InputMissing { path } => format!(
+                "Create {path} or correct the path in check.toml, then retry."
+            ),
+            Self::ResponseInvalid { .. } => {
+                "Retry the request. If it persists, treat a truncated or off-schema judge response as a backend failure."
+                    .to_owned()
+            }
+            Self::NetworkError { .. } => {
+                "Check connectivity and retry. Backends retry busy responses before returning this error."
+                    .to_owned()
+            }
+            Self::PromptFileMissing { path } => format!(
+                "Provide the LLM system prompt at {path}, or select it with check.toml or the CLI override."
+            ),
+            Self::SessionNotFound { .. } => {
+                "Create a session or pass the id of a session that still exists.".to_owned()
+            }
+            Self::SessionExpired { .. } => {
+                "Start a new session. Expiry is measured from the session created_at timestamp."
+                    .to_owned()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+    use uuid::Uuid;
+
+    fn samples() -> Vec<JevError> {
+        let session = SessionId::from_uuid(Uuid::nil());
+        vec![
+            JevError::ConfigInvalid {
+                detail: "missing model".into(),
+            },
+            JevError::KeyMissing {
+                backend: BackendKeyId::TypeSafe,
+            },
+            JevError::InputTooLarge {
+                limit_bytes: 10,
+                actual_bytes: 11,
+            },
+            JevError::InputEmpty,
+            JevError::InputInvalid {
+                detail: "bad json".into(),
+            },
+            JevError::ExtractionEmpty,
+            JevError::ExtractionParseError {
+                path: "a.py".into(),
+                line: 3,
+            },
+            JevError::ExtractionInvalid {
+                detail: "schema".into(),
+            },
+            JevError::ExtractionFailed {
+                detail: "exit 1".into(),
+            },
+            JevError::ExtractionTimeout {
+                timeout_seconds: 30,
+            },
+            JevError::LanguageUnavailable {
+                language: "go".into(),
+            },
+            JevError::QueryInvalid {
+                detail: "syntax".into(),
+            },
+            JevError::QueryNotFound {
+                query: "missing".into(),
+            },
+            JevError::InputMissing {
+                path: "gone.toml".into(),
+            },
+            JevError::ResponseInvalid {
+                detail: "truncated".into(),
+            },
+            JevError::NetworkError {
+                detail: "reset".into(),
+            },
+            JevError::PromptFileMissing {
+                path: "prompt.md".into(),
+            },
+            JevError::SessionNotFound {
+                session_id: session,
+            },
+            JevError::SessionExpired {
+                session_id: session,
+            },
+        ]
+    }
+
+    #[test]
+    fn codes_match_readme_contract_snapshot() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/jev/README-contract/errors.json");
+        let text = std::fs::read_to_string(&path).expect("read errors.json");
+        let document: serde_json::Value = serde_json::from_str(&text).expect("parse errors.json");
+        let expected: BTreeSet<String> = document["error_ids"]
+            .as_array()
+            .expect("error_ids array")
+            .iter()
+            .map(|value| value.as_str().expect("error id string").to_owned())
+            .collect();
+        let actual: BTreeSet<String> = samples()
+            .iter()
+            .map(JevError::code)
+            .map(str::to_owned)
+            .collect();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), samples().len(), "error codes must be unique");
+    }
+
+    #[test]
+    fn every_variant_has_a_fix_hint() {
+        for error in samples() {
+            assert!(!error.fix_hint().trim().is_empty(), "{}", error.code());
+            assert!(!error.code().is_empty());
+        }
+    }
+}

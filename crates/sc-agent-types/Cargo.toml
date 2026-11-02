@@ -1,0 +1,28 @@
+[package]
+name = "sc-agent-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared error, judge, and subjects types for sc-agent."
+
+[features]
+default = []
+# Test doubles for JudgeBackend and SessionLog. Unit tests compile this module
+# via cfg(test); downstream crates enable the feature explicitly.
+test-util = []
+
+[dependencies]
+sc-observability-types = "=1.5.0"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[[test]]
+name = "jev_cross_impl"
+path = "../../tests/jev_cross_impl/main.rs"

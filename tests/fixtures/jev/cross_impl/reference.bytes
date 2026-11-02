@@ -1,0 +1,1 @@
+{"questions":[{"choices":["yes","no"],"id":"relevant","prompt":"Does the café policy apply?"}],"state":[{"choice":"yes","question_id":"relevant"}]}

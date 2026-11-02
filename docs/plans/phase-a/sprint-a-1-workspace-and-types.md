@@ -1,7 +1,7 @@
 ---
 id: a-1
 phase: a
-status: planned
+status: complete
 closure_type: contract
 target_boundary: agent-types
 track: foundation

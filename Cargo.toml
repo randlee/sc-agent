@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/sc-agent-types",
+    "crates/sc-agent-secrets",
+    "crates/sc-jev",
+    "crates/sc-jev-backends",
+    "crates/sc-jev-check",
+    "crates/sc-treesitter",
+    "crates/sc-ai",
+    "crates/sc-jev-py",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.1"
+authors = ["Rand Lee <github@randlee.com>"]
+license = "MIT"
+repository = "https://github.com/randlee/sc-agent"
+homepage = "https://github.com/randlee/sc-agent"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+uuid = { version = "1", features = ["serde", "v4"] }

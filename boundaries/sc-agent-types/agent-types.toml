@@ -1,0 +1,37 @@
+boundary_id = "BOUNDARY-agent-types"
+owner_package = "sc-agent-types"
+owner_crate_path = "sc_agent_types"
+name = "agent-types"
+
+[public]
+facade = "sc_agent_types::JevError, sc_agent_types::JudgeBackend, sc_agent_types::JudgeRequest, sc_agent_types::ScAgentErrorResponse"
+notes = "Errors, judge contract, subjects schema, and the temporary v2 log port."
+
+[implementation]
+type = "marker"
+module = "sc_agent_types"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["JevError", "JudgeBackend", "JudgeRequest"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"

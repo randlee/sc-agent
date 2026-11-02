@@ -1,0 +1,36 @@
+boundary_id = "BOUNDARY-jev-backends"
+owner_package = "sc-jev-backends"
+owner_crate_path = "sc_jev_backends"
+name = "jev-backends"
+
+[public]
+facade = "sc_jev_backends::stub_name"
+
+[implementation]
+type = "marker"
+module = "sc_jev_backends"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["stub_name"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "stub_landed"

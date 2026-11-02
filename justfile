@@ -1,0 +1,18 @@
+# Managed by sc-lint; regenerate with `sc-lint init --just`.
+set windows-shell := ["cmd.exe", "/c"]
+
+python := if os_family() == "windows" { "python" } else { "python3" }
+
+default: lint
+
+setup:
+    {{python}} .sc-lint/bootstrap.py setup --config sc-lint.toml
+
+lint *profile:
+    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{profile}}
+
+test *layer:
+    {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
+
+upgrade:
+    {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml
