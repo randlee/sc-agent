@@ -1,0 +1,18 @@
+{
+  "task_id": "bd-e5f6",
+  "phase": "p3",
+  "sprint_id": "p3-2",
+  "sprint_doc": "docs/plans/phase-p3/sprint-p3-2-retry-policy.md",
+  "branch": "fix/p3-2-qa1",
+  "worktree_path": "/path/to/repo-worktrees/fix-p3-2-qa1",
+  "pr_target": "sprint/p3-2-retry-policy",
+  "description": "Fix the QA-1 findings for sprint p3-2.",
+  "finding_ids": "- RQA-001\n- RBP-004-01",
+  "triage_records": "",
+  "required_fixes": "- RQA-001: bound the retry loop at crates/example/src/retry.rs:42\n- RBP-004-01: replace the bool flag with an enum",
+  "acceptance_criteria": "- every listed finding fixed and verified at its cited location",
+  "references": "- docs/architecture.md",
+  "validation_requirements": "- cargo test --workspace\n- cargo clippy --workspace -- -D warnings",
+  "lead": "team-lead",
+  "cc": "team-lead"
+}

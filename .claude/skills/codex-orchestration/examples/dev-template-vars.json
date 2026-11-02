@@ -1,0 +1,15 @@
+{
+  "task_id": "bd-a1b2",
+  "sprint": "p3-2",
+  "sprint_doc": "docs/plans/phase-p3/sprint-p3-2-retry-policy.md",
+  "description": "Implement the retry policy described in the sprint doc.",
+  "worktree_path": "/path/to/repo-worktrees/sprint-p3-2-retry-policy",
+  "branch": "sprint/p3-2-retry-policy",
+  "pr_target": "sprint/p3-1-exporter-contract",
+  "deliverables": "- D1: retry policy type and builder\n- D2: exporter uses the policy on transient failures",
+  "acceptance_criteria": "- AC1: transient failures retry with bounded backoff\n- AC2: permanent failures surface without retry",
+  "references": "- docs/requirements.md\n- docs/architecture.md",
+  "dependency_relations": "- must_follow: p3-1 (merge-forward on parent dev push)",
+  "lead": "team-lead",
+  "cc": "team-lead"
+}

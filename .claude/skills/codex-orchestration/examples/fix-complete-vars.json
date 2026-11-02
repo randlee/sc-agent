@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-09-25T05:00:00Z",
+  "task_id": "run-a-2-fix1",
+  "phase": "a",
+  "branch": "sprint/a-2-config",
+  "commit": "def5678",
+  "pr_number": 28,
+  "findings_fixed": 2,
+  "findings_not_reproducible": 1,
+  "findings_md": "- REQ-QA-001 fixed at crates/sc-config/src/lib.rs:42\n- ARCH-002 fixed at boundaries/sc-config/sc-config.toml:12\n- REQ-QA-003 not-reproducible: line no longer present at assigned commit",
+  "validation_md": "- `cargo test -p sc-config`: passed"
+}

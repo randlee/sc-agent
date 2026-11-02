@@ -1,0 +1,130 @@
+---
+name: findings-report
+version: 1.0.2
+description: Multi-pass QA findings report template for FAIL and IN-FLIGHT updates.
+format: markdown
+required_variables:
+  - generated_at
+  - qa_pass
+  - sprint_id
+  - task_id
+  - branch
+  - commit
+  - pr_number
+  - verdict
+  - deliverables_complete
+  - deliverables_total
+  - deliverables_percent
+  - merge_readiness
+  - merge_reason
+  - findings_blocking
+  - findings_important
+  - findings_minor
+  - blocking_ids_json
+  - blocking_findings_md
+  - detailed_findings_md
+  - next_action
+  - action_owner
+optional_variables:
+  - resolved_findings_md
+  - reviewer_spawn_gate
+  - reviewer_manifest_json
+  - evidence_chain_json
+  - missing_reviewers_json
+  - unparsed_reviewers_json
+defaults:
+  resolved_findings_md: ""
+  reviewer_spawn_gate: ""
+  reviewer_manifest_json: "[]"
+  evidence_chain_json: "{}"
+  missing_reviewers_json: "[]"
+  unparsed_reviewers_json: "[]"
+metadata:
+  type: qa-findings-report
+  tags:
+    - stage:qa
+  workflow:
+    scope:
+      kind: sprint
+      variable: sprint_id
+    state: qa-rejected
+    stage: qa
+    transition: rejected
+    iteration_variable: qa_pass
+---
+# QA Findings Update
+
+Generated: {{ generated_at }}
+QA Pass: {{ qa_pass }}
+Sprint/Task: {{ sprint_id }} / {{ task_id }}
+Branch: `{{ branch }}`
+Commit: `{{ commit }}`
+PR: #{{ pr_number }}
+Verdict: **{{ verdict }}**
+
+## Machine Status (JSON)
+```json
+{
+  "sprint": {{ sprint_id | tojson }},
+  "task": {{ task_id | tojson }},
+  "branch": {{ branch | tojson }},
+  "commit": {{ commit | tojson }},
+  "pr": {{ pr_number }},
+  "verdict": {{ verdict | tojson }},
+  "deliverables": {
+    "complete": {{ deliverables_complete }},
+    "total": {{ deliverables_total }},
+    "percent": {{ deliverables_percent }}
+  },
+  "findings": {
+    "blocking": {{ findings_blocking }},
+    "important": {{ findings_important }},
+    "minor": {{ findings_minor }}
+  },
+  "blocking_ids": {{ blocking_ids_json | safe }},
+  "merge_readiness": {{ merge_readiness | tojson }},
+  "merge_reason": {{ merge_reason | tojson }},
+  "next_action": {{ next_action | tojson }},
+  "owner": {{ action_owner | tojson }}{% if reviewer_spawn_gate %},
+  "reviewer_spawn_gate": {{ reviewer_spawn_gate | tojson }},
+  "reviewer_manifest": {{ reviewer_manifest_json | safe }},
+  "evidence_chain": {{ evidence_chain_json | safe }},
+  "missing_reviewers": {{ missing_reviewers_json | safe }},
+  "unparsed_reviewers": {{ unparsed_reviewers_json | safe }}{% endif %}
+}
+```
+
+## Findings Summary
+- Deliverables: {{ deliverables_complete }}/{{ deliverables_total }} ({{ deliverables_percent }}%)
+- Blocking: {{ findings_blocking }}
+- Important: {{ findings_important }}
+- Minor: {{ findings_minor }}
+
+## Blocking Findings
+{% if blocking_findings_md -%}
+{{ blocking_findings_md }}
+{% else -%}
+- none
+{% endif %}
+
+## Detailed Findings
+{% if detailed_findings_md -%}
+{{ detailed_findings_md }}
+{% else -%}
+- none
+{% endif %}
+
+## Resolved Since Last Pass
+{% if resolved_findings_md -%}
+{{ resolved_findings_md }}
+{% else -%}
+- none
+{% endif %}
+
+## Merge Readiness
+- Status: **{{ merge_readiness }}**
+- Reason: {{ merge_reason }}
+
+## Next Action
+- Action: {{ next_action }}
+- Owner: {{ action_owner }}
