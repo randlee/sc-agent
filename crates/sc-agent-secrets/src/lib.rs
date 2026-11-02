@@ -59,3 +59,106 @@ pub use resolve::{
 #[cfg(any(test, feature = "test-util"))]
 #[doc(inline)]
 pub use resolve::{MapEnv, MapKeyring};
+
+#[cfg(test)]
+mod exact_name_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use sc_agent_types::RepoRoot;
+
+    pub(crate) struct TempRepo {
+        path: PathBuf,
+    }
+
+    impl TempRepo {
+        pub(crate) fn new(dotenv: Option<&str>) -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "sc-agent-secrets-order-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).unwrap();
+            if let Some(body) = dotenv {
+                fs::write(path.join(".env"), body).unwrap();
+            }
+            Self { path }
+        }
+
+        pub(crate) fn root(&self) -> RepoRoot {
+            RepoRoot::new(&self.path)
+        }
+    }
+
+    impl Drop for TempRepo {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
+// Crate-root name so `cargo test -- test_env_dotenv_keychain_order --exact` selects it.
+#[cfg(test)]
+#[test]
+fn test_env_dotenv_keychain_order() {
+    use sc_agent_types::BackendKeyId;
+
+    use crate::exact_name_tests::TempRepo;
+    use crate::{MapEnv, MapKeyring, resolve_key_with};
+
+    let repo = TempRepo::new(Some(
+        "TYPESAFE_API_KEY=from-dotenv\nANTHROPIC_API_KEY=from-dotenv-anthropic\n",
+    ));
+    let env = MapEnv::with([("TYPESAFE_API_KEY", "from-env")]);
+    let keyring = MapKeyring::new(
+        "tester",
+        [
+            ("TYPESAFE_API_KEY", "from-keyring"),
+            ("ANTHROPIC_API_KEY", "from-keyring-anthropic"),
+            ("OPENAI_API_KEY", "from-keyring-openai"),
+        ],
+    );
+
+    let from_env = resolve_key_with(
+        BackendKeyId::TypeSafe,
+        &repo.root(),
+        &env,
+        &keyring,
+        "tester",
+    )
+    .unwrap();
+    assert_eq!(from_env, "from-env");
+
+    let from_dotenv = resolve_key_with(
+        BackendKeyId::Anthropic,
+        &repo.root(),
+        &env,
+        &keyring,
+        "tester",
+    )
+    .unwrap();
+    assert_eq!(from_dotenv, "from-dotenv-anthropic");
+
+    let from_keyring =
+        resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
+    assert_eq!(from_keyring, "from-keyring-openai");
+
+    let empty = TempRepo::new(None);
+    let missing = resolve_key_with(
+        BackendKeyId::TypeSafe,
+        &empty.root(),
+        &MapEnv::default(),
+        &MapKeyring::new("tester", Vec::<(&str, &str)>::new()),
+        "tester",
+    )
+    .unwrap_err();
+    assert_eq!(missing.code(), "KEY_MISSING");
+    assert!(!missing.fix_hint().is_empty());
+    for secret in ["from-env", "from-dotenv", "from-keyring"] {
+        let rendered = format!("{missing} {missing:?} {}", missing.fix_hint());
+        assert!(!rendered.contains(secret), "{rendered}");
+    }
+}

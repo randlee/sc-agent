@@ -339,61 +339,6 @@ mod tests {
     }
 
     #[test]
-    fn test_env_dotenv_keychain_order() {
-        let repo = TempRepo::new(Some(
-            "TYPESAFE_API_KEY=from-dotenv\nANTHROPIC_API_KEY=from-dotenv-anthropic\n",
-        ));
-        let env = MapEnv::with([("TYPESAFE_API_KEY", "from-env")]);
-        let keyring = MapKeyring::new(
-            "tester",
-            [
-                ("TYPESAFE_API_KEY", "from-keyring"),
-                ("ANTHROPIC_API_KEY", "from-keyring-anthropic"),
-                ("OPENAI_API_KEY", "from-keyring-openai"),
-            ],
-        );
-
-        let from_env = resolve_key_with(
-            BackendKeyId::TypeSafe,
-            &repo.root(),
-            &env,
-            &keyring,
-            "tester",
-        )
-        .unwrap();
-        assert_eq!(from_env, "from-env");
-
-        let from_dotenv = resolve_key_with(
-            BackendKeyId::Anthropic,
-            &repo.root(),
-            &env,
-            &keyring,
-            "tester",
-        )
-        .unwrap();
-        assert_eq!(from_dotenv, "from-dotenv-anthropic");
-
-        let from_keyring =
-            resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-        assert_eq!(from_keyring, "from-keyring-openai");
-
-        let empty = TempRepo::new(None);
-        let missing = resolve_key_with(
-            BackendKeyId::TypeSafe,
-            &empty.root(),
-            &MapEnv::default(),
-            &MapKeyring::new("tester", Vec::<(&str, &str)>::new()),
-            "tester",
-        )
-        .unwrap_err();
-        assert_eq!(missing.code(), "KEY_MISSING");
-        assert!(!missing.fix_hint().is_empty());
-        assert_no_secret(&missing, "from-env");
-        assert_no_secret(&missing, "from-dotenv");
-        assert_no_secret(&missing, "from-keyring");
-    }
-
-    #[test]
     fn test_api_key_env_first_then_keychain() {
         let repo = TempRepo::new(Some("OPENAI_API_KEY=from-dotenv\n"));
         let env = MapEnv::with([("OPENAI_API_KEY", "from-env")]);
