@@ -4,6 +4,12 @@
 
 use crate::ids::{BackendKeyId, SessionId};
 
+/// Marks a [`JevError::ConfigInvalid`] detail that describes a credential store.
+///
+/// [`JevError::fix_hint`] returns the text after this prefix. Other
+/// `CONFIG_INVALID` details keep the `check.toml` recovery text.
+const CREDENTIAL_STORE_DETAIL_PREFIX: &str = "credential-store: ";
+
 /// Stable error ids and fix text for Jev, check, extraction, and the CLI.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum JevError {
@@ -122,6 +128,36 @@ pub enum JevError {
 }
 
 impl JevError {
+    /// Builds `CONFIG_INVALID` for an unreadable credential store.
+    ///
+    /// `what` names the store, such as the repo-root `.env` file or the
+    /// platform keyring. `cause` is a sanitized label (an I/O kind or a
+    /// keyring variant). It must not contain secret bytes, passwords, or the
+    /// raw platform error text. `recovery` is the caller-facing fix.
+    /// [`Self::fix_hint`] returns those three parts and does not mention
+    /// `check.toml`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::credential_store_invalid(
+    ///     "platform keyring could not be read",
+    ///     "keystore access was denied",
+    ///     "Unlock the platform keystore for this OS user and retry.",
+    /// );
+    /// assert_eq!(error.code(), "CONFIG_INVALID");
+    /// assert!(error.fix_hint().contains("keystore access was denied"));
+    /// assert!(!error.fix_hint().contains("check.toml"));
+    /// ```
+    #[must_use]
+    pub fn credential_store_invalid(what: &str, cause: &str, recovery: &str) -> Self {
+        Self::ConfigInvalid {
+            detail: format!("{CREDENTIAL_STORE_DETAIL_PREFIX}{what} (cause: {cause}). {recovery}"),
+        }
+    }
+
     /// Returns the stable machine-readable id for this error.
     ///
     /// Ids match `tests/fixtures/jev/README-contract/errors.json` and are the
@@ -155,13 +191,23 @@ impl JevError {
     ///
     /// The CLI copies this string into the stderr `message` field. Variants
     /// that carry `detail` or `session_id` include that value. Callers must
-    /// keep secrets out of `detail`; this hint copies it unchanged.
+    /// keep secrets out of `detail`.
+    ///
+    /// Credential-store failures built with [`Self::credential_store_invalid`]
+    /// return the store name, sanitized cause, and recovery text. Other
+    /// `CONFIG_INVALID` values keep the `check.toml` hint.
     #[must_use]
     pub fn fix_hint(&self) -> String {
         match self {
-            Self::ConfigInvalid { detail } => format!(
-                "Fix the check.toml field or packaged jev.toml entry ({detail}), then retry."
-            ),
+            Self::ConfigInvalid { detail } => {
+                if let Some(message) = detail.strip_prefix(CREDENTIAL_STORE_DETAIL_PREFIX) {
+                    message.to_owned()
+                } else {
+                    format!(
+                        "Fix the check.toml field or packaged jev.toml entry ({detail}), then retry."
+                    )
+                }
+            }
             Self::KeyMissing { backend } => format!(
                 "Provide a credential for {backend} via the process environment, the repo-root .env file, or the keyring, then retry."
             ),
@@ -359,6 +405,12 @@ mod tests {
                 "{} hint {hint:?} missing {needle}",
                 error.code()
             );
+            if error.code() == "CONFIG_INVALID" {
+                assert!(
+                    hint.contains("check.toml"),
+                    "non-credential CONFIG_INVALID keeps the check.toml hint: {hint}"
+                );
+            }
             assert!(
                 !hint.to_ascii_lowercase().contains("bearer "),
                 "{} hint must not add credential material",

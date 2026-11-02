@@ -17,7 +17,7 @@ constructor = "none"
 roots = ["JevError", "JudgeBackend", "JudgeRequest"]
 
 [dependencies]
-allowed_dependents = []
+allowed_dependents = ["sc-agent-secrets"]
 allowed_dependencies = []
 forbidden_edges = []
 
