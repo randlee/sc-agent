@@ -3,7 +3,7 @@
 //! Success envelopes stay in `sc-ai`. This crate only defines the error body
 //! so every CLI crate copies ids from [`crate::JevError`].
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::error::JevError;
 
@@ -12,7 +12,7 @@ use crate::error::JevError;
 /// Serialized form is `{"error":"<code>","message":"<fix hint>"}`.
 /// Fields stay private so the only Rust constructor is [`Self::from_jev_error`].
 /// Neither field holds a secret (NFR-SAG-0002).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScAgentErrorResponse {
     /// [`JevError::code`] value.

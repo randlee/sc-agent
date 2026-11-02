@@ -145,6 +145,8 @@ python3 -c "import json; json.load(open('tests/fixtures/jev/README-contract/erro
 
 Expected: all commands exit 0; last command confirms no HTTP client deps in workspace yet.
 
+Cross-impl and fixture-backed tests run in the **workspace** only (see `sc-agent-types` crate docs); they are omitted from the published crate package.
+
 ## Parity checklist
 
 Enables future rows; directly supports README tighten **#1**, **#10**.

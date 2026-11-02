@@ -15,6 +15,12 @@
 //! of those bytes is `prompt_sha256`. LLM system-prompt
 //! text is not part of the digest (ADR-SAG-0019).
 //!
+//! # Tests and fixtures
+//!
+//! The workspace integration test `jev_cross_impl` and unit tests that read
+//! `tests/fixtures/jev/**` run at the repo root only; they are not part of the
+//! published `sc-agent-types` crate package.
+//!
 //! # Observability
 //!
 //! [`observability::v2`] is a temporary `SessionLog` port. It depends on
