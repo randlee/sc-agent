@@ -10,7 +10,5 @@ description = "Synaptic Canvas agent teams and orchestration assets"
 homepage = "https://github.com/randlee/sc-agent"
 license = "MIT"
 
-# Phase A first release (populate in sprint a-8):
-# - crates.io: sc-jev, sc-agent-*, sc-jev-backends, sc-ai
-# - pypi: sc-jev-py (maturin wheel)
-# - cli: sc-ai binary (crates.io or attached release asset)
+# Rendered by sc-publish install (sprint a-9). Consumer input targets:
+# crates.io, pypi (sc-jev-py), homebrew, scoop, winget (sc-ai), GitHub release assets.

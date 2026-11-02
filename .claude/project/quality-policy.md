@@ -71,8 +71,9 @@ When root `Cargo.toml` exists:
 - Channel contracts: `release/publish-channel-contracts.toml`
 - Helpers: `.github/scripts/release_artifacts.py`, `worker_result.py`,
   `bootstrap_sc_compose.py`
-- Workflows under `.github/workflows/` are kit-aligned; do not publish until the
-  manifest declares real artifacts and Release Preflight passes
+- Workflows under `.github/workflows/` are kit-aligned (crates.io, PyPI, Homebrew,
+  Scoop, WinGet); do not publish until sc-publish consumer input is installed and
+  Release Preflight passes
 
 ## Repository layout (reviewer expectations)
 

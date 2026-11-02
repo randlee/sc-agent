@@ -78,9 +78,9 @@ from [sc-publish](https://github.com/randlee/sc-publish) via
 
 ## ADR-SAG-0017 — First release surfaces
 
-Phase A first release ships **three** consumer paths: **crates.io** (Rust
-libraries + `sc-ai`), **PyPI** (`sc-jev-py` wheel), and the **`sc-ai`** CLI
-binary from the same version tag.
+Phase A first release ships **five publish channels** from one tag via sc-publish:
+**crates.io**, **PyPI** (`sc-jev-py`), **Homebrew**, **Scoop**, and **WinGet**
+(`sc-ai` binary), plus GitHub Release assets.
 
 ## ADR-SAG-0015 — Delimited regions (language-agnostic)
 

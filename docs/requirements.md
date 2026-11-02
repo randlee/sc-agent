@@ -108,10 +108,10 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0130 | Pin [sc-publish](https://github.com/randlee/sc-publish); complete `sc-publish-consumer-input.json`; run `install.py` |
+| REQ-SAG-0130 | sc-publish consumer input enables **crates.io**, **pypi**, **homebrew**, **scoop**, **winget** + `sc-ai` release binaries |
 | REQ-SAG-0131 | `docs/development/sc-publish.md`; do not hand-edit rendered publish manifests |
 | REQ-SAG-0132 | Release preflight CI green; local preflight script matches kit |
-| REQ-SAG-0803 | **First release:** PyPI + crates.io + GitHub via sc-publish (dry-run proven in CI) |
+| REQ-SAG-0803 | **First release:** all five channels via sc-publish (preflight + dry-run in CI) |
 
 ## Phase B (draft — not scheduled)
 

@@ -16,8 +16,8 @@ extension; it is not the primary deliverable.
 
 - **maturin** builds the extension against workspace `sc-jev`.
 - Version **lockstep** with Rust crates on first release (single tag / workspace version).
-- CI produces wheels (manylinux, macOS arm64 minimum); publish to **PyPI** with
-  Rust **crates.io** publish in the same release train as **`sc-ai`**.
+- CI produces wheels (manylinux, macOS arm64 minimum); **PyPI** publish aligns
+  with crates.io and **Homebrew / Scoop / WinGet** for `sc-ai` on one tag.
 
 ## Contract
 

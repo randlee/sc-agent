@@ -27,7 +27,7 @@
 6. a-9 **sc-publish** kit install  
 7. a-10 release preflight + publish dry-run  
 
-**First release:** crates.io + PyPI + `sc-ai` via [sc-publish](https://github.com/randlee/sc-publish).
+**First release:** crates.io, PyPI, Homebrew, Scoop, WinGet via [sc-publish](https://github.com/randlee/sc-publish).
 
 Sprint docs: `docs/plans/phase-a/sprint-a-*.md`.
 

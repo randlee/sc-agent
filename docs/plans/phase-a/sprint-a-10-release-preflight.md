@@ -29,8 +29,9 @@ owned_paths:
 ## Outcome
 
 **Release Preflight** and publish workflows (from sc-publish kit) pass on
-`integrate/phase-a`. First release train is **provable** via dry-run (crates +
-PyPI + GitHub release gate) without requiring production credentials in CI.
+`integrate/phase-a`. First release train is **provable** via dry-run for
+**crates.io**, **PyPI**, **homebrew**, **scoop**, and **winget** (plus GitHub
+release assets) without production credentials in CI where the kit allows.
 
 ## Deliverables
 
@@ -61,5 +62,4 @@ via sc-publish — not ad-hoc workflow edits.
 
 ## This sprint does not close
 
-Production publish of v0.x (owner-triggered after plan approval); winget/homebrew
-unless enabled in consumer input.
+Production publish of v0.x (owner-triggered tag after plan approval).

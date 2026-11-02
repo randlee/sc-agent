@@ -32,14 +32,16 @@ owned_paths:
 Install the shared **[sc-publish](https://github.com/randlee/sc-publish)** kit
 (manifest-driven release for all SC repos). Pin an exact kit revision, author a
 complete **`release/sc-publish-consumer-input.json`** for sc-agent (Rust crate
-order, `sc-jev-py` Python distribution, GitHub + **crates.io** + **PyPI**
-channels), and run `install.py` so rendered manifests and workflows match policy.
+order, `sc-jev-py`, **`sc-ai` release binaries**, and channels **crates.io**,
+**PyPI**, **homebrew**, **scoop**, **winget**), then run `install.py`.
 
 ## Deliverables
 
 1. **REQ-SAG-0130** — `release/sc-publish-pin.toml` + consumer JSON declaring:
    workspace crates (`sc-agent-types`, `sc-agent-secrets`, `sc-jev-backends`,
-   `sc-jev`, `sc-ai`), maturin project `sc-jev-py`, and enabled channels.
+   `sc-jev`, `sc-ai`), maturin project `sc-jev-py`, **`release_binaries`** for
+   `sc-ai` (platform matrix per kit), and channels **crates.io**, **pypi**,
+   **homebrew**, **scoop**, **winget**.
 2. **REQ-SAG-0131** — `docs/development/sc-publish.md` (install, pin bump,
    dry-run drift check); `.gitignore` entries for `.sc-publish-kit/`, venv cache.
 3. **ADR-SAG-0018** — Do not hand-edit rendered `publish-artifacts.toml` /
@@ -62,9 +64,10 @@ test $? -eq 0
 test -f release/publish-artifacts.toml
 ```
 
-Expected: dry-run exit 0 (no drift after install commit); rendered manifests list
-sc-agent crates and `sc-jev-py`.
+Expected: dry-run exit 0 (no drift after install commit); rendered manifests and
+workflows include all five channels; `release/publish-channel-contracts.toml`
+names homebrew, scoop, winget, pypi, crates.io.
 
 ## This sprint does not close
 
-Live publish to crates.io/PyPI (a-10); homebrew/winget unless added to consumer input.
+Live publish to any channel (a-10 dry-run / owner-triggered tag).

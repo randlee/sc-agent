@@ -11,7 +11,7 @@ Do not hand-edit rendered files under `release/` once install has run.
 | File | Role |
 | --- | --- |
 | `release/sc-publish-pin.toml` | Exact upstream kit git SHA |
-| `release/sc-publish-consumer-input.json` | Crates, `sc-jev-py`, channels (crates.io, PyPI, GitHub) |
+| `release/sc-publish-consumer-input.json` | Crates, `sc-jev-py`, `sc-ai` binaries, channels: **crates.io**, **pypi**, **homebrew**, **scoop**, **winget** |
 | `release/publish-artifacts.toml` | Rendered by install |
 | `release/publish-channel-contracts.toml` | Rendered by install |
 | `release/publish-preflight.toml` | Rendered by install |

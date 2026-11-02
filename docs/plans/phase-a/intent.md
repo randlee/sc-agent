@@ -53,9 +53,9 @@ Three consumer surfaces, same `sc-jev` core:
 
 | Surface | Artifact |
 | --- | --- |
-| Rust | `sc-jev` + shared crates on **crates.io** |
-| Python | **`sc-jev-py`** PyO3 extension, **PyPI wheel** (`pip install …`) |
-| CLI | **`sc-ai`** binary (install via crates.io / documented release channel) |
+| Rust | **crates.io** — `sc-jev` + shared crates |
+| Python | **PyPI** — **`sc-jev-py`** wheel |
+| CLI | **`sc-ai`** — crates.io, **Homebrew**, **Scoop**, **WinGet** (sc-publish channels) |
 
 Python apps import the extension directly; atm-bd `packages/jev-check` may thin-wrap
 but is not required for PyPI consumers.

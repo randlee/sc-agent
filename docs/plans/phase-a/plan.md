@@ -192,7 +192,7 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 - Requested features **4–7** (disagreement UI, `sessions list/show`, `ask --json`,
   local key implementation beyond resolver hook).
 - **sc-runtime daemon / UDS** hosting for backends.
-- Benchmark-run; extra publish channels (winget/homebrew/npm) until added to sc-publish consumer input.
+- Benchmark-run; **npm** or other channels not listed above until added to consumer input.
 - Parallel fan-out of hundreds of questions in CLI (design in types; optional
   batch API in library if low cost, not required for phase close).
 
@@ -215,9 +215,14 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 
 | Channel | Packages |
 | --- | --- |
-| **crates.io** | `sc-jev`, `sc-agent-types`, `sc-agent-secrets`, `sc-jev-backends`, `sc-ai` (no separate observability crate) |
-| **PyPI** | `sc-jev-py` (maturin-built wheel; manylinux + macOS arm64 minimum) |
-| **CLI** | `sc-ai` — same release train as Rust crates |
+| **crates.io** | `sc-jev`, `sc-agent-types`, `sc-agent-secrets`, `sc-jev-backends`, `sc-ai` |
+| **PyPI** | `sc-jev-py` (maturin wheel) |
+| **Homebrew** | `sc-ai` formula (kit `homebrew` channel) |
+| **Scoop** | `sc-ai` manifest (kit `scoop` channel) |
+| **WinGet** | `sc-ai` manifest (kit `winget` channel) |
+
+GitHub Release assets feed the package managers; one tag drives all channels via
+sc-publish.
 
 Release uses the **[sc-publish](https://github.com/randlee/sc-publish)** kit
 (sprints **a-9**, **a-10**): consumer input, rendered manifests, preflight CI.

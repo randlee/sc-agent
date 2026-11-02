@@ -1,7 +1,7 @@
 # sc-agent crates
 
 Rust workspace members land here. Phase A adds the Jev-check stack and the
-`sc-ai` CLI. **First release:** Rust crates on crates.io, **`sc-jev-py`** on PyPI, **`sc-ai`** CLI.
+`sc-ai` CLI. **First release:** crates.io, PyPI (`sc-jev-py`), Homebrew/Scoop/WinGet (`sc-ai`).
 
 After Phase A, add **API-direct** Claude and Codex agent crates
 (Jev comparison). Do **not** add subprocess wrappers for claude-code, codex-cli,
