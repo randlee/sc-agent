@@ -1,7 +1,7 @@
 ---
 id: a-2
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: agent-secrets
 track: secrets

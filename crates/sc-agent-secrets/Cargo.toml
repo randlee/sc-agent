@@ -7,4 +7,25 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "API key resolution for sc-agent (stub until sprint a-2)."
+description = "API key resolution for sc-agent (process env, repo-root .env, keyring)."
+
+[features]
+default = []
+# In-memory env and keyring doubles for tests. Production builds omit them.
+test-util = []
+
+[dependencies]
+# No default features: platform keystores are enabled per target below.
+# Targets without a keystore fall back to keyring's empty mock (no network).
+keyring = { version = "3.6", default-features = false }
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+whoami = "1.6"
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+keyring = { version = "3.6", features = ["apple-native"] }
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3.6", features = ["windows-native"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "openbsd"))'.dependencies]
+keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
