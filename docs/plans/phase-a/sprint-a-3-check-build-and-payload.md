@@ -22,6 +22,7 @@ requirements:
   - REQ-SAG-0304
   - REQ-SAG-0305
   - REQ-SAG-0309
+  - REQ-SAG-0503
 adrs:
   - ADR-SAG-0002
   - ADR-SAG-0004
@@ -63,7 +64,7 @@ slices (not `ast.unparse`) so cross-impl branches fixture can pass.
 5. **REQ-SAG-0302** — Repo-root via `git rev-parse --show-toplevel`.
 6. **REQ-SAG-0303** — Question-set schema `plan-anchoring/questions/1`.
 7. **REQ-SAG-0309 (tighten #9)** — `table-column` splits on **unescaped** pipes only.
-8. Parse **`[llm_judge] system_prompt_file`** path only (bytes read in **a-6** per ADR-SAG-0019).
+8. **REQ-SAG-0503 (parse scope)** — Validate **`[llm_judge] system_prompt_file`** path in `check.toml` only; bytes read and inject in **a-6** / CLI override in **a-7** (ADR-SAG-0019).
 9. **`crates/sc-jev-check/Cargo.toml`** — path deps on `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, tree-sitter grammars; **no HTTP client crates** (HTTP usage forbidden under `src/extract/**` and `src/payload/**` only).
 10. **`assets/jev.toml`** — packaged default paths + **vendor pin defaults** (plan tighten **#12**).
 11. Cross-impl **`tests/fixtures/cross-impl/branches/`** — sole owner of query + expected artifacts; loader per [`extraction.md`](../../../sc-jev-check/extraction.md) (`git show` at rev; fixture dir acts as repo in tests).
@@ -87,14 +88,11 @@ See committed query: `tests/fixtures/cross-impl/branches/queries/python-branches
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0301 | Invalid config/input → typed error; no backend send |
-| req:REQ-SAG-0302 | Relative paths resolve from git repo root |
-| req:REQ-SAG-0303 | Question-set schema expands per plan-anchoring/questions/1 |
-| req:REQ-SAG-0304 | Six named `test_tree_sitter_*` tests + cross-impl branches gate (`test_tree_sitter_python_branches_lists_arms_and_refusals`) |
-| req:REQ-SAG-0305 | Command extractor typed errors on bad JSON / exit / timeout |
-| req:REQ-SAG-0309 | Escaped `\|` in table-column fixtures |
-| boundary:jev-check | No HTTP client usage under `src/extract/**` or `src/payload/**`; queries are config, not Rust match logic |
-| ADR-SAG-0005 | Single canonical `PayloadBundle` built here |
+| boundary:jev-check | Invalid config/input → typed error; no backend send; paths from git root; question-set schema; six `test_tree_sitter_*` + branches gate; command extractor errors; table-column escaped pipes; no HTTP under `src/extract/**` / `src/payload/**` |
+| ADR-SAG-0002 | Canonical `PayloadBundle` bytes + SHA-256 |
+| ADR-SAG-0005 | Single canonical payload per check |
+| ADR-SAG-0015 | Tree-sitter `.scm` extraction (no per-language Rust branch logic) |
+| ADR-SAG-0019 | `system_prompt_file` path validated here; load/inject deferred to a-6/a-7 |
 
 ## Required validation
 

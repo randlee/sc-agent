@@ -98,7 +98,7 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 | REQ-SAG-0701 | stderr `{"error","message"}`, exit 2 |
 | REQ-SAG-0702 | Readback pairs per sc-ai-cli |
 | REQ-SAG-0703 | Documented install path for `sc-ai` binary |
-| REQ-SAG-0710 | Blocking CLI: stdout = Jev API JSON + `session_id`; stderr errors; exit 2 |
+| REQ-SAG-0710 | Blocking CLI: stdout = versioned envelope (ADR-SAG-0014) with Jev answer JSON in `data` + `session_id`; stderr errors; exit 2 |
 | NFR-SAG-0002 | Secrets never appear in CLI output or logs |
 | NFR-SAG-0003 | Session JSONL retained on disk (path configurable; default documented) |
 | REQ-SAG-0711 | `sc-ai` wires `v2::LoggerBuilder` + adapter into `SharedSessionLog` for `sc-jev-check` |

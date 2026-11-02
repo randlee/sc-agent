@@ -51,12 +51,14 @@ release assets) without production credentials in CI where the kit allows.
 ## Required validation
 
 ```bash
+set -o pipefail
 just lint
 just test
 bash .github/scripts/run-consumer-preflight.sh
-cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-ai 2>&1 | tail -5
+cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-ai
 maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
 test -n "$(ls /tmp/sc-agent-wheels/*.whl 2>/dev/null | head -1)"
+# Five-channel proof: consumer preflight exercises homebrew/scoop/winget render + dry-run per kit contract
 ```
 
 Expected: preflight exit 0; dry-run publish and wheel build succeed on CI runner

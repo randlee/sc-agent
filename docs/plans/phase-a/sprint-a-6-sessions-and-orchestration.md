@@ -84,15 +84,10 @@ pub fn run_check(
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0503 | Sole owner: prompt load/inject; packaged default via build-time asset |
-| req:REQ-SAG-0600 | Session files mode `0600`; expiry from `created_at` |
-| req:REQ-SAG-0601 | `run_check` orchestrates keys + backends; dry-run no send |
-| req:REQ-SAG-0602 | Equal-input record on every backend |
-| req:REQ-SAG-0603 | Multi-backend run shares one `PayloadBundle` |
-| req:REQ-SAG-0610 | Each send emits `LogEvent` via injected port |
-| req:REQ-SAG-0611 | Log lines contain no API key substrings |
+| boundary:jev-check | Sessions, `run_check`, equal-input, registry, prompt load/inject (packaged asset); library tests prove behaviour — feature `req:` closure on a-7/a-8 per plan.md |
 | ADR-SAG-0008 | Second backend receives session context |
 | ADR-SAG-0009 | Registry accepts new `JudgeBackend` without API change |
+| ADR-SAG-0019 | Runtime prompt resolution (check file → asset); not in `prompt_sha256` |
 
 ## Required validation
 

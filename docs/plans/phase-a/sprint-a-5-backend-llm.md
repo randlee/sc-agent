@@ -53,12 +53,11 @@ in by orchestration — no production prose literals in this crate.
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0500 | Haiku fake-transport wire matches README; prompt injection does not alter `prompt_sha256` |
-| req:REQ-SAG-0501 | Luna fake transport: token-count request method/path/body in `validate_for_send`; over-cap skips `judge` |
-| req:REQ-SAG-0502 | Full provider message over cap → `INPUT_TOO_LARGE`; nothing sent |
-| req:REQ-SAG-0504 | Truncated `stop_reason`/`status` → `RESPONSE_INVALID` |
-| req:REQ-SAG-0505 | Busy responses retry with identical body |
-| boundary:jev-backends | Resolved API key + transport at construction; no `sc-agent-secrets` dep |
+| boundary:jev-backends | Haiku/Luna fake-transport tests pass (wire, token-count preflight, INPUT_TOO_LARGE, RESPONSE_INVALID, busy retry); key + transport at construction; no `sc-agent-secrets` dep |
+| ADR-SAG-0004 | Pre-send byte/token validation |
+| ADR-SAG-0006 | Transport at construction |
+| ADR-SAG-0007 | HTTP timeouts on token-count + judge |
+| ADR-SAG-0019 | Prompt injection does not alter `prompt_sha256` |
 
 ## Required validation
 
