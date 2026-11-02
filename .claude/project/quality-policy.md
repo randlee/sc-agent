@@ -71,8 +71,9 @@ When root `Cargo.toml` exists:
 - Channel contracts: `release/publish-channel-contracts.toml`
 - Helpers: `.github/scripts/release_artifacts.py`, `worker_result.py`,
   `bootstrap_sc_compose.py`
-- Workflows under `.github/workflows/` are kit-aligned; do not publish until the
-  manifest declares real artifacts and Release Preflight passes
+- Workflows under `.github/workflows/` are kit-aligned (crates.io, PyPI, Homebrew,
+  Scoop, WinGet); do not publish until sc-publish consumer input is installed and
+  Release Preflight passes
 
 ## Repository layout (reviewer expectations)
 
@@ -107,7 +108,7 @@ Lower case only.
 | Phase id | next unused letter(s) | `a` |
 | Sprint id | `<phase>-<n>` | `a-1` |
 | Plan directory | `docs/plans/phase-<phase>/` | `docs/plans/phase-a/` |
-| Phase plan | `phase-<phase>-plan.md` | `phase-a-plan.md` |
+| Phase plan | `plan.md` under `docs/plans/phase-<phase>/` (alias `phase-<phase>-plan.md` also allowed) | `docs/plans/phase-a/plan.md` |
 | Sprint doc | `sprint-<phase>-<n>-<slug>.md` | `sprint-a-1-bootstrap.md` |
 | Plan branch | `plan/phase-<phase>`, PR to `develop` | `plan/phase-a` |
 | Phase branch | `integrate/phase-<phase>`, from `develop` | `integrate/phase-a` |

@@ -1,0 +1,25 @@
+{
+  "source": "In-repo snapshot of jev-check README Errors table (Phase A contract).",
+  "upstream_hint": "atm-core plan/phase-bo-replan docs/plans/phase-bo/design/packages/jev-check/README.md",
+  "error_ids": [
+    "CONFIG_INVALID",
+    "KEY_MISSING",
+    "INPUT_TOO_LARGE",
+    "INPUT_EMPTY",
+    "INPUT_INVALID",
+    "EXTRACTION_EMPTY",
+    "EXTRACTION_PARSE_ERROR",
+    "EXTRACTION_INVALID",
+    "EXTRACTION_FAILED",
+    "EXTRACTION_TIMEOUT",
+    "LANGUAGE_UNAVAILABLE",
+    "QUERY_INVALID",
+    "QUERY_NOT_FOUND",
+    "INPUT_MISSING",
+    "RESPONSE_INVALID",
+    "NETWORK_ERROR",
+    "PROMPT_FILE_MISSING",
+    "SESSION_NOT_FOUND",
+    "SESSION_EXPIRED"
+  ]
+}

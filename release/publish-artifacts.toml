@@ -10,4 +10,5 @@ description = "Synaptic Canvas agent teams and orchestration assets"
 homepage = "https://github.com/randlee/sc-agent"
 license = "MIT"
 
-# No release targets, crates, or channels until the workspace ships binaries or libraries.
+# Rendered by sc-publish install (sprint a-9). Consumer input targets:
+# crates.io, pypi (sc-jev-py), homebrew, scoop, winget (sc-ai), GitHub release assets.
