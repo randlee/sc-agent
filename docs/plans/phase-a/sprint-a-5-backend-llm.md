@@ -22,9 +22,10 @@ requirements:
   - REQ-SAG-0505
   - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0004
+  - ADR-SAG-0006
   - ADR-SAG-0007
   - ADR-SAG-0019
-  - ADR-SAG-0006
 owned_paths:
   - "crates/sc-jev-backends/**"
   - "boundaries/jev-backends/**"

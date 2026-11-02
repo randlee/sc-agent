@@ -24,6 +24,7 @@ requirements:
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
+  - ADR-SAG-0006
   - ADR-SAG-0016
   - ADR-SAG-0019
 owned_paths:
