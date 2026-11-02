@@ -1,21 +1,41 @@
 # sc-agent project plan
 
-**Status:** Bootstrap  
+**Status:** Phase A planned (awaiting approval)  
 **Default branch:** `develop`
 
-## Current phase
+## Phases
 
-| Phase | Status | Integration branch | Notes |
+| Phase | Status | Integration branch | Plan |
 | --- | --- | --- | --- |
-| Bootstrap | In progress | `develop` | Agent teams, plan-anchor, beads, policy docs |
+| Bootstrap | Complete | `develop` | Agent teams, plan-anchor, beads, policy |
+| **A — sc-jev + sc-ai** | **Planned** | `integrate/phase-a` | [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md) |
+| B (draft) | Not planned | — | Remaining Jev API (REQ-SAG-0110); check features 4–7; **API-direct** Claude + Codex via `sc-ai`. **Not** claude-code/codex-cli/cursor-cli wrappers |
 
 ## Lead
 
-| Phase | Lead (ATM identity) | Appointed |
-| --- | --- | --- |
-| Bootstrap | `ai-lead` | — |
+| Phase | Lead (ATM identity) |
+| --- | --- |
+| Bootstrap / A | `ai-lead` |
 
-## Next
+## Phase A sprints (dependency order)
 
-Add `docs/plans/phase-<id>/` when the first formal phase plan opens. Until then,
-sprints are tracked in beads and orchestration ledgers only.
+1. a-1 workspace, errors, cross-impl fixture  
+2. a-2 ∥ a-3 secrets ∥ check build  
+3. a-4 ∥ a-5 Jev ∥ LLM backends  
+4. a-6 sessions + orchestration  
+5. a-7 ∥ a-8 CLI ∥ **sc-jev-py (PyPI wheel)**  
+
+**First release:** crates.io + PyPI + `sc-ai`.
+
+Sprint docs: `docs/plans/phase-a/sprint-a-*.md`.
+
+## Approval gate
+
+**No Rust implementation PRs** until Rand approves `plan.md` and sprint docs.
+
+## After Phase A
+
+- Migrate orchestration / plan-anchor call sites to the new client (separate repos).
+- API-direct Claude and Codex agent crates (Phase B).
+- Subprocess wrappers for claude-code, codex-cli, cursor-cli (never).
+- Optional: `decider-4b` local backend crate.

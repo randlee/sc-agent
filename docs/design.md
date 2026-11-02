@@ -20,6 +20,14 @@ development workflows.
 
 - Replacing product runtime code in `sc-runtime`
 - Embedding host-specific paths or secrets in committed agent text
+- **Wrapping vendor harness CLIs** (claude-code, codex-cli, cursor-cli) as
+  launch paths — use provider HTTP APIs instead
+
+## Rust agents (roadmap)
+
+- **Phase A:** `sc-jev` (Jev API + check slice; API-direct Haiku/Luna on one payload).
+- **Phase B:** standalone Claude and Codex **API** agents under `sc-ai` for
+  broader comparison to Jev, sharing `sc-agent-types` and `sc-agent-secrets`.
 
 ## Principles
 
