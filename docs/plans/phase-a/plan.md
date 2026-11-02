@@ -89,10 +89,12 @@ only until a-1 commits real rules).
 | llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-3 |
 | runtime | 3 | a-6 | boundary | jev | sessions, run_request, multi-backend; `must_follow` a-4,a-5 |
 | cli | 3 | a-7 | integration | sc-ai-cli | CLI features 1–3, parity CLI paths; `must_follow` a-6 |
-| python | 3 | a-8 | integration | jev | PyO3 wrapper; `must_follow` a-6 |
+| python | 3 | a-8 | integration | jev | PyO3 + maturin wheel; `must_follow` a-6 |
+| publish | 4 | a-9 | integration | release | [sc-publish](https://github.com/randlee/sc-publish) kit install; `must_follow` a-8 |
+| publish | 4 | a-10 | integration | release | Release preflight + publish dry-run; `must_follow` a-9 |
 
-**Critical path:** a-1 → a-3 → a-4 → a-6 → a-7 (5 sprints).  
-**Width:** 2 (a-2 ∥ a-3; a-4 ∥ a-5). **Sprint count:** 8.
+**Critical path:** a-1 → a-3 → a-4 → a-6 → a-7 → a-8 → a-9 → a-10 (8 sprints).  
+**Width:** 2 (a-2 ∥ a-3; a-4 ∥ a-5; a-7 ∥ a-8 until a-6 done). **Sprint count:** 10.
 
 ## Parity and features mapping
 
@@ -104,7 +106,9 @@ only until a-1 commits real rules).
 | a-5 | Haiku/Luna rows | **8** (Luna live count) |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
 | a-7 | CLI session/ask/run | **1**, **2** |
-| a-8 | library API parity for Python callers | PyO3 |
+| a-8 | library API parity for Python callers | PyO3 + wheel build |
+| a-9 | — | sc-publish consumer input + install |
+| a-10 | — | first release preflight (REQ-SAG-0803) |
 
 ## Areas to tighten (Phase A vs defer)
 
@@ -188,7 +192,7 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 - Requested features **4–7** (disagreement UI, `sessions list/show`, `ask --json`,
   local key implementation beyond resolver hook).
 - **sc-runtime daemon / UDS** hosting for backends.
-- Benchmark-run; full multi-channel publisher beyond **crates.io + PyPI + sc-ai** (stub manifest OK until a-8).
+- Benchmark-run; extra publish channels (winget/homebrew/npm) until added to sc-publish consumer input.
 - Parallel fan-out of hundreds of questions in CLI (design in types; optional
   batch API in library if low cost, not required for phase close).
 
@@ -204,6 +208,8 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 | a-6 | [`sprint-a-6-sessions-and-orchestration.md`](sprint-a-6-sessions-and-orchestration.md) |
 | a-7 | [`sprint-a-7-sc-ai-cli.md`](sprint-a-7-sc-ai-cli.md) |
 | a-8 | [`sprint-a-8-pyo3-wrapper.md`](sprint-a-8-pyo3-wrapper.md) |
+| a-9 | [`sprint-a-9-sc-publish-install.md`](sprint-a-9-sc-publish-install.md) |
+| a-10 | [`sprint-a-10-release-preflight.md`](sprint-a-10-release-preflight.md) |
 
 ## First release artifacts (Phase A close)
 
@@ -213,7 +219,8 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 | **PyPI** | `sc-jev-py` (maturin-built wheel; manylinux + macOS arm64 minimum) |
 | **CLI** | `sc-ai` — same release train as Rust crates |
 
-Release manifest and CI publish steps land in sprint **a-8** (REQ-SAG-0802/0803).
+Release uses the **[sc-publish](https://github.com/randlee/sc-publish)** kit
+(sprints **a-9**, **a-10**): consumer input, rendered manifests, preflight CI.
 Orchestration/plan-anchor **call-site migration** in other repos is post-release.
 
 ## Phase acceptance (integration)
@@ -226,10 +233,11 @@ just test
 cargo test -p sc-jev -- --nocapture
 cargo test -p sc-ai -- --nocapture
 uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_bytes.py
+bash .github/scripts/run-consumer-preflight.sh
 ```
 
 Expected: all exit 0; cross-impl test asserts Rust `prompt_sha256` matches
-committed fixture from Python reference bytes.
+committed fixture from Python reference bytes; release preflight passes (a-10).
 
 Optional evidence (not CI-gated in Phase A): one live `sc-ai jev run`
 against TypeSafe with Rand-provided key, artifact attached to phase PR.

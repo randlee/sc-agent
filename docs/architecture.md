@@ -69,6 +69,13 @@ Python apps use the **`sc-jev-py`** PyPI extension (PyO3 → `sc-jev`). Optional
 thin wrappers (e.g. atm-bd `packages/jev-check`) must not reimplement Jev HTTP
 or canonicalization.
 
+## ADR-SAG-0018 — sc-publish kit owns release surface
+
+Release manifests, channel contracts, and publish workflows are **installed**
+from [sc-publish](https://github.com/randlee/sc-publish) via
+`release/sc-publish-consumer-input.json`. Edit consumer input + re-run
+`install.py`; do not hand-edit rendered TOML under `release/`.
+
 ## ADR-SAG-0017 — First release surfaces
 
 Phase A first release ships **three** consumer paths: **crates.io** (Rust

@@ -103,7 +103,15 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | REQ-SAG-0800 | PyO3 exports `sc-jev`; Python errors match enum codes |
 | REQ-SAG-0801 | Cross-impl pytest harness in repo |
 | REQ-SAG-0802 | maturin wheel build; `pip install` from built artifact |
-| REQ-SAG-0803 | **First release:** PyPI (`sc-jev-py`) + crates.io (Rust crates) + `sc-ai` CLI |
+
+## Phase A — sc-publish kit (sprints a-9, a-10)
+
+| ID | Requirement |
+| --- | --- |
+| REQ-SAG-0130 | Pin [sc-publish](https://github.com/randlee/sc-publish); complete `sc-publish-consumer-input.json`; run `install.py` |
+| REQ-SAG-0131 | `docs/development/sc-publish.md`; do not hand-edit rendered publish manifests |
+| REQ-SAG-0132 | Release preflight CI green; local preflight script matches kit |
+| REQ-SAG-0803 | **First release:** PyPI + crates.io + GitHub via sc-publish (dry-run proven in CI) |
 
 ## Phase B (draft — not scheduled)
 

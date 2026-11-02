@@ -23,9 +23,11 @@
 2. a-2 ∥ a-3 secrets ∥ check build  
 3. a-4 ∥ a-5 Jev ∥ LLM backends  
 4. a-6 sessions + orchestration  
-5. a-7 ∥ a-8 CLI ∥ **sc-jev-py (PyPI wheel)**  
+5. a-7 ∥ a-8 CLI ∥ sc-jev-py wheel  
+6. a-9 **sc-publish** kit install  
+7. a-10 release preflight + publish dry-run  
 
-**First release:** crates.io + PyPI + `sc-ai`.
+**First release:** crates.io + PyPI + `sc-ai` via [sc-publish](https://github.com/randlee/sc-publish).
 
 Sprint docs: `docs/plans/phase-a/sprint-a-*.md`.
 
