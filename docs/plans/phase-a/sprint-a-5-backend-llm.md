@@ -18,6 +18,7 @@ requirements:
   - REQ-SAG-0502
 adrs:
   - ADR-SAG-0007
+  - ADR-SAG-0019
 owned_paths:
   - "crates/sc-jev-backends/src/anthropic/**"
   - "crates/sc-jev-backends/src/openai/**"
@@ -27,9 +28,10 @@ owned_paths:
 
 ## Outcome
 
-API-direct Haiku and Luna backends: system prompt + embedded schema on check;
-token count + message; reply validation; equal-input fields (except Jev-null
-fields).
+API-direct Haiku and Luna backends: **system prompt** (evaluator role; tunable
+without changing `prompt_sha256`) + **embedded canonical payload** in the judge
+message; token count + send; reply validation; equal-input fields (except Jev-null
+fields). HTTP body ≠ Jev wire bytes (ADR-SAG-0019).
 
 ## Deliverables
 

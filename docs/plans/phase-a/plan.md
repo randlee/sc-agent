@@ -22,9 +22,14 @@ future agent launchers.
   README is the Phase A behavioural contract for the check slice.
 - **One check = one request**; over byte cap → `INPUT_TOO_LARGE`, never split;
   context-length check before every backend send.
-- **Byte-identical payload** across backends (sorted compact JSON, sha256);
-  cross-implementation fixture vs Python (tighten #1).
-- **Haiku/Luna API-direct** (no SDK/harness/tools); equal-input record every run.
+- **Canonical judge payload** — one sorted compact JSON blob (questions + state);
+  **`prompt_sha256`** is computed on those bytes for cross-impl (tighten #1) and
+  equal-input. **Not** byte-identical HTTP bodies across backends: TypeSafe Jev
+  uses its evaluator wire shape; Haiku/Luna may add a **system prompt** and schema
+  wrapper (and may tune that prompt over time) while still embedding the **same
+  canonical payload** in what the model judges.
+- **Haiku/Luna API-direct** (no SDK/harness/tools); equal-input record every run
+  attests each backend saw the same canonical bytes (README `prompt_sha256`, `equal`).
 - **Sessions + `ask`** are required, not optional.
 - **Typed errors**: one enum variant each with fix text; CLI stderr
   `{"error","message"}`, exit 2.

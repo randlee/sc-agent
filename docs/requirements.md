@@ -68,7 +68,7 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0500 | Haiku API-direct wire format |
+| REQ-SAG-0500 | Haiku API-direct; system prompt allowed; canonical payload embedded; `prompt_sha256` on canonical bytes only |
 | REQ-SAG-0501 | Luna API-direct + live input token count verification (feature 8) |
 | REQ-SAG-0502 | LLM context-length refusal matches Jev semantics |
 

@@ -41,10 +41,25 @@ without changing callers.
 All user-visible error ids come from `JevError` in `sc-agent-types`.
 CLI and PyO3 map variants to JSON / exceptions; no ad-hoc strings.
 
-## ADR-SAG-0002 — Canonical payload bytes
+## ADR-SAG-0002 — Canonical judge payload bytes
 
-Judge requests use sorted-key compact JSON (UTF-8). SHA-256 of payload bytes
-is recorded for equal-input proofs. Cross-language fixture in sprint a-1.
+The **canonical judge payload** is sorted-key compact JSON (UTF-8): the
+questions + state the backends must judge. SHA-256 of **those** bytes is
+`prompt_sha256` for equal-input and the cross-language fixture (sprint a-1).
+
+## ADR-SAG-0019 — LLM wire envelope vs canonical payload
+
+**Jev (TypeSafe)** sends the canonical payload in the API shape the evaluator
+expects (including model selection on the wire).
+
+**Haiku / Luna** send API-direct HTTP that is **not** byte-identical to Jev’s
+body. They **must** embed the **same canonical payload bytes** in the user/judge
+message (per README parity). A **system prompt** (evaluator instructions, JSON
+schema hints) is allowed and **may change** over time without changing
+`prompt_sha256`, as long as the embedded canonical blob is unchanged.
+
+Token/count checks apply to the full message the provider receives; equal-input
+still records whether every backend saw the same canonical bytes.
 
 ## ADR-SAG-0003 — Secret resolution
 
