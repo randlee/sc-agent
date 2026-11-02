@@ -17,6 +17,8 @@ requirements:
   - REQ-SAG-0501
   - REQ-SAG-0502
   - REQ-SAG-0503
+  - REQ-SAG-0504
+  - REQ-SAG-0505
 adrs:
   - ADR-SAG-0007
   - ADR-SAG-0019
@@ -39,9 +41,11 @@ in by orchestration — no production prose literals in this crate.
 ## Deliverables
 
 1. **REQ-SAG-0500** — Haiku wire format matches README table (fake transport tests).
-2. **REQ-SAG-0501** — Luna wire format + **live** verification of `/v1/responses/input_tokens` (**requested feature 8**) documented in sprint PR evidence.
+2. **REQ-SAG-0501** — Luna wire format + token-count request shape verified with **fake transport** (feature **8**). Optional: maintainer with `OPENAI_API_KEY` attaches live `/v1/responses/input_tokens` output in PR — **not** required for phase close (Rand has no OpenAI key).
 3. **REQ-SAG-0502** — LLM `INPUT_TOO_LARGE` after full provider message (prompt + payload) is known; invalid question paths refuse send like Jev.
 4. **REQ-SAG-0503** — System prompt via `JudgeRequest.llm`; changing prompt changes wire, not `prompt_sha256`.
+5. **REQ-SAG-0504** — Read Anthropic `stop_reason` / OpenAI `status`; truncation at `max_tokens` → `RESPONSE_INVALID` with reason (tighten **#4**).
+6. **REQ-SAG-0505** — Busy retry 429/502/529 + `Retry-After` clamp, same as Jev (tighten **#5**).
 
 ## Acceptance criteria (authoritative)
 
@@ -65,9 +69,8 @@ cargo test -p sc-jev-backends -- test_llm_bad_reply_is_typed --exact --nocapture
 cargo test -p sc-jev-backends -- test_unknown_question_type_has_no_answer_schema --exact --nocapture
 ```
 
-Expected: exit 0 on CI (no network). **Feature 8 live probe:** attach Luna
-token-count probe output in PR description, or `SKIPPED: no OPENAI_API_KEY` only
-with Rand waiver bead (not a CI gate).
+Expected: exit 0 on CI (no network). Live Luna probe is **optional** evidence
+when a key exists; phase close does **not** require one.
 
 ## Parity checklist
 

@@ -157,9 +157,9 @@ multi-backend, and logging without overloading a-3.
 | Sprint | Parity rows closed (README checklist) | Requested features |
 | --- | --- | --- |
 | a-1 | (fixture only; enables payload tests) | — |
-| a-3 | extractors (`file`, `table-column`, `branches`, `command`), config, payload | python-branches parity |
+| a-3 | extractors (`file`, `table-column`, `tree-sitter`, `command`), config, payload | python-branches + branches cross-impl |
 | a-4 | Jev transport rows | — |
-| a-5 | Haiku/Luna rows | **8** (Luna live count) |
+| a-5 | Haiku/Luna rows | **8** (Luna token-count wire; fake transport) |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
 | a-7 | CLI session/ask/run | **1**, **2** |
 | a-8 | library API parity for Python callers | PyO3 + wheel build |
@@ -171,14 +171,14 @@ multi-backend, and logging without overloading a-3.
 | # | Item | Phase A |
 | --- | --- | --- |
 | 1 | Cross-impl byte fixture | **a-1** |
-| 2 | Branch / region text | **a-3** — tree-sitter **`branches`** extractor (ADR-SAG-0015) |
+| 2 | Branch / region text | **a-3** — **`tree-sitter`** + `.scm` query (ADR-SAG-0015) |
 | 3 | Jev probabilities strict | **a-4** |
-| 4 | LLM stop_reason / status | defer |
-| 5 | LLM busy retry | defer |
+| 4 | LLM stop_reason / status | **a-5** |
+| 5 | LLM busy retry | **a-5** |
 | 6 | Session UUID + mode 0600 | **a-6** |
 | 7 | Expiry uses `created_at` | **a-6** |
 | 8 | Repo-root for git paths | **a-3** |
-| 9 | Markdown escaped pipes | defer |
+| 9 | Markdown escaped pipes | **a-3** (`table-column`) |
 | 10 | Error enum + fix text | **a-1** |
 | 11 | `consistent` flag on answers | defer |
 | 12 | Vendor pins in config | **a-3** / **a-4** |
@@ -190,8 +190,8 @@ Phase A optimizes for a **blocking CLI** that prints **JSON on stdout** and exit
 **appends JSONL** session records (Claude/Codex-style retained logs): prompt
 payload metadata, backend id, timestamps, equal-input digest — one line per
 logical prompt/send. Use **`sc-observability` v2** (`LoggerBuilder`, not v1 `Logger::new`) via
-**`sc-agent-types::observability::v2`** injection (ADR-SAG-0016). `sc-jev` logs through
-`SharedSessionLog`; `sc-ai` owns the real logger and log root. Shim removed when
+**`sc-agent-types::observability::v2`** injection (ADR-SAG-0016). **`sc-jev-check`**
+logs through `SharedSessionLog`; `sc-ai` / `sc-jev-py` own real loggers. Shim removed when
 upstream v2 is released.
 
 **Stdout success shape:** the **same JSON object TypeSafe Jev returns** for the
@@ -204,12 +204,15 @@ ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps 
 ## Resolved decisions (Rand)
 
 1. **Key precedence:** process environment → **repo-root `.env`** → keyring
-   (REQ-SAG-0202). Later waves may add a user-level `.env` path; Phase A is
-   repo-root only.
-2. **sc-runtime daemon / UDS** — out of Phase A.
-3. **Branch / region extraction:** **tree-sitter `branches` extractor**
-   (ADR-SAG-0015) with optional **`command`** escape hatch. Phase A ships Python
-   grammar; README `test_python_branches_*` is a **Phase A gate** (sprint a-3).
+   (REQ-SAG-0202). **Source:** Rand, 2026-11-01 — PR #4 review comment (amendment to §6).
+2. **sc-runtime daemon / UDS** — out of Phase A. **Source:** Phase A planning thread, 2026-11-01.
+3. **Branch extraction:** **`tree-sitter`** + **`.scm` query** + **`command`**
+   (ADR-SAG-0015; PR §9). Python slices via atm-core PR #2308. README
+   `test_python_branches_*` + `tests/fixtures/cross-impl/branches/` gate **a-3**.
+   **Source:** PR #4 review §1/§9, 2026-11-01.
+4. **Luna / OpenAI key:** Phase A does not require the maintainer to hold
+   `OPENAI_API_KEY`. Feature **8** = fake-transport token-count wire in a-5.
+   **Source:** Rand, 2026-11-01 (no OpenAI key).
 
 ## Open questions (for Rand)
 
@@ -220,12 +223,13 @@ None blocking plan approval. **Kickoff decisions** (can default in sprint if sil
 3. ~~Cross-impl bytes~~ — **Resolved:** a-1 commits Python reference bytes;
    phase acceptance runs `tests/fixtures/jev-python` pytest (a-8); Rust-only
    fixtures are not a substitute.
-4. **Luna live token-count (feature 8)** — a-5 ships fake-transport wire tests;
-   **live** `/v1/responses/input_tokens` probe is manual PR evidence on a-5
-   (`SKIPPED` only with Rand waiver bead); not a CI gate in Phase A.
+4. ~~Luna live token-count~~ — **Resolved (Rand, 2026-11-01):** no OpenAI key.
+   Feature **8** closes on **fake-transport** proof of the token-count wire in a-5.
+   Live `/v1/responses/input_tokens` is optional maintainer evidence when a key
+   exists; not required for phase approval or close.
 5. **sc-ai-cli envelope** — confirm top-level `{ "version", "operation", "data": { …jev…, "session_id" } }` against synaptic-canvas `packages/sc-ai-cli` before a-7?
 
-Follow-ups as beads: user-level `.env`, extra comment sigils in ADR-SAG-0015, parallel question fan-out.
+Follow-ups as beads: user-level `.env`, parallel question fan-out.
 
 ## Roadmap after Phase A (product intent)
 
@@ -296,6 +300,7 @@ just test
 cargo test -p sc-jev -- --nocapture
 cargo test -p sc-ai -- --nocapture
 uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_bytes.py
+cargo test -p sc-jev-check cross_impl_branches -- --nocapture
 bash .github/scripts/run-consumer-preflight.sh
 ```
 

@@ -52,8 +52,10 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0300 | Extractors: `file`, `table-column`, `branches`, `command` |
-| REQ-SAG-0304 | `branches`: tree-sitter slices; Phase A Python grammar + README python-branches gate |
+| REQ-SAG-0300 | Extractors: `file`, `table-column`, `tree-sitter`, `command` (`Extractor` trait) |
+| REQ-SAG-0304 | `tree-sitter`: `.scm` query, subject rules, pinned grammars; README python-branches gate |
+| REQ-SAG-0305 | `command` extractor argv/JSON/timeout contract |
+| REQ-SAG-0309 | `table-column`: unescaped pipe splitting only (tighten #9) |
 | REQ-SAG-0301 | Refuse send on `CONFIG_INVALID`, `INPUT_*` errors |
 | REQ-SAG-0302 | Git repo-root resolution for relative paths |
 | REQ-SAG-0303 | Question-set schema `plan-anchoring/questions/1` |
@@ -70,9 +72,11 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | ID | Requirement |
 | --- | --- |
 | REQ-SAG-0500 | Haiku API-direct; injectable system prompt; canonical payload embedded; `prompt_sha256` on canonical bytes only |
-| REQ-SAG-0501 | Luna API-direct + live input token count verification (feature 8) |
+| REQ-SAG-0501 | Luna API-direct + input token count path (feature 8); fake-transport proof in CI; live probe optional when `OPENAI_API_KEY` present |
 | REQ-SAG-0502 | LLM context-length refusal matches Jev semantics |
 | REQ-SAG-0503 | LLM evaluator system prompt from config/file at runtime; no production prompt prose hardcoded in Rust |
+| REQ-SAG-0504 | LLM `stop_reason` / `status`: truncated at max_tokens → `RESPONSE_INVALID` (tighten #4) |
+| REQ-SAG-0505 | Haiku/Luna busy retry 429/502/529 + Retry-After like Jev (tighten #5) |
 
 ## Phase A — orchestration (sprint a-6)
 

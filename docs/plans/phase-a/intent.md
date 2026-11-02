@@ -35,7 +35,8 @@ is copied from legacy `jev_client.py` / plan-anchor scripts.
   module in the shared crate until upstream v2 release).
 - Parity on every row of the README **Parity checklist**.
 - Requested features **1** (caller-built requests), **2** (dry run), **3**
-  (multi-backend one run), **8** (Luna live token-count verification).
+  (multi-backend one run), **8** (Luna token-count wire verified in tests; live
+  OpenAI call optional — not required for phase close without a key).
 - Selected **areas to tighten** closed where cheaper than copying Python
   weaknesses (see phase plan).
 

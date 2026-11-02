@@ -13,7 +13,7 @@ to `JudgeBackend` impls in `sc-jev` and `sc-jev-backends`.
 | Module | Purpose |
 | --- | --- |
 | `config` | `check.toml`, packaged `jev.toml`, `[llm_judge]` paths |
-| `extract` | `file`, `table-column`, `branches` (tree-sitter), `command` |
+| `extract` | `file`, `table-column`, `tree-sitter`, `command` — see [`extraction.md`](extraction.md) |
 | `payload` | One canonical `PayloadBundle` per check |
 | `run` | `run_check`, `run_request`, dry-run |
 | `session` | Store, TTL, `ask` |

@@ -67,7 +67,7 @@ verified against committed Python reference bytes. **No network code.**
    add a one-line empty root only so `cargo check --workspace` passes).
    `just lint` / `just test`, sc-lint manifests for Phase A boundaries.
 2. **REQ-SAG-0101** — `JevError` enum covering every id in jev-check README Errors table; each variant exposes stable `code()` and `fix_hint()`.
-3. **REQ-SAG-0102** — Fixture `tests/fixtures/jev/cross_impl/request.json` + `expected.sha256` + `expected.body.bin` generated from Python reference; Rust test computes same digest.
+3. **REQ-SAG-0102** — Fixture `tests/fixtures/jev/cross_impl/` (payload-only) + scaffold `tests/fixtures/cross-impl/branches/` (subjects + request filled in **a-3** after atm-core PR #2308); Rust tests match Python reference digests.
 4. **NFR-SAG-0001** — `sc-ai-cli` JSON error shape types stubbed (`ScAgentErrorResponse`) for CLI crates.
 5. **ADR-SAG-0001** — Error enum is the only source of CLI `error` ids.
 6. **ADR-SAG-0002** — Payload bytes use sorted keys, compact JSON, UTF-8 (`BTreeMap` / serde policy documented).

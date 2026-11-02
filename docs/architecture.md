@@ -115,39 +115,26 @@ Phase A first release ships **five publish channels** from one tag via sc-publis
 **crates.io**, **PyPI** (`sc-jev-py`), **Homebrew**, **Scoop**, and **WinGet**
 (`sc-ai` binary), plus GitHub Release assets.
 
-## ADR-SAG-0015 — Branch extraction (`branches` + `command`)
+## ADR-SAG-0015 — Language-agnostic extraction (`tree-sitter` + `command`)
 
-Branch-like inputs for jev-check parity use a **`branches` extractor** in
-**`sc-jev-check`** (not in `sc-jev` HTTP):
+Replaces delimited comment regions. **Normative spec:**
+[`docs/sc-jev-check/extraction.md`](sc-jev-check/extraction.md) (PR review §9).
 
-- **tree-sitter** at the pinned git blob; `language` in check.toml selects the
-  grammar (Phase A: **Python** for README `test_python_branches_*`).
-- Slices are **UTF-8 source text** from byte spans (not `ast.unparse` or
-  comment markers).
-- Optional **`command` extractor** runs a user command and expects JSON region
-  map for pre-extracted input.
+Summary:
 
-```toml
-[[extractors]]
-id = "policy-arms"
-type = "branches"
-language = "python"
-path = "src/policy.py"
-rev = "HEAD"
-```
+- One **`Extractor`** trait; kinds **`file`**, **`table-column`**, **`tree-sitter`**, **`command`**.
+- **`tree-sitter`**: grammar id + **`.scm` query file** (or inline query) — no
+  per-language branch logic in Rust. Subject **text** = source byte slice; normative
+  **id**, **order**, helper captures (`@_…`), parse errors, session metadata
+  (`grammar_version`, `query_sha256`).
+- **`command`**: argv-array subprocess → JSON `{id: text}` escape hatch.
+- **Python reference** must switch `python-branches` from `ast.unparse` to the
+  same slice (**atm-core PR #2308**); cross-impl fixture under
+  `tests/fixtures/cross-impl/branches/`.
+- Delimited regions and comment sigils are **out of scope**.
 
-Delimited comment regions are **not** Phase A extractors. `sc-jev` does not
-read source files.
-
-### LLM judge system prompt (see ADR-SAG-0019)
-
-```toml
-[llm_judge]
-system_prompt_file = "prompts/evaluator-system.md"
-```
-
-Default asset path in packaged `jev.toml` points at a markdown file under
-`sc-jev-check` assets (not a Rust string). Facade reads at send time.
+LLM system prompt loading: **ADR-SAG-0019** (`[llm_judge] system_prompt_file` in
+check.toml; default asset under `sc-jev-check`).
 
 ## ADR-SAG-0013 — Session JSONL via sc-observability v2
 
@@ -196,4 +183,4 @@ comparison flows.
 - [`design.md`](design.md) — goals and non-goals
 - [`framework-charter.md`](framework-charter.md) — multi-consumer Rust posture
 - [`plans/phase-a/plan.md`](plans/phase-a/plan.md) — Phase A sprints and boundaries
-- Per-crate: `docs/sc-agent-types/`, `docs/sc-jev-check/`, `docs/sc-jev/`, `docs/sc-jev-backends/`, `docs/sc-jev-py/`, etc.
+- Per-crate: `docs/sc-agent-types/`, `docs/sc-jev-check/` (+ [`extraction.md`](sc-jev-check/extraction.md)), `docs/sc-jev/`, etc.

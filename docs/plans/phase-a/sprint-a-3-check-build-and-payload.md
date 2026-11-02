@@ -18,6 +18,8 @@ requirements:
   - REQ-SAG-0302
   - REQ-SAG-0303
   - REQ-SAG-0304
+  - REQ-SAG-0305
+  - REQ-SAG-0309
 adrs:
   - ADR-SAG-0004
   - ADR-SAG-0005
@@ -29,79 +31,77 @@ owned_paths:
   - "crates/sc-jev-check/src/payload/**"
   - "crates/sc-jev-check/assets/jev.toml"
   - "crates/sc-jev-check/assets/llm-evaluator-system.md"
+  - "crates/sc-jev-check/assets/queries/**"
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/lib.rs"
   - "boundaries/jev-check/**"
   - "tests/fixtures/jev/git-repo/**"
+  - "tests/fixtures/cross-impl/branches/**"
+  - "docs/sc-jev-check/extraction.md"
 ---
 
 # Sprint a-3 — check build, extractors, payload
 
 ## Outcome
 
-**`sc-jev-check`** loads `check.toml`, runs git extractors at repo root, expands
-question sets, builds canonical **`PayloadBundle`** bytes, validates `INPUT_*`
-without sending. Vendor pin defaults live in packaged `jev.toml` (tighten **#12**).
-Parses `[llm_judge] system_prompt_file` (file read at send in a-6).
+**`sc-jev-check`** loads `check.toml`, runs extractors at repo root, builds
+canonical **`PayloadBundle`**, validates `INPUT_*` without sending. Extraction
+follows **ADR-SAG-0015** / [`extraction.md`](../../../sc-jev-check/extraction.md)
+(`.scm` queries — no hard-coded per-language branch logic in Rust).
+
+**Dependency:** atm-core **PR #2308** — Python `python-branches` uses source
+slices (not `ast.unparse`) so cross-impl branches fixture can pass.
 
 ## Deliverables
 
-1. **REQ-SAG-0300** — Extractors: `file`, `table-column`, **`branches`**, **`command`**.
-2. **REQ-SAG-0304** — `branches`: tree-sitter, `language` in check.toml; Phase A
-   Python grammar; README `test_python_branches_lists_arms_and_refusals` passes.
-3. **REQ-SAG-0301** — Pre-send validation errors before any backend call.
-4. **REQ-SAG-0302** — Repo-root resolution via `git rev-parse --show-toplevel`.
-5. **REQ-SAG-0303** — Question-set schema `plan-anchoring/questions/1`.
-6. **ADR-SAG-0004/0005/0015** — One payload; max bytes; branch extraction policy.
-7. Parse **`[llm_judge] system_prompt_file`** (ADR-SAG-0019); default asset path in `jev.toml`.
-8. **`src/lib.rs`** declares `pub mod` for `config`, `extract`, `payload`, `session`,
-   `run`, `equal_input`, and `registry`. a-3 implements the first three; **`session`,
-   `run`, `equal_input`, `registry`** are empty compiling stubs so **a-6** fills
-   owned_paths **without editing `lib.rs` again**.
+1. **REQ-SAG-0300** — `Extractor` trait; kinds `file`, `table-column`, **`tree-sitter`**, **`command`**.
+2. **REQ-SAG-0304** — `tree-sitter`: query file path (or inline), captures list, subject rules, pinned grammars; README `test_python_branches_lists_arms_and_refusals` passes via `queries/python-branches.scm`.
+3. **REQ-SAG-0305** — `command` extractor contract (argv, JSON stdout, timeouts, session audit fields).
+4. **REQ-SAG-0301** — Includes `EXTRACTION_PARSE_ERROR` and existing `INPUT_*` / `EXTRACTION_*` paths.
+5. **REQ-SAG-0302** — Repo-root via `git rev-parse --show-toplevel`.
+6. **REQ-SAG-0303** — Question-set schema `plan-anchoring/questions/1`.
+7. **REQ-SAG-0309 (tighten #9)** — `table-column` splits on **unescaped** pipes only.
+8. Parse **`[llm_judge] system_prompt_file`** (file read at send in a-6).
+9. **`src/lib.rs`** declares `session`, `run`, `equal_input`, `registry` as compiling stubs for a-6.
+10. Cross-impl **`tests/fixtures/cross-impl/branches/`** — subjects JSON + full request sha256 (Python + Rust).
 
 ## Explicit code samples
 
-```rust
-// crates/sc-jev-check/src/lib.rs (a-3)
-pub mod config;
-pub mod extract;
-pub mod payload;
-pub mod session;      // stub until a-6
-pub mod run;          // stub until a-6
-pub mod equal_input;  // stub until a-6
-pub mod registry;     // stub until a-6
-```
-
 ```toml
 [[extractors]]
-id = "policy-arms"
-type = "branches"
+id = "branches"
+kind = "tree-sitter"
 language = "python"
-path = "src/policy.py"
+path = "skills/atm-bd-lite/scripts/atm-bd-task-hook.py"
 rev = "HEAD"
+query = "queries/python-branches.scm"
+captures = ["arm", "refusal"]
 ```
+
+See committed query: `tests/fixtures/cross-impl/branches/queries/python-branches.scm`.
 
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0304 | Python branch fixture matches README arms/refusals test |
-| req:REQ-SAG-0301 | Oversized / invalid input refuses before send |
-| req:REQ-SAG-0303 | Question-set expansion produces stable canonical bytes |
-| boundary:jev-check | `sc-jev-check` crate builds; no HTTP client deps in this crate |
+| req:REQ-SAG-0304 | Seven named tree-sitter tests + README python-branches row |
+| req:REQ-SAG-0305 | Command extractor typed errors on bad JSON / exit / timeout |
+| req:REQ-SAG-0309 | Escaped `\|` in table-column fixtures |
+| boundary:jev-check | No HTTP deps; queries are config, not Rust match logic |
 
 ## Required validation
 
 ```bash
 just lint
-cargo test -p sc-jev-check build -- --nocapture
 cargo test -p sc-jev-check extractors -- --nocapture
-cargo test -p sc-jev-check branches -- --nocapture
+cargo test -p sc-jev-check tree_sitter -- --nocapture
+cargo test -p sc-jev-check command_extractor -- --nocapture
 cargo test -p sc-jev-check payload -- --nocapture
+cargo test -p sc-jev-check cross_impl_branches -- --nocapture
 ```
 
-Expected: exit 0; python-branches parity test included.
+Expected: exit 0; branches cross-impl matches Python reference after PR #2308.
 
 ## This sprint does not close
 
-HTTP backends, `run_check`, sessions, CLI, reading LLM prompt file at send.
+HTTP backends, `run_check`, sessions, CLI prompt file read at send.
