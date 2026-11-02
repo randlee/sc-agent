@@ -1,0 +1,41 @@
+{
+  "schema": "sc/subjects/1",
+  "source": {
+    "path": "src/example.py",
+    "rev": "HEAD",
+    "blob_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "producer": {
+    "name": "sc-treesitter",
+    "version": "0.1.0",
+    "language": "python",
+    "grammar": "tree-sitter-python",
+    "grammar_version": "0.23.6",
+    "query_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mode": "matches"
+  },
+  "subjects": [
+    {
+      "id": "src/example.py:42",
+      "capture": "arm",
+      "text": "alpha",
+      "span": {
+        "start_line": 42,
+        "end_line": 42,
+        "start_byte": 10,
+        "end_byte": 15
+      }
+    },
+    {
+      "id": "src/example.py:42:1",
+      "capture": "refusal",
+      "text": "beta",
+      "span": {
+        "start_line": 42,
+        "end_line": 42,
+        "start_byte": 20,
+        "end_byte": 24
+      }
+    }
+  ]
+}

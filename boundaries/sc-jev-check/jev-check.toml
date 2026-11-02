@@ -1,0 +1,36 @@
+boundary_id = "BOUNDARY-jev-check"
+owner_package = "sc-jev-check"
+owner_crate_path = "sc_jev_check"
+name = "jev-check"
+
+[public]
+facade = "sc_jev_check::config, sc_jev_check::extract, sc_jev_check::payload, sc_jev_check::run, sc_jev_check::session, sc_jev_check::equal_input, sc_jev_check::registry"
+
+[implementation]
+type = "marker"
+module = "sc_jev_check"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["config", "extract", "payload", "run"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "stub_landed"

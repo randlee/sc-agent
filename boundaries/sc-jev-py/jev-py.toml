@@ -1,0 +1,36 @@
+boundary_id = "BOUNDARY-jev-py"
+owner_package = "sc-jev-py"
+owner_crate_path = "sc_jev_py"
+name = "jev-py"
+
+[public]
+facade = "sc_jev_py::stub_name"
+
+[implementation]
+type = "marker"
+module = "sc_jev_py"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["stub_name"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "stub_landed"

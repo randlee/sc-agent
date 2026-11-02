@@ -1,7 +1,7 @@
 ---
 id: a-1
 phase: a
-status: planned
+status: in_progress
 closure_type: contract
 target_boundary: agent-types
 track: foundation
@@ -22,10 +22,14 @@ requirements:
   - REQ-SAG-0120
   - REQ-SAG-0121
   - NFR-SAG-0001
+  - NFR-SAG-0002
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
+  - ADR-SAG-0005
   - ADR-SAG-0006
+  - ADR-SAG-0009
+  - ADR-SAG-0013
   - ADR-SAG-0015
   - ADR-SAG-0016
   - ADR-SAG-0019
@@ -34,6 +38,9 @@ owned_paths:
   - "Cargo.lock"
   - "justfile"
   - "sc-lint.toml"
+  - ".gitignore"
+  - ".sc-lint/bootstrap.py"
+  - ".beads/issues.jsonl"
   - "boundaries/**"
   - "crates/sc-agent-types/**"
   - "crates/sc-agent-types/src/observability/**"
@@ -47,12 +54,21 @@ owned_paths:
   - "crates/sc-jev-backends/src/lib.rs"
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/lib.rs"
+  - "crates/sc-jev-check/src/config.rs"
+  - "crates/sc-jev-check/src/equal_input.rs"
+  - "crates/sc-jev-check/src/extract.rs"
+  - "crates/sc-jev-check/src/payload.rs"
+  - "crates/sc-jev-check/src/registry.rs"
+  - "crates/sc-jev-check/src/run.rs"
+  - "crates/sc-jev-check/src/session.rs"
   - "crates/sc-ai/Cargo.toml"
+  - "crates/sc-ai/src/lib.rs"
   - "crates/sc-ai/src/main.rs"
   - "crates/sc-jev-py/Cargo.toml"
   - "crates/sc-jev-py/src/lib.rs"
   - "crates/sc-treesitter/Cargo.toml"
   - "crates/sc-treesitter/src/lib.rs"
+  - "docs/sc-agent-types/architecture.md"
   - "docs/sc-agent-types/subjects-schema.md"
   - "tests/fixtures/jev/subjects-schema/**"
 ---
@@ -76,17 +92,21 @@ verified against committed Python reference bytes. **No network code.**
    module files (`config`, `extract`, `payload`, `session`, `run`, `equal_input`,
    `registry`); a-3 and a-6 fill bodies only, never restructure `lib.rs`.
    `just lint` / `just test`, sc-lint manifests for Phase A boundaries.
+   Stub crates satisfy **REQ-SAG-0100** only; crate REQ ids are owned by later sprints.
 2. **REQ-SAG-0101** — `JevError` enum covering every id in `tests/fixtures/jev/README-contract/errors.json`; each variant exposes stable `code()` and `fix_hint()`.
 3. **REQ-SAG-0102** — Fixture `tests/fixtures/jev/cross_impl/` (payload-only); Rust workspace test `tests/jev_cross_impl/` matches Python reference digests (not `cargo test -p sc-agent-types` alone).
 4. **REQ-SAG-0005** — Workspace layout matches `docs/architecture.md` and per-crate requirement tables.
-5. **NFR-SAG-0001** — `sc-ai-cli` JSON error shape types stubbed (`ScAgentErrorResponse`) for CLI crates.
+5. **NFR-SAG-0001** / **NFR-SAG-0002** — `sc-ai-cli` JSON error shape types stubbed (`ScAgentErrorResponse`) for CLI crates. A unit test asserts `ScAgentErrorResponse` and `LogEvent` carry no secret fields.
 6. **ADR-SAG-0001** — Error enum is the only source of CLI `error` ids.
 7. **ADR-SAG-0002** — Payload bytes use sorted keys, compact JSON, UTF-8 (`BTreeMap` / serde policy documented).
 8. **REQ-SAG-0120** — Module `sc-agent-types::observability::v2` (`SessionLog` port; `sc-observability-types = "1.5.0"` on **this crate only** for shim).
-9. **REQ-SAG-0121** — `NoopSessionLog` + `test-util` doubles; bead `agt-obs-v2-shim-removal` to delete module + dependency after release 1–2.
+9. **REQ-SAG-0121** — `NoopSessionLog` + `test-util` doubles; bead `agt-obs-v2-shim-removal` (recorded in `.beads/issues.jsonl`; local Dolt database `sc-agent` was unavailable) to delete module + dependency after release 1–2.
 10. **ADR-SAG-0016** — No separate observability crate on crates.io; full `sc-observability` on composition roots **`sc-ai`** and **`sc-jev-py`** (a-8 wires PyO3 logger).
 11. **REQ-SAG-0104** — Rust types + JSON fixture for **`sc/subjects/1`** ([`subjects-schema.md`](../../../sc-agent-types/subjects-schema.md)); commit **`tests/fixtures/jev/subjects-schema/v1/minimal.json`** (valid minimal document for a-3 unit tests); producer/consumer pin same schema id.
-12. **REQ-SAG-0103** — Freeze `JudgeBackend`, `JudgeRequest`, `PayloadBundle`, `LlmWireContext`, `JudgeOutcome`, `EqualInputRecord`, `BackendId`, `LogEvent`, `RepoRoot`, `Rev`, `SessionId`, `Sha256Digest`, extractor domain types; contract tests + `MockJudgeBackend`.
+12. **REQ-SAG-0103** — Freeze `JudgeBackend`, `JudgeRequest`, `PayloadBundle`, `LlmWireContext`, `JudgeOutcome`, `EqualInputRecord`, `BackendId`, `LogEvent`, `RepoRoot`, `Rev`, `SessionId`, `Sha256Digest`, extractor domain types; contract tests + `MockJudgeBackend`. The shared `JudgeOutcome` field-parity check in this sprint is the **mock-only half**: it covers `MockJudgeBackend` via `test_util::judge_outcome_field_names`. Sprints **a-4** and **a-5** apply that same helper to `sc-jev` and `sc-jev-backends`.
+13. **ADR-SAG-0005** — `PayloadBundle` is the facade-owned assembly result. This sprint freezes the type and does not build payloads.
+14. **ADR-SAG-0009** — `JudgeBackend` stays an open trait so a later local backend can register without changing callers.
+15. **ADR-SAG-0013** — `LogEvent` and `SharedSessionLog` are the v2 session-log port. This sprint adds no bespoke writer.
 
 ## Explicit code samples
 
@@ -99,7 +119,12 @@ Authoritative signatures: `docs/sc-agent-types/architecture.md` (same as phase p
 | boundary:agent-types | sc-lint manifests stubbed under `boundaries/**` for all eight Phase A boundaries |
 | ADR-SAG-0001 | `JevError` is the only CLI/PyO3 error id source |
 | ADR-SAG-0002 | Canonical payload serde policy documented in crate docs |
+| ADR-SAG-0005 | `PayloadBundle` type only; facade assembly is a later sprint |
+| ADR-SAG-0009 | `JudgeBackend` is an open trait |
+| ADR-SAG-0013 | Shim is the only session-log path |
 | ADR-SAG-0016 | Shim module present; no full `sc-observability` on library crates |
+| NFR-SAG-0002 | `ScAgentErrorResponse` and `LogEvent` carry no secret fields |
+| REQ-SAG-0103 | Mock-only `JudgeOutcome` field parity via `test_util::judge_outcome_field_names`; a-4 and a-5 cover live backends |
 
 ## Required validation
 
@@ -119,6 +144,8 @@ python3 -c "import json; json.load(open('tests/fixtures/jev/README-contract/erro
 ```
 
 Expected: all commands exit 0; last command confirms no HTTP client deps in workspace yet.
+
+Cross-impl and fixture-backed tests run in the **workspace** only (see `sc-agent-types` crate docs); they are omitted from the published crate package.
 
 ## Parity checklist
 

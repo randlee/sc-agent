@@ -59,6 +59,9 @@ tmp/
 
 # sc-publish kit bootstrap cache (pinned clone, see release/sc-publish-pin.toml)
 .sc-publish-kit/
+
+# Local sc-lint bootstrap environment. Commit `.sc-lint/bootstrap.py` only.
+.sc-lint/venv/
 **/.sc-compose/
 
 # Beads / Dolt files (added by bd init)

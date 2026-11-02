@@ -1,0 +1,10 @@
+[package]
+name = "sc-jev-check"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Jev check facade (module tree only until sprints a-3 and a-6)."

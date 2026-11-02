@@ -1,0 +1,15 @@
+{
+  "state": [
+    {
+      "choice": "yes",
+      "question_id": "relevant"
+    }
+  ],
+  "questions": [
+    {
+      "choices": ["yes", "no"],
+      "prompt": "Does the café policy apply?",
+      "id": "relevant"
+    }
+  ]
+}

@@ -55,6 +55,7 @@ in by orchestration — no production prose literals in this crate.
 | Root | Criterion |
 | --- | --- |
 | boundary:jev-backends | Haiku/Luna fake-transport tests pass (wire, token-count preflight, INPUT_TOO_LARGE, RESPONSE_INVALID, busy retry); key + transport at construction; no `sc-agent-secrets` dep |
+| REQ-SAG-0103 | Haiku and Luna `JudgeOutcome` field names match `sc_agent_types::test_util::judge_outcome_field_names()` |
 | ADR-SAG-0004 | Pre-send byte/token validation |
 | ADR-SAG-0006 | Transport at construction |
 | ADR-SAG-0007 | HTTP timeouts on token-count + judge |
