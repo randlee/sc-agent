@@ -169,7 +169,7 @@ multi-backend, and logging without overloading a-3.
 | a-3 | extractors (`file`, `table-column`, `subjects`, `command`), config, payload | `subjects` input (minimal fixture only) |
 | a-7 | CLI session/ask/run; branches cross-impl (consumer digest) | **1**, **2** |
 | a-4 | Jev transport rows | — |
-| a-5 | Haiku/Luna rows | **8** (Luna token-count wire; fake transport) |
+| a-5 | Haiku/Luna rows (Luna `equal` unverified — decision **4**) | **8** open (`agt-luna-live-count`); a-5 fake-transport wire only |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
 | a-8 | library API parity for Python callers | PyO3 + wheel build |
 | a-9 | — | sc-publish install + preflight + REQ-SAG-0803 dry-run |
@@ -220,9 +220,12 @@ to the same Jev answer shape inside `data`; fake transports are test-only.
    dynamic loading (Phase A). Python drops `python-branches` extractor; cross-impl
    reads committed **`subjects.json`**. **No** atm-core PR #2308 dependency.
    **Source:** Rand, 2026-11-02 — [PR #4 comment](https://github.com/randlee/sc-agent/pull/4#issuecomment-6588041822).
-4. **Luna / OpenAI key:** Phase A does not require the maintainer to hold
-   `OPENAI_API_KEY`. Feature **8** = fake-transport token-count wire in a-5.
-   **Source:** Rand, 2026-11-01 (no OpenAI key).
+4. **Luna live token count:** no OpenAI key is available to the maintainer in
+   Phase A. Luna's `equal` record is therefore **unverified**, and the plan does
+   not claim Luna parity. Tracked as bead **`agt-luna-live-count`**; closes when a
+   key exists and the a-5 probe is run once with its output attached. Requested
+   feature **8** remains open until then. **Source:** fenix status, atm-core PR
+   #2308, 2026-11-01; recorded here by review 2026-11-02.
 
 ## Open questions (for Rand)
 
@@ -233,10 +236,9 @@ None blocking plan approval. **Kickoff decisions** (can default in sprint if sil
 3. ~~Cross-impl bytes~~ — **Resolved:** a-1 commits Python reference bytes;
    phase acceptance runs `tests/fixtures/jev-python` pytest (a-8); Rust-only
    fixtures are not a substitute.
-4. ~~Luna live token-count~~ — **Resolved (Rand, 2026-11-01):** no OpenAI key.
-   Feature **8** closes on **fake-transport** proof of the token-count wire in a-5.
-   Live `/v1/responses/input_tokens` is optional maintainer evidence when a key
-   exists; not required for phase approval or close.
+4. ~~Luna live token-count~~ — **Resolved:** see resolved decision **4** above
+   (`agt-luna-live-count`); a-5 still proves token-count **wire** with fake
+   transport; feature **8** / live `equal` verification stays open.
 5. ~~**sc-ai-cli envelope**~~ — **Resolved:** ADR-SAG-0014 + sprint **a-7** use
    `{ "version", "operation", "data" }` with Jev body + `session_id` in `data`.
 

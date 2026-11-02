@@ -44,7 +44,7 @@ in by orchestration — no production prose literals in this crate.
 ## Deliverables
 
 1. **REQ-SAG-0500** — Haiku wire format matches README table (fake transport tests).
-2. **REQ-SAG-0501** — Luna wire format + token-count request shape verified with **fake transport** (feature **8**). Optional: maintainer with `OPENAI_API_KEY` attaches live `/v1/responses/input_tokens` output in PR — **not** required for phase close (Rand has no OpenAI key).
+2. **REQ-SAG-0501** — Luna wire format + token-count request shape verified with **fake transport** (does **not** close requested feature **8** — see plan resolved decision **4** / bead `agt-luna-live-count`).
 3. **REQ-SAG-0502** — LLM `INPUT_TOO_LARGE` after full provider message (prompt + payload) is known; invalid question paths refuse send like Jev.
 4. **REQ-SAG-0500 (prompt injection proof)** — System prompt via `JudgeRequest.llm`; changing prompt changes wire, not `prompt_sha256` (REQ-SAG-0503 load/inject owned by **a-6**).
 5. **REQ-SAG-0504** — Read Anthropic `stop_reason` / OpenAI `status`; truncation at `max_tokens` → `RESPONSE_INVALID` with reason (tighten **#4**).
@@ -78,8 +78,9 @@ cargo test -p sc-jev-backends -- test_llm_busy_retry_same_body --exact --nocaptu
 ! cargo tree -p sc-jev-backends -i sc-agent-secrets 2>/dev/null
 ```
 
-Expected: exit 0 on CI (no network). Live Luna probe is **optional** evidence
-when a key exists; phase close does **not** require one.
+Expected: exit 0 on CI (no network). Live `/v1/responses/input_tokens` probe
+closes **`agt-luna-live-count`** when a key exists; Phase A does not claim Luna
+parity until then.
 
 ## Parity checklist
 
