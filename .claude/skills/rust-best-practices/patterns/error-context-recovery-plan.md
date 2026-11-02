@@ -206,7 +206,7 @@ A Claude Code command that scans source files and flags violations:
 
 When this repository adds an error-audit binary or lint step, wire it in CI or
 pre-commit per `.claude/project/quality-policy.md`. No `sc-hooks` or
-`/error-audit` tooling is required in sc-runtime until explicitly added.
+`/error-audit` tooling is required in this repository until explicitly added.
 
 ---
 

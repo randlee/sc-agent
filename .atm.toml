@@ -1,0 +1,51 @@
+# ATM configuration for sc-agent (Synaptic Canvas agent runtime).
+#
+# Runtime identity is from the environment (see `atm help identity`):
+#   export ATM_IDENTITY=team-lead ATM_TEAM=sc-agent
+#
+# Register the team and members on the ATM daemon before first use, for example:
+#   atm teams add-member sc-agent team-lead --agent-type lead --model sonnet \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default \
+#     --alias sc-agent-lead
+# Repeat for scodex, quality-mgr, and publisher (aliases below).
+#
+# team-lead, quality-mgr, and publisher MUST keep repo-unique Herdr aliases
+# (see .claude/skills/team-lead/SKILL.md).
+
+[atm]
+default_team = "sc-agent"
+
+[rmux]
+session = "sc-agent"
+
+[[rmux.windows]]
+name = "agents"
+layout = "even-horizontal"
+
+[[rmux.windows.panes]]
+name = "team-lead"
+alias = "sc-agent-lead"
+model = "sonnet"
+env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+
+[[rmux.windows.panes]]
+name = "scodex"
+alias = "sc-agent-codex"
+command = "codex -c features.hooks=true --yolo"
+env = { ATM_IDENTITY = "scodex", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+
+[[rmux.windows.panes]]
+name = "quality-mgr"
+alias = "sc-agent-quality"
+model = "sonnet"
+env = { ATM_IDENTITY = "quality-mgr", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+
+[[rmux.windows]]
+name = "publishing"
+layout = "even-horizontal"
+
+[[rmux.windows.panes]]
+name = "publisher"
+alias = "sc-agent-publisher"
+model = "sonnet"
+env = { ATM_IDENTITY = "publisher", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }

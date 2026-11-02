@@ -67,7 +67,7 @@ under review are not Blocking when absent.
 - `docs/framework-charter.md`: multi-consumer scaffolding framework posture
   (mandatory for `doc_review`, phase plans, and any sprint touching public
   APIs or the template)
-- `docs/sc-runtime-design.md`: product principles and non-goals
+- `docs/design.md` when present: product principles and non-goals; else `docs/requirements.md`
 - `docs/architecture.md`: repo-level architecture and repo-level ADRs
   (`ADR-<DOMAIN>-nnnn`, the product's domain code)
 - `docs/<crate>/architecture.md` for each crate the sprint owns or references

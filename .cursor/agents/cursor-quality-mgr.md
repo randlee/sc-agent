@@ -34,7 +34,7 @@ reviewer-equivalent analysis in the foreground.
 - Use assignment placeholders (`worktree_path`, `sprint_doc`) as provided.
 - Resolve unknown paths via git common-dir / `/sc-git-worktree` metadata for the
   current machine (macOS, Linux, or Windows). Never assume cwd-relative
-  `../wyvern-worktrees`.
+  `../sc-agent-worktrees` from an arbitrary cwd.
 
 ## CLI auth
 

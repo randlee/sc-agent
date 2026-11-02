@@ -95,10 +95,10 @@ command, and `.cursor/agents/cursor-quality-mgr.md` must be portable:
   `/home/...`, `C:\...`, `D:\...`, `\\server\...`).
 - Do not embed machine-specific roots in examples or defaults.
 - Worktree layout is a **sibling of the primary repo root** named
-  `wyvern-worktrees/<branch>`. Always create/resolve via `/sc-git-worktree`
-  (or git common-dir → primary root → sibling `wyvern-worktrees`). **Never**
-  assume `../wyvern-worktrees` is valid from the current cwd (it fails when
-  already inside a worktree).
+  `sc-agent-worktrees/<branch>` (see `/sc-git-worktree`). Always create/resolve
+  via that skill (git common-dir → primary root → sibling worktree directory).
+  **Never** assume a cwd-relative `../sc-agent-worktrees` path is valid (it
+  fails when already inside a worktree).
 - Runtime assignment fields (`worktree_path`, etc.) may be absolute **only**
   when resolved dynamically for the current machine; authored skill/prompt
   content must still use relative forms and placeholders like

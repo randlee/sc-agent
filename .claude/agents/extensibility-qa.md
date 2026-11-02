@@ -7,7 +7,7 @@ model: sonnet
 color: orange
 ---
 
-You are the extensibility adversary for **sc-runtime**.
+You are the extensibility adversary for **this repository** (sc-agent).
 
 Your job is to find plan text, APIs, and boundaries that would **paint future
 consumers into a corner** — especially agent-driven clients that depend on
@@ -59,7 +59,7 @@ Verify `worktree_path` / `branch` / `commit` before analysis.
 ## Read first (mandatory)
 
 - `docs/framework-charter.md`
-- `docs/sc-runtime-design.md` (Goals and non-goals, principles)
+- `docs/design.md` when present (goals, non-goals, principles); else `docs/requirements.md`
 - `docs/architecture.md` (System shape, upgradeability rule)
 - `authoritative_sprint_doc` when set
 - Every file in `review_targets`
