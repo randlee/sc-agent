@@ -2,14 +2,16 @@
 name: team-lead
 version: 0.4.0
 description: >
-  Session initialization for the team-lead identity. Confirms identity,
+  Session initialization for the phase lead identity. Confirms identity,
   verifies the ATM runtime, and keeps `.atm.toml` aliases, the ATM roster and
-  the live Herdr agents in agreement. Only run when ATM_IDENTITY=team-lead.
+  the live Herdr agents in agreement. Run when ATM_IDENTITY is the repo lead
+  (here `ai-lead`; generic repos use `team-lead`).
 ---
 
 # Team Lead Skill
 
-Trigger: run at the start of every fresh session where `ATM_IDENTITY=team-lead`.
+Trigger: run at the start of every fresh session where `ATM_IDENTITY` is this
+repository's lead (`ai-lead` for sc-ai; see `.claude/project/quality-policy.md`).
 Do not use this skill for same-session compaction or resume unless Step 1
 or Step 2 shows a problem, or a teammate stops receiving messages.
 
@@ -19,7 +21,7 @@ or Step 2 shows a problem, or a teammate stops receiving messages.
 echo "ATM_IDENTITY=$ATM_IDENTITY"
 ```
 
-Stop if `ATM_IDENTITY` is not `team-lead`.
+Stop if `ATM_IDENTITY` is not the configured lead (`ai-lead` on team `sc-ai`).
 
 ## Step 1 — Verify Runtime
 
@@ -122,7 +124,8 @@ store. That is disaster recovery and needs the user's instruction.
 
 ## Step 4 — Project Status
 
-Read `docs/project-plan.md`, check open PRs with `atm gh pr list`, and output a
+Read `.claude/project/quality-policy.md`, `docs/development/developer-roster.md`,
+and `docs/project-plan.md`, check open PRs with `atm gh pr list`, and output a
 concise status: current phase, open PRs, each teammate's last known task, and
 the next sprints ready to run. Stay silent in ATM unless a teammate has to act.
 
@@ -148,7 +151,7 @@ After initialization, use these repo-local skills to coordinate work:
 | Skill | Trigger |
 |-------|---------|
 | `/phase-orchestration` | Orchestrate a multi-sprint phase with fresh scrum-masters |
-| `/codex-orchestration` | Run phases with roster developers and pipelined QA via quality-mgr |
+| `/codex-orchestration` | Run phases with developers (`tai`, `lai`, `sai`); QA gate via `ai-qa` (`lead=ai-lead` in template vars) |
 | `/plan-hardening` | Harden a phase plan and create any missing sprint docs before implementation starts or resumes |
 | `/todo-triage` | Run the repo TODO scan during sprint-end or integration review and route TODOs into QA findings/Turtle triage instead of silent deferral |
 | `/triaging-findings` | Correlate QA findings when `.claude/skills/triaging-findings/` is installed; otherwise parent writes `.triage/` records |

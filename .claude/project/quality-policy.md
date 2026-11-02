@@ -3,6 +3,9 @@
 Repository-specific QA policy for **sc-agent**. Reusable agents and skills read
 this file instead of embedding repo names, commands, or exceptions in prompts.
 
+(Structure follows Synaptic Canvas QA repos; **atm-core** does not ship a
+`.claude/project/quality-policy.md` — this file is sc-agent's source of truth.)
+
 ## Repository baseline
 
 - Default comparison branch: `develop`
@@ -16,14 +19,17 @@ this file instead of embedding repo names, commands, or exceptions in prompts.
 - Crate docs (when present): `docs/<crate>/requirements.md` and
   `docs/<crate>/architecture.md`
 - Developer roster: `docs/development/developer-roster.md`
+- Lead session skill: `.claude/skills/team-lead/SKILL.md`
 
 ## ATM team (sc-ai)
 
-- Team name: `sc-ai` (see `.atm.toml`)
-- Lead identity: `ai-lead` — pass `lead=ai-lead` in orchestration template vars
-- QA enforcer identity: `ai-qa` (quality-mgr role; prompt:
-  `.claude/agents/quality-mgr.md`)
-- Codex developers: `tai`, `lai`, `sai`
+- Team name: `sc-ai` (see `.atm.toml`, `ATM_TEAM=sc-ai`)
+- **Lead identity:** `ai-lead` — orchestration templates use `--var lead=ai-lead`
+  (or `"lead": "ai-lead"` in vars JSON)
+- **QA enforcer identity:** `ai-qa` — dispatches use member `ai-qa`; prompt file
+  remains `.claude/agents/quality-mgr.md`
+- **Developers:** `tai`, `lai`, `sai` (Codex)
+- Session init: lead runs `/team-lead` at fresh session start
 
 ## Reviewer policy
 
@@ -36,34 +42,41 @@ this file instead of embedding repo names, commands, or exceptions in prompts.
   `ruthless-boundary-qa`, `rust-best-practices-agent`,
   `rust-service-hardening-agent`, and `ceremony-qa`
 - Plan review QA-2 and later: `req-qa` and `arch-qa` scoped to dispatched
-  findings; plan QA capped at 3 rounds (`plan_qa_cycle_limit`)
-- `ceremony-finding-screen`: every sprint or plan QA round with findings,
+  findings; dispatch another reviewer only when rechecking a carry-forward
+  finding it owns. Plan QA is capped at **3 rounds** (`plan_qa_cycle_limit`);
+  a round that leaves only minor findings reports
+  `PASS — minor fixes required, no re-QA`
+- `ceremony-finding-screen`: every sprint or plan QA round that has findings,
   before the report is posted
 - Phase-end review: initial implementation set plus `flaky-test-qa`
-- `schema-reviewer`: only when governed interfaces in scope (see below)
-- Every QA round requires an open PR and a posted findings report
+- Run `flaky-test-qa` earlier when tests changed or instability is suspected
+- `schema-reviewer`: only when Governed Interfaces below names a relevant
+  interface; otherwise `SKIPPED`
+- Every QA round requires an open PR; the rendered report is posted every round
 
 ## Validation policy
 
-Until a Rust workspace lands on `develop`, sprint validation is **docs and agent
+Until a Rust workspace exists on `develop`, sprint validation is **docs and agent
 asset review only** (no `cargo` gate).
 
-When `Cargo.toml` exists at the repository root:
+When root `Cargo.toml` exists:
 
 - Sprint QA: `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`,
   `cargo test --workspace`
-- Phase-end artifact command: same as sprint unless a phase plan overrides it
+- Phase-end artifact command: same unless a phase plan overrides it
 
 ## Release and publishing
 
-- Manifest: `release/publish-artifacts.toml` (minimal until crates ship)
+- Manifest: `release/publish-artifacts.toml` (minimal until crates/channels ship)
 - Channel contracts: `release/publish-channel-contracts.toml`
 - Helpers: `.github/scripts/release_artifacts.py`, `worker_result.py`,
   `bootstrap_sc_compose.py`
-- Publishing workflows under `.github/workflows/` are present for kit sync;
-  do not run release until the manifest declares real artifacts.
+- Workflows under `.github/workflows/` are kit-aligned; do not publish until the
+  manifest declares real artifacts and Release Preflight passes
 
 ## Repository layout (reviewer expectations)
+
+Reviewers read this table before treating missing paths as Blocking.
 
 | Path | When required |
 | --- | --- |
@@ -75,14 +88,15 @@ When `Cargo.toml` exists at the repository root:
 | `crates/<crate>/` or root `Cargo.toml` | Rust implementation sprints |
 | `.claude/project/quality-policy.md` | Every QA round |
 | `.claude/assets/sc-rust/` | Rust QA orchestration |
+| `.claude/skills/triaging-findings/` | Pre-dispatch finding correlation |
+| `.claude/skills/closing-triage/scripts/query_open_findings.py` | Fix rounds when present |
 
-Absent paths marked “when present” or not yet required are **not** Blocking in
-early bootstrap reviews.
+Absent paths marked not yet required are **not** Blocking in bootstrap reviews.
 
 ## Governed interfaces
 
-None declared yet. When added, list JSON Schema paths, OpenAPI specs, or MCP
-tool manifests here for `schema-reviewer`.
+None declared. Until this section names an interface, its compatibility rule,
+evidence paths, and approval authority, `schema-reviewer` returns `SKIPPED`.
 
 ## Plan naming
 
@@ -90,17 +104,23 @@ Lower case only.
 
 | Thing | Form | Example |
 | --- | --- | --- |
-| Phase id | unused letter pair | `a` |
+| Phase id | next unused letter(s) | `a` |
 | Sprint id | `<phase>-<n>` | `a-1` |
 | Plan directory | `docs/plans/phase-<phase>/` | `docs/plans/phase-a/` |
 | Phase plan | `phase-<phase>-plan.md` | `phase-a-plan.md` |
 | Sprint doc | `sprint-<phase>-<n>-<slug>.md` | `sprint-a-1-bootstrap.md` |
+| Plan branch | `plan/phase-<phase>`, PR to `develop` | `plan/phase-a` |
+| Phase branch | `integrate/phase-<phase>`, from `develop` | `integrate/phase-a` |
+| Sprint branch | `sprint/<phase>-<n>-<slug>` | `sprint/a-1-bootstrap` |
+| Fix layer | `fix/<phase>-<n>-<slug>` | `fix/a-1-qa1` |
+
+Phase plans live only under `docs/plans/phase-<phase>/`.
 
 ## Architectural rules
 
 - Agent and skill paths are repo-root-relative; no host-specific paths in
   committed prompts.
-- Orchestration dispatches to ATM identities declared in `.atm.toml`.
+- Orchestration dispatches to ATM identities in `.atm.toml` and this policy.
 
 ## Repository exceptions
 
