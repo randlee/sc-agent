@@ -5,9 +5,7 @@
 
 use std::sync::Arc;
 
-use uuid::Uuid;
-
-use crate::ids::{BackendId, Sha256Digest};
+use crate::ids::{BackendId, SessionId, Sha256Digest};
 
 /// Rejection returned by a [`SessionLog`] implementation.
 #[doc(inline)]
@@ -15,11 +13,12 @@ pub use sc_observability_types::v2::EventError;
 
 /// One prompt or judge send.
 ///
-/// Fields are correlation metadata only. Secrets never appear here.
+/// Fields are correlation metadata only. Secrets never appear here
+/// (NFR-SAG-0002).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogEvent {
     /// Session the send belongs to.
-    pub session_id: Uuid,
+    pub session_id: SessionId,
     /// Backend that received the payload.
     pub backend: BackendId,
     /// SHA-256 of the canonical payload bytes.
@@ -143,7 +142,7 @@ mod tests {
 
     fn event() -> LogEvent {
         LogEvent {
-            session_id: Uuid::nil(),
+            session_id: SessionId::from_uuid(Uuid::nil()),
             backend: BackendId::Jev,
             prompt_sha256: Sha256Digest::of(b"payload"),
             operation: "judge".into(),
@@ -163,5 +162,22 @@ mod tests {
         let rejecting = RejectingSessionLog::new();
         assert!(rejecting.try_log(event()).is_err());
         assert_eq!(rejecting.attempts(), 1);
+    }
+
+    #[test]
+    fn log_event_fields_carry_no_secrets() {
+        let event = event();
+        let LogEvent {
+            session_id,
+            backend,
+            prompt_sha256,
+            operation,
+        } = event;
+        let rendered = format!("{session_id} {backend} {prompt_sha256} {operation}");
+        let lower = rendered.to_ascii_lowercase();
+        for forbidden in ["secret", "api_key", "password", "authorization", "bearer"] {
+            assert!(!lower.contains(forbidden), "{forbidden} in {rendered}");
+        }
+        assert_eq!(operation, "judge");
     }
 }

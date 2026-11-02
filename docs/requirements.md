@@ -1,7 +1,7 @@
 # sc-agent requirements
 
 **ID range:** REQ-SAG-0001+  
-**Status:** Draft (Phase A planning)  
+**Status:** Approved  
 **Owner:** sc-agent maintainers
 
 ## Product purpose

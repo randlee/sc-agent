@@ -9,6 +9,11 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
+/// Matches the justfile: `python` on Windows, `python3` elsewhere.
+fn python_program() -> &'static str {
+    if cfg!(windows) { "python" } else { "python3" }
+}
+
 #[test]
 fn jev_cross_impl_matches_python_reference() {
     let root = repo_root();
@@ -17,7 +22,7 @@ fn jev_cross_impl_matches_python_reference() {
     let value: serde_json::Value = serde_json::from_str(&logical).expect("parse logical json");
     let rust_bytes = canonical_json_bytes(&value).expect("canonicalize");
 
-    let python = Command::new("python3")
+    let python = Command::new(python_program())
         .arg(fixture.join("canonicalize.py"))
         .output()
         .expect("run python reference");

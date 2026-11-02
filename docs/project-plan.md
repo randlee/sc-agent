@@ -1,6 +1,6 @@
 # sc-agent project plan
 
-**Status:** Phase A planned (awaiting approval)  
+**Status:** Phase A approved; implementation in progress (PR #4 merged 2026-11-02)  
 **Default branch:** `develop`
 
 ## Phases
@@ -8,7 +8,7 @@
 | Phase | Status | Integration branch | Plan |
 | --- | --- | --- | --- |
 | Bootstrap | Complete | `develop` | Agent teams, plan-anchor, beads, policy |
-| **A — sc-jev + sc-ai** | **Planned** | `integrate/phase-a` | [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md) |
+| **A — sc-jev + sc-ai** | **In progress** | `integrate/phase-a` | [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md) |
 | B (draft) | Not planned | — | Remaining Jev API (REQ-SAG-0110); check features 4–7; **API-direct** Claude + Codex via `sc-ai`. **Not** claude-code/codex-cli/cursor-cli wrappers |
 
 ## Lead
@@ -33,7 +33,7 @@ Sprint docs: `docs/plans/phase-a/sprint-a-*.md`.
 
 ## Approval gate
 
-**No Rust implementation PRs** until Rand approves `plan.md` and sprint docs.
+Phase A plan approved (PR #4 merged 2026-11-02). Implementation is in progress.
 
 ## After Phase A
 

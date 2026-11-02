@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::ids::Sha256Digest;
+use crate::ids::{Rev, Sha256Digest};
 
 /// Schema id for the Phase A subjects artifact.
 pub const SUBJECTS_SCHEMA_V1: &str = "sc/subjects/1";
@@ -16,7 +16,7 @@ pub struct SubjectsSource {
     /// Repo-relative source path.
     pub path: String,
     /// Git revision, or `HEAD` when the producer recorded that name.
-    pub rev: String,
+    pub rev: Rev,
     /// Git blob id of the source bytes.
     pub blob_sha: String,
 }
@@ -83,24 +83,23 @@ pub struct SubjectsDocument {
     pub subjects: Vec<Subject>,
 }
 
-/// Named check input.
+/// Check input stored under `[inputs.<name>]` in `check.toml`.
 ///
-/// Only the four Phase A kinds exist. `sc-jev-check` is the only crate that
-/// runs them.
+/// `<name>` is the table key, not a field. Keys match
+/// `docs/sc-jev-check/extraction.md`: `kind`, `path`, `column`, and for
+/// `command` the argv array `command` plus optional `timeout_seconds`
+/// (default 30). Only these four Phase A kinds exist. `sc-jev-check` is the
+/// only crate that runs them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum InputSpec {
-    /// Read a file at `rev`.
+    /// Read a file at the caller-supplied revision.
     File {
-        /// Input name in `check.toml`.
-        name: String,
         /// Repo-relative path.
         path: String,
     },
     /// Read one markdown table column.
     TableColumn {
-        /// Input name in `check.toml`.
-        name: String,
         /// Repo-relative path.
         path: String,
         /// Column header to extract.
@@ -108,20 +107,21 @@ pub enum InputSpec {
     },
     /// Read a `sc/subjects/1` document from `path`.
     Subjects {
-        /// Input name in `check.toml`.
-        name: String,
         /// Repo-relative path of the artifact.
         path: String,
     },
     /// Run an argv array. No shell.
     Command {
-        /// Input name in `check.toml`.
-        name: String,
-        /// Argument vector. Placeholders are expanded by the facade.
-        argv: Vec<String>,
-        /// Process time limit in seconds.
+        /// Argument vector. The check.toml key is `command`.
+        command: Vec<String>,
+        /// Process time limit in seconds. Omitted toml uses 30.
+        #[serde(default = "default_command_timeout_seconds")]
         timeout_seconds: u64,
     },
+}
+
+fn default_command_timeout_seconds() -> u64 {
+    30
 }
 
 #[cfg(test)]
@@ -135,9 +135,71 @@ mod tests {
         let text = std::fs::read_to_string(path).expect("read minimal.json");
         let document: SubjectsDocument = serde_json::from_str(&text).expect("parse subjects");
         assert_eq!(document.schema, SUBJECTS_SCHEMA_V1);
+        assert_eq!(document.source.rev, Rev::new("HEAD"));
         assert_eq!(document.producer.mode, "matches");
         assert_eq!(document.subjects[0].id, "src/example.py:42");
         assert_eq!(document.subjects[1].id, "src/example.py:42:1");
         assert!(document.subjects[0].span.start_byte < document.subjects[1].span.start_byte);
+    }
+
+    #[test]
+    fn input_spec_matches_extraction_check_toml_keys() {
+        let file: InputSpec = serde_json::from_str(
+            r#"{"kind":"file","path":"skills/atm-bd-lite/scripts/atm-bd-task-hook.py"}"#,
+        )
+        .expect("file");
+        assert_eq!(
+            file,
+            InputSpec::File {
+                path: "skills/atm-bd-lite/scripts/atm-bd-task-hook.py".into(),
+            }
+        );
+
+        let subjects: InputSpec = serde_json::from_str(
+            r#"{"kind":"subjects","path":"tests/fixtures/cross-impl/branches/subjects.json"}"#,
+        )
+        .expect("subjects");
+        assert!(matches!(subjects, InputSpec::Subjects { .. }));
+
+        let column: InputSpec = serde_json::from_str(
+            r#"{"kind":"table-column","path":"docs/decisions.md","column":"Choice"}"#,
+        )
+        .expect("table-column");
+        assert_eq!(
+            column,
+            InputSpec::TableColumn {
+                path: "docs/decisions.md".into(),
+                column: "Choice".into(),
+            }
+        );
+
+        let command: InputSpec = serde_json::from_str(
+            r#"{"kind":"command","command":["sc-treesitter","extract","--language","python","--query","branches","{path}"]}"#,
+        )
+        .expect("command");
+        assert_eq!(
+            command,
+            InputSpec::Command {
+                command: vec![
+                    "sc-treesitter".into(),
+                    "extract".into(),
+                    "--language".into(),
+                    "python".into(),
+                    "--query".into(),
+                    "branches".into(),
+                    "{path}".into(),
+                ],
+                timeout_seconds: 30,
+            }
+        );
+
+        let with_name =
+            serde_json::from_str::<InputSpec>(r#"{"kind":"file","name":"hook","path":"a.py"}"#);
+        assert!(
+            with_name.is_err(),
+            "input name is the table key, not a field"
+        );
+        let with_argv = serde_json::from_str::<InputSpec>(r#"{"kind":"command","argv":["echo"]}"#);
+        assert!(with_argv.is_err(), "argv is the check.toml key command");
     }
 }

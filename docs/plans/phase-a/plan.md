@@ -1,6 +1,6 @@
 # Phase A — sc-jev and sc-ai CLI foundation
 
-Status: **planned** — awaiting Rand approval before implementation.
+Status: **approved** — implementation in progress (plan PR #4 merged 2026-11-02).
 
 Sprint doc shape follows
 [`docs/development/sprint-planning-guidelines.md`](../../development/sprint-planning-guidelines.md).
@@ -113,8 +113,11 @@ depends on CLI, PyO3, or full `sc-observability`.
 | `jev-py` | `sc-jev-py` | PyO3 over facade |
 | `sc-ai-cli` | `sc-ai` | argv → operations → JSON envelope |
 
-Sprint **a-1** commits **stub** manifests only. Each boundary sprint owns
-`boundaries/<id>/**` for its crate thereafter (a-1 does not retain `boundaries/**`).
+Sprint **a-1** commits stub manifests for every Phase A boundary and lists
+`boundaries/**` in its `owned_paths`, along with `.gitignore`,
+`.sc-lint/bootstrap.py`, the `sc-jev-check` module files, and the `sc-ai`
+library stub. Each later boundary sprint also lists `boundaries/<id>/**` for
+the boundary it closes and may replace the a-1 stub for that id.
 
 ## Wave table
 
@@ -347,4 +350,5 @@ against TypeSafe with Rand-provided key, artifact attached to phase PR.
 
 ## Approval gate
 
-**Stop:** no implementation PRs until Rand approves this plan and sprint docs.
+Phase A plan and sprint docs were approved when PR #4 merged on 2026-11-02.
+Implementation is in progress on `integrate/phase-a`.

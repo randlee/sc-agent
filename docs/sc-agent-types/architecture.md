@@ -31,9 +31,12 @@ pub struct Sha256Digest(String);
 Extractor-facing types (`Subject`, `Span`, `InputSpec`, `Question`, …) and the
 **`sc/subjects/1`** document types live in this crate and are frozen in a-1.
 Normative JSON rules: [`subjects-schema.md`](subjects-schema.md).
+`InputSpec` matches `docs/sc-jev-check/extraction.md` `check.toml`: the input
+name is the `[inputs.<name>]` table key, and a `command` input stores its argv
+array under the key `command` (`timeout_seconds` defaults to 30).
 
 ```rust
-pub struct SubjectsSource { pub path: String, pub rev: String, pub blob_sha: String }
+pub struct SubjectsSource { pub path: String, pub rev: Rev, pub blob_sha: String }
 pub struct SubjectsProducer {
     pub name: String,
     pub version: String,
@@ -120,7 +123,7 @@ same `JudgeOutcome` fields for a fixture request.
 
 ```rust
 pub struct LogEvent {
-    pub session_id: uuid::Uuid,
+    pub session_id: SessionId,
     pub backend: BackendId,
     pub prompt_sha256: Sha256Digest,
     pub operation: String,

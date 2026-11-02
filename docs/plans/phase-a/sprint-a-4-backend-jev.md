@@ -71,6 +71,7 @@ Consumes **`JudgeBackend` / `JudgeRequest` from a-1** only (not a-3 payload buil
 | boundary:jev | `JevClient: JudgeBackend`; transport + resolved key at construction |
 | ADR-SAG-0004 | `validate_for_send` + refuse before send on oversize input |
 | ADR-SAG-0006 | No transport parameter on `judge` |
+| REQ-SAG-0103 | `JevClient` `JudgeOutcome` field names match `sc_agent_types::test_util::judge_outcome_field_names()` |
 
 ## Required validation
 
