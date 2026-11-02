@@ -9,8 +9,9 @@
 Rust crates plus orchestration assets for launching Synaptic Canvas agents.
 Phase A delivers **`sc-jev`** (full Jev API home; check/judge slice first +
 Haiku/Luna comparison) and
-the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
-`docs/plans/phase-bo/design/packages/jev-check/README.md`.
+the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
+**in-repo snapshot** [`tests/fixtures/jev/README-contract/errors.json`](../tests/fixtures/jev/README-contract/errors.json)
+(aligned with atm-core jev-check README; update snapshot when README changes).
 
 ## Bootstrap (done)
 
@@ -33,7 +34,7 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | ID | Requirement |
 | --- | --- |
 | REQ-SAG-0100 | Root Cargo workspace, `justfile`, sc-lint, standard lint/test targets |
-| REQ-SAG-0101 | `JevError`: one variant per README error id; each has `code()` and `fix_hint()` |
+| REQ-SAG-0101 | `JevError`: one variant per id in `tests/fixtures/jev/README-contract/errors.json`; each has `code()` and `fix_hint()` |
 | REQ-SAG-0102 | Cross-implementation payload fixture: Rust digest matches committed Python reference bytes |
 | REQ-SAG-0103 | Frozen `JudgeBackend` / `JudgeRequest` contract + contract tests in `sc-agent-types` |
 | NFR-SAG-0001 | CLI error JSON shape (`ScAgentErrorResponse`) defined in `sc-agent-types` |
@@ -100,13 +101,13 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | REQ-SAG-0710 | Blocking CLI: stdout = Jev API JSON + `session_id`; stderr errors; exit 2 |
 | NFR-SAG-0002 | Secrets never appear in CLI output or logs |
 | NFR-SAG-0003 | Session JSONL retained on disk (path configurable; default documented) |
-| REQ-SAG-0711 | `sc-ai` wires `v2::LoggerBuilder` + adapter into `sc-jev` |
+| REQ-SAG-0711 | `sc-ai` wires `v2::LoggerBuilder` + adapter into `SharedSessionLog` for `sc-jev-check` |
 
 ## Phase A — sc-jev-py + first release (sprint a-8)
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0800 | PyO3 exports `sc-jev`; Python errors match enum codes |
+| REQ-SAG-0800 | PyO3 exports **`sc-jev-check`** (`run_check`, sessions); Python errors match `JevError` codes; no direct `sc-jev` dependency |
 | REQ-SAG-0801 | Cross-impl pytest harness in repo |
 | REQ-SAG-0802 | maturin wheel build; `pip install` from built artifact |
 
@@ -117,7 +118,7 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | REQ-SAG-0130 | sc-publish consumer input enables **crates.io**, **pypi**, **homebrew**, **scoop**, **winget** + `sc-ai` release binaries |
 | REQ-SAG-0131 | `docs/development/sc-publish.md`; do not hand-edit rendered publish manifests |
 | REQ-SAG-0132 | Release preflight CI green; local preflight script matches kit |
-| REQ-SAG-0803 | **First release:** all five channels via sc-publish (preflight + dry-run in CI) |
+| REQ-SAG-0803 | **First release:** all five channels via sc-publish — **a-9** installs kit + consumer input; **a-10** proves preflight + publish dry-run in CI |
 
 ## Phase B (draft — not scheduled)
 

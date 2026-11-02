@@ -5,8 +5,12 @@ Extraction lives only in **`sc-jev-check`**. **`sc-jev`** never reads source fil
 ## Extractor trait
 
 ```rust
-pub trait Extractor {
-    /// Subjects in deterministic order. `id` unique within this input; `text` = exact bytes judged.
+mod private {
+    pub trait Sealed {}
+}
+
+/// Phase A kinds only (`file`, `table-column`, `tree-sitter`, `command`).
+pub trait Extractor: private::Sealed {
     fn extract(&self, repo: &RepoRoot, rev: &Rev, input: &InputSpec) -> Result<Vec<Subject>, JevError>;
 }
 

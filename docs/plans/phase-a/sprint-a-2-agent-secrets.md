@@ -13,9 +13,11 @@ recommended_model: gpt-5.6-terra-medium
 must_follow: [a-1]
 parallel_safe: [a-3, a-4, a-5]
 requirements:
+  - REQ-SAG-0101
   - REQ-SAG-0200
   - REQ-SAG-0201
   - REQ-SAG-0202
+  - NFR-SAG-0002
 adrs:
   - ADR-SAG-0003
 owned_paths:
@@ -48,8 +50,8 @@ pub fn resolve_key(id: BackendKeyId, repo_root: &Path) -> Result<String, JevErro
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0202 | Repo-root `.env` loaded; process env wins |
-| req:REQ-SAG-0200 | Missing key → `KEY_MISSING` without network |
+| boundary:agent-secrets | `resolve_key` injectable; no logging of secret material |
+| ADR-SAG-0003 | Errors never echo key values |
 
 ## Required validation
 

@@ -1,7 +1,7 @@
 # sc-jev — architecture
 
 **Boundary:** `jev`  
-**Depends on:** `sc-agent-types`, `sc-agent-secrets` (for auth key resolution at call site)
+**Depends on:** `sc-agent-types` only (API key resolved by **`sc-jev-check`** and passed at `JevClient` construction)
 
 ## North star
 

@@ -13,9 +13,14 @@ recommended_model: gpt-5.6-terra-medium
 must_follow: [a-6]
 parallel_safe: [a-7]
 requirements:
+  - REQ-SAG-0102
+  - REQ-SAG-0610
+  - REQ-SAG-0611
   - REQ-SAG-0800
   - REQ-SAG-0801
   - REQ-SAG-0802
+  - NFR-SAG-0002
+  - NFR-SAG-0003
 adrs:
   - ADR-SAG-0011
   - ADR-SAG-0016
@@ -38,7 +43,7 @@ owned_paths:
 2. **REQ-SAG-0801** — Cross-impl test harness under `tests/fixtures/jev-python`.
 3. **REQ-SAG-0802** — `pyproject.toml` + maturin config; `pip install` / `uv add` works from wheel (local `maturin build` in CI).
 4. **ADR-SAG-0011** — Python must not reimplement Jev HTTP or payload canonicalization.
-5. **ADR-SAG-0016** — Optional `sc-observability` pin in this crate; adapter implements `SharedSessionLog` for in-process Python (same JSONL shape as CLI when log dir set).
+5. **ADR-SAG-0016** — **Required** `sc-observability = "1.5.0"` pin; adapter implements `SharedSessionLog` for in-process Python (same JSONL shape as CLI when log dir set).
 6. Integration test: one `run_check` with temp log dir appends **one** JSONL line per judge send; line contains **no** API key material.
 
 ## Explicit code samples
@@ -61,8 +66,10 @@ requires-python = ">=3.11"
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0800 | `run_check` + session `ask` through wheel |
-| req:REQ-SAG-0801 | Cross-impl pytest matches a-1 fixture digest |
-| boundary:jev-py | Depends on facade only (+ types); PyO3 boundary manifest owned here |
+| req:REQ-SAG-0801 | Cross-impl pytest matches a-1 payload digest **and** branches fixture |
+| req:REQ-SAG-0610 | JSONL line per judge send when log dir set |
+| req:REQ-SAG-0611 | JSONL contains no API key material |
+| boundary:jev-py | `cargo tree -p sc-jev-py --depth 1` lists `sc-jev-check`, not `sc-jev` |
 
 ## Required validation
 
@@ -74,6 +81,8 @@ uv run --directory tests/fixtures/jev-python pytest -q
 python3 -m pip install --force-reinstall /tmp/sc-jev-py-wheels/sc_jev_py-*.whl
 uv run --directory tests/fixtures/jev-python pytest -q tests/test_run_check_and_ask.py
 uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_bytes.py
+uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_branches.py
+! cargo tree -p sc-jev-py --depth 1 | rg -q ' sc-jev '
 ```
 
 Expected: exit 0; pytest exercises `run_check`, session `ask`, cross-impl digest,

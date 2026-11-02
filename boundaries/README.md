@@ -7,9 +7,12 @@ id referenced in `docs/plans/phase-a/plan.md`:
 | --- | --- |
 | `agent-types` | `sc-agent-types` |
 | `agent-secrets` | `sc-agent-secrets` |
+| `jev` | `sc-jev` |
 | `jev-backends` | `sc-jev-backends` |
-| `jev` | `sc-jev`, `sc-jev-py` |
+| `jev-check` | `sc-jev-check` |
+| `jev-py` | `sc-jev-py` |
 | `sc-ai-cli` | `sc-ai` |
 
 Manifest files (`boundary.toml` or sc-lint convention used by sibling repos)
-are **not** committed until implementation PR **a-1**.
+are **not** committed until implementation PR **a-1**. Sprint **a-1** owns
+`boundaries/**` stub manifests (not only this README).

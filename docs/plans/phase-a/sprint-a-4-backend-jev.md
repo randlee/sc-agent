@@ -13,10 +13,14 @@ recommended_model: gpt-5.6-sol-medium
 must_follow: [a-1]
 parallel_safe: [a-2, a-3, a-5]
 requirements:
+  - REQ-SAG-0101
+  - REQ-SAG-0103
   - REQ-SAG-0110
   - REQ-SAG-0400
   - REQ-SAG-0401
+  - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0004
   - ADR-SAG-0006
   - ADR-SAG-0012
 owned_paths:
@@ -41,6 +45,7 @@ Phase A implements check/judge HTTP plus **`JevClient: JudgeBackend`**. No
 2. **REQ-SAG-0400** — Injectable transport at `JevClient` construction; byte-exact body.
 3. **REQ-SAG-0401** — Busy retry 429/502/529 + `Retry-After`.
 4. **ADR-SAG-0012** — Future Jev endpoints extend `sc-jev::api`.
+5. **Vendor pins (tighten #12)** — TypeSafe API version / model defaults in client config (committed in this crate).
 
 ## Explicit code samples
 
@@ -63,9 +68,9 @@ Consumes **`JudgeBackend` / `JudgeRequest` from a-1** only (not a-3 payload buil
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0400 | One check = one byte-exact HTTP body |
-| req:REQ-SAG-0401 | Busy responses retry with same body |
-| boundary:jev | No TypeSafe code under `sc-jev-backends` |
+| boundary:jev | `JevClient: JudgeBackend`; transport + resolved key at construction |
+| ADR-SAG-0004 | `validate_for_send` + refuse before send on oversize input |
+| ADR-SAG-0006 | No transport parameter on `judge` |
 
 ## Required validation
 

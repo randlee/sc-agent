@@ -142,8 +142,8 @@ multi-backend, and logging without overloading a-3.
 
 | Edge | Artifact consumed |
 | --- | --- |
-| a-2 → a-1 | `JevError`, `BackendKeyId` |
-| a-3 → a-1 | `PayloadBundle`, extractor-facing domain types |
+| a-2 → a-1 | `JevError` (secrets define `BackendKeyId` in `sc-agent-secrets`, re-exported for facade) |
+| a-3 → a-1 | `PayloadBundle`, `RepoRoot`, `Rev`, extractor-facing domain types |
 | a-4 → a-1 | `JudgeBackend`, `JudgeRequest` |
 | a-5 → a-1 | `JudgeBackend`, `JudgeRequest`, `LlmWireContext` |
 | a-6 → a-2 | `resolve_key(id, repo_root)` |
@@ -157,6 +157,7 @@ multi-backend, and logging without overloading a-3.
 | Sprint | Parity rows closed (README checklist) | Requested features |
 | --- | --- | --- |
 | a-1 | (fixture only; enables payload tests) | — |
+| a-2 | key resolution order tests (library; full parity in a-6) | — |
 | a-3 | extractors (`file`, `table-column`, `tree-sitter`, `command`), config, payload | python-branches + branches cross-impl |
 | a-4 | Jev transport rows | — |
 | a-5 | Haiku/Luna rows | **8** (Luna token-count wire; fake transport) |
@@ -181,7 +182,7 @@ multi-backend, and logging without overloading a-3.
 | 9 | Markdown escaped pipes | **a-3** (`table-column`) |
 | 10 | Error enum + fix text | **a-1** |
 | 11 | `consistent` flag on answers | defer |
-| 12 | Vendor pins in config | **a-3** / **a-4** |
+| 12 | Vendor pins in config | **a-3** (`assets/jev.toml`) + **a-4** (Jev client defaults) |
 
 ## Phase A CLI and session logging (Rand)
 
@@ -208,7 +209,8 @@ ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps 
 2. **sc-runtime daemon / UDS** — out of Phase A. **Source:** Phase A planning thread, 2026-11-01.
 3. **Branch extraction:** **`tree-sitter`** + **`.scm` query** + **`command`**
    (ADR-SAG-0015; PR §9). Python slices via atm-core PR #2308. README
-   `test_python_branches_*` + `tests/fixtures/cross-impl/branches/` gate **a-3**.
+   `test_tree_sitter_python_branches_*` + `tests/fixtures/cross-impl/branches/` gate **a-3**.
+   **Gating:** blocked on atm-core **PR #2308** until merged (or Rand waives).
    **Source:** PR #4 review §1/§9, 2026-11-01.
 4. **Luna / OpenAI key:** Phase A does not require the maintainer to hold
    `OPENAI_API_KEY`. Feature **8** = fake-transport token-count wire in a-5.
@@ -227,7 +229,8 @@ None blocking plan approval. **Kickoff decisions** (can default in sprint if sil
    Feature **8** closes on **fake-transport** proof of the token-count wire in a-5.
    Live `/v1/responses/input_tokens` is optional maintainer evidence when a key
    exists; not required for phase approval or close.
-5. **sc-ai-cli envelope** — confirm top-level `{ "version", "operation", "data": { …jev…, "session_id" } }` against synaptic-canvas `packages/sc-ai-cli` before a-7?
+5. ~~**sc-ai-cli envelope**~~ — **Resolved:** ADR-SAG-0014 + sprint **a-7** use
+   `{ "version", "operation", "data" }` with Jev body + `session_id` in `data`.
 
 Follow-ups as beads: user-level `.env`, parallel question fan-out.
 
@@ -290,6 +293,26 @@ Release uses the **[sc-publish](https://github.com/randlee/sc-publish)** kit
 (sprints **a-9**, **a-10**): consumer input, rendered manifests, preflight CI.
 Orchestration/plan-anchor **call-site migration** in other repos is post-release.
 
+## Requirement closure (integration `req:` roots)
+
+Authoritative **`req:<ID>` acceptance roots** live on integration sprints only.
+Boundary sprints **a-1…a-6** prove `boundary:` / ADR rows; feature REQ closure
+below is verified at phase integration:
+
+| Sprint | REQ / NFR ids closed at integration |
+| --- | --- |
+| a-7 | 0101, 0600, 0601, 0603, 0700–0703, 0710, 0711, 0503 (CLI override), NFR-0001–0003 |
+| a-8 | 0102, 0610, 0611, 0800, 0801, 0802, NFR-0002–0003 |
+| a-9 | 0130, 0131 |
+| a-10 | 0132, 0803 |
+
+Remaining feature REQs (0100, 0103, 0120, 0121, 0200–0202, 0300–0309, 0400–0401,
+0500–0502, 0504–0505, 0602, 0110) close via **boundary sprint deliverables**
+plus the integration tests above (no duplicate `req:` rows on a-1…a-6).
+
+**REQ-SAG-0110** (lifetime Jev API coverage) — Phase A closes check/judge slice
+in **a-4**; full API is a standing requirement with later sprints.
+
 ## Phase acceptance (integration)
 
 Run on `integrate/phase-a` HEAD after all sprints merge:
@@ -299,13 +322,15 @@ just lint
 just test
 cargo test -p sc-jev -- --nocapture
 cargo test -p sc-ai -- --nocapture
-uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_bytes.py
+maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
+uv run --directory tests/fixtures/jev-python pytest -q
 cargo test -p sc-jev-check cross_impl_branches -- --nocapture
 bash .github/scripts/run-consumer-preflight.sh
+cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-ai
 ```
 
-Expected: all exit 0; cross-impl test asserts Rust `prompt_sha256` matches
-committed fixture from Python reference bytes; release preflight passes (a-10).
+Expected: all exit 0; cross-impl tests assert Rust digests match committed
+fixtures; release preflight + publish dry-run satisfy REQ-SAG-0803 (a-10).
 
 Optional evidence (not CI-gated in Phase A): one live `sc-ai jev run`
 against TypeSafe with Rand-provided key, artifact attached to phase PR.

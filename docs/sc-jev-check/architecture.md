@@ -18,7 +18,7 @@ to `JudgeBackend` impls in `sc-jev` and `sc-jev-backends`.
 | `run` | `run_check`, `run_request`, dry-run |
 | `session` | Store, TTL, `ask` |
 | `equal_input` | README equal-input record |
-| `registry` | Select backends by id |
+| `registry` | `Vec<Arc<dyn JudgeBackend>>` — select backends by id (ADR-SAG-0009) |
 
 ## Composition
 

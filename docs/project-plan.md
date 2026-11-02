@@ -19,13 +19,13 @@
 
 ## Phase A sprints (dependency order)
 
-1. a-1 workspace, errors, cross-impl fixture  
-2. a-2 ∥ a-3 secrets ∥ check build  
-3. a-4 ∥ a-5 Jev ∥ LLM backends  
-4. a-6 sessions + orchestration  
-5. a-7 ∥ a-8 CLI ∥ sc-jev-py wheel  
-6. a-9 **sc-publish** kit install  
-7. a-10 release preflight + publish dry-run  
+Wave table in [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md) is authoritative.
+
+1. **a-1** — workspace, errors, cross-impl fixture  
+2. **Wave 2 (parallel):** a-2, a-3, a-4, a-5 — secrets, check build, Jev HTTP, LLM backends  
+3. **a-6** — sessions + orchestration  
+4. **Wave 3 (parallel):** a-7, a-8 — CLI ∥ sc-jev-py wheel  
+5. **Wave 4:** a-9 sc-publish kit install → a-10 release preflight + publish dry-run  
 
 **First release:** crates.io, PyPI, Homebrew, Scoop, WinGet via [sc-publish](https://github.com/randlee/sc-publish).
 

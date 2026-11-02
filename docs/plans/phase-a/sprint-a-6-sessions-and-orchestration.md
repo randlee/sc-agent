@@ -13,6 +13,11 @@ recommended_model: gpt-5.6-luna-medium
 must_follow: [a-2, a-3, a-4, a-5]
 parallel_safe: []
 requirements:
+  - REQ-SAG-0102
+  - REQ-SAG-0200
+  - REQ-SAG-0201
+  - REQ-SAG-0202
+  - REQ-SAG-0301
   - REQ-SAG-0503
   - REQ-SAG-0600
   - REQ-SAG-0601
@@ -20,6 +25,8 @@ requirements:
   - REQ-SAG-0603
   - REQ-SAG-0610
   - REQ-SAG-0611
+  - NFR-SAG-0002
+  - NFR-SAG-0003
 adrs:
   - ADR-SAG-0008
   - ADR-SAG-0009
@@ -31,6 +38,7 @@ owned_paths:
   - "crates/sc-jev-check/src/run/**"
   - "crates/sc-jev-check/src/equal_input/**"
   - "crates/sc-jev-check/src/registry/**"
+  - "crates/sc-jev-check/Cargo.toml"
 ---
 
 # Sprint a-6 — sessions, run_request, multi-backend
@@ -46,7 +54,7 @@ equal-input record on every backend run, multi-backend in one invocation
 ## Deliverables
 
 1. **REQ-SAG-0600** — `SessionStore`: create/load, TTL, file permissions tighten **#6**, **#7**.
-2. **REQ-SAG-0601** — `run_request` / `run_check` wire `resolve_key(_, repo_root)` + backends; load LLM system prompt file into `JudgeRequest.llm`; dry-run returns digest only (feature **2**).
+2. **REQ-SAG-0601** — `run_request` / `run_check` wire `resolve_key(_, repo_root)` + construct backends with resolved secrets; **REQ-SAG-0503** load/inject LLM system prompt into `JudgeRequest.llm` (ADR-SAG-0019 precedence); dry-run returns digest only (feature **2**). **`RunOptions`**: `repo_root`, `dry_run`, `system_prompt_override`, `session_log`.
 3. **REQ-SAG-0602** — `EqualInputRecord` with `prompt_sha256`, `leak`, `commands`, `equal` per README.
 4. **REQ-SAG-0603** — `MultiBackendRun`: Jev + optional second opinions in one call; shared payload bytes; shared injected LLM system prompt for that run.
 5. **ADR-SAG-0008** — Sessions are how second backends receive prior answers; Jev has no rationale field.
@@ -76,9 +84,15 @@ pub fn run_check(
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0503 | Changing prompt file changes LLM wire without recompiling backends |
+| req:REQ-SAG-0503 | Sole owner: prompt load/inject; packaged default via build-time asset |
+| req:REQ-SAG-0600 | Session files mode `0600`; expiry from `created_at` |
+| req:REQ-SAG-0601 | `run_check` orchestrates keys + backends; dry-run no send |
+| req:REQ-SAG-0602 | Equal-input record on every backend |
 | req:REQ-SAG-0603 | Multi-backend run shares one `PayloadBundle` |
 | req:REQ-SAG-0610 | Each send emits `LogEvent` via injected port |
+| req:REQ-SAG-0611 | Log lines contain no API key substrings |
+| ADR-SAG-0008 | Second backend receives session context |
+| ADR-SAG-0009 | Registry accepts new `JudgeBackend` without API change |
 
 ## Required validation
 
@@ -90,7 +104,10 @@ cargo test -p sc-jev-check equal_input -- --nocapture
 cargo test -p sc-jev-check -- test_session_round_trip --exact --nocapture
 cargo test -p sc-jev-check -- test_equal_input_record --exact --nocapture
 cargo test -p sc-jev-check -- test_multi_backend_one_payload --exact --nocapture
-cargo test -p sc-jev-check observability -- --nocapture
+cargo test -p sc-jev-check -- test_session_file_mode_0600 --exact --nocapture
+cargo test -p sc-jev-check -- test_session_expiry_uses_created_at --exact --nocapture
+cargo test -p sc-jev-check -- test_log_event_has_no_secrets --exact --nocapture
+cargo test -p sc-jev-check -- test_packaged_default_prompt_available --exact --nocapture
 ```
 
 Expected: exit 0; README parity rows for sessions, equal-input, multi-backend library paths; JSONL tests use temp dir sink.

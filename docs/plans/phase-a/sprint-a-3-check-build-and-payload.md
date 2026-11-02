@@ -13,6 +13,8 @@ recommended_model: gpt-5.6-luna-medium
 must_follow: [a-1]
 parallel_safe: [a-2, a-4, a-5]
 requirements:
+  - REQ-SAG-0101
+  - REQ-SAG-0102
   - REQ-SAG-0300
   - REQ-SAG-0301
   - REQ-SAG-0302
@@ -21,6 +23,7 @@ requirements:
   - REQ-SAG-0305
   - REQ-SAG-0309
 adrs:
+  - ADR-SAG-0002
   - ADR-SAG-0004
   - ADR-SAG-0005
   - ADR-SAG-0015
@@ -33,7 +36,6 @@ owned_paths:
   - "crates/sc-jev-check/assets/llm-evaluator-system.md"
   - "crates/sc-jev-check/assets/queries/**"
   - "crates/sc-jev-check/Cargo.toml"
-  - "crates/sc-jev-check/src/lib.rs"
   - "boundaries/jev-check/**"
   - "tests/fixtures/jev/git-repo/**"
   - "tests/fixtures/cross-impl/branches/**"
@@ -61,9 +63,10 @@ slices (not `ast.unparse`) so cross-impl branches fixture can pass.
 5. **REQ-SAG-0302** — Repo-root via `git rev-parse --show-toplevel`.
 6. **REQ-SAG-0303** — Question-set schema `plan-anchoring/questions/1`.
 7. **REQ-SAG-0309 (tighten #9)** — `table-column` splits on **unescaped** pipes only.
-8. Parse **`[llm_judge] system_prompt_file`** (file read at send in a-6).
-9. **`src/lib.rs`** declares `session`, `run`, `equal_input`, `registry` as compiling stubs for a-6.
-10. Cross-impl **`tests/fixtures/cross-impl/branches/`** — subjects JSON + full request sha256 (Python + Rust).
+8. Parse **`[llm_judge] system_prompt_file`** path only (bytes read in **a-6** per ADR-SAG-0019).
+9. **`crates/sc-jev-check/Cargo.toml`** — path deps on `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, tree-sitter grammars; **no HTTP client crates** (HTTP usage forbidden under `src/extract/**` and `src/payload/**` only).
+10. **`assets/jev.toml`** — packaged default paths + **vendor pin defaults** (plan tighten **#12**).
+11. Cross-impl **`tests/fixtures/cross-impl/branches/`** — sole owner of query + expected artifacts; loader per [`extraction.md`](../../../sc-jev-check/extraction.md) (`git show` at rev; fixture dir acts as repo in tests).
 
 ## Explicit code samples
 
@@ -84,10 +87,14 @@ See committed query: `tests/fixtures/cross-impl/branches/queries/python-branches
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0304 | Seven named tree-sitter tests + README python-branches row |
+| req:REQ-SAG-0301 | Invalid config/input → typed error; no backend send |
+| req:REQ-SAG-0302 | Relative paths resolve from git repo root |
+| req:REQ-SAG-0303 | Question-set schema expands per plan-anchoring/questions/1 |
+| req:REQ-SAG-0304 | Six named `test_tree_sitter_*` tests + cross-impl branches gate (`test_tree_sitter_python_branches_lists_arms_and_refusals`) |
 | req:REQ-SAG-0305 | Command extractor typed errors on bad JSON / exit / timeout |
 | req:REQ-SAG-0309 | Escaped `\|` in table-column fixtures |
-| boundary:jev-check | No HTTP deps; queries are config, not Rust match logic |
+| boundary:jev-check | No HTTP client usage under `src/extract/**` or `src/payload/**`; queries are config, not Rust match logic |
+| ADR-SAG-0005 | Single canonical `PayloadBundle` built here |
 
 ## Required validation
 
@@ -98,9 +105,15 @@ cargo test -p sc-jev-check tree_sitter -- --nocapture
 cargo test -p sc-jev-check command_extractor -- --nocapture
 cargo test -p sc-jev-check payload -- --nocapture
 cargo test -p sc-jev-check cross_impl_branches -- --nocapture
+cargo test -p sc-jev-check -- test_tree_sitter_python_branches_lists_arms_and_refusals --exact --nocapture
+cargo test -p sc-jev-check -- test_payload_refuses_invalid_input --exact --nocapture
+cargo test -p sc-jev-check -- test_repo_root_resolution --exact --nocapture
+cargo test -p sc-jev-check -- test_question_set_schema --exact --nocapture
+! rg -l 'reqwest|hyper|ureq' crates/sc-jev-check/src/extract crates/sc-jev-check/src/payload 2>/dev/null
 ```
 
-Expected: exit 0; branches cross-impl matches Python reference after PR #2308.
+Expected: exit 0; branches cross-impl matches Python reference after atm-core PR #2308
+(**blocked** until merged — track in plan.md gate; waivers require Rand approval).
 
 ## This sprint does not close
 

@@ -13,12 +13,17 @@ recommended_model: gpt-5.6-sol-medium
 must_follow: [a-6]
 parallel_safe: [a-8]
 requirements:
+  - REQ-SAG-0600
+  - REQ-SAG-0601
+  - REQ-SAG-0603
+  - REQ-SAG-0610
   - REQ-SAG-0700
   - REQ-SAG-0701
   - REQ-SAG-0702
   - REQ-SAG-0703
   - REQ-SAG-0710
   - REQ-SAG-0711
+  - NFR-SAG-0001
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
@@ -29,6 +34,8 @@ adrs:
 owned_paths:
   - "crates/sc-ai/**"
   - "boundaries/sc-ai-cli/**"
+  - "justfile"
+  - "README.md"
 ---
 
 # Sprint a-7 — sc-ai CLI (`jev`)
@@ -37,8 +44,10 @@ owned_paths:
 
 `sc-ai` binary with **`sc-ai jev`** subcommands (Phase A: check parity — `run`,
 `dry-run`, `ask`): **blocking** process — JSON on stdout, typed errors on
-stderr, exit 2 on failure. Success **`data`** = TypeSafe Jev response JSON +
-**`session_id`**. Features **1**–**3** per sc-ai-cli guidelines.
+stderr, exit 2 on failure. Success envelope
+`{ "version", "operation", "data" }` where **`data`** = TypeSafe Jev response JSON +
+**`session_id`** (REQ-SAG-0710 / ADR-SAG-0014). Feature **3** (multi-backend) proven
+via integration test on this sprint (see acceptance).
 
 ## Deliverables
 
@@ -50,7 +59,9 @@ stderr, exit 2 on failure. Success **`data`** = TypeSafe Jev response JSON +
 6. **ADR-SAG-0010** — CLI is a thin adapter over **`sc-jev-check`**; no HTTP in `sc-ai`.
 7. **REQ-SAG-0710** — Integration test asserts stdout JSON includes Jev answer fields + `session_id`.
 8. **NFR-SAG-0003** — Document default log root; `LoggerBuilder` (v2) + adapter injects `SharedSessionLog`.
-9. **REQ-SAG-0711** — Pin `sc-observability = "1.5.0"` only in this crate; forward `try_log` / emit path.
+9. **REQ-SAG-0711** — Pin `sc-observability = "1.5.0"` in this crate; adapt v2 logger to `SharedSessionLog` for `sc-jev-check` (not inside `sc-jev`).
+10. Integration — **`--llm-system-prompt-file`** override changes LLM wire, not `prompt_sha256` (ADR-SAG-0019).
+11. Integration — one `sc-ai jev run` with two backend ids + fake transports: one payload, equal-input recorded (feature **3**).
 
 ## Explicit code samples
 
@@ -70,16 +81,23 @@ fn emit_cli_error(err: &JevError) -> ! {
 
 | Root | Criterion |
 | --- | --- |
+| req:REQ-SAG-0101 | CLI stderr uses `JevError` codes from contract snapshot |
+| req:REQ-SAG-0603 | Two backends in one CLI run share payload + equal-input |
 | req:REQ-SAG-0700 | `run`, `dry-run`, `ask` emit versioned envelope |
-| req:REQ-SAG-0710 | Success stdout includes Jev body + `session_id` |
+| req:REQ-SAG-0710 | `data` includes Jev body + `session_id` |
 | req:REQ-SAG-0711 | v2 logger adapter wired to `SharedSessionLog` |
-| boundary:sc-ai-cli | No HTTP crates linked from `sc-ai` |
+| req:REQ-SAG-0503 | CLI prompt override proof (wire changes, digest stable) |
+| NFR-SAG-0002 | No secrets in stdout/stderr/logs |
+| boundary:sc-ai-cli | No HTTP crates in **direct** deps (`cargo tree -p sc-ai --depth 1`) |
 
 ## Required validation
 
 ```bash
 just lint
 cargo test -p sc-ai -- --nocapture
+cargo test -p sc-ai -- test_multi_backend_cli_equal_input --exact --nocapture
+cargo test -p sc-ai -- test_cli_prompt_override --exact --nocapture
+! cargo tree -p sc-ai --depth 1 | rg -q 'reqwest|hyper|ureq'
 cargo build -p sc-ai --release
 target/release/sc-ai --version
 target/release/sc-ai jev dry-run --help

@@ -20,9 +20,14 @@ adrs:
 owned_paths:
   - "release/sc-publish-pin.toml"
   - "release/sc-publish-consumer-input.json"
+  - "release/publish-artifacts.toml"
+  - "release/publish-channel-contracts.toml"
   - "docs/development/sc-publish.md"
   - "README.sc-publish.md"
   - ".gitignore"
+  - ".github/workflows/release-preflight.yml"
+  - ".github/workflows/release.yml"
+  - ".github/workflows/pypi-publish.yml"
 ---
 
 # Sprint a-9 — sc-publish kit install
