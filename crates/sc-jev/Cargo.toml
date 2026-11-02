@@ -7,4 +7,13 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "TypeSafe Jev HTTP client (stub until sprint a-4)."
+description = "TypeSafe Jev HTTP client."
+
+[dependencies]
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+serde_json.workspace = true
+toml = "1.1.8"
+ureq = "3.5.1"
+
+[dev-dependencies]
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types", features = ["test-util"] }

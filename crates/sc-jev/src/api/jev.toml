@@ -1,0 +1,9 @@
+# TypeSafe Jev HTTP pins (tighten #12).
+# The API version is the /v1 path prefix. The model is the evaluator id.
+# This file is the only place those defaults are set in sc-jev.
+model = "jev-1.13.0"
+host = "api.typesafe.ai"
+path = "/v1/systemone"
+max_request_bytes = 96000
+attempts = 4
+timeout_seconds = 60

@@ -1,7 +1,7 @@
 ---
 id: a-4
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: jev
 track: jev
