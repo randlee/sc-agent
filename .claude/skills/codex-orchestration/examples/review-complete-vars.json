@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-09-25T05:00:00Z",
+  "task_id": "run-a-2-review1",
+  "phase": "a",
+  "branch": "integrate/phase-a",
+  "commit": "def5678",
+  "verdict": "PASS",
+  "findings_blocking": 0,
+  "findings_important": 0,
+  "findings_minor": 1,
+  "findings_md": "- R-M1 minor: doc comment typo at crates/sc-config/src/lib.rs:5"
+}

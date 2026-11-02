@@ -23,6 +23,8 @@ with free-form input.
 ```json
 {
   "worktree_path": "/absolute/path/to/worktree",
+  "branch": "feature/branch-name",
+  "commit": "abc1234",
   "review_mode": "sprint_review | phase_end",
   "review_targets": [
     "src/",
@@ -38,12 +40,8 @@ with free-form input.
   "artifact_regeneration_required": false,
   "artifact_commands": "",
   "round_limit": false,
-  "changed_files": [
-    "optional changed-file hint"
-  ],
-  "triage_records": [
-    "optional prior findings"
-  ],
+  "changed_files": ["optional changed-file hint for limited recheck rounds"],
+  "triage_records": ["optional prior finding records to recheck"],
   "carry_forward_findings": [],
   "notes": "optional context"
 }
@@ -51,12 +49,15 @@ with free-form input.
 
 Rules:
 - `worktree_path` is required and must be absolute.
+- `branch` and `commit` are required. Verify the worktree's `HEAD` is exactly
+  the assigned commit on the assigned branch before running checks; return an
+  input error on mismatch.
 - `review_mode` is required.
 - `review_targets` is optional. Omit to review the default changed-file scope plus impacted files when needed.
 - `run_checks` is optional. If omitted, default to `fmt=true`, `clippy=true`, `tests=true`, `coverage=false`.
-- `artifact_commands` is optional. If `artifact_regeneration_required` is true and commands are supplied, treat failed regeneration as a finding.
-- `round_limit`, `changed_files`, `triage_records`, and `carry_forward_findings`
-  are prior-round context; they do not replace re-running requested checks.
+- `artifact_commands` is optional. If `artifact_regeneration_required` is true
+  and commands are supplied, run them and treat failure as a finding. Report
+  the result under `executed_checks.artifacts`.
 - This agent does not own `rust-best-practices` or `rust-service-hardening` policy. Do not infer those reviews from this input.
 
 ## Review Process
@@ -64,7 +65,9 @@ Rules:
 1. Parse and validate the input JSON.
 2. Read the required Rust guideline files first.
 3. Review changed files first, then widen scope only where a failed check or concrete first-principles issue requires more context.
-4. If `artifact_regeneration_required` is true and `artifact_commands` is non-empty, run those commands and treat failures or unexpected drift as findings.
+4. If `artifact_regeneration_required` is true and `artifact_commands` is
+   non-empty, run those commands and treat failures or unexpected drift as
+   findings.
 5. If `run_checks` requests execution, run only the requested checks.
 6. Return fenced JSON only.
 
@@ -109,6 +112,8 @@ Return fenced JSON only.
   "success": true,
   "data": {
     "status": "pass | findings",
+    "reviewed_branch": "feature/branch-name",
+    "reviewed_commit": "abc1234",
     "review_mode": "sprint_review",
     "executed_checks": {
       "fmt": {

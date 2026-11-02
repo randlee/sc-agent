@@ -15,7 +15,7 @@ version: 1
 
 agents:
   rust-developer:
-    model: cursor-grok-4.6-high-fast
+    model: grok-4.5-fast-xhigh
     alternates:
       - composer-2.5-fast
     notes: Implement/fix loops; default grok unless user prefers composer
@@ -30,10 +30,22 @@ agents:
 
   arch-qa:
     model: cursor-grok-4.6-high-fast
-    notes: Precision / boundary gate; Grok per team preference (Phase H orchestration)
+    notes: Precision / boundary gate; Grok (not Sonnet) per team preference
+
+  extensibility-qa:
+    model: cursor-grok-4.6-high-fast
+    notes: Adversarial multi-consumer review; QA-1 and plan review only — skip on round_limit
+
+  ceremony-qa:
+    model: composer-2.5-fast
+    notes: Plan/sprint doc ceremony review only; input contract in `.claude/agents/ceremony-qa.md`
+
+  ruthless-boundary-qa:
+    model: cursor-grok-4.6-high-fast
+    notes: Boundary discipline; QA-1 and plan QA-1 per quality-policy
 
   rust-qa-agent:
-    model: cursor-grok-4.6-high-fast
+    model: grok-4.5-fast-xhigh
     notes: Normal QA rounds; see phase-ending override in cursor-quality-mgr.md
 
   rust-best-practices-agent:
@@ -48,6 +60,3 @@ agents:
     model: composer-2.5-fast
     notes: Narrow flaky-test contract
 
-  qa-triage:
-    model: inherit
-    notes: Use agent frontmatter default (haiku)

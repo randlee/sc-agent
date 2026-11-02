@@ -24,7 +24,9 @@ scripts/__pycache__/
 
 # Local Synaptic Canvas orchestration state: retain it locally for agent
 # history/status, but never treat it as repository content.
-.sc/
+.sc/*
+!.sc/plan-anchor/
+!.sc/plan-anchor/**
 .sc-compose/logs/
 **/.sc-compose/logs/
 .just/logs/
@@ -58,3 +60,10 @@ tmp/
 # sc-publish kit bootstrap cache (pinned clone, see release/sc-publish-pin.toml)
 .sc-publish-kit/
 **/.sc-compose/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*

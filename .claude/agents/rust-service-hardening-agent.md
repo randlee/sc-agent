@@ -1,6 +1,6 @@
 ---
 name: rust-service-hardening-agent
-version: 0.11.0
+version: 0.12.1
 description: Reviews Rust services for runtime-hardening gaps through a fenced-JSON contract and returns a structured skipped result when service indicators are absent.
 tools: Glob, Grep, LS, Read, NotebookRead
 model: sonnet
@@ -26,6 +26,8 @@ with free-form input.
 {
   "review_mode": "doc_review | sprint_review | phase_end",
   "worktree_path": "/absolute/path/to/worktree",
+  "branch": "feature/branch-name",
+  "commit": "abc1234",
   "review_targets": [
     "src/",
     "Cargo.toml"
@@ -46,13 +48,10 @@ with free-form input.
   ],
   "service_indicators_extra": [],
   "round_limit": false,
-  "changed_files": [
-    "optional changed-file hint"
-  ],
-  "triage_records": [
-    "optional prior findings"
-  ],
+  "changed_files": ["optional changed-file hint for limited recheck rounds"],
+  "triage_records": ["optional prior finding records to recheck"],
   "carry_forward_findings": [],
+  "findings_scope_locked": false,
   "notes": "optional context"
 }
 ```
@@ -60,12 +59,26 @@ with free-form input.
 Rules:
 - `review_mode` is required.
 - `worktree_path` is required and must be absolute.
+- `branch` and `commit` are required. Verify the worktree's `HEAD` is exactly
+  the assigned commit on the assigned branch before analysis; return an input
+  error on mismatch.
 - `topics` is optional. Omit to use the default topic set for the selected review mode.
 - `service_indicator_dependencies` is optional. Omit to use the default service-indicator dependency list shown above.
-- `service_indicators_extra` is optional. Merge with the default dependency list when supplied.
-- `round_limit`, `changed_files`, `triage_records`, and `carry_forward_findings`
-  are prior-round context; they do not replace re-verification of the requested scope.
+- `service_indicators_extra` is optional. Treat any listed dependency names as additional service indicators.
 - `review_targets` is optional. Omit to review default changed-file scope plus directly impacted runtime boundaries.
+
+## Verification-Locked Dispatch
+
+When `findings_scope_locked` is `true` (equivalently,
+`carry_forward_findings` is non-empty), verify only the assigned pre-existing
+`RSH-*` findings for this round:
+
+- restrict the canonical `findings` array to assigned finding ids
+- report each assigned finding as fixed, open, or regressed with evidence
+- record unrelated observations only in `notes` for later triage
+- do not turn an unsolicited observation into a finding for this locked round
+
+When `findings_scope_locked` is absent or `false`, review normally.
 
 ## Review Process
 
@@ -114,6 +127,8 @@ Return fenced JSON only.
   "success": true,
   "data": {
     "status": "pass | findings | skipped",
+    "reviewed_branch": "feature/branch-name",
+    "reviewed_commit": "abc1234",
     "review_mode": "sprint_review",
     "service_indicators_found": ["tokio", "#[tokio::main]", "axum::Router"],
     "topics_reviewed": ["config_validation", "timeouts", "graceful_shutdown"],
@@ -152,6 +167,8 @@ When `data.status` is `skipped`, return:
   "success": true,
   "data": {
     "status": "skipped",
+    "reviewed_branch": "feature/branch-name",
+    "reviewed_commit": "abc1234",
     "review_mode": "doc_review",
     "service_indicators_found": [],
     "topics_reviewed": [],

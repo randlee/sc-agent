@@ -39,6 +39,8 @@ with free-form input.
 {
   "review_mode": "doc_review | sprint_review | phase_end",
   "worktree_path": "/absolute/path/to/worktree",
+  "branch": "feature/branch-name",
+  "commit": "abc1234",
   "review_targets": [
     "src/",
     "Cargo.toml"
@@ -46,13 +48,10 @@ with free-form input.
   "practice_mode": "all | selected",
   "practice_ids": ["RBP-001", "RBP-004"],
   "round_limit": false,
-  "changed_files": [
-    "optional changed-file hint"
-  ],
-  "triage_records": [
-    "optional prior findings"
-  ],
-  "carry_forward_findings": [],
+  "changed_files": ["optional changed-file hint for limited recheck rounds"],
+  "triage_records": ["optional prior finding records to recheck"],
+  "carry_forward_findings": ["optional/pre-existing finding ids assigned for verification this round"],
+  "findings_scope_locked": false,
   "notes": "optional context"
 }
 ```
@@ -60,13 +59,25 @@ with free-form input.
 Rules:
 - `review_mode` is required.
 - `worktree_path` is required and must be absolute.
+- `branch` and `commit` are required. Verify the worktree's `HEAD` is exactly
+  the assigned commit on the assigned branch before analysis; return an input
+  error on mismatch.
 - `practice_mode` is required.
-- `round_limit`, `changed_files`, `triage_records`, and `carry_forward_findings`
-  are prior-round context; they do not replace re-verification of assigned practices.
 - `review_targets` is optional. Omit to review default changed-file scope plus directly impacted boundaries.
 - `practice_ids` must be non-empty when `practice_mode` is `selected`.
 - Unknown practice ids are input errors. Do not guess.
 - When `practice_mode` is `all`, review the full canonical inventory from `practice-inventory.md`.
+
+## Verification-Locked Dispatch
+
+When `findings_scope_locked` is `true` (equivalently, `carry_forward_findings` is non-empty), this dispatch is a fix-round re-check of specific pre-existing findings, not an open review. In this mode:
+
+- Review each assigned id as rigorously as ever and determine its disposition: fixed, open, or regressed.
+- Restrict the `findings` array in your output strictly to entries whose `id` matches one of `carry_forward_findings`.
+- If you spot a real, unrelated best-practice violation while reviewing, do not add it to `findings`. Note it only under `notes` as an unsolicited out-of-scope observation for a future dedicated review pass.
+- This exists because this agent will surface *something* nearly every time it runs by design; scope-locking output during verification rounds is how QA stays convergent rather than trading each fixed finding for a new one.
+
+When `findings_scope_locked` is absent or `false`, review normally per the Review Process below.
 
 ## Review Process
 
@@ -105,6 +116,8 @@ Return fenced JSON only.
   "success": true,
   "data": {
     "status": "pass | findings",
+    "reviewed_branch": "feature/branch-name",
+    "reviewed_commit": "abc1234",
     "review_mode": "sprint_review",
     "practice_mode": "selected",
     "practices_reviewed": ["RBP-001", "RBP-004"],

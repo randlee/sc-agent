@@ -1,0 +1,12 @@
+{
+  "task_id": "bd-g7h8",
+  "phase": "p3",
+  "branch": "integrate/phase-p3",
+  "commit": "4567def",
+  "worktree_path": "/path/to/repo-worktrees/integrate-phase-p3",
+  "review_focus": "Phase-close readiness of the exporter crate.",
+  "review_questions": "- Are all phase deliverables traceable to code and tests?\n- Is any boundary relaxed relative to the architecture doc?",
+  "references": "- docs/project-plan.md\n- docs/architecture.md",
+  "lead": "team-lead",
+  "cc": "team-lead"
+}

@@ -1,0 +1,106 @@
+---
+name: quality-report
+version: 1.0.1
+description: Final QA closeout report template for PASS verdicts.
+format: markdown
+required_variables:
+  - generated_at
+  - qa_pass
+  - sprint_id
+  - task_id
+  - branch
+  - commit
+  - pr_number
+  - verdict
+  - validated_scope_md
+  - findings_blocking
+  - findings_important
+  - findings_minor
+  - residual_risks_md
+  - merge_readiness
+  - merge_reason
+  - recommendation
+optional_variables:
+  - blocking_ids_json
+  - reviewer_spawn_gate
+  - reviewer_manifest_json
+  - evidence_chain_json
+defaults:
+  blocking_ids_json: "[]"
+  reviewer_spawn_gate: ""
+  reviewer_manifest_json: "[]"
+  evidence_chain_json: "{}"
+metadata:
+  type: qa-quality-report
+  tags:
+    - stage:qa
+  workflow:
+    scope:
+      kind: sprint
+      variable: sprint_id
+    state: qa-approved
+    stage: qa
+    transition: approved
+    iteration_variable: qa_pass
+---
+# Final Quality Report
+
+Generated: {{ generated_at }}
+QA Pass: {{ qa_pass }}
+Sprint/Task: {{ sprint_id }} / {{ task_id }}
+Branch: `{{ branch }}`
+Commit: `{{ commit }}`
+PR: #{{ pr_number }}
+Final Verdict: **{{ verdict }}**
+
+## Machine Status (JSON)
+```json
+{
+  "sprint": {{ sprint_id | tojson }},
+  "task": {{ task_id | tojson }},
+  "branch": {{ branch | tojson }},
+  "commit": {{ commit | tojson }},
+  "pr": {{ pr_number }},
+  "verdict": {{ verdict | tojson }},
+  "findings": {
+    "blocking": {{ findings_blocking }},
+    "important": {{ findings_important }},
+    "minor": {{ findings_minor }}
+  },
+  "blocking_ids": {{ blocking_ids_json | safe }},
+  "merge_readiness": {{ merge_readiness | tojson }},
+  "merge_reason": {{ merge_reason | tojson }},
+  "next_action": "none",
+  "owner": "none",
+  "recommendation": {{ recommendation | tojson }}{% if reviewer_spawn_gate %},
+  "reviewer_spawn_gate": {{ reviewer_spawn_gate | tojson }},
+  "reviewer_manifest": {{ reviewer_manifest_json | safe }},
+  "evidence_chain": {{ evidence_chain_json | safe }}{% endif %}
+}
+```
+
+## Validated Scope
+{% if validated_scope_md -%}
+{{ validated_scope_md }}
+{% else -%}
+- not specified
+{% endif %}
+
+## Findings Summary (Final)
+- Blocking: {{ findings_blocking }}
+- Important: {{ findings_important }}
+- Minor: {{ findings_minor }}
+
+## Residual Risks
+{% if residual_risks_md -%}
+{{ residual_risks_md }}
+{% else -%}
+- none
+{% endif %}
+
+## Merge Readiness
+- Status: **{{ merge_readiness }}**
+- Reason: {{ merge_reason }}
+
+## Recommendation
+{{ recommendation }}
