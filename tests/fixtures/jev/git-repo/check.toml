@@ -1,0 +1,17 @@
+[questions]
+path = "questions.json"
+
+[state]
+path = "state.json"
+
+[llm_judge]
+system_prompt_file = "prompt.md"
+
+[inputs.note]
+kind = "file"
+path = "notes/readme.txt"
+
+[inputs.choice]
+kind = "table-column"
+path = "docs/decisions.md"
+column = "Choice"

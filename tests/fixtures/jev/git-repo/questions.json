@@ -1,0 +1,14 @@
+{
+  "schema": "plan-anchoring/questions/1",
+  "version": 1,
+  "questions": {
+    "relevant": {
+      "type": "choice",
+      "instructions": "Does the note apply?\n\n{note}",
+      "criteria": {
+        "no": "The note does not apply.",
+        "yes": "The note applies."
+      }
+    }
+  }
+}
