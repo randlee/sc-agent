@@ -2,9 +2,9 @@
 
 | ID | Requirement | Sprint |
 | --- | --- | --- |
-| REQ-SAG-0300 | Extractors: `file`, `table-column`, `tree-sitter`, `command` | a-3 |
-| REQ-SAG-0304 | `tree-sitter` + `.scm` queries; subject rules; python-branches gate | a-3 |
-| REQ-SAG-0305 | `command` extractor | a-3 |
+| REQ-SAG-0300 | Extractors: `file`, `table-column`, `subjects`, `command` | a-3 |
+| REQ-SAG-0311 | `subjects` input: validate `sc/subjects/1`, map ids/text | a-3 |
+| REQ-SAG-0305 | `command` stdout = subjects schema | a-3 |
 | REQ-SAG-0309 | `table-column` unescaped pipes | a-3 |
 | REQ-SAG-0301 | Refuse send on config/input errors | a-3 |
 | REQ-SAG-0302 | Repo-root resolution | a-3 |
@@ -17,4 +17,4 @@
 | REQ-SAG-0610 | Session logging via `SharedSessionLog` | a-6 |
 | REQ-SAG-0611 | Log fields, no secrets | a-6 |
 
-Normative extraction rules: [`extraction.md`](extraction.md).
+Consumer boundary: [`extraction.md`](extraction.md). Subjects schema: [`subjects-schema.md`](../sc-agent-types/subjects-schema.md).

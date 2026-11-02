@@ -182,25 +182,17 @@ Phase A first release ships **five publish channels** from one tag via sc-publis
 (`sc-ai` binary), plus GitHub Release assets. REQ-SAG-0803 closes in **a-10**
 (preflight + dry-run), not in a-9 alone.
 
-## ADR-SAG-0015 — Language-agnostic extraction (`tree-sitter` + `command`)
+## ADR-SAG-0015 — Subjects artifact outside the judge
 
 **Status:** Active
 
-Replaces delimited comment regions. **Normative spec:**
-[`docs/sc-jev-check/extraction.md`](sc-jev-check/extraction.md) (PR review §9).
+**Boundary (one line):** extraction produces the **subjects artifact outside the
+judge**; the judge consumes it and **links no parser**.
 
-Summary:
+Replaces delimited comment regions and in-crate tree-sitter (third review,
+Rand 2026-11-02). **Normative artifact:** [`docs/sc-agent-types/subjects-schema.md`](sc-agent-types/subjects-schema.md) (`sc/subjects/1`). **Producer:** [`sc-treesitter`](sc-treesitter/architecture.md) (pinned static grammars, query assets, `matches` mode). **Consumer:** [`docs/sc-jev-check/extraction.md`](sc-jev-check/extraction.md) — kinds `file`, `table-column`, `subjects`, `command` only.
 
-- One **`Extractor`** trait; kinds **`file`**, **`table-column`**, **`tree-sitter`**, **`command`**.
-- **`tree-sitter`**: grammar id + **`.scm` query file** (or inline query) — no
-  per-language branch logic in Rust. Subject **text** = source byte slice; normative
-  **id**, **order**, helper captures (`@_…`), parse errors, session metadata
-  (`grammar_version`, `query_sha256`).
-- **`command`**: argv-array subprocess → JSON `{id: text}` escape hatch.
-- **Python reference** must switch `python-branches` from `ast.unparse` to the
-  same slice (**atm-core PR #2308**); cross-impl fixture under
-  `tests/fixtures/cross-impl/branches/`.
-- Delimited regions and comment sigils are **out of scope**.
+Delimited regions, in-facade tree-sitter, and Python `python-branches` extractor are **out of scope** for Phase A.
 
 LLM system prompt loading: **ADR-SAG-0019** (`[llm_judge] system_prompt_file` in
 check.toml; default asset under `sc-jev-check`).

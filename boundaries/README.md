@@ -10,6 +10,7 @@ id referenced in `docs/plans/phase-a/plan.md`:
 | `jev` | `sc-jev` |
 | `jev-backends` | `sc-jev-backends` |
 | `jev-check` | `sc-jev-check` |
+| `treesitter` | `sc-treesitter` |
 | `jev-py` | `sc-jev-py` |
 | `sc-ai-cli` | `sc-ai` |
 

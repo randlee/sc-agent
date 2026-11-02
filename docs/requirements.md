@@ -49,13 +49,25 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 | REQ-SAG-0201 | Optional `ANTHROPIC_KEYCHAIN_SERVICE` override |
 | REQ-SAG-0202 | Repo-root `.env` third; precedence **process env → `.env` → keyring** |
 
+## Phase A — subjects schema (sprint a-1)
+
+| ID | Requirement |
+| --- | --- |
+| REQ-SAG-0104 | Artifact schema **`sc/subjects/1`** in `sc-agent-types` + golden fixture |
+
+## Phase A — sc-treesitter (sprint a-3b)
+
+| ID | Requirement |
+| --- | --- |
+| REQ-SAG-0310 | Producer crate/binary; pinned grammars; query assets; emits `sc/subjects/1` |
+
 ## Phase A — check build (sprint a-3)
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0300 | Extractors: `file`, `table-column`, `tree-sitter`, `command` (`Extractor` trait) |
-| REQ-SAG-0304 | `tree-sitter`: `.scm` query, subject rules, pinned grammars; README python-branches gate |
-| REQ-SAG-0305 | `command` extractor argv/JSON/timeout contract |
+| REQ-SAG-0300 | Extractors: `file`, `table-column`, `subjects`, `command` (no parser deps) |
+| REQ-SAG-0311 | `subjects` input kind reads validated `sc/subjects/1` |
+| REQ-SAG-0305 | `command` stdout must be subjects schema; argv/timeout contract |
 | REQ-SAG-0309 | `table-column`: unescaped pipe splitting only (tighten #9) |
 | REQ-SAG-0301 | Refuse send on `CONFIG_INVALID`, `INPUT_*` errors |
 | REQ-SAG-0302 | Git repo-root resolution for relative paths |

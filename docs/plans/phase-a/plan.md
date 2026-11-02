@@ -50,6 +50,7 @@ future agent launchers.
 | `sc-jev` | **TypeSafe Jev HTTP only** | Jev API client; `JevClient: JudgeBackend`; no `check.toml`, no extractors |
 | `sc-jev-backends` | LLM comparison judges | Haiku/Luna `JudgeBackend` impls; injectable HTTP at construction |
 | `sc-jev-check` | **Check facade** | `check.toml`, extractors, payload, sessions, `run_check`, backend registry |
+| `sc-treesitter` | **Subjects producer** | Tree-sitter queries → `sc/subjects/1` JSON; no Jev deps |
 | `sc-ai` | Binary crate | `sc-ai jev …`; JSON-first per sc-ai-cli |
 | `sc-jev-py` | PyO3 + **PyPI wheel** | Thin bindings over `sc-jev-check` |
 
@@ -91,8 +92,11 @@ sc-ai ── sc-observability 1.5.0 (v2 logger)
                      └── sc-agent-types
 
 sc-jev-py → sc-jev-check
+
+sc-treesitter → sc-agent-types   (standalone; nothing in Phase A links it except CLI invocation via `command` / shell)
 ```
 
+`sc-jev-check` does **not** depend on `sc-treesitter` or any grammar crate.
 `sc-jev` and `sc-jev-backends` do **not** depend on each other. No library
 depends on CLI, PyO3, or full `sc-observability`.
 
@@ -105,6 +109,7 @@ depends on CLI, PyO3, or full `sc-observability`.
 | `jev` | `sc-jev` | TypeSafe Jev HTTP + `JudgeBackend` impl |
 | `jev-backends` | `sc-jev-backends` | LLM `JudgeBackend` impls |
 | `jev-check` | `sc-jev-check` | Facade: config, extractors, run, sessions |
+| `treesitter` | `sc-treesitter` | Subjects producer (`sc/subjects/1`) |
 | `jev-py` | `sc-jev-py` | PyO3 over facade |
 | `sc-ai-cli` | `sc-ai` | argv → operations → JSON envelope |
 
@@ -117,9 +122,10 @@ Sprint **a-1** commits **stub** manifests only. Each boundary sprint owns
 | --- | --- | --- | --- | --- | --- |
 | foundation | 1 | a-1 | contract | agent-types | workspace, sc-lint, frozen trait + types, cross-impl fixture |
 | secrets | 2 | a-2 | boundary | agent-secrets | `must_follow` a-1 (`JudgeBackend` + errors); ∥ a-3 |
-| build | 2 | a-3 | boundary | jev-check | extractors + payload; `must_follow` a-1 (contract types) |
-| jev | 2 | a-4 | boundary | jev | TypeSafe HTTP; `must_follow` a-1; **∥ a-3, a-5** |
-| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-1; **∥ a-3, a-4** |
+| build | 2 | a-3 | boundary | jev-check | extractors (`subjects`, …) + payload; `must_follow` a-1 |
+| build | 2 | a-3b | boundary | treesitter | `sc-treesitter` producer; `must_follow` a-1; **∥ a-3** |
+| jev | 2 | a-4 | boundary | jev | TypeSafe HTTP; `must_follow` a-1; **∥ a-3, a-3b, a-5** |
+| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-1; **∥ a-3, a-3b, a-4** |
 | runtime | 3 | a-6 | boundary | jev-check | run, sessions, prompt load; `must_follow` a-2,a-3,a-4,a-5 |
 | cli | 3 | a-7 | integration | sc-ai-cli | `must_follow` a-6 |
 | python | 3 | a-8 | integration | jev-py | PyO3; `must_follow` a-6; **∥ a-7** |
@@ -128,8 +134,8 @@ Sprint **a-1** commits **stub** manifests only. Each boundary sprint owns
 
 **Critical path (longest `must_follow` chain):** a-1 → a-3 → a-6 → a-7 → a-9 → a-10
 (6 sprints). a-8 joins publish at a-9; a-7 and a-8 are not serial with each other.  
-**Width:** after a-1, up to **4** parallel siblings (a-2 ∥ a-3 ∥ a-4 ∥ a-5; a-4 and
-a-5 share the HTTP track but are separate boundary sprints). **Sprint count:** 10.
+**Width:** after a-1, up to **5** parallel siblings (a-2 ∥ a-3 ∥ a-3b ∥ a-4 ∥ a-5).
+**Sprint count:** 11.
 
 Sprint frontmatter **`parallel_safe`** lists local siblings; the **wave table above**
 is the authoritative dependency graph when YAML and prose differ.
@@ -143,7 +149,8 @@ multi-backend, and logging without overloading a-3.
 | Edge | Artifact consumed |
 | --- | --- |
 | a-2 → a-1 | `JevError` (secrets define `BackendKeyId` in `sc-agent-secrets`, re-exported for facade) |
-| a-3 → a-1 | `PayloadBundle`, `RepoRoot`, `Rev`, extractor-facing domain types |
+| a-3 → a-1 | `PayloadBundle`, `RepoRoot`, `Rev`, `sc/subjects/1` types, extractor-facing domain types |
+| a-3b → a-1 | `sc/subjects/1` types + schema fixture |
 | a-4 → a-1 | `JudgeBackend`, `JudgeRequest` |
 | a-5 → a-1 | `JudgeBackend`, `JudgeRequest`, `LlmWireContext` |
 | a-6 → a-2 | `resolve_key(id, repo_root)` |
@@ -158,7 +165,8 @@ multi-backend, and logging without overloading a-3.
 | --- | --- | --- |
 | a-1 | (fixture only; enables payload tests) | — |
 | a-2 | key resolution order tests (library; full parity in a-6) | — |
-| a-3 | extractors (`file`, `table-column`, `tree-sitter`, `command`), config, payload | python-branches + branches cross-impl |
+| a-3b | — | `sc-treesitter` + committed `subjects.json` (producer) |
+| a-3 | extractors (`file`, `table-column`, `subjects`, `command`), config, payload | subjects + branches cross-impl (consumer) |
 | a-4 | Jev transport rows | — |
 | a-5 | Haiku/Luna rows | **8** (Luna token-count wire; fake transport) |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
@@ -172,7 +180,7 @@ multi-backend, and logging without overloading a-3.
 | # | Item | Phase A |
 | --- | --- | --- |
 | 1 | Cross-impl byte fixture | **a-1** |
-| 2 | Branch / region text | **a-3** — **`tree-sitter`** + `.scm` query (ADR-SAG-0015) |
+| 2 | Branch / region text | **a-3b** (`sc-treesitter`) + **a-3** (`subjects` input); ADR-SAG-0015 |
 | 3 | Jev probabilities strict | **a-4** |
 | 4 | LLM stop_reason / status | **a-5** |
 | 5 | LLM busy retry | **a-5** |
@@ -207,11 +215,13 @@ ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps 
 1. **Key precedence:** process environment → **repo-root `.env`** → keyring
    (REQ-SAG-0202). **Source:** Rand, 2026-11-01 — PR #4 review comment (amendment to §6).
 2. **sc-runtime daemon / UDS** — out of Phase A. **Source:** Phase A planning thread, 2026-11-01.
-3. **Branch extraction:** **`tree-sitter`** + **`.scm` query** + **`command`**
-   (ADR-SAG-0015; PR §9). Python slices via atm-core PR #2308. README
-   `test_tree_sitter_python_branches_*` + `tests/fixtures/cross-impl/branches/` gate **a-3**.
-   **Gating:** blocked on atm-core **PR #2308** until merged (or Rand waives).
-   **Source:** PR #4 review §1/§9, 2026-11-01.
+3. **Branch extraction:** **`sc/subjects/1`** artifact; **`sc-treesitter`** producer
+   (sprint **a-3b**); **`subjects`** input in **sc-jev-check** (a-3). Extraction is
+   **independent of the Jev path** — injected from outside judge code. Tool is
+   tree-sitter-specific, named **`sc-treesitter`**; grammars **static/pinned**, no
+   dynamic loading (Phase A). Python drops `python-branches` extractor; cross-impl
+   reads committed **`subjects.json`**. **No** atm-core PR #2308 dependency.
+   **Source:** Rand, 2026-11-02 — [PR #4 comment](https://github.com/randlee/sc-agent/pull/4#issuecomment-6588041822).
 4. **Luna / OpenAI key:** Phase A does not require the maintainer to hold
    `OPENAI_API_KEY`. Feature **8** = fake-transport token-count wire in a-5.
    **Source:** Rand, 2026-11-01 (no OpenAI key).
@@ -268,6 +278,7 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 | a-1 | [`sprint-a-1-workspace-and-types.md`](sprint-a-1-workspace-and-types.md) |
 | a-2 | [`sprint-a-2-agent-secrets.md`](sprint-a-2-agent-secrets.md) |
 | a-3 | [`sprint-a-3-check-build-and-payload.md`](sprint-a-3-check-build-and-payload.md) |
+| a-3b | [`sprint-a-3b-sc-treesitter.md`](sprint-a-3b-sc-treesitter.md) |
 | a-4 | [`sprint-a-4-backend-jev.md`](sprint-a-4-backend-jev.md) |
 | a-5 | [`sprint-a-5-backend-llm.md`](sprint-a-5-backend-llm.md) |
 | a-6 | [`sprint-a-6-sessions-and-orchestration.md`](sprint-a-6-sessions-and-orchestration.md) |
@@ -306,9 +317,10 @@ below is verified at phase integration:
 | a-9 | 0130, 0131 |
 | a-10 | 0132, 0803 |
 
-Remaining feature REQs (0100, 0103, 0120, 0121, 0200–0202, 0300–0309, 0400–0401,
-0500–0502, 0504–0505, 0602, 0110) close via **boundary sprint deliverables**
-plus the integration tests above (no duplicate `req:` rows on a-1…a-6).
+Remaining feature REQs (0100, 0103, 0104, 0120, 0121, 0200–0202, 0300–0303,
+0305, 0309, 0310, 0311, 0400–0401, 0500–0502, 0504–0505, 0602, 0110) close via
+**boundary sprint deliverables** plus integration tests above (no duplicate `req:`
+rows on a-1…a-6).
 
 **REQ-SAG-0110** (lifetime Jev API coverage) — Phase A closes check/judge slice
 in **a-4**; full API is a standing requirement with later sprints.

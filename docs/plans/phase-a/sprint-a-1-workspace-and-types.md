@@ -18,6 +18,7 @@ requirements:
   - REQ-SAG-0101
   - REQ-SAG-0102
   - REQ-SAG-0103
+  - REQ-SAG-0104
   - REQ-SAG-0120
   - REQ-SAG-0121
   - NFR-SAG-0001
@@ -49,6 +50,10 @@ owned_paths:
   - "crates/sc-ai/src/main.rs"
   - "crates/sc-jev-py/Cargo.toml"
   - "crates/sc-jev-py/src/lib.rs"
+  - "crates/sc-treesitter/Cargo.toml"
+  - "crates/sc-treesitter/src/lib.rs"
+  - "docs/sc-agent-types/subjects-schema.md"
+  - "tests/fixtures/jev/subjects-schema/**"
 ---
 
 # Sprint a-1 — workspace, sc-lint, errors, cross-impl fixture
@@ -63,7 +68,7 @@ verified against committed Python reference bytes. **No network code.**
 
 1. **REQ-SAG-0100** — Root **`Cargo.toml` `[workspace.members]`** lists every Phase A crate:
    `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, `sc-jev-check`,
-   `sc-ai`, `sc-jev-py`. a-1 commits **minimal compiling stubs** (`Cargo.toml` + root
+   `sc-treesitter`, `sc-ai`, `sc-jev-py`. a-1 commits **minimal compiling stubs** (`Cargo.toml` + root
    module only) for each member except `sc-agent-types` (fully implemented here).
    Later sprints **replace stub bodies** without editing root `Cargo.toml` members list.
    **`sc-jev-check/src/lib.rs`** — a-1 commits the **full `mod` tree** and empty
@@ -79,7 +84,8 @@ verified against committed Python reference bytes. **No network code.**
 8. **REQ-SAG-0120** — Module `sc-agent-types::observability::v2` (`SessionLog` port; `sc-observability-types = "1.5.0"` on **this crate only** for shim).
 9. **REQ-SAG-0121** — `NoopSessionLog` + `test-util` doubles; bead `agt-obs-v2-shim-removal` to delete module + dependency after release 1–2.
 10. **ADR-SAG-0016** — No separate observability crate on crates.io; full `sc-observability` on composition roots **`sc-ai`** and **`sc-jev-py`** (a-8 wires PyO3 logger).
-11. **REQ-SAG-0103** — Freeze `JudgeBackend`, `JudgeRequest`, `PayloadBundle`, `LlmWireContext`, `JudgeOutcome`, `EqualInputRecord`, `BackendId`, `LogEvent`, `RepoRoot`, `Rev`, `SessionId`, `Sha256Digest`, extractor domain types; contract tests + `MockJudgeBackend`.
+11. **REQ-SAG-0104** — Rust types + JSON fixture for **`sc/subjects/1`** ([`subjects-schema.md`](../../../sc-agent-types/subjects-schema.md)); producer/consumer pin same schema id.
+12. **REQ-SAG-0103** — Freeze `JudgeBackend`, `JudgeRequest`, `PayloadBundle`, `LlmWireContext`, `JudgeOutcome`, `EqualInputRecord`, `BackendId`, `LogEvent`, `RepoRoot`, `Rev`, `SessionId`, `Sha256Digest`, extractor domain types; contract tests + `MockJudgeBackend`.
 
 ## Explicit code samples
 
@@ -89,7 +95,7 @@ Authoritative signatures: `docs/sc-agent-types/architecture.md` (same as phase p
 
 | Root | Criterion |
 | --- | --- |
-| boundary:agent-types | sc-lint manifests stubbed under `boundaries/**` for all seven Phase A boundaries |
+| boundary:agent-types | sc-lint manifests stubbed under `boundaries/**` for all eight Phase A boundaries |
 | ADR-SAG-0001 | `JevError` is the only CLI/PyO3 error id source |
 | ADR-SAG-0002 | Canonical payload serde policy documented in crate docs |
 | ADR-SAG-0016 | Shim module present; no full `sc-observability` on library crates |
@@ -98,7 +104,7 @@ Authoritative signatures: `docs/sc-agent-types/architecture.md` (same as phase p
 
 ```bash
 test -f Cargo.toml && test -f justfile && test -f sc-lint.toml
-rg -q 'sc-jev-check' Cargo.toml && rg -q 'sc-jev-py' Cargo.toml
+rg -q 'sc-jev-check' Cargo.toml && rg -q 'sc-treesitter' Cargo.toml && rg -q 'sc-jev-py' Cargo.toml
 cargo check --workspace
 just lint
 just test

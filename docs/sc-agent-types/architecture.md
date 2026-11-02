@@ -28,8 +28,9 @@ pub enum BackendKeyId { TypeSafe, Anthropic, OpenAi }
 pub struct Sha256Digest(String);
 ```
 
-Extractor-facing types (`Subject`, `Span`, `InputSpec`, `Question`, …) live in
-this crate and are frozen in a-1 alongside the judge contract.
+Extractor-facing types (`Subject`, `Span`, `InputSpec`, `Question`, …) and the
+**`sc/subjects/1`** document types live in this crate and are frozen in a-1.
+Normative JSON rules: [`subjects-schema.md`](subjects-schema.md).
 
 ## Judge contract (sprint a-1)
 

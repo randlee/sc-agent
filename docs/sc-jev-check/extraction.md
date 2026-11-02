@@ -1,126 +1,60 @@
-# sc-jev-check — extraction (ADR-SAG-0015)
+# sc-jev-check — inputs and extraction boundary
 
-Extraction lives only in **`sc-jev-check`**. **`sc-jev`** never reads source files.
+**ADR-SAG-0015:** Extraction produces the **subjects artifact outside the judge**; the judge consumes it and **links no parser**.
 
-## Extractor trait
+Normative artifact: [`docs/sc-agent-types/subjects-schema.md`](../sc-agent-types/subjects-schema.md) (`sc/subjects/1`).  
+Tree-sitter production: crate **`sc-treesitter`** ([`docs/sc-treesitter/architecture.md`](../sc-treesitter/architecture.md)).
+
+## Extractor trait (Phase A kinds)
+
+`sc-jev-check` implements **`file`**, **`table-column`**, **`subjects`**, and **`command`** only. **No** `tree-sitter` kind and **no** grammar crate dependencies.
 
 ```rust
-mod private {
-    pub trait Sealed {}
-}
-
-/// Phase A kinds only (`file`, `table-column`, `tree-sitter`, `command`).
-pub trait Extractor: private::Sealed {
-    fn extract(&self, repo: &RepoRoot, rev: &Rev, input: &InputSpec) -> Result<Vec<Subject>, JevError>;
-}
-
-pub struct Subject {
-    pub id: String,
-    pub text: String,
-    pub span: Option<Span>,
-}
-
-pub struct Span {
-    pub path: String,
-    pub start_line: u32,
-    pub end_line: u32,
-    pub start_byte: u32,
-    pub end_byte: u32,
-}
+/// Phase A kinds: file, table-column, subjects, command.
+pub trait Extractor { /* … */ }
 ```
 
-Kinds **`file`**, **`table-column`**, **`tree-sitter`**, and **`command`** implement this trait.
+### `subjects`
 
-## `tree-sitter` kind
+Reads a **`sc/subjects/1`** JSON file (path or stdin). Validates `schema`, uses `subjects[].id` / `.text` as question subjects. Copies the `producer` block into session metadata and the equal-input record.
 
 ```toml
-[[extractors]]
-id = "branches"
-kind = "tree-sitter"
-language = "python"
+[inputs.branches]
+kind = "subjects"
+path = "out/task-hook.subjects.json"
+```
+
+### `command`
+
+Argv subprocess; **stdout must be** a valid `sc/subjects/1` document (typical: invoke `sc-treesitter extract …`).
+
+```toml
+# Example: inline producer step
+command = ["sc-treesitter", "extract", "--language", "python", "--query", "branches", "{path}"]
+```
+
+Replaces the old ad hoc `{id: text}` JSON contract.
+
+### `file` / `table-column`
+
+Unchanged roles (raw file bytes; markdown table column with unescaped `|` rules per REQ-SAG-0309).
+
+## Lite gate `check.toml` shape
+
+```toml
+[inputs.hook]
+kind = "file"
 path = "skills/atm-bd-lite/scripts/atm-bd-task-hook.py"
-rev = "HEAD"
-query = "queries/python-branches.scm"
-captures = ["arm", "refusal"]
-# id scheme default: path:line (see ADR subject rules)
+
+[inputs.branches]
+kind = "subjects"
+path = "out/task-hook.subjects.json"
 ```
 
-Query path is relative to `check.toml` (or `query_inline = "..."`). Query file is
-loaded via `git show` at `rev`, like other inputs.
+(`out/task-hook.subjects.json` is produced by `sc-treesitter` in a prior step or CI fixture.)
 
-### Lite gate query (committed as versioned config)
+## Cross-impl (consumer)
 
-```scheme
-;; queries/python-branches.scm
-(case_clause pattern: (_) @arm)
+`tests/fixtures/cross-impl/branches/` holds hook source, reference `.scm`, **committed `subjects.json`** (from `sc-treesitter`), and expected request bytes + sha256. Rust `sc-jev-check` and Python `jev-check` **read the same `subjects.json`**; no Python branch extractor. atm-core PR #2308 is **not** a Phase A dependency.
 
-(return_statement
-  (call function: (identifier) @_fn) @refusal
-  (#eq? @_fn "Refusal"))
-```
-
-Captures whose names start with `_` are helpers — never subjects.
-
-### Subject rules (normative)
-
-| Rule | Definition |
-| --- | --- |
-| **id** | `{path}:{start_line}`; duplicate captures on same line → `:{n}` suffix (`n` from 1) |
-| **text** | UTF-8 slice `[start_byte, end_byte)` — no unparse, trim, or reformat |
-| **order** | `(start_byte, capture name)` ascending; stable across impls |
-| **empty** | zero subjects → `EXTRACTION_EMPTY` |
-| **parse error** | ERROR node inside captured span → `EXTRACTION_PARSE_ERROR` (path + line) |
-| **multiplicity** | same node, different capture names → two subjects; same name → one |
-
-Session records `extractor: { kind, language, grammar_version, query_sha256 }`.
-
-### Grammars (pinned in `Cargo.toml`)
-
-| `language` | crate | Phase A |
-| --- | --- | --- |
-| `python` | `tree-sitter-python` | yes (lite gate) |
-| `rust` | `tree-sitter-rust` | yes |
-| `c-sharp` | `tree-sitter-c-sharp` | feature, not default |
-| others | respective crates | feature flags |
-
-Unknown/disabled language → `CONFIG_INVALID` listing available set.
-
-## `command` kind (escape hatch)
-
-```toml
-[[extractors]]
-id = "arms"
-kind = "command"
-path = "crates/x/src/hook.rs"
-rev = "HEAD"
-command = ["syn-grep", "arms", "{path}", "--rev", "{rev}"]
-timeout_seconds = 30
-```
-
-Argv array only (no shell). Placeholders `{path}`, `{rev}`, `{repo_root}`. Cwd =
-repo root. stdout = JSON object `{ "<id>": "<text>" }` or array of `{id, text, span?}`;
-else `EXTRACTION_INVALID` (first 300 bytes). Non-zero exit → `EXTRACTION_FAILED`;
-timeout → `EXTRACTION_TIMEOUT`; empty → `EXTRACTION_EMPTY`. Command + argv +
-stdout sha256 recorded in session.
-
-## Python parity dependency (atm-core)
-
-**atm-core PR #2308** (`extractors.py`): `python-branches` must emit the **same
-source slice** as tree-sitter (replace `ast.unparse`). Sprint **a-3** is blocked
-on that one-line semantic change + fixture update so cross-impl `prompt_sha256`
-matches when branches are present.
-
-## Cross-impl fixture
-
-`tests/fixtures/cross-impl/branches/` — one hook, one `.scm` query, byte-equal
-subjects JSON from Python reference and Rust; full request bytes + sha256 equal.
-
-## Phase A tests (sprint a-3)
-
-- `test_tree_sitter_python_branches_lists_arms_and_refusals`
-- `test_tree_sitter_rust_match_arms`
-- `test_tree_sitter_helper_capture_is_not_a_subject`
-- `test_tree_sitter_same_line_ids_are_unique_and_stable`
-- `test_tree_sitter_parse_error_is_typed`
-- `test_tree_sitter_unknown_language_is_config_invalid`
-- cross-impl branches fixture (subjects + full request sha256)
+Producer byte-for-byte test lives in **`sc-treesitter`** (sprint **a-3b**).
