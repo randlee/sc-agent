@@ -6,12 +6,12 @@ closure_type: boundary
 target_boundary: jev
 track: jev
 wave: 2
-branch: sprint/a-4-jev-api-check
-worktree: sprint/a-4-jev-api-check
+branch: sprint/a-4-backend-jev
+worktree: sprint/a-4-backend-jev
 recommended_agent: sai
 recommended_model: gpt-5.6-sol-medium
-must_follow: [a-3]
-parallel_safe: [a-5]
+must_follow: [a-1]
+parallel_safe: [a-2, a-3, a-5]
 requirements:
   - REQ-SAG-0110
   - REQ-SAG-0400
@@ -22,6 +22,8 @@ adrs:
 owned_paths:
   - "crates/sc-jev/src/api/**"
   - "crates/sc-jev/src/client/**"
+  - "crates/sc-jev/Cargo.toml"
+  - "crates/sc-jev/src/lib.rs"
   - "boundaries/jev/**"
 ---
 
@@ -30,29 +32,42 @@ owned_paths:
 ## Outcome
 
 Jev HTTP client lives in **`sc-jev`** (foundation for **100% of Jev API**).
-Phase A implements the **check/judge** request path: byte-exact body with
-`model` key, busy retry policy, strict answer parsing (tighten **#3**
-probabilities). No Jev traffic in other crates.
+Phase A implements check/judge HTTP plus **`JevClient: JudgeBackend`**. No
+`check.toml`, no extractors, no dependency on `sc-jev-backends`.
 
 ## Deliverables
 
-1. **REQ-SAG-0110** — `sc-jev` owns TypeSafe Jev HTTP; this sprint establishes `client` + check/judge method(s).
-2. **REQ-SAG-0400** — Injectable transport; fake transport in tests.
-3. **REQ-SAG-0401** — Retry only 429/502/529 with `Retry-After` clamp; same body each attempt.
-4. **ADR-SAG-0012** — All future Jev endpoints extend `sc-jev::api`, not new crates.
+1. **REQ-SAG-0110** — `sc-jev` owns TypeSafe Jev HTTP; `client` + check/judge path.
+2. **REQ-SAG-0400** — Injectable transport at `JevClient` construction; byte-exact body.
+3. **REQ-SAG-0401** — Busy retry 429/502/529 + `Retry-After`.
+4. **ADR-SAG-0012** — Future Jev endpoints extend `sc-jev::api`.
 
 ## Explicit code samples
 
 ```rust
-// crates/sc-jev/src/client/mod.rs
-pub struct JevClient { /* auth, base url, transport */ }
+pub struct JevClient { /* transport injected at new() */ }
 
-impl JevClient {
-    pub fn judge_check(&self, body: &[u8]) -> Result<JudgeResponse, JevError>;
+impl JudgeBackend for JevClient {
+    fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
+        let _ = req.llm; // Jev ignores LLM system prompt
+        // POST canonical req.payload.bytes
+    }
 }
 ```
 
-## Acceptance criteria
+## Must-follow
+
+Consumes **`JudgeBackend` / `JudgeRequest` from a-1** only (not a-3 payload builder).
+
+## Acceptance criteria (authoritative)
+
+| Root | Criterion |
+| --- | --- |
+| req:REQ-SAG-0400 | One check = one byte-exact HTTP body |
+| req:REQ-SAG-0401 | Busy responses retry with same body |
+| boundary:jev | No TypeSafe code under `sc-jev-backends` |
+
+## Required validation
 
 ```bash
 just lint
@@ -60,16 +75,11 @@ cargo test -p sc-jev jev_api -- --nocapture
 cargo test -p sc-jev -- test_one_check_is_one_request_byte_exact --exact --nocapture
 cargo test -p sc-jev -- test_busy_is_retried_with_the_same_body --exact --nocapture
 cargo clippy -p sc-jev -- -D warnings
-! rg -l 'typesafe' crates/sc-jev-backends/src/ 2>/dev/null | head -1 | grep -q . || true
+test -z "$(rg -l -i typesafe crates/sc-jev-backends/src 2>/dev/null || true)"
 ```
 
-Expected: exit 0; Jev parity transport tests run against `sc-jev`; no TypeSafe
-module under `sc-jev-backends`.
-
-## Parity checklist
-
-All Jev-backend rows in README checklist.
+Expected: exit 0; last command fails if TypeSafe module appears under backends.
 
 ## This sprint does not close
 
-Other Jev API endpoints (REQ-SAG-0110 remainder), Haiku/Luna, sessions, CLI.
+Other Jev API endpoints, Haiku/Luna, facade `run_check`, CLI.

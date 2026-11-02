@@ -10,7 +10,7 @@ branch: sprint/a-9-sc-publish-install
 worktree: sprint/a-9-sc-publish-install
 recommended_agent: sai
 recommended_model: gpt-5.6-sol-medium
-must_follow: [a-8]
+must_follow: [a-7, a-8]
 parallel_safe: []
 requirements:
   - REQ-SAG-0130
@@ -38,8 +38,9 @@ order, `sc-jev-py`, **`sc-ai` release binaries**, and channels **crates.io**,
 ## Deliverables
 
 1. **REQ-SAG-0130** — `release/sc-publish-pin.toml` + consumer JSON declaring:
-   workspace crates (`sc-agent-types`, `sc-agent-secrets`, `sc-jev-backends`,
-   `sc-jev`, `sc-ai`), maturin project `sc-jev-py`, **`release_binaries`** for
+   workspace crates (`sc-agent-types`, `sc-agent-secrets`, `sc-jev`,
+   `sc-jev-backends`, `sc-jev-check`, `sc-ai`), maturin project `sc-jev-py`,
+   **`release_binaries`** for
    `sc-ai` (platform matrix per kit), and channels **crates.io**, **pypi**,
    **homebrew**, **scoop**, **winget**.
 2. **REQ-SAG-0131** — `docs/development/sc-publish.md` (install, pin bump,
@@ -47,7 +48,15 @@ order, `sc-jev-py`, **`sc-ai` release binaries**, and channels **crates.io**,
 3. **ADR-SAG-0018** — Do not hand-edit rendered `publish-artifacts.toml` /
    channel contracts; change consumer input + re-install.
 
-## Acceptance criteria
+## Acceptance criteria (authoritative)
+
+| Root | Criterion |
+| --- | --- |
+| req:REQ-SAG-0130 | Consumer JSON lists facade + all publish crates/channels |
+| req:REQ-SAG-0131 | Install doc + pin bump recipe |
+| boundary:release | Kit dry-run renders five channels |
+
+## Required validation
 
 ```bash
 test -f release/sc-publish-pin.toml

@@ -3,7 +3,7 @@ id: a-8
 phase: a
 status: planned
 closure_type: integration
-target_boundary: jev
+target_boundary: jev-py
 track: python
 wave: 3
 branch: sprint/a-8-pyo3-wrapper
@@ -18,8 +18,10 @@ requirements:
   - REQ-SAG-0802
 adrs:
   - ADR-SAG-0011
+  - ADR-SAG-0016
 owned_paths:
   - "crates/sc-jev-py/**"
+  - "boundaries/jev-py/**"
   - "tests/fixtures/jev-python/**"
 ---
 
@@ -28,7 +30,7 @@ owned_paths:
 ## Outcome
 
 **`sc-jev-py`** is the supported Python integration: PyO3 bindings over
-`sc-jev`, built with **maturin**, built as a **PyPI-ready wheel** (publish wiring in **a-9/a-10** via sc-publish).
+**`sc-jev-check`**, built with **maturin**, PyPI-ready wheel (publish in **a-9/a-10**).
 
 ## Deliverables
 
@@ -36,6 +38,8 @@ owned_paths:
 2. **REQ-SAG-0801** — Cross-impl test harness under `tests/fixtures/jev-python`.
 3. **REQ-SAG-0802** — `pyproject.toml` + maturin config; `pip install` / `uv add` works from wheel (local `maturin build` in CI).
 4. **ADR-SAG-0011** — Python must not reimplement Jev HTTP or payload canonicalization.
+5. **ADR-SAG-0016** — Optional `sc-observability` pin in this crate; adapter implements `SharedSessionLog` for in-process Python (same JSONL shape as CLI when log dir set).
+6. Integration test: one `run_check` with temp log dir appends **one** JSONL line per judge send; line contains **no** API key material.
 
 ## Explicit code samples
 
@@ -52,7 +56,15 @@ name = "sc-jev-py"
 requires-python = ">=3.11"
 ```
 
-## Acceptance criteria
+## Acceptance criteria (authoritative)
+
+| Root | Criterion |
+| --- | --- |
+| req:REQ-SAG-0800 | `run_check` + session `ask` through wheel |
+| req:REQ-SAG-0801 | Cross-impl pytest matches a-1 fixture digest |
+| boundary:jev-py | Depends on facade only (+ types); PyO3 boundary manifest owned here |
+
+## Required validation
 
 ```bash
 just lint
@@ -60,15 +72,16 @@ cargo test -p sc-jev-py -- --nocapture
 maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-jev-py-wheels
 uv run --directory tests/fixtures/jev-python pytest -q
 python3 -m pip install --force-reinstall /tmp/sc-jev-py-wheels/sc_jev_py-*.whl
-python3 -c "import sc_jev_py; assert hasattr(sc_jev_py, 'run_check')"
+uv run --directory tests/fixtures/jev-python pytest -q tests/test_run_check_and_ask.py
+uv run --directory tests/fixtures/jev-python pytest -q tests/test_cross_impl_bytes.py
 ```
 
-Expected: exit 0; wheel imports on supported platform. **sc-publish** install and
-CI preflight land in sprints **a-9** and **a-10**.
+Expected: exit 0; pytest exercises `run_check`, session `ask`, cross-impl digest,
+and maps `JevError` to Python exceptions (no HTTP reimplementation).
 
 ## Parity checklist
 
-Library API for Python callers; cross-impl bytes test where fixture applies.
+See **plan.md** parity rows for sprint **a-8**.
 
 ## This sprint does not close
 

@@ -21,14 +21,17 @@ sc-agent combines **agent orchestration assets** (prompts, skills, policy) with 
 ## Phase A crate graph
 
 ```
-sc-ai (binary) ── builds sc_observability::v2::Logger, SessionLog adapter
-  └── sc-jev (all Jev HTTP + check orchestration)
-        ├── sc-jev-backends (Haiku, Luna only)
-        ├── sc-agent-types (includes temporary `observability::v2` shim)
-        └── sc-agent-secrets
+sc-ai (binary) ── sc-observability v2 Logger → SessionLog adapter
+  └── sc-jev-check (facade: check.toml, extractors, run_check, sessions)
+        ├── sc-jev (TypeSafe Jev HTTP + JudgeBackend impl)
+        ├── sc-jev-backends (Haiku/Luna JudgeBackend impls)
+        ├── sc-agent-secrets
+        └── sc-agent-types (temporary observability::v2 shim)
 
-sc-jev-py (PyO3) → sc-jev
+sc-jev-py (PyO3) → sc-jev-check
 ```
+
+`sc-jev` and `sc-jev-backends` do not depend on each other.
 
 **Jev API:** All TypeSafe Jev HTTP lives in **`sc-jev`** (REQ-SAG-0110).  
 **Trait boundary:** `JudgeBackend` and shared domain types live in
@@ -58,6 +61,14 @@ message (per README parity). A **system prompt** (evaluator instructions, JSON
 schema hints) is allowed and **may change** over time without changing
 `prompt_sha256`, as long as the embedded canonical blob is unchanged.
 
+**System prompt injection (not hardcoded in Rust):** production crates must not
+embed evaluator prose as string literals. Orchestration loads prompt text from
+**`check.toml`** (`llm_judge.system_prompt_file`, path relative to the check
+file) and/or packaged **`jev.toml`** defaults (path to a shipped **asset file**).
+`sc-jev-backends` receives the resolved text from the caller when building the
+wire envelope. **`sc-ai jev`** may override with `--llm-system-prompt-file` for
+one run. Tests use fixture files or explicit test-only strings.
+
 Token/count checks apply to the full message the provider receives; equal-input
 still records whether every backend saw the same canonical bytes.
 
@@ -71,8 +82,15 @@ No splitting oversized inputs. Pre-send byte/token validation on every backend.
 
 ## ADR-SAG-0006 — Transport injection
 
-Jev HTTP client lives in `sc-jev`; LLM HTTP in `sc-jev-backends`. Both use
-injectable transports for tests.
+Jev HTTP client lives in `sc-jev`; LLM HTTP in `sc-jev-backends`. Transports are
+**injected at backend construction** (not passed into `JudgeBackend::judge`).
+Both use test doubles for unit tests.
+
+## ADR-SAG-0007 — API-direct LLM backends
+
+Haiku and Luna judges use **provider HTTP only** in Phase A: no vendor SDK,
+agent harness, or tool-use loop. Wire format and token counting are implemented
+in `sc-jev-backends` against documented REST endpoints.
 
 ## ADR-SAG-0010 — CLI thin adapter
 
@@ -80,7 +98,7 @@ injectable transports for tests.
 
 ## ADR-SAG-0011 — Python via sc-jev-py wheel
 
-Python apps use the **`sc-jev-py`** PyPI extension (PyO3 → `sc-jev`). Optional
+Python apps use the **`sc-jev-py`** PyPI extension (PyO3 → `sc-jev-check`). Optional
 thin wrappers (e.g. atm-bd `packages/jev-check`) must not reimplement Jev HTTP
 or canonicalization.
 
@@ -97,96 +115,46 @@ Phase A first release ships **five publish channels** from one tag via sc-publis
 **crates.io**, **PyPI** (`sc-jev-py`), **Homebrew**, **Scoop**, and **WinGet**
 (`sc-ai` binary), plus GitHub Release assets.
 
-## ADR-SAG-0015 — Delimited regions (language-agnostic)
+## ADR-SAG-0015 — Branch extraction (`branches` + `command`)
 
-Branch-like inputs use **embedded delimiters** in source files, not AST parsers
-inside `sc-jev`. Python/Rust-specific splitting belongs to **consumers**; they
-either place markers or pre-extract via other extractors.
+Branch-like inputs for jev-check parity use a **`branches` extractor** in
+**`sc-jev-check`** (not in `sc-jev` HTTP):
 
-### Recommended marker tokens (defaults)
-
-| Role | Substring on the line (after comment sigil) |
-| --- | --- |
-| Begin | `sc-jev:region:<id>` |
-| End | `sc-jev:end:<id>` |
-
-`<id>` matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. A file may contain **many
-regions** with **distinct** ids. Duplicate begin/end for the same id, or
-overlapping open regions with the **same** id → `CONFIG_INVALID`. Different ids
-may appear in any order; **nesting** across ids is allowed only when each pair
-is properly closed (inner `end` before outer `end`).
-
-### How authors embed them (by language)
-
-Use a **whole-line comment** whose body starts with the token (leading
-whitespace allowed):
-
-| Language | Example begin | Example end |
-| --- | --- | --- |
-| Python, shell, YAML | `# sc-jev:region:allow` | `# sc-jev:end:allow` |
-| Rust, Go, JS, C++ | `// sc-jev:region:deny` | `// sc-jev:end:deny` |
-| SQL | `-- sc-jev:region:path` | `-- sc-jev:end:path` |
-
-The extractor does **not** parse ASTs; it scans text at the pinned git blob and
-treats a line as a marker when, after trimming, it matches:
-
-```text
-^(#|//|--)\s*sc-jev:(region|end):<id>\s*$
-```
-
-(Extend the alternation when a consumer documents another comment sigil.)
-
-### Region body
-
-- Content is **lines strictly between** begin and end markers.
-- Marker lines themselves are **excluded** from the body.
-- Body is UTF-8, normalized to `\n`-terminated text for payload embedding.
-- Any **included** id with unclosed region or `end` before `begin` → typed
-  extraction error (no send).
-
-### Including vs excluding regions
-
-check.toml may list which ids to extract; **all other marked regions in the
-file are ignored** (useful for leaving audit markers in source without feeding
-Jev).
+- **tree-sitter** at the pinned git blob; `language` in check.toml selects the
+  grammar (Phase A: **Python** for README `test_python_branches_*`).
+- Slices are **UTF-8 source text** from byte spans (not `ast.unparse` or
+  comment markers).
+- Optional **`command` extractor** runs a user command and expects JSON region
+  map for pre-extracted input.
 
 ```toml
 [[extractors]]
-type = "delimited-regions"
-path = "src/lib.rs"
+id = "policy-arms"
+type = "branches"
+language = "python"
+path = "src/policy.py"
 rev = "HEAD"
-regions = ["allow", "deny"]   # optional; omit to take every well-formed pair
 ```
 
-- **`regions` omitted:** extract every complete `region`/`end` pair in the file.
-  Payload map keys sorted lexicographically by `<id>` for stable bytes.
-- **`regions` set:** extract only those ids; a listed id missing or incomplete →
-  `INPUT_MISSING` / extraction error; unlisted ids in the file are skipped.
+Delimited comment regions are **not** Phase A extractors. `sc-jev` does not
+read source files.
 
-### Optional check.toml overrides
+### LLM judge system prompt (see ADR-SAG-0019)
 
 ```toml
-# Rare; defaults are sc-jev:region: and sc-jev:end:
-# begin_token = "sc-jev:region:"
-# end_token = "sc-jev:end:"
+[llm_judge]
+system_prompt_file = "prompts/evaluator-system.md"
 ```
 
-Override only the token prefix (`sc-jev:region:` / `sc-jev:end:`), not the
-`<id>` grammar, unless a future ADR extends it.
-
-### Why this pattern
-
-- **Greppable** and unlikely to collide with normal prose (`sc-jev:` namespace).
-- **Multiple ids per file** with optional **`regions` filter** excludes noise.
-- **Comment-line rule** keeps markers out of string literals in most styles.
-- Consumers can **generate** markers from AST tools without `sc-jev` knowing Python/Rust.
+Default asset path in packaged `jev.toml` points at a markdown file under
+`sc-jev-check` assets (not a Rust string). Facade reads at send time.
 
 ## ADR-SAG-0013 — Session JSONL via sc-observability v2
 
 Jev session/prompt logging uses **`sc-observability` v2** (`LoggerBuilder`,
-file/console sinks). `sc-jev` emits `LogEvent`s through **`SharedSessionLog`**
-(see ADR-SAG-0016); only **`sc-ai`** links full `sc-observability`. No bespoke
-JSONL writers. Secrets never appear in log lines.
+file/console sinks). **`sc-jev-check`** emits `LogEvent`s through
+**`SharedSessionLog`** (see ADR-SAG-0016); only **`sc-ai`** links full
+`sc-observability`. No bespoke JSONL writers. Secrets never appear in log lines.
 
 ## ADR-SAG-0016 — v2 shim in sc-agent-types (no extra crate)
 
@@ -194,7 +162,8 @@ Do **not** publish a separate observability crate. For the **first release or tw
 **`sc-agent-types::observability::v2`** holds the injectable `SessionLog` port
 (aligned with registry `v2::Logger`). Temporary dependency:
 `sc-observability-types = "1.5.0"` on **`sc-agent-types` only**; full
-`sc-observability = "1.5.0"` only on **`sc-ai`**. When upstream v2 ships, **delete
+`sc-observability = "1.5.0"` on composition roots **`sc-ai`** and **`sc-jev-py`**.
+Libraries take only **`SharedSessionLog`**. When upstream v2 ships, **delete
 the module** and drop the types dependency if possible (bead:
 `agt-obs-v2-shim-removal`).
 
@@ -214,7 +183,7 @@ endpoints extend `sc-jev` in place.
 
 | Approach | Status |
 | --- | --- |
-| API-direct Anthropic / OpenAI (Haiku/Luna in `sc-jev` check flow; future `sc-ai` agents) | **Wanted** — Phase A and Phase B (standalone) |
+| API-direct Anthropic / OpenAI (Haiku/Luna in `sc-jev-check` flow; future `sc-ai` agents) | **Wanted** — Phase A and Phase B (standalone) |
 | Subprocess JSON bridges to claude-code, codex-cli, cursor-cli | **Out of scope** |
 
 Future agent crates sit beside `sc-jev` and depend on `sc-agent-types` +
@@ -227,4 +196,4 @@ comparison flows.
 - [`design.md`](design.md) — goals and non-goals
 - [`framework-charter.md`](framework-charter.md) — multi-consumer Rust posture
 - [`plans/phase-a/plan.md`](plans/phase-a/plan.md) — Phase A sprints and boundaries
-- Per-crate: `docs/sc-agent-types/` (incl. temporary observability shim), `docs/sc-jev/`, etc.
+- Per-crate: `docs/sc-agent-types/`, `docs/sc-jev-check/`, `docs/sc-jev/`, `docs/sc-jev-backends/`, `docs/sc-jev-py/`, etc.

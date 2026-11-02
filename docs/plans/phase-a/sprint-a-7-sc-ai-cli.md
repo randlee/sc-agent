@@ -18,11 +18,14 @@ requirements:
   - REQ-SAG-0702
   - REQ-SAG-0703
   - REQ-SAG-0710
+  - REQ-SAG-0711
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
   - ADR-SAG-0010
   - ADR-SAG-0014
+  - ADR-SAG-0016
+  - ADR-SAG-0019
 owned_paths:
   - "crates/sc-ai/**"
   - "boundaries/sc-ai-cli/**"
@@ -41,10 +44,10 @@ stderr, exit 2 on failure. Success **`data`** = TypeSafe Jev response JSON +
 
 1. **REQ-SAG-0700** — Subcommands: `run`, `dry-run`, `ask` (session id + text); versioned response envelope.
 2. **REQ-SAG-0701** — Errors: `{"error":"<JevError code>","message":"<fix hint>"}` on stderr only.
-3. **REQ-SAG-0702** — Readback pairs for operations that mutate or consume paths (check.toml, repo root).
+3. **REQ-SAG-0702** — Readback pairs for operations that mutate or consume paths (check.toml, repo root, optional `--llm-system-prompt-file` override per ADR-SAG-0019).
 4. **REQ-SAG-0703** — `just install-sc-ai` or documented `cargo install --path crates/sc-ai` in README.
 5. **NFR-SAG-0002** — No secrets in logs or JSON output.
-6. **ADR-SAG-0010** — CLI is a thin adapter over `sc-jev`; no HTTP in `sc-ai` crate.
+6. **ADR-SAG-0010** — CLI is a thin adapter over **`sc-jev-check`**; no HTTP in `sc-ai`.
 7. **REQ-SAG-0710** — Integration test asserts stdout JSON includes Jev answer fields + `session_id`.
 8. **NFR-SAG-0003** — Document default log root; `LoggerBuilder` (v2) + adapter injects `SharedSessionLog`.
 9. **REQ-SAG-0711** — Pin `sc-observability = "1.5.0"` only in this crate; forward `try_log` / emit path.
@@ -63,7 +66,16 @@ fn emit_cli_error(err: &JevError) -> ! {
 }
 ```
 
-## Acceptance criteria
+## Acceptance criteria (authoritative)
+
+| Root | Criterion |
+| --- | --- |
+| req:REQ-SAG-0700 | `run`, `dry-run`, `ask` emit versioned envelope |
+| req:REQ-SAG-0710 | Success stdout includes Jev body + `session_id` |
+| req:REQ-SAG-0711 | v2 logger adapter wired to `SharedSessionLog` |
+| boundary:sc-ai-cli | No HTTP crates linked from `sc-ai` |
+
+## Required validation
 
 ```bash
 just lint
@@ -81,7 +93,7 @@ Integration tests (fake transport) must cover CLI parity rows tied to `run`, `dr
 
 ## Parity checklist
 
-All CLI-facing README rows not covered solely by library tests in a-6.
+See **plan.md** parity rows for sprint **a-7**.
 
 ## This sprint does not close
 

@@ -7,41 +7,77 @@
 
 - Single error enum for Jev and CLI (`JevError`).
 - JSON envelope helpers aligned with sc-ai-cli.
-- `JudgeBackend` trait definition — implementations live in other crates.
+- **Frozen judge contract:** `JudgeBackend`, `JudgeRequest`, shared domain types.
 - **Temporary (release 1–2):** `observability::v2` logging port (see below).
+
+## Judge contract (sprint a-1)
+
+```rust
+pub struct PayloadBundle {
+    pub bytes: Vec<u8>,
+    pub sha256: String,
+}
+
+pub struct LlmWireContext {
+    pub system_prompt: String,
+}
+
+pub struct JudgeRequest {
+    pub payload: PayloadBundle,
+    pub llm: Option<LlmWireContext>,
+}
+
+pub struct JudgeOutcome { /* normalized answers + backend metadata */ }
+
+pub struct EqualInputRecord {
+    pub prompt_sha256: String,
+    pub leak: bool,
+    pub commands: Vec<String>,
+    pub equal: bool,
+}
+
+pub enum BackendId { Jev, AnthropicHaiku, OpenAiLuna /* … */ }
+
+/// Question map keyed for canonical JSON (sorted keys at serialize time).
+pub type QuestionMap = BTreeMap<String, Question>;
+
+pub trait JudgeBackend: Send + Sync {
+    fn id(&self) -> BackendId;
+    fn validate_for_send(&self, req: &JudgeRequest) -> Result<(), JevError>;
+    fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError>;
+}
+```
+
+The facade builds one `PayloadBundle` and sets `llm` for Haiku/Luna only
+(ADR-SAG-0019). Implementations hold HTTP transport at **construction**; the
+trait does not name transport types.
+
+Contract tests + `MockJudgeBackend` live in **`sc-agent-types`** (`test-util`).
 
 ## Temporary v2 logging shim (`observability::v2`)
 
-Until **sc-observability v2** is the stable released API, this crate holds a small
-**SessionLog** port (same shape as sc-runtime’s injectable v2 logger), so we do
-**not** publish a separate observability crate on crates.io:
-
 ```rust
-pub mod observability {
-    pub mod v2 {
-        pub trait SessionLog: Send + Sync { /* emit LogEvent → EventError */ }
-        pub type SharedSessionLog = Arc<dyn SessionLog>;
-        // NoopSessionLog, test-util doubles
-    }
+pub struct LogEvent {
+    pub session_id: uuid::Uuid,
+    pub backend: BackendId,
+    pub prompt_sha256: String,
+    pub operation: String,
+    // no secrets
 }
+
+pub trait SessionLog: Send + Sync {
+    /// Best-effort append; never panics; errors are logged to stderr in adapters only.
+    fn try_log(&self, event: LogEvent) -> Result<(), EventError>;
+}
+pub type SharedSessionLog = Arc<dyn SessionLog>;
 ```
 
 - Depends only on **`sc-observability-types`** (not full `sc-observability`).
 - **`sc-ai`** builds `sc_observability::v2::Logger` and adapts to `SharedSessionLog`.
-- **`sc-jev`** takes `SharedSessionLog` by injection.
+- **`sc-jev-check`** takes `SharedSessionLog` by injection (not `sc-jev`).
 
-**Removal plan (bead `agt-obs-v2-shim-removal`):** delete `observability::v2`,
-drop `sc-observability-types` from this crate if upstream exposes the port, migrate
-call sites to the released interface.
+**Removal (bead `agt-obs-v2-shim-removal`):** delete shim when upstream v2 ships.
 
 ## Non-responsibilities
 
 - HTTP, keyring, check.toml parsing, CLI argv, building the real Logger.
-
-## Key types
-
-```rust
-pub trait JudgeBackend: Send + Sync { /* see phase plan */ }
-pub enum JevError { /* one variant per README error */ }
-pub struct PayloadBundle { pub bytes: Vec<u8>, pub sha256: String }
-```

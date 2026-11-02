@@ -1,7 +1,7 @@
 # sc-jev-py — architecture
 
-**Boundary:** `jev` (Python surface)  
-**Depends on:** `sc-jev` (Rust, statically linked in extension)
+**Boundary:** `jev-py`  
+**Depends on:** `sc-jev-check` (Rust, statically linked in extension)
 
 ## Role
 
@@ -14,7 +14,7 @@ extension; it is not the primary deliverable.
 
 ## Build and release
 
-- **maturin** builds the extension against workspace `sc-jev`.
+- **maturin** builds the extension against workspace **`sc-jev-check`**.
 - Version **lockstep** with Rust crates on first release (single tag / workspace version).
 - CI produces wheels (manylinux, macOS arm64 minimum); **PyPI** publish aligns
   with crates.io and **Homebrew / Scoop / WinGet** for `sc-ai` on one tag.

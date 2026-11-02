@@ -108,7 +108,7 @@ Lower case only.
 | Phase id | next unused letter(s) | `a` |
 | Sprint id | `<phase>-<n>` | `a-1` |
 | Plan directory | `docs/plans/phase-<phase>/` | `docs/plans/phase-a/` |
-| Phase plan | `phase-<phase>-plan.md` | `phase-a-plan.md` |
+| Phase plan | `plan.md` under `docs/plans/phase-<phase>/` (alias `phase-<phase>-plan.md` also allowed) | `docs/plans/phase-a/plan.md` |
 | Sprint doc | `sprint-<phase>-<n>-<slug>.md` | `sprint-a-1-bootstrap.md` |
 | Plan branch | `plan/phase-<phase>`, PR to `develop` | `plan/phase-a` |
 | Phase branch | `integrate/phase-<phase>`, from `develop` | `integrate/phase-a` |

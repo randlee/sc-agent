@@ -15,6 +15,12 @@ Non-Jev **comparison** backends only. TypeSafe Jev HTTP lives in **`sc-jev`**.
 
 Each implements `JudgeBackend` from `sc-agent-types`.
 
+## LLM wire envelope
+
+Backends accept **caller-supplied** evaluator system prompt text plus canonical
+payload bytes (ADR-SAG-0019). This crate does not read `check.toml` and does not
+ship production prompt prose in source — only wiring, validation, and HTTP.
+
 ## Transport
 
 ```rust

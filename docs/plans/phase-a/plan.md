@@ -27,7 +27,8 @@ future agent launchers.
   equal-input. **Not** byte-identical HTTP bodies across backends: TypeSafe Jev
   uses its evaluator wire shape; Haiku/Luna may add a **system prompt** and schema
   wrapper (and may tune that prompt over time) while still embedding the **same
-  canonical payload** in what the model judges.
+  canonical payload** in what the model judges. That system prompt is **injected**
+  from `check.toml` / asset files / CLI override — **not** hardcoded in Rust.
 - **Haiku/Luna API-direct** (no SDK/harness/tools); equal-input record every run
   attests each backend saw the same canonical bytes (README `prompt_sha256`, `equal`).
 - **Sessions + `ask`** are required, not optional.
@@ -44,69 +45,119 @@ future agent launchers.
 
 | Crate | Role | Public surface (summary) |
 | --- | --- | --- |
-| `sc-agent-types` | Shared types + **temporary** v2 log port | `JevError`, `JudgeBackend`, `observability::v2::SessionLog` (shim; remove after upstream v2) |
-| `sc-agent-secrets` | API key resolution shared by all backends | `resolve_key(BackendKeyId) -> Result<String, JevError>` env → `.env` → keyring |
-| `sc-jev` | **All TypeSafe Jev HTTP** + check orchestration | Jev API client (100% over time); `check.toml`, extractors, `run_check`, sessions; no CLI parsing |
-| `sc-jev-backends` | LLM comparison judges only | `AnthropicHaikuBackend`, `OpenAiLunaBackend`; injectable HTTP/transports |
-| `sc-ai` | Binary crate | `sc-ai jev …` subcommands (Phase A: check parity); JSON-first per sc-ai-cli |
-| `sc-jev-py` | PyO3 + **PyPI wheel** | Published extension; Python apps call `sc-jev` in-process |
+| `sc-agent-types` | Shared types + **temporary** v2 log port | `JevError`, `JudgeBackend`, `JudgeRequest`, domain types, `observability::v2` (shim) |
+| `sc-agent-secrets` | API key resolution | `resolve_key(id, repo_root)` env → repo `.env` → keyring |
+| `sc-jev` | **TypeSafe Jev HTTP only** | Jev API client; `JevClient: JudgeBackend`; no `check.toml`, no extractors |
+| `sc-jev-backends` | LLM comparison judges | Haiku/Luna `JudgeBackend` impls; injectable HTTP at construction |
+| `sc-jev-check` | **Check facade** | `check.toml`, extractors, payload, sessions, `run_check`, backend registry |
+| `sc-ai` | Binary crate | `sc-ai jev …`; JSON-first per sc-ai-cli |
+| `sc-jev-py` | PyO3 + **PyPI wheel** | Thin bindings over `sc-jev-check` |
 
-**Trait boundary** (in `sc-agent-types`):
+**Trait boundary** (frozen in sprint **a-1**, authoritative sample in
+`sprint-a-1-workspace-and-types.md` and `docs/sc-agent-types/architecture.md`):
 
 ```rust
+pub struct PayloadBundle { pub bytes: Vec<u8>, pub sha256: String }
+
+pub struct LlmWireContext { pub system_prompt: String }
+
+pub struct JudgeRequest {
+    pub payload: PayloadBundle,
+    pub llm: Option<LlmWireContext>,
+}
+
 pub trait JudgeBackend: Send + Sync {
     fn id(&self) -> BackendId;
-    /// Validate size and shape; return canonical payload bytes + digest.
-    fn validate_request(&self, questions: &QuestionMap, state: &JsonValue) -> Result<PayloadBundle, JevError>;
-    /// One check = one HTTP exchange (LLM: count + message internally, still one logical check).
-    fn judge(&self, bundle: &PayloadBundle, transport: &dyn BackendTransport) -> Result<JudgeOutcome, JevError>;
+    fn validate_for_send(&self, req: &JudgeRequest) -> Result<(), JevError>;
+    fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError>;
 }
 ```
 
-Local backend (`decider-4b` / cyprid) implements `JudgeBackend` in a **later**
-crate; Phase A keeps the trait stable and registration point in `sc-jev`.
+The facade builds **`PayloadBundle` once** and loads the injectable LLM system
+prompt into `JudgeRequest.llm` (ADR-SAG-0019). Jev ignores `llm`; Haiku/Luna
+require `Some`. Transport is **construction state** on each backend (`JevClient`,
+`AnthropicHaikuBackend`, …), not a `judge` parameter.
 
-**Dependency direction:** `sc-ai` → (`sc-jev`, `sc-observability` 1.5.0 v2) →
-`sc-jev-backends` → (`sc-agent-types`, `sc-agent-secrets`). Libraries never depend on CLI, PyO3, or full
-`sc-observability`.
+Local backend (`decider-4b` / cyprid) implements `JudgeBackend` in a **later**
+crate; Phase A registers backends in **`sc-jev-check`**.
+
+**Dependency direction:**
+
+```text
+sc-ai ── sc-observability 1.5.0 (v2 logger)
+  └── sc-jev-check ──┬── sc-jev (TypeSafe HTTP)
+                     ├── sc-jev-backends (Haiku/Luna)
+                     ├── sc-agent-secrets
+                     └── sc-agent-types
+
+sc-jev-py → sc-jev-check
+```
+
+`sc-jev` and `sc-jev-backends` do **not** depend on each other. No library
+depends on CLI, PyO3, or full `sc-observability`.
 
 ## Boundary map (Phase A)
 
 | Boundary | Crates | Contract |
 | --- | --- | --- |
-| `agent-types` | `sc-agent-types` | Errors, domain types, `JudgeBackend`, temporary `observability::v2` |
+| `agent-types` | `sc-agent-types` | Errors, `JudgeBackend`, `JudgeRequest`, `LogEvent`, v2 shim |
 | `agent-secrets` | `sc-agent-secrets` | Key resolution policy |
-| `jev-backends` | `sc-jev-backends` | HTTP transports + backend impls |
-| `jev` | `sc-jev`, `sc-jev-py` | Full Jev API home; Phase A check slice + orchestration |
+| `jev` | `sc-jev` | TypeSafe Jev HTTP + `JudgeBackend` impl |
+| `jev-backends` | `sc-jev-backends` | LLM `JudgeBackend` impls |
+| `jev-check` | `sc-jev-check` | Facade: config, extractors, run, sessions |
+| `jev-py` | `sc-jev-py` | PyO3 over facade |
 | `sc-ai-cli` | `sc-ai` | argv → operations → JSON envelope |
 
-Manifests under `boundaries/<id>/` land in sprint **a-1** (empty stubs allowed
-only until a-1 commits real rules).
+Sprint **a-1** commits **stub** manifests only. Each boundary sprint owns
+`boundaries/<id>/**` for its crate thereafter (a-1 does not retain `boundaries/**`).
 
 ## Wave table
 
 | Track | Wave | Sprint | `closure_type` | `target_boundary` | Notes |
 | --- | --- | --- | --- | --- | --- |
-| foundation | 1 | a-1 | contract | agent-types | workspace, sc-lint, errors, cross-impl fixture |
-| secrets | 1 | a-2 | boundary | agent-secrets | parallel with a-3 after a-1 |
-| build | 1 | a-3 | boundary | jev | config, extractors, payload; parallel with a-2 |
-| jev | 2 | a-4 | boundary | jev | TypeSafe Jev HTTP (check endpoint); `must_follow` a-3 |
-| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-3 |
-| runtime | 3 | a-6 | boundary | jev | sessions, run_request, multi-backend; `must_follow` a-4,a-5 |
-| cli | 3 | a-7 | integration | sc-ai-cli | CLI features 1–3, parity CLI paths; `must_follow` a-6 |
-| python | 3 | a-8 | integration | jev | PyO3 + maturin wheel; `must_follow` a-6 |
-| publish | 4 | a-9 | integration | release | [sc-publish](https://github.com/randlee/sc-publish) kit install; `must_follow` a-8 |
-| publish | 4 | a-10 | integration | release | Release preflight + publish dry-run; `must_follow` a-9 |
+| foundation | 1 | a-1 | contract | agent-types | workspace, sc-lint, frozen trait + types, cross-impl fixture |
+| secrets | 2 | a-2 | boundary | agent-secrets | `must_follow` a-1 (`JudgeBackend` + errors); ∥ a-3 |
+| build | 2 | a-3 | boundary | jev-check | extractors + payload; `must_follow` a-1 (contract types) |
+| jev | 2 | a-4 | boundary | jev | TypeSafe HTTP; `must_follow` a-1; **∥ a-3, a-5** |
+| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-1; **∥ a-3, a-4** |
+| runtime | 3 | a-6 | boundary | jev-check | run, sessions, prompt load; `must_follow` a-2,a-3,a-4,a-5 |
+| cli | 3 | a-7 | integration | sc-ai-cli | `must_follow` a-6 |
+| python | 3 | a-8 | integration | jev-py | PyO3; `must_follow` a-6; **∥ a-7** |
+| publish | 4 | a-9 | integration | release | sc-publish install; `must_follow` **a-7 and a-8** |
+| publish | 4 | a-10 | integration | release | preflight; `must_follow` a-9 |
 
-**Critical path:** a-1 → a-3 → a-4 → a-6 → a-7 → a-8 → a-9 → a-10 (8 sprints).  
-**Width:** 2 (a-2 ∥ a-3; a-4 ∥ a-5; a-7 ∥ a-8 until a-6 done). **Sprint count:** 10.
+**Critical path (longest `must_follow` chain):** a-1 → a-3 → a-6 → a-7 → a-9 → a-10
+(6 sprints). a-8 joins publish at a-9; a-7 and a-8 are not serial with each other.  
+**Width:** after a-1, up to **4** parallel siblings (a-2 ∥ a-3 ∥ a-4 ∥ a-5; a-4 and
+a-5 share the HTTP track but are separate boundary sprints). **Sprint count:** 10.
+
+Sprint frontmatter **`parallel_safe`** lists local siblings; the **wave table above**
+is the authoritative dependency graph when YAML and prose differ.
+
+**Why three `jev-check` / HTTP layer sprints:** a-3 (extractors + payload) and
+a-4/a-5 (HTTP backends) are substantial and parallel; a-6 integrates secrets,
+multi-backend, and logging without overloading a-3.
+
+### Must-follow artifacts (not “same file”)
+
+| Edge | Artifact consumed |
+| --- | --- |
+| a-2 → a-1 | `JevError`, `BackendKeyId` |
+| a-3 → a-1 | `PayloadBundle`, extractor-facing domain types |
+| a-4 → a-1 | `JudgeBackend`, `JudgeRequest` |
+| a-5 → a-1 | `JudgeBackend`, `JudgeRequest`, `LlmWireContext` |
+| a-6 → a-2 | `resolve_key(id, repo_root)` |
+| a-6 → a-3 | `CheckSpec`, canonical payload builder |
+| a-6 → a-4 / a-5 | `JevClient`, Haiku/Luna backends as `JudgeBackend` |
+| a-7 / a-8 → a-6 | `run_check`, sessions, logging port |
+| a-9 → a-7 / a-8 | `sc-ai` binary + `sc-jev-py` wheel artifacts |
 
 ## Parity and features mapping
 
 | Sprint | Parity rows closed (README checklist) | Requested features |
 | --- | --- | --- |
 | a-1 | (fixture only; enables payload tests) | — |
-| a-3 | extractors (`file`, `table-column`, `delimited-regions`), config, payload | — (not python-branches AST) |
+| a-3 | extractors (`file`, `table-column`, `branches`, `command`), config, payload | python-branches parity |
 | a-4 | Jev transport rows | — |
 | a-5 | Haiku/Luna rows | **8** (Luna live count) |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
@@ -120,7 +171,7 @@ only until a-1 commits real rules).
 | # | Item | Phase A |
 | --- | --- | --- |
 | 1 | Cross-impl byte fixture | **a-1** |
-| 2 | Branch / region text | **a-3** — **delimited regions** in source (see resolved #3); no in-crate Python AST |
+| 2 | Branch / region text | **a-3** — tree-sitter **`branches`** extractor (ADR-SAG-0015) |
 | 3 | Jev probabilities strict | **a-4** |
 | 4 | LLM stop_reason / status | defer |
 | 5 | LLM busy retry | defer |
@@ -146,8 +197,8 @@ upstream v2 is released.
 **Stdout success shape:** the **same JSON object TypeSafe Jev returns** for the
 check/judge call, plus a required **`session_id`** (UUID for this run’s session
 log correlation). Haiku/Luna paths still emit that **Jev-equivalent answer JSON**
-on stdout (mocked/parsed as today in Python parity); `session_id` is always
-present. sc-ai-cli version envelope wraps this if required by guidelines
+on stdout (normalized Jev answer shape; fake transports are test-only per
+ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps this if required by guidelines
 (`data` holds Jev body + `session_id`).
 
 ## Resolved decisions (Rand)
@@ -156,11 +207,9 @@ present. sc-ai-cli version envelope wraps this if required by guidelines
    (REQ-SAG-0202). Later waves may add a user-level `.env` path; Phase A is
    repo-root only.
 2. **sc-runtime daemon / UDS** — out of Phase A.
-3. **Branch / region extraction:** **Embedded delimiters** (`delimited-regions`;
-   ADR-SAG-0015). **Many regions per file** (distinct ids); optional
-   `regions = [...]` in check.toml **includes only listed ids** (others
-   excluded). No in-crate Python AST — consumers add markers or pre-extract.
-   README `test_python_branches_*` is **not** a Phase A gate.
+3. **Branch / region extraction:** **tree-sitter `branches` extractor**
+   (ADR-SAG-0015) with optional **`command`** escape hatch. Phase A ships Python
+   grammar; README `test_python_branches_*` is a **Phase A gate** (sprint a-3).
 
 ## Open questions (for Rand)
 
@@ -168,8 +217,12 @@ None blocking plan approval. **Kickoff decisions** (can default in sprint if sil
 
 1. **Session JSONL root** — default directory and env var (e.g. `SC_AGENT_LOG_DIR` vs reuse an `sc-observability` convention)?
 2. ~~**`sc-observability` pin**~~ — **`=1.5.0`**, v2 `LoggerBuilder` in `sc-ai` only (resolved).
-3. **Cross-impl bytes test** — still gate Phase A on Python `packages/jev-check` fixture repo in-tree, or Rust-only fixture until Python wraps `sc-jev-py`?
-4. **Luna live token-count (feature 8)** — manual PR evidence only (current sprint a-5), or required in CI with a secret?
+3. ~~Cross-impl bytes~~ — **Resolved:** a-1 commits Python reference bytes;
+   phase acceptance runs `tests/fixtures/jev-python` pytest (a-8); Rust-only
+   fixtures are not a substitute.
+4. **Luna live token-count (feature 8)** — a-5 ships fake-transport wire tests;
+   **live** `/v1/responses/input_tokens` probe is manual PR evidence on a-5
+   (`SKIPPED` only with Rand waiver bead); not a CI gate in Phase A.
 5. **sc-ai-cli envelope** — confirm top-level `{ "version", "operation", "data": { …jev…, "session_id" } }` against synaptic-canvas `packages/sc-ai-cli` before a-7?
 
 Follow-ups as beads: user-level `.env`, extra comment sigils in ADR-SAG-0015, parallel question fan-out.
@@ -220,7 +273,7 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 
 | Channel | Packages |
 | --- | --- |
-| **crates.io** | `sc-jev`, `sc-agent-types`, `sc-agent-secrets`, `sc-jev-backends`, `sc-ai` |
+| **crates.io** | `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, `sc-jev-check`, `sc-ai` |
 | **PyPI** | `sc-jev-py` (maturin wheel) |
 | **Homebrew** | `sc-ai` formula (kit `homebrew` channel) |
 | **Scoop** | `sc-ai` manifest (kit `scoop` channel) |

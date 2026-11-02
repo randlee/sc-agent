@@ -41,13 +41,20 @@ release assets) without production credentials in CI where the kit allows.
    for workspace crates; `maturin build` for `sc-jev-py`; tag/release gate
    documented in `docs/development/sc-publish.md`.
 
-## Acceptance criteria
+## Acceptance criteria (authoritative)
+
+| Root | Criterion |
+| --- | --- |
+| req:REQ-SAG-0132 | Release preflight workflow green |
+| req:REQ-SAG-0803 | Dry-run publish order documented and exercised |
+
+## Required validation
 
 ```bash
 just lint
 just test
 bash .github/scripts/run-consumer-preflight.sh
-cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev-backends -p sc-jev -p sc-ai 2>&1 | tail -5
+cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-ai 2>&1 | tail -5
 maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
 test -n "$(ls /tmp/sc-agent-wheels/*.whl 2>/dev/null | head -1)"
 ```

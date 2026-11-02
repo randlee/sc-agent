@@ -35,6 +35,7 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 | REQ-SAG-0100 | Root Cargo workspace, `justfile`, sc-lint, standard lint/test targets |
 | REQ-SAG-0101 | `JevError`: one variant per README error id; each has `code()` and `fix_hint()` |
 | REQ-SAG-0102 | Cross-implementation payload fixture: Rust digest matches committed Python reference bytes |
+| REQ-SAG-0103 | Frozen `JudgeBackend` / `JudgeRequest` contract + contract tests in `sc-agent-types` |
 | NFR-SAG-0001 | CLI error JSON shape (`ScAgentErrorResponse`) defined in `sc-agent-types` |
 | REQ-SAG-0120 | Temporary `sc-agent-types::observability::v2` SessionLog shim (not a separate crate) |
 | REQ-SAG-0121 | Noop + test-util doubles; delete shim + trim deps after upstream v2 release |
@@ -51,8 +52,8 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0300 | Extractors: `file`, `table-column`, `delimited-regions` |
-| REQ-SAG-0304 | `delimited-regions`: many ids per file; optional `regions = [...]` to include only listed ids |
+| REQ-SAG-0300 | Extractors: `file`, `table-column`, `branches`, `command` |
+| REQ-SAG-0304 | `branches`: tree-sitter slices; Phase A Python grammar + README python-branches gate |
 | REQ-SAG-0301 | Refuse send on `CONFIG_INVALID`, `INPUT_*` errors |
 | REQ-SAG-0302 | Git repo-root resolution for relative paths |
 | REQ-SAG-0303 | Question-set schema `plan-anchoring/questions/1` |
@@ -68,9 +69,10 @@ the **`sc-ai`** CLI. Contract: atm-core `plan/phase-bo-replan` →
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0500 | Haiku API-direct; system prompt allowed; canonical payload embedded; `prompt_sha256` on canonical bytes only |
+| REQ-SAG-0500 | Haiku API-direct; injectable system prompt; canonical payload embedded; `prompt_sha256` on canonical bytes only |
 | REQ-SAG-0501 | Luna API-direct + live input token count verification (feature 8) |
 | REQ-SAG-0502 | LLM context-length refusal matches Jev semantics |
+| REQ-SAG-0503 | LLM evaluator system prompt from config/file at runtime; no production prompt prose hardcoded in Rust |
 
 ## Phase A — orchestration (sprint a-6)
 
