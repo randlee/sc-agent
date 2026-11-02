@@ -1,0 +1,85 @@
+{
+  "schema": "sc/subjects/1",
+  "source": {
+    "path": "tests/fixtures/cross-impl/branches/hook.py",
+    "rev": "HEAD",
+    "blob_sha": "a1ca45f53a52fc4f2e9adef72f2dcb046dadc261"
+  },
+  "producer": {
+    "name": "sc-treesitter",
+    "version": "0.1.0",
+    "language": "python",
+    "grammar": "tree-sitter-python",
+    "grammar_version": "0.25.0",
+    "query_sha256": "1df7df571e74e5df2841802c50212b7d4681b08a2ce7aa0d88646fc6574dbaa6",
+    "mode": "matches"
+  },
+  "subjects": [
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:17",
+      "capture": "arm",
+      "text": "Transition.GIVE_BACK",
+      "span": {
+        "start_line": 17,
+        "end_line": 17,
+        "start_byte": 314,
+        "end_byte": 334
+      }
+    },
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:17:1",
+      "capture": "refusal",
+      "text": "Refusal(\"give-back\")",
+      "span": {
+        "start_line": 17,
+        "end_line": 17,
+        "start_byte": 343,
+        "end_byte": 363
+      }
+    },
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:18",
+      "capture": "arm",
+      "text": "Transition.KEEP",
+      "span": {
+        "start_line": 18,
+        "end_line": 18,
+        "start_byte": 377,
+        "end_byte": 392
+      }
+    },
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:20",
+      "capture": "arm",
+      "text": "Transition.STOP",
+      "span": {
+        "start_line": 20,
+        "end_line": 20,
+        "start_byte": 433,
+        "end_byte": 448
+      }
+    },
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:21",
+      "capture": "refusal",
+      "text": "Refusal(\"stop\")",
+      "span": {
+        "start_line": 21,
+        "end_line": 21,
+        "start_byte": 469,
+        "end_byte": 484
+      }
+    },
+    {
+      "id": "tests/fixtures/cross-impl/branches/hook.py:22",
+      "capture": "arm",
+      "text": "_",
+      "span": {
+        "start_line": 22,
+        "end_line": 22,
+        "start_byte": 498,
+        "end_byte": 499
+      }
+    }
+  ]
+}

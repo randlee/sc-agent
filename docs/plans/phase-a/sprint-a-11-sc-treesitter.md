@@ -1,7 +1,7 @@
 ---
 id: a-11
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: treesitter
 track: build

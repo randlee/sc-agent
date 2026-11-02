@@ -1,0 +1,18 @@
+{
+  "language": "python",
+  "query": "branches",
+  "rev": "HEAD",
+  "path": "tests/fixtures/cross-impl/branches/hook.py",
+  "captures": ["arm", "refusal"],
+  "argv": [
+    "sc-treesitter",
+    "extract",
+    "--language",
+    "python",
+    "--query",
+    "branches",
+    "--rev",
+    "HEAD",
+    "tests/fixtures/cross-impl/branches/hook.py"
+  ]
+}
