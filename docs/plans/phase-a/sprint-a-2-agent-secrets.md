@@ -19,10 +19,13 @@ requirements:
   - REQ-SAG-0202
   - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0001
   - ADR-SAG-0003
+  - ADR-SAG-0013
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-agent-secrets/**"
-  - "boundaries/agent-secrets/**"
+  - "boundaries/sc-agent-secrets/**"
 ---
 
 # Sprint a-2 — sc-agent-secrets
@@ -35,23 +38,27 @@ keyring** (service = env var name, account = user); injectable for tests;
 
 ## Deliverables
 
-1. **REQ-SAG-0200** — `resolve_key(id: BackendKeyId, repo_root: &RepoRoot)` for `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (facade passes git toplevel from a-3; this crate does not run git).
+1. **REQ-SAG-0200** — `resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<ResolvedApiKey, JevError>` for `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (facade passes git toplevel from a-3; this crate does not run git).
 2. **REQ-SAG-0201** — Optional override for `ANTHROPIC_KEYCHAIN_SERVICE` on Anthropic only.
 3. **REQ-SAG-0202** — Load vars from repo-root `.env` between env and keyring; `.env` never overrides set process env.
-4. **ADR-SAG-0003** — Secrets never logged or included in error messages.
+4. **NFR-SAG-0002** / **ADR-SAG-0013** — Secrets never appear in CLI output or logs. This crate emits no log lines. **ADR-SAG-0003** is the resolution order (process env → repo-root `.env` → keyring), not the session-log policy. Credential errors are `JevError` ids (**ADR-SAG-0001**) and never include secret material.
+5. **REQ-SAG-0200** / **NFR-SAG-0002** / **ADR-SAG-0020** — `EnvSource` and `KeyringSource` are the open injection traits. Feature `test-util` exposes `MapEnv` and `MapKeyring`. `resolve_key` returns `ResolvedApiKey`, whose `Debug` and `Display` redact the secret.
 
 ## Explicit code samples
 
 ```rust
-pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<String, JevError>;
+pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<ResolvedApiKey, JevError>;
 ```
 
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
-| boundary:agent-secrets | `resolve_key` injectable; no logging of secret material |
-| ADR-SAG-0003 | Errors never echo key values |
+| boundary:agent-secrets | `resolve_key` injectable; returns `ResolvedApiKey`; no logging of secret material |
+| ADR-SAG-0001 | Credential failures use `JevError` codes `KEY_MISSING` and `CONFIG_INVALID` |
+| ADR-SAG-0003 | Resolution order is process env → `.env` → keyring; errors never echo key values |
+| NFR-SAG-0002 | `fix_hint`, `Display`, and `Debug` contain no secret material (log lines: ADR-SAG-0013) |
+| ADR-SAG-0020 | Injection traits and the `test-util` doubles are the recorded extension points |
 
 ## Required validation
 

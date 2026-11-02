@@ -1,14 +1,16 @@
 //! Process environment and platform keyring adapters.
 //!
-//! Keyring failures become [`JevError::ConfigInvalid`] with a fixed detail
-//! string. Upstream messages are dropped because `BadEncoding` carries the
-//! raw secret bytes.
+//! Keyring failures become [`JevError::ConfigInvalid`] with a sanitized cause
+//! and a recovery hint. Upstream messages are dropped because `BadEncoding`
+//! carries the raw secret bytes and platform errors can echo caller text.
 
 use sc_agent_types::JevError;
 
 use crate::resolve::{EnvSource, KeyringSource};
 
 pub(crate) const KEYRING_UNREADABLE: &str = "platform keyring could not be read";
+
+pub(crate) const KEYRING_RECOVERY: &str = "Unlock the platform keystore for this OS user and retry. Do not paste secret values into logs or this message.";
 
 /// Reads variables from the process environment.
 ///
@@ -45,7 +47,7 @@ impl KeyringSource for PlatformKeyring {
     fn password(&self, service: &str, account: &str) -> Result<Option<String>, JevError> {
         let entry = match keyring::Entry::new(service, account) {
             Ok(entry) => entry,
-            Err(_) => return Err(keyring_unavailable()),
+            Err(error) => return Err(keyring_unavailable(sanitized_keyring_cause(&error))),
         };
         classify_keyring(entry.get_password())
     }
@@ -57,14 +59,29 @@ pub(crate) fn classify_keyring(
     match result {
         Ok(secret) => Ok(Some(secret)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(_) => Err(keyring_unavailable()),
+        Err(error) => Err(keyring_unavailable(sanitized_keyring_cause(&error))),
     }
 }
 
-fn keyring_unavailable() -> JevError {
-    JevError::ConfigInvalid {
-        detail: KEYRING_UNREADABLE.to_owned(),
+/// Labels a keyring failure without formatting the error.
+///
+/// `keyring::Error`'s `Display` and `Debug` can include secret bytes
+/// (`BadEncoding`) or the inner platform message (`PlatformFailure`).
+fn sanitized_keyring_cause(error: &keyring::Error) -> &'static str {
+    match error {
+        keyring::Error::PlatformFailure(_) => "platform keystore returned an error",
+        keyring::Error::NoStorageAccess(_) => "keystore access was denied",
+        keyring::Error::NoEntry => "entry is absent",
+        keyring::Error::BadEncoding(_) => "stored value was not valid UTF-8",
+        keyring::Error::TooLong(_, _) => "keystore rejected an attribute length",
+        keyring::Error::Invalid(_, _) => "keystore rejected the service or account",
+        keyring::Error::Ambiguous(_) => "keystore matched more than one entry",
+        _ => "keystore returned an unrecognized error",
     }
+}
+
+fn keyring_unavailable(cause: &str) -> JevError {
+    JevError::credential_store_invalid(KEYRING_UNREADABLE, cause, KEYRING_RECOVERY)
 }
 
 /// OS user name used as the keyring account.
@@ -80,16 +97,38 @@ mod tests {
     #[test]
     fn keyring_errors_drop_secret_bytes() {
         let secret = "super-secret-value";
-        let err = classify_keyring(Err(keyring::Error::BadEncoding(secret.as_bytes().to_vec())))
-            .expect_err("bad encoding");
-        assert_eq!(err.code(), "CONFIG_INVALID");
-        assert_secret_absent(&err, secret);
-
-        let err = classify_keyring(Err(keyring::Error::PlatformFailure(Box::new(
-            std::io::Error::other(secret),
-        ))))
-        .expect_err("platform failure");
-        assert_secret_absent(&err, secret);
+        let cases = [
+            (
+                keyring::Error::BadEncoding(secret.as_bytes().to_vec()),
+                "stored value was not valid UTF-8",
+            ),
+            (
+                keyring::Error::PlatformFailure(Box::new(std::io::Error::other(secret))),
+                "platform keystore returned an error",
+            ),
+            (
+                keyring::Error::NoStorageAccess(Box::new(std::io::Error::other(secret))),
+                "keystore access was denied",
+            ),
+            (
+                keyring::Error::TooLong(secret.to_owned(), 8),
+                "keystore rejected an attribute length",
+            ),
+            (
+                keyring::Error::Invalid("password".to_owned(), secret.to_owned()),
+                "keystore rejected the service or account",
+            ),
+        ];
+        for (error, cause) in cases {
+            let err = classify_keyring(Err(error)).expect_err("keyring failure");
+            assert_eq!(err.code(), "CONFIG_INVALID");
+            let hint = err.fix_hint();
+            assert!(hint.contains(KEYRING_UNREADABLE), "{hint}");
+            assert!(hint.contains(cause), "{hint}");
+            assert!(hint.contains(KEYRING_RECOVERY), "{hint}");
+            assert!(!hint.contains("check.toml"), "{hint}");
+            assert_secret_absent(&err, secret);
+        }
         assert_eq!(
             classify_keyring(Err(keyring::Error::NoEntry)).unwrap(),
             None

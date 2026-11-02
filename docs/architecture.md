@@ -124,6 +124,33 @@ still records whether every backend saw the same canonical bytes.
 the resolved secret (and transport) at **construction**; they do **not** depend on
 `sc-agent-secrets`. `JudgeRequest` carries neither keys nor `repo_root`.
 
+Amended by ADR-SAG-0020.
+
+## ADR-SAG-0020 — Secret injection and redaction
+
+**Status:** Active
+
+Amends ADR-SAG-0003.
+
+Resolution order stays ADR-SAG-0003. This decision records the extension
+points and the secret-bearing return type.
+
+- `EnvSource` and `KeyringSource` are open injection traits. `resolve_key_with`
+  takes them. Production `resolve_key` uses `ProcessEnv` and `PlatformKeyring`.
+- Cargo feature `test-util` exposes the in-memory doubles `MapEnv` and
+  `MapKeyring`. Production builds leave the feature off. The doubles are not
+  a second resolution policy.
+- `resolve_key` and `resolve_key_with` return `ResolvedApiKey`. `Debug` and
+  `Display` redact the secret. `as_str` is the only read, and only the
+  transport that sends the key may call it.
+- An unreadable repo-root `.env` or keyring is `CONFIG_INVALID`
+  (`JevError::credential_store_invalid`). The cause is an I/O kind or a
+  keyring variant label. It never includes secret bytes, passwords, or the
+  raw platform error text. The fix hint names that cause and the recovery
+  step. A miss stays `KEY_MISSING` (ADR-SAG-0001).
+- This crate writes no log lines. Secrets in CLI output and logs remain
+  NFR-SAG-0002 and ADR-SAG-0013.
+
 ## ADR-SAG-0004 — One check, one request
 
 **Status:** Active
@@ -249,6 +276,8 @@ endpoints extend `sc-jev` in place.
 - **Domain newtypes:** `RepoRoot`, `Rev`, `SessionId`, `BackendKeyId` in
   `sc-agent-types` (frozen in a-1); secrets APIs take `&RepoRoot` not raw paths
   where the contract requires repo context (RBP-F003).
+- **Resolved secrets:** `ResolvedApiKey` in `sc-agent-secrets` (ADR-SAG-0020).
+  `Debug` and `Display` redact. `as_str` is the only read of the secret.
 - **Extractor sealing:** `Extractor` is `pub trait Extractor: private::Sealed` —
   only the four Phase A kinds implement it; external crates cannot add kinds
   without a new ADR (RBP-F004).

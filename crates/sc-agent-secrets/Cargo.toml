@@ -11,7 +11,8 @@ description = "API key resolution for sc-agent (process env, repo-root .env, key
 
 [features]
 default = []
-# In-memory env and keyring doubles for tests. Production builds omit them.
+# In-memory env and keyring doubles for tests (ADR-SAG-0020).
+# Production builds omit them.
 test-util = []
 
 [dependencies]
@@ -29,3 +30,6 @@ keyring = { version = "3.6", features = ["windows-native"] }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "openbsd"))'.dependencies]
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
+
+[dev-dependencies]
+tempfile = "3"

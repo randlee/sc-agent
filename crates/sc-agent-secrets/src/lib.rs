@@ -8,7 +8,15 @@
 //! Callers pass the git toplevel as a [`RepoRoot`]. This crate does not run
 //! git, does not open network connections, and does not log credential values.
 //! Errors are [`JevError`] values and never include secret material
-//! (ADR-SAG-0003).
+//! (ADR-SAG-0003). Log lines stay under NFR-SAG-0002 and ADR-SAG-0013; this
+//! crate emits none.
+//!
+//! [`resolve_key`] returns a [`ResolvedApiKey`]. Its `Debug` and `Display`
+//! implementations redact the secret (ADR-SAG-0020).
+//!
+//! [`EnvSource`] and [`KeyringSource`] are open injection traits. The
+//! `test-util` feature exposes `MapEnv` and `MapKeyring` for downstream tests.
+//! Production builds leave that feature off.
 //!
 //! # Examples
 //!
@@ -48,57 +56,20 @@ mod dotenv;
 mod platform;
 mod resolve;
 
+#[cfg(test)]
+mod test_support;
+
 #[doc(inline)]
 pub use platform::{PlatformKeyring, ProcessEnv};
 #[doc(inline)]
 pub use resolve::{
     ANTHROPIC_API_KEY_VAR, ANTHROPIC_KEYCHAIN_SERVICE_VAR, EnvSource, KeyringSource,
-    OPENAI_API_KEY_VAR, TYPESAFE_API_KEY_VAR, resolve_key, resolve_key_with,
+    OPENAI_API_KEY_VAR, ResolvedApiKey, TYPESAFE_API_KEY_VAR, resolve_key, resolve_key_with,
 };
 
 #[cfg(any(test, feature = "test-util"))]
 #[doc(inline)]
 pub use resolve::{MapEnv, MapKeyring};
-
-#[cfg(test)]
-mod exact_name_tests {
-    use std::fs;
-    use std::path::PathBuf;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    use sc_agent_types::RepoRoot;
-
-    pub(crate) struct TempRepo {
-        path: PathBuf,
-    }
-
-    impl TempRepo {
-        pub(crate) fn new(dotenv: Option<&str>) -> Self {
-            static NEXT: AtomicU64 = AtomicU64::new(0);
-            let path = std::env::temp_dir().join(format!(
-                "sc-agent-secrets-order-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            let _ = fs::remove_dir_all(&path);
-            fs::create_dir_all(&path).unwrap();
-            if let Some(body) = dotenv {
-                fs::write(path.join(".env"), body).unwrap();
-            }
-            Self { path }
-        }
-
-        pub(crate) fn root(&self) -> RepoRoot {
-            RepoRoot::new(&self.path)
-        }
-    }
-
-    impl Drop for TempRepo {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
-}
 
 // Crate-root name so `cargo test -- test_env_dotenv_keychain_order --exact` selects it.
 #[cfg(test)]
@@ -106,7 +77,7 @@ mod exact_name_tests {
 fn test_env_dotenv_keychain_order() {
     use sc_agent_types::BackendKeyId;
 
-    use crate::exact_name_tests::TempRepo;
+    use crate::test_support::TempRepo;
     use crate::{MapEnv, MapKeyring, resolve_key_with};
 
     let repo = TempRepo::new(Some(
@@ -130,7 +101,7 @@ fn test_env_dotenv_keychain_order() {
         "tester",
     )
     .unwrap();
-    assert_eq!(from_env, "from-env");
+    assert_eq!(from_env.as_str(), "from-env");
 
     let from_dotenv = resolve_key_with(
         BackendKeyId::Anthropic,
@@ -140,11 +111,11 @@ fn test_env_dotenv_keychain_order() {
         "tester",
     )
     .unwrap();
-    assert_eq!(from_dotenv, "from-dotenv-anthropic");
+    assert_eq!(from_dotenv.as_str(), "from-dotenv-anthropic");
 
     let from_keyring =
         resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-    assert_eq!(from_keyring, "from-keyring-openai");
+    assert_eq!(from_keyring.as_str(), "from-keyring-openai");
 
     let empty = TempRepo::new(None);
     let missing = resolve_key_with(

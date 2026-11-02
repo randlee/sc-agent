@@ -13,14 +13,32 @@ use sc_agent_types::JevError;
 
 pub(crate) const DOTENV_UNREADABLE: &str = "repo-root .env could not be read";
 
+pub(crate) const DOTENV_RECOVERY: &str = "Make the repo-root .env file readable by this user, or remove it, then retry. Do not paste secret values into logs or this message.";
+
 pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, JevError> {
     let path = repo_root.join(".env");
     match fs::read_to_string(&path) {
         Ok(text) => Ok(parse_dotenv(&text)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(BTreeMap::new()),
-        Err(_) => Err(JevError::ConfigInvalid {
-            detail: DOTENV_UNREADABLE.to_owned(),
-        }),
+        Err(error) => Err(JevError::credential_store_invalid(
+            DOTENV_UNREADABLE,
+            sanitized_io_cause(&error),
+            DOTENV_RECOVERY,
+        )),
+    }
+}
+
+/// Labels an I/O failure without the OS message.
+///
+/// `std::io::Error`'s display text can echo path or payload bytes. Callers
+/// pass this label as the sanitized cause.
+fn sanitized_io_cause(error: &io::Error) -> &'static str {
+    match error.kind() {
+        io::ErrorKind::PermissionDenied => "permission denied",
+        io::ErrorKind::IsADirectory => "path is a directory",
+        io::ErrorKind::InvalidData => "contents are not valid text",
+        io::ErrorKind::NotFound => "not found",
+        _ => "read failed",
     }
 }
 
@@ -119,14 +137,24 @@ mod tests {
 
     #[test]
     fn missing_file_is_empty() {
-        let dir = std::env::temp_dir().join(format!(
-            "sc-agent-secrets-dotenv-missing-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        let loaded = load_dotenv(&dir).unwrap();
+        let repo = crate::test_support::TempRepo::new(None);
+        let loaded = load_dotenv(repo.path()).unwrap();
         assert!(loaded.is_empty());
-        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unreadable_cause_omits_raw_error_text() {
+        let secret = "super-secret-value";
+        let error = io::Error::new(io::ErrorKind::PermissionDenied, secret);
+        let rendered = JevError::credential_store_invalid(
+            DOTENV_UNREADABLE,
+            super::sanitized_io_cause(&error),
+            DOTENV_RECOVERY,
+        );
+        let text = format!("{rendered} {rendered:?} {}", rendered.fix_hint());
+        assert!(text.contains("cause: permission denied"), "{text}");
+        assert!(text.contains(DOTENV_RECOVERY), "{text}");
+        assert!(!text.contains(secret), "{text}");
+        assert!(!rendered.fix_hint().contains("check.toml"));
     }
 }
