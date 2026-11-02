@@ -24,7 +24,9 @@ scripts/__pycache__/
 
 # Local Synaptic Canvas orchestration state: retain it locally for agent
 # history/status, but never treat it as repository content.
-.sc/
+.sc/*
+!.sc/plan-anchor/
+!.sc/plan-anchor/**
 .sc-compose/logs/
 **/.sc-compose/logs/
 .just/logs/
