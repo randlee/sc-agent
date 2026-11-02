@@ -7,4 +7,12 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "LLM judge backends (stub until sprint a-5)."
+description = "API-direct Haiku and Luna judge backends."
+
+[dependencies]
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+serde_json.workspace = true
+ureq = "2.12"
+
+[dev-dependencies]
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
