@@ -1,51 +1,58 @@
 # ATM configuration for sc-agent (Synaptic Canvas agent runtime).
 #
-# Runtime identity is from the environment (see `atm help identity`):
-#   export ATM_IDENTITY=team-lead ATM_TEAM=sc-agent
+# Runtime identity (see `atm help identity`):
+#   export ATM_IDENTITY=ai-lead ATM_TEAM=sc-ai
 #
-# Register the team and members on the ATM daemon before first use, for example:
-#   atm teams add-member sc-agent team-lead --agent-type lead --model sonnet \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default \
-#     --alias sc-agent-lead
-# Repeat for scodex, quality-mgr, and publisher (aliases below).
+# Register the team on the ATM daemon before first use, for example:
+#   atm teams add-member sc-ai ai-lead --agent-type lead --model opus \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#   atm teams add-member sc-ai tai --agent-type developer --model gpt-5.6-terra-medium \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#   atm teams add-member sc-ai lai --agent-type developer --model gpt-5.6-luna-medium \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#   atm teams add-member sc-ai sai --agent-type developer --model gpt-5.6-sol-medium \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#   atm teams add-member sc-ai ai-qa --agent-type qa --model sonnet \
+#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
 #
-# team-lead, quality-mgr, and publisher MUST keep repo-unique Herdr aliases
-# (see .claude/skills/team-lead/SKILL.md).
+# Orchestration: pass `--var lead=ai-lead` and dispatch QA to `ai-qa` (quality-mgr role;
+# prompt file remains `.claude/agents/quality-mgr.md`).
 
 [atm]
-default_team = "sc-agent"
+default_team = "sc-ai"
 
 [rmux]
-session = "sc-agent"
+session = "sc-ai"
 
 [[rmux.windows]]
-name = "agents"
+name = "lead"
 layout = "even-horizontal"
 
 [[rmux.windows.panes]]
-name = "team-lead"
-alias = "sc-agent-lead"
-model = "sonnet"
-env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+name = "ai-lead"
+model = "opus"
+env = { ATM_IDENTITY = "ai-lead", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows.panes]]
-name = "scodex"
-alias = "sc-agent-codex"
-command = "codex -c features.hooks=true --yolo"
-env = { ATM_IDENTITY = "scodex", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
-
-[[rmux.windows.panes]]
-name = "quality-mgr"
-alias = "sc-agent-quality"
+name = "ai-qa"
 model = "sonnet"
-env = { ATM_IDENTITY = "quality-mgr", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+env = { ATM_IDENTITY = "ai-qa", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows]]
-name = "publishing"
+name = "developers"
 layout = "even-horizontal"
 
 [[rmux.windows.panes]]
-name = "publisher"
-alias = "sc-agent-publisher"
-model = "sonnet"
-env = { ATM_IDENTITY = "publisher", ATM_TEAM = "sc-agent", CLAUDE_CODE_TASK_LIST_ID = "sc-agent" }
+name = "tai"
+command = "codex -c features.hooks=true -m gpt-5.6-terra-medium --yolo"
+env = { ATM_IDENTITY = "tai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+[[rmux.windows.panes]]
+name = "lai"
+command = "codex -c features.hooks=true -m gpt-5.6-luna-medium --yolo"
+env = { ATM_IDENTITY = "lai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+[[rmux.windows.panes]]
+name = "sai"
+command = "codex -c features.hooks=true -m gpt-5.6-sol-medium --yolo"
+env = { ATM_IDENTITY = "sai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
