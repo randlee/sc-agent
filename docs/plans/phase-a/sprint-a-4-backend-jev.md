@@ -20,15 +20,22 @@ requirements:
   - REQ-SAG-0401
   - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0001
+  - ADR-SAG-0002
+  - ADR-SAG-0003
   - ADR-SAG-0004
+  - ADR-SAG-0005
   - ADR-SAG-0006
   - ADR-SAG-0012
+  - ADR-SAG-0013
+  - ADR-SAG-0019
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-jev/src/api/**"
   - "crates/sc-jev/src/client/**"
   - "crates/sc-jev/Cargo.toml"
   - "crates/sc-jev/src/lib.rs"
-  - "boundaries/jev/**"
+  - "boundaries/sc-jev/**"
 ---
 
 # Sprint a-4 — TypeSafe Jev API (check endpoint)

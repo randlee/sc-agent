@@ -47,7 +47,12 @@ fn main() -> ExitCode {
 fn emit(error: &JevError) {
     let body = ScAgentErrorResponse::from_jev_error(error);
     let line = serde_json::to_string(&body).unwrap_or_else(|_| {
-        r#"{"error":"EXTRACTION_FAILED","message":"Fix the producer failure (stderr encoding) and run extraction again."}"#.to_owned()
+        serde_json::to_string(&ScAgentErrorResponse::from_jev_error(
+            &JevError::ExtractionFailed {
+                detail: "stderr encoding".to_owned(),
+            },
+        ))
+        .expect("ScAgentErrorResponse from JevError must serialize")
     });
     let _ = writeln!(io::stderr(), "{line}");
 }
