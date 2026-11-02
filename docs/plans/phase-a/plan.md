@@ -58,7 +58,7 @@ future agent launchers.
 `sprint-a-1-workspace-and-types.md` and `docs/sc-agent-types/architecture.md`):
 
 ```rust
-pub struct PayloadBundle { pub bytes: Vec<u8>, pub sha256: String }
+pub struct PayloadBundle { pub bytes: Vec<u8>, pub sha256: Sha256Digest }
 
 pub struct LlmWireContext { pub system_prompt: String }
 
@@ -202,12 +202,11 @@ logical prompt/send. Use **`sc-observability` v2** (`LoggerBuilder`, not v1 `Log
 logs through `SharedSessionLog`; `sc-ai` / `sc-jev-py` own real loggers. Shim removed when
 upstream v2 is released.
 
-**Stdout success shape:** the **same JSON object TypeSafe Jev returns** for the
-check/judge call, plus a required **`session_id`** (UUID for this run’s session
-log correlation). Haiku/Luna paths still emit that **Jev-equivalent answer JSON**
-on stdout (normalized Jev answer shape; fake transports are test-only per
-ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps this if required by guidelines
-(`data` holds Jev body + `session_id`).
+**Stdout success shape (ADR-SAG-0014):** blocking CLI prints the **versioned
+sc-ai-cli envelope** on stdout — `{ "version", "operation", "data" }` where
+**`data`** holds the **TypeSafe Jev-equivalent answer JSON** plus required
+**`session_id`** (UUID for session log correlation). Haiku/Luna paths normalize
+to the same Jev answer shape inside `data`; fake transports are test-only.
 
 ## Resolved decisions (Rand)
 

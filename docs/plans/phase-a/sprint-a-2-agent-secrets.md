@@ -35,7 +35,7 @@ keyring** (service = env var name, account = user); injectable for tests;
 
 ## Deliverables
 
-1. **REQ-SAG-0200** — `resolve_key(id: BackendKeyId, repo_root: &Path)` for `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (facade passes git toplevel from a-3; this crate does not run git).
+1. **REQ-SAG-0200** — `resolve_key(id: BackendKeyId, repo_root: &RepoRoot)` for `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (facade passes git toplevel from a-3; this crate does not run git).
 2. **REQ-SAG-0201** — Optional override for `ANTHROPIC_KEYCHAIN_SERVICE` on Anthropic only.
 3. **REQ-SAG-0202** — Load vars from repo-root `.env` between env and keyring; `.env` never overrides set process env.
 4. **ADR-SAG-0003** — Secrets never logged or included in error messages.
@@ -43,7 +43,7 @@ keyring** (service = env var name, account = user); injectable for tests;
 ## Explicit code samples
 
 ```rust
-pub fn resolve_key(id: BackendKeyId, repo_root: &Path) -> Result<String, JevError>;
+pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<String, JevError>;
 ```
 
 ## Acceptance criteria (authoritative)

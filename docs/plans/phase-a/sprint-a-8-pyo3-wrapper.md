@@ -22,7 +22,9 @@ requirements:
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
+  - ADR-SAG-0001
   - ADR-SAG-0011
+  - ADR-SAG-0013
   - ADR-SAG-0016
 owned_paths:
   - "crates/sc-jev-py/**"
@@ -65,10 +67,14 @@ requires-python = ">=3.11"
 
 | Root | Criterion |
 | --- | --- |
+| req:REQ-SAG-0102 | Python cross-impl payload digest matches a-1 fixture |
 | req:REQ-SAG-0800 | `run_check` + session `ask` through wheel |
 | req:REQ-SAG-0801 | Cross-impl pytest matches a-1 payload digest **and** branches fixture |
+| req:REQ-SAG-0802 | `pip install` wheel + pytest re-run succeeds |
 | req:REQ-SAG-0610 | JSONL line per judge send when log dir set |
 | req:REQ-SAG-0611 | JSONL contains no API key material |
+| NFR-SAG-0002 | No secrets in Python-visible output or JSONL |
+| NFR-SAG-0003 | Log root / env documented for Python callers |
 | boundary:jev-py | `cargo tree -p sc-jev-py --depth 1` lists `sc-jev-check`, not `sc-jev` |
 
 ## Required validation

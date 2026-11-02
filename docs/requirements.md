@@ -45,7 +45,7 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 
 | ID | Requirement |
 | --- | --- |
-| REQ-SAG-0200 | Resolve API keys env → keyring for TypeSafe, Anthropic, OpenAI |
+| REQ-SAG-0200 | Resolve API keys **process env → repo-root `.env` → keyring** (see REQ-SAG-0202) |
 | REQ-SAG-0201 | Optional `ANTHROPIC_KEYCHAIN_SERVICE` override |
 | REQ-SAG-0202 | Repo-root `.env` third; precedence **process env → `.env` → keyring** |
 

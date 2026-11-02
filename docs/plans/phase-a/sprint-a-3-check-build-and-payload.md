@@ -54,9 +54,13 @@ owned_paths:
 2. **REQ-SAG-0311** — `subjects` kind validates `sc/subjects/1`; unit tests use **a-1**
    `tests/fixtures/jev/subjects-schema/v1/minimal.json` only.
 3. **REQ-SAG-0305** — `command` contract per [`extraction.md`](../../../sc-jev-check/extraction.md).
-4. **REQ-SAG-0301** … **0303**, **0309**, **0503** (parse scope) — as before.
-5. **`Cargo.toml`** — no grammar crates; no HTTP under `src/extract/**` / `src/payload/**`.
-6. **`assets/jev.toml`** — vendor pins (tighten #12).
+4. **REQ-SAG-0301** — Refuse backend send when payload over cap (`INPUT_TOO_LARGE`); unit tests on builder only.
+5. **REQ-SAG-0302** — Git-relative paths resolve via injected `RepoRoot`; tests with fixture repo under `tests/fixtures/jev/git-repo/`.
+6. **REQ-SAG-0303** — Question-set / state JSON schema validation before payload merge.
+7. **REQ-SAG-0309** — `table-column` escapes markdown pipe cells per README.
+8. **REQ-SAG-0503** — Load LLM system prompt asset paths from check config (no send in a-3).
+9. **`Cargo.toml`** — no grammar crates; no HTTP under `src/extract/**` / `src/payload/**`.
+10. **`assets/jev.toml`** — vendor pins (tighten #12).
 
 ## Acceptance criteria (authoritative)
 

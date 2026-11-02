@@ -179,8 +179,9 @@ from [sc-publish](https://github.com/randlee/sc-publish) via
 
 Phase A first release ships **five publish channels** from one tag via sc-publish:
 **crates.io**, **PyPI** (`sc-jev-py`), **Homebrew**, **Scoop**, and **WinGet**
-(`sc-ai` binary), plus GitHub Release assets. REQ-SAG-0803 closes in **a-9**
-(preflight + dry-run), not in a-9 alone.
+(`sc-ai` binary), plus GitHub Release assets. Sprint **a-9** closes
+REQ-SAG-0130, REQ-SAG-0131, REQ-SAG-0132, and REQ-SAG-0803 (kit install,
+preflight CI, and publish dry-run).
 
 ## ADR-SAG-0015 — Subjects artifact outside the judge
 

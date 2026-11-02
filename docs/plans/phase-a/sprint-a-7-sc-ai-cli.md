@@ -13,6 +13,8 @@ recommended_model: gpt-5.6-sol-medium
 must_follow: [a-6, a-11]
 parallel_safe: [a-8]
 requirements:
+  - REQ-SAG-0101
+  - REQ-SAG-0503
   - REQ-SAG-0600
   - REQ-SAG-0601
   - REQ-SAG-0603
@@ -27,8 +29,11 @@ requirements:
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
+  - ADR-SAG-0001
   - ADR-SAG-0010
+  - ADR-SAG-0013
   - ADR-SAG-0014
+  - ADR-SAG-0015
   - ADR-SAG-0016
   - ADR-SAG-0019
 owned_paths:
@@ -57,7 +62,7 @@ via integration test on this sprint (see acceptance).
 4. **REQ-SAG-0703** — `just install-sc-ai` or documented `cargo install --path crates/sc-ai` in README.
 5. **NFR-SAG-0002** — No secrets in logs or JSON output.
 6. **ADR-SAG-0010** — CLI is a thin adapter over **`sc-jev-check`**; no HTTP in `sc-ai`.
-7. **REQ-SAG-0710** — Integration test asserts stdout JSON includes Jev answer fields + `session_id`.
+7. **REQ-SAG-0710** — Integration test asserts stdout is the versioned envelope and **`data`** includes Jev answer fields + `session_id` (ADR-SAG-0014).
 8. **NFR-SAG-0003** — Document default log root; `LoggerBuilder` (v2) + adapter injects `SharedSessionLog`.
 9. **REQ-SAG-0711** — Pin `sc-observability = "1.5.0"` in this crate; adapt v2 logger to `SharedSessionLog` for `sc-jev-check` (not inside `sc-jev`).
 10. Integration — **`--llm-system-prompt-file`** override changes LLM wire, not `prompt_sha256` (ADR-SAG-0019).
@@ -83,12 +88,19 @@ fn emit_cli_error(err: &JevError) -> ! {
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0101 | CLI stderr uses `JevError` codes from contract snapshot |
+| req:REQ-SAG-0503 | CLI `--llm-system-prompt-file` override changes LLM wire only; `prompt_sha256` stable |
+| req:REQ-SAG-0600 | Session create/load + TTL via CLI `ask` path |
+| req:REQ-SAG-0601 | CLI `run`/`dry-run` resolve keys and inject LLM system prompt per ADR-SAG-0019 |
 | req:REQ-SAG-0603 | Two backends in one CLI run share payload + equal-input |
 | req:REQ-SAG-0700 | `run`, `dry-run`, `ask` emit versioned envelope |
-| req:REQ-SAG-0710 | `data` includes Jev body + `session_id` |
+| req:REQ-SAG-0701 | Failure exits 2; stderr JSON `{error, message}` only |
+| req:REQ-SAG-0702 | Readback tests for path-consuming flags |
+| req:REQ-SAG-0703 | README or `just` target documents install |
+| req:REQ-SAG-0710 | `data` includes Jev body + `session_id` inside envelope |
 | req:REQ-SAG-0711 | v2 logger adapter wired to `SharedSessionLog` |
-| req:REQ-SAG-0503 | CLI prompt override proof (wire changes, digest stable) |
+| NFR-SAG-0001 | Typed errors only; no ad hoc exit messages |
 | NFR-SAG-0002 | No secrets in stdout/stderr/logs |
+| NFR-SAG-0003 | Default log root documented |
 | boundary:sc-ai-cli | No HTTP crates in **direct** deps (`cargo tree -p sc-ai --depth 1`) |
 
 ## Required validation

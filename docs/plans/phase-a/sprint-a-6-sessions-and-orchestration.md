@@ -28,6 +28,9 @@ requirements:
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
+  - ADR-SAG-0003
+  - ADR-SAG-0004
+  - ADR-SAG-0005
   - ADR-SAG-0008
   - ADR-SAG-0009
   - ADR-SAG-0013
