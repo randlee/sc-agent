@@ -84,7 +84,7 @@ verified against committed Python reference bytes. **No network code.**
 8. **REQ-SAG-0120** — Module `sc-agent-types::observability::v2` (`SessionLog` port; `sc-observability-types = "1.5.0"` on **this crate only** for shim).
 9. **REQ-SAG-0121** — `NoopSessionLog` + `test-util` doubles; bead `agt-obs-v2-shim-removal` to delete module + dependency after release 1–2.
 10. **ADR-SAG-0016** — No separate observability crate on crates.io; full `sc-observability` on composition roots **`sc-ai`** and **`sc-jev-py`** (a-8 wires PyO3 logger).
-11. **REQ-SAG-0104** — Rust types + JSON fixture for **`sc/subjects/1`** ([`subjects-schema.md`](../../../sc-agent-types/subjects-schema.md)); producer/consumer pin same schema id.
+11. **REQ-SAG-0104** — Rust types + JSON fixture for **`sc/subjects/1`** ([`subjects-schema.md`](../../../sc-agent-types/subjects-schema.md)); commit **`tests/fixtures/jev/subjects-schema/v1/minimal.json`** (valid minimal document for a-3 unit tests); producer/consumer pin same schema id.
 12. **REQ-SAG-0103** — Freeze `JudgeBackend`, `JudgeRequest`, `PayloadBundle`, `LlmWireContext`, `JudgeOutcome`, `EqualInputRecord`, `BackendId`, `LogEvent`, `RepoRoot`, `Rev`, `SessionId`, `Sha256Digest`, extractor domain types; contract tests + `MockJudgeBackend`.
 
 ## Explicit code samples
@@ -111,6 +111,8 @@ just test
 cargo test -p sc-agent-types -- --nocapture
 cargo test jev_cross_impl -- --nocapture
 test -f tests/fixtures/jev/README-contract/errors.json
+test -f tests/fixtures/jev/subjects-schema/v1/minimal.json
+python3 -c "import json; d=json.load(open('tests/fixtures/jev/subjects-schema/v1/minimal.json')); assert d.get('schema')=='sc/subjects/1'"
 python3 -c "import json; json.load(open('tests/fixtures/jev/README-contract/errors.json'))"
 ! rg -l 'reqwest|hyper|ureq' crates/ 2>/dev/null | rg -v sc-agent-types || test $(rg -l 'reqwest|hyper|ureq' crates/ 2>/dev/null | wc -l) -eq 0
 ```

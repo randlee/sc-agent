@@ -5,7 +5,7 @@ status: planned
 closure_type: integration
 target_boundary: jev-py
 track: python
-wave: 3
+wave: 4
 branch: sprint/a-8-pyo3-wrapper
 worktree: sprint/a-8-pyo3-wrapper
 recommended_agent: tai
@@ -35,7 +35,7 @@ owned_paths:
 ## Outcome
 
 **`sc-jev-py`** is the supported Python integration: PyO3 bindings over
-**`sc-jev-check`**, built with **maturin**, PyPI-ready wheel (publish in **a-9/a-10**).
+**`sc-jev-check`**, built with **maturin**, PyPI-ready wheel (publish in **a-9**).
 
 ## Deliverables
 

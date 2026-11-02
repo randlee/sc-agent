@@ -5,12 +5,12 @@ status: planned
 closure_type: integration
 target_boundary: sc-ai-cli
 track: cli
-wave: 3
+wave: 4
 branch: sprint/a-7-sc-ai-cli
 worktree: sprint/a-7-sc-ai-cli
 recommended_agent: sai
 recommended_model: gpt-5.6-sol-medium
-must_follow: [a-6]
+must_follow: [a-6, a-11]
 parallel_safe: [a-8]
 requirements:
   - REQ-SAG-0600
@@ -62,6 +62,7 @@ via integration test on this sprint (see acceptance).
 9. **REQ-SAG-0711** — Pin `sc-observability = "1.5.0"` in this crate; adapt v2 logger to `SharedSessionLog` for `sc-jev-check` (not inside `sc-jev`).
 10. Integration — **`--llm-system-prompt-file`** override changes LLM wire, not `prompt_sha256` (ADR-SAG-0019).
 11. Integration — one `sc-ai jev run` with two backend ids + fake transports: one payload, equal-input recorded (feature **3**).
+12. **Cross-impl (consumer)** — `cargo test -p sc-jev-check cross_impl_branches` asserts payload digests match **`tests/fixtures/cross-impl/branches/`** producer fixture from **a-11** (README tighten **#1** / **#2** consumer side).
 
 ## Explicit code samples
 
@@ -97,6 +98,7 @@ just lint
 cargo test -p sc-ai -- --nocapture
 cargo test -p sc-ai -- test_multi_backend_cli_equal_input --exact --nocapture
 cargo test -p sc-ai -- test_cli_prompt_override --exact --nocapture
+cargo test -p sc-jev-check cross_impl_branches -- --nocapture
 ! cargo tree -p sc-ai --depth 1 | rg -q 'reqwest|hyper|ureq'
 cargo build -p sc-ai --release
 target/release/sc-ai --version

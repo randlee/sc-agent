@@ -123,22 +123,21 @@ Sprint **a-1** commits **stub** manifests only. Each boundary sprint owns
 | foundation | 1 | a-1 | contract | agent-types | workspace, sc-lint, frozen trait + types, cross-impl fixture |
 | secrets | 2 | a-2 | boundary | agent-secrets | `must_follow` a-1 (`JudgeBackend` + errors); ∥ a-3 |
 | build | 2 | a-3 | boundary | jev-check | extractors (`subjects`, …) + payload; `must_follow` a-1 |
-| build | 2 | a-3b | boundary | treesitter | `sc-treesitter` producer; `must_follow` a-1; **∥ a-3** |
-| jev | 2 | a-4 | boundary | jev | TypeSafe HTTP; `must_follow` a-1; **∥ a-3, a-3b, a-5** |
-| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-1; **∥ a-3, a-3b, a-4** |
+| build | 2 | a-11 | boundary | treesitter | `sc-treesitter` producer; `must_follow` a-1; **∥ a-3** |
+| jev | 2 | a-4 | boundary | jev | TypeSafe HTTP; `must_follow` a-1; **∥ a-3, a-11, a-5** |
+| llm | 2 | a-5 | boundary | jev-backends | Haiku + Luna; `must_follow` a-1; **∥ a-3, a-11, a-4** |
 | runtime | 3 | a-6 | boundary | jev-check | run, sessions, prompt load; `must_follow` a-2,a-3,a-4,a-5 |
-| cli | 3 | a-7 | integration | sc-ai-cli | `must_follow` a-6 |
-| python | 3 | a-8 | integration | jev-py | PyO3; `must_follow` a-6; **∥ a-7** |
-| publish | 4 | a-9 | integration | release | sc-publish install; `must_follow` **a-7 and a-8** |
-| publish | 4 | a-10 | integration | release | preflight; `must_follow` a-9 |
+| cli | 4 | a-7 | integration | sc-ai-cli | `must_follow` a-6, **a-11** (cross-impl consumer) |
+| python | 4 | a-8 | integration | jev-py | PyO3; `must_follow` a-6; **∥ a-7** |
+| publish | 5 | a-9 | integration | release | sc-publish install + preflight + dry-run; `must_follow` **a-7 and a-8** |
 
-**Critical path (longest `must_follow` chain):** a-1 → a-3 → a-6 → a-7 → a-9 → a-10
-(6 sprints). a-8 joins publish at a-9; a-7 and a-8 are not serial with each other.  
-**Width:** after a-1, up to **5** parallel siblings (a-2 ∥ a-3 ∥ a-3b ∥ a-4 ∥ a-5).
-**Sprint count:** 11.
+**Critical path (longest `must_follow` chain):** a-1 → a-3 → a-6 → a-7 → a-9
+(5 sprints). a-8 joins publish at a-9; a-7 and a-8 are not serial with each other.  
+**Width:** after a-1, up to **5** parallel siblings (a-2 ∥ a-3 ∥ a-11 ∥ a-4 ∥ a-5).
+**Sprint count:** 10.
 
-Sprint frontmatter **`parallel_safe`** lists local siblings; the **wave table above**
-is the authoritative dependency graph when YAML and prose differ.
+Sprint frontmatter **`parallel_safe`** lists wave-2 siblings only; **`must_follow`**
+and the wave table define the authoritative dependency graph.
 
 **Why three `jev-check` / HTTP layer sprints:** a-3 (extractors + payload) and
 a-4/a-5 (HTTP backends) are substantial and parallel; a-6 integrates secrets,
@@ -148,9 +147,10 @@ multi-backend, and logging without overloading a-3.
 
 | Edge | Artifact consumed |
 | --- | --- |
-| a-2 → a-1 | `JevError` (secrets define `BackendKeyId` in `sc-agent-secrets`, re-exported for facade) |
-| a-3 → a-1 | `PayloadBundle`, `RepoRoot`, `Rev`, `sc/subjects/1` types, extractor-facing domain types |
-| a-3b → a-1 | `sc/subjects/1` types + schema fixture |
+| a-2 → a-1 | `JevError`, `BackendKeyId` (types); `resolve_key` API in secrets |
+| a-3 → a-1 | `PayloadBundle`, `RepoRoot`, `Rev`, `sc/subjects/1` types, `minimal.json` fixture |
+| a-11 → a-1 | `sc/subjects/1` types + schema rules; owns branches producer fixture |
+| a-7 → a-11 | Committed `tests/fixtures/cross-impl/branches/**` for consumer digest tests |
 | a-4 → a-1 | `JudgeBackend`, `JudgeRequest` |
 | a-5 → a-1 | `JudgeBackend`, `JudgeRequest`, `LlmWireContext` |
 | a-6 → a-2 | `resolve_key(id, repo_root)` |
@@ -165,22 +165,21 @@ multi-backend, and logging without overloading a-3.
 | --- | --- | --- |
 | a-1 | (fixture only; enables payload tests) | — |
 | a-2 | key resolution order tests (library; full parity in a-6) | — |
-| a-3b | — | `sc-treesitter` + committed `subjects.json` (producer) |
-| a-3 | extractors (`file`, `table-column`, `subjects`, `command`), config, payload | subjects + branches cross-impl (consumer) |
+| a-11 | — | `sc-treesitter` + committed branches producer fixture |
+| a-3 | extractors (`file`, `table-column`, `subjects`, `command`), config, payload | `subjects` input (minimal fixture only) |
+| a-7 | CLI session/ask/run; branches cross-impl (consumer digest) | **1**, **2** |
 | a-4 | Jev transport rows | — |
 | a-5 | Haiku/Luna rows | **8** (Luna token-count wire; fake transport) |
 | a-6 | sessions, equal-input, keys via library | **3** (multi-backend) |
-| a-7 | CLI session/ask/run | **1**, **2** |
 | a-8 | library API parity for Python callers | PyO3 + wheel build |
-| a-9 | — | sc-publish consumer input + install |
-| a-10 | — | first release preflight (REQ-SAG-0803) |
+| a-9 | — | sc-publish install + preflight + REQ-SAG-0803 dry-run |
 
 ## Areas to tighten (Phase A vs defer)
 
 | # | Item | Phase A |
 | --- | --- | --- |
 | 1 | Cross-impl byte fixture | **a-1** |
-| 2 | Branch / region text | **a-3b** (`sc-treesitter`) + **a-3** (`subjects` input); ADR-SAG-0015 |
+| 2 | Branch / region text | **a-11** (`sc-treesitter`) + **a-3** (`subjects` input) + **a-7** (consumer); ADR-SAG-0015 |
 | 3 | Jev probabilities strict | **a-4** |
 | 4 | LLM stop_reason / status | **a-5** |
 | 5 | LLM busy retry | **a-5** |
@@ -216,7 +215,7 @@ ADR-SAG-0014); `session_id` is always present. sc-ai-cli version envelope wraps 
    (REQ-SAG-0202). **Source:** Rand, 2026-11-01 — PR #4 review comment (amendment to §6).
 2. **sc-runtime daemon / UDS** — out of Phase A. **Source:** Phase A planning thread, 2026-11-01.
 3. **Branch extraction:** **`sc/subjects/1`** artifact; **`sc-treesitter`** producer
-   (sprint **a-3b**); **`subjects`** input in **sc-jev-check** (a-3). Extraction is
+   (sprint **a-11**); **`subjects`** input in **sc-jev-check** (a-3). Extraction is
    **independent of the Jev path** — injected from outside judge code. Tool is
    tree-sitter-specific, named **`sc-treesitter`**; grammars **static/pinned**, no
    dynamic loading (Phase A). Python drops `python-branches` extractor; cross-impl
@@ -278,20 +277,19 @@ Phase A lays shared **`sc-agent-types`**, **`sc-agent-secrets`**, and
 | a-1 | [`sprint-a-1-workspace-and-types.md`](sprint-a-1-workspace-and-types.md) |
 | a-2 | [`sprint-a-2-agent-secrets.md`](sprint-a-2-agent-secrets.md) |
 | a-3 | [`sprint-a-3-check-build-and-payload.md`](sprint-a-3-check-build-and-payload.md) |
-| a-3b | [`sprint-a-3b-sc-treesitter.md`](sprint-a-3b-sc-treesitter.md) |
+| a-11 | [`sprint-a-11-sc-treesitter.md`](sprint-a-11-sc-treesitter.md) |
 | a-4 | [`sprint-a-4-backend-jev.md`](sprint-a-4-backend-jev.md) |
 | a-5 | [`sprint-a-5-backend-llm.md`](sprint-a-5-backend-llm.md) |
 | a-6 | [`sprint-a-6-sessions-and-orchestration.md`](sprint-a-6-sessions-and-orchestration.md) |
 | a-7 | [`sprint-a-7-sc-ai-cli.md`](sprint-a-7-sc-ai-cli.md) |
 | a-8 | [`sprint-a-8-pyo3-wrapper.md`](sprint-a-8-pyo3-wrapper.md) |
 | a-9 | [`sprint-a-9-sc-publish-install.md`](sprint-a-9-sc-publish-install.md) |
-| a-10 | [`sprint-a-10-release-preflight.md`](sprint-a-10-release-preflight.md) |
 
 ## First release artifacts (Phase A close)
 
 | Channel | Packages |
 | --- | --- |
-| **crates.io** | `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, `sc-jev-check`, `sc-ai` |
+| **crates.io** | `sc-agent-types`, `sc-agent-secrets`, `sc-jev`, `sc-jev-backends`, `sc-jev-check`, `sc-treesitter`, `sc-ai` |
 | **PyPI** | `sc-jev-py` (maturin wheel) |
 | **Homebrew** | `sc-ai` formula (kit `homebrew` channel) |
 | **Scoop** | `sc-ai` manifest (kit `scoop` channel) |
@@ -301,7 +299,7 @@ GitHub Release assets feed the package managers; one tag drives all channels via
 sc-publish.
 
 Release uses the **[sc-publish](https://github.com/randlee/sc-publish)** kit
-(sprints **a-9**, **a-10**): consumer input, rendered manifests, preflight CI.
+(sprint **a-9**): consumer input, rendered manifests, preflight CI, publish dry-run.
 Orchestration/plan-anchor **call-site migration** in other repos is post-release.
 
 ## Requirement closure (integration `req:` roots)
@@ -314,8 +312,7 @@ below is verified at phase integration:
 | --- | --- |
 | a-7 | 0101, 0600, 0601, 0603, 0700–0703, 0710, 0711, 0503 (CLI override), NFR-0001–0003 |
 | a-8 | 0102, 0610, 0611, 0800, 0801, 0802, NFR-0002–0003 |
-| a-9 | 0130, 0131 |
-| a-10 | 0132, 0803 |
+| a-9 | 0130, 0131, 0132, 0803 |
 
 Remaining feature REQs (0100, 0103, 0104, 0120, 0121, 0200–0202, 0300–0303,
 0305, 0309, 0310, 0311, 0400–0401, 0500–0502, 0504–0505, 0602, 0110) close via
@@ -338,11 +335,11 @@ maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
 uv run --directory tests/fixtures/jev-python pytest -q
 cargo test -p sc-jev-check cross_impl_branches -- --nocapture
 bash .github/scripts/run-consumer-preflight.sh
-cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-ai
+cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```
 
 Expected: all exit 0; cross-impl tests assert Rust digests match committed
-fixtures; release preflight + publish dry-run satisfy REQ-SAG-0803 (a-10).
+fixtures; release preflight + publish dry-run satisfy REQ-SAG-0803 (a-9).
 
 Optional evidence (not CI-gated in Phase A): one live `sc-ai jev run`
 against TypeSafe with Rand-provided key, artifact attached to phase PR.

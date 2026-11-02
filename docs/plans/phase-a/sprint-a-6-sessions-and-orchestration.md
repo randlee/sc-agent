@@ -55,7 +55,7 @@ equal-input record on every backend run, multi-backend in one invocation
 
 1. **REQ-SAG-0600** — `SessionStore`: create/load, TTL, file permissions tighten **#6**, **#7**.
 2. **REQ-SAG-0601** — `run_request` / `run_check` wire `resolve_key(_, repo_root)` + construct backends with resolved secrets; **REQ-SAG-0503** load/inject LLM system prompt into `JudgeRequest.llm` (ADR-SAG-0019 precedence); dry-run returns digest only (feature **2**). **`RunOptions`**: `repo_root`, `dry_run`, `system_prompt_override`, `session_log`.
-3. **REQ-SAG-0602** — `EqualInputRecord` with `prompt_sha256`, `leak`, `commands`, `equal` per README.
+3. **REQ-SAG-0602** — `EqualInputRecord` with `prompt_sha256`, `leak`, `commands`, `equal`, and **`producer: Option<SubjectsProducer>`** copied from the subjects document when check inputs used `subjects` or `command` extractors (README parity).
 4. **REQ-SAG-0603** — `MultiBackendRun`: Jev + optional second opinions in one call; shared payload bytes; shared injected LLM system prompt for that run.
 5. **ADR-SAG-0008** — Sessions are how second backends receive prior answers; Jev has no rationale field.
 6. **ADR-SAG-0009** — Local backend registers via trait without changing callers (stub registry only).

@@ -55,7 +55,7 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 | --- | --- |
 | REQ-SAG-0104 | Artifact schema **`sc/subjects/1`** in `sc-agent-types` + golden fixture |
 
-## Phase A — sc-treesitter (sprint a-3b)
+## Phase A — sc-treesitter (sprint a-11)
 
 | ID | Requirement |
 | --- | --- |
@@ -123,14 +123,14 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 | REQ-SAG-0801 | Cross-impl pytest harness in repo |
 | REQ-SAG-0802 | maturin wheel build; `pip install` from built artifact |
 
-## Phase A — sc-publish kit (sprints a-9, a-10)
+## Phase A — sc-publish kit (sprint a-9)
 
 | ID | Requirement |
 | --- | --- |
 | REQ-SAG-0130 | sc-publish consumer input enables **crates.io**, **pypi**, **homebrew**, **scoop**, **winget** + `sc-ai` release binaries |
 | REQ-SAG-0131 | `docs/development/sc-publish.md`; do not hand-edit rendered publish manifests |
 | REQ-SAG-0132 | Release preflight CI green; local preflight script matches kit |
-| REQ-SAG-0803 | **First release:** all five channels via sc-publish — **a-9** installs kit + consumer input; **a-10** proves preflight + publish dry-run in CI |
+| REQ-SAG-0803 | **First release:** all five channels via sc-publish — **a-9** installs kit + consumer input + preflight + publish dry-run in CI |
 
 ## Phase B (draft — not scheduled)
 

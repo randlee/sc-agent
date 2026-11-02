@@ -62,7 +62,7 @@ Python apps import the extension directly; atm-bd `packages/jev-check` may thin-
 but is not required for PyPI consumers.
 
 Publishing uses the **[sc-publish](https://github.com/randlee/sc-publish)** kit
-(sprints a-9/a-10), not ad-hoc workflow edits.
+(sprint a-9), not ad-hoc workflow edits.
 
 Rand approves `docs/plans/phase-a/plan.md` and sprint docs before
 implementation starts.

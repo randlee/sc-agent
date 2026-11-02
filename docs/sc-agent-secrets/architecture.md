@@ -6,9 +6,9 @@
 ## API
 
 ```rust
-pub enum BackendKeyId { Typesafe, Anthropic, OpenAi }
+use sc_agent_types::{BackendKeyId, JevError, RepoRoot};
 
-pub fn resolve_key(id: BackendKeyId, repo_root: &Path) -> Result<String, JevError>;
+pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<String, JevError>;
 ```
 
 Callers pass the same git toplevel the facade uses for extractors; this crate

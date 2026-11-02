@@ -11,7 +11,7 @@ worktree: sprint/a-4-backend-jev
 recommended_agent: sai
 recommended_model: gpt-5.6-sol-medium
 must_follow: [a-1]
-parallel_safe: [a-2, a-3, a-5]
+parallel_safe: [a-2, a-3, a-11, a-5]
 requirements:
   - REQ-SAG-0101
   - REQ-SAG-0103

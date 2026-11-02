@@ -21,7 +21,7 @@ pub struct Rev(String);
 
 pub struct SessionId(uuid::Uuid);
 
-/// Resolved credential id (defined in sc-agent-secrets; re-exported here for facade).
+/// Backend credential id (frozen here; sc-agent-secrets consumes it).
 pub enum BackendKeyId { TypeSafe, Anthropic, OpenAi }
 
 /// Lowercase hex SHA-256 (64 chars) — canonical payload / equal-input digests.
@@ -31,6 +31,37 @@ pub struct Sha256Digest(String);
 Extractor-facing types (`Subject`, `Span`, `InputSpec`, `Question`, …) and the
 **`sc/subjects/1`** document types live in this crate and are frozen in a-1.
 Normative JSON rules: [`subjects-schema.md`](subjects-schema.md).
+
+```rust
+pub struct SubjectsSource { pub path: String, pub rev: String, pub blob_sha: String }
+pub struct SubjectsProducer {
+    pub name: String,
+    pub version: String,
+    pub language: String,
+    pub grammar: String,
+    pub grammar_version: String,
+    pub query_sha256: Sha256Digest,
+    pub mode: String, // "matches" for tree-sitter
+}
+pub struct Span {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_byte: u32,
+    pub end_byte: u32,
+}
+pub struct Subject {
+    pub id: String,
+    pub capture: String,
+    pub text: String,
+    pub span: Span,
+}
+pub struct SubjectsDocument {
+    pub schema: String, // "sc/subjects/1"
+    pub source: SubjectsSource,
+    pub producer: SubjectsProducer,
+    pub subjects: Vec<Subject>,
+}
+```
 
 ## Judge contract (sprint a-1)
 
@@ -64,6 +95,8 @@ pub struct EqualInputRecord {
     pub leak: bool,
     pub commands: Vec<String>,
     pub equal: bool,
+    /// Copy of subjects `producer` block when check used subjects/command inputs.
+    pub producer: Option<SubjectsProducer>,
 }
 
 pub enum BackendId { Jev, AnthropicHaiku, OpenAiLuna /* … */ }

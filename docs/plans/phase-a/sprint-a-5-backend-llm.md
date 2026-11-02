@@ -11,7 +11,7 @@ worktree: sprint/a-5-backend-llm
 recommended_agent: tai
 recommended_model: gpt-5.6-terra-medium
 must_follow: [a-1]
-parallel_safe: [a-2, a-3, a-4]
+parallel_safe: [a-2, a-3, a-11, a-4]
 requirements:
   - REQ-SAG-0101
   - REQ-SAG-0103

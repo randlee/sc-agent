@@ -1,15 +1,8 @@
-# Cross-impl branches fixture (Phase A gate)
+# Cross-impl branches fixture
 
-**Producer (a-3b):** `sc-treesitter` emits `subjects.json` from hook source + `queries/python-branches.scm` (also shipped under `sc-treesitter` assets).
+**Producer (a-11):** `sc-treesitter extract --language python --query branches …` emits
+`subjects.json` from hook source + `queries/python/branches.scm` (also shipped under
+`sc-treesitter` assets). This directory is owned only by sprint **a-11**.
 
-**Consumers (a-3 / Python):** read the **same committed** `subjects.json`; build identical check request bytes + sha256.
-
-Artifacts:
-
-- Hook source (e.g. `hook.py` or path documented in fixture)
-- `queries/python-branches.scm` (reference query; canonical copy in `sc-treesitter` assets)
-- **`subjects.json`** — committed output of `sc-treesitter extract` (not Python `python-branches` extractor)
-- `expected.request.sha256` / `expected.request.body.bin` — full check payload
-
-Rust `sc-jev-check` and Python `jev-check` tests must match request digest.  
-**No** atm-core PR #2308 dependency.
+**Consumer (a-7):** `sc-jev-check` cross-impl tests read the committed artifact and assert
+payload digests match the Python reference (README tighten **#2**).

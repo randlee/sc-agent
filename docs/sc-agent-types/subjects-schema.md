@@ -1,7 +1,7 @@
 # Subjects artifact — `sc/subjects/1`
 
 **Owner:** `sc-agent-types` (schema id + Rust types).  
-**Producers:** `sc-treesitter`, future `syn-grep`, scripts, etc.  
+**Producers:** `sc-treesitter`, future tools.  
 **Consumers:** `sc-jev-check`, Phase B agents — **no parser crates in consumers**.
 
 Normative JSON (Phase A example):
@@ -43,14 +43,20 @@ Normative JSON (Phase A example):
 
 | Rule | Requirement |
 | --- | --- |
-| **id** | `{path}:{start_line}`; `:n` suffix for same-line duplicates |
-| **text** | Exact UTF-8 byte slice from source (not pretty-print / `unparse`) |
-| **order** | Sort subjects by `(start_byte, capture)` |
+| **Lines** | `start_line` / `end_line` are **1-based**; `end_line` inclusive |
+| **id** | `{path}:{start_line}` for the first subject on that line; further subjects on the same line get `:1`, `:2`, … in `(start_byte, capture)` order |
+| **text** | Half-open UTF-8 slice **`[start_byte, end_byte)`** from source bytes |
+| **order** | Sort emitted subjects by `(start_byte, capture)` |
 | **helpers** | Capture names `@_…` never appear in `subjects` |
-| **empty** | Zero subjects → producer error (`EXTRACTION_EMPTY`) |
+| **empty** | Zero subjects → `EXTRACTION_EMPTY` |
 | **parse errors** | ERROR node inside a subject span → `EXTRACTION_PARSE_ERROR` (path + line) |
-| **query mode** | Tree-sitter producers use **`matches`**, not `captures` (duplicate-capture semantics differ); record `"mode": "matches"` in `producer` |
+| **query mode** | Tree-sitter producers run **`matches`** only; record `"mode": "matches"` in `producer` |
+
+### Same-line example
+
+Two captures on line 42 → ids `path/to/file.py:42` and `path/to/file.py:42:1`.
 
 ## Fixture
 
-Sprint **a-1** commits `tests/fixtures/jev/subjects-schema/v1/minimal.json` validating against these rules (roundtrip + golden fields).
+Sprint **a-1** commits `tests/fixtures/jev/subjects-schema/v1/minimal.json` including
+at least one same-line duplicate id case; validation in a-1 AC.
