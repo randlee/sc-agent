@@ -1210,7 +1210,10 @@ dependencies = [
 name = "sc-jev-check"
 version = "0.1.0"
 dependencies = [
+ "sc-agent-secrets",
  "sc-agent-types",
+ "sc-jev",
+ "sc-jev-backends",
  "serde",
  "serde_json",
  "toml 0.8.23",
