@@ -115,8 +115,11 @@ mod tests {
     #[test]
     fn extractors_file_rejects_parent_and_absolute_paths() {
         let dir = temp_dir("escape");
+        let absolute_dir = temp_dir("absolute");
+        let absolute = absolute_dir.path().join("note.txt");
+        let absolute = absolute.to_str().expect("temp path is utf-8");
         let repo = RepoRoot::new(dir.path());
-        for path in ["../note.txt", "/tmp/note.txt", ""] {
+        for path in ["../note.txt", absolute, ""] {
             let error = FileExtractor
                 .extract(
                     &repo,

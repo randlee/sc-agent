@@ -179,9 +179,11 @@ pub fn run_check(
 ///
 /// # Errors
 ///
-/// Returns [`JevError`] when no backend is requested, an LLM backend has no
-/// system prompt, validation fails, or a judge call fails. Dry-run returns
-/// the digest without resolving keys or sending.
+/// Returns [`JevError::ConfigInvalid`] when no backend is requested or an LLM
+/// backend has no system prompt on `request`. A missing prompt file is
+/// [`JevError::PromptFileMissing`] from [`run_check`], which carries the real
+/// path. Validation or judge failures return the corresponding [`JevError`].
+/// Dry-run returns the digest without resolving keys or sending.
 pub fn run_request(
     request: &RunRequest,
     backends: &[BackendId],
@@ -190,8 +192,8 @@ pub fn run_request(
     require_backends(backends)?;
     let needs_llm = backends.iter().copied().any(is_llm);
     if needs_llm && request.system_prompt.is_none() {
-        return Err(JevError::PromptFileMissing {
-            path: "system prompt".to_owned(),
+        return Err(JevError::ConfigInvalid {
+            detail: "an LLM backend requires a system prompt on the run request; pass system_prompt or load it with run_check".into(),
         });
     }
     if opts.dry_run {
@@ -309,7 +311,7 @@ mod tests {
     use sc_agent_types::{
         BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, ResolvedApiKey,
     };
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
     const QUESTIONS: &str = r#"{
@@ -743,7 +745,8 @@ mod tests {
 
     #[test]
     fn run_resolver_receives_repo_root_before_construction() {
-        let repo = RepoRoot::new(Path::new("/tmp/sc-jev-check-run-root"));
+        let dir = test_support::temp_dir("run-root");
+        let repo = RepoRoot::new(dir.path());
         let mut seen = Vec::new();
         let registry = crate::registry::registry_from_resolver(
             &repo,
@@ -758,6 +761,36 @@ mod tests {
         assert_eq!(seen, [BackendKeyId::OpenAi]);
         assert!(registry.contains(BackendId::OpenAiLuna));
         assert!(!format!("{registry:?}").contains("test-key"));
+    }
+
+    #[test]
+    fn run_request_missing_llm_prompt_is_config_invalid() {
+        let dir = test_support::temp_dir("run-request-prompt");
+        let (sessions, _session_dir) = sessions_for(Arc::new(NoopSessionLog));
+        let error = run_request(
+            &RunRequest {
+                bundle: PayloadBundle::from_canonical_bytes(
+                    br#"{"questions":[],"state":[]}"#.to_vec(),
+                ),
+                system_prompt: None,
+                producer: None,
+            },
+            &[BackendId::OpenAiLuna],
+            RunOptions::new(
+                RepoRoot::new(dir.path()),
+                sessions,
+                Arc::new(NoopSessionLog),
+            ),
+        )
+        .expect_err("missing prompt");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        assert!(
+            !matches!(error, JevError::PromptFileMissing { .. }),
+            "a missing run-request prompt is not a prompt-file path"
+        );
+        let hint = error.fix_hint();
+        assert!(hint.contains("system prompt"), "{hint}");
+        assert!(!hint.contains("at system prompt"), "{hint}");
     }
 
     #[test]

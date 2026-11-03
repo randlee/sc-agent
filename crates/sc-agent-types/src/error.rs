@@ -7,8 +7,21 @@ use crate::ids::{BackendKeyId, SessionId};
 /// Marks a [`JevError::ConfigInvalid`] detail that describes a credential store.
 ///
 /// [`JevError::fix_hint`] returns the text after this prefix. Other
-/// `CONFIG_INVALID` details keep the `check.toml` recovery text.
+/// `CONFIG_INVALID` details keep the `check.toml` recovery text unless they
+/// use [`REGISTRY_DETAIL_PREFIX`] or [`SESSION_STORE_DETAIL_PREFIX`].
 const CREDENTIAL_STORE_DETAIL_PREFIX: &str = "credential-store: ";
+
+/// Marks a registry failure whose recovery text is the fix hint.
+///
+/// [`JevError::fix_hint`] returns the text after this prefix and does not
+/// mention `check.toml`.
+const REGISTRY_DETAIL_PREFIX: &str = "registry: ";
+
+/// Marks a session-store I/O or parse failure whose recovery text is the fix hint.
+///
+/// [`JevError::fix_hint`] returns the text after this prefix. It names the
+/// session directory or file and does not mention `check.toml` or an input schema.
+const SESSION_STORE_DETAIL_PREFIX: &str = "session-store: ";
 
 /// Stable error ids and fix text for Jev, check, extraction, and the CLI.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -158,6 +171,79 @@ impl JevError {
         }
     }
 
+    /// Builds `CONFIG_INVALID` for a backend-registry failure.
+    ///
+    /// `recovery` is the caller-facing fix. It should name the backend id and
+    /// the next step, such as registering that id once. [`Self::fix_hint`]
+    /// returns `recovery` and does not mention `check.toml`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::registry_invalid(
+    ///     "Backend jev is not registered. Register it before the run.",
+    /// );
+    /// assert_eq!(error.code(), "CONFIG_INVALID");
+    /// assert!(error.fix_hint().contains("not registered"));
+    /// assert!(!error.fix_hint().contains("check.toml"));
+    /// ```
+    #[must_use]
+    pub fn registry_invalid(recovery: &str) -> Self {
+        Self::ConfigInvalid {
+            detail: format!("{REGISTRY_DETAIL_PREFIX}{recovery}"),
+        }
+    }
+
+    /// Builds `CONFIG_INVALID` for a session-store I/O failure.
+    ///
+    /// `recovery` names the session directory or file and the next step.
+    /// [`Self::fix_hint`] returns `recovery` and does not mention `check.toml`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::session_store_io(
+    ///     "Create session directory sessions or choose a writable directory (permission denied).",
+    /// );
+    /// assert_eq!(error.code(), "CONFIG_INVALID");
+    /// assert!(error.fix_hint().contains("sessions"));
+    /// assert!(!error.fix_hint().contains("check.toml"));
+    /// ```
+    #[must_use]
+    pub fn session_store_io(recovery: &str) -> Self {
+        Self::ConfigInvalid {
+            detail: format!("{SESSION_STORE_DETAIL_PREFIX}{recovery}"),
+        }
+    }
+
+    /// Builds `INPUT_INVALID` for a session file that cannot be parsed.
+    ///
+    /// `recovery` names the session file and the next step. [`Self::fix_hint`]
+    /// returns `recovery` and does not tell the caller to fix a check schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::session_document_invalid(
+    ///     "Session file sessions/abc is not a session document (expected value). Delete it and start a new session.",
+    /// );
+    /// assert_eq!(error.code(), "INPUT_INVALID");
+    /// assert!(error.fix_hint().contains("sessions/abc"));
+    /// assert!(!error.fix_hint().contains("schema"));
+    /// ```
+    #[must_use]
+    pub fn session_document_invalid(recovery: &str) -> Self {
+        Self::InputInvalid {
+            detail: format!("{SESSION_STORE_DETAIL_PREFIX}{recovery}"),
+        }
+    }
+
     /// Returns the stable machine-readable id for this error.
     ///
     /// Ids match `tests/fixtures/jev/README-contract/errors.json` and are the
@@ -193,14 +279,17 @@ impl JevError {
     /// that carry `detail` or `session_id` include that value. Callers must
     /// keep secrets out of `detail`.
     ///
-    /// Credential-store failures built with [`Self::credential_store_invalid`]
-    /// return the store name, sanitized cause, and recovery text. Other
-    /// `CONFIG_INVALID` values keep the `check.toml` hint.
+    /// Credential-store failures built with [`Self::credential_store_invalid`],
+    /// registry failures built with [`Self::registry_invalid`], and session
+    /// store failures built with [`Self::session_store_io`] or
+    /// [`Self::session_document_invalid`] return that caller-facing recovery
+    /// text. Other `CONFIG_INVALID` values keep the `check.toml` hint. Other
+    /// `INPUT_INVALID` values keep the schema hint.
     #[must_use]
     pub fn fix_hint(&self) -> String {
         match self {
             Self::ConfigInvalid { detail } => {
-                if let Some(message) = detail.strip_prefix(CREDENTIAL_STORE_DETAIL_PREFIX) {
+                if let Some(message) = explicit_recovery(detail) {
                     message.to_owned()
                 } else {
                     format!(
@@ -218,9 +307,15 @@ impl JevError {
                 "Shrink the check input from {actual_bytes} bytes to at most {limit_bytes} bytes. One check is one request and is never split."
             ),
             Self::InputEmpty => "Provide a non-empty input and retry.".to_owned(),
-            Self::InputInvalid { detail } => format!(
-                "Correct the input so it matches the expected schema ({detail}), then retry."
-            ),
+            Self::InputInvalid { detail } => {
+                if let Some(message) = explicit_recovery(detail) {
+                    message.to_owned()
+                } else {
+                    format!(
+                        "Correct the input so it matches the expected schema ({detail}), then retry."
+                    )
+                }
+            }
             Self::ExtractionEmpty => {
                 "Change the query or input so extraction emits at least one subject.".to_owned()
             }
@@ -265,6 +360,13 @@ impl JevError {
             ),
         }
     }
+}
+
+fn explicit_recovery(detail: &str) -> Option<&str> {
+    detail
+        .strip_prefix(CREDENTIAL_STORE_DETAIL_PREFIX)
+        .or_else(|| detail.strip_prefix(REGISTRY_DETAIL_PREFIX))
+        .or_else(|| detail.strip_prefix(SESSION_STORE_DETAIL_PREFIX))
 }
 
 #[cfg(test)]

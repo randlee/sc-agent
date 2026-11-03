@@ -102,11 +102,15 @@ impl FileSessionStore {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::ConfigInvalid`] when `dir` cannot be created.
+    /// Returns [`JevError::session_store_io`] when `dir` cannot be created.
+    /// The code is `CONFIG_INVALID`. The fix hint names `dir`.
     pub fn new(dir: impl Into<PathBuf>, session_log: SharedSessionLog) -> Result<Self, JevError> {
         let dir = dir.into();
-        fs::create_dir_all(&dir).map_err(|error| JevError::ConfigInvalid {
-            detail: format!("session directory {}: {error}", dir.display()),
+        fs::create_dir_all(&dir).map_err(|error| {
+            JevError::session_store_io(&format!(
+                "Create session directory {} or choose a writable directory ({error}).",
+                dir.display()
+            ))
         })?;
         Ok(Self {
             dir,
@@ -159,7 +163,8 @@ impl FileSessionStore {
     /// # Errors
     ///
     /// Returns [`JevError::InputInvalid`] when the payload is not UTF-8, and
-    /// [`JevError::ConfigInvalid`] when the file cannot be written.
+    /// [`JevError::session_store_io`] when the session file cannot be written.
+    /// The write failure code is `CONFIG_INVALID` and names the session file.
     pub fn open(
         &self,
         backend: BackendId,
@@ -193,8 +198,10 @@ impl FileSessionStore {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::SessionNotFound`] when the file is absent and
-    /// [`JevError::InputInvalid`] when the file is not a session document.
+    /// Returns [`JevError::SessionNotFound`] when the file is absent,
+    /// [`JevError::session_store_io`] when the file cannot be read, and
+    /// [`JevError::session_document_invalid`] when the file is not a session
+    /// document. The fix hint names the session file.
     pub fn load_raw(&self, id: &SessionId) -> Result<StoredSession, JevError> {
         let _guard = self
             .io
@@ -208,8 +215,10 @@ impl FileSessionStore {
     /// # Errors
     ///
     /// Returns [`JevError::SessionNotFound`] when the file is absent,
-    /// [`JevError::SessionExpired`] when `created_at` is past the TTL, and
-    /// [`JevError::InputInvalid`] when the file is not a session document.
+    /// [`JevError::SessionExpired`] when `created_at` is past the TTL,
+    /// [`JevError::session_store_io`] when the file cannot be read, and
+    /// [`JevError::session_document_invalid`] when the file is not a session
+    /// document.
     /// File modification time is not consulted.
     pub fn load(&self, id: &SessionId) -> Result<StoredSession, JevError> {
         let stored = self.load_raw(id)?;
@@ -269,47 +278,47 @@ impl FileSessionStore {
                 return Err(JevError::SessionNotFound { session_id: *id });
             }
             Err(error) => {
-                return Err(JevError::ConfigInvalid {
-                    detail: format!("session {id}: {error}"),
-                });
+                return Err(session_io(
+                    &path,
+                    &self.dir,
+                    &format!("could not be opened ({error})"),
+                ));
             }
         };
         let mut bytes = Vec::new();
         file.take(MAX_SESSION_BYTES.saturating_add(1))
             .read_to_end(&mut bytes)
-            .map_err(|error| JevError::ConfigInvalid {
-                detail: format!("session {id}: {error}"),
+            .map_err(|error| {
+                session_io(&path, &self.dir, &format!("could not be read ({error})"))
             })?;
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_SESSION_BYTES {
-            return Err(JevError::InputInvalid {
-                detail: format!("session {id} exceeds {MAX_SESSION_BYTES} bytes"),
-            });
+            return Err(session_parse(
+                &path,
+                &format!("exceeds {MAX_SESSION_BYTES} bytes"),
+            ));
         }
-        let document: SessionDocument =
-            serde_json::from_slice(&bytes).map_err(|error| JevError::InputInvalid {
-                detail: format!("session {id} is invalid: {error}"),
-            })?;
+        let document: SessionDocument = serde_json::from_slice(&bytes).map_err(|error| {
+            session_parse(&path, &format!("is not a session document ({error})"))
+        })?;
         if document.version != SESSION_VERSION || document.session_id != *id {
-            return Err(JevError::InputInvalid {
-                detail: format!("session {id} is invalid"),
-            });
+            return Err(session_parse(
+                &path,
+                "does not match this session id or version",
+            ));
         }
         let payload = utf8_payload(document.payload_utf8.as_bytes())?;
         if sc_agent_types::Sha256Digest::of(payload.as_bytes()) != document.prompt_sha256 {
-            return Err(JevError::InputInvalid {
-                detail: format!("session {id} payload digest does not match"),
-            });
+            return Err(session_parse(&path, "payload digest does not match"));
         }
         Ok(document)
     }
 
     fn write_document(&self, document: &SessionDocument) -> Result<(), JevError> {
-        let bytes = serde_json::to_vec(document).map_err(|error| JevError::InputInvalid {
-            detail: format!("session encoding failed: {error}"),
-        })?;
         let path = self.path(&document.session_id);
-        write_private(&path, &bytes).map_err(|error| JevError::ConfigInvalid {
-            detail: format!("session {}: {error}", document.session_id),
+        let bytes = serde_json::to_vec(document)
+            .map_err(|error| session_parse(&path, &format!("could not be encoded ({error})")))?;
+        write_private(&path, &bytes).map_err(|error| {
+            session_io(&path, &self.dir, &format!("could not be written ({error})"))
         })
     }
 
@@ -419,6 +428,21 @@ pub(crate) fn emit_log(log: &SharedSessionLog, event: LogEvent) {
 
 pub(crate) fn is_llm(id: BackendId) -> bool {
     matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
+}
+
+fn session_io(path: &Path, dir: &Path, problem: &str) -> JevError {
+    JevError::session_store_io(&format!(
+        "Session file {} {problem}. Check that session directory {} is accessible, then retry.",
+        path.display(),
+        dir.display()
+    ))
+}
+
+fn session_parse(path: &Path, problem: &str) -> JevError {
+    JevError::session_document_invalid(&format!(
+        "Session file {} {problem}. Delete it and start a new session.",
+        path.display()
+    ))
 }
 
 fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
@@ -654,6 +678,49 @@ mod tests {
         let expired = store.load(&id).expect_err("expired");
         assert_eq!(expired.code(), "SESSION_EXPIRED");
         assert!(expired.fix_hint().contains(&id.to_string()));
+    }
+
+    #[test]
+    fn session_parse_hint_names_the_file() {
+        let (store, _dir) = store(Duration::from_secs(60));
+        let id = store.create(BackendId::Jev, &bundle()).expect("create");
+        let path = store.path(&id);
+        fs::write(&path, b"not-json").expect("corrupt");
+        let error = store.load(&id).expect_err("parse");
+        assert_eq!(error.code(), "INPUT_INVALID");
+        let hint = error.fix_hint();
+        assert!(
+            hint.contains(&path.display().to_string()),
+            "parse hint names the session file: {hint}"
+        );
+        assert!(
+            !hint.contains("check.toml"),
+            "parse hint is not a check.toml hint: {hint}"
+        );
+        assert!(
+            !hint.to_ascii_lowercase().contains("schema"),
+            "parse hint is not a schema hint: {hint}"
+        );
+    }
+
+    #[test]
+    fn session_directory_failure_names_the_directory() {
+        let parent = crate::extract::test_support::temp_dir("session-file-parent");
+        let blocker = parent.path().join("not-a-directory");
+        fs::write(&blocker, b"x").expect("blocker");
+        let nested = blocker.join("sessions");
+        let error =
+            FileSessionStore::new(nested.as_path(), Arc::new(NoopSessionLog)).expect_err("dir");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        let hint = error.fix_hint();
+        assert!(
+            hint.contains(&nested.display().to_string()),
+            "directory hint names the session directory: {hint}"
+        );
+        assert!(
+            !hint.contains("check.toml"),
+            "directory hint is not a check.toml hint: {hint}"
+        );
     }
 
     fn file_set_modified(path: &Path, time: SystemTime) {

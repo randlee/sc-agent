@@ -38,14 +38,15 @@ impl BackendRegistry {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::ConfigInvalid`] when another backend with the same
-    /// [`JudgeBackend::id`] is already registered.
+    /// Returns [`JevError::registry_invalid`] when another backend with the same
+    /// [`JudgeBackend::id`] is already registered. The code is `CONFIG_INVALID`.
+    /// The fix hint names that id and does not mention `check.toml`.
     pub fn register(&mut self, backend: Arc<dyn JudgeBackend>) -> Result<(), JevError> {
         let id = backend.id();
         if self.backends.iter().any(|existing| existing.id() == id) {
-            return Err(JevError::ConfigInvalid {
-                detail: format!("backend {id} is already registered"),
-            });
+            return Err(JevError::registry_invalid(&format!(
+                "Backend {id} is already registered. Register each backend id once."
+            )));
         }
         self.backends.push(backend);
         Ok(())
@@ -55,14 +56,18 @@ impl BackendRegistry {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::ConfigInvalid`] when `id` was not registered.
+    /// Returns [`JevError::registry_invalid`] when `id` was not registered.
+    /// The code is `CONFIG_INVALID`. The fix hint names `id` and does not
+    /// mention `check.toml`.
     pub fn get(&self, id: BackendId) -> Result<Arc<dyn JudgeBackend>, JevError> {
         self.backends
             .iter()
             .find(|backend| backend.id() == id)
             .cloned()
-            .ok_or_else(|| JevError::ConfigInvalid {
-                detail: format!("backend {id} is not registered"),
+            .ok_or_else(|| {
+                JevError::registry_invalid(&format!(
+                    "Backend {id} is not registered. Register it before the run or remove it from the requested backends."
+                ))
             })
     }
 
@@ -103,8 +108,9 @@ pub fn backend_key_id(id: BackendId) -> BackendKeyId {
 /// # Errors
 ///
 /// Returns [`JevError::KeyMissing`] when a credential is absent,
-/// [`JevError::ConfigInvalid`] when a key or a duplicate id is rejected, and
-/// the transport constructors' errors. No judge request is sent.
+/// [`JevError::registry_invalid`] when a duplicate id is rejected,
+/// [`JevError::ConfigInvalid`] when a key is rejected, and the transport
+/// constructors' errors. No judge request is sent.
 pub fn registry_for_repo(repo: &RepoRoot, ids: &[BackendId]) -> Result<BackendRegistry, JevError> {
     registry_from_resolver(repo, ids, &mut |id, root| resolve_key(id, root))
 }
@@ -189,14 +195,37 @@ mod tests {
             )))
             .expect_err("duplicate");
         assert_eq!(error.code(), "CONFIG_INVALID");
+        let duplicate_hint = error.fix_hint();
+        assert!(
+            duplicate_hint.contains("jev"),
+            "duplicate hint names the backend: {duplicate_hint}"
+        );
+        assert!(
+            !duplicate_hint.contains("check.toml"),
+            "duplicate hint is not a check.toml hint: {duplicate_hint}"
+        );
         let backend = registry.get(BackendId::Jev).expect("jev");
-        assert!(registry.get(BackendId::OpenAiLuna).is_err());
+        let missing = match registry.get(BackendId::OpenAiLuna) {
+            Ok(_) => panic!("openai_luna must be absent"),
+            Err(error) => error,
+        };
+        assert_eq!(missing.code(), "CONFIG_INVALID");
+        let missing_hint = missing.fix_hint();
+        assert!(
+            missing_hint.contains("openai_luna"),
+            "missing hint names the backend: {missing_hint}"
+        );
+        assert!(
+            !missing_hint.contains("check.toml"),
+            "missing hint is not a check.toml hint: {missing_hint}"
+        );
         let _ = backend;
     }
 
     #[test]
     fn resolver_builds_backends_with_the_repo_root_and_no_send() {
-        let repo = RepoRoot::new("/tmp/sc-jev-check-registry-root");
+        let dir = crate::extract::test_support::temp_dir("registry-root");
+        let repo = RepoRoot::new(dir.path());
         let mut seen = Vec::new();
         let registry = registry_from_resolver(
             &repo,
