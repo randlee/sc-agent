@@ -1,7 +1,7 @@
 ---
 id: a-6
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: jev-check
 track: runtime
@@ -28,14 +28,21 @@ requirements:
   - NFR-SAG-0002
   - NFR-SAG-0003
 adrs:
+  - ADR-SAG-0001
+  - ADR-SAG-0002
   - ADR-SAG-0003
   - ADR-SAG-0004
   - ADR-SAG-0005
+  - ADR-SAG-0006
+  - ADR-SAG-0007
   - ADR-SAG-0008
   - ADR-SAG-0009
+  - ADR-SAG-0012
   - ADR-SAG-0013
+  - ADR-SAG-0015
   - ADR-SAG-0016
   - ADR-SAG-0019
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-jev-check/src/session/**"
   - "crates/sc-jev-check/src/run/**"
