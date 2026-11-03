@@ -126,7 +126,7 @@ Override with --log-dir or SC_LOG_ROOT.
 Session JSONL: <log-root>/logs/sc-ai.log.jsonl
 Session files: <repo-root>/.sc-ai/sessions (override with --sessions-dir).
 
-data includes the Jev answer fields and session_id. Dry-run returns
+data includes the Jev response JSON and session_id. Dry-run returns
 prompt_sha256 and does not resolve API keys.
 ";
 
@@ -569,6 +569,9 @@ fn run_data(
     dry_run: bool,
 ) -> Result<Value, JevError> {
     let mut data = Map::new();
+    if !dry_run && let Some(outcome) = result.outcomes.first() {
+        merge_jev_response(&mut data, outcome);
+    }
     data.insert(
         "session_id".to_owned(),
         serde_json::to_value(result.session_id).map_err(|_| JevError::InputInvalid {
@@ -605,22 +608,31 @@ fn run_data(
                 detail: "response JSON could not be encoded".into(),
             })?,
         );
-        if let Some(outcome) = result.outcomes.first() {
-            merge_jev_response(&mut data, outcome);
-        }
     }
     Ok(Value::Object(data))
 }
 
-/// Copies the Jev response fields into `data` and leaves `model` and `usage`
-/// unchanged (ADR-SAG-0014).
+/// Copies the judge answer into `data` (ADR-SAG-0014).
 ///
-/// `answers` is the validated answer object. `model` and `usage` are copied
-/// from provider metadata only when the judge stored them under those names.
-/// They are not nested under `provider_meta` and their values are not rebuilt.
-/// LLM outcomes use the same fields: normalized `answers`, plus `model` or
-/// `usage` when that backend recorded them.
+/// A TypeSafe outcome contributes every top-level field of the validated
+/// response (`provider_meta`), then the validated `answers` object. Callers
+/// add `session_id` after this merge so it is not replaced by a response field.
+///
+/// LLM outcomes are normalized to that answer shape: `answers`, plus `model`
+/// and `usage` when the backend stored them under those names. Other provider
+/// fields stay out of `data`. Values are copied, not rebuilt, and are not
+/// nested under `provider_meta`.
 fn merge_jev_response(data: &mut Map<String, Value>, outcome: &JudgeOutcome) {
+    if outcome.backend == BackendId::Jev {
+        if let Some(meta) = outcome.provider_meta.as_ref().and_then(Value::as_object) {
+            for (key, value) in meta {
+                data.insert(key.clone(), value.clone());
+            }
+        }
+        data.insert("answers".to_owned(), outcome.answers.clone());
+        return;
+    }
+
     data.insert("answers".to_owned(), outcome.answers.clone());
     let Some(meta) = outcome.provider_meta.as_ref().and_then(Value::as_object) else {
         return;

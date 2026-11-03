@@ -578,7 +578,7 @@ fn cli_request_json_rejects_inline_system_prompt() {
 }
 
 #[test]
-fn cli_preserves_jev_model_and_usage() {
+fn cli_keeps_typesafe_response_fields() {
     let repo = TempDir::new("verbatim");
     write_repo(repo.path());
     let sessions = TempDir::new("verbatim-sessions");
@@ -588,7 +588,8 @@ fn cli_preserves_jev_model_and_usage() {
     backend.provider_meta = Some(serde_json::json!({
         "model": "jev-test",
         "usage": usage,
-        "stop_reason": "end_turn"
+        "stop_reason": "end_turn",
+        "id": "resp-1"
     }));
     let value = execute(
         &[
@@ -607,10 +608,11 @@ fn cli_preserves_jev_model_and_usage() {
     let data = &value["data"];
     assert_eq!(data["model"], "jev-test");
     assert_eq!(data["usage"], usage);
+    assert_eq!(data["stop_reason"], "end_turn");
+    assert_eq!(data["id"], "resp-1");
     assert!(data["session_id"].as_str().is_some());
     assert_eq!(data["answers"]["relevant"]["choice"], "yes");
     assert!(data.get("provider_meta").is_none());
-    assert!(data.get("stop_reason").is_none());
     assert!(data.get("backend").is_none());
 }
 

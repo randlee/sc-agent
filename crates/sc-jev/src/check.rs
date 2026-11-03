@@ -74,6 +74,9 @@ pub(crate) fn prepare(config: &JevClientConfig, payload: &[u8]) -> Result<Prepar
 
 /// Parses a Jev check response into a [`JudgeOutcome`].
 ///
+/// `provider_meta` is that response object with every top-level field kept.
+/// The CLI prints it plus `session_id` (ADR-SAG-0014).
+///
 /// # Errors
 ///
 /// Returns [`JevError::ResponseInvalid`] when the model, answer ids, choice,
@@ -145,17 +148,11 @@ pub(crate) fn parse_outcome(
         probabilities.insert(id.clone(), Value::Object(probs.clone()));
     }
 
-    let mut provider_meta = Map::new();
-    provider_meta.insert("model".to_owned(), Value::String(model.to_owned()));
-    if let Some(usage) = body.get("usage").filter(|usage| usage.is_object()) {
-        provider_meta.insert("usage".to_owned(), usage.clone());
-    }
-
     Ok(JudgeOutcome {
         answers: Value::Object(answers.clone()),
         backend: BackendId::Jev,
         probabilities: Some(Value::Object(probabilities)),
-        provider_meta: Some(Value::Object(provider_meta)),
+        provider_meta: Some(Value::Object(body.clone())),
     })
 }
 
@@ -280,6 +277,30 @@ fn require_number(value: Option<&Value>) -> Result<(), JevError> {
         _ => Err(JevError::ResponseInvalid {
             detail: "Jev confidence or probability is not a number".to_owned(),
         }),
+    }
+}
+
+#[cfg(test)]
+mod response_shape {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use super::parse_outcome;
+
+    #[test]
+    fn parse_outcome_keeps_other_top_level_fields() {
+        let raw = br#"{"model":"jev-test","answers":{"q":{"choice":"no","confidence":0.9,"probabilities":{"no":0.9,"yes":0.1}}},"usage":{"input_tokens":318,"output_tokens":31},"stop_reason":"end_turn"}"#;
+        let mut labels = BTreeSet::new();
+        labels.insert("yes".to_owned());
+        labels.insert("no".to_owned());
+        let mut criteria = BTreeMap::new();
+        criteria.insert("q".to_owned(), labels);
+        let outcome = parse_outcome(raw, "jev-test", &criteria).expect("parse");
+        let meta = outcome.provider_meta.expect("meta");
+        assert_eq!(meta["stop_reason"], "end_turn");
+        assert_eq!(meta["model"], "jev-test");
+        assert_eq!(meta["usage"]["input_tokens"], 318);
+        assert_eq!(meta["answers"]["q"]["choice"], "no");
+        assert_eq!(outcome.answers["q"]["choice"], "no");
     }
 }
 
