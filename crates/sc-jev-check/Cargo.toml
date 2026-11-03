@@ -9,6 +9,12 @@ repository.workspace = true
 homepage.workspace = true
 description = "Jev check facade: check.toml, extractors, sessions, and run_check."
 
+[features]
+default = []
+# In-process scripted judges for tests. Production builds leave this off
+# (ADR-SAG-0009). `run_check`'s signature does not change.
+test-util = []
+
 [dependencies]
 sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }

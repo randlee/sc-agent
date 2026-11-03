@@ -1,15 +1,18 @@
-//! In-process judge used when Python passes `scripted_answers`.
+//! In-process judges for tests (ADR-SAG-0009).
 //!
-//! This backend never opens a socket and never stores an API key. Production
-//! runs omit it and let `sc-jev-check` construct the HTTP backends.
+//! [`register_scripted_backends`] builds a [`BackendRegistry`] whose judges
+//! return a fixed answer object and never open a socket. Production builds
+//! leave the `test-util` feature off, so [`crate::run::run_check`] stays the
+//! caller API.
 
 use std::sync::Arc;
 
 use sc_agent_types::{BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
-use sc_jev_check::registry::BackendRegistry;
+
+use super::BackendRegistry;
 
 /// Returns `answers` for every accepted request.
-pub(crate) struct ScriptedJudge {
+struct ScriptedJudge {
     id: BackendId,
     answers: Arc<serde_json::Value>,
 }
@@ -56,10 +59,14 @@ impl JudgeBackend for ScriptedJudge {
 
 /// Registers one scripted judge per `ids` entry.
 ///
+/// Each judge returns `answers` and does not open a socket or store an API
+/// key. Callers pass the registry to [`crate::run::RunOptions::registry`].
+/// This does not change [`crate::run::run_check`]'s parameters (ADR-SAG-0009).
+///
 /// # Errors
 ///
 /// Returns [`JevError::registry_invalid`] when `ids` repeats a backend.
-pub(crate) fn registry(
+pub fn register_scripted_backends(
     ids: &[BackendId],
     answers: serde_json::Value,
 ) -> Result<BackendRegistry, JevError> {

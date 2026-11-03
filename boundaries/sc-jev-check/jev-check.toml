@@ -25,7 +25,7 @@ scope = "outside_owner_crate"
 forbidden = []
 
 [testing]
-allowed_test_double_paths = []
+allowed_test_double_paths = ["crates/sc-jev-check/src/registry/scripted.rs"]
 forbidden_test_bypasses = []
 
 [enforcement]

@@ -18,7 +18,7 @@ to `JudgeBackend` impls in `sc-jev` and `sc-jev-backends`.
 | `run` | `build_request`, `run_check`, `run_request`, dry-run |
 | `session` | Store, TTL, `ask` |
 | `equal_input` | README equal-input record |
-| `registry` | `Vec<Arc<dyn JudgeBackend>>` — select backends by id (ADR-SAG-0009) |
+| `registry` | `Vec<Arc<dyn JudgeBackend>>` — select backends by id (ADR-SAG-0009). Feature `test-util` adds `register_scripted_backends` for tests. Production builds leave the feature off. |
 
 ## Composition
 

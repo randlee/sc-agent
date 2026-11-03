@@ -23,7 +23,10 @@ extension; it is not the primary deliverable.
 
 PyO3 only — no duplicate Jev HTTP or canonicalization. `build_request` calls
 `sc_jev_check::run::build_request` and does not run extractors (ADR-SAG-0005).
-Exceptions expose the same error codes as `JevError`.
+Production `run_check` does not take `scripted_answers` and does not implement
+`JudgeBackend` (ADR-SAG-0009). The `test-util` feature forwards scripted
+answers to `sc_jev_check::registry::register_scripted_backends`. Default
+features leave that off. Exceptions expose the same error codes as `JevError`.
 
 Log and session paths follow ADR-SAG-0021. Log root, first match:
 `log_dir`, `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, then `~/.sc-agent/log`. Session

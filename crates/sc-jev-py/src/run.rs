@@ -18,7 +18,6 @@ use serde_json::Value;
 
 use crate::error::{self, map_err};
 use crate::logging::{self, LoggerGuard};
-use crate::scripted;
 
 /// One Python `run_check` invocation.
 struct CheckRun {
@@ -30,6 +29,8 @@ struct CheckRun {
     log_dir: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     system_prompt_file: Option<PathBuf>,
+    /// Present only for `cargo test` and the `test-util` feature.
+    #[cfg(any(test, feature = "test-util"))]
     scripted_answers: Option<Value>,
 }
 
@@ -69,7 +70,6 @@ fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     let repo = resolve_repo(spec.repo_root.as_deref())?;
     let rev = parse_rev(&spec.rev);
     let check = load_check_at(&repo, &rev, &spec.check_path)?;
-    let scripted_answers = spec.scripted_answers.map(normalize_answers).transpose()?;
     let log_root = logging::resolve_log_root(spec.log_dir.as_deref());
     let session_dir = logging::resolve_session_dir(spec.session_dir.as_deref(), &log_root);
     let (logger, session_log) = logging::open_session_log(&log_root)?;
@@ -80,8 +80,12 @@ fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     if let Some(path) = spec.system_prompt_file {
         options = options.system_prompt_override(path);
     }
-    if let Some(answers) = scripted_answers {
-        options = options.registry(scripted::registry(&backends, answers)?);
+    #[cfg(any(test, feature = "test-util"))]
+    if let Some(answers) = spec.scripted_answers {
+        let answers = normalize_answers(answers)?;
+        options = options.registry(sc_jev_check::registry::register_scripted_backends(
+            &backends, answers,
+        )?);
     }
     let result = run_check_facade(&check, &backends, options)?;
     logger.flush();
@@ -159,6 +163,7 @@ fn resolve_repo(repo_root: Option<&Path>) -> Result<RepoRoot, JevError> {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 fn normalize_answers(value: Value) -> Result<Value, JevError> {
     let Value::Object(map) = value else {
         return Err(JevError::InputInvalid {
@@ -185,6 +190,7 @@ fn optional_path(value: Option<&str>) -> Option<PathBuf> {
     value.filter(|text| !text.is_empty()).map(PathBuf::from)
 }
 
+#[cfg(any(test, feature = "test-util"))]
 fn py_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, JevError> {
     let text = python_json(obj).map_err(|error| JevError::InputInvalid {
         detail: format!("scripted_answers is not JSON: {error}"),
@@ -194,6 +200,7 @@ fn py_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, JevError> {
     })
 }
 
+#[cfg(any(test, feature = "test-util"))]
 fn python_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     let json = obj.py().import("json")?;
     json.call_method1("dumps", (obj,))?.extract()
@@ -429,8 +436,8 @@ pub fn build_request(
 /// Runs `check_path` through `sc-jev-check`.
 ///
 /// `backends` defaults to `["jev"]`. `dry_run` returns the payload digest and
-/// does not resolve keys or send. `scripted_answers` installs an in-process
-/// judge and does not open a socket; omit it to use the HTTP backends.
+/// does not resolve keys or send. This function does not register a judge.
+/// Live runs use the HTTP backends inside `sc-jev-check` (ADR-SAG-0009).
 ///
 /// Log and session paths follow ADR-SAG-0021. See the module documentation
 /// for `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, and the JSONL path.
@@ -445,6 +452,58 @@ pub fn build_request(
 /// import sc_jev_py as jev
 /// result = jev.run_check("check.toml", backends=["jev"], dry_run=False)
 /// ```
+#[cfg(not(any(test, feature = "test-util")))]
+#[pyfunction]
+#[pyo3(signature = (
+    check_path,
+    *,
+    backends=None,
+    dry_run=false,
+    repo_root=None,
+    rev="WORKTREE",
+    log_dir=None,
+    session_dir=None,
+    system_prompt_file=None,
+))]
+#[allow(clippy::too_many_arguments)]
+pub fn run_check(
+    py: Python<'_>,
+    check_path: &str,
+    backends: Option<Vec<String>>,
+    dry_run: bool,
+    repo_root: Option<&str>,
+    rev: &str,
+    log_dir: Option<&str>,
+    session_dir: Option<&str>,
+    system_prompt_file: Option<&str>,
+) -> PyResult<CheckResult> {
+    finish_check(
+        py,
+        check_path,
+        backends,
+        dry_run,
+        repo_root,
+        rev,
+        log_dir,
+        session_dir,
+        system_prompt_file,
+    )
+}
+
+/// Runs `check_path` through `sc-jev-check`.
+///
+/// Same contract as the production function. `scripted_answers` is compiled
+/// only for tests. It forwards to
+/// [`sc_jev_check::registry::register_scripted_backends`] and does not
+/// implement a judge in this crate (ADR-SAG-0009). Omit it to use the HTTP
+/// backends.
+///
+/// # Errors
+///
+/// Raises `JevError` with `code` and `message` set from the facade error.
+/// `scripted_answers` that is not a JSON object of question ids raises
+/// `JevError` with code `INPUT_INVALID`.
+#[cfg(any(test, feature = "test-util"))]
 #[pyfunction]
 #[pyo3(signature = (
     check_path,
@@ -475,6 +534,33 @@ pub fn run_check(
         Some(answers) => Some(map_err(py, py_to_value(&answers))?),
         None => None,
     };
+    finish_check(
+        py,
+        check_path,
+        backends,
+        dry_run,
+        repo_root,
+        rev,
+        log_dir,
+        session_dir,
+        system_prompt_file,
+        scripted_answers,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_check(
+    py: Python<'_>,
+    check_path: &str,
+    backends: Option<Vec<String>>,
+    dry_run: bool,
+    repo_root: Option<&str>,
+    rev: &str,
+    log_dir: Option<&str>,
+    session_dir: Option<&str>,
+    system_prompt_file: Option<&str>,
+    #[cfg(any(test, feature = "test-util"))] scripted_answers: Option<Value>,
+) -> PyResult<CheckResult> {
     let spec = CheckRun {
         check_path: check_path.to_owned(),
         backends: backends.unwrap_or_else(|| vec!["jev".to_owned()]),
@@ -484,6 +570,7 @@ pub fn run_check(
         log_dir: optional_path(log_dir),
         session_dir: optional_path(session_dir),
         system_prompt_file: optional_path(system_prompt_file),
+        #[cfg(any(test, feature = "test-util"))]
         scripted_answers,
     };
     let finished = py.detach(move || execute(spec));

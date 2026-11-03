@@ -38,7 +38,6 @@
 mod error;
 mod logging;
 mod run;
-mod scripted;
 
 use pyo3::prelude::*;
 use pyo3::types::PyModuleMethods;
@@ -65,11 +64,9 @@ pub use run::{
 /// argument, `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`.
 ///
 /// `build_request` calls `sc_jev_check::run::build_request`. `run_check` calls
-/// `sc_jev_check::run::run_check`. This module does not run extractors or
-/// reimplement payload canonicalization or Jev HTTP (ADR-SAG-0005). Pass
-/// `scripted_answers`
-/// only for an in-process judge that never opens a socket. Omit it to resolve
-/// keys and use the HTTP backends inside `sc-jev-check`.
+/// `sc_jev_check::run::run_check`. This module does not run extractors,
+/// reimplement payload canonicalization or Jev HTTP, or register a judge
+/// (ADR-SAG-0005, ADR-SAG-0009). Live runs resolve keys inside `sc-jev-check`.
 #[pymodule]
 fn sc_jev_py(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<CheckResult>()?;
