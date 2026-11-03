@@ -10,6 +10,25 @@ use sc_agent_types::{JevError, RepoRoot, Rev};
 use crate::config::{CheckSpec, PromptOrigin, load_packaged_config};
 use crate::extract::read_repo_text;
 
+pub(crate) fn load_request_system_prompt(
+    repo: &RepoRoot,
+    override_path: Option<&Path>,
+    needs_llm: bool,
+) -> Result<Option<String>, JevError> {
+    if !needs_llm {
+        return Ok(None);
+    }
+    if let Some(path) = override_path {
+        return Ok(Some(read_override(repo.as_path(), path)?));
+    }
+    non_empty(
+        crate::config::PACKAGED_SYSTEM_PROMPT,
+        "packaged system prompt",
+    )
+    .map(str::to_owned)
+    .map(Some)
+}
+
 pub(crate) fn load_system_prompt(
     spec: &CheckSpec,
     repo: &RepoRoot,

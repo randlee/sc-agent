@@ -6,17 +6,13 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use sc_agent_types::observability::v2::SharedSessionLog;
-use sc_agent_types::{
-    BackendId, CanonicalJudgePayload, ChoiceAnswer, JevError, JudgeOutcome, PayloadBundle,
-    Question, RepoRoot, Rev, SessionId, payload_bundle_from_value,
-};
+use sc_agent_types::{BackendId, JevError, JudgeOutcome, PayloadBundle, RepoRoot, Rev, SessionId};
 use sc_jev_check::config;
 use sc_jev_check::registry::{BackendRegistry, registry_for_repo};
-use sc_jev_check::run::{RunOptions, RunRequest, run_check, run_request};
+use sc_jev_check::run::{RunOptions, RunRequest, prepare_caller_request, run_check, run_request};
 use sc_jev_check::session::{FileSessionStore, SessionStore};
-use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::envelope::{self, OP_ASK, OP_DRY_RUN, OP_RUN};
 use crate::observe::{
@@ -423,19 +419,16 @@ fn dispatch_run(
         .map(|path| joined_path(repo.as_path().to_path_buf(), path));
     let plan = if let Some(request_path) = &command.request_json {
         let bytes = request_bytes(&repo, request_path, &command.stdin)?;
-        let document = parse_request(&bytes)?;
-        let backends = resolve_backends(&command.backends, &document.backends)?;
-        let bundle = bundle_from_request(&document)?;
-        let system_prompt = request_prompt(
+        let prepared = prepare_caller_request(
+            &bytes,
+            &parse_flag_backends(&command.backends)?,
             &repo,
-            &backends,
             command.prompt_file.as_deref(),
-            document.system_prompt.as_deref(),
         )?;
         PreparedRun::Request {
-            backends,
-            bundle,
-            system_prompt,
+            backends: prepared.backends,
+            bundle: prepared.bundle,
+            system_prompt: prepared.system_prompt,
         }
     } else {
         let check_path = command
@@ -444,7 +437,11 @@ fn dispatch_run(
             .unwrap_or_else(|| PathBuf::from("check.toml"));
         let relative = relative_to_repo(&repo, &check_path)?;
         let spec = config::load_check_at(&repo, &rev, &relative)?;
-        let backends = resolve_backends(&command.backends, &[])?;
+        let backends = if command.backends.is_empty() {
+            vec![BackendId::Jev]
+        } else {
+            parse_flag_backends(&command.backends)?
+        };
         PreparedRun::Check { spec, backends }
     };
     let prepared = prepare_log(&log_root, overrides)?;
@@ -547,13 +544,23 @@ fn dispatch_ask(command: AskCommand, overrides: &ExecuteOverrides) -> Result<Vec
         sessions_dir: path_text(&sessions_dir),
         session_id: session_id.to_string(),
     };
-    let mut data = outcome_fields(&outcome);
-    data["session_id"] = Value::String(session_id.to_string());
-    data["prompt_sha256"] = Value::String(stored.payload.sha256.as_str().to_owned());
-    data["readback"] = serde_json::to_value(&readback).map_err(|_| JevError::InputInvalid {
-        detail: "response JSON could not be encoded".into(),
-    })?;
-    envelope::envelope(OP_ASK, data)
+    let mut body = Map::new();
+    merge_jev_response(&mut body, &outcome);
+    body.insert(
+        "session_id".to_owned(),
+        Value::String(session_id.to_string()),
+    );
+    body.insert(
+        "prompt_sha256".to_owned(),
+        Value::String(stored.payload.sha256.as_str().to_owned()),
+    );
+    body.insert(
+        "readback".to_owned(),
+        serde_json::to_value(&readback).map_err(|_| JevError::InputInvalid {
+            detail: "response JSON could not be encoded".into(),
+        })?,
+    );
+    envelope::envelope(OP_ASK, Value::Object(body))
 }
 
 fn run_data(
@@ -561,43 +568,69 @@ fn run_data(
     readback: &RunReadback,
     dry_run: bool,
 ) -> Result<Value, JevError> {
-    let mut data = serde_json::json!({
-        "session_id": result.session_id,
-        "prompt_sha256": result.bundle.sha256.as_str(),
-        "readback": readback,
-    });
+    let mut data = Map::new();
+    data.insert(
+        "session_id".to_owned(),
+        serde_json::to_value(result.session_id).map_err(|_| JevError::InputInvalid {
+            detail: "response JSON could not be encoded".into(),
+        })?,
+    );
+    data.insert(
+        "prompt_sha256".to_owned(),
+        Value::String(result.bundle.sha256.as_str().to_owned()),
+    );
+    data.insert(
+        "readback".to_owned(),
+        serde_json::to_value(readback).map_err(|_| JevError::InputInvalid {
+            detail: "response JSON could not be encoded".into(),
+        })?,
+    );
     if dry_run {
-        data["payload"] =
+        data.insert(
+            "payload".to_owned(),
             serde_json::from_slice(&result.bundle.bytes).map_err(|_| JevError::InputInvalid {
                 detail: "canonical payload was not JSON".into(),
-            })?;
+            })?,
+        );
     } else {
-        data["outcomes"] =
+        data.insert(
+            "outcomes".to_owned(),
             serde_json::to_value(&result.outcomes).map_err(|_| JevError::InputInvalid {
                 detail: "response JSON could not be encoded".into(),
-            })?;
-        data["equal_input"] =
+            })?,
+        );
+        data.insert(
+            "equal_input".to_owned(),
             serde_json::to_value(&result.equal_input).map_err(|_| JevError::InputInvalid {
                 detail: "response JSON could not be encoded".into(),
-            })?;
+            })?,
+        );
         if let Some(outcome) = result.outcomes.first() {
-            copy_outcome(&mut data, outcome);
+            merge_jev_response(&mut data, outcome);
         }
     }
-    Ok(data)
+    Ok(Value::Object(data))
 }
 
-fn outcome_fields(outcome: &JudgeOutcome) -> Value {
-    let mut data = serde_json::json!({});
-    copy_outcome(&mut data, outcome);
-    data
-}
-
-fn copy_outcome(data: &mut Value, outcome: &JudgeOutcome) {
-    data["answers"] = outcome.answers.clone();
-    data["backend"] = serde_json::json!(outcome.backend);
-    data["probabilities"] = outcome.probabilities.clone().unwrap_or(Value::Null);
-    data["provider_meta"] = outcome.provider_meta.clone().unwrap_or(Value::Null);
+/// Copies the Jev response fields into `data` and leaves `model` and `usage`
+/// unchanged (ADR-SAG-0014).
+///
+/// `answers` is the validated answer object. `model` and `usage` are copied
+/// from provider metadata only when the judge stored them under those names.
+/// They are not nested under `provider_meta` and their values are not rebuilt.
+/// LLM outcomes use the same fields: normalized `answers`, plus `model` or
+/// `usage` when that backend recorded them.
+fn merge_jev_response(data: &mut Map<String, Value>, outcome: &JudgeOutcome) {
+    data.insert("answers".to_owned(), outcome.answers.clone());
+    let Some(meta) = outcome.provider_meta.as_ref().and_then(Value::as_object) else {
+        return;
+    };
+    if let Some(model) = meta.get("model") {
+        data.insert("model".to_owned(), model.clone());
+    }
+    if let Some(usage) = meta.get("usage") {
+        data.insert("usage".to_owned(), usage.clone());
+    }
 }
 
 #[derive(Serialize)]
@@ -616,115 +649,6 @@ struct AskReadback {
     session_id: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RequestDocument {
-    questions: Vec<Question>,
-    #[serde(default)]
-    state: Vec<ChoiceAnswer>,
-    #[serde(default)]
-    backends: Vec<String>,
-    #[serde(default)]
-    system_prompt: Option<String>,
-}
-
-fn parse_request(bytes: &[u8]) -> Result<RequestDocument, JevError> {
-    if bytes.iter().all(u8::is_ascii_whitespace) {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON is empty. Pass a questions document on --request-json.".into(),
-        });
-    }
-    serde_json::from_slice(bytes).map_err(|error| JevError::InputInvalid {
-        detail: match error.classify() {
-            serde_json::error::Category::Syntax => {
-                "request JSON is not valid JSON. Pass a questions document.".into()
-            }
-            serde_json::error::Category::Eof => "request JSON was empty or truncated.".into(),
-            serde_json::error::Category::Io => "request JSON could not be read.".into(),
-            serde_json::error::Category::Data => {
-                "request JSON must contain a questions array and may contain state, backends, and system_prompt.".into()
-            }
-        },
-    })
-}
-
-fn bundle_from_request(document: &RequestDocument) -> Result<PayloadBundle, JevError> {
-    if document.questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON has no questions".into(),
-        });
-    }
-    for answer in &document.state {
-        let Some(question) = document
-            .questions
-            .iter()
-            .find(|question| question.id == answer.question_id)
-        else {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} is not in the question set",
-                    answer.question_id
-                ),
-            });
-        };
-        if !question
-            .choices
-            .iter()
-            .any(|choice| choice == &answer.choice)
-        {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} has a choice that is not in the question",
-                    answer.question_id
-                ),
-            });
-        }
-    }
-    let value = serde_json::to_value(CanonicalJudgePayload {
-        questions: document.questions.clone(),
-        state: document.state.clone(),
-    })
-    .map_err(|_| JevError::InputInvalid {
-        detail: "request JSON could not be encoded".into(),
-    })?;
-    payload_bundle_from_value(&value)
-}
-
-fn request_prompt(
-    repo: &RepoRoot,
-    backends: &[BackendId],
-    override_path: Option<&Path>,
-    json_prompt: Option<&str>,
-) -> Result<Option<String>, JevError> {
-    if !needs_llm(backends) {
-        return Ok(None);
-    }
-    if let Some(path) = override_path {
-        return Ok(Some(read_prompt_file(repo, path)?));
-    }
-    if let Some(text) = json_prompt.filter(|text| !text.trim().is_empty()) {
-        return Ok(Some(text.to_owned()));
-    }
-    Ok(Some(config::PACKAGED_SYSTEM_PROMPT.to_owned()))
-}
-
-fn read_prompt_file(repo: &RepoRoot, path: &Path) -> Result<String, JevError> {
-    let full = joined_path(repo.as_path().to_path_buf(), path);
-    let display = full.display().to_string();
-    match std::fs::read_to_string(&full) {
-        Ok(text) if !text.trim().is_empty() => Ok(text),
-        Ok(_) => Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {display} is empty"),
-        }),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            Err(JevError::PromptFileMissing { path: display })
-        }
-        Err(error) => Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {display} could not be read ({error})"),
-        }),
-    }
-}
-
 fn request_bytes(repo: &RepoRoot, spec: &str, stdin: &[u8]) -> Result<Vec<u8>, JevError> {
     if spec == "-" {
         return Ok(stdin.to_vec());
@@ -736,28 +660,16 @@ fn request_bytes(repo: &RepoRoot, spec: &str, stdin: &[u8]) -> Result<Vec<u8>, J
                 path: path.display().to_string(),
             }
         } else {
-            JevError::InputInvalid {
-                detail: format!(
-                    "request JSON {} could not be read ({error})",
-                    path.display()
-                ),
-            }
+            JevError::operational_io(&format!(
+                "request JSON {} could not be read ({error}). Check the file permissions and retry.",
+                path.display()
+            ))
         }
     })
 }
 
-fn resolve_backends(
-    flags: &[String],
-    json_backends: &[String],
-) -> Result<Vec<BackendId>, JevError> {
-    let source: &[String] = if !flags.is_empty() {
-        flags
-    } else if !json_backends.is_empty() {
-        json_backends
-    } else {
-        return Ok(vec![BackendId::Jev]);
-    };
-    source.iter().map(|text| parse_backend(text)).collect()
+fn parse_flag_backends(flags: &[String]) -> Result<Vec<BackendId>, JevError> {
+    flags.iter().map(|text| parse_backend(text)).collect()
 }
 
 fn parse_backend(text: &str) -> Result<BackendId, JevError> {
@@ -773,12 +685,6 @@ fn parse_session_id(text: &str) -> Result<SessionId, JevError> {
     Ok(SessionId::from_uuid(id))
 }
 
-fn needs_llm(backends: &[BackendId]) -> bool {
-    backends
-        .iter()
-        .any(|id| matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna))
-}
-
 fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
     if let Some(path) = flag {
         if !path.is_dir() {
@@ -788,24 +694,27 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
         }
         return Ok(RepoRoot::new(path));
     }
-    let cwd = std::env::current_dir().map_err(|error| JevError::ConfigInvalid {
-        detail: format!("current directory is unavailable ({error}). Pass --repo-root."),
+    let cwd = std::env::current_dir().map_err(|error| {
+        JevError::operational_config(&format!(
+            "current directory is unavailable ({error}). Pass --repo-root."
+        ))
     })?;
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .current_dir(&cwd)
         .output()
-        .map_err(|error| JevError::ConfigInvalid {
-            detail: format!("git rev-parse failed ({error}). Pass --repo-root."),
+        .map_err(|error| {
+            JevError::operational_config(&format!(
+                "git rev-parse failed ({error}). Pass --repo-root."
+            ))
         })?;
     if !output.status.success() {
-        return Err(JevError::ConfigInvalid {
-            detail: "Could not find a git toplevel. Pass --repo-root with the repository root."
-                .into(),
-        });
+        return Err(JevError::operational_config(
+            "Could not find a git toplevel. Pass --repo-root with the repository root.",
+        ));
     }
-    let text = String::from_utf8(output.stdout).map_err(|_| JevError::ConfigInvalid {
-        detail: "git rev-parse returned non-UTF-8. Pass --repo-root.".into(),
+    let text = String::from_utf8(output.stdout).map_err(|_| {
+        JevError::operational_config("git rev-parse returned non-UTF-8. Pass --repo-root.")
     })?;
     let path = PathBuf::from(text.trim());
     if !path.is_dir() {

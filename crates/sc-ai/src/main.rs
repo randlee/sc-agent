@@ -17,9 +17,9 @@ fn main() -> ExitCode {
     let stdin = if reads_stdin(&args) {
         let mut buf = Vec::new();
         if let Err(error) = io::stdin().read_to_end(&mut buf) {
-            emit(&JevError::InputInvalid {
-                detail: format!("stdin could not be read ({error})"),
-            });
+            emit(&JevError::operational_io(&format!(
+                "stdin could not be read ({error}). Retry or pass --request-json as a file path."
+            )));
             return ExitCode::from(2);
         }
         buf
@@ -29,9 +29,9 @@ fn main() -> ExitCode {
     match execute(&args, &stdin, ExecuteOverrides::default()) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
-                emit(&JevError::InputInvalid {
-                    detail: format!("stdout write failed ({error})"),
-                });
+                emit(&JevError::operational_io(&format!(
+                    "stdout write failed ({error}). Check that stdout is writable and retry."
+                )));
                 return ExitCode::from(2);
             }
             ExitCode::SUCCESS
@@ -47,9 +47,9 @@ fn emit(error: &JevError) {
     let body = ScAgentErrorResponse::from_jev_error(error);
     let line = serde_json::to_string(&body).unwrap_or_else(|_| {
         serde_json::to_string(&ScAgentErrorResponse::from_jev_error(
-            &JevError::InputInvalid {
-                detail: "stderr encoding failed".into(),
-            },
+            &JevError::operational_io(
+                "stderr encoding failed. Retry the command; the error text could not be written as JSON.",
+            ),
         ))
         .expect("ScAgentErrorResponse from JevError must serialize")
     });

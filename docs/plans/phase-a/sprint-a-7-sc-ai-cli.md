@@ -30,15 +30,23 @@ requirements:
   - NFR-SAG-0003
 adrs:
   - ADR-SAG-0001
+  - ADR-SAG-0002
+  - ADR-SAG-0003
+  - ADR-SAG-0004
+  - ADR-SAG-0005
+  - ADR-SAG-0007
+  - ADR-SAG-0008
   - ADR-SAG-0010
+  - ADR-SAG-0012
   - ADR-SAG-0013
   - ADR-SAG-0014
   - ADR-SAG-0015
   - ADR-SAG-0016
   - ADR-SAG-0019
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-ai/**"
-  - "boundaries/sc-ai-cli/**"
+  - "boundaries/sc-ai/**"
   - "justfile"
   - "README.md"
 ---

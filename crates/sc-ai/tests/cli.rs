@@ -9,7 +9,9 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use sc_agent_types::observability::v2::NoopSessionLog;
 use sc_agent_types::{BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
-use sc_ai::{ExecuteOverrides, OP_ASK, OP_DRY_RUN, OP_RUN, session_log_file};
+use sc_ai::{
+    ExecuteOverrides, OP_ASK, OP_DRY_RUN, OP_RUN, ObservabilitySessionLog, session_log_file,
+};
 use sc_jev_check::config::PACKAGED_SYSTEM_PROMPT;
 use sc_jev_check::registry::BackendRegistry;
 use serde_json::Value;
@@ -42,6 +44,7 @@ struct Capture {
     id: BackendId,
     requests: Arc<Mutex<Vec<JudgeRequest>>>,
     answers: Value,
+    provider_meta: Option<Value>,
 }
 
 impl JudgeBackend for Capture {
@@ -70,7 +73,7 @@ impl JudgeBackend for Capture {
             answers: self.answers.clone(),
             backend: self.id,
             probabilities: None,
-            provider_meta: None,
+            provider_meta: self.provider_meta.clone(),
         })
     }
 }
@@ -88,6 +91,7 @@ fn capture(id: BackendId, requests: &Arc<Mutex<Vec<JudgeRequest>>>, choice: &str
         id,
         requests: Arc::clone(requests),
         answers: serde_json::json!({"relevant": {"choice": choice}}),
+        provider_meta: None,
     }
 }
 
@@ -186,8 +190,10 @@ fn test_multi_backend_cli_equal_input() {
     let data = &value["data"];
     assert!(data["session_id"].as_str().is_some());
     assert_eq!(data["answers"]["relevant"]["choice"], "yes");
-    assert_eq!(data["backend"], "jev");
-    assert!(data["probabilities"].is_null());
+    assert_eq!(data["outcomes"][0]["backend"], "jev");
+    assert!(data.get("backend").is_none());
+    assert!(data.get("provider_meta").is_none());
+    assert!(data.get("probabilities").is_none());
     assert_eq!(data["outcomes"].as_array().expect("outcomes").len(), 2);
     assert_eq!(data["equal_input"]["equal"], true);
     assert_eq!(data["equal_input"]["leak"], false);
@@ -434,7 +440,8 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     assert_eq!(asked["version"], "1");
     assert_eq!(asked["operation"], OP_ASK);
     assert_eq!(asked["data"]["session_id"], session_id);
-    assert_eq!(asked["data"]["backend"], "anthropic_haiku");
+    assert!(asked["data"].get("backend").is_none());
+    assert!(asked["data"].get("provider_meta").is_none());
     assert_eq!(asked["data"]["answers"]["relevant"]["choice"], "yes");
     assert_eq!(
         asked["data"]["readback"]["sessions_dir"],
@@ -548,6 +555,93 @@ fn cli_invalid_request_json_is_input_invalid() {
     .expect_err("invalid");
     assert_eq!(error.code(), "INPUT_INVALID");
     assert!(!error.fix_hint().contains("invalid"));
+}
+
+#[test]
+fn cli_request_json_rejects_inline_system_prompt() {
+    let error = sc_ai::execute(
+        &[
+            "jev".into(),
+            "run".into(),
+            "--request-json".into(),
+            "-".into(),
+        ],
+        br#"{"questions":[{"id":"q","prompt":"p","choices":["a","b"]}],"system_prompt":"INLINE-PROMPT-TOKEN"}"#,
+        ExecuteOverrides::default(),
+    )
+    .expect_err("inline");
+    assert_eq!(error.code(), "INPUT_INVALID");
+    let hint = error.fix_hint();
+    assert!(hint.contains("--llm-system-prompt-file"));
+    assert!(hint.contains("packaged default"));
+    assert!(!hint.contains("INLINE-PROMPT-TOKEN"));
+}
+
+#[test]
+fn cli_preserves_jev_model_and_usage() {
+    let repo = TempDir::new("verbatim");
+    write_repo(repo.path());
+    let sessions = TempDir::new("verbatim-sessions");
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let usage = serde_json::json!({"input_tokens": 318, "output_tokens": 31});
+    let mut backend = capture(BackendId::Jev, &seen, "yes");
+    backend.provider_meta = Some(serde_json::json!({
+        "model": "jev-test",
+        "usage": usage,
+        "stop_reason": "end_turn"
+    }));
+    let value = execute(
+        &[
+            "jev",
+            "run",
+            "--repo-root",
+            repo.path().to_str().expect("utf8"),
+            "--sessions-dir",
+            sessions.path().to_str().expect("utf8"),
+            "--backend",
+            "jev",
+        ],
+        noop_overrides(registry(vec![backend])),
+    )
+    .expect("run");
+    let data = &value["data"];
+    assert_eq!(data["model"], "jev-test");
+    assert_eq!(data["usage"], usage);
+    assert!(data["session_id"].as_str().is_some());
+    assert_eq!(data["answers"]["relevant"]["choice"], "yes");
+    assert!(data.get("provider_meta").is_none());
+    assert!(data.get("stop_reason").is_none());
+    assert!(data.get("backend").is_none());
+}
+
+#[test]
+fn cli_log_and_git_errors_do_not_blame_check_toml() {
+    let root = TempDir::new("logblock");
+    let file = root.path().join("not-a-directory");
+    std::fs::write(&file, b"x").expect("file");
+    let error = match ObservabilitySessionLog::open(&file.join("nested")) {
+        Ok(_) => panic!("log directory should fail when a parent path is a file"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), "CONFIG_INVALID");
+    let hint = error.fix_hint();
+    assert!(!hint.contains("check.toml"), "{hint}");
+    assert!(hint.contains("--log-dir"), "{hint}");
+
+    let outside = TempDir::new("nogit");
+    let output = Command::new(binary())
+        .args(["jev", "dry-run"])
+        .current_dir(outside.path())
+        .env("GIT_DIR", outside.path().join("missing-git"))
+        .output()
+        .expect("git");
+    assert_eq!(output.status.code(), Some(2));
+    let err: Value = serde_json::from_slice(&output.stderr).expect("stderr json");
+    assert_eq!(err["error"], "CONFIG_INVALID");
+    let message = err["message"].as_str().expect("message");
+    assert!(message.contains("--repo-root"), "{message}");
+    assert!(!message.contains("check.toml"), "{message}");
+    assert!(!message.contains("schema"), "{message}");
 }
 
 #[test]

@@ -8,7 +8,8 @@ use crate::ids::{BackendKeyId, SessionId};
 ///
 /// [`JevError::fix_hint`] returns the text after this prefix. Other
 /// `CONFIG_INVALID` details keep the `check.toml` recovery text unless they
-/// use [`REGISTRY_DETAIL_PREFIX`] or [`SESSION_STORE_DETAIL_PREFIX`].
+/// use [`REGISTRY_DETAIL_PREFIX`], [`SESSION_STORE_DETAIL_PREFIX`], or
+/// [`OPERATIONAL_DETAIL_PREFIX`].
 const CREDENTIAL_STORE_DETAIL_PREFIX: &str = "credential-store: ";
 
 /// Marks a registry failure whose recovery text is the fix hint.
@@ -22,6 +23,13 @@ const REGISTRY_DETAIL_PREFIX: &str = "registry: ";
 /// [`JevError::fix_hint`] returns the text after this prefix. It names the
 /// session directory or file and does not mention `check.toml` or an input schema.
 const SESSION_STORE_DETAIL_PREFIX: &str = "session-store: ";
+
+/// Marks a process, git, or log failure whose recovery text is the fix hint.
+///
+/// [`JevError::fix_hint`] returns the text after this prefix. It names the
+/// failing operation and the next step. It does not mention `check.toml` or
+/// an input schema.
+const OPERATIONAL_DETAIL_PREFIX: &str = "operational: ";
 
 /// Stable error ids and fix text for Jev, check, extraction, and the CLI.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -220,6 +228,55 @@ impl JevError {
         }
     }
 
+    /// Builds `CONFIG_INVALID` for a process, git, or log failure.
+    ///
+    /// `recovery` names what failed and the next step, such as passing
+    /// `--repo-root` or choosing a writable `--log-dir`. [`Self::fix_hint`]
+    /// returns `recovery` and does not mention `check.toml`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::operational_config(
+    ///     "Could not find a git toplevel. Pass --repo-root with the repository root.",
+    /// );
+    /// assert_eq!(error.code(), "CONFIG_INVALID");
+    /// assert!(error.fix_hint().contains("--repo-root"));
+    /// assert!(!error.fix_hint().contains("check.toml"));
+    /// ```
+    #[must_use]
+    pub fn operational_config(recovery: &str) -> Self {
+        Self::ConfigInvalid {
+            detail: format!("{OPERATIONAL_DETAIL_PREFIX}{recovery}"),
+        }
+    }
+
+    /// Builds `INPUT_INVALID` for stdin or stdout I/O.
+    ///
+    /// `recovery` names the stream and the next step. [`Self::fix_hint`]
+    /// returns `recovery` and does not tell the caller to fix a check schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::operational_io(
+    ///     "stdin could not be read (broken pipe). Retry or pass --request-json as a file path.",
+    /// );
+    /// assert_eq!(error.code(), "INPUT_INVALID");
+    /// assert!(error.fix_hint().contains("stdin"));
+    /// assert!(!error.fix_hint().contains("schema"));
+    /// ```
+    #[must_use]
+    pub fn operational_io(recovery: &str) -> Self {
+        Self::InputInvalid {
+            detail: format!("{OPERATIONAL_DETAIL_PREFIX}{recovery}"),
+        }
+    }
+
     /// Builds `INPUT_INVALID` for a session file that cannot be parsed.
     ///
     /// `recovery` names the session file and the next step. [`Self::fix_hint`]
@@ -280,11 +337,12 @@ impl JevError {
     /// keep secrets out of `detail`.
     ///
     /// Credential-store failures built with [`Self::credential_store_invalid`],
-    /// registry failures built with [`Self::registry_invalid`], and session
-    /// store failures built with [`Self::session_store_io`] or
-    /// [`Self::session_document_invalid`] return that caller-facing recovery
-    /// text. Other `CONFIG_INVALID` values keep the `check.toml` hint. Other
-    /// `INPUT_INVALID` values keep the schema hint.
+    /// registry failures built with [`Self::registry_invalid`], session store
+    /// failures built with [`Self::session_store_io`] or
+    /// [`Self::session_document_invalid`], and process failures built with
+    /// [`Self::operational_config`] or [`Self::operational_io`] return that
+    /// caller-facing recovery text. Other `CONFIG_INVALID` values keep the
+    /// `check.toml` hint. Other `INPUT_INVALID` values keep the schema hint.
     #[must_use]
     pub fn fix_hint(&self) -> String {
         match self {
@@ -367,6 +425,7 @@ fn explicit_recovery(detail: &str) -> Option<&str> {
         .strip_prefix(CREDENTIAL_STORE_DETAIL_PREFIX)
         .or_else(|| detail.strip_prefix(REGISTRY_DETAIL_PREFIX))
         .or_else(|| detail.strip_prefix(SESSION_STORE_DETAIL_PREFIX))
+        .or_else(|| detail.strip_prefix(OPERATIONAL_DETAIL_PREFIX))
 }
 
 #[cfg(test)]
@@ -540,5 +599,26 @@ mod tests {
             .fix_hint()
             .contains(&session_text)
         );
+    }
+
+    #[test]
+    fn operational_hints_name_the_recovery_step() {
+        let config = JevError::operational_config(
+            "Create log directory /tmp/logs or pass a writable --log-dir (permission denied).",
+        );
+        let config_hint = config.fix_hint();
+        assert_eq!(config.code(), "CONFIG_INVALID");
+        assert!(config_hint.contains("--log-dir"));
+        assert!(!config_hint.contains("check.toml"));
+        assert!(!config_hint.contains("operational:"));
+
+        let io = JevError::operational_io(
+            "stdout write failed (broken pipe). Check that stdout is writable and retry.",
+        );
+        let io_hint = io.fix_hint();
+        assert_eq!(io.code(), "INPUT_INVALID");
+        assert!(io_hint.contains("stdout"));
+        assert!(!io_hint.contains("schema"));
+        assert!(!io_hint.contains("operational:"));
     }
 }

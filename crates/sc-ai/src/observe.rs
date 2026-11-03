@@ -70,13 +70,14 @@ impl ObservabilitySessionLog {
     ///
     /// Returns [`JevError::ConfigInvalid`] when `log_root` cannot be created
     /// or the v2 logger refuses the configuration. The fix hint names the
-    /// directory and does not include secret material.
+    /// directory or `SC_LOG_ROOT` and does not mention `check.toml` or secret
+    /// material.
     pub fn open(log_root: &Path) -> Result<Arc<Self>, JevError> {
-        std::fs::create_dir_all(log_root).map_err(|error| JevError::ConfigInvalid {
-            detail: format!(
+        std::fs::create_dir_all(log_root).map_err(|error| {
+            JevError::operational_config(&format!(
                 "Create log directory {} or pass a writable --log-dir ({error}).",
                 log_root.display()
-            ),
+            ))
         })?;
         let mut config = LoggerConfig::default_for(service_name(), log_root.to_path_buf());
         config.enable_file_sink = true;
@@ -93,16 +94,15 @@ impl ObservabilitySessionLog {
     /// # Errors
     ///
     /// Returns [`JevError::ConfigInvalid`] when the sink cannot flush. The
-    /// hint tells the caller to check the log root.
+    /// hint tells the caller to check the log root and does not mention
+    /// `check.toml`.
     pub fn flush(&self) -> Result<(), JevError> {
-        self.logger
-            .flush()
-            .map_err(|error| JevError::ConfigInvalid {
-                detail: format!(
-                    "session log flush failed ({}). Check that the log root is writable.",
-                    error.diagnostic().message
-                ),
-            })
+        self.logger.flush().map_err(|error| {
+            JevError::operational_config(&format!(
+                "session log flush failed ({}). Check that the log root is writable.",
+                error.diagnostic().message
+            ))
+        })
     }
 }
 
@@ -123,12 +123,10 @@ fn service_name() -> ServiceName {
 }
 
 fn init_error(error: &impl DiagnosticMessage) -> JevError {
-    JevError::ConfigInvalid {
-        detail: format!(
-            "session log could not be started ({}). Choose a writable --log-dir or set {LOG_ROOT_ENV}.",
-            error.diagnostic_message()
-        ),
-    }
+    JevError::operational_config(&format!(
+        "session log could not be started ({}). Choose a writable --log-dir or set {LOG_ROOT_ENV}.",
+        error.diagnostic_message()
+    ))
 }
 
 trait DiagnosticMessage {

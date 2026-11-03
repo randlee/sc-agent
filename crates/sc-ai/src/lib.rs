@@ -1,8 +1,8 @@
 //! `sc-ai` command-line adapter over [`sc_jev_check`].
 //!
-//! The binary parses argv and prints a versioned JSON envelope. Judge calls,
-//! sessions, and key resolution stay in `sc-jev-check`. This crate does not
-//! send HTTP.
+//! The binary parses argv and prints a versioned JSON envelope. Request
+//! validation, payload assembly, prompt resolution, judge calls, sessions, and
+//! key resolution stay in `sc-jev-check`. This crate does not send HTTP.
 //!
 //! # Session logs
 //!
