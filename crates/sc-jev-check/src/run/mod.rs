@@ -11,7 +11,7 @@
 
 mod prompt;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
 use sc_agent_types::{
@@ -324,6 +324,60 @@ pub fn run_request(
         system_prompt: request.system_prompt.clone(),
         outcomes,
         equal_input: Some(equal_input),
+    })
+}
+
+/// Caller questions document prepared for [`run_request`].
+///
+/// [`prepare_caller_request`] validates the document and builds the payload.
+/// `sc-ai` passes the result to [`run_request`] and does not assemble bytes
+/// itself (ADR-SAG-0005, ADR-SAG-0010).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedCallerRequest {
+    /// Canonical payload shared by every backend.
+    pub bundle: PayloadBundle,
+    /// Backends to judge. CLI flags win over ids in the document.
+    pub backends: Vec<BackendId>,
+    /// LLM system prompt from the CLI file or the packaged default.
+    ///
+    /// `None` when no LLM backend is selected. The text is not part of
+    /// [`PayloadBundle::sha256`].
+    pub system_prompt: Option<String>,
+}
+
+/// Validates request JSON, builds one payload, and resolves the system prompt.
+///
+/// `flag_backends` are the `--backend` values. A non-empty slice replaces
+/// backends named in the document. When both are empty the backend is
+/// [`BackendId::Jev`]. Prompt precedence for this path is `prompt_file`, then
+/// the packaged default. [`run_check`] applies `check.toml` on the check path.
+/// A `system_prompt` field in `bytes` is refused (ADR-SAG-0019).
+///
+/// # Errors
+///
+/// Returns [`JevError`] when the document, backend id, prompt file, or
+/// packaged asset is unusable. A Jev-only selection does not read
+/// `prompt_file`.
+pub fn prepare_caller_request(
+    bytes: &[u8],
+    flag_backends: &[BackendId],
+    repo: &RepoRoot,
+    prompt_file: Option<&Path>,
+) -> Result<PreparedCallerRequest, JevError> {
+    let parsed = crate::payload::parse_caller_request(bytes)?;
+    let backends = if !flag_backends.is_empty() {
+        flag_backends.to_vec()
+    } else if !parsed.backends.is_empty() {
+        parsed.backends
+    } else {
+        vec![BackendId::Jev]
+    };
+    let needs_llm = backends.iter().copied().any(is_llm);
+    let system_prompt = prompt::load_request_system_prompt(repo, prompt_file, needs_llm)?;
+    Ok(PreparedCallerRequest {
+        bundle: parsed.bundle,
+        backends,
+        system_prompt,
     })
 }
 
@@ -948,5 +1002,49 @@ mod tests {
         assert_eq!(producer.mode, "matches");
         let missing = build_request(&root, &Rev::worktree(), "missing.toml").expect_err("missing");
         assert_eq!(missing.code(), "INPUT_MISSING");
+    }
+
+    #[test]
+    fn prepare_caller_request_uses_file_override_not_inline_prompt() {
+        let repo = test_support::temp_dir("caller-prompt");
+        let root = RepoRoot::new(repo.path());
+        let override_path = repo.path().join("override.md");
+        std::fs::write(&override_path, "OVERRIDE-PROMPT-TOKEN-a7\n").expect("override");
+        let inline = br#"{"questions":[{"id":"q","prompt":"p","choices":["no","yes"]}],"system_prompt":"INLINE-PROMPT-TOKEN"}"#;
+        let rejected = prepare_caller_request(inline, &[], &root, None).expect_err("inline");
+        assert!(!rejected.fix_hint().contains("INLINE-PROMPT-TOKEN"));
+        assert!(rejected.fix_hint().contains("--llm-system-prompt-file"));
+
+        let bytes = br#"{"questions":[{"id":"q","prompt":"Judge this","choices":["no","yes"]}],"backends":["anthropic_haiku"]}"#;
+        let packaged = prepare_caller_request(bytes, &[], &root, None).expect("packaged");
+        assert_eq!(packaged.backends, vec![BackendId::AnthropicHaiku]);
+        assert_eq!(
+            packaged.system_prompt.as_deref(),
+            Some(PACKAGED_SYSTEM_PROMPT)
+        );
+        let jev_only = prepare_caller_request(
+            bytes,
+            &[BackendId::Jev],
+            &root,
+            Some(override_path.as_path()),
+        )
+        .expect("flags win");
+        assert_eq!(jev_only.backends, vec![BackendId::Jev]);
+        assert!(jev_only.system_prompt.is_none());
+        let llm = prepare_caller_request(
+            bytes,
+            &[BackendId::AnthropicHaiku],
+            &root,
+            Some(override_path.as_path()),
+        )
+        .expect("override");
+        assert_eq!(
+            llm.system_prompt.as_deref(),
+            Some("OVERRIDE-PROMPT-TOKEN-a7\n")
+        );
+        assert_eq!(packaged.bundle.sha256, llm.bundle.sha256);
+        let text = std::str::from_utf8(&llm.bundle.bytes).expect("utf8");
+        assert!(!text.contains("OVERRIDE-PROMPT-TOKEN-a7"));
+        assert!(text.contains("Judge this"));
     }
 }

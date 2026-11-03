@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["config", "extract", "payload", "run", "session", "equal_input", "registry"]
 
 [dependencies]
-allowed_dependents = ["sc-jev-py"]
+allowed_dependents = ["sc-ai", "sc-jev-py"]
 allowed_dependencies = ["sc-agent-types", "sc-agent-secrets", "sc-jev", "sc-jev-backends"]
 forbidden_edges = [{ from = "sc-jev-check", to = "sc-treesitter" }]
 
