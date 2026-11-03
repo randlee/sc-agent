@@ -1,7 +1,7 @@
 ---
 id: a-7
 phase: a
-status: planned
+status: in_progress
 closure_type: integration
 target_boundary: sc-ai-cli
 track: cli
@@ -82,14 +82,18 @@ via integration test on this sprint (see acceptance).
 ## Explicit code samples
 
 ```rust
-// crates/sc-ai/src/error.rs — map JevError → stderr JSON + exit 2
-fn emit_cli_error(err: &JevError) -> ! {
-    let body = ScAgentErrorResponse {
-        error: err.code().into(),
-        message: err.fix_hint().into(),
-    };
-    eprintln!("{}", serde_json::to_string(&body).unwrap());
-    std::process::exit(2);
+// crates/sc-ai/src/main.rs — `emit` maps JevError → stderr JSON; main exits 2
+fn emit(error: &JevError) {
+    let body = ScAgentErrorResponse::from_jev_error(error);
+    let line = serde_json::to_string(&body).unwrap_or_else(|_| {
+        serde_json::to_string(&ScAgentErrorResponse::from_jev_error(
+            &JevError::operational_io(
+                "stderr encoding failed. Retry the command; the error text could not be written as JSON.",
+            ),
+        ))
+        .expect("ScAgentErrorResponse from JevError must serialize")
+    });
+    let _ = writeln!(io::stderr(), "{line}");
 }
 ```
 
@@ -102,6 +106,7 @@ fn emit_cli_error(err: &JevError) -> ! {
 | req:REQ-SAG-0600 | Session create/load + TTL via CLI `ask` path |
 | req:REQ-SAG-0601 | CLI `run`/`dry-run` resolve keys and inject LLM system prompt per ADR-SAG-0019 |
 | req:REQ-SAG-0603 | Two backends in one CLI run share payload + equal-input |
+| req:REQ-SAG-0610 | One JSONL `LogEvent` per judge send through the v2 `SharedSessionLog` adapter |
 | req:REQ-SAG-0700 | `run`, `dry-run`, `ask` emit versioned envelope |
 | req:REQ-SAG-0701 | Failure exits 2; stderr JSON `{error, message}` only |
 | req:REQ-SAG-0702 | Readback tests for path-consuming flags |

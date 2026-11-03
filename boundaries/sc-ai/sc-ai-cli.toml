@@ -18,7 +18,7 @@ roots = ["execute"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-agent-types", "sc-jev-check"]
+allowed_dependencies = ["sc-agent-types", "sc-jev-check", "sc-observability"]
 forbidden_edges = []
 
 [references]
