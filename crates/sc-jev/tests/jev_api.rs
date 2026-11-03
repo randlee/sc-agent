@@ -411,6 +411,40 @@ mod jev_api {
     }
 
     #[test]
+    fn non_canonical_whitespace_sends_nothing() {
+        let mut bytes = payload(json!({"code": "x"}));
+        bytes.insert(1, b' ');
+        let harness = scripted(vec![ok("jev-test")]);
+        let error = harness
+            .client
+            .judge(&request(bytes, None))
+            .expect_err("whitespace");
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(error.to_string().contains("not canonical"));
+        assert!(harness.transport.sent().is_empty());
+    }
+
+    #[test]
+    fn non_canonical_key_order_sends_nothing() {
+        let questions = canonical_json_bytes(&questions()).expect("questions");
+        let state = canonical_json_bytes(&json!({"code": "x"})).expect("state");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(br#"{"state":"#);
+        bytes.extend_from_slice(&state);
+        bytes.extend_from_slice(br#","questions":"#);
+        bytes.extend_from_slice(&questions);
+        bytes.push(b'}');
+        let harness = scripted(vec![ok("jev-test")]);
+        let error = harness
+            .client
+            .judge(&request(bytes, None))
+            .expect_err("key order");
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(error.to_string().contains("not canonical"));
+        assert!(harness.transport.sent().is_empty());
+    }
+
+    #[test]
     fn invalid_question_sends_nothing() {
         let bytes = canonical_json_bytes(&json!({
             "questions": {
