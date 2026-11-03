@@ -4,28 +4,29 @@ owner_crate_path = "sc_jev_py"
 name = "jev-py"
 
 [public]
-facade = "sc_jev_py::stub_name"
+facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session"
+notes = "PyO3 over sc-jev-check. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2."
 
 [implementation]
 type = "marker"
 module = "sc_jev_py"
 visibility = "public"
-constructor = "none"
+constructor = "public"
 
 [composition]
-roots = ["stub_name"]
+roots = ["build_request", "run_check", "Session", "canonical_bytes"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = []
-forbidden_edges = []
+allowed_dependencies = ["sc-jev-check", "sc-agent-types", "sc-observability", "pyo3", "serde_json"]
+forbidden_edges = [{ from = "sc-jev-py", to = "sc-jev" }]
 
 [references]
 scope = "outside_owner_crate"
 forbidden = []
 
 [testing]
-allowed_test_double_paths = []
+allowed_test_double_paths = ["crates/sc-jev-py/src/scripted.rs"]
 forbidden_test_bypasses = []
 
 [enforcement]
@@ -33,4 +34,4 @@ lint_rules = []
 review_gates = []
 
 [status]
-state = "stub_landed"
+state = "concrete_landed"

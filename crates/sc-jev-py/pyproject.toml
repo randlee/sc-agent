@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "sc-jev-py"
+description = "PyO3 bindings over sc-jev-check."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dynamic = ["version"]
+
+[tool.maturin]
+features = ["extension-module"]
+module-name = "sc_jev_py"

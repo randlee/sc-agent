@@ -7,4 +7,21 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "PyO3 bindings (stub until sprint a-8)."
+description = "PyO3 bindings over sc-jev-check."
+
+[lib]
+name = "sc_jev_py"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# Maturin enables this so the wheel does not link libpython. `cargo test`
+# leaves it off and links the interpreter.
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.26", features = ["abi3-py311"] }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+sc-jev-check = { path = "../sc-jev-check", version = "0.1.0" }
+sc-observability = "=1.5.0"
+serde_json.workspace = true

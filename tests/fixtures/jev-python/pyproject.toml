@@ -1,0 +1,17 @@
+[project]
+name = "jev-python-harness"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8",
+    "sc-jev-py",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+sc-jev-py = { path = "../../../crates/sc-jev-py" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
