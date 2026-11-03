@@ -201,18 +201,30 @@ fn python_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     json.call_method1("dumps", (obj,))?.extract()
 }
 
+/// Maps a `serde_json` encode failure onto [`JevError::InputInvalid`].
+///
+/// Callers pass the result to [`error::to_py_err`]. `label` names the value
+/// that failed. The detail carries the serde message and no secret material.
+fn encode_failure(label: &str, error: &serde_json::Error) -> JevError {
+    JevError::InputInvalid {
+        detail: format!("{label}: {error}"),
+    }
+}
+
+fn encode_py_err(py: Python<'_>, label: &str, error: serde_json::Error) -> PyErr {
+    error::to_py_err(py, &encode_failure(label, &error))
+}
+
 fn to_py<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny>> {
     let json = py.import("json")?;
-    let text = serde_json::to_string(value).map_err(|error| {
-        pyo3::exceptions::PyValueError::new_err(format!("encode result JSON: {error}"))
-    })?;
+    let text = serde_json::to_string(value)
+        .map_err(|error| encode_py_err(py, "encode result JSON", error))?;
     json.call_method1("loads", (text,))
 }
 
 fn outcome_py(py: Python<'_>, outcome: &JudgeOutcome) -> PyResult<Py<PyAny>> {
-    let value = serde_json::to_value(outcome).map_err(|error| {
-        pyo3::exceptions::PyValueError::new_err(format!("encode outcome JSON: {error}"))
-    })?;
+    let value = serde_json::to_value(outcome)
+        .map_err(|error| encode_py_err(py, "encode outcome JSON", error))?;
     Ok(to_py(py, &value)?.unbind())
 }
 
@@ -262,24 +274,30 @@ impl CheckResult {
     }
 
     /// Judge outcomes in backend order. Empty on dry-run.
+    ///
+    /// # Errors
+    ///
+    /// Raises `JevError` with code `INPUT_INVALID` when the outcomes cannot
+    /// be encoded as JSON.
     #[getter]
     fn outcomes(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let value = serde_json::to_value(&self.inner.outcomes).map_err(|error| {
-            pyo3::exceptions::PyValueError::new_err(format!("encode outcomes JSON: {error}"))
-        })?;
+        let value = serde_json::to_value(&self.inner.outcomes)
+            .map_err(|error| encode_py_err(py, "encode outcomes JSON", error))?;
         Ok(to_py(py, &value)?.unbind())
     }
 
     /// Equal-input record. `None` on dry-run.
+    ///
+    /// # Errors
+    ///
+    /// Raises `JevError` with code `INPUT_INVALID` when the record cannot be
+    /// encoded as JSON.
     #[getter]
     fn equal_input(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         match &self.inner.equal_input {
             Some(record) => {
-                let value = serde_json::to_value(record).map_err(|error| {
-                    pyo3::exceptions::PyValueError::new_err(format!(
-                        "encode equal-input JSON: {error}"
-                    ))
-                })?;
+                let value = serde_json::to_value(record)
+                    .map_err(|error| encode_py_err(py, "encode equal-input JSON", error))?;
                 Ok(to_py(py, &value)?.unbind())
             }
             None => Ok(py.None()),
@@ -740,6 +758,37 @@ mod tests {
         assert!(!missing.fix_hint().to_ascii_lowercase().contains("api_key"));
         drop(finished);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn serde_encode_failure_is_jev_error() {
+        struct FailWriter;
+        impl std::io::Write for FailWriter {
+            fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("encode refused"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let failure = serde_json::to_writer(FailWriter, &serde_json::json!({"ok": true}))
+            .expect_err("writer");
+        let error = encode_failure("encode outcomes JSON", &failure);
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(error.fix_hint().contains("encode outcomes JSON"));
+        Python::initialize();
+        Python::attach(|py| {
+            let py_err = error::to_py_err(py, &error);
+            assert!(py_err.is_instance_of::<crate::error::JevError>(py));
+            assert!(!py_err.is_instance_of::<pyo3::exceptions::PyValueError>(py));
+            let code: String = py_err
+                .value(py)
+                .getattr("code")
+                .expect("code")
+                .extract()
+                .expect("code str");
+            assert_eq!(code, "INPUT_INVALID");
+        });
     }
 
     #[test]

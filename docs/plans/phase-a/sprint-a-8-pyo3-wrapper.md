@@ -24,6 +24,7 @@ requirements:
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
+  - ADR-SAG-0003
   - ADR-SAG-0005
   - ADR-SAG-0008
   - ADR-SAG-0009
@@ -34,6 +35,7 @@ adrs:
   - ADR-SAG-0016
   - ADR-SAG-0017
   - ADR-SAG-0019
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-jev-py/**"
   - "boundaries/sc-jev-py/**"
@@ -49,12 +51,13 @@ owned_paths:
 
 ## Deliverables
 
-1. **REQ-SAG-0800** — PyO3 module: `build_request`, `run_check`, session types; exceptions carry `JevError` codes.
+1. **REQ-SAG-0800** — PyO3 module: `build_request`, `run_check`, session types; exceptions carry `JevError` codes. Live runs leave `resolve_key` to `sc-jev-check` (ADR-SAG-0003, ADR-SAG-0020). This crate does not call `resolve_key`.
 2. **REQ-SAG-0801** — Cross-impl test harness under `tests/fixtures/jev-python`.
 3. **REQ-SAG-0802** — `pyproject.toml` + maturin config; `pip install` / `uv add` works from a locally built wheel. Proof is the `maturin build` and pytest commands in Required validation. There is no pull-request workflow that runs that job. Wheel CI (`maturin build` plus `tests/fixtures/jev-python` pytest) is deferred to sprint **a-9** (REQ-SAG-0803; `docs/plans/phase-a/sprint-a-9-sc-publish-install.md` required validation).
 4. **ADR-SAG-0011** — Python must not reimplement Jev HTTP or payload canonicalization.
 5. **ADR-SAG-0016** — **Required** `sc-observability = "1.5.0"` pin; adapter implements `SharedSessionLog` for in-process Python (same JSONL shape as CLI when log dir set).
 6. Integration test: one `run_check` with temp log dir appends **one** JSONL line per judge send; line contains **no** API key material.
+7. **NFR-SAG-0003** / **ADR-SAG-0013** — `resolve_log_root` and `resolve_session_dir` are the Python log and session path contract. The `sc_jev_py` module docs record the order: log root is `log_dir`, then `SC_AGENT_LOG_DIR`, then `SC_LOG_ROOT`, then `~/.sc-agent/log`; session dir is `session_dir`, then `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`. ADR-SAG-0013 governs those paths (v2 `LoggerBuilder` file sink, no bespoke JSONL writer). `docs/plans/phase-a/plan.md` open question 1 and `docs/architecture.md` are outside this sprint's owned paths, so this sprint leaves them as they are and closes the Python NFR-SAG-0003 row with that module documentation. No new ADR.
 
 ## Explicit code samples
 
@@ -82,7 +85,7 @@ requires-python = ">=3.11"
 | req:REQ-SAG-0610 | JSONL line per judge send when log dir set |
 | req:REQ-SAG-0611 | JSONL contains no API key material |
 | NFR-SAG-0002 | No secrets in Python-visible output or JSONL |
-| NFR-SAG-0003 | Log root / env documented for Python callers |
+| NFR-SAG-0003 | `resolve_log_root` and `resolve_session_dir` match the module contract under ADR-SAG-0013 |
 | boundary:jev-py | `cargo tree -p sc-jev-py --depth 1` lists `sc-jev-check`, not `sc-jev` |
 
 ## Required validation
