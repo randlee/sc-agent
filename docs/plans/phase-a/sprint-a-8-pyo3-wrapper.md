@@ -1,7 +1,7 @@
 ---
 id: a-8
 phase: a
-status: planned
+status: in_progress
 closure_type: integration
 target_boundary: jev-py
 track: python
@@ -23,12 +23,20 @@ requirements:
   - NFR-SAG-0003
 adrs:
   - ADR-SAG-0001
+  - ADR-SAG-0002
+  - ADR-SAG-0005
+  - ADR-SAG-0008
+  - ADR-SAG-0009
   - ADR-SAG-0011
+  - ADR-SAG-0012
   - ADR-SAG-0013
+  - ADR-SAG-0015
   - ADR-SAG-0016
+  - ADR-SAG-0017
+  - ADR-SAG-0019
 owned_paths:
   - "crates/sc-jev-py/**"
-  - "boundaries/jev-py/**"
+  - "boundaries/sc-jev-py/**"
   - "tests/fixtures/jev-python/**"
 ---
 
@@ -43,7 +51,7 @@ owned_paths:
 
 1. **REQ-SAG-0800** — PyO3 module: `build_request`, `run_check`, session types; exceptions carry `JevError` codes.
 2. **REQ-SAG-0801** — Cross-impl test harness under `tests/fixtures/jev-python`.
-3. **REQ-SAG-0802** — `pyproject.toml` + maturin config; `pip install` / `uv add` works from wheel (local `maturin build` in CI).
+3. **REQ-SAG-0802** — `pyproject.toml` + maturin config; `pip install` / `uv add` works from a locally built wheel. Proof is the `maturin build` and pytest commands in Required validation. There is no pull-request workflow that runs that job. Wheel CI (`maturin build` plus `tests/fixtures/jev-python` pytest) is deferred to sprint **a-9** (REQ-SAG-0803; `docs/plans/phase-a/sprint-a-9-sc-publish-install.md` required validation).
 4. **ADR-SAG-0011** — Python must not reimplement Jev HTTP or payload canonicalization.
 5. **ADR-SAG-0016** — **Required** `sc-observability = "1.5.0"` pin; adapter implements `SharedSessionLog` for in-process Python (same JSONL shape as CLI when log dir set).
 6. Integration test: one `run_check` with temp log dir appends **one** JSONL line per judge send; line contains **no** API key material.
@@ -102,3 +110,7 @@ See **plan.md** parity rows for sprint **a-8**.
 
 Migrating atm-bd / orchestration / plan-anchor call sites in other repos (use
 published wheel after release).
+
+Pull-request CI that builds the wheel and runs jev-python pytest. No
+pull-request workflow runs `maturin build` or `tests/fixtures/jev-python`
+pytest. Sprint **a-9** owns that CI proof (REQ-SAG-0803).

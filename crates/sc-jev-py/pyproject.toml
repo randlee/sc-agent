@@ -1,3 +1,5 @@
+# Wheel CI (maturin build + tests/fixtures/jev-python pytest) is sprint a-9
+# (REQ-SAG-0803). This sprint proves the wheel with local maturin build.
 [build-system]
 requires = ["maturin>=1.8,<2"]
 build-backend = "maturin"

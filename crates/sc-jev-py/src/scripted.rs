@@ -11,11 +11,11 @@ use sc_jev_check::registry::BackendRegistry;
 /// Returns `answers` for every accepted request.
 pub(crate) struct ScriptedJudge {
     id: BackendId,
-    answers: serde_json::Value,
+    answers: Arc<serde_json::Value>,
 }
 
 impl ScriptedJudge {
-    fn new(id: BackendId, answers: serde_json::Value) -> Self {
+    fn new(id: BackendId, answers: Arc<serde_json::Value>) -> Self {
         Self { id, answers }
     }
 }
@@ -46,7 +46,7 @@ impl JudgeBackend for ScriptedJudge {
     fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
         self.validate_for_send(request)?;
         Ok(JudgeOutcome {
-            answers: self.answers.clone(),
+            answers: self.answers.as_ref().clone(),
             backend: self.id,
             probabilities: None,
             provider_meta: None,
@@ -64,12 +64,35 @@ pub(crate) fn registry(
     answers: serde_json::Value,
 ) -> Result<BackendRegistry, JevError> {
     let mut registry = BackendRegistry::new();
-    for id in ids {
-        registry.register(Arc::new(ScriptedJudge::new(*id, answers.clone())))?;
+    for judge in shared_judges(ids, answers) {
+        registry.register(Arc::new(judge))?;
     }
     Ok(registry)
 }
 
+fn shared_judges(ids: &[BackendId], answers: serde_json::Value) -> Vec<ScriptedJudge> {
+    let shared = Arc::new(answers);
+    ids.iter()
+        .copied()
+        .map(|id| ScriptedJudge::new(id, Arc::clone(&shared)))
+        .collect()
+}
+
 fn is_llm(id: BackendId) -> bool {
     matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scripted_answers_share_one_allocation() {
+        let judges = shared_judges(
+            &[BackendId::Jev, BackendId::OpenAiLuna],
+            serde_json::json!({"relevant": "yes"}),
+        );
+        assert_eq!(judges.len(), 2);
+        assert!(Arc::ptr_eq(&judges[0].answers, &judges[1].answers));
+    }
 }

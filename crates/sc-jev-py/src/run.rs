@@ -187,12 +187,18 @@ fn optional_path(value: Option<&str>) -> Option<PathBuf> {
     value.filter(|text| !text.is_empty()).map(PathBuf::from)
 }
 
-fn py_to_value(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
-    let json = obj.py().import("json")?;
-    let text: String = json.call_method1("dumps", (obj,))?.extract()?;
-    serde_json::from_str(&text).map_err(|error| {
-        pyo3::exceptions::PyValueError::new_err(format!("scripted_answers is not JSON: {error}"))
+fn py_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, JevError> {
+    let text = python_json(obj).map_err(|error| JevError::InputInvalid {
+        detail: format!("scripted_answers is not JSON: {error}"),
+    })?;
+    serde_json::from_str(&text).map_err(|error| JevError::InputInvalid {
+        detail: format!("scripted_answers is not JSON: {error}"),
     })
+}
+
+fn python_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    let json = obj.py().import("json")?;
+    json.call_method1("dumps", (obj,))?.extract()
 }
 
 fn to_py<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny>> {
@@ -448,7 +454,7 @@ pub fn run_check(
     scripted_answers: Option<Bound<'_, PyAny>>,
 ) -> PyResult<CheckResult> {
     let scripted_answers = match scripted_answers {
-        Some(answers) => Some(py_to_value(&answers)?),
+        Some(answers) => Some(map_err(py, py_to_value(&answers))?),
         None => None,
     };
     let spec = CheckRun {
@@ -734,5 +740,21 @@ mod tests {
         assert!(!missing.fix_hint().to_ascii_lowercase().contains("api_key"));
         drop(finished);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scripted_answers_that_are_not_json_are_input_invalid() {
+        Python::initialize();
+        Python::attach(|py| {
+            let nan = py.eval(c"float('nan')", None, None).expect("nan");
+            let error = py_to_value(&nan).expect_err("nan is not JSON");
+            assert_eq!(error.code(), "INPUT_INVALID");
+            assert!(error.fix_hint().contains("scripted_answers"));
+
+            let opaque = py.eval(c"object()", None, None).expect("object");
+            let error = py_to_value(&opaque).expect_err("object is not JSON");
+            assert_eq!(error.code(), "INPUT_INVALID");
+            assert!(error.fix_hint().contains("scripted_answers"));
+        });
     }
 }

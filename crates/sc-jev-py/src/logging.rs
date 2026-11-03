@@ -1,7 +1,8 @@
 //! `sc-observability` v2 logger adapted to [`SharedSessionLog`].
 //!
+//! Construction uses [`sc_observability::v2::LoggerBuilder`] (ADR-SAG-0013).
 //! The JSONL file uses the crate's built-in file sink. This module does not
-//! write JSONL itself (ADR-SAG-0013).
+//! write JSONL itself.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::{
     EventError, LogEvent as SessionEvent, SessionLog, SharedSessionLog,
 };
-use sc_observability::v2::Logger;
+use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
     ActionName, Level, LogEvent, LoggerConfig, OBSERVATION_ENVELOPE_VERSION, ProcessIdentity,
     SchemaVersion, ServiceName, TargetCategory, Timestamp,
@@ -93,12 +94,14 @@ pub(crate) fn open_session_log(
     let mut config = LoggerConfig::default_for(service_name(), log_root.to_path_buf());
     config.enable_console_sink = false;
     config.enable_file_sink = true;
-    let logger = Logger::new(config).map_err(|error| {
-        JevError::session_store_io(&format!(
-            "Start the session logger at {} ({error}). Choose a writable log directory and retry.",
-            log_root.display()
-        ))
-    })?;
+    let logger = LoggerBuilder::new(config)
+        .and_then(LoggerBuilder::build)
+        .map_err(|error| {
+            JevError::session_store_io(&format!(
+                "Start the session logger at {} ({error}). Choose a writable log directory and retry.",
+                log_root.display()
+            ))
+        })?;
     let guard = LoggerGuard {
         logger: Arc::new(logger),
     };
@@ -242,18 +245,17 @@ mod tests {
 
     #[test]
     fn explicit_log_root_wins() {
-        let explicit = Path::new("/tmp/sc-jev-py-explicit");
-        assert_eq!(resolve_log_root(Some(explicit)), explicit);
+        let temp_dir = std::env::temp_dir();
+        let explicit = temp_dir.join("sc-jev-py-explicit");
+        let sessions = temp_dir.join("sessions");
+        assert_eq!(resolve_log_root(Some(&explicit)), explicit);
+        assert_eq!(resolve_session_dir(Some(&sessions), &explicit), sessions);
         assert_eq!(
-            resolve_session_dir(Some(Path::new("/tmp/sessions")), explicit),
-            Path::new("/tmp/sessions")
-        );
-        assert_eq!(
-            resolve_session_dir(None, explicit),
+            resolve_session_dir(None, &explicit),
             explicit.join("sessions")
         );
         assert_eq!(
-            log_file(explicit),
+            log_file(&explicit),
             explicit.join("logs").join("sc-jev-py.log.jsonl")
         );
     }
