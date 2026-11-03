@@ -1186,6 +1186,15 @@ dependencies = [
 [[package]]
 name = "sc-ai"
 version = "0.1.0"
+dependencies = [
+ "mimalloc",
+ "sc-agent-types",
+ "sc-jev-check",
+ "sc-observability",
+ "serde",
+ "serde_json",
+ "uuid",
+]
 
 [[package]]
 name = "sc-jev"
@@ -1242,6 +1251,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c59d16ee010b347f206134c9af1f0278cb541a6a5c8cc0bd9ca26323e35fd5b8"
 dependencies = [
  "syn 2.0.119",
+]
+
+[[package]]
+name = "sc-observability"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db7297a0157628a9185f25e4efb657ec9c4559469b61784ae8e7a39bf47607aa"
+dependencies = [
+ "sc-observability-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -16,3 +16,7 @@ test *layer:
 
 upgrade:
     {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml
+
+# Install the sc-ai binary from this workspace (REQ-SAG-0703).
+install-sc-ai:
+    cargo install --path crates/sc-ai --locked
