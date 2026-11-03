@@ -1,9 +1,10 @@
-//! `run_check` and `run_request` (REQ-SAG-0601, REQ-SAG-0603).
+//! `build_request`, `run_check`, and `run_request` (REQ-SAG-0601, REQ-SAG-0603).
 //!
-//! One invocation builds one canonical payload, resolves one LLM system
-//! prompt, and judges every requested backend with those bytes. Dry-run
-//! returns the digest and does not resolve keys or send. Judge sends emit one
-//! [`LogEvent`] through the injected [`SharedSessionLog`].
+//! [`build_request`] is the public payload assembly entry (ADR-SAG-0005).
+//! [`run_check`] uses that same assembly, resolves one LLM system prompt, and
+//! judges every requested backend with those bytes. Dry-run returns the digest
+//! and does not resolve keys or send. Judge sends emit one [`LogEvent`]
+//! through the injected [`SharedSessionLog`].
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -120,6 +121,62 @@ pub struct CheckResult {
     pub equal_input: Option<EqualInputRecord>,
 }
 
+/// Canonical payload for one check file, with no judge send.
+///
+/// [`build_request`] and [`run_check`] both produce this assembly.
+/// [`BuiltRequest::bundle`]'s digest is `prompt_sha256`. The system prompt is
+/// not included (ADR-SAG-0019).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuiltRequest {
+    /// Canonical bytes shared by every backend.
+    pub bundle: PayloadBundle,
+    /// Subjects producer from the first `subjects` or `command` extraction.
+    pub producer: Option<SubjectsProducer>,
+}
+
+/// Loads repo-relative `check_path` and assembles one canonical payload.
+///
+/// This is the public assembly entry (ADR-SAG-0005). Extractors and
+/// canonicalization run in this crate. Composition roots call this function
+/// and do not call [`PayloadBuilder`].
+///
+/// # Errors
+///
+/// Returns [`JevError`] when `check_path` is missing or invalid, an extractor
+/// fails, or the payload exceeds the packaged byte cap.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sc_agent_types::{RepoRoot, Rev};
+/// use sc_jev_check::run::build_request;
+///
+/// let repo = RepoRoot::new(".");
+/// let built = build_request(&repo, &Rev::worktree(), "check.toml")?;
+/// let _digest = built.bundle.sha256;
+/// # Ok::<(), sc_agent_types::JevError>(())
+/// ```
+pub fn build_request(
+    repo: &RepoRoot,
+    rev: &Rev,
+    check_path: &str,
+) -> Result<BuiltRequest, JevError> {
+    let spec = crate::config::load_check_at(repo, rev, check_path)?;
+    assemble_payload(&spec, repo, rev)
+}
+
+fn assemble_payload(
+    spec: &CheckSpec,
+    repo: &RepoRoot,
+    rev: &Rev,
+) -> Result<BuiltRequest, JevError> {
+    let built = PayloadBuilder::packaged()?.build(spec, repo, rev)?;
+    Ok(BuiltRequest {
+        bundle: built.bundle,
+        producer: producer_from_extractions(&built.extractions),
+    })
+}
+
 /// A payload that is already built.
 ///
 /// [`run_check`] fills this from `check.toml`. Callers that already have
@@ -155,7 +212,7 @@ pub fn run_check(
     opts: RunOptions,
 ) -> Result<CheckResult, JevError> {
     require_backends(backends)?;
-    let built = PayloadBuilder::packaged()?.build(spec, &opts.repo_root, &opts.rev)?;
+    let built = assemble_payload(spec, &opts.repo_root, &opts.rev)?;
     let needs_llm = backends.iter().copied().any(is_llm);
     let system_prompt = prompt::load_system_prompt(
         spec,
@@ -168,7 +225,7 @@ pub fn run_check(
         &RunRequest {
             bundle: built.bundle,
             system_prompt,
-            producer: producer_from_extractions(&built.extractions),
+            producer: built.producer,
         },
         backends,
         opts,
@@ -861,5 +918,35 @@ mod tests {
             .expect("producer");
         assert_eq!(producer.name, "sc-treesitter");
         assert_eq!(producer.language, "python");
+    }
+
+    #[test]
+    fn build_request_assembles_canonical_payload_and_producer() {
+        let repo = test_support::temp_dir("build-request");
+        std::fs::write(repo.path().join("questions.json"), QUESTIONS).expect("questions");
+        let subjects = std::fs::read_to_string(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/jev/subjects-schema/v1/minimal.json"),
+        )
+        .expect("fixture");
+        std::fs::write(repo.path().join("subjects.json"), subjects).expect("subjects");
+        std::fs::write(
+            repo.path().join("check.toml"),
+            "[questions]\npath = \"questions.json\"\n\n[inputs.branches]\nkind = \"subjects\"\npath = \"subjects.json\"\n",
+        )
+        .expect("check");
+        let root = RepoRoot::new(repo.path());
+        let built = build_request(&root, &Rev::worktree(), "check.toml").expect("build");
+        let again = build_request(&root, &Rev::worktree(), "check.toml").expect("rebuild");
+        assert_eq!(built.bundle.sha256, again.bundle.sha256);
+        assert_eq!(
+            built.bundle.sha256,
+            sc_agent_types::Sha256Digest::of(&built.bundle.bytes)
+        );
+        let producer = built.producer.expect("producer");
+        assert_eq!(producer.name, "sc-treesitter");
+        assert_eq!(producer.mode, "matches");
+        let missing = build_request(&root, &Rev::worktree(), "missing.toml").expect_err("missing");
+        assert_eq!(missing.code(), "INPUT_MISSING");
     }
 }

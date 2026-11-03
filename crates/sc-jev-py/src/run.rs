@@ -10,9 +10,9 @@ use sc_agent_types::{
     SubjectsProducer, canonical_json_bytes,
 };
 use sc_jev_check::config::load_check_at;
-use sc_jev_check::equal_input::producer_from_extractions;
-use sc_jev_check::payload::PayloadBuilder;
-use sc_jev_check::run::{RunOptions, run_check as run_check_facade};
+use sc_jev_check::run::{
+    RunOptions, build_request as build_request_facade, run_check as run_check_facade,
+};
 use sc_jev_check::session::{FileSessionStore, SessionStore};
 use serde_json::Value;
 
@@ -45,7 +45,7 @@ struct FinishedRun {
     logger: LoggerGuard,
 }
 
-struct BuiltRequest {
+struct PreparedRequest {
     payload: String,
     prompt_sha256: Sha256Digest,
     producer: Option<SubjectsProducer>,
@@ -102,16 +102,14 @@ fn build(
     check_path: &str,
     repo_root: Option<&Path>,
     rev_text: &str,
-) -> Result<BuiltRequest, JevError> {
+) -> Result<PreparedRequest, JevError> {
     let repo = resolve_repo(repo_root)?;
     let rev = parse_rev(rev_text);
-    let spec = load_check_at(&repo, &rev, check_path)?;
-    let built = PayloadBuilder::packaged()?.build(&spec, &repo, &rev)?;
-    let producer = producer_from_extractions(&built.extractions);
-    Ok(BuiltRequest {
+    let built = build_request_facade(&repo, &rev, check_path)?;
+    Ok(PreparedRequest {
         payload: utf8_payload(built.bundle.bytes)?,
         prompt_sha256: built.bundle.sha256,
-        producer,
+        producer: built.producer,
     })
 }
 
@@ -392,9 +390,11 @@ impl Session {
 
 /// Builds the canonical payload for repo-relative `check_path` without sending.
 ///
-/// `repo_root` defaults to the process current directory. `rev` defaults to
-/// `WORKTREE`. The result mapping contains `payload`, `prompt_sha256`, and
-/// `producer`.
+/// Assembly is [`sc_jev_check::run::build_request`] (ADR-SAG-0005). This
+/// function maps that result into Python. It does not run extractors or call
+/// `PayloadBuilder`. `repo_root` defaults to the process current directory.
+/// `rev` defaults to `WORKTREE`. The result mapping contains `payload`,
+/// `prompt_sha256`, and `producer`.
 ///
 /// # Errors
 ///
@@ -432,8 +432,8 @@ pub fn build_request(
 /// does not resolve keys or send. `scripted_answers` installs an in-process
 /// judge and does not open a socket; omit it to use the HTTP backends.
 ///
-/// Log and session paths follow the crate log-root rules. See the module
-/// documentation for `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, and the JSONL path.
+/// Log and session paths follow ADR-SAG-0021. See the module documentation
+/// for `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, and the JSONL path.
 ///
 /// # Errors
 ///
@@ -525,9 +525,12 @@ pub fn default_log_root() -> String {
     logging::default_log_root().display().to_string()
 }
 
-/// Resolves the log root from `log_dir`, then the environment, then the default.
+/// Resolves the log root (ADR-SAG-0021).
 ///
-/// See the module documentation for `SC_AGENT_LOG_DIR` and `SC_LOG_ROOT`.
+/// First match wins: `log_dir`, then `SC_AGENT_LOG_DIR`, then `SC_LOG_ROOT`,
+/// then `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset).
+/// When both home variables are unset, the path is the process temp directory
+/// plus `sc-agent/log`. An empty argument or environment value is absent.
 #[pyfunction]
 #[pyo3(signature = (log_dir=None))]
 #[must_use]
@@ -537,9 +540,11 @@ pub fn resolve_log_root(log_dir: Option<&str>) -> String {
         .to_string()
 }
 
-/// Resolves the session directory for `log_dir`.
+/// Resolves the session directory (ADR-SAG-0021).
 ///
-/// `session_dir` wins, then `SC_AGENT_SESSION_DIR`, then `{log_dir}/sessions`.
+/// `log_dir` is the log root from [`resolve_log_root`]. First match wins:
+/// `session_dir`, then `SC_AGENT_SESSION_DIR`, then `{log_dir}/sessions`.
+/// An empty `session_dir` or environment value is absent.
 #[pyfunction]
 #[pyo3(signature = (log_dir, *, session_dir=None))]
 #[must_use]

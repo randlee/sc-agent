@@ -15,7 +15,7 @@ to `JudgeBackend` impls in `sc-jev` and `sc-jev-backends`.
 | `config` | `check.toml`, packaged `jev.toml`, `[llm_judge]` paths |
 | `extract` | `file`, `table-column`, `subjects`, `command` — see [`extraction.md`](extraction.md); **no** tree-sitter deps |
 | `payload` | One canonical `PayloadBundle` per check |
-| `run` | `run_check`, `run_request`, dry-run |
+| `run` | `build_request`, `run_check`, `run_request`, dry-run |
 | `session` | Store, TTL, `ask` |
 | `equal_input` | README equal-input record |
 | `registry` | `Vec<Arc<dyn JudgeBackend>>` — select backends by id (ADR-SAG-0009) |
@@ -30,6 +30,8 @@ run_check → build PayloadBundle once
 ```
 
 `sc-ai` and `sc-jev-py` depend on **`sc-jev-check`**, not on `sc-jev` directly.
+`build_request` is the public payload assembly entry (ADR-SAG-0005). Callers
+do not call `PayloadBuilder`.
 
 ## Non-responsibilities
 

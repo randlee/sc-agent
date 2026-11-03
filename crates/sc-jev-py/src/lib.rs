@@ -8,19 +8,23 @@
 //!
 //! # Session log
 //!
-//! Log root resolution, first match wins:
+//! Log and session paths follow ADR-SAG-0021. Log root resolution, first
+//! match wins:
 //!
 //! 1. The `log_dir` argument.
 //! 2. `SC_AGENT_LOG_DIR`.
 //! 3. `SC_LOG_ROOT` (the `sc-observability` convention).
-//! 4. `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset).
+//! 4. `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset;
+//!    the process temp directory plus `sc-agent/log` when both are unset).
 //!
 //! The active file is `{log_root}/logs/sc-jev-py.log.jsonl`. One JSONL line is
 //! written per judge send and per session `ask`. The line carries
 //! `session_id`, `backend`, `prompt_sha256`, and `operation`. It does not
-//! carry API keys. Session files default to `{log_root}/sessions`, or
-//! `SC_AGENT_SESSION_DIR` when that variable is set. `session_dir` overrides
-//! both.
+//! carry API keys. Session directory resolution, first match wins:
+//!
+//! 1. The `session_dir` argument.
+//! 2. `SC_AGENT_SESSION_DIR`.
+//! 3. `{log_root}/sessions`.
 //!
 //! # Examples
 //!
@@ -49,18 +53,21 @@ pub use run::{
 
 /// Registers the Python entry points.
 ///
-/// Log root resolution, first match wins: the `log_dir` argument,
-/// `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, then `~/.sc-agent/log`
-/// (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset). The JSONL file is
-/// `{log_root}/logs/sc-jev-py.log.jsonl`. One line is appended per judge send
-/// and per session `ask`. Lines contain `session_id`, `backend`,
+/// Log and session paths follow ADR-SAG-0021. Log root resolution, first
+/// match wins: the `log_dir` argument, `SC_AGENT_LOG_DIR`, `SC_LOG_ROOT`, then
+/// `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset; the
+/// process temp directory plus `sc-agent/log` when both are unset). The JSONL
+/// file is `{log_root}/logs/sc-jev-py.log.jsonl`. One line is appended per
+/// judge send and per session `ask`. Lines contain `session_id`, `backend`,
 /// `prompt_sha256`, and `operation`, and do not contain API keys.
 ///
-/// Session files default to `{log_root}/sessions`. `SC_AGENT_SESSION_DIR`
-/// overrides that default. The `session_dir` argument overrides both.
+/// Session directory resolution, first match wins: the `session_dir`
+/// argument, `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`.
 ///
-/// `build_request` and `run_check` call `sc-jev-check`. They do not
-/// reimplement payload canonicalization or Jev HTTP. Pass `scripted_answers`
+/// `build_request` calls `sc_jev_check::run::build_request`. `run_check` calls
+/// `sc_jev_check::run::run_check`. This module does not run extractors or
+/// reimplement payload canonicalization or Jev HTTP (ADR-SAG-0005). Pass
+/// `scripted_answers`
 /// only for an in-process judge that never opens a socket. Omit it to resolve
 /// keys and use the HTTP backends inside `sc-jev-check`.
 #[pymodule]

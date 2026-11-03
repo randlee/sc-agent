@@ -1,8 +1,8 @@
 //! `sc-observability` v2 logger adapted to [`SharedSessionLog`].
 //!
 //! Construction uses [`sc_observability::v2::LoggerBuilder`] (ADR-SAG-0013).
-//! The JSONL file uses the crate's built-in file sink. This module does not
-//! write JSONL itself.
+//! Path precedence is ADR-SAG-0021. The JSONL file uses the crate's built-in
+//! file sink. This module does not write JSONL itself.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -112,6 +112,10 @@ pub(crate) fn open_session_log(
 }
 
 /// Default log root when no argument or environment variable is set.
+///
+/// `~/.sc-agent/log`, or `%USERPROFILE%\.sc-agent\log` when `HOME` is unset.
+/// When both are unset, the path is the process temp directory plus
+/// `sc-agent/log` (ADR-SAG-0021).
 #[must_use]
 pub(crate) fn default_log_root() -> PathBuf {
     let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
@@ -121,10 +125,10 @@ pub(crate) fn default_log_root() -> PathBuf {
     }
 }
 
-/// Resolves the log root.
+/// Resolves the log root (ADR-SAG-0021).
 ///
 /// `explicit` wins, then [`LOG_DIR_ENV`], then [`OBS_LOG_ROOT_ENV`], then
-/// [`default_log_root`].
+/// [`default_log_root`]. An empty path or environment value is absent.
 #[must_use]
 pub(crate) fn resolve_log_root(explicit: Option<&Path>) -> PathBuf {
     if let Some(path) = non_empty(explicit) {
@@ -139,9 +143,10 @@ pub(crate) fn resolve_log_root(explicit: Option<&Path>) -> PathBuf {
     default_log_root()
 }
 
-/// Resolves the session directory.
+/// Resolves the session directory (ADR-SAG-0021).
 ///
 /// `explicit` wins, then [`SESSION_DIR_ENV`], then `{log_root}/sessions`.
+/// An empty path or environment value is absent.
 #[must_use]
 pub(crate) fn resolve_session_dir(explicit: Option<&Path>, log_root: &Path) -> PathBuf {
     if let Some(path) = non_empty(explicit) {
