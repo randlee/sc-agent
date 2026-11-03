@@ -4,7 +4,9 @@
 //! replaced before spawn. The working directory is the repo root.
 
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::mem::ManuallyDrop;
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -25,6 +27,13 @@ const MAX_COMMAND_STDOUT_BYTES: usize = 8 * 1024 * 1024;
 ///
 /// 20 ms keeps timeout tests short without a busy spin.
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+/// Bound on killing a child and collecting its pipe readers.
+///
+/// Starts when the command's own timeout fires, or when the process has
+/// already exited. Past this deadline the caller returns. `Child`'s
+/// destructor and `JoinHandle::join` are not used: both wait without a limit.
+const CLEANUP_BUDGET: Duration = Duration::from_secs(2);
 
 /// Runs an argv array and parses stdout as `sc/subjects/1`.
 #[derive(Debug, Clone, Copy)]
@@ -130,20 +139,26 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         .map_err(|error| JevError::ExtractionFailed {
             detail: format!("failed to spawn {}: {error}", argv[0]),
         })?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| JevError::ExtractionFailed {
-            detail: "command stdout was not captured".into(),
-        })?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| JevError::ExtractionFailed {
-            detail: "command stderr was not captured".into(),
-        })?;
-    let stdout_thread = thread::spawn(move || read_capped(stdout, MAX_COMMAND_STDOUT_BYTES));
-    let stderr_thread = thread::spawn(move || {
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            kill_and_reap(child, Instant::now() + CLEANUP_BUDGET);
+            return Err(JevError::ExtractionFailed {
+                detail: "command stdout was not captured".into(),
+            });
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            kill_and_reap(child, Instant::now() + CLEANUP_BUDGET);
+            return Err(JevError::ExtractionFailed {
+                detail: "command stderr was not captured".into(),
+            });
+        }
+    };
+    let stdout_reader = PipeReader::spawn(move || read_capped(stdout, MAX_COMMAND_STDOUT_BYTES));
+    let stderr_reader = PipeReader::spawn(move || {
         let mut sink = Vec::new();
         let mut pipe = stderr;
         let _ = read_capped_discard(&mut pipe, &mut sink);
@@ -154,16 +169,20 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() >= timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = stdout_thread.join();
-                let _ = stderr_thread.join();
+                let deadline = Instant::now() + CLEANUP_BUDGET;
+                kill_and_reap(child, deadline);
+                let _ = stdout_reader.finish_by(deadline);
+                let _ = stderr_reader.finish_by(deadline);
                 return Err(JevError::ExtractionTimeout {
                     timeout_seconds: timeout.as_secs(),
                 });
             }
             Ok(None) => thread::sleep(POLL_INTERVAL),
             Err(error) => {
+                let deadline = Instant::now() + CLEANUP_BUDGET;
+                kill_and_reap(child, deadline);
+                let _ = stdout_reader.finish_by(deadline);
+                let _ = stderr_reader.finish_by(deadline);
                 return Err(JevError::ExtractionFailed {
                     detail: format!("failed to wait for command: {error}"),
                 });
@@ -171,12 +190,23 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         }
     };
 
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| JevError::ExtractionFailed {
-            detail: "command stdout reader stopped".into(),
-        })?;
-    let _ = stderr_thread.join();
+    let deadline = Instant::now() + CLEANUP_BUDGET;
+    let stdout = match stdout_reader.finish_by(deadline) {
+        Ok(stdout) => stdout,
+        Err(ReaderStop::Stopped) => {
+            let _ = stderr_reader.finish_by(deadline);
+            return Err(JevError::ExtractionFailed {
+                detail: "command stdout reader stopped".into(),
+            });
+        }
+        Err(ReaderStop::TimedOut) => {
+            let _ = stderr_reader.finish_by(deadline);
+            return Err(JevError::ExtractionFailed {
+                detail: "command stdout reader did not finish before the cleanup deadline".into(),
+            });
+        }
+    };
+    let _ = stderr_reader.finish_by(deadline);
     if !status.success() {
         let code = status.code().unwrap_or(-1);
         return Err(JevError::ExtractionFailed {
@@ -197,6 +227,74 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
 enum CapError {
     TooLarge,
     Io(std::io::Error),
+}
+
+enum ReaderStop {
+    TimedOut,
+    Stopped,
+}
+
+/// Pipe drain that reports completion on a channel.
+///
+/// `finish_by` waits with `recv_timeout` and then detaches the worker. It
+/// never calls `JoinHandle::join`, which has no deadline. A reader still
+/// blocked when the deadline passes cannot keep the caller running; closing
+/// the child (see [`kill_and_reap`]) is what unblocks `read`.
+struct PipeReader<T> {
+    rx: mpsc::Receiver<T>,
+    handle: thread::JoinHandle<()>,
+}
+
+impl<T> PipeReader<T> {
+    fn spawn(work: impl FnOnce() -> T + Send + 'static) -> Self
+    where
+        T: Send + 'static,
+    {
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let _ = tx.send(work());
+        });
+        Self { rx, handle }
+    }
+
+    fn finish_by(self, deadline: Instant) -> Result<T, ReaderStop> {
+        let wait = deadline.saturating_duration_since(Instant::now());
+        let received = self.rx.recv_timeout(wait);
+        drop(self.handle);
+        match received {
+            Ok(value) => Ok(value),
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(ReaderStop::TimedOut),
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(ReaderStop::Stopped),
+        }
+    }
+}
+
+/// Kills `child` and reaps it until `deadline`.
+///
+/// `Child`'s destructor calls `wait` with no deadline. When the process is
+/// still alive at `deadline`, or `try_wait` fails, the handle is left
+/// undropped so this function can return. `Child::kill` is `SIGKILL` on Unix
+/// and process termination on Windows.
+fn kill_and_reap(child: Child, deadline: Instant) {
+    let mut child = ManuallyDrop::new(child);
+    let _ = child.kill();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                drop(ManuallyDrop::into_inner(child));
+                return;
+            }
+            Ok(None) if Instant::now() >= deadline => return,
+            Ok(None) => {
+                let slice = POLL_INTERVAL.min(deadline.saturating_duration_since(Instant::now()));
+                if slice.is_zero() {
+                    return;
+                }
+                thread::sleep(slice);
+            }
+            Err(_) => return,
+        }
+    }
 }
 
 fn read_capped(mut pipe: impl Read, cap: usize) -> Result<Vec<u8>, CapError> {

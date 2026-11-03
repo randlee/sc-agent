@@ -8,7 +8,10 @@
 
 use std::collections::BTreeMap;
 
+mod caller;
 mod questions;
+
+pub(crate) use caller::parse_caller_request;
 
 use sc_agent_types::{
     CanonicalJudgePayload, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot, Rev,
@@ -160,7 +163,7 @@ fn substitute_inputs(
     questions
 }
 
-fn encode_payload(
+pub(crate) fn encode_payload(
     questions: &[Question],
     state: &[ChoiceAnswer],
 ) -> Result<PayloadBundle, JevError> {

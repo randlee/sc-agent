@@ -84,6 +84,10 @@ pub struct StoredSession {
 /// Clone shares the registry, clock handle, log, and file lock. `with_ttl` and
 /// `with_clock` replace those settings on the returned value only. Call them
 /// before cloning the store into [`crate::run::RunOptions`].
+///
+/// The shared file lock serializes session-file read-modify-write. A run and a
+/// later `ask` can hold clones of one store, and the lock keeps those calls
+/// from interleaving writes to the same UUID file.
 #[derive(Clone)]
 pub struct FileSessionStore {
     dir: PathBuf,
@@ -91,6 +95,10 @@ pub struct FileSessionStore {
     clock: Arc<dyn Fn() -> SystemTime + Send + Sync>,
     registry: Arc<RwLock<BackendRegistry>>,
     session_log: SharedSessionLog,
+    /// Shared by every clone. Session create, record, and `ask` take this lock
+    /// for the whole read-modify-write so concurrent callers cannot corrupt a
+    /// session file. `RwLock` is the wrong shape: the critical section updates
+    /// the file, not an in-memory map.
     io: Arc<Mutex<()>>,
 }
 
