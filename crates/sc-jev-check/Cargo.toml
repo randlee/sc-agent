@@ -7,4 +7,10 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Jev check facade (module tree only until sprints a-3 and a-6)."
+description = "Jev check facade: check.toml, extractors, and canonical payloads."
+
+[dependencies]
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+serde.workspace = true
+serde_json.workspace = true
+toml = "0.8"

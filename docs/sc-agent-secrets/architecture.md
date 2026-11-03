@@ -31,8 +31,10 @@ traits. The `test-util` feature exposes `MapEnv` and `MapKeyring`
 The keyring service is the environment variable name. Anthropic lookups honor
 `ANTHROPIC_KEYCHAIN_SERVICE`.
 
-`ResolvedApiKey`'s `Debug` and `Display` redact the secret. `as_str` is the
-only read. This crate emits no log lines (NFR-SAG-0002, ADR-SAG-0013).
+`ResolvedApiKey` lives in `sc-agent-types` so a sending transport can accept
+it without depending on this crate. `Debug` and `Display` redact the secret.
+`as_str` is the only read, and only that transport may call it. This crate
+emits no log lines (NFR-SAG-0002, ADR-SAG-0013).
 Unreadable `.env` or keyring failures are `CONFIG_INVALID` with a sanitized
 cause and a recovery hint, never secret bytes. A miss is `KEY_MISSING`
 (ADR-SAG-0001).

@@ -1,7 +1,7 @@
 ---
 id: a-11
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: treesitter
 track: build
@@ -15,12 +15,14 @@ parallel_safe: [a-2, a-3, a-4, a-5]
 requirements:
   - REQ-SAG-0310
   - REQ-SAG-0101
+  - REQ-SAG-0104
+  - NFR-SAG-0001
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0015
 owned_paths:
   - "crates/sc-treesitter/**"
-  - "boundaries/treesitter/**"
+  - "boundaries/sc-treesitter/**"
   - "docs/sc-treesitter/**"
   - "tests/fixtures/cross-impl/branches/**"
 ---

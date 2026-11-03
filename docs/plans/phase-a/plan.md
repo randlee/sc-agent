@@ -1,3 +1,19 @@
+---
+adrs:
+  - ADR-SAG-0001
+  - ADR-SAG-0002
+  - ADR-SAG-0003
+  - ADR-SAG-0004
+  - ADR-SAG-0005
+  - ADR-SAG-0006
+  - ADR-SAG-0007
+  - ADR-SAG-0012
+  - ADR-SAG-0013
+  - ADR-SAG-0015
+  - ADR-SAG-0019
+  - ADR-SAG-0020
+---
+
 # Phase A — sc-jev and sc-ai CLI foundation
 
 Status: **approved** — implementation in progress (plan PR #4 merged 2026-11-02).
@@ -118,6 +134,14 @@ Sprint **a-1** commits stub manifests for every Phase A boundary and lists
 `.sc-lint/bootstrap.py`, the `sc-jev-check` module files, and the `sc-ai`
 library stub. Each later boundary sprint also lists `boundaries/<id>/**` for
 the boundary it closes and may replace the a-1 stub for that id.
+
+## Governing ADRs
+
+The `adrs` list in this document's frontmatter governs wave 2 (sprints a-2,
+a-3, a-11, a-4, and a-5). Each sprint doc repeats the subset that applies to
+its owned paths. Those ids are ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0003,
+ADR-SAG-0004, ADR-SAG-0005, ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0012,
+ADR-SAG-0013, ADR-SAG-0015, ADR-SAG-0019, and ADR-SAG-0020.
 
 ## Wave table
 

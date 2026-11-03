@@ -1,7 +1,7 @@
 ---
 id: a-3
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: jev-check
 track: build
@@ -24,6 +24,7 @@ requirements:
   - REQ-SAG-0311
   - REQ-SAG-0503
 adrs:
+  - ADR-SAG-0001
   - ADR-SAG-0002
   - ADR-SAG-0004
   - ADR-SAG-0005
@@ -36,7 +37,7 @@ owned_paths:
   - "crates/sc-jev-check/assets/jev.toml"
   - "crates/sc-jev-check/assets/llm-evaluator-system.md"
   - "crates/sc-jev-check/Cargo.toml"
-  - "boundaries/jev-check/**"
+  - "boundaries/sc-jev-check/**"
   - "tests/fixtures/jev/git-repo/**"
   - "docs/sc-jev-check/extraction.md"
 ---

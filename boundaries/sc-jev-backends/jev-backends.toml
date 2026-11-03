@@ -4,20 +4,21 @@ owner_crate_path = "sc_jev_backends"
 name = "jev-backends"
 
 [public]
-facade = "sc_jev_backends::stub_name"
+facade = "sc_jev_backends::AnthropicHaikuBackend, sc_jev_backends::OpenAiLunaBackend, sc_jev_backends::BackendTransport"
+notes = "Haiku and Luna JudgeBackend implementations. API key and HTTP transport are construction state."
 
 [implementation]
 type = "marker"
 module = "sc_jev_backends"
 visibility = "public"
-constructor = "none"
+constructor = "public"
 
 [composition]
-roots = ["stub_name"]
+roots = ["AnthropicHaikuBackend", "OpenAiLunaBackend"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = []
+allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 
 [references]
@@ -33,4 +34,4 @@ lint_rules = []
 review_gates = []
 
 [status]
-state = "stub_landed"
+state = "concrete_landed"

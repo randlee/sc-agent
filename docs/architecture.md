@@ -276,8 +276,9 @@ endpoints extend `sc-jev` in place.
 - **Domain newtypes:** `RepoRoot`, `Rev`, `SessionId`, `BackendKeyId` in
   `sc-agent-types` (frozen in a-1); secrets APIs take `&RepoRoot` not raw paths
   where the contract requires repo context (RBP-F003).
-- **Resolved secrets:** `ResolvedApiKey` in `sc-agent-secrets` (ADR-SAG-0020).
-  `Debug` and `Display` redact. `as_str` is the only read of the secret.
+- **Resolved secrets:** `ResolvedApiKey` in `sc-agent-types`, returned by
+  `sc-agent-secrets::resolve_key` (ADR-SAG-0020). `Debug` and `Display` redact.
+  `as_str` is the only read of the secret, and only the sending transport calls it.
 - **Extractor sealing:** `Extractor` is `pub trait Extractor: private::Sealed` —
   only the four Phase A kinds implement it; external crates cannot add kinds
   without a new ADR (RBP-F004).

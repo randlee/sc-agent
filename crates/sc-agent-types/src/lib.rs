@@ -35,6 +35,7 @@ mod error;
 mod ids;
 mod judge;
 mod payload;
+mod secret;
 mod subjects;
 
 pub mod observability;
@@ -55,6 +56,8 @@ pub use judge::{
 };
 #[doc(inline)]
 pub use payload::{canonical_json_bytes, payload_bundle_from_value};
+#[doc(inline)]
+pub use secret::ResolvedApiKey;
 #[doc(inline)]
 pub use subjects::{
     InputSpec, SUBJECTS_SCHEMA_V1, Span, Subject, SubjectsDocument, SubjectsProducer,

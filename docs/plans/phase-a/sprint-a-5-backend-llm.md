@@ -1,7 +1,7 @@
 ---
 id: a-5
 phase: a
-status: planned
+status: complete
 closure_type: boundary
 target_boundary: jev-backends
 track: llm
@@ -22,13 +22,19 @@ requirements:
   - REQ-SAG-0505
   - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0001
+  - ADR-SAG-0002
+  - ADR-SAG-0003
   - ADR-SAG-0004
+  - ADR-SAG-0005
   - ADR-SAG-0006
   - ADR-SAG-0007
+  - ADR-SAG-0012
   - ADR-SAG-0019
+  - ADR-SAG-0020
 owned_paths:
   - "crates/sc-jev-backends/**"
-  - "boundaries/jev-backends/**"
+  - "boundaries/sc-jev-backends/**"
 ---
 
 # Sprint a-5 — Haiku and Luna backends

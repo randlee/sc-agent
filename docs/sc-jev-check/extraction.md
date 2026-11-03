@@ -34,7 +34,9 @@ command = ["sc-treesitter", "extract", "--language", "python", "--query", "branc
 
 ### `file` / `table-column`
 
-Unchanged; table-column uses unescaped `|` rules (REQ-SAG-0309).
+`file` reads the repo-relative path at `rev` (`WORKTREE` is the working tree; any other rev is `git show`).
+
+`table-column` splits rows on unescaped `|` only. A cell may contain `\|`, which is one literal `|` and does not open a new column (REQ-SAG-0309).
 
 ## Lite gate `check.toml`
 

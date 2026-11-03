@@ -17,8 +17,8 @@ roots = ["config", "extract", "payload", "run"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = []
-forbidden_edges = []
+allowed_dependencies = ["sc-agent-types"]
+forbidden_edges = [{ from = "sc-jev-check", to = "sc-treesitter" }]
 
 [references]
 scope = "outside_owner_crate"
@@ -33,4 +33,4 @@ lint_rules = []
 review_gates = []
 
 [status]
-state = "stub_landed"
+state = "concrete_landed"
