@@ -59,9 +59,11 @@ questions + state the backends must judge. SHA-256 of **those** bytes is
 **Status:** Active
 
 `sc-jev-check` is the **only** crate that runs extractors and builds
-`PayloadBundle`. Backend crates consume `JudgeRequest` and must not re-canonicalize.
-Pre-send refusal for config/input errors happens before any backend call
-(ADR-SAG-0004).
+`PayloadBundle`. `run::build_request` is the public assembly entry for a
+check file. `run_check` uses that same assembly. Backend crates consume
+`JudgeRequest` and must not re-canonicalize. Composition roots call the
+facade and do not call `PayloadBuilder`. Pre-send refusal for config/input
+errors happens before any backend call (ADR-SAG-0004).
 
 ## ADR-SAG-0008 — Sessions carry prior answers to later backends
 
@@ -79,6 +81,44 @@ with mode `0600` (sprint a-6).
 Future local judges (decider-4b / cyprid) implement `JudgeBackend` and register
 in `sc-jev-check`’s backend registry. Callers keep `run_check(..., backends: &[BackendId])`;
 no CLI or PyO3 API change when a local backend lands.
+
+Amended by ADR-SAG-0022.
+
+## ADR-SAG-0022 — Scripted backends are a test-util feature
+
+**Status:** Active
+
+Amends ADR-SAG-0009.
+
+Registration without a caller-signature change stays ADR-SAG-0009. This
+decision records the test-only scripted judge. It is not a production backend
+and not a second `run_check` policy.
+
+- `sc-jev-check` Cargo feature `test-util` exposes
+  `registry::register_scripted_backends`. It builds a `BackendRegistry` of
+  in-process `JudgeBackend`s. Each judge returns the supplied answer object.
+  It does not open a socket and does not store an API key. Callers pass that
+  registry to `RunOptions::registry`. `run_check`'s parameters stay unchanged.
+  A repeated backend id is `JevError::registry_invalid` (`CONFIG_INVALID`).
+  An LLM backend id still requires `JudgeRequest.llm` before it returns
+  (ADR-SAG-0019). A build that leaves the feature off does not export the
+  function. This crate's own `cargo test` compiles the library with
+  `cfg(test)`, so those tests see the function without enabling the feature.
+  Every other crate, including `sc-jev-py`, sees it only by enabling
+  `sc-jev-check/test-util`.
+- `sc-jev-py` Cargo feature `test-util` enables `sc-jev-check/test-util` and
+  adds keyword-only `scripted_answers` to `run_check`. That argument forwards
+  to `register_scripted_backends`. This crate does not implement
+  `JudgeBackend`. When the feature is off, production `run_check` has no
+  `scripted_answers` parameter and does not register a judge. A value that is
+  not a JSON object of question ids is `INPUT_INVALID` (ADR-SAG-0001). Omit
+  the argument to use the HTTP backends inside `sc-jev-check`. `cargo test`
+  of this crate enables `sc-jev-check/test-util` through its dev-dependency
+  and compiles the Python signature with `cfg(test)`.
+- Default features of both crates leave `test-util` off. The publish wheel
+  does not pass `--features test-util`. Sprint a-8 pytest may enable it so
+  session `ask` runs without a network send. Enabling it does not change
+  production registration.
 
 ## ADR-SAG-0019 — LLM wire envelope vs canonical payload
 
@@ -234,7 +274,36 @@ file/console sinks). **`sc-jev-check`** emits `LogEvent`s through
 **`SharedSessionLog`** (see ADR-SAG-0016). Composition roots **`sc-ai`** and
 **`sc-jev-py`** link full `sc-observability` and adapt to `SharedSessionLog`.
 **`sc-jev`** does not log and does not depend on observability crates. No bespoke
-JSONL writers. Secrets never appear in log lines.
+JSONL writers. Secrets never appear in log lines. Path precedence for the two
+composition roots is ADR-SAG-0021.
+
+## ADR-SAG-0021 — Log and session path precedence
+
+**Status:** Active
+
+Amends ADR-SAG-0013. The v2 file sink and the ban on bespoke JSONL writers
+stay ADR-SAG-0013. This decision records where each composition root puts
+that sink and its session files. First match wins. An empty flag, argument,
+or environment value is absent.
+
+**`sc-ai` (CLI):**
+
+1. Log root: `--log-dir`, then `SC_LOG_ROOT`, then `<repo-root>/.sc-ai`.
+2. Session directory: `--sessions-dir`, then `<repo-root>/.sc-ai/sessions`.
+3. JSONL path: `<log-root>/logs/sc-ai.log.jsonl`.
+
+**`sc-jev-py` (Python):**
+
+1. Log root: `log_dir`, then `SC_AGENT_LOG_DIR`, then `SC_LOG_ROOT`, then
+   `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset; the
+   process temp directory plus `sc-agent/log` when both are unset).
+2. Session directory: `session_dir`, then `SC_AGENT_SESSION_DIR`, then
+   `{log_root}/sessions`.
+3. JSONL path: `{log_root}/logs/sc-jev-py.log.jsonl`.
+
+`resolve_log_root` and `resolve_session_dir` are the Python contract for that
+order. The two roots do not share a default directory. Secrets never appear
+in either log (ADR-SAG-0013).
 
 ## ADR-SAG-0016 — v2 shim in sc-agent-types (no extra crate)
 

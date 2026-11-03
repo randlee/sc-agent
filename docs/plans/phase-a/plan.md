@@ -258,7 +258,7 @@ to the same Jev answer shape inside `data`; fake transports are test-only.
 
 None blocking plan approval. **Kickoff decisions** (can default in sprint if silent):
 
-1. **Session JSONL root** — default directory and env var (e.g. `SC_AGENT_LOG_DIR` vs reuse an `sc-observability` convention)?
+1. ~~**Session JSONL root**~~ — **Resolved:** ADR-SAG-0021. CLI (`sc-ai`): `--log-dir`, then `SC_LOG_ROOT`, then `<repo-root>/.sc-ai`; sessions `--sessions-dir`, then `<repo-root>/.sc-ai/sessions`. Python (`sc-jev-py`): `log_dir`, then `SC_AGENT_LOG_DIR`, then `SC_LOG_ROOT`, then `~/.sc-agent/log`; sessions `session_dir`, then `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`.
 2. ~~**`sc-observability` pin**~~ — **`=1.5.0`**, v2 `LoggerBuilder` in `sc-ai` only (resolved).
 3. ~~Cross-impl bytes~~ — **Resolved:** a-1 commits Python reference bytes;
    phase acceptance runs `tests/fixtures/jev-python` pytest (a-8); Rust-only

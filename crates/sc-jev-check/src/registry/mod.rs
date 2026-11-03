@@ -5,16 +5,27 @@
 //! change the `run_check` signature. Production wiring resolves API keys with
 //! [`sc_agent_secrets::resolve_key`] and constructs the Jev, Haiku, and Luna
 //! clients. Those clients receive the resolved secret at construction.
+//!
+//! The `test-util` feature exposes `register_scripted_backends` for tests
+//! (ADR-SAG-0022). Production builds leave that feature off. It does not add
+//! a `run_check` parameter (ADR-SAG-0009).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::sync::Arc;
 
+#[cfg(any(test, feature = "test-util"))]
+mod scripted;
+
 use sc_agent_secrets::resolve_key;
 use sc_agent_types::{BackendId, BackendKeyId, JevError, JudgeBackend, RepoRoot, ResolvedApiKey};
 use sc_jev::{HttpsTransport, JevClient};
 use sc_jev_backends::{AnthropicHaikuBackend, OpenAiLunaBackend, UreqTransport};
+
+#[cfg(any(test, feature = "test-util"))]
+#[doc(inline)]
+pub use scripted::register_scripted_backends;
 
 /// Selected judge backends for one run.
 ///

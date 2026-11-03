@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["config", "extract", "payload", "run", "session", "equal_input", "registry"]
 
 [dependencies]
-allowed_dependents = ["sc-ai"]
+allowed_dependents = ["sc-ai", "sc-jev-py"]
 allowed_dependencies = ["sc-agent-types", "sc-agent-secrets", "sc-jev", "sc-jev-backends"]
 forbidden_edges = [{ from = "sc-jev-check", to = "sc-treesitter" }]
 
@@ -25,7 +25,7 @@ scope = "outside_owner_crate"
 forbidden = []
 
 [testing]
-allowed_test_double_paths = []
+allowed_test_double_paths = ["crates/sc-jev-check/src/registry/scripted.rs"]
 forbidden_test_bypasses = []
 
 [enforcement]

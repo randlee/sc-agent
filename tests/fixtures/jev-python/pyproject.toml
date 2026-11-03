@@ -1,0 +1,22 @@
+[project]
+name = "jev-python-harness"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8",
+    "sc-jev-py",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+sc-jev-py = { path = "../../../crates/sc-jev-py" }
+
+# Pytest needs an in-process judge. This is not the publish feature set
+# (ADR-SAG-0022). `build-args` is maturin's PEP 517 setting.
+[tool.uv.config-settings-package.sc-jev-py]
+build-args = "--features extension-module,test-util"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
