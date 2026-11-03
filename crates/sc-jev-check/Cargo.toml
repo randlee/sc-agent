@@ -11,8 +11,8 @@ description = "Jev check facade: check.toml, extractors, sessions, and run_check
 
 [features]
 default = []
-# In-process scripted judges for tests. Production builds leave this off
-# (ADR-SAG-0009). `run_check`'s signature does not change.
+# In-process scripted judges for tests (ADR-SAG-0022). Production builds
+# leave this off. `run_check`'s signature does not change (ADR-SAG-0009).
 test-util = []
 
 [dependencies]

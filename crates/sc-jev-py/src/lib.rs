@@ -65,8 +65,10 @@ pub use run::{
 ///
 /// `build_request` calls `sc_jev_check::run::build_request`. `run_check` calls
 /// `sc_jev_check::run::run_check`. This module does not run extractors,
-/// reimplement payload canonicalization or Jev HTTP, or register a judge
-/// (ADR-SAG-0005, ADR-SAG-0009). Live runs resolve keys inside `sc-jev-check`.
+/// reimplement payload canonicalization or Jev HTTP, or implement
+/// `JudgeBackend` (ADR-SAG-0005, ADR-SAG-0009). Feature `test-util` may
+/// forward `scripted_answers` into `sc-jev-check` (ADR-SAG-0022). Live runs
+/// resolve keys inside `sc-jev-check`.
 #[pymodule]
 fn sc_jev_py(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<CheckResult>()?;

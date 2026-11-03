@@ -14,7 +14,7 @@ package = false
 sc-jev-py = { path = "../../../crates/sc-jev-py" }
 
 # Pytest needs an in-process judge. This is not the publish feature set
-# (ADR-SAG-0009). `build-args` is maturin's PEP 517 setting.
+# (ADR-SAG-0022). `build-args` is maturin's PEP 517 setting.
 [tool.uv.config-settings-package.sc-jev-py]
 build-args = "--features extension-module,test-util"
 

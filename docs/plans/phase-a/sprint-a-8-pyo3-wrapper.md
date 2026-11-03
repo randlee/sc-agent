@@ -38,6 +38,7 @@ adrs:
   - ADR-SAG-0019
   - ADR-SAG-0020
   - ADR-SAG-0021
+  - ADR-SAG-0022
 owned_paths:
   - "crates/sc-jev-py/**"
   - "crates/sc-jev-check/src/run/**"
@@ -66,7 +67,7 @@ owned_paths:
 6. Integration test: one `run_check` with temp log dir appends **one** JSONL line per judge send; line contains **no** API key material.
 7. **NFR-SAG-0003** / **ADR-SAG-0021** — `resolve_log_root` and `resolve_session_dir` follow the Python order in ADR-SAG-0021. Log root is `log_dir`, then `SC_AGENT_LOG_DIR`, then `SC_LOG_ROOT`, then `~/.sc-agent/log` (`%USERPROFILE%\.sc-agent\log` when `HOME` is unset; the process temp directory plus `sc-agent/log` when both are unset). Session dir is `session_dir`, then `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`. ADR-SAG-0013 still governs the v2 `LoggerBuilder` file sink and forbids a bespoke JSONL writer. CLI precedence is the other half of ADR-SAG-0021 (`--log-dir`, then `SC_LOG_ROOT`, then `<repo-root>/.sc-ai`; `--sessions-dir`, then `<repo-root>/.sc-ai/sessions`) and stays implemented in sprint a-7.
 8. **ADR-SAG-0004** — `run_check` uses the facade path that calls `validate_for_send` before any judge send. This crate does not split an oversized check.
-9. **ADR-SAG-0009** — Production `run_check` does not take `scripted_answers` and this crate does not implement `JudgeBackend`. `sc-jev-check` feature `test-util` exposes `register_scripted_backends` for tests. `sc-jev-py` feature `test-util` only forwards that call. Default features and the publish build leave both off. Required validation below enables `test-util` so pytest can exercise session `ask` without a network send.
+9. **ADR-SAG-0022** — Amends ADR-SAG-0009. Production `run_check` does not take `scripted_answers` and this crate does not implement `JudgeBackend`. `sc-jev-check` feature `test-util` exposes `register_scripted_backends` for tests. `sc-jev-py` feature `test-util` only forwards that call. Default features and the publish build leave both off. Required validation below enables `test-util` so pytest can exercise session `ask` without a network send.
 
 ## Explicit code samples
 

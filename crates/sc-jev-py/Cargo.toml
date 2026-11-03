@@ -19,7 +19,7 @@ default = []
 # leaves it off and links the interpreter.
 extension-module = ["pyo3/extension-module"]
 # Forwards `scripted_answers` to `sc-jev-check`'s test-only registry.
-# Production wheels leave this off (ADR-SAG-0009).
+# Production wheels leave this off (ADR-SAG-0022).
 test-util = ["sc-jev-check/test-util"]
 
 [dependencies]

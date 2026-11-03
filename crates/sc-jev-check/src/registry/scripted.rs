@@ -1,9 +1,9 @@
-//! In-process judges for tests (ADR-SAG-0009).
+//! In-process judges for tests (ADR-SAG-0022).
 //!
 //! [`register_scripted_backends`] builds a [`BackendRegistry`] whose judges
 //! return a fixed answer object and never open a socket. Production builds
 //! leave the `test-util` feature off, so [`crate::run::run_check`] stays the
-//! caller API.
+//! caller API (ADR-SAG-0009).
 
 use std::sync::Arc;
 

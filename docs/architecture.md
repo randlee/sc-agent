@@ -82,6 +82,44 @@ Future local judges (decider-4b / cyprid) implement `JudgeBackend` and register
 in `sc-jev-check`’s backend registry. Callers keep `run_check(..., backends: &[BackendId])`;
 no CLI or PyO3 API change when a local backend lands.
 
+Amended by ADR-SAG-0022.
+
+## ADR-SAG-0022 — Scripted backends are a test-util feature
+
+**Status:** Active
+
+Amends ADR-SAG-0009.
+
+Registration without a caller-signature change stays ADR-SAG-0009. This
+decision records the test-only scripted judge. It is not a production backend
+and not a second `run_check` policy.
+
+- `sc-jev-check` Cargo feature `test-util` exposes
+  `registry::register_scripted_backends`. It builds a `BackendRegistry` of
+  in-process `JudgeBackend`s. Each judge returns the supplied answer object.
+  It does not open a socket and does not store an API key. Callers pass that
+  registry to `RunOptions::registry`. `run_check`'s parameters stay unchanged.
+  A repeated backend id is `JevError::registry_invalid` (`CONFIG_INVALID`).
+  An LLM backend id still requires `JudgeRequest.llm` before it returns
+  (ADR-SAG-0019). A build that leaves the feature off does not export the
+  function. This crate's own `cargo test` compiles the library with
+  `cfg(test)`, so those tests see the function without enabling the feature.
+  Every other crate, including `sc-jev-py`, sees it only by enabling
+  `sc-jev-check/test-util`.
+- `sc-jev-py` Cargo feature `test-util` enables `sc-jev-check/test-util` and
+  adds keyword-only `scripted_answers` to `run_check`. That argument forwards
+  to `register_scripted_backends`. This crate does not implement
+  `JudgeBackend`. When the feature is off, production `run_check` has no
+  `scripted_answers` parameter and does not register a judge. A value that is
+  not a JSON object of question ids is `INPUT_INVALID` (ADR-SAG-0001). Omit
+  the argument to use the HTTP backends inside `sc-jev-check`. `cargo test`
+  of this crate enables `sc-jev-check/test-util` through its dev-dependency
+  and compiles the Python signature with `cfg(test)`.
+- Default features of both crates leave `test-util` off. The publish wheel
+  does not pass `--features test-util`. Sprint a-8 pytest may enable it so
+  session `ask` runs without a network send. Enabling it does not change
+  production registration.
+
 ## ADR-SAG-0019 — LLM wire envelope vs canonical payload
 
 **Status:** Active

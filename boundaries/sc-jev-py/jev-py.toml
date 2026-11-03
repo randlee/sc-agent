@@ -5,7 +5,7 @@ name = "jev-py"
 
 [public]
 facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session"
-notes = "PyO3 over sc-jev-check. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). Feature test-util only forwards scripted answers to sc-jev-check."
+notes = "PyO3 over sc-jev-check. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). Feature test-util only forwards scripted answers to sc-jev-check (ADR-SAG-0022)."
 
 [implementation]
 type = "marker"

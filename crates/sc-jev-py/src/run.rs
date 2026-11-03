@@ -493,7 +493,7 @@ pub fn run_check(
 /// Runs `check_path` through `sc-jev-check`.
 ///
 /// Same contract as the production function. `scripted_answers` is compiled
-/// only for tests. It forwards to
+/// only when `test-util` or `cfg(test)` is on (ADR-SAG-0022). It forwards to
 /// [`sc_jev_check::registry::register_scripted_backends`] and does not
 /// implement a judge in this crate (ADR-SAG-0009). Omit it to use the HTTP
 /// backends.

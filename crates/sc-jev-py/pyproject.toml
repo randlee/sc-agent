@@ -12,7 +12,7 @@ license = { text = "MIT" }
 dynamic = ["version"]
 
 [tool.maturin]
-# Publish and the default build. `test-util` stays off here (ADR-SAG-0009).
+# Publish and the default build. `test-util` stays off here (ADR-SAG-0022).
 # Sprint validation passes `--features extension-module,test-util` when pytest
 # needs an in-process judge. CLI `--features` replaces this list.
 features = ["extension-module"]

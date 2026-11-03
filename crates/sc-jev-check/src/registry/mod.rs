@@ -6,9 +6,9 @@
 //! [`sc_agent_secrets::resolve_key`] and constructs the Jev, Haiku, and Luna
 //! clients. Those clients receive the resolved secret at construction.
 //!
-//! The `test-util` feature exposes `register_scripted_backends` for tests.
-//! Production builds leave that feature off. It does not add a `run_check`
-//! parameter.
+//! The `test-util` feature exposes `register_scripted_backends` for tests
+//! (ADR-SAG-0022). Production builds leave that feature off. It does not add
+//! a `run_check` parameter (ADR-SAG-0009).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
