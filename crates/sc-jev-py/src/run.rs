@@ -6,7 +6,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyBytes};
 use sc_agent_types::{
-    BackendId, EqualInputRecord, JevError, JudgeOutcome, RepoRoot, Rev, SessionId,
+    BackendId, EqualInputRecord, JevError, JudgeOutcome, RepoRoot, Rev, SessionId, Sha256Digest,
     SubjectsProducer, canonical_json_bytes,
 };
 use sc_jev_check::config::load_check_at;
@@ -37,7 +37,7 @@ struct CheckRun {
 struct FinishedRun {
     session_id: Option<SessionId>,
     payload: String,
-    prompt_sha256: String,
+    prompt_sha256: Sha256Digest,
     outcomes: Vec<JudgeOutcome>,
     equal_input: Option<EqualInputRecord>,
     system_prompt: Option<String>,
@@ -47,7 +47,7 @@ struct FinishedRun {
 
 struct BuiltRequest {
     payload: String,
-    prompt_sha256: String,
+    prompt_sha256: Sha256Digest,
     producer: Option<SubjectsProducer>,
 }
 
@@ -88,7 +88,7 @@ fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     let payload = utf8_payload(result.bundle.bytes)?;
     Ok(FinishedRun {
         session_id: result.session_id,
-        prompt_sha256: result.bundle.sha256.to_string(),
+        prompt_sha256: result.bundle.sha256,
         payload,
         outcomes: result.outcomes,
         equal_input: result.equal_input,
@@ -110,7 +110,7 @@ fn build(
     let producer = producer_from_extractions(&built.extractions);
     Ok(BuiltRequest {
         payload: utf8_payload(built.bundle.bytes)?,
-        prompt_sha256: built.bundle.sha256.to_string(),
+        prompt_sha256: built.bundle.sha256,
         producer,
     })
 }
@@ -264,7 +264,7 @@ impl CheckResult {
     /// SHA-256 of the canonical payload. This is `prompt_sha256`.
     #[getter]
     fn prompt_sha256(&self) -> &str {
-        &self.inner.prompt_sha256
+        self.inner.prompt_sha256.as_str()
     }
 
     /// Canonical payload JSON.
@@ -705,7 +705,7 @@ mod tests {
         let lines = jsonl_lines(&logs);
         assert_eq!(lines.len(), 1, "{lines:?}");
         assert!(lines[0].contains("judge"));
-        assert!(lines[0].contains(&finished.prompt_sha256));
+        assert!(lines[0].contains(finished.prompt_sha256.as_str()));
         assert!(lines[0].contains("anthropic_haiku"));
         assert!(!lines[0].contains(sentinel));
         assert!(!lines[0].to_ascii_lowercase().contains("api_key"));
