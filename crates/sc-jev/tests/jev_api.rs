@@ -429,6 +429,43 @@ mod jev_api {
     }
 
     #[test]
+    fn payload_bytes_are_spliced_without_recanonicalizing() {
+        let bytes = br#"{"questions": {"q":{"criteria":{"no":"n","yes":"y"},"instructions":"Is it?","type":"choice"}},"state":{"code":"x"}}"#.to_vec();
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+        let recanonical = canonical_json_bytes(&parsed).expect("canonical");
+        assert_ne!(bytes, recanonical);
+
+        let harness = scripted(vec![ok("jev-test")]);
+        harness
+            .client
+            .judge(&request(bytes.clone(), None))
+            .expect("judge");
+        let sent = harness.transport.sent();
+        assert_eq!(sent.len(), 1);
+        let expected = [br#"{"model":"jev-test","#, &bytes[1..]].concat();
+        assert_eq!(sent[0], expected);
+        let recanonical_body = [br#"{"model":"jev-test","#, &recanonical[1..]].concat();
+        assert_ne!(sent[0], recanonical_body);
+    }
+
+    #[test]
+    fn key_sorting_before_model_sends_nothing() {
+        let bytes = canonical_json_bytes(&json!({
+            "aaa": 1,
+            "questions": questions(),
+            "state": {}
+        }))
+        .expect("canonical");
+        let harness = scripted(vec![ok("jev-test")]);
+        let error = harness
+            .client
+            .judge(&request(bytes, None))
+            .expect_err("key");
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(harness.transport.sent().is_empty());
+    }
+
+    #[test]
     fn array_questions_from_the_shared_contract_round_trip() {
         let bytes = canonical_json_bytes(&json!({
             "questions": [{
