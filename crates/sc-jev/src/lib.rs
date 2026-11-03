@@ -6,7 +6,8 @@
 //! byte-exact with the pinned model, and retries busy responses.
 //!
 //! The crate does not read `check.toml`, run extractors, or resolve API keys.
-//! Callers pass the resolved key and a [`JevTransport`] at construction.
+//! Callers pass a [`ResolvedApiKey`](sc_agent_types::ResolvedApiKey) and a
+//! [`JevTransport`] at construction. Only the transport reads the key.
 //!
 //! # Errors
 //!

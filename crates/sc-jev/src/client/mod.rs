@@ -10,7 +10,9 @@ mod transport;
 use std::fmt;
 use std::sync::Arc;
 
-use sc_agent_types::{BackendId, BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
+use sc_agent_types::{
+    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, ResolvedApiKey,
+};
 
 use crate::api::JevClientConfig;
 use crate::check::{self, PreparedCheck};
@@ -33,7 +35,7 @@ const BUSY: [u16; 3] = [429, 502, 529];
 ///
 /// ```
 /// use std::sync::Arc;
-/// use sc_agent_types::{payload_bundle_from_value, JudgeBackend, JudgeRequest};
+/// use sc_agent_types::{payload_bundle_from_value, JudgeBackend, JudgeRequest, ResolvedApiKey};
 /// use sc_jev::{JevClient, JevTransport, WireRequest, WireResponse};
 ///
 /// struct Scripted;
@@ -44,7 +46,8 @@ const BUSY: [u16; 3] = [429, 502, 529];
 ///         request: &WireRequest<'_>,
 ///     ) -> Result<WireResponse, sc_agent_types::JevError> {
 ///         assert!(request.body.starts_with(br#"{"model":"jev-1.13.0","#));
-///         assert!(request.authorization.starts_with("Bearer "));
+///         let authorization = format!("Bearer {}", request.api_key.as_str());
+///         assert!(authorization.starts_with("Bearer "));
 ///         Ok(WireResponse {
 ///             status: 200,
 ///             body: br#"{"model":"jev-1.13.0","answers":{"q":{"choice":"yes","confidence":1,"probabilities":{"no":0,"yes":1}}}}"#.to_vec(),
@@ -64,7 +67,11 @@ const BUSY: [u16; 3] = [429, 502, 529];
 ///     "state": {}
 /// }))
 /// .expect("payload");
-/// let client = JevClient::new("test-key", Arc::new(Scripted)).expect("key");
+/// let client = JevClient::new(
+///     ResolvedApiKey::new("test-key".to_owned()),
+///     Arc::new(Scripted),
+/// )
+/// .expect("key");
 /// let outcome = client
 ///     .judge(&JudgeRequest { payload, llm: None })
 ///     .expect("judge");
@@ -72,7 +79,7 @@ const BUSY: [u16; 3] = [429, 502, 529];
 /// ```
 pub struct JevClient {
     config: JevClientConfig,
-    api_key: ApiKey,
+    api_key: ResolvedApiKey,
     transport: Arc<dyn JevTransport>,
     retry_delay: Arc<dyn RetryDelay>,
 }
@@ -80,8 +87,9 @@ pub struct JevClient {
 impl JevClient {
     /// Creates a client for the packaged TypeSafe endpoint.
     ///
-    /// `api_key` is the resolved credential. An empty key fails before any
-    /// request can be sent.
+    /// `api_key` is the resolved credential. The client does not read it.
+    /// [`JevTransport::send`] formats the `Bearer` header (ADR-SAG-0020).
+    /// An empty key fails before any request can be sent.
     ///
     /// # Errors
     ///
@@ -89,7 +97,7 @@ impl JevClient {
     /// [`JevError::ConfigInvalid`] when it contains whitespace or a control
     /// character.
     pub fn new(
-        api_key: impl AsRef<str>,
+        api_key: ResolvedApiKey,
         transport: Arc<dyn JevTransport>,
     ) -> Result<Self, JevError> {
         Self::with_config(JevClientConfig::packaged(), api_key, transport)
@@ -104,12 +112,12 @@ impl JevClient {
     /// character.
     pub fn with_config(
         config: JevClientConfig,
-        api_key: impl AsRef<str>,
+        api_key: ResolvedApiKey,
         transport: Arc<dyn JevTransport>,
     ) -> Result<Self, JevError> {
         Ok(Self {
             config,
-            api_key: ApiKey::parse(api_key.as_ref())?,
+            api_key: api_key.normalized_typesafe()?,
             transport,
             retry_delay: Arc::new(ThreadRetryDelay),
         })
@@ -130,24 +138,19 @@ impl JevClient {
         &self.config
     }
 
-    fn authorization(&self) -> String {
-        format!("Bearer {}", self.api_key.as_str())
-    }
-
     fn execute(&self, prepared: &PreparedCheck) -> Result<JudgeOutcome, JevError> {
         let url = self.config.endpoint();
-        let authorization = self.authorization();
         let attempts = self.config.attempts();
         for attempt in 1..=attempts {
             let request = WireRequest {
                 url: &url,
                 body: &prepared.body,
-                authorization: &authorization,
+                api_key: &self.api_key,
                 timeout: self.config.timeout(),
             };
             let response = match self.transport.send(&request) {
                 Ok(response) => response,
-                Err(error) => return Err(redact_error(error, self.api_key.as_str())),
+                Err(error) => return Err(self.api_key.redact_error(error)),
             };
             if BUSY.contains(&response.status) && attempt < attempts {
                 self.retry_delay
@@ -160,7 +163,7 @@ impl JevClient {
                 });
             }
             return check::parse_outcome(&response.body, self.config.model(), &prepared.criteria)
-                .map_err(|error| redact_error(error, self.api_key.as_str()));
+                .map_err(|error| self.api_key.redact_error(error));
         }
         Err(JevError::NetworkError {
             detail: "Jev busy; attempts exhausted".to_owned(),
@@ -192,58 +195,5 @@ impl fmt::Debug for JevClient {
             .field("config", &self.config)
             .field("api_key", &self.api_key)
             .finish_non_exhaustive()
-    }
-}
-
-struct ApiKey(String);
-
-impl ApiKey {
-    fn parse(raw: &str) -> Result<Self, JevError> {
-        let key = raw.trim();
-        if key.is_empty() {
-            return Err(JevError::KeyMissing {
-                backend: BackendKeyId::TypeSafe,
-            });
-        }
-        if key
-            .bytes()
-            .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
-        {
-            return Err(JevError::ConfigInvalid {
-                detail: "TypeSafe API key contains whitespace or a control character".to_owned(),
-            });
-        }
-        Ok(Self(key.to_owned()))
-    }
-
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ApiKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ApiKey([redacted])")
-    }
-}
-
-fn redact_error(error: JevError, key: &str) -> JevError {
-    if key.is_empty() {
-        return error;
-    }
-    match error {
-        JevError::NetworkError { detail } => JevError::NetworkError {
-            detail: detail.replace(key, "[redacted]"),
-        },
-        JevError::ResponseInvalid { detail } => JevError::ResponseInvalid {
-            detail: detail.replace(key, "[redacted]"),
-        },
-        JevError::InputInvalid { detail } => JevError::InputInvalid {
-            detail: detail.replace(key, "[redacted]"),
-        },
-        JevError::ConfigInvalid { detail } => JevError::ConfigInvalid {
-            detail: detail.replace(key, "[redacted]"),
-        },
-        other => other,
     }
 }

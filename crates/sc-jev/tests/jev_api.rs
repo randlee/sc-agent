@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeRequest, LlmWireContext, PayloadBundle,
+    BackendId, JevError, JudgeBackend, JudgeRequest, LlmWireContext, PayloadBundle, ResolvedApiKey,
     canonical_json_bytes,
 };
 use sc_jev::{
@@ -50,13 +50,14 @@ impl FakeTransport {
 impl JevTransport for FakeTransport {
     fn send(&self, request: &WireRequest<'_>) -> Result<WireResponse, JevError> {
         self.sent.lock().expect("sent").push(request.body.to_vec());
+        let authorization = format!("Bearer {}", request.api_key.as_str());
         self.authorizations
             .lock()
             .expect("auth")
-            .push(request.authorization.to_owned());
+            .push(authorization.clone());
         if self.fail_with_key {
             return Err(JevError::NetworkError {
-                detail: format!("boom {}", request.authorization),
+                detail: format!("boom {authorization}"),
             });
         }
         self.responses
@@ -110,7 +111,7 @@ fn scripted(responses: Vec<WireResponse>) -> Harness {
     });
     let client = JevClient::with_config(
         config(),
-        "super-secret",
+        ResolvedApiKey::new("super-secret".to_owned()),
         Arc::clone(&transport) as Arc<dyn JevTransport>,
     )
     .expect("client")
@@ -466,7 +467,7 @@ mod jev_api {
         let transport = Arc::new(FakeTransport::new(vec![ok("jev-test")]));
         let error = JevClient::with_config(
             config(),
-            "  ",
+            ResolvedApiKey::new("  ".to_owned()),
             Arc::clone(&transport) as Arc<dyn JevTransport>,
         )
         .expect_err("key");
@@ -482,7 +483,7 @@ mod jev_api {
         });
         let client = JevClient::with_config(
             config(),
-            "super-secret",
+            ResolvedApiKey::new("super-secret".to_owned()),
             Arc::clone(&transport) as Arc<dyn JevTransport>,
         )
         .expect("client")
@@ -498,11 +499,12 @@ mod jev_api {
     #[test]
     fn https_transport_refuses_cleartext_without_sending() {
         let transport = HttpsTransport::new();
+        let api_key = ResolvedApiKey::new("super-secret".to_owned());
         let error = transport
             .send(&WireRequest {
                 url: "http://api.typesafe.ai/v1/systemone",
                 body: b"{}",
-                authorization: "Bearer super-secret",
+                api_key: &api_key,
                 timeout: Duration::from_secs(1),
             })
             .expect_err("cleartext");

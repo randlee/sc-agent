@@ -11,7 +11,9 @@ use ureq::Agent;
 
 use super::{JevTransport, WireRequest, WireResponse};
 
-/// Production transport. Holds no API key; the client passes it per send.
+/// Production transport. Holds no API key; each [`WireRequest`] carries it.
+///
+/// [`JevTransport::send`] is the only place this type reads the key.
 #[derive(Debug, Clone)]
 pub struct HttpsTransport {
     user_agent: String,
@@ -51,13 +53,14 @@ impl JevTransport for HttpsTransport {
                 detail: "Jev connection failed: URL is not https".to_owned(),
             });
         }
+        let authorization = format!("Bearer {}", request.api_key.as_str());
         let agent = self.agent(request.timeout);
         let mut response = agent
             .post(request.url)
-            .header("Authorization", request.authorization)
+            .header("Authorization", &authorization)
             .header("Content-Type", "application/json")
             .send(request.body)
-            .map_err(|error| network(&error, request.authorization))?;
+            .map_err(|error| network(&error, &authorization))?;
         let status = response.status().as_u16();
         let retry_after = response
             .headers()
@@ -67,7 +70,7 @@ impl JevTransport for HttpsTransport {
         let body = response
             .body_mut()
             .read_to_vec()
-            .map_err(|error| network(&error, request.authorization))?;
+            .map_err(|error| network(&error, &authorization))?;
         Ok(WireResponse {
             status,
             body,

@@ -1,9 +1,10 @@
 //! Credential lookup: process env, repo-root `.env`, then keyring.
 
 use std::collections::BTreeMap;
+#[cfg(any(test, feature = "test-util"))]
 use std::fmt;
 
-use sc_agent_types::{BackendKeyId, JevError, RepoRoot};
+use sc_agent_types::{BackendKeyId, JevError, RepoRoot, ResolvedApiKey};
 
 use crate::dotenv::load_dotenv;
 use crate::platform::current_account;
@@ -23,42 +24,6 @@ pub const OPENAI_API_KEY_VAR: &str = "OPENAI_API_KEY";
 /// use it as the service name. It does not change the Anthropic environment
 /// variable, and other backends ignore it.
 pub const ANTHROPIC_KEYCHAIN_SERVICE_VAR: &str = "ANTHROPIC_KEYCHAIN_SERVICE";
-
-/// API key returned by [`resolve_key`].
-///
-/// The inner value is a non-empty trimmed secret. [`Debug`] and [`Display`]
-/// print `[redacted]` and never the secret bytes (ADR-SAG-0020, NFR-SAG-0002).
-/// Call [`Self::as_str`] only at the transport that sends the key.
-#[must_use = "read the secret with as_str only at the transport that sends it"]
-#[derive(Clone, PartialEq, Eq)]
-pub struct ResolvedApiKey(String);
-
-impl ResolvedApiKey {
-    pub(crate) fn new(secret: String) -> Self {
-        Self(secret)
-    }
-
-    /// Returns the secret.
-    ///
-    /// This is the only way to read the key. Do not log it, store it in an
-    /// error, or place it in `Debug` output.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ResolvedApiKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ResolvedApiKey([redacted])")
-    }
-}
-
-impl fmt::Display for ResolvedApiKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("[redacted]")
-    }
-}
 
 /// Reads named variables.
 ///
@@ -340,6 +305,7 @@ mod tests {
     use crate::dotenv::{DOTENV_RECOVERY, DOTENV_UNREADABLE};
     use crate::platform::{KEYRING_RECOVERY, KEYRING_UNREADABLE};
     use crate::test_support::TempRepo;
+    use sc_agent_types::ResolvedApiKey;
 
     const SECRET: &str = "super-secret-value";
 

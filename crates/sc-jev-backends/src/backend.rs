@@ -1,17 +1,23 @@
 //! Haiku and Luna [`JudgeBackend`](sc_agent_types::JudgeBackend) implementations.
 //!
-//! Both backends count tokens, then send the judge message. The count request
-//! uses the same body as the judge call except Haiku omits `max_tokens`.
+//! Both backends validate byte and token limits, count tokens, then send the
+//! judge message. `validate_for_send` applies those limits before any HTTP
+//! call. The provider count is checked again before the judge message is
+//! posted (ADR-SAG-0004). The count request uses the same body as the judge
+//! call except Haiku omits `max_tokens`.
 
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-use sc_agent_types::{BackendId, BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
+use sc_agent_types::{
+    BackendId, BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, ResolvedApiKey,
+};
 
 use crate::retry::{self, RetrySleeper, ThreadSleeper};
 use crate::transport::{
-    BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, HttpRequest, HttpResponse,
+    AuthScheme, BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, HttpRequest,
+    HttpResponse,
 };
 use crate::validate::{self, ParsedQuestion};
 use crate::wire::{self, ProviderKind};
@@ -65,7 +71,7 @@ struct Prepared {
 #[derive(Clone)]
 struct Client {
     provider: Provider,
-    api_key: String,
+    api_key: ResolvedApiKey,
     transport: Arc<dyn BackendTransport>,
     sleeper: Arc<dyn RetrySleeper>,
     connect_timeout: Duration,
@@ -74,14 +80,16 @@ struct Client {
 
 impl Client {
     fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-        let _ = self.prepare(request)?;
-        Ok(())
+        let prepared = self.prepare(request)?;
+        validate::enforce_count_and_message_limits(&prepared.count_body, &prepared.message_body)
     }
 
     fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
+        self.validate_for_send(request)?;
         let prepared = self.prepare(request)?;
         let counted = self.send(self.provider.count_path, &prepared.count_body)?;
         let prompt_tokens = wire::parse_count(self.provider.name, &counted.body)?;
+        validate::enforce_input_token_limit(prompt_tokens)?;
         let judged = self.send(self.provider.message_path, &prepared.message_body)?;
         let reply = wire::parse_vendor(self.provider.kind, self.provider.name, &judged.body)?;
         if let Some(reason) = &reply.truncation {
@@ -117,9 +125,6 @@ impl Client {
             payload_text,
             &prompt.system_prompt,
         );
-        if message_body.len() as u64 > validate::MAX_REQUEST_BYTES {
-            return Err(validate::too_large(message_body.len() as u64));
-        }
         let count_body = wire::count_body(self.provider.kind, &message_body);
         Ok(Prepared {
             questions,
@@ -135,7 +140,7 @@ impl Client {
             let response = self
                 .transport
                 .send(self.http_request(path, body))
-                .map_err(|error| redact_error(error, &self.api_key))?;
+                .map_err(|error| self.api_key.redact_error(error))?;
             if response.status == 200 {
                 return Ok(response);
             }
@@ -148,7 +153,7 @@ impl Client {
             } else {
                 retry::http_failure(self.provider.name, &response)
             };
-            return Err(redact_error(error, &self.api_key));
+            return Err(self.api_key.redact_error(error));
         }
     }
 
@@ -156,50 +161,33 @@ impl Client {
         HttpRequest {
             method: "POST".to_owned(),
             url: format!("https://{}{path}", self.provider.host),
-            headers: wire::headers(self.provider.kind, &self.api_key),
+            headers: wire::unsigned_headers(self.provider.kind),
             body: body.to_vec(),
             connect_timeout: self.connect_timeout,
             request_timeout: self.request_timeout,
+            scheme: auth_scheme(self.provider.kind),
+            credential: self.api_key.clone(),
+            auth_installed: false,
         }
     }
 }
 
-fn redact_error(error: JevError, secret: &str) -> JevError {
-    match error {
-        JevError::NetworkError { detail } => JevError::NetworkError {
-            detail: redact(&detail, secret),
-        },
-        JevError::ResponseInvalid { detail } => JevError::ResponseInvalid {
-            detail: redact(&detail, secret),
-        },
-        other => other,
+fn auth_scheme(kind: ProviderKind) -> AuthScheme {
+    match kind {
+        ProviderKind::Anthropic => AuthScheme::AnthropicApiKey,
+        ProviderKind::OpenAi => AuthScheme::Bearer,
     }
-}
-
-fn redact(detail: &str, secret: &str) -> String {
-    if secret.is_empty() {
-        return detail.to_owned();
-    }
-    detail.replace(secret, "[redacted]")
-}
-
-fn normalize_key(raw: String, backend: BackendKeyId) -> Result<String, JevError> {
-    let key = raw.trim().to_owned();
-    if key.is_empty() || key.chars().any(char::is_control) {
-        return Err(JevError::KeyMissing { backend });
-    }
-    Ok(key)
 }
 
 fn assemble(
     provider: Provider,
-    api_key: String,
+    api_key: ResolvedApiKey,
     transport: impl BackendTransport + 'static,
     sleeper: Arc<dyn RetrySleeper>,
 ) -> Result<Arc<Client>, JevError> {
-    let key_id = provider.key_id;
+    let api_key = api_key.normalized_provider(provider.key_id)?;
     Ok(Arc::new(Client {
-        api_key: normalize_key(api_key, key_id)?,
+        api_key,
         provider,
         transport: Arc::new(transport),
         sleeper,
@@ -213,7 +201,7 @@ fn assemble(
 /// # Examples
 ///
 /// ```
-/// use sc_agent_types::JevError;
+/// use sc_agent_types::{JevError, ResolvedApiKey};
 /// use sc_jev_backends::{
 ///     AnthropicHaikuBackend, BackendTransport, HttpRequest, HttpResponse,
 /// };
@@ -228,7 +216,8 @@ fn assemble(
 ///     }
 /// }
 ///
-/// let error = AnthropicHaikuBackend::new("  ", Offline).expect_err("blank key");
+/// let error = AnthropicHaikuBackend::new(ResolvedApiKey::new("  ".to_owned()), Offline)
+///     .expect_err("blank key");
 /// assert_eq!(error.code(), "KEY_MISSING");
 /// ```
 #[derive(Clone)]
@@ -239,18 +228,22 @@ pub struct AnthropicHaikuBackend {
 impl AnthropicHaikuBackend {
     /// Builds a Haiku backend with the default timeouts.
     ///
+    /// `api_key` is the resolved credential. This type does not read it.
+    /// [`BackendTransport::send`] installs the `x-api-key` header
+    /// (ADR-SAG-0020).
+    ///
     /// # Errors
     ///
     /// Returns [`JevError::KeyMissing`] when `api_key` is empty or contains a
     /// control character.
     pub fn new(
-        api_key: impl Into<String>,
+        api_key: ResolvedApiKey,
         transport: impl BackendTransport + 'static,
     ) -> Result<Self, JevError> {
         Ok(Self {
             inner: assemble(
                 Provider::haiku(),
-                api_key.into(),
+                api_key,
                 transport,
                 Arc::new(ThreadSleeper),
             )?,
@@ -301,18 +294,22 @@ pub struct OpenAiLunaBackend {
 impl OpenAiLunaBackend {
     /// Builds a Luna backend with the default timeouts.
     ///
+    /// `api_key` is the resolved credential. This type does not read it.
+    /// [`BackendTransport::send`] installs the `Authorization` header
+    /// (ADR-SAG-0020).
+    ///
     /// # Errors
     ///
     /// Returns [`JevError::KeyMissing`] when `api_key` is empty or contains a
     /// control character.
     pub fn new(
-        api_key: impl Into<String>,
+        api_key: ResolvedApiKey,
         transport: impl BackendTransport + 'static,
     ) -> Result<Self, JevError> {
         Ok(Self {
             inner: assemble(
                 Provider::luna(),
-                api_key.into(),
+                api_key,
                 transport,
                 Arc::new(ThreadSleeper),
             )?,

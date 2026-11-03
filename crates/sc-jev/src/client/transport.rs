@@ -6,19 +6,20 @@
 use std::fmt;
 use std::time::Duration;
 
-use sc_agent_types::JevError;
+use sc_agent_types::{JevError, ResolvedApiKey};
 
 /// One Jev HTTP POST.
 ///
-/// The API key is the `authorization` value (`Bearer …`). It is not part of
-/// `body`. [`Debug`] redacts it.
+/// `api_key` stays sealed on the request. [`crate::JevTransport::send`] is
+/// the only caller that may read it, via [`ResolvedApiKey::as_str`], when it
+/// sets the `Authorization` header (ADR-SAG-0020). [`Debug`] redacts the key.
 pub struct WireRequest<'a> {
     /// Absolute `https` URL.
     pub url: &'a str,
     /// Canonical check body, including the pinned model.
     pub body: &'a [u8],
-    /// `Bearer` credential for this send.
-    pub authorization: &'a str,
+    /// Sealed TypeSafe credential. The transport formats `Bearer` at send time.
+    pub api_key: &'a ResolvedApiKey,
     /// Deadline for this send, including the response body.
     pub timeout: Duration,
 }
@@ -29,7 +30,7 @@ impl fmt::Debug for WireRequest<'_> {
             .debug_struct("WireRequest")
             .field("url", &self.url)
             .field("body", &self.body)
-            .field("authorization", &"[redacted]")
+            .field("api_key", &self.api_key)
             .field("timeout", &self.timeout)
             .finish()
     }
@@ -49,8 +50,8 @@ pub struct WireResponse {
 /// Sends one check body.
 ///
 /// Object-safe and `Send + Sync` so a client can share it across threads.
-/// Implementations must apply [`WireRequest::timeout`] and must not log
-/// `authorization`.
+/// Implementations must apply [`WireRequest::timeout`], may call
+/// [`ResolvedApiKey::as_str`] only while sending, and must not log the key.
 pub trait JevTransport: Send + Sync {
     /// Posts `request` and returns the status line data.
     ///

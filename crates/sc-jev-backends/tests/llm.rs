@@ -6,7 +6,7 @@ use std::time::Duration;
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
     BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle,
-    Sha256Digest,
+    ResolvedApiKey, Sha256Digest,
 };
 use sc_jev_backends::{
     AnthropicHaikuBackend, BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT,
@@ -48,7 +48,9 @@ impl ScriptedTransport {
 }
 
 impl BackendTransport for ScriptedTransport {
-    fn send(&self, request: HttpRequest) -> Result<HttpResponse, JevError> {
+    fn send(&self, mut request: HttpRequest) -> Result<HttpResponse, JevError> {
+        // The sending transport is the only reader of the sealed key.
+        request.install_auth();
         // The last queued reply is the next response.
         self.recorded.posts.lock().expect("posts").push(request);
         self.recorded
@@ -164,12 +166,16 @@ fn standard_request(prompt: &str) -> JudgeRequest {
     request_with(json!([question(&["yes", "no"])]), Some(prompt))
 }
 
+fn credential() -> ResolvedApiKey {
+    ResolvedApiKey::new(KEY.to_owned())
+}
+
 fn haiku(replies: Vec<HttpResponse>) -> (AnthropicHaikuBackend, Arc<Recorded>) {
     let (transport, recorded) = ScriptedTransport::new(replies);
     let sleeper = ScriptedSleeper {
         recorded: Arc::clone(&recorded),
     };
-    let backend = AnthropicHaikuBackend::new(KEY, transport)
+    let backend = AnthropicHaikuBackend::new(credential(), transport)
         .expect("key")
         .with_retry_sleeper(sleeper);
     (backend, recorded)
@@ -180,7 +186,7 @@ fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend, Arc<Recorded>) {
     let sleeper = ScriptedSleeper {
         recorded: Arc::clone(&recorded),
     };
-    let backend = OpenAiLunaBackend::new(KEY, transport)
+    let backend = OpenAiLunaBackend::new(credential(), transport)
         .expect("key")
         .with_retry_sleeper(sleeper);
     (backend, recorded)
@@ -529,12 +535,13 @@ fn test_llm_bad_token_count_does_not_send_judge() {
 #[test]
 fn test_llm_missing_key_does_not_build() {
     let (transport, recorded) = ScriptedTransport::new(vec![count_reply(1)]);
-    let error = AnthropicHaikuBackend::new("", transport).expect_err("missing");
+    let error = AnthropicHaikuBackend::new(ResolvedApiKey::new(String::new()), transport)
+        .expect_err("missing");
     assert_eq!(error.code(), "KEY_MISSING");
     assert!(posts(&recorded).is_empty());
     let rendered = format!(
         "{:?}",
-        OpenAiLunaBackend::new(KEY, {
+        OpenAiLunaBackend::new(credential(), {
             let (transport, _) = ScriptedTransport::new(Vec::new());
             transport
         })
@@ -548,6 +555,33 @@ fn backends_are_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<AnthropicHaikuBackend>();
     assert_send_sync::<OpenAiLunaBackend>();
+}
+
+#[test]
+fn test_validate_for_send_refuses_oversize_before_http() {
+    let (backend, recorded) = haiku(vec![count_reply(1)]);
+    let oversized = standard_request(&"x".repeat(100_000));
+    let error = backend.validate_for_send(&oversized).expect_err("validate");
+    assert_eq!(error.code(), "INPUT_TOO_LARGE");
+    let error = backend.judge(&oversized).expect_err("judge");
+    assert_eq!(error.code(), "INPUT_TOO_LARGE");
+    assert!(posts(&recorded).is_empty());
+}
+
+#[test]
+fn test_provider_token_count_over_limit_does_not_send_judge() {
+    let (backend, recorded) = haiku(vec![count_reply(32_001)]);
+    backend
+        .validate_for_send(&standard_request(PROMPT))
+        .expect("local ceiling");
+    let error = backend
+        .judge(&standard_request(PROMPT))
+        .expect_err("provider tokens");
+    assert_eq!(error.code(), "INPUT_INVALID");
+    assert!(error.to_string().contains("32001"));
+    let seen = posts(&recorded);
+    assert_eq!(seen.len(), 1);
+    assert!(seen[0].url.ends_with("/count_tokens"));
 }
 
 #[test]

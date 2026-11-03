@@ -21,6 +21,60 @@ pub(crate) struct ParsedQuestion {
 /// A larger judge body is `INPUT_TOO_LARGE` and is never split.
 pub(crate) const MAX_REQUEST_BYTES: u64 = 96_000;
 
+/// Pre-send input token ceiling for one judge call (ADR-SAG-0004).
+///
+/// `validate_for_send` applies [`local_input_tokens`] to the count body and
+/// the judge message before any HTTP send. `judge` checks the provider's
+/// `input_tokens` against this same ceiling after the count call and before
+/// the judge message.
+pub(crate) const MAX_INPUT_TOKENS: u64 = 32_000;
+
+/// Conservative token count of an assembled provider body.
+///
+/// One token per four bytes, rounded up. A body that already passed
+/// [`MAX_REQUEST_BYTES`] estimates to at most 24_000 tokens, under
+/// [`MAX_INPUT_TOKENS`]. The provider count is the check that can still
+/// refuse the judge message.
+pub(crate) fn local_input_tokens(body: &[u8]) -> u64 {
+    let bytes = u64::try_from(body.len()).unwrap_or(u64::MAX);
+    bytes.div_ceil(4)
+}
+
+/// Refuses `tokens` above [`MAX_INPUT_TOKENS`].
+///
+/// # Errors
+///
+/// Returns [`JevError::InputInvalid`] when `tokens` exceeds the ceiling.
+pub(crate) fn enforce_input_token_limit(tokens: u64) -> Result<(), JevError> {
+    if tokens > MAX_INPUT_TOKENS {
+        return Err(JevError::InputInvalid {
+            detail: format!("input is {tokens} tokens; limit is {MAX_INPUT_TOKENS} tokens"),
+        });
+    }
+    Ok(())
+}
+
+/// Byte and local token checks for the count body and the judge message.
+///
+/// # Errors
+///
+/// Returns [`JevError::InputTooLarge`] when either body exceeds
+/// [`MAX_REQUEST_BYTES`], and [`JevError::InputInvalid`] when the local token
+/// estimate exceeds [`MAX_INPUT_TOKENS`].
+pub(crate) fn enforce_count_and_message_limits(
+    count_body: &[u8],
+    message_body: &[u8],
+) -> Result<(), JevError> {
+    for body in [count_body, message_body] {
+        let actual = u64::try_from(body.len()).unwrap_or(u64::MAX);
+        if actual > MAX_REQUEST_BYTES {
+            return Err(too_large(actual));
+        }
+        enforce_input_token_limit(local_input_tokens(body))?;
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_questions(bytes: &[u8]) -> Result<Vec<ParsedQuestion>, JevError> {
     let value: Value = serde_json::from_slice(bytes).map_err(|error| JevError::InputInvalid {
         detail: format!("canonical payload is not JSON: {error}"),

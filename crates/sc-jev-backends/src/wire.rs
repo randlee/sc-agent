@@ -81,13 +81,16 @@ pub(crate) fn count_body(kind: ProviderKind, message_body: &[u8]) -> Vec<u8> {
     }
 }
 
-pub(crate) fn headers(kind: ProviderKind, api_key: &str) -> Vec<(String, String)> {
+/// Provider headers that do not carry the API key.
+///
+/// The sending transport adds `x-api-key` or `Authorization` when it reads
+/// the sealed credential (ADR-SAG-0020).
+pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(String, String)> {
     let mut headers = match kind {
-        ProviderKind::Anthropic => vec![
-            ("x-api-key".to_owned(), api_key.to_owned()),
-            ("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned()),
-        ],
-        ProviderKind::OpenAi => vec![("Authorization".to_owned(), format!("Bearer {api_key}"))],
+        ProviderKind::Anthropic => {
+            vec![("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned())]
+        }
+        ProviderKind::OpenAi => Vec::new(),
     };
     headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
     headers

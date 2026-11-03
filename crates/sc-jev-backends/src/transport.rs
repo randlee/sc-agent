@@ -3,10 +3,11 @@
 //! Production calls use [`UreqTransport`]. Tests supply another
 //! [`BackendTransport`] so judge tests do not open sockets.
 
+use std::fmt;
 use std::io::Read;
 use std::time::Duration;
 
-use sc_agent_types::JevError;
+use sc_agent_types::{JevError, ResolvedApiKey};
 
 /// TCP connect timeout for provider calls.
 ///
@@ -26,14 +27,29 @@ pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 /// Anything larger is refused so a response cannot grow without a bound.
 const MAX_RESPONSE_BYTES: u64 = 8 * 1024 * 1024;
 
+/// How the sending transport attaches [`ResolvedApiKey`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AuthScheme {
+    /// Anthropic `x-api-key` header.
+    AnthropicApiKey,
+    /// `Authorization: Bearer` header.
+    Bearer,
+}
+
 /// One outbound provider call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// `credential` stays sealed until [`Self::install_auth`], which a
+/// [`BackendTransport::send`] implementation calls before the bytes leave
+/// the process (ADR-SAG-0020).
+#[derive(Clone, PartialEq, Eq)]
 pub struct HttpRequest {
     /// HTTP method. Provider calls use `POST`.
     pub method: String,
     /// Absolute URL, including host and path.
     pub url: String,
     /// Request headers in send order. Names keep the caller's casing.
+    ///
+    /// The credential header is absent until [`Self::install_auth`].
     pub headers: Vec<(String, String)>,
     /// Raw JSON body.
     pub body: Vec<u8>,
@@ -41,6 +57,46 @@ pub struct HttpRequest {
     pub connect_timeout: Duration,
     /// Read and write deadline applied by the transport.
     pub request_timeout: Duration,
+    pub(crate) credential: ResolvedApiKey,
+    pub(crate) scheme: AuthScheme,
+    pub(crate) auth_installed: bool,
+}
+
+impl HttpRequest {
+    /// Copies the sealed credential into the provider auth header.
+    ///
+    /// Only a [`BackendTransport::send`] implementation may call this.
+    pub fn install_auth(&mut self) {
+        if self.auth_installed {
+            return;
+        }
+        let header = match self.scheme {
+            AuthScheme::AnthropicApiKey => {
+                ("x-api-key".to_owned(), self.credential.as_str().to_owned())
+            }
+            AuthScheme::Bearer => (
+                "Authorization".to_owned(),
+                format!("Bearer {}", self.credential.as_str()),
+            ),
+        };
+        self.headers.insert(0, header);
+        self.auth_installed = true;
+    }
+}
+
+impl fmt::Debug for HttpRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("HttpRequest")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("headers", &"[redacted]")
+            .field("body", &self.body)
+            .field("connect_timeout", &self.connect_timeout)
+            .field("request_timeout", &self.request_timeout)
+            .field("credential", &self.credential)
+            .finish()
+    }
 }
 
 /// One provider response, including non-200 statuses.
@@ -82,7 +138,8 @@ impl UreqTransport {
 }
 
 impl BackendTransport for UreqTransport {
-    fn send(&self, request: HttpRequest) -> Result<HttpResponse, JevError> {
+    fn send(&self, mut request: HttpRequest) -> Result<HttpResponse, JevError> {
+        request.install_auth();
         let agent = ureq::AgentBuilder::new()
             .timeout(request.request_timeout)
             .timeout_connect(request.connect_timeout)
@@ -92,11 +149,17 @@ impl BackendTransport for UreqTransport {
             outbound = outbound.set(name, value);
         }
         match outbound.send_bytes(&request.body) {
-            Ok(response) => read_response(response),
-            Err(ureq::Error::Status(_, response)) => read_response(response),
-            Err(ureq::Error::Transport(error)) => Err(JevError::NetworkError {
-                detail: format!("provider connection failed: {error}"),
-            }),
+            Ok(response) => {
+                read_response(response).map_err(|error| request.credential.redact_error(error))
+            }
+            Err(ureq::Error::Status(_, response)) => {
+                read_response(response).map_err(|error| request.credential.redact_error(error))
+            }
+            Err(ureq::Error::Transport(error)) => {
+                Err(request.credential.redact_error(JevError::NetworkError {
+                    detail: format!("provider connection failed: {error}"),
+                }))
+            }
         }
     }
 }
