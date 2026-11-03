@@ -50,11 +50,52 @@ pub(crate) fn message_body(
     payload_text: &str,
     system_prompt: &str,
 ) -> Vec<u8> {
+    encode(&provider_document(
+        kind,
+        model,
+        payload_text,
+        system_prompt,
+        true,
+    ))
+}
+
+/// Token-count body for `kind`.
+///
+/// OpenAI counts the judge document. Anthropic counts the same document
+/// without `max_tokens`. Both documents are built here. This function does
+/// not parse the judge body.
+pub(crate) fn count_body(
+    kind: ProviderKind,
+    model: &str,
+    payload_text: &str,
+    system_prompt: &str,
+) -> Vec<u8> {
+    encode(&provider_document(
+        kind,
+        model,
+        payload_text,
+        system_prompt,
+        !matches!(kind, ProviderKind::Anthropic),
+    ))
+}
+
+fn provider_document(
+    kind: ProviderKind,
+    model: &str,
+    payload_text: &str,
+    system_prompt: &str,
+    include_max_tokens: bool,
+) -> Value {
     let user = serde_json::json!([{ "role": "user", "content": payload_text }]);
-    let value = match kind {
-        ProviderKind::Anthropic => serde_json::json!({
+    match kind {
+        ProviderKind::Anthropic if include_max_tokens => serde_json::json!({
             "model": model,
             "max_tokens": HAIKU_MAX_TOKENS,
+            "messages": user,
+            "system": system_prompt,
+        }),
+        ProviderKind::Anthropic => serde_json::json!({
+            "model": model,
             "messages": user,
             "system": system_prompt,
         }),
@@ -63,21 +104,6 @@ pub(crate) fn message_body(
             "input": user,
             "instructions": system_prompt,
         }),
-    };
-    encode(&value)
-}
-
-pub(crate) fn count_body(kind: ProviderKind, message_body: &[u8]) -> Vec<u8> {
-    match kind {
-        ProviderKind::OpenAi => message_body.to_vec(),
-        ProviderKind::Anthropic => {
-            let mut value: Value =
-                serde_json::from_slice(message_body).expect("judge body was just encoded as JSON");
-            if let Some(object) = value.as_object_mut() {
-                object.remove("max_tokens");
-            }
-            encode(&value)
-        }
     }
 }
 

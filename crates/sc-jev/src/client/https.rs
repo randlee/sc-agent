@@ -1,15 +1,23 @@
 //! Blocking HTTPS transport for the packaged TypeSafe endpoint.
 //!
 //! Each send uses `timeout_global` from the request, refuses cleartext, and
-//! does not follow redirects. 4xx and 5xx stay in the [`crate::WireResponse`]
+//! does not follow redirects. The response body is capped at
+//! [`MAX_RESPONSE_BYTES`]. 4xx and 5xx stay in the [`crate::WireResponse`]
 //! so the client can apply the busy-retry policy.
 
+use std::io::Read;
 use std::time::Duration;
 
 use sc_agent_types::JevError;
 use ureq::Agent;
 
 use super::{JevTransport, WireRequest, WireResponse};
+
+/// Largest Jev response body this client will buffer.
+///
+/// A normal check reply fits well under this. Anything larger is
+/// [`JevError::ResponseInvalid`] so a response cannot grow without a bound.
+const MAX_RESPONSE_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Production transport. Holds no API key; each [`WireRequest`] carries it.
 ///
@@ -67,10 +75,22 @@ impl JevTransport for HttpsTransport {
             .get("retry-after")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        let body = response
+        let mut reader = response
             .body_mut()
-            .read_to_vec()
-            .map_err(|error| network(&error, &authorization))?;
+            .as_reader()
+            .take(MAX_RESPONSE_BYTES.saturating_add(1));
+        let mut body = Vec::new();
+        reader
+            .read_to_end(&mut body)
+            .map_err(|error| network_io(&error, &authorization))?;
+        if body.len() as u64 > MAX_RESPONSE_BYTES {
+            return Err(JevError::ResponseInvalid {
+                detail: redact(
+                    format!("Jev response exceeds {MAX_RESPONSE_BYTES} bytes"),
+                    &authorization,
+                ),
+            });
+        }
         Ok(WireResponse {
             status,
             body,
@@ -80,12 +100,22 @@ impl JevTransport for HttpsTransport {
 }
 
 fn network(error: &ureq::Error, authorization: &str) -> JevError {
-    let mut detail = format!("Jev connection failed: {error}");
+    JevError::NetworkError {
+        detail: redact(format!("Jev connection failed: {error}"), authorization),
+    }
+}
+
+fn network_io(error: &std::io::Error, authorization: &str) -> JevError {
+    JevError::NetworkError {
+        detail: redact(format!("Jev connection failed: {error}"), authorization),
+    }
+}
+
+fn redact(mut detail: String, authorization: &str) -> String {
     if let Some(key) = authorization.strip_prefix("Bearer ")
         && !key.is_empty()
     {
         detail = detail.replace(key, "[redacted]");
     }
-    detail = detail.replace(authorization, "[redacted]");
-    JevError::NetworkError { detail }
+    detail.replace(authorization, "[redacted]")
 }

@@ -125,7 +125,12 @@ impl Client {
             payload_text,
             &prompt.system_prompt,
         );
-        let count_body = wire::count_body(self.provider.kind, &message_body);
+        let count_body = wire::count_body(
+            self.provider.kind,
+            self.provider.model,
+            payload_text,
+            &prompt.system_prompt,
+        );
         Ok(Prepared {
             questions,
             message_body,

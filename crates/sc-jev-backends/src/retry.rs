@@ -30,8 +30,9 @@ const RETRY_AFTER_UNPARSABLE: Duration = Duration::from_secs(30);
 
 /// Sleeps between busy retries.
 ///
-/// The production sleeper blocks the calling thread. Tests supply a sleeper
-/// that records the delay and returns.
+/// This trait is an open extension point (ADR-SAG-0006) so tests can record
+/// waits without sleeping the calling thread. It is intentionally not sealed.
+/// The production sleeper blocks the calling thread.
 pub trait RetrySleeper: Send + Sync {
     /// Waits `delay` before the next send of the same body.
     fn wait(&self, delay: Duration);

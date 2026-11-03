@@ -1,9 +1,8 @@
 //! Check/judge body encoding and response parsing.
 //!
-//! The canonical payload bytes are posted unchanged, with the pinned `model`
-//! key spliced in front. The client does not re-canonicalize the payload for
-//! send (ADR-SAG-0005). [`reject_unless_already_canonical`] only compares the
-//! original bytes to a validation oracle and drops that oracle.
+//! The payload bytes are posted unchanged, with the pinned `model` key spliced
+//! in front. This client validates question shape and does not re-canonicalize
+//! those bytes (ADR-SAG-0005). [`splice_model`] copies the original payload.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,9 +24,9 @@ pub(crate) struct PreparedCheck {
 ///
 /// # Errors
 ///
-/// Returns [`JevError::InputInvalid`] when the payload is not a canonical
-/// object with at least one choice question, and [`JevError::InputTooLarge`]
-/// when the wire body exceeds `config.max_request_bytes`.
+/// Returns [`JevError::InputInvalid`] when the payload is not a JSON object
+/// with at least one choice question, and [`JevError::InputTooLarge`] when the
+/// wire body exceeds `config.max_request_bytes`.
 pub(crate) fn prepare(config: &JevClientConfig, payload: &[u8]) -> Result<PreparedCheck, JevError> {
     let value: Value = serde_json::from_slice(payload).map_err(|_| JevError::InputInvalid {
         detail: "Jev payload is not JSON".to_owned(),
@@ -36,7 +35,12 @@ pub(crate) fn prepare(config: &JevClientConfig, payload: &[u8]) -> Result<Prepar
         detail: "Jev payload must be a JSON object".to_owned(),
     })?;
     let criteria = question_criteria(&value)?;
-    reject_unless_already_canonical(payload, &value)?;
+    if !payload.starts_with(b"{") {
+        return Err(JevError::InputInvalid {
+            detail: "Jev payload object must start at the first byte so the wire body can keep those bytes"
+                .to_owned(),
+        });
+    }
     if object.contains_key("model") {
         return Err(JevError::InputInvalid {
             detail: "canonical payload must not include model; sc-jev adds the pinned model"
@@ -233,20 +237,6 @@ fn criteria_from_array(items: &[Value]) -> Result<BTreeMap<String, BTreeSet<Stri
         }
     }
     Ok(criteria)
-}
-
-/// Compares `payload` to the canonical encoding of `value` and drops that encoding.
-///
-/// The oracle is a validation check that the facade already canonicalized the
-/// bytes. It is not the wire body. [`splice_model`] copies `payload` unchanged.
-fn reject_unless_already_canonical(payload: &[u8], value: &Value) -> Result<(), JevError> {
-    let validation_oracle = sc_agent_types::canonical_json_bytes(value)?;
-    if validation_oracle.as_slice() != payload {
-        return Err(JevError::InputInvalid {
-            detail: "payload bytes are not canonical sorted-key compact JSON".to_owned(),
-        });
-    }
-    Ok(())
 }
 
 fn splice_model(model: &str, payload: &[u8]) -> Result<Vec<u8>, JevError> {
