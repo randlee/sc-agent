@@ -100,6 +100,13 @@ jobs:
           restore-keys: |
             sc-agent-ci-test-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
+      # Warm the cache for every platform: sc-agent-types' tests/features.rs
+      # runs `cargo tree --locked --offline --target all`, which needs the
+      # platform-only crates in Cargo.lock downloaded (no --target here).
+      - name: cargo fetch --locked (all targets)
+        timeout-minutes: 10
+        run: cargo fetch --locked
+
       - name: just setup (checksum-verified sc-lint)
         if: matrix.os == 'ubuntu-24.04'
         timeout-minutes: 5
@@ -360,6 +367,13 @@ jobs:
           key: sc-agent-ci-coverage-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sc-agent-ci-coverage-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
+
+      # Warm the cache for every platform: sc-agent-types' tests/features.rs
+      # runs `cargo tree --locked --offline --target all`, which needs the
+      # platform-only crates in Cargo.lock downloaded (no --target here).
+      - name: cargo fetch --locked (all targets)
+        timeout-minutes: 10
+        run: cargo fetch --locked
 
       - name: cargo llvm-cov (run tests, no report)
         timeout-minutes: 30

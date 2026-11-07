@@ -228,6 +228,12 @@ for the Scoop multi-shim limit.
   kept the record until the dependency was gone; r-1 deleted the record
   with the dependency, and the merge keeps that deletion. r-4 no longer
   deletes it.
+- **Warm cargo cache for offline tree tests.** r-1's
+  `crates/sc-agent-types/tests/features.rs` runs `cargo tree --locked
+  --offline --target all`, so every platform's crates in `Cargo.lock` must
+  already be downloaded; adding `clap` brought in platform-only crates, so
+  the `test` and `coverage` jobs run `cargo fetch --locked` (no `--target`)
+  before their test steps.
 - **CLI tests cannot be skipped silently** (FTQ-002). CI job `features` runs
   `cargo test -p sc-treesitter --test cli --features cli` and the same for
   `sc-ai`; cargo fails if the target or the feature is renamed or dropped.
