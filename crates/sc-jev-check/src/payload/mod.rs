@@ -16,11 +16,10 @@ pub use caller::{PreparedCallerRequest, prepare_caller_request};
 
 use sc_agent_types::{
     CanonicalJudgePayload, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot, Rev,
-    payload_bundle_from_value,
 };
 
 use crate::config::{CheckSpec, load_packaged_config};
-use crate::extract::{Extracted, extract_input, read_repo_text};
+use crate::extract::{Extracted, extract_input, read_repo_text, repo_path};
 
 pub(crate) use questions::parse_state;
 #[doc(inline)]
@@ -49,9 +48,9 @@ impl PayloadBuilder {
     /// Returns [`JevError::ConfigInvalid`] when the cap is zero.
     pub fn new(max_input_bytes: u64) -> Result<Self, JevError> {
         if max_input_bytes == 0 {
-            return Err(JevError::ConfigInvalid {
-                detail: "payload byte cap must be greater than zero".into(),
-            });
+            return Err(JevError::config_invalid(
+                "payload byte cap must be greater than zero",
+            ));
         }
         Ok(Self { max_input_bytes })
     }
@@ -87,9 +86,13 @@ impl PayloadBuilder {
         repo: &RepoRoot,
         rev: &Rev,
     ) -> Result<BuiltPayload, JevError> {
-        let questions = parse_question_set(&read_repo_text(repo, rev, &spec.questions_path)?)?;
+        let questions = parse_question_set(&read_repo_text(
+            repo,
+            rev,
+            &repo_path(&spec.questions_path)?,
+        )?)?;
         let state = match &spec.state_path {
-            Some(path) => parse_state(&read_repo_text(repo, rev, path)?, &questions)?,
+            Some(path) => parse_state(&read_repo_text(repo, rev, &repo_path(path)?)?, &questions)?,
             None => Vec::new(),
         };
         let mut extractions = BTreeMap::new();
@@ -115,17 +118,14 @@ impl PayloadBuilder {
 pub(crate) fn refuse_over_cap(bytes: &[u8], limit_bytes: u64) -> Result<(), JevError> {
     let actual_bytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if actual_bytes > limit_bytes {
-        Err(JevError::InputTooLarge {
-            limit_bytes,
-            actual_bytes,
-        })
+        Err(JevError::input_too_large(limit_bytes, actual_bytes))
     } else {
         Ok(())
     }
 }
 
 fn substitute_inputs(
-    mut questions: Vec<Question>,
+    questions: Vec<Question>,
     extractions: &BTreeMap<String, Extracted>,
 ) -> Vec<Question> {
     let replacements: BTreeMap<&str, String> = extractions
@@ -134,16 +134,19 @@ fn substitute_inputs(
             let joined = extracted
                 .subjects
                 .iter()
-                .map(|subject| subject.text.as_str())
+                .map(|subject| subject.text())
                 .collect::<Vec<_>>()
                 .join("\n");
             (name.as_str(), joined)
         })
         .collect();
-    for question in &mut questions {
-        question.prompt = expand_placeholders(&question.prompt, &replacements);
-    }
     questions
+        .into_iter()
+        .map(|question| {
+            let prompt = expand_placeholders(question.prompt(), &replacements);
+            question.with_prompt(prompt)
+        })
+        .collect()
 }
 
 /// Replaces each `{name}` token in one left-to-right pass.
@@ -176,12 +179,10 @@ pub(crate) fn encode_payload(
     questions: &[Question],
     state: &[ChoiceAnswer],
 ) -> Result<PayloadBundle, JevError> {
-    let value = serde_json::to_value(CanonicalJudgePayload {
-        questions: questions.to_vec(),
-        state: state.to_vec(),
-    })
-    .map_err(|error| JevError::encode_failed("canonical payload", &error))?;
-    payload_bundle_from_value(&value)
+    PayloadBundle::encode(&CanonicalJudgePayload::new(
+        questions.to_vec(),
+        state.to_vec(),
+    ))
 }
 
 #[cfg(test)]
@@ -208,13 +209,13 @@ mod tests {
             inputs: BTreeMap::from([
                 (
                     "a".into(),
-                    sc_agent_types::InputSpec::File {
+                    crate::config::InputSpec::File {
                         path: "a.txt".into(),
                     },
                 ),
                 (
                     "b".into(),
-                    sc_agent_types::InputSpec::File {
+                    crate::config::InputSpec::File {
                         path: "b.txt".into(),
                     },
                 ),
@@ -248,7 +249,7 @@ mod tests {
             built.extractions["choice"]
                 .subjects
                 .iter()
-                .any(|subject| subject.text == "ship | hold")
+                .any(|subject| subject.text() == "ship | hold")
         );
         assert!(!text.contains("PROMPT-TOKEN-a3-check"));
         assert!(!text.contains(crate::config::PACKAGED_SYSTEM_PROMPT.trim()));
@@ -293,6 +294,7 @@ mod tests {
             JevError::InputTooLarge {
                 limit_bytes,
                 actual_bytes,
+                ..
             } => {
                 assert_eq!(limit_bytes, 1);
                 assert!(actual_bytes > 1);
@@ -318,7 +320,7 @@ mod tests {
             system_prompt_file: None,
             inputs: BTreeMap::from([(
                 "missing".into(),
-                sc_agent_types::InputSpec::File {
+                crate::config::InputSpec::File {
                     path: "no-such-file.txt".into(),
                 },
             )]),

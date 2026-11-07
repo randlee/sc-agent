@@ -26,8 +26,7 @@ sc-ai (binary) ── sc-observability v2 Logger → SessionLog adapter
         ├── sc-jev (TypeSafe Jev HTTP + JudgeBackend impl)
         ├── sc-jev-backends (Haiku/Luna JudgeBackend impls)
         ├── sc-agent-secrets
-        └── sc-agent-types (temporary observability::v2 shim)
-                └── sc-observability-types (=1.5.0, v2 port types)
+        └── sc-agent-types (observability::v2 port; no sc-observability* dep since r-1)
 
 sc-jev-py (PyO3) ── sc-observability v2 Logger → SessionLog adapter
   └── sc-jev-check
@@ -36,9 +35,9 @@ sc-treesitter (library + binary) → sc-agent-types
 ```
 
 Every workspace crate depends on `sc-agent-types`; the graph shows the edge
-once. `sc-agent-types` is the only crate that depends on
-`sc-observability-types` (ADR-SAG-0016). Only the composition roots `sc-ai`
-and `sc-jev-py` depend on full `sc-observability`.
+once. Since r-1 no crate depends on `sc-observability-types` (ADR-SAG-0016
+r-1 amendment). Only the composition roots `sc-ai` and `sc-jev-py` depend on
+full `sc-observability`.
 
 `sc-jev` and `sc-jev-backends` do not depend on each other.
 
@@ -75,35 +74,35 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 
 | ADR | Title | Status | Amends / amended by |
 | --- | --- | --- | --- |
-| ADR-SAG-0001 | Error enum is CLI authority | Active | Amended by ADR-SAG-0027 (Proposed, r-1) |
+| ADR-SAG-0001 | Error enum is CLI authority | Active | Amended by ADR-SAG-0027 (Active, r-1) |
 | ADR-SAG-0002 | Canonical judge payload bytes | Active | — |
 | ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020; ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0004 | One check, one request | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2); A.1 subsections (Proposed, r-4), (Proposed, r-5) |
 | ADR-SAG-0006 | Transport injection | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0007 | API-direct LLM backends | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
-| ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0027 (Proposed, r-1); ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0027 (Active, r-1); ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0010 | CLI thin adapter | Active | Amended by ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0011 | Python via sc-jev-py wheel | Active | Amended by ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0012 | sc-jev owns Jev API | Active | — |
 | ADR-SAG-0013 | Session JSONL via sc-observability v2 | Active | Amended by ADR-SAG-0021; ADR-SAG-0026 (Proposed, r-3b) |
-| ADR-SAG-0014 | CLI success body | Active | Amended by ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0014 | CLI success body | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
-| ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0027 (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3b) |
+| ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0027 (Active, r-1); ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
-| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | Amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3) |
+| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
-| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Proposed, r-1); ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0023 | Dependency pins, allocator, released binaries | Proposed (r-4; compose pin r-3b) | Amends ADR-SAG-0016, ADR-SAG-0017 |
 | ADR-SAG-0024 | Engine entry point and response contract | Proposed (r-2) | Amends ADR-SAG-0003, ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0025 | Multi-backend semantics and equal-input attestation | Proposed (r-2b) | Amends ADR-SAG-0004, ADR-SAG-0008, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0026 | Shared HTTP crate and composition crate | Proposed (HTTP half r-3; compose half r-3b) | Amends ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0020, ADR-SAG-0017 (HTTP half); ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013, ADR-SAG-0016, ADR-SAG-0017 (compose half) |
-| ADR-SAG-0027 | Error taxonomy and extensibility | Proposed (r-1) | Amends ADR-SAG-0001, ADR-SAG-0009, ADR-SAG-0016 |
+| ADR-SAG-0027 | Error taxonomy and extensibility | Active (r-1) | Amends ADR-SAG-0001, ADR-SAG-0009, ADR-SAG-0016 |
 | ADR-SAG-0028 | workspace-tests crate | Proposed (r-3b) | — |
-| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Proposed, r-1), (Proposed, r-3) and of (b) (Proposed, r-1), (Proposed, r-2) |
+| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Active, r-1), (Proposed, r-3) and of (b) (Active, r-1), (Proposed, r-2) |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 
@@ -165,6 +164,21 @@ opinion receives prior answers. TypeSafe Jev has no rationale field on the wire;
 Haiku/Luna session `ask` paths reuse stored context. Session files are UUID paths
 with mode `0600` (sprint a-6).
 
+### Amendment (Phase A.1, r-1 — interim shapes)
+
+**Status:** Active (Phase A.1, landed in r-1). Superseded by ADR-SAG-0025
+(r-2b) when that lands.
+
+- (Active, r-1) The run engine is unchanged in behaviour: later LLM
+  backends still receive earlier answers as session context, and the
+  record now says so (`EqualInputRecord.mode = ChainContext`). Every backend
+  gets the same `Arc<PayloadBundle>`.
+- (Active, r-1) Session files are **document version 2**. A file with a
+  missing or older version (Phase A, v1) or a newer one loads as
+  `SessionDocumentInvalid` (`INPUT_INVALID`) with its own recovery text; v1
+  sessions cannot be resumed. On load, every stored outcome is checked
+  against the stored payload (`JudgeOutcome::check_against`).
+
 ### Amendment (Phase A.1, r-2b)
 
 **Status:** Proposed (Phase A.1) — lands in r-2b.
@@ -187,14 +201,14 @@ Amended by ADR-SAG-0022.
 
 ### Amendment (Phase A.1, r-1)
 
-**Status:** Proposed (Phase A.1) — lands in r-1.
+**Status:** Active (Phase A.1, landed in r-1).
 
-- (Proposed, r-1) `BackendId` is `#[non_exhaustive]`. Static backend facts
+- (Active, r-1) `BackendId` is `#[non_exhaustive]`. Static backend facts
   (`family`, `key_id`, `requires_llm_context`, `supports_session_ask`,
   `request_limit_bytes`) live on `BackendDescriptor` rows in `BACKENDS`;
   `JudgeBackend::capabilities()` is a provided method derived from the
   descriptor.
-- (Proposed, r-1) Backend dispatch is a **test-and-review convention**, not a
+- (Active, r-1) Backend dispatch is a **test-and-review convention**, not a
   lint: the production factory is a table
   `&[(BackendId, fn(ResolvedApiKey) -> Arc<dyn JudgeBackend>)]` in
   `sc-jev-check::registry`, checked against `BACKENDS` by
@@ -202,12 +216,12 @@ Amended by ADR-SAG-0022.
   descriptor facts (`family`, `requires_llm_context`,
   `supports_session_ask`, `request_limit_bytes`), never on `BackendId`
   equality or a `match`; review enforces it (no clippy lint expresses it).
-- (Proposed, r-1) "Open" means additive: adding a built-in backend is a
+- (Active, r-1) "Open" means additive: adding a built-in backend is a
   minor `sc-agent-types` change (variant + `BACKENDS` row) plus one factory
   table row, with no caller signature change (checklist in ADR-SAG-0027). It
   is not a runtime-open registry: `BackendRegistry::register` installs a
   double or scripted backend for an existing id and cannot add an id.
-- (Proposed, r-1) `JudgeBackend` is intentionally open (not sealed); every
+- (Active, r-1) `JudgeBackend` is intentionally open (not sealed); every
   method added after A.1 has a default body.
 
 ### Amendment (Phase A.1, r-2)
@@ -263,9 +277,9 @@ and not a second `run_check` policy.
 
 ### Amendment (Phase A.1, r-1)
 
-**Status:** Proposed (Phase A.1) — lands in r-1.
+**Status:** Active (Phase A.1, landed in r-1).
 
-- (Proposed, r-1) `registry::ScriptedJudge` and `registry::RequestLog` are
+- (Active, r-1) `registry::ScriptedJudge` and `registry::RequestLog` are
   deleted; their callers use `sc_agent_types::test_util::MockJudgeBackend`
   (`requests()`, `validations()`, `with_provider_meta`, `with_failure`,
   `refusing`). `register_scripted_backends` keeps its signature and the
@@ -275,7 +289,7 @@ and not a second `run_check` policy.
   `test-util` makes `registry::ScriptedJudge`, `registry::RequestLog`, and
   `registry::register_scripted_backends` public": only
   `register_scripted_backends` stays.
-- (Proposed, r-1) The sentence above "An LLM backend id still requires
+- (Active, r-1) The sentence above "An LLM backend id still requires
   `JudgeRequest.llm` before it returns" still holds and is not superseded:
   `MockJudgeBackend` enforces it from the descriptor
   (`requires_llm_context()`), so `validate_for_send` (counted) and `judge`
@@ -350,6 +364,26 @@ When an LLM backend is selected and the resolved file is missing → `CONFIG_INV
 
 Token/count checks apply to the full message the provider receives; equal-input
 still records whether every backend saw the same canonical bytes.
+*Amended by the r-1 interim amendment below: `equal` is derived from
+per-backend attestations and is false on live runs until r-2b.*
+
+### Amendment (Phase A.1, r-1 — interim shapes)
+
+**Status:** Active (Phase A.1, landed in r-1). Superseded by ADR-SAG-0025
+(r-2b) when that lands.
+
+- (Active, r-1) The sentence "equal-input still records whether every
+  backend saw the same canonical bytes" now reads: equal-input records, per
+  backend, an `Attestation` (`Matched`, `Mismatched`, `Unattested`,
+  `Failed`, `NotSent`), and `equal` is **derived**: true only when every
+  backend is `Matched`. Until r-2b lands backend-side hashing, no backend
+  reports `JudgeOutcome.input_sha256`, so the engine records `Unattested`
+  for every backend it sent to and **a live run reports `equal = false`**.
+  The engine still gives every backend the one shared bundle.
+- (Active, r-1) `JudgeRequest` carries `Arc<PayloadBundle>` (one bundle per
+  run) and a `CancelToken`; `JudgeRequest.llm` is unchanged.
+  `MultiBackendMode` (`Independent` default, `ChainContext`) is recorded on
+  `EqualInputRecord.mode`; r-1 records `ChainContext`, its actual behaviour.
 
 ### Amendment (Phase A.1, r-2)
 
@@ -421,13 +455,13 @@ points and the secret-bearing return type.
 
 ### Amendment (Phase A.1, r-1)
 
-**Status:** Proposed (Phase A.1) — lands in r-1.
+**Status:** Active (Phase A.1, landed in r-1).
 
-- (Proposed, r-1) `ResolvedApiKey::try_new` is the only constructor in every
+- (Active, r-1) `ResolvedApiKey::try_new` is the only constructor in every
   build; the unchecked `new` is removed, and test keys use `try_new`; the
   secret is held as `Arc<str>`. Backend constructors (`JevClient::new`,
   Haiku, Luna, and their `with_default_transport`) are infallible.
-- (Proposed, r-1) Supersedes these ADR-SAG-0029 (a) sentences: "The
+- (Active, r-1) Supersedes these ADR-SAG-0029 (a) sentences: "The
   unchecked `ResolvedApiKey::new` exists only under `cfg(test)` or the
   `sc-agent-types/test-util` feature, for test doubles" (it no longer
   exists), and, for the two sending transports, "carry
@@ -684,7 +718,8 @@ in either log (ADR-SAG-0013).
 Do **not** publish a separate observability crate. For the **first release or two**,
 **`sc-agent-types::observability::v2`** holds the injectable `SessionLog` port
 (aligned with registry `v2::Logger`). Temporary dependency:
-`sc-observability-types = "1.5.0"` on **`sc-agent-types` only**; full
+`sc-observability-types = "1.5.0"` on **`sc-agent-types` only**
+(*superseded by the r-1 amendment below: the dependency is removed*); full
 `sc-observability = "1.5.0"` on composition roots **`sc-ai`** and **`sc-jev-py`**.
 Libraries take only **`SharedSessionLog`**. When upstream v2 ships, **delete
 the module** and drop the types dependency if possible (bead:
@@ -699,9 +734,9 @@ the module** and drop the types dependency if possible (bead:
 
 ### Amendment (Phase A.1, r-1)
 
-**Status:** Proposed (Phase A.1) — lands in r-1.
+**Status:** Active (Phase A.1, landed in r-1).
 
-- (Proposed, r-1) `sc-agent-types` no longer depends on
+- (Active, r-1) `sc-agent-types` no longer depends on
   `sc-observability-types`, and the root workspace entry is deleted (no
   user remains). `observability::v2::SessionLog::emit` returns the local
   `LogRejected`. The `observability` module is behind the default-on `obs`
@@ -729,8 +764,31 @@ On success, stdout is the versioned sc-ai-cli envelope
 `{ "version", "operation", "data" }` where **`data`** holds the **verbatim Jev
 response JSON** for the operation plus **`session_id`** (REQ-SAG-0710). LLM
 backends normalize to the same answer shape before printing.
+*Amended by the r-1 interim amendment below: `answers` is written once from
+the typed answers; other per-answer keys stay in `provider_meta`.*
 
 Amended by ADR-SAG-0024 (Proposed, r-2).
+
+### Amendment (Phase A.1, r-1 — interim shapes)
+
+**Status:** Active (Phase A.1, landed in r-1). Superseded by ADR-SAG-0024
+(r-2) when that lands.
+
+- (Active, r-1) The data that `data` is built from is typed. For a Jev
+  primary outcome, the response fields other than `answers` are copied from
+  `provider_meta` verbatim, and `answers` is written **once**, from the typed
+  answers (`choice`, `confidence`, `probabilities`; byte-identical to the Jev
+  answer objects for those keys). A per-answer key outside those three
+  survives only in `provider_meta` (plan CPR-203 option (a)). For an LLM
+  primary outcome, `answers`, `model` and `usage` are as before.
+- (Active, r-1) Each `outcomes[]` entry is a `JudgeOutcome`: `answers`
+  (question id → `{choice, confidence?, probabilities?}`), `backend`,
+  `input_sha256` (null until r-2b backend hashing) and `provider_meta`. The
+  Phase A `probabilities` field is removed (it was derived from `answers`).
+- (Active, r-1) `equal_input` is `{prompt_sha256, mode, backends: [{backend,
+  attestation: {status}}], leak, equal, producer}`; `commands` is removed
+  and `equal` is derived (ADR-SAG-0019 r-1 amendment). REQ-SAG-0710 holds
+  with these shapes.
 
 ### Amendment (Phase A.1, r-2)
 
@@ -1045,9 +1103,9 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
 
 ## ADR-SAG-0027 — Error taxonomy and extensibility
 
-**Status:** Proposed (Phase A.1) — lands in r-1. Amends ADR-SAG-0001.
+**Status:** Active (Phase A.1, landed in r-1). Amends ADR-SAG-0001.
 
-- (Proposed, r-1) `JevError`, `BackendId` and `BackendKeyId` are
+- (Active, r-1) `JevError`, `BackendId` and `BackendKeyId` are
   `#[non_exhaustive]`, and struct-like `JevError` variants are
   `#[non_exhaustive]` so downstream crates use constructors; every
   struct-like variant has a public constructor. Recovery
@@ -1058,7 +1116,7 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
   re-raised as `ProducerError { producer: String, code: ErrorCode, message:
   String }`, whose `code()` is the carried id; every `producer` field is a
   `String`. No string-prefix parsing. REQ-SAG-0106.
-- (Proposed, r-1) `code()` returns `ErrorCode`, a `#[non_exhaustive]` enum
+- (Active, r-1) `code()` returns `ErrorCode`, a `#[non_exhaustive]` enum
   with `as_str()`; its ids are unchanged. `ErrorCode::ALL` is a hand-written
   `const` table (no `build.rs`) that a test compares with
   `errors.json`. Every variant maps to exactly one existing id; an id may
@@ -1066,9 +1124,9 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
   sprint r-1 and pinned by a golden test. A new stable code requires
   changing the README `errors.json` contract shared with Python. Revisit
   when Phase B needs an `INTERNAL` class.
-- (Proposed, r-1) `retryable()` is true only for `NetworkError` kinds Busy,
+- (Active, r-1) `retryable()` is true only for `NetworkError` kinds Busy,
   Timeout, Connect.
-- (Proposed, r-1) `ScAgentErrorResponse::from_jev_error` (name unchanged)
+- (Active, r-1) `ScAgentErrorResponse::from_jev_error` (name unchanged)
   fills fields by one rule, in the fixed key order `error`, `message`,
   `schema_version`, `retryable`, `details`: `schema_version` is always `1`
   (versions this error shape only, independent of the stdout envelope
@@ -1081,25 +1139,33 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
   level or in `details`, is a breaking change and bumps `schema_version`.
   Every stderr line gains `"schema_version":1`; NFR-SAG-0001 and
   REQ-SAG-0701 are amended and a golden stderr test pins the bytes.
-- (Proposed, r-1) **Consumer rule.** Agents and CLI/MCP clients may read
+- (Active, r-1) **Consumer rule.** Agents and CLI/MCP clients may read
   `schema_version` from every stderr line. A value other than `1` means
   "unknown error shape": fall back to the exit code and the raw line. A bump
   is a breaking change announced in the changelog.
-- (Proposed, r-1) `Error::source()` is `None` for every redacted-cause
+- (Active, r-1) `Error::source()` is `None` for every redacted-cause
   variant (`CredentialStoreInvalid`, `NetworkError`, `EncodeFailed`,
   `IoFailed`, `SessionStoreIo`); no A.1 variant carries a non-redacted source.
-- (Proposed, r-1) Serde spelling of backend ids matches `Display`
+- (Active, r-1) Serde spelling of backend ids matches `Display`
   (`openai_luna`, `openai`), with a one-release read alias for
   `open_ai_luna` / `open_ai` in config and caller-request input.
-- (Proposed, r-1) Module seams are cargo features of `sc-agent-types`:
+- (Active, r-1) Module seams are cargo features of `sc-agent-types`:
   `judge`, `secret`, `obs` (default-on), `git` and `test-util`
   (non-default); `error`, `envelope`, `ids`, `schema`, `cancel` are always
   on. `secret` and `judge` are independent; `git` needs only the core.
-  `sc-jev-check` and `sc-treesitter`'s `cli` feature are the only enablers
-  of `git`. `cargo hack --feature-powerset` checks every combination. `sc-treesitter` uses
-  `default-features = false`. Module paths are the stable surface for a later
-  re-export split.
-- (Proposed, r-1) **Adding a built-in backend** (checklist): (1) a minor
+  `sc-jev-check` (r-2) and `sc-treesitter`'s `cli` feature (r-3c) are the
+  only enablers of `git`. `cargo hack --feature-powerset` checks every
+  combination. `sc-treesitter` uses `default-features = false` (r-3c).
+  The stable public surface is the crate-root re-exports plus the public
+  modules `schema` (`schema::subjects`), `observability::v2`, `git` and
+  `test_util`; `error`, `ids`, `judge`, `payload`, `secret`, `cancel`, and
+  the `catalog` / `code` modules are private. The catalog
+  (`BackendDescriptor`, `BACKENDS`, `BackendFamily`) and the error-code
+  enums (`ErrorCode`, `NetworkErrorKind`, `OperationalArea`) sit in their
+  own private modules because sc-boundary 0.8 reports a type cycle inside
+  one module (SCB-CYCLE-001); callers reach them only through the crate
+  root.
+- (Active, r-1) **Adding a built-in backend** (checklist): (1) a minor
   `sc-agent-types` release with the `BackendId` variant, its `BACKENDS` row
   (facts, aliases, limit) and a `BackendKeyId` variant if needed; (2) the
   backend type with `with_default_transport`; (3) one row in
@@ -1109,11 +1175,15 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
   `BackendRegistry::register` is for doubles and scripted backends of
   existing ids only. `BackendId` deserializes through `FromStr`, so the
   descriptor's `aliases()` is the one alias source.
-- (Proposed, r-1) **Test seams** are non-default, additive `test-util` cargo
+- (Active, r-1) **Test seams** are non-default, additive `test-util` cargo
   features of the crate that owns the hook, enabled only by
-  dev-dependencies (a crate's own integration targets use a
-  self-referencing dev-dependency with no `version` key), never by a normal
-  dependency edge; `workspace-tests --test test_util_off` and a `cargo tree`
+  dev-dependencies of other crates, never by a normal dependency edge. A
+  crate's own integration targets that need the hook declare
+  `[[test]] required-features = ["test-util"]` and their validation lines
+  pass `--features test-util`: the r-1 D0 spike showed sc-boundary flags a
+  path-only self dev-dependency (`SCB-MANIFEST-002`) and a versioned one
+  cannot be packaged (`boundaries/README.md` "Dev-dependency and self
+  edges"); `workspace-tests --test test_util_off` and a `cargo tree`
   gate prove it. The one exception is the `sc-jev-py` pytest wheel, built
   with `maturin --features extension-module,test-util` (ADR-SAG-0029 (b));
   the publish wheel has no `_testing` submodule. No acceptance test in

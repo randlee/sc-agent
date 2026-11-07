@@ -11,7 +11,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, ResolvedApiKey,
+    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, NetworkErrorKind, ResolvedApiKey,
 };
 
 use crate::check::{self, PreparedCheck};
@@ -35,7 +35,8 @@ use crate::retry_policy::{self, RetryBudget};
 /// ```
 /// use std::sync::Arc;
 /// use sc_agent_types::{
-///     payload_bundle_from_value, BackendKeyId, JudgeBackend, JudgeRequest, ResolvedApiKey,
+///     BackendKeyId, CanonicalJudgePayload, JudgeBackend, JudgeRequest, PayloadBundle,
+///     ResolvedApiKey,
 /// };
 /// use sc_jev::{JevClient, JevTransport, WireRequest, WireResponse};
 ///
@@ -55,26 +56,20 @@ use crate::retry_policy::{self, RetryBudget};
 ///     }
 /// }
 ///
-/// let payload = payload_bundle_from_value(&serde_json::json!({
-///     "questions": {
-///         "q": {
-///             "type": "choice",
-///             "instructions": "Is it?",
-///             "criteria": {"no": "n", "yes": "y"}
-///         }
-///     },
-///     "state": {}
+/// let payload: CanonicalJudgePayload = serde_json::from_value(serde_json::json!({
+///     "questions": [{"id": "q", "prompt": "Is it?", "choices": ["no", "yes"]}],
+///     "state": []
 /// }))
 /// .expect("payload");
+/// let bundle = PayloadBundle::encode(&payload).expect("bundle");
 /// let client = JevClient::new(
 ///     ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "test-key".to_owned()).expect("key"),
 ///     Arc::new(Scripted),
-/// )
-/// .expect("key");
+/// );
 /// let outcome = client
-///     .judge(&JudgeRequest { payload, llm: None })
+///     .judge(&JudgeRequest::new(Arc::new(bundle), None))
 ///     .expect("judge");
-/// assert_eq!(outcome.answers["q"]["choice"], "yes");
+/// assert_eq!(outcome.answers()["q"].choice().as_str(), "yes");
 /// ```
 pub struct JevClient {
     config: JevClientConfig,
@@ -90,34 +85,35 @@ impl JevClient {
     /// [`ResolvedApiKey::try_new`]. The client does not read it.
     /// [`JevTransport::send`] formats the `Bearer` header (ADR-SAG-0020).
     ///
-    /// # Errors
-    ///
-    /// Does not fail today: key validation happens once, in
-    /// [`ResolvedApiKey::try_new`]. The `Result` is kept so construction
-    /// checks can be added without an API break.
-    pub fn new(
-        api_key: ResolvedApiKey,
-        transport: Arc<dyn JevTransport>,
-    ) -> Result<Self, JevError> {
+    /// Construction is infallible: key validation happens once, in
+    /// [`ResolvedApiKey::try_new`] (ADR-SAG-0020 r-1 amendment).
+    #[must_use]
+    pub fn new(api_key: ResolvedApiKey, transport: Arc<dyn JevTransport>) -> Self {
         Self::with_config(JevClientConfig::packaged(), api_key, transport)
     }
 
+    /// Creates a client for the packaged endpoint over [`HttpsTransport`].
+    ///
+    /// The backend registry calls only this constructor, so the transport
+    /// type can change without touching `sc-jev-check`.
+    #[must_use]
+    pub fn with_default_transport(api_key: ResolvedApiKey) -> Self {
+        Self::new(api_key, Arc::new(HttpsTransport::new()))
+    }
+
     /// Creates a client with explicit endpoint and retry settings.
-    ///
-    /// # Errors
-    ///
-    /// Does not fail today; see [`Self::new`].
+    #[must_use]
     pub fn with_config(
         config: JevClientConfig,
         api_key: ResolvedApiKey,
         transport: Arc<dyn JevTransport>,
-    ) -> Result<Self, JevError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             config,
             api_key,
             transport,
             retry_delay: Arc::new(ThreadRetryDelay),
-        })
+        }
     }
 
     /// Replaces the busy-retry wait.
@@ -135,7 +131,16 @@ impl JevClient {
         &self.config
     }
 
-    fn execute(&self, prepared: &PreparedCheck) -> Result<JudgeOutcome, JevError> {
+    /// The Jev descriptor's request limit.
+    fn limit_bytes(&self) -> u64 {
+        self.id().descriptor().request_limit_bytes()
+    }
+
+    fn execute(
+        &self,
+        prepared: &PreparedCheck,
+        judged: &JudgeRequest,
+    ) -> Result<JudgeOutcome, JevError> {
         let url = self.config.endpoint();
         let attempts = self.config.attempts();
         let request = WireRequest {
@@ -162,17 +167,24 @@ impl JevClient {
                     self.retry_delay.wait(wait);
                     continue;
                 }
-                return Err(JevError::NetworkError {
-                    detail: retry_policy::exhausted_detail("Jev", response.status, sends),
-                });
+                return Err(JevError::network(
+                    NetworkErrorKind::Busy,
+                    retry_policy::exhausted_detail("Jev", response.status, sends),
+                ));
             }
             if response.status != 200 {
-                return Err(JevError::NetworkError {
-                    detail: format!("Jev HTTP {}", response.status),
-                });
+                return Err(JevError::network(
+                    NetworkErrorKind::Status,
+                    format!("Jev HTTP {}", response.status),
+                ));
             }
-            return check::parse_outcome(&response.body, self.config.model(), &prepared.criteria)
-                .map_err(|error| self.api_key.redact_error(error));
+            return check::parse_outcome(
+                &response.body,
+                self.config.model(),
+                &prepared.criteria,
+                judged,
+            )
+            .map_err(|error| self.api_key.redact_error(error));
         }
     }
 }
@@ -183,12 +195,12 @@ impl JudgeBackend for JevClient {
     }
 
     fn validate_for_send(&self, req: &JudgeRequest) -> Result<(), JevError> {
-        check::prepare(&self.config, req.payload.bytes()).map(|_| ())
+        check::prepare(&self.config, self.limit_bytes(), req.payload().bytes()).map(|_| ())
     }
 
     fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-        let prepared = check::prepare(&self.config, req.payload.bytes())?;
-        self.execute(&prepared)
+        let prepared = check::prepare(&self.config, self.limit_bytes(), req.payload().bytes())?;
+        self.execute(&prepared, req)
     }
 }
 

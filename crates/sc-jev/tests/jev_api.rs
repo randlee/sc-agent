@@ -5,15 +5,15 @@ use std::time::Duration;
 
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, BackendKeyId, JevError, JudgeBackend, JudgeRequest, LlmWireContext, PayloadBundle,
-    ResolvedApiKey, canonical_json_bytes,
+    BackendId, BackendKeyId, CanonicalJudgePayload, JevError, JudgeBackend, JudgeRequest,
+    LlmWireContext, NetworkErrorKind, PayloadBundle, ResolvedApiKey,
 };
 use sc_jev::{
     HttpsTransport, JevClient, JevClientConfig, JevTransport, RetryDelay, WireRequest, WireResponse,
 };
 use serde_json::json;
 
-const EXPECTED_BODY: &[u8] = b"{\"model\":\"jev-test\",\"questions\":{\"q\":{\"criteria\":{\"no\":\"n\",\"yes\":\"y\"},\"instructions\":\"Is it?\",\"type\":\"choice\"}},\"state\":{\"code\":\"x = 1\"}}";
+const EXPECTED_BODY: &[u8] = b"{\"model\":\"jev-test\",\"questions\":[{\"choices\":[\"no\",\"yes\"],\"id\":\"q\",\"prompt\":\"x = 1\"}],\"state\":[]}";
 
 /// Largest jitter the busy-retry policy adds to a wait, in seconds.
 const JITTER_MAX_SECS: f64 = 0.25;
@@ -74,16 +74,17 @@ impl JevTransport for FakeTransport {
             .push(request.api_key.clone());
         if self.fail_with_key {
             // A transport whose error echoes the key; the client must redact it.
-            return Err(JevError::NetworkError {
-                detail: "boom Bearer super-secret".to_owned(),
-            });
+            return Err(JevError::network(
+                NetworkErrorKind::Connect,
+                "boom Bearer super-secret",
+            ));
         }
         self.responses
             .lock()
             .expect("responses")
             .pop()
-            .ok_or_else(|| JevError::NetworkError {
-                detail: "fake transport has no response".to_owned(),
+            .ok_or_else(|| {
+                JevError::network(NetworkErrorKind::Connect, "fake transport has no response")
             })
     }
 }
@@ -115,7 +116,6 @@ fn config() -> JevClientConfig {
         "jev-test",
         "jev.invalid",
         "/v1/x",
-        400,
         3,
         Duration::from_secs(1),
     )
@@ -132,7 +132,6 @@ fn scripted(responses: Vec<WireResponse>) -> Harness {
         secret_key(),
         Arc::clone(&transport) as Arc<dyn JevTransport>,
     )
-    .expect("client")
     .with_retry_delay(Arc::clone(&delay) as Arc<dyn RetryDelay>);
     Harness {
         transport,
@@ -141,31 +140,21 @@ fn scripted(responses: Vec<WireResponse>) -> Harness {
     }
 }
 
-fn questions() -> serde_json::Value {
-    json!({
-        "q": {
-            "type": "choice",
-            "instructions": "Is it?",
-            "criteria": {"yes": "y", "no": "n"}
-        }
-    })
-}
-
-fn payload(state: serde_json::Value) -> Vec<u8> {
-    canonical_json_bytes(&json!({
-        "questions": questions(),
-        "state": state,
+/// Canonical payload with one `q` question whose instructions are `prompt`.
+fn payload(prompt: &str) -> PayloadBundle {
+    bundle(json!({
+        "questions": [{"id": "q", "prompt": prompt, "choices": ["no", "yes"]}],
+        "state": []
     }))
-    .expect("canonical")
 }
 
-fn request(bytes: Vec<u8>, llm: Option<&str>) -> JudgeRequest {
-    JudgeRequest {
-        payload: PayloadBundle::from_canonical_bytes(bytes),
-        llm: llm.map(|system_prompt| LlmWireContext {
-            system_prompt: system_prompt.to_owned(),
-        }),
-    }
+fn bundle(value: serde_json::Value) -> PayloadBundle {
+    let payload: CanonicalJudgePayload = serde_json::from_value(value).expect("payload");
+    PayloadBundle::encode(&payload).expect("bundle")
+}
+
+fn request(bundle: PayloadBundle, llm: Option<&str>) -> JudgeRequest {
+    JudgeRequest::new(Arc::new(bundle), llm.map(LlmWireContext::new))
 }
 
 fn ok(model: &str) -> WireResponse {
@@ -199,24 +188,22 @@ fn one_check_is_one_request_byte_exact() {
     let harness = scripted(vec![ok("jev-test")]);
     let outcome = harness
         .client
-        .judge(&request(payload(json!({"code": "x = 1"})), None))
+        .judge(&request(payload("x = 1"), None))
         .expect("judge");
     assert_eq!(harness.transport.sent(), vec![EXPECTED_BODY.to_vec()]);
     let sent = &harness.transport.sent()[0];
-    let payload_bytes = payload(json!({"code": "x = 1"}));
+    let payload_bytes = payload("x = 1");
     assert_eq!(
         sent,
-        &[b"{\"model\":\"jev-test\",", &payload_bytes[1..]].concat()
+        &[b"{\"model\":\"jev-test\",", &payload_bytes.bytes()[1..]].concat()
     );
-    assert_eq!(outcome.backend, BackendId::Jev);
-    assert_eq!(outcome.answers["q"]["choice"], "no");
-    assert_eq!(outcome.answers["q"]["confidence"], 0.9);
+    assert_eq!(outcome.backend(), BackendId::Jev);
+    let answer = &outcome.answers()["q"];
+    assert_eq!(answer.choice().as_str(), "no");
+    assert_eq!(answer.confidence(), Some(0.9));
+    assert_eq!(answer.probabilities().expect("probabilities")["no"], 0.9);
     assert_eq!(
-        outcome.probabilities.as_ref().expect("probabilities")["q"]["no"],
-        0.9
-    );
-    assert_eq!(
-        outcome.provider_meta.as_ref().expect("meta")["usage"]["input_tokens"],
+        outcome.provider_meta().expect("meta")["usage"]["input_tokens"],
         318
     );
     let value = serde_json::to_value(&outcome).expect("serialize");
@@ -237,7 +224,7 @@ fn busy_is_retried_with_the_same_body() {
     let harness = scripted(vec![ok("jev-test"), busy(529, Some("2"))]);
     harness
         .client
-        .judge(&request(payload(json!({"code": "x"})), None))
+        .judge(&request(payload("x"), None))
         .expect("judge");
     let sent = harness.transport.sent();
     assert_eq!(sent.len(), 2);
@@ -273,10 +260,7 @@ mod jev_api {
         let harness = scripted(vec![ok("jev-test")]);
         harness
             .client
-            .judge(&request(
-                payload(json!({"code": "x = 1"})),
-                Some("DO NOT SEND THIS PROMPT"),
-            ))
+            .judge(&request(payload("x = 1"), Some("DO NOT SEND THIS PROMPT")))
             .expect("judge");
         let sent = harness.transport.sent();
         assert_eq!(sent.len(), 1);
@@ -295,7 +279,7 @@ mod jev_api {
     #[test]
     fn oversized_input_is_refused_and_nothing_is_sent() {
         let harness = scripted(vec![ok("jev-test")]);
-        let req = request(payload(json!({"code": "x".repeat(500)})), None);
+        let req = request(payload(&"x".repeat(100_000)), None);
         let error = harness
             .client
             .validate_for_send(&req)
@@ -312,7 +296,7 @@ mod jev_api {
             let harness = scripted(vec![ok("jev-test"), busy(status, None)]);
             harness
                 .client
-                .judge(&request(payload(json!({"code": "x"})), None))
+                .judge(&request(payload("x"), None))
                 .expect("judge");
             let sent = harness.transport.sent();
             assert_eq!(sent.len(), 2, "status {status}");
@@ -326,7 +310,7 @@ mod jev_api {
         let harness = scripted(vec![ok("jev-test"), busy(500, Some("1"))]);
         let error = harness
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("status");
         assert_eq!(error.code(), "NETWORK_ERROR");
         assert_eq!(harness.transport.sent().len(), 1);
@@ -338,7 +322,7 @@ mod jev_api {
         let harness = scripted(vec![busy(429, None), busy(429, None), busy(429, None)]);
         let error = harness
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("exhausted");
         assert_eq!(error.code(), "NETWORK_ERROR");
         assert_eq!(
@@ -358,7 +342,7 @@ mod jev_api {
         }]);
         let error = harness
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("ids");
         assert_eq!(error.code(), "RESPONSE_INVALID");
     }
@@ -382,7 +366,7 @@ mod jev_api {
         }]);
         let error = harness
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("extra");
         assert_eq!(error.code(), "RESPONSE_INVALID");
 
@@ -403,7 +387,7 @@ mod jev_api {
         }]);
         let error = missing_case
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("missing");
         assert_eq!(error.code(), "RESPONSE_INVALID");
     }
@@ -413,7 +397,7 @@ mod jev_api {
         let harness = scripted(vec![ok("other-model")]);
         let error = harness
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("model");
         assert_eq!(error.code(), "RESPONSE_INVALID");
 
@@ -424,58 +408,39 @@ mod jev_api {
         }]);
         let error = not_json
             .client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("json");
         assert_eq!(error.code(), "RESPONSE_INVALID");
     }
 
     #[test]
-    fn non_canonical_whitespace_sends_nothing() {
-        let mut bytes = payload(json!({"code": "x"}));
-        bytes.insert(1, b' ');
-        let harness = scripted(vec![ok("jev-test")]);
-        let error = harness
-            .client
-            .judge(&request(bytes, None))
-            .expect_err("whitespace");
+    fn non_canonical_bytes_never_become_a_bundle() {
+        let canonical = payload("x");
+        let mut spaced = canonical.bytes().to_vec();
+        spaced.insert(1, b' ');
+        let error = PayloadBundle::decode(&spaced).expect_err("whitespace");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(error.to_string().contains("not canonical"));
-        assert!(harness.transport.sent().is_empty());
-    }
-
-    #[test]
-    fn non_canonical_key_order_sends_nothing() {
-        let questions = canonical_json_bytes(&questions()).expect("questions");
-        let state = canonical_json_bytes(&json!({"code": "x"})).expect("state");
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(br#"{"state":"#);
-        bytes.extend_from_slice(&state);
-        bytes.extend_from_slice(br#","questions":"#);
-        bytes.extend_from_slice(&questions);
-        bytes.push(b'}');
-        let harness = scripted(vec![ok("jev-test")]);
-        let error = harness
-            .client
-            .judge(&request(bytes, None))
-            .expect_err("key order");
-        assert_eq!(error.code(), "INPUT_INVALID");
+        let reordered =
+            br#"{"state":[],"questions":[{"choices":["no","yes"],"id":"q","prompt":"x"}]}"#;
+        let error = PayloadBundle::decode(reordered).expect_err("key order");
         assert!(error.to_string().contains("not canonical"));
-        assert!(harness.transport.sent().is_empty());
+        assert_eq!(
+            PayloadBundle::decode(canonical.bytes()).expect("canonical"),
+            canonical
+        );
     }
 
     #[test]
     fn invalid_question_sends_nothing() {
-        let bytes = canonical_json_bytes(&json!({
-            "questions": {
-                "q": {"type": "text", "instructions": "x", "criteria": {"yes": "y"}}
-            },
-            "state": {}
-        }))
-        .expect("canonical");
+        let one_choice = bundle(json!({
+            "questions": [{"id": "q", "prompt": "x", "choices": ["yes"]}],
+            "state": []
+        }));
         let harness = scripted(vec![ok("jev-test")]);
         let error = harness
             .client
-            .judge(&request(bytes, None))
+            .judge(&request(one_choice, None))
             .expect_err("question");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(harness.transport.sent().is_empty());
@@ -483,15 +448,14 @@ mod jev_api {
 
     #[test]
     fn array_questions_from_the_shared_contract_round_trip() {
-        let bytes = canonical_json_bytes(&json!({
+        let bytes = bundle(json!({
             "questions": [{
                 "choices": ["yes", "no"],
                 "id": "relevant",
                 "prompt": "Does it apply?"
             }],
             "state": []
-        }))
-        .expect("canonical");
+        }));
         let body = serde_json::to_vec(&json!({
             "model": "jev-test",
             "answers": {
@@ -509,7 +473,7 @@ mod jev_api {
             retry_after: None,
         }]);
         let outcome = harness.client.judge(&request(bytes, None)).expect("judge");
-        assert_eq!(outcome.answers["relevant"]["choice"], "yes");
+        assert_eq!(outcome.answers()["relevant"].choice().as_str(), "yes");
         let sent = harness.transport.sent();
         assert_eq!(sent.len(), 1);
         assert!(sent[0].starts_with(br#"{"model":"jev-test","#));
@@ -537,10 +501,9 @@ mod jev_api {
             secret_key(),
             Arc::clone(&transport) as Arc<dyn JevTransport>,
         )
-        .expect("client")
         .with_retry_delay(delay);
         let error = client
-            .judge(&request(payload(json!({"code": "x"})), None))
+            .judge(&request(payload("x"), None))
             .expect_err("network");
         assert_eq!(error.code(), "NETWORK_ERROR");
         assert!(!error.fix_hint().contains("super-secret"));
@@ -571,7 +534,7 @@ mod jev_api {
                 packaged.model(),
                 packaged.host(),
                 packaged.path(),
-                packaged.max_request_bytes(),
+                BackendId::Jev.descriptor().request_limit_bytes(),
                 packaged.attempts(),
                 packaged.timeout()
             ),

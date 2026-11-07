@@ -35,9 +35,9 @@ pub(crate) struct ParsedCallerRequest {
 /// cannot be loaded.
 pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, JevError> {
     if bytes.iter().all(u8::is_ascii_whitespace) {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON is empty. Pass a questions document on --request-json.".into(),
-        });
+        return Err(JevError::input_invalid(
+            "request JSON is empty. Pass a questions document on --request-json.",
+        ));
     }
     let value: Value = serde_json::from_slice(bytes).map_err(request_json_error)?;
     reject_inline_prompt(&value)?;
@@ -99,7 +99,9 @@ pub fn prepare_caller_request(
     } else {
         vec![BackendId::Jev]
     };
-    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
+    let needs_llm = backends
+        .iter()
+        .any(|id| id.descriptor().requires_llm_context());
     let system_prompt =
         crate::run::prompt::load_request_system_prompt(repo, prompt_file, needs_llm)?;
     Ok(PreparedCallerRequest {
@@ -124,9 +126,9 @@ fn reject_inline_prompt(value: &Value) -> Result<(), JevError> {
         .as_object()
         .is_some_and(|object| object.contains_key("system_prompt"));
     if present {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON must not include system_prompt. Pass --llm-system-prompt-file, set check.toml [llm_judge] system_prompt_file, or use the packaged default.".into(),
-        });
+        return Err(JevError::input_invalid(
+            "request JSON must not include system_prompt. Pass --llm-system-prompt-file, set check.toml [llm_judge] system_prompt_file, or use the packaged default.",
+        ));
     }
     Ok(())
 }
@@ -143,7 +145,7 @@ fn request_json_error(error: serde_json::Error) -> JevError {
                 .to_owned()
         }
     };
-    JevError::InputInvalid { detail }
+    JevError::input_invalid(detail)
 }
 
 #[cfg(test)]

@@ -1,0 +1,114 @@
+{
+  "ConfigInvalid": {
+    "code": "CONFIG_INVALID",
+    "fix_hint": "Fix the check.toml field or packaged jev.toml entry (missing model), then retry."
+  },
+  "CredentialStoreInvalid": {
+    "code": "CONFIG_INVALID",
+    "fix_hint": "the repo-root .env file (cause: permission denied). Make the file readable and retry."
+  },
+  "EncodeFailed": {
+    "code": "INPUT_INVALID",
+    "fix_hint": "response JSON could not be encoded as JSON (unexpected end of input error at line 1 column 1). Retry; if it persists, report it as a bug."
+  },
+  "ExtractionEmpty": {
+    "code": "EXTRACTION_EMPTY",
+    "fix_hint": "Change the query or input so extraction emits at least one subject."
+  },
+  "ExtractionFailed": {
+    "code": "EXTRACTION_FAILED",
+    "fix_hint": "Fix the producer failure (exit 1) and run extraction again."
+  },
+  "ExtractionInvalid": {
+    "code": "EXTRACTION_INVALID",
+    "fix_hint": "Emit a valid sc/subjects/1 document on stdout (schema) and retry."
+  },
+  "ExtractionParseError": {
+    "code": "EXTRACTION_PARSE_ERROR",
+    "fix_hint": "Fix the syntax error at a.py:3 and run extraction again."
+  },
+  "ExtractionTimeout": {
+    "code": "EXTRACTION_TIMEOUT",
+    "fix_hint": "Raise timeout_seconds above 30 or reduce the input so extraction finishes in time."
+  },
+  "InputEmpty": {
+    "code": "INPUT_EMPTY",
+    "fix_hint": "Provide a non-empty input and retry."
+  },
+  "InputInvalid": {
+    "code": "INPUT_INVALID",
+    "fix_hint": "Correct the input so it matches the expected schema (bad json), then retry."
+  },
+  "InputMissing": {
+    "code": "INPUT_MISSING",
+    "fix_hint": "Create gone.toml or correct the path in check.toml, then retry."
+  },
+  "InputTooLarge": {
+    "code": "INPUT_TOO_LARGE",
+    "fix_hint": "Shrink the check input from 11 bytes to at most 10 bytes. One check is one request and is never split."
+  },
+  "IoFailed": {
+    "code": "INPUT_INVALID",
+    "fix_hint": "stdout I/O failed (cause: broken pipe). Check that it is readable or writable and retry."
+  },
+  "KeyMissing": {
+    "code": "KEY_MISSING",
+    "fix_hint": "Provide a credential for typesafe via the process environment, the repo-root .env file, or the keyring, then retry."
+  },
+  "LanguageUnavailable": {
+    "code": "LANGUAGE_UNAVAILABLE",
+    "fix_hint": "Use a language built into sc-treesitter instead of cobol."
+  },
+  "NetworkError": {
+    "code": "NETWORK_ERROR",
+    "fix_hint": "Check connectivity and retry. Transport detail: Jev HTTP 500. Backends retry busy responses before returning this error."
+  },
+  "Operational.Config": {
+    "code": "CONFIG_INVALID",
+    "fix_hint": "Pass --repo-root with the repository root."
+  },
+  "Operational.Io": {
+    "code": "INPUT_INVALID",
+    "fix_hint": "stdout write failed. Check that stdout is writable."
+  },
+  "ProducerError": {
+    "code": "QUERY_NOT_FOUND",
+    "fix_hint": "sc-treesitter: Use branches."
+  },
+  "PromptFileMissing": {
+    "code": "PROMPT_FILE_MISSING",
+    "fix_hint": "Provide the LLM system prompt at prompt.md, or select it with check.toml or the CLI override."
+  },
+  "QueryInvalid": {
+    "code": "QUERY_INVALID",
+    "fix_hint": "Fix the tree-sitter query syntax (syntax) and retry."
+  },
+  "QueryNotFound": {
+    "code": "QUERY_NOT_FOUND",
+    "fix_hint": "Choose a query asset that exists for this language instead of missing."
+  },
+  "RegistryInvalid": {
+    "code": "CONFIG_INVALID",
+    "fix_hint": "Backend jev is not registered. Register it before the run."
+  },
+  "ResponseInvalid": {
+    "code": "RESPONSE_INVALID",
+    "fix_hint": "Retry the request. The judge response was invalid (truncated). If it persists, treat a truncated or off-schema response as a backend failure."
+  },
+  "SessionDocumentInvalid": {
+    "code": "INPUT_INVALID",
+    "fix_hint": "Session file s is not a session document. Delete it and start a new session."
+  },
+  "SessionExpired": {
+    "code": "SESSION_EXPIRED",
+    "fix_hint": "Start a new session. Session 00000000-0000-0000-0000-000000000000 expired; expiry is measured from the session created_at timestamp."
+  },
+  "SessionNotFound": {
+    "code": "SESSION_NOT_FOUND",
+    "fix_hint": "Create a session or pass the id of a session that still exists. Missing session: 00000000-0000-0000-0000-000000000000."
+  },
+  "SessionStoreIo": {
+    "code": "CONFIG_INVALID",
+    "fix_hint": "Create session directory sessions failed (cause: permission denied). Choose a writable directory, then retry."
+  }
+}

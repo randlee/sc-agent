@@ -37,7 +37,6 @@ ureq = "3.5.1"
 # with the sc-ai / sc-treesitter binaries' tested allocator. Caret relaxation
 # for library crates is revisited at the Phase A architectural review.
 sc-observability = "=1.5.0"
-sc-observability-types = "=1.5.0"
 mimalloc = "=0.1.52"
 # Dev-only. Tests use tempfile::TempDir instead of hand-rolled temp dirs.
 tempfile = "3"

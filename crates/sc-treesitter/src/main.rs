@@ -49,9 +49,7 @@ fn emit(error: &JevError) {
     let body = ScAgentErrorResponse::from_jev_error(error);
     let line = serde_json::to_string(&body).unwrap_or_else(|_| {
         serde_json::to_string(&ScAgentErrorResponse::from_jev_error(
-            &JevError::ExtractionFailed {
-                detail: "stderr encoding".to_owned(),
-            },
+            &JevError::extraction_failed("stderr encoding"),
         ))
         .expect("ScAgentErrorResponse from JevError must serialize")
     });
@@ -141,25 +139,19 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Cli, JevError> {
         "help" => Ok(Cli::Help),
         "--version" | "-V" => {
             if args.len() != 1 {
-                return Err(JevError::InputInvalid {
-                    detail: "--version does not take arguments".into(),
-                });
+                return Err(JevError::input_invalid("--version does not take arguments"));
             }
             Ok(Cli::Version)
         }
         "languages" => {
             if args.len() != 1 {
-                return Err(JevError::InputInvalid {
-                    detail: "languages does not take arguments".into(),
-                });
+                return Err(JevError::input_invalid("languages does not take arguments"));
             }
             Ok(Cli::Languages)
         }
         "queries" => parse_queries(&args[1..]),
         "extract" => parse_extract(&args[1..]),
-        other => Err(JevError::InputInvalid {
-            detail: format!("unknown command {other}"),
-        }),
+        other => Err(JevError::input_invalid(format!("unknown command {other}"))),
     }
 }
 
@@ -169,16 +161,15 @@ fn parse_queries(args: &[String]) -> Result<Cli, JevError> {
     while index < args.len() {
         if let Some(value) = flag_value("--language", args, &mut index)? {
             if language.is_some() {
-                return Err(JevError::InputInvalid {
-                    detail: "--language was given twice".into(),
-                });
+                return Err(JevError::input_invalid("--language was given twice"));
             }
             language = Some(value);
             continue;
         }
-        return Err(JevError::InputInvalid {
-            detail: format!("unexpected argument {}", args[index]),
-        });
+        return Err(JevError::input_invalid(format!(
+            "unexpected argument {}",
+            args[index]
+        )));
     }
     Ok(Cli::Queries { language })
 }
@@ -208,27 +199,21 @@ fn parse_extract(args: &[String]) -> Result<Cli, JevError> {
             continue;
         }
         if args[index].starts_with('-') {
-            return Err(JevError::InputInvalid {
-                detail: format!("unknown flag {}", args[index]),
-            });
+            return Err(JevError::input_invalid(format!(
+                "unknown flag {}",
+                args[index]
+            )));
         }
         if path.is_some() {
-            return Err(JevError::InputInvalid {
-                detail: "extract takes one source path".into(),
-            });
+            return Err(JevError::input_invalid("extract takes one source path"));
         }
         path = Some(args[index].clone());
         index += 1;
     }
-    let language = language.ok_or_else(|| JevError::InputInvalid {
-        detail: "extract requires --language".into(),
-    })?;
-    let query = query.ok_or_else(|| JevError::InputInvalid {
-        detail: "extract requires --query".into(),
-    })?;
-    let path = path.ok_or_else(|| JevError::InputInvalid {
-        detail: "extract requires a source path".into(),
-    })?;
+    let language =
+        language.ok_or_else(|| JevError::input_invalid("extract requires --language"))?;
+    let query = query.ok_or_else(|| JevError::input_invalid("extract requires --query"))?;
+    let path = path.ok_or_else(|| JevError::input_invalid("extract requires a source path"))?;
     Ok(Cli::Extract {
         language,
         query,
@@ -240,9 +225,7 @@ fn parse_extract(args: &[String]) -> Result<Cli, JevError> {
 
 fn assign_once<T>(name: &str, slot: &mut Option<T>, value: T) -> Result<(), JevError> {
     if slot.is_some() {
-        return Err(JevError::InputInvalid {
-            detail: format!("--{name} was given twice"),
-        });
+        return Err(JevError::input_invalid(format!("--{name} was given twice")));
     }
     *slot = Some(value);
     Ok(())
@@ -250,17 +233,15 @@ fn assign_once<T>(name: &str, slot: &mut Option<T>, value: T) -> Result<(), JevE
 
 fn split_captures(value: &str) -> Result<Vec<String>, JevError> {
     if value.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "--captures requires a comma-separated allow-list".into(),
-        });
+        return Err(JevError::input_invalid(
+            "--captures requires a comma-separated allow-list",
+        ));
     }
     let mut names = Vec::new();
     for part in value.split(',') {
         let name = part.trim();
         if name.is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: "--captures contains an empty name".into(),
-            });
+            return Err(JevError::input_invalid("--captures contains an empty name"));
         }
         names.push(name.to_owned());
     }
@@ -276,21 +257,17 @@ fn flag_value(name: &str, args: &[String], index: &mut usize) -> Result<Option<S
     let with_equals = format!("{name}=");
     if let Some(value) = arg.strip_prefix(&with_equals) {
         if value.is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: format!("{name} requires a value"),
-            });
+            return Err(JevError::input_invalid(format!("{name} requires a value")));
         }
         *index += 1;
         return Ok(Some(value.to_owned()));
     }
     if arg == name {
-        let value = args.get(*index + 1).ok_or_else(|| JevError::InputInvalid {
-            detail: format!("{name} requires a value"),
-        })?;
+        let value = args
+            .get(*index + 1)
+            .ok_or_else(|| JevError::input_invalid(format!("{name} requires a value")))?;
         if value.starts_with('-') {
-            return Err(JevError::InputInvalid {
-                detail: format!("{name} requires a value"),
-            });
+            return Err(JevError::input_invalid(format!("{name} requires a value")));
         }
         *index += 2;
         return Ok(Some(value.clone()));

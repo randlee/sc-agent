@@ -4,9 +4,11 @@
 //! never reads process stdin: `-` is refused with a pointer to
 //! `--request-json -` or a committed file.
 
-use sc_agent_types::{
-    InputSpec, JevError, RepoRoot, Rev, SUBJECTS_SCHEMA_V1, Subject, SubjectsDocument,
-};
+use crate::config::InputSpec;
+#[cfg(test)]
+use sc_agent_types::schema::subjects::SUBJECTS_SCHEMA_V1;
+use sc_agent_types::schema::subjects::{Subject, SubjectsDocument};
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 use super::Extracted;
 use super::Extractor;
@@ -40,20 +42,23 @@ pub(crate) fn extract_subjects(
     input: &InputSpec,
 ) -> Result<Extracted, JevError> {
     let InputSpec::Subjects { path } = input else {
-        return Err(JevError::ConfigInvalid {
-            detail: "subjects extractor received a different input kind".into(),
-        });
+        return Err(JevError::config_invalid(
+            "subjects extractor received a different input kind",
+        ));
     };
     if path == "-" {
-        return Err(JevError::ConfigInvalid {
-            detail: "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path".into(),
-        });
+        return Err(JevError::config_invalid(
+            "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path",
+        ));
     }
-    let bytes = read_repo_bytes(repo, rev, path)?;
+    let bytes = read_repo_bytes(repo, rev, &super::read::repo_path(path)?)?;
     parse_subjects_bytes(&bytes)
 }
 
 /// Parses and validates a `sc/subjects/1` document.
+///
+/// Validation is [`SubjectsDocument`]'s own (schema id, id rule, spans, sort
+/// order, helper captures); this crate keeps no copy of it.
 ///
 /// # Errors
 ///
@@ -61,105 +66,11 @@ pub(crate) fn extract_subjects(
 /// the document is not the schema, and [`JevError::ExtractionEmpty`] when
 /// `subjects` is empty.
 pub(crate) fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
-    let document: SubjectsDocument =
-        serde_json::from_slice(bytes).map_err(|error| JevError::ExtractionInvalid {
-            detail: format!("subjects JSON: {error}"),
-        })?;
-    validate_subjects_document(&document)?;
+    let document = SubjectsDocument::from_json_slice(bytes)?;
     Ok(Extracted {
-        subjects: document.subjects.clone(),
+        subjects: document.subjects().to_vec(),
         document: Some(document),
     })
-}
-
-/// Checks schema id, id rules, spans, sort order, and the helper-capture rule.
-///
-/// A capture name beginning with `_` (a query helper, stored without `@`)
-/// must not appear.
-///
-/// # Errors
-///
-/// Returns [`JevError::ExtractionEmpty`] or [`JevError::ExtractionInvalid`].
-pub(crate) fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), JevError> {
-    if document.schema != SUBJECTS_SCHEMA_V1 {
-        return Err(JevError::ExtractionInvalid {
-            detail: format!(
-                "schema is {}, expected {SUBJECTS_SCHEMA_V1}",
-                document.schema
-            ),
-        });
-    }
-    if document.subjects.is_empty() {
-        return Err(JevError::ExtractionEmpty);
-    }
-    if document.source.path.is_empty() || document.producer.mode.is_empty() {
-        return Err(JevError::ExtractionInvalid {
-            detail: "subjects source path and producer mode must be non-empty".into(),
-        });
-    }
-    let mut previous: Option<(u32, &str)> = None;
-    let mut line_counts: Vec<(u32, u32)> = Vec::new();
-    for subject in &document.subjects {
-        // Capture names are stored without `@`; query helpers (`@_name`)
-        // arrive as `_name`. Producers drop them, so one here is a leak.
-        if subject.capture.trim_start_matches('@').starts_with('_') {
-            return Err(JevError::ExtractionInvalid {
-                detail: format!("helper capture {} must not be emitted", subject.capture),
-            });
-        }
-        if subject.span.start_line == 0 || subject.span.end_line < subject.span.start_line {
-            return Err(JevError::ExtractionInvalid {
-                detail: format!("span lines are invalid for {}", subject.id),
-            });
-        }
-        if subject.span.end_byte < subject.span.start_byte {
-            return Err(JevError::ExtractionInvalid {
-                detail: format!("span bytes are invalid for {}", subject.id),
-            });
-        }
-        let width = subject.span.end_byte - subject.span.start_byte;
-        if usize::try_from(width).ok() != Some(subject.text.len()) {
-            return Err(JevError::ExtractionInvalid {
-                detail: format!("text length does not match the span for {}", subject.id),
-            });
-        }
-        let key = (subject.span.start_byte, subject.capture.as_str());
-        if let Some(prev) = previous
-            && key < prev
-        {
-            return Err(JevError::ExtractionInvalid {
-                detail: "subjects are not sorted by (start_byte, capture)".into(),
-            });
-        }
-        previous = Some(key);
-        let count = line_counts
-            .iter()
-            .find(|(line, _)| *line == subject.span.start_line)
-            .map(|(_, count)| *count)
-            .unwrap_or(0);
-        let expected = if count == 0 {
-            format!("{}:{}", document.source.path, subject.span.start_line)
-        } else {
-            format!(
-                "{}:{}:{count}",
-                document.source.path, subject.span.start_line
-            )
-        };
-        if subject.id != expected {
-            return Err(JevError::ExtractionInvalid {
-                detail: format!("subject id is {}, expected {expected}", subject.id),
-            });
-        }
-        if let Some((_, seen)) = line_counts
-            .iter_mut()
-            .find(|(line, _)| *line == subject.span.start_line)
-        {
-            *seen = seen.saturating_add(1);
-        } else {
-            line_counts.push((subject.span.start_line, 1));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -185,13 +96,13 @@ mod tests {
             },
         )
         .expect("subjects");
-        assert_eq!(extracted.subjects[0].id, "src/example.py:42");
-        assert_eq!(extracted.subjects[1].id, "src/example.py:42:1");
-        assert_eq!(extracted.subjects[0].text, "alpha");
-        assert_eq!(extracted.subjects[1].text, "beta");
+        assert_eq!(extracted.subjects[0].id(), "src/example.py:42");
+        assert_eq!(extracted.subjects[1].id(), "src/example.py:42:1");
+        assert_eq!(extracted.subjects[0].text(), "alpha");
+        assert_eq!(extracted.subjects[1].text(), "beta");
         let document = extracted.document.expect("document");
-        assert_eq!(document.schema, SUBJECTS_SCHEMA_V1);
-        assert_eq!(document.producer.mode, "matches");
+        assert_eq!(document.schema(), SUBJECTS_SCHEMA_V1);
+        assert_eq!(document.producer().mode, "matches");
         assert_eq!(
             SubjectsExtractor
                 .extract(

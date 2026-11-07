@@ -22,7 +22,7 @@ workspace = true
 default = []
 # In-process scripted judges for tests (ADR-SAG-0022). Production builds
 # leave this off. `run_check`'s signature does not change (ADR-SAG-0009).
-test-util = []
+test-util = ["sc-agent-types/test-util"]
 
 [dependencies]
 sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }

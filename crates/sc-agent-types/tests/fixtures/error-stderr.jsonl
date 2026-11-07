@@ -1,0 +1,3 @@
+{"error":"INPUT_EMPTY","message":"Provide a non-empty input and retry.","schema_version":1}
+{"error":"NETWORK_ERROR","message":"Check connectivity and retry. Transport detail: Jev busy: HTTP 429 after 4 sends. Backends retry busy responses before returning this error.","schema_version":1,"retryable":true}
+{"error":"LANGUAGE_UNAVAILABLE","message":"sc-treesitter: Use a language built into sc-treesitter instead of cobol.","schema_version":1,"details":{"producer":"sc-treesitter"}}

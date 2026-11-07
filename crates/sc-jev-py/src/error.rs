@@ -22,7 +22,7 @@ pub(crate) fn to_py_err(py: Python<'_>, error: &sc_agent_types::JevError) -> PyE
     let err = PyErr::new::<JevError, _>(format!("{code}: {message}"));
     let value = err.value(py);
     let attributes = value
-        .setattr("code", code)
+        .setattr("code", code.as_str())
         .and_then(|()| value.setattr("message", message));
     // A fresh exception instance accepts new attributes, so this fails only
     // on an interpreter-level error such as `MemoryError`. The display text

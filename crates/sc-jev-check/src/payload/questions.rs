@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sc_agent_types::{ChoiceAnswer, JevError, Question};
+use sc_agent_types::{ChoiceAnswer, ChoiceId, JevError, Question, QuestionId};
 use serde::Deserialize;
 
 /// Schema id required on question-set files.
@@ -21,36 +21,31 @@ pub(crate) const STATE_SCHEMA: &str = "plan-anchoring/state/1";
 /// Returns [`JevError::InputInvalid`] when the schema, question type, or
 /// criteria do not match the Phase A question set.
 pub fn parse_question_set(text: &str) -> Result<Vec<Question>, JevError> {
-    let raw: RawQuestionSet =
-        serde_json::from_str(text).map_err(|error| JevError::InputInvalid {
-            detail: format!("question set: {error}"),
-        })?;
+    let raw: RawQuestionSet = serde_json::from_str(text)
+        .map_err(|error| JevError::input_invalid(format!("question set: {error}")))?;
     if raw.schema != QUESTION_SET_SCHEMA {
-        return Err(JevError::InputInvalid {
-            detail: format!(
-                "question set schema is {}, expected {QUESTION_SET_SCHEMA}",
-                raw.schema
-            ),
-        });
+        return Err(JevError::input_invalid(format!(
+            "question set schema is {}, expected {QUESTION_SET_SCHEMA}",
+            raw.schema
+        )));
     }
     if raw.version.is_some_and(|version| version == 0) {
-        return Err(JevError::InputInvalid {
-            detail: "question set version must be greater than zero".into(),
-        });
+        return Err(JevError::input_invalid(
+            "question set version must be greater than zero",
+        ));
     }
     // gate, notes, and roles are accepted and are not part of the judge payload.
     let _context = (raw.gate, raw.notes, raw.roles);
     if raw.questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "question set has no questions".into(),
-        });
+        return Err(JevError::input_invalid("question set has no questions"));
     }
     let mut questions = Vec::with_capacity(raw.questions.len());
     for (id, question) in raw.questions {
         if question.kind != "choice" {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {id} type {} is not choice", question.kind),
-            });
+            return Err(JevError::input_invalid(format!(
+                "question {id} type {} is not choice",
+                question.kind
+            )));
         }
         if question.criteria.is_empty()
             || question
@@ -58,15 +53,20 @@ pub fn parse_question_set(text: &str) -> Result<Vec<Question>, JevError> {
                 .values()
                 .any(|value| value.trim().is_empty())
         {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {id} criteria are empty"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "question {id} criteria are empty"
+            )));
         }
-        questions.push(Question {
-            id,
-            prompt: question.instructions,
-            choices: question.criteria.into_keys().collect(),
-        });
+        let choices = question
+            .criteria
+            .into_keys()
+            .map(ChoiceId::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        questions.push(Question::new(
+            QuestionId::try_from(id)?,
+            question.instructions,
+            choices,
+        ));
     }
     validate_question_set(&questions)?;
     Ok(questions)
@@ -83,31 +83,25 @@ pub fn parse_question_set(text: &str) -> Result<Vec<Question>, JevError> {
 /// Returns [`JevError::InputInvalid`] naming the first rule that fails.
 pub(crate) fn validate_question_set(questions: &[Question]) -> Result<(), JevError> {
     if questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "question set has no questions".into(),
-        });
+        return Err(JevError::input_invalid("question set has no questions"));
     }
     let mut seen = BTreeSet::new();
     for question in questions {
-        if question.id.is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: "question id is empty".into(),
-            });
+        let id = question.id();
+        if !seen.insert(id.as_str()) {
+            return Err(JevError::input_invalid(format!(
+                "question id {id} is repeated"
+            )));
         }
-        if !seen.insert(question.id.as_str()) {
-            return Err(JevError::InputInvalid {
-                detail: format!("question id {} is repeated", question.id),
-            });
+        if question.prompt().trim().is_empty() {
+            return Err(JevError::input_invalid(format!(
+                "question {id} instructions are empty"
+            )));
         }
-        if question.prompt.trim().is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {} instructions are empty", question.id),
-            });
-        }
-        if question.choices.is_empty() || question.choices.iter().any(String::is_empty) {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {} choices are empty", question.id),
-            });
+        if question.choices().is_empty() {
+            return Err(JevError::input_invalid(format!(
+                "question {id} choices are empty"
+            )));
         }
     }
     Ok(())
@@ -128,32 +122,29 @@ pub(crate) fn validate_state(
     let mut seen = BTreeSet::new();
     for answer in answers {
         if !seen.insert(answer.question_id.as_str()) {
-            return Err(JevError::InputInvalid {
-                detail: format!("state repeats question {}", answer.question_id),
-            });
+            return Err(JevError::input_invalid(format!(
+                "state repeats question {}",
+                answer.question_id
+            )));
         }
         let Some(question) = questions
             .iter()
-            .find(|question| question.id == answer.question_id)
+            .find(|question| question.id() == &answer.question_id)
         else {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} is not in the question set",
-                    answer.question_id
-                ),
-            });
+            return Err(JevError::input_invalid(format!(
+                "state question {} is not in the question set",
+                answer.question_id
+            )));
         };
         if !question
-            .choices
+            .choices()
             .iter()
             .any(|choice| choice == &answer.choice)
         {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} has choice {}, which is not in the question's choices",
-                    answer.question_id, answer.choice
-                ),
-            });
+            return Err(JevError::input_invalid(format!(
+                "state question {} has choice {}, which is not in the question's choices",
+                answer.question_id, answer.choice
+            )));
         }
     }
     Ok(())
@@ -169,13 +160,13 @@ pub(crate) fn parse_state(
     text: &str,
     questions: &[Question],
 ) -> Result<Vec<ChoiceAnswer>, JevError> {
-    let raw: RawState = serde_json::from_str(text).map_err(|error| JevError::InputInvalid {
-        detail: format!("state: {error}"),
-    })?;
+    let raw: RawState = serde_json::from_str(text)
+        .map_err(|error| JevError::input_invalid(format!("state: {error}")))?;
     if raw.schema != STATE_SCHEMA {
-        return Err(JevError::InputInvalid {
-            detail: format!("state schema is {}, expected {STATE_SCHEMA}", raw.schema),
-        });
+        return Err(JevError::input_invalid(format!(
+            "state schema is {}, expected {STATE_SCHEMA}",
+            raw.schema
+        )));
     }
     validate_state(&raw.answers, questions)?;
     Ok(raw.answers)
@@ -217,17 +208,20 @@ mod tests {
     use super::*;
 
     fn question(id: &str, prompt: &str, choices: &[&str]) -> Question {
-        Question {
-            id: id.to_owned(),
-            prompt: prompt.to_owned(),
-            choices: choices.iter().map(|choice| (*choice).to_owned()).collect(),
-        }
+        Question::new(
+            QuestionId::try_from(id).expect("id"),
+            prompt,
+            choices
+                .iter()
+                .map(|choice| ChoiceId::try_from(*choice).expect("choice"))
+                .collect(),
+        )
     }
 
     fn answer(id: &str, choice: &str) -> ChoiceAnswer {
         ChoiceAnswer {
-            question_id: id.to_owned(),
-            choice: choice.to_owned(),
+            question_id: QuestionId::try_from(id).expect("id"),
+            choice: ChoiceId::try_from(choice).expect("choice"),
         }
     }
 
@@ -236,15 +230,16 @@ mod tests {
         assert!(validate_question_set(&[question("q", "p", &["a"])]).is_ok());
         for bad in [
             vec![],
-            vec![question("", "p", &["a"])],
             vec![question("q", " ", &["a"])],
             vec![question("q", "p", &[])],
-            vec![question("q", "p", &[""])],
             vec![question("q", "p", &["a"]), question("q", "p", &["a"])],
         ] {
             let error = validate_question_set(&bad).expect_err("invalid set");
             assert_eq!(error.code(), "INPUT_INVALID");
         }
+        // Empty ids and choices are unrepresentable (`QuestionId`, `ChoiceId`).
+        assert!(QuestionId::try_from("").is_err());
+        assert!(ChoiceId::try_from("").is_err());
     }
 
     #[test]

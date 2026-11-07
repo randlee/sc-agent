@@ -3,11 +3,9 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use sc_agent_types::{
-    BackendId, CanonicalJudgePayload, InputSpec, RepoRoot, Rev, SubjectsDocument,
-    payload_bundle_from_value,
-};
-use sc_jev_check::config::CheckSpec;
+use sc_agent_types::schema::subjects::SubjectsDocument;
+use sc_agent_types::{BackendId, CanonicalJudgePayload, PayloadBundle, RepoRoot, Rev};
+use sc_jev_check::config::{CheckSpec, InputSpec};
 use sc_jev_check::equal_input::producer_from_extractions;
 use sc_jev_check::payload::{PayloadBuilder, parse_question_set};
 use sc_jev_check::run::{RunOptions, run_check};
@@ -30,24 +28,24 @@ fn cross_impl_branches() {
         .join("../../tests/fixtures/cross-impl/branches/subjects.json");
     let bytes = std::fs::read(&fixture).expect("subjects.json");
     let document: SubjectsDocument = serde_json::from_slice(&bytes).expect("subjects document");
-    assert_eq!(document.subjects.len(), 6);
+    assert_eq!(document.subjects().len(), 6);
     let joined = document
-        .subjects
+        .subjects()
         .iter()
-        .map(|subject| subject.text.as_str())
+        .map(|subject| subject.text())
         .collect::<Vec<_>>()
         .join("\n");
-    let mut questions = parse_question_set(QUESTIONS).expect("questions");
+    let questions = parse_question_set(QUESTIONS).expect("questions");
     assert_eq!(questions.len(), 1);
-    questions[0].prompt = questions[0].prompt.replace("{branches}", &joined);
-    let expected = payload_bundle_from_value(
-        &serde_json::to_value(CanonicalJudgePayload {
-            questions,
-            state: Vec::new(),
+    let questions: Vec<_> = questions
+        .into_iter()
+        .map(|question| {
+            let prompt = question.prompt().replace("{branches}", &joined);
+            question.with_prompt(prompt)
         })
-        .expect("value"),
-    )
-    .expect("expected bundle");
+        .collect();
+    let expected = PayloadBundle::encode(&CanonicalJudgePayload::new(questions, Vec::new()))
+        .expect("expected bundle");
 
     let temp = tempfile::tempdir().expect("temp");
     let dir = temp.path();
@@ -80,8 +78,8 @@ fn cross_impl_branches() {
         .expect("one producer")
         .expect("producer");
     assert_eq!(producer.name, "sc-treesitter");
-    assert_eq!(producer.language, document.producer.language);
-    assert_eq!(producer.query_sha256, document.producer.query_sha256);
+    assert_eq!(producer.language, document.producer().language);
+    assert_eq!(producer.query_sha256, document.producer().query_sha256);
     assert_eq!(producer.mode, "matches");
 
     let dry = run_check(&spec, &[BackendId::Jev], RunOptions::dry_run_only(repo)).expect("dry-run");

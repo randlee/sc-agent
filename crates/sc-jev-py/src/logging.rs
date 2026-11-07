@@ -14,10 +14,11 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 
-use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::{
-    EventError, LogEvent as SessionEvent, LogOperation, SessionLog, SharedSessionLog,
+    LogEvent as SessionEvent, LogRejected, SessionLog, SharedSessionLog,
 };
+use sc_agent_types::{JevError, Operation};
+use sc_observability::v2::EventError;
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
     ActionName, Level, LogEvent, LoggerConfig, OBSERVATION_ENVELOPE_VERSION, ProcessIdentity,
@@ -87,8 +88,10 @@ struct ObservabilitySessionLog {
 }
 
 impl SessionLog for ObservabilitySessionLog {
-    fn try_log(&self, event: SessionEvent) -> Result<(), EventError> {
-        self.logger.log(to_obs_event(&event))
+    fn emit(&self, event: SessionEvent) -> Result<(), LogRejected> {
+        self.logger
+            .log(to_obs_event(&event)?)
+            .map_err(|error| LogRejected::new(error.to_string()))
     }
 }
 
@@ -109,7 +112,7 @@ impl std::fmt::Debug for ObservabilitySessionLog {
 ///
 /// # Errors
 ///
-/// Returns [`JevError::session_store_io`] (`CONFIG_INVALID`) when `log_root`
+/// Returns [`JevError::operational_config`] (`CONFIG_INVALID`) when `log_root`
 /// cannot be created or resolved, or the logger cannot start. The fix hint
 /// names `log_root`.
 pub(crate) fn open_session_log(
@@ -124,13 +127,13 @@ pub(crate) fn open_session_log(
 
 fn shared_logger(log_root: &Path) -> Result<LoggerGuard, JevError> {
     std::fs::create_dir_all(log_root).map_err(|error| {
-        JevError::session_store_io(&format!(
+        JevError::operational_config(format!(
             "Create log directory {} or set {LOG_DIR_ENV} to a writable directory ({error}).",
             log_root.display()
         ))
     })?;
     let key = std::fs::canonicalize(log_root).map_err(|error| {
-        JevError::session_store_io(&format!(
+        JevError::operational_config(format!(
             "Resolve log directory {} ({error}). Choose a readable log directory and retry.",
             log_root.display()
         ))
@@ -152,7 +155,7 @@ fn start_logger(log_root: &Path) -> Result<Logger, JevError> {
     LoggerBuilder::new(config)
         .and_then(LoggerBuilder::build)
         .map_err(|error| {
-            JevError::session_store_io(&format!(
+            JevError::operational_config(format!(
                 "Start the session logger at {} ({error}). Choose a writable log directory and retry.",
                 log_root.display()
             ))
@@ -246,8 +249,14 @@ fn target() -> TargetCategory {
     TargetCategory::new(TARGET).expect("TARGET is a valid target category")
 }
 
-fn action_name(operation: LogOperation) -> ActionName {
-    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
+/// A spelling that is not a valid action name is a rejected event, never a
+/// panic.
+fn action_name(operation: Operation) -> Result<ActionName, LogRejected> {
+    ActionName::new(operation.as_str()).map_err(|_| {
+        LogRejected::new(format!(
+            "operation {operation} is not a valid sc-observability action name"
+        ))
+    })
 }
 
 fn schema_version() -> SchemaVersion {
@@ -255,31 +264,31 @@ fn schema_version() -> SchemaVersion {
         .expect("OBSERVATION_ENVELOPE_VERSION is a valid schema version")
 }
 
-fn to_obs_event(event: &SessionEvent) -> LogEvent {
+fn to_obs_event(event: &SessionEvent) -> Result<LogEvent, LogRejected> {
     let mut fields = serde_json::Map::new();
     fields.insert(
         "session_id".to_owned(),
-        serde_json::Value::String(event.session_id.to_string()),
+        serde_json::Value::String(event.session_id().to_string()),
     );
     fields.insert(
         "backend".to_owned(),
-        serde_json::Value::String(event.backend.to_string()),
+        serde_json::Value::String(event.backend().to_string()),
     );
     fields.insert(
         "prompt_sha256".to_owned(),
-        serde_json::Value::String(event.prompt_sha256.as_str().to_owned()),
+        serde_json::Value::String(event.prompt_sha256().as_str().to_owned()),
     );
     fields.insert(
         "operation".to_owned(),
-        serde_json::Value::String(event.operation.as_str().to_owned()),
+        serde_json::Value::String(event.operation().as_str().to_owned()),
     );
-    LogEvent {
+    Ok(LogEvent {
         version: schema_version(),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
         service: service_name(),
         target: target(),
-        action: action_name(event.operation),
+        action: action_name(event.operation())?,
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -289,7 +298,7 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
         diagnostic: None,
         state_transition: None,
         fields,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -298,17 +307,13 @@ mod tests {
     use sc_agent_types::{BackendId, SessionId, Sha256Digest};
     use tempfile::TempDir;
 
-    fn event(
-        session_id: SessionId,
-        digest: &Sha256Digest,
-        operation: LogOperation,
-    ) -> SessionEvent {
-        SessionEvent {
+    fn event(session_id: SessionId, digest: &Sha256Digest, operation: Operation) -> SessionEvent {
+        SessionEvent::new(
             session_id,
-            backend: BackendId::AnthropicHaiku,
-            prompt_sha256: digest.clone(),
+            BackendId::AnthropicHaiku,
+            digest.clone(),
             operation,
-        }
+        )
     }
 
     /// Stable projection of an adapted event: every key except the
@@ -322,28 +327,28 @@ mod tests {
         value
     }
 
-    fn golden_event(operation: LogOperation) -> SessionEvent {
-        SessionEvent {
-            session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
+    fn golden_event(operation: Operation) -> SessionEvent {
+        SessionEvent::new(
+            serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
                 .expect("nil session id"),
-            backend: sc_agent_types::BackendId::AnthropicHaiku,
-            prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
+            sc_agent_types::BackendId::AnthropicHaiku,
+            sc_agent_types::Sha256Digest::of(b"payload"),
             operation,
-        }
+        )
     }
 
     /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
     /// (where a shared one lives is decision D2). Both compare against this
-    /// one golden (every `LogOperation`), so they cannot drift apart.
+    /// one golden (every `Operation`), so they cannot drift apart.
     #[test]
     fn adapter_matches_the_shared_session_event_golden() {
         let golden: serde_json::Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/observability/session-event.json"
         ))
         .expect("golden json");
-        for operation in LogOperation::ALL {
+        for operation in Operation::ALL.iter().copied() {
             assert_eq!(
-                projection(&to_obs_event(&golden_event(operation))),
+                projection(&to_obs_event(&golden_event(operation)).expect("event")),
                 golden[operation.as_str()],
                 "{operation}"
             );
@@ -355,8 +360,11 @@ mod tests {
         assert!(ServiceName::new(SERVICE_NAME).is_ok());
         assert!(TargetCategory::new(TARGET).is_ok());
         assert!(SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).is_ok());
-        for operation in LogOperation::ALL {
-            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        for operation in Operation::ALL.iter().copied() {
+            assert_eq!(
+                action_name(operation).expect("valid").as_str(),
+                operation.as_str()
+            );
         }
     }
 
@@ -400,7 +408,7 @@ mod tests {
         let (guard, log) = open_session_log(root.path()).expect("logger");
         let digest = Sha256Digest::of(b"payload");
         let session_id = SessionId::new();
-        log.try_log(event(session_id, &digest, LogOperation::Judge))
+        log.emit(event(session_id, &digest, Operation::Judge))
             .expect("log");
         guard.flush();
         let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");
@@ -425,10 +433,10 @@ mod tests {
         assert!(first.shares_writer_with(&second));
         let digest = Sha256Digest::of(b"payload");
         first_log
-            .try_log(event(SessionId::new(), &digest, LogOperation::Judge))
+            .emit(event(SessionId::new(), &digest, Operation::Judge))
             .expect("first line");
         second_log
-            .try_log(event(SessionId::new(), &digest, LogOperation::Ask))
+            .emit(event(SessionId::new(), &digest, Operation::Ask))
             .expect("second line");
         second.flush();
         let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");

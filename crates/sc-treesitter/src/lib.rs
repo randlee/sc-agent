@@ -7,7 +7,7 @@
 //!
 //! Normative JSON rules live in `docs/sc-agent-types/subjects-schema.md`.
 //!
-//! [`SubjectsDocument`]: sc_agent_types::SubjectsDocument
+//! [`SubjectsDocument`]: sc_agent_types::schema::subjects::SubjectsDocument
 //!
 //! # Examples
 //!
@@ -22,9 +22,9 @@
 //! .with_rev("HEAD")
 //! .with_blob_sha("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 //! let document = sc_treesitter::extract(&input).expect("extract");
-//! assert_eq!(document.schema, sc_agent_types::SUBJECTS_SCHEMA_V1);
-//! assert_eq!(document.producer.mode, "matches");
-//! assert_eq!(document.subjects.len(), 2);
+//! assert_eq!(document.schema(), sc_agent_types::schema::subjects::SUBJECTS_SCHEMA_V1);
+//! assert_eq!(document.producer().mode, "matches");
+//! assert_eq!(document.subjects().len(), 2);
 //! # }
 //! ```
 

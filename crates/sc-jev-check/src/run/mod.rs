@@ -11,15 +11,17 @@
 pub(crate) mod prompt;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use sc_agent_types::observability::v2::{LogEvent, LogOperation, NoopSessionLog, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, NoopSessionLog, SharedSessionLog};
+use sc_agent_types::schema::subjects::SubjectsProducer;
 use sc_agent_types::{
-    BackendId, EqualInputRecord, JevError, JudgeOutcome, JudgeRequest, LlmWireContext,
-    PayloadBundle, RepoRoot, Rev, SessionId, SubjectsProducer,
+    Attestation, BackendId, EqualInputRecord, JevError, JudgeOutcome, JudgeRequest, LlmWireContext,
+    MultiBackendMode, Operation, PayloadBundle, RepoRoot, Rev, SessionId,
 };
 
 use crate::config::CheckSpec;
-use crate::equal_input::{commands_for, producer_from_extractions, record, same_bytes};
+use crate::equal_input::{RunAttestation, producer_from_extractions, record};
 use crate::payload::PayloadBuilder;
 #[doc(inline)]
 pub use crate::payload::{PreparedCallerRequest, prepare_caller_request};
@@ -233,7 +235,9 @@ pub fn run_check(
 ) -> Result<CheckResult, JevError> {
     require_backends(backends)?;
     let built = assemble_payload(spec, &opts.repo_root, &opts.rev)?;
-    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
+    let needs_llm = backends
+        .iter()
+        .any(|id| id.descriptor().requires_llm_context());
     let system_prompt = prompt::load_system_prompt(
         spec,
         &opts.repo_root,
@@ -267,7 +271,9 @@ pub fn run_request(
     opts: RunOptions,
 ) -> Result<CheckResult, JevError> {
     require_backends(backends)?;
-    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
+    let needs_llm = backends
+        .iter()
+        .any(|id| id.descriptor().requires_llm_context());
     if needs_llm && request.system_prompt.is_none() {
         return Err(run_request_invalid(
             "An LLM backend requires a system prompt on the run request. Pass system_prompt, or load it with run_check.",
@@ -293,58 +299,57 @@ pub fn run_request(
         None => registry_for_repo(&opts.repo_root, backends)?,
     };
     sessions.install_registry(registry.clone());
+    let payload = Arc::new(request.bundle.clone());
     for id in backends {
         let backend = registry.get(*id)?;
-        let judge_request =
-            judge_request(*id, &request.bundle, request.system_prompt.as_deref(), &[])?;
+        let judge_request = judge_request(*id, &payload, request.system_prompt.as_deref(), &[])?;
         backend.validate_for_send(&judge_request)?;
     }
 
     let primary = backends
         .iter()
         .copied()
-        .find(|id| id.is_llm())
+        .find(|id| id.descriptor().supports_session_ask())
         .unwrap_or(backends[0]);
     let session_id = sessions.open(primary, &request.bundle, request.system_prompt.clone())?;
     let mut outcomes = Vec::with_capacity(backends.len());
-    let mut payloads = Vec::with_capacity(backends.len());
     for id in backends {
         let prior = sessions.load(&session_id)?.outcomes;
-        let judge_request = judge_request(
-            *id,
-            &request.bundle,
-            request.system_prompt.as_deref(),
-            &prior,
-        )?;
-        payloads.push(judge_request.payload.bytes().to_vec());
+        let judge_request = judge_request(*id, &payload, request.system_prompt.as_deref(), &prior)?;
         let backend = registry.get(*id)?;
         // Pre-flight above validated the context-free request
         // (ADR-SAG-0004). Re-validate only when session context was appended.
-        if id.is_llm() && !prior.is_empty() {
+        if id.descriptor().requires_llm_context() && !prior.is_empty() {
             backend.validate_for_send(&judge_request)?;
         }
         let judged = backend.judge(&judge_request);
         emit_log(
             &opts.session_log,
-            LogEvent {
+            LogEvent::new(
                 session_id,
-                backend: *id,
-                prompt_sha256: request.bundle.sha256().clone(),
-                operation: LogOperation::Judge,
-            },
+                *id,
+                request.bundle.sha256().clone(),
+                Operation::Judge,
+            ),
         );
         let outcome = judged?;
         sessions.record_outcome(&session_id, &outcome)?;
         outcomes.push(outcome);
     }
 
+    // Every backend got the same `Arc` bundle and later LLM backends got
+    // earlier answers as session context (chain context). No backend reports
+    // an input digest until r-2b, so each one is `Unattested`.
     let equal_input = record(
         &request.bundle,
-        &commands_for(backends),
-        outcomes.len() != backends.len(),
-        same_bytes(&payloads),
+        RunAttestation::uniform(
+            MultiBackendMode::ChainContext,
+            backends,
+            &Attestation::Unattested,
+            outcomes.len() != backends.len(),
+        ),
         request.producer.clone(),
-    );
+    )?;
     Ok(CheckResult {
         session_id: Some(session_id),
         bundle: request.bundle.clone(),
@@ -357,6 +362,7 @@ pub fn run_request(
 fn require_backends(backends: &[BackendId]) -> Result<(), JevError> {
     if backends.is_empty() {
         Err(JevError::registry_invalid(
+            "No backend was requested",
             "Request at least one backend: jev, anthropic_haiku, or openai_luna.",
         ))
     } else {
@@ -374,23 +380,18 @@ fn run_request_invalid(recovery: &str) -> JevError {
 
 fn judge_request(
     id: BackendId,
-    bundle: &PayloadBundle,
+    bundle: &Arc<PayloadBundle>,
     base_prompt: Option<&str>,
     prior: &[JudgeOutcome],
 ) -> Result<JudgeRequest, JevError> {
-    let llm = if id.is_llm() {
+    let llm = if id.descriptor().requires_llm_context() {
         let mut text = base_prompt.unwrap_or("").to_owned();
         text.push_str(&render_session_context(prior)?);
-        Some(LlmWireContext {
-            system_prompt: text,
-        })
+        Some(LlmWireContext::new(text))
     } else {
         None
     };
-    Ok(JudgeRequest {
-        payload: bundle.clone(),
-        llm,
-    })
+    Ok(JudgeRequest::new(Arc::clone(bundle), llm))
 }
 
 #[cfg(test)]

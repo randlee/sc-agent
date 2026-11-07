@@ -106,7 +106,10 @@ fn test_env_dotenv_keychain_order() {
         "tester",
     )
     .unwrap();
-    assert_eq!(from_env, ResolvedApiKey::new("from-env".to_owned()));
+    assert_eq!(
+        from_env,
+        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "from-env".to_owned()).unwrap()
+    );
 
     let from_dotenv = resolve_key_with(
         BackendKeyId::Anthropic,
@@ -118,14 +121,15 @@ fn test_env_dotenv_keychain_order() {
     .unwrap();
     assert_eq!(
         from_dotenv,
-        ResolvedApiKey::new("from-dotenv-anthropic".to_owned())
+        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "from-dotenv-anthropic".to_owned())
+            .unwrap()
     );
 
     let from_keyring =
         resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
     assert_eq!(
         from_keyring,
-        ResolvedApiKey::new("from-keyring-openai".to_owned())
+        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "from-keyring-openai".to_owned()).unwrap()
     );
 
     let empty = TempRepo::new(None);

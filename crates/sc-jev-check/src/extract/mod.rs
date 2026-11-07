@@ -17,7 +17,9 @@ mod private {
     pub trait Sealed {}
 }
 
-use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev, Subject, SubjectsDocument};
+use crate::config::InputSpec;
+use sc_agent_types::schema::subjects::{Subject, SubjectsDocument};
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 /// Subjects produced by one input, plus the source document when there is one.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +56,7 @@ pub trait Extractor: private::Sealed {
 
 pub(crate) use command::CommandExtractor;
 pub(crate) use file::FileExtractor;
-pub(crate) use read::{read_repo_bytes, read_repo_text};
+pub(crate) use read::{read_repo_bytes, read_repo_text, repo_path};
 pub(crate) use subjects::SubjectsExtractor;
 pub(crate) use table::TableColumnExtractor;
 

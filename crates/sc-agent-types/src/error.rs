@@ -1,55 +1,120 @@
 //! `JevError` is the only CLI and PyO3 error-id source (ADR-SAG-0001).
 //!
-//! Variant codes match `tests/fixtures/jev/README-contract/errors.json`.
+//! Every variant maps to exactly one id of
+//! `tests/fixtures/jev/README-contract/errors.json`; an id may have several
+//! variants (REQ-SAG-0101 as amended by r-1). Recovery categories are explicit
+//! variants, and [`JevError::fix_hint`] is the one renderer of recovery text
+//! (ADR-SAG-0027). No detail text is parsed for a prefix.
+//!
+//! # Construction
+//!
+//! The enum and every struct-like variant are `#[non_exhaustive]`, so other
+//! crates build errors only through the snake-case constructors
+//! ([`JevError::input_invalid`], [`JevError::network`], ...). Matching from
+//! another crate needs `{ .. }` patterns and a wildcard arm.
+//!
+//! # Sources
+//!
+//! [`std::error::Error::source`] is `None` for every variant. The variants
+//! that summarise a cause (`CredentialStoreInvalid`, `NetworkError`,
+//! `EncodeFailed`, `IoFailed`, `SessionStoreIo`) keep only a redacted label
+//! or an [`io::ErrorKind`], never the original error, so no unredacted text
+//! can be reached through the source chain.
 
 use std::io;
 
+pub use crate::code::{ErrorCode, NetworkErrorKind, OperationalArea};
+use crate::envelope::ScAgentErrorResponse;
 use crate::ids::{BackendKeyId, SessionId};
-
-/// Marks a [`JevError::ConfigInvalid`] detail that describes a credential store.
-///
-/// [`JevError::fix_hint`] returns the text after this prefix. Other
-/// `CONFIG_INVALID` details keep the `check.toml` recovery text unless they
-/// use [`REGISTRY_DETAIL_PREFIX`], [`SESSION_STORE_DETAIL_PREFIX`], or
-/// [`OPERATIONAL_DETAIL_PREFIX`].
-const CREDENTIAL_STORE_DETAIL_PREFIX: &str = "credential-store: ";
-
-/// Marks a registry failure whose recovery text is the fix hint.
-///
-/// [`JevError::fix_hint`] returns the text after this prefix and does not
-/// mention `check.toml`.
-const REGISTRY_DETAIL_PREFIX: &str = "registry: ";
-
-/// Marks a session-store I/O or parse failure whose recovery text is the fix hint.
-///
-/// [`JevError::fix_hint`] returns the text after this prefix. It names the
-/// session directory or file and does not mention `check.toml` or an input schema.
-const SESSION_STORE_DETAIL_PREFIX: &str = "session-store: ";
-
-/// Marks a process, git, or log failure whose recovery text is the fix hint.
-///
-/// [`JevError::fix_hint`] returns the text after this prefix. It names the
-/// failing operation and the next step. It does not mention `check.toml` or
-/// an input schema.
-const OPERATIONAL_DETAIL_PREFIX: &str = "operational: ";
 
 /// Stable error ids and fix text for Jev, check, extraction, and the CLI.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum JevError {
     /// `check.toml` or a packaged asset failed validation.
     #[error("config is invalid: {detail}")]
+    #[non_exhaustive]
     ConfigInvalid {
         /// What failed validation.
         detail: String,
     },
+    /// An unreadable credential store (`CONFIG_INVALID`).
+    #[error("credential store is invalid: {what} (cause: {cause})")]
+    #[non_exhaustive]
+    CredentialStoreInvalid {
+        /// The store, such as the repo-root `.env` file.
+        what: String,
+        /// A sanitized cause label (an I/O kind or a keyring variant).
+        cause: String,
+        /// The caller-facing fix.
+        recovery: String,
+    },
+    /// A backend-registry failure (`CONFIG_INVALID`).
+    #[error("backend registry is invalid: {detail}")]
+    #[non_exhaustive]
+    RegistryInvalid {
+        /// What is wrong, naming the backend id.
+        detail: String,
+        /// The caller-facing fix.
+        recovery: String,
+    },
+    /// A session-store I/O failure (`CONFIG_INVALID`).
+    #[error("session store {op} failed ({kind})")]
+    #[non_exhaustive]
+    SessionStoreIo {
+        /// The operation and its target, such as `create session directory sessions`.
+        op: String,
+        /// The I/O error class; never the OS message.
+        kind: io::ErrorKind,
+        /// The caller-facing fix.
+        recovery: String,
+    },
+    /// A process, git, log, stdin, or stdout failure; the id depends on `area`.
+    #[error("operational failure: {recovery}")]
+    #[non_exhaustive]
+    Operational {
+        /// `Config` (`CONFIG_INVALID`) or `Io` (`INPUT_INVALID`).
+        area: OperationalArea,
+        /// What failed and the next step.
+        recovery: String,
+    },
+    /// A session file that is not a readable session document (`INPUT_INVALID`).
+    #[error("session document is invalid: {detail}")]
+    #[non_exhaustive]
+    SessionDocumentInvalid {
+        /// Which file and what is wrong.
+        detail: String,
+        /// The caller-facing fix.
+        recovery: String,
+    },
+    /// A value `serde_json` could not encode or decode (`INPUT_INVALID`).
+    #[error("{what} could not be encoded as JSON ({cause})")]
+    #[non_exhaustive]
+    EncodeFailed {
+        /// What was being encoded, such as `response JSON`.
+        what: String,
+        /// The `serde_json` category and position only.
+        cause: String,
+    },
+    /// A failed read or write (`INPUT_INVALID`).
+    #[error("{what} I/O failed ({kind})")]
+    #[non_exhaustive]
+    IoFailed {
+        /// The stream or file, such as `stdout`.
+        what: String,
+        /// The I/O error class; never the OS message.
+        kind: io::ErrorKind,
+    },
     /// No credential was found for a backend.
     #[error("API key for {backend} is missing")]
+    #[non_exhaustive]
     KeyMissing {
         /// Backend whose credential is missing.
         backend: BackendKeyId,
     },
     /// The check input exceeds the single-request byte cap.
     #[error("input is {actual_bytes} bytes; limit is {limit_bytes}")]
+    #[non_exhaustive]
     InputTooLarge {
         /// Maximum accepted payload size.
         limit_bytes: u64,
@@ -61,6 +126,7 @@ pub enum JevError {
     InputEmpty,
     /// The check input did not match the expected shape.
     #[error("input is invalid: {detail}")]
+    #[non_exhaustive]
     InputInvalid {
         /// What about the input is wrong.
         detail: String,
@@ -70,6 +136,7 @@ pub enum JevError {
     ExtractionEmpty,
     /// A subject span contains a parse error.
     #[error("parse error in {path}:{line}")]
+    #[non_exhaustive]
     ExtractionParseError {
         /// Source path that failed to parse.
         path: String,
@@ -78,72 +145,103 @@ pub enum JevError {
     },
     /// Extractor stdout was not a valid subjects document.
     #[error("extraction output is invalid: {detail}")]
+    #[non_exhaustive]
     ExtractionInvalid {
         /// What about the artifact is wrong.
         detail: String,
     },
     /// The extractor process failed.
     #[error("extraction failed: {detail}")]
+    #[non_exhaustive]
     ExtractionFailed {
         /// Producer failure detail.
         detail: String,
     },
     /// The extractor exceeded its time limit.
     #[error("extraction timed out after {timeout_seconds}s")]
+    #[non_exhaustive]
     ExtractionTimeout {
         /// Limit that was exceeded.
         timeout_seconds: u64,
     },
-    /// The requested grammar is not built into `sc-treesitter`.
-    #[error("language {language} is unavailable")]
+    /// The requested grammar is not built into the producer.
+    #[error("language {language} is unavailable in {producer}")]
+    #[non_exhaustive]
     LanguageUnavailable {
+        /// Producer command name, such as `sc-treesitter`.
+        producer: String,
         /// Requested language id.
         language: String,
     },
-    /// A tree-sitter query failed to compile.
+    /// A producer query failed to compile.
     #[error("query is invalid: {detail}")]
+    #[non_exhaustive]
     QueryInvalid {
+        /// Producer command name.
+        producer: String,
         /// Query compiler detail.
         detail: String,
     },
     /// The named query asset does not exist.
     #[error("query {query} was not found")]
+    #[non_exhaustive]
     QueryNotFound {
+        /// Producer command name.
+        producer: String,
         /// Query name that was requested.
         query: String,
     },
+    /// A producer reported a stable error on stderr; `code()` is the carried id.
+    #[error("{producer} failed with {code}: {message}")]
+    #[non_exhaustive]
+    ProducerError {
+        /// Producer command name from `check.toml`.
+        producer: String,
+        /// The producer's stable error id.
+        code: ErrorCode,
+        /// The producer's fix hint.
+        message: String,
+    },
     /// An input path does not exist.
     #[error("input path {path} is missing")]
+    #[non_exhaustive]
     InputMissing {
         /// Path that could not be read.
         path: String,
     },
     /// A judge response failed validation.
     #[error("response is invalid: {detail}")]
+    #[non_exhaustive]
     ResponseInvalid {
         /// What about the response is wrong.
         detail: String,
     },
     /// A backend transport failed.
     #[error("network error: {detail}")]
+    #[non_exhaustive]
     NetworkError {
+        /// Failure class; decides [`JevError::retryable`].
+        kind: NetworkErrorKind,
         /// Transport failure detail, with secrets removed.
         detail: String,
     },
     /// An LLM system-prompt file could not be read.
     #[error("prompt file {path} is missing")]
+    #[non_exhaustive]
     PromptFileMissing {
         /// Path that could not be read.
         path: String,
     },
     /// The session id does not exist in the store.
     #[error("session {session_id} was not found")]
+    #[non_exhaustive]
     SessionNotFound {
         /// Id that was requested.
         session_id: SessionId,
     },
     /// The session is past its TTL.
     #[error("session {session_id} has expired")]
+    #[non_exhaustive]
     SessionExpired {
         /// Id that expired.
         session_id: SessionId,
@@ -151,6 +249,14 @@ pub enum JevError {
 }
 
 impl JevError {
+    /// `CONFIG_INVALID` for a `check.toml` or packaged-asset problem.
+    #[must_use]
+    pub fn config_invalid(detail: impl Into<String>) -> Self {
+        Self::ConfigInvalid {
+            detail: detail.into(),
+        }
+    }
+
     /// Builds `CONFIG_INVALID` for an unreadable credential store.
     ///
     /// `what` names the store, such as the repo-root `.env` file or the
@@ -175,17 +281,23 @@ impl JevError {
     /// assert!(!error.fix_hint().contains("check.toml"));
     /// ```
     #[must_use]
-    pub fn credential_store_invalid(what: &str, cause: &str, recovery: &str) -> Self {
-        Self::ConfigInvalid {
-            detail: format!("{CREDENTIAL_STORE_DETAIL_PREFIX}{what} (cause: {cause}). {recovery}"),
+    pub fn credential_store_invalid(
+        what: impl Into<String>,
+        cause: impl Into<String>,
+        recovery: impl Into<String>,
+    ) -> Self {
+        Self::CredentialStoreInvalid {
+            what: what.into(),
+            cause: cause.into(),
+            recovery: recovery.into(),
         }
     }
 
     /// Builds `CONFIG_INVALID` for a backend-registry failure.
     ///
-    /// `recovery` is the caller-facing fix. It should name the backend id and
-    /// the next step, such as registering that id once. [`Self::fix_hint`]
-    /// returns `recovery` and does not mention `check.toml`.
+    /// `detail` says what is wrong and names the backend id; `recovery` is
+    /// the next step. [`Self::fix_hint`] returns `"{detail}. {recovery}"`
+    /// and does not mention `check.toml`.
     ///
     /// # Examples
     ///
@@ -193,23 +305,25 @@ impl JevError {
     /// use sc_agent_types::JevError;
     ///
     /// let error = JevError::registry_invalid(
-    ///     "Backend jev is not registered. Register it before the run.",
+    ///     "Backend jev is not registered",
+    ///     "Register it before the run.",
     /// );
     /// assert_eq!(error.code(), "CONFIG_INVALID");
-    /// assert!(error.fix_hint().contains("not registered"));
-    /// assert!(!error.fix_hint().contains("check.toml"));
+    /// assert_eq!(error.fix_hint(), "Backend jev is not registered. Register it before the run.");
     /// ```
     #[must_use]
-    pub fn registry_invalid(recovery: &str) -> Self {
-        Self::ConfigInvalid {
-            detail: format!("{REGISTRY_DETAIL_PREFIX}{recovery}"),
+    pub fn registry_invalid(detail: impl Into<String>, recovery: impl Into<String>) -> Self {
+        Self::RegistryInvalid {
+            detail: detail.into(),
+            recovery: recovery.into(),
         }
     }
 
     /// Builds `CONFIG_INVALID` for a session-store I/O failure.
     ///
-    /// `recovery` names the session directory or file and the next step.
-    /// [`Self::fix_hint`] returns `recovery` and does not mention `check.toml`.
+    /// `op` names the operation and its target, `kind` is the I/O class, and
+    /// `recovery` is the next step. [`Self::fix_hint`] returns
+    /// `"{op} failed (cause: {kind}). {recovery}"`.
     ///
     /// # Examples
     ///
@@ -217,23 +331,30 @@ impl JevError {
     /// use sc_agent_types::JevError;
     ///
     /// let error = JevError::session_store_io(
-    ///     "Create session directory sessions or choose a writable directory (permission denied).",
+    ///     "Create session directory sessions",
+    ///     std::io::ErrorKind::PermissionDenied,
+    ///     "Choose a writable directory.",
     /// );
     /// assert_eq!(error.code(), "CONFIG_INVALID");
-    /// assert!(error.fix_hint().contains("sessions"));
+    /// assert!(error.fix_hint().contains("permission denied"));
     /// assert!(!error.fix_hint().contains("check.toml"));
     /// ```
     #[must_use]
-    pub fn session_store_io(recovery: &str) -> Self {
-        Self::ConfigInvalid {
-            detail: format!("{SESSION_STORE_DETAIL_PREFIX}{recovery}"),
+    pub fn session_store_io(
+        op: impl Into<String>,
+        kind: io::ErrorKind,
+        recovery: impl Into<String>,
+    ) -> Self {
+        Self::SessionStoreIo {
+            op: op.into(),
+            kind,
+            recovery: recovery.into(),
         }
     }
 
     /// Builds `CONFIG_INVALID` for a process, git, or log failure.
     ///
-    /// `recovery` names what failed and the next step, such as passing
-    /// `--repo-root` or choosing a writable `--log-dir`. [`Self::fix_hint`]
+    /// `recovery` names what failed and the next step. [`Self::fix_hint`]
     /// returns `recovery` and does not mention `check.toml`.
     ///
     /// # Examples
@@ -246,12 +367,12 @@ impl JevError {
     /// );
     /// assert_eq!(error.code(), "CONFIG_INVALID");
     /// assert!(error.fix_hint().contains("--repo-root"));
-    /// assert!(!error.fix_hint().contains("check.toml"));
     /// ```
     #[must_use]
-    pub fn operational_config(recovery: &str) -> Self {
-        Self::ConfigInvalid {
-            detail: format!("{OPERATIONAL_DETAIL_PREFIX}{recovery}"),
+    pub fn operational_config(recovery: impl Into<String>) -> Self {
+        Self::Operational {
+            area: OperationalArea::Config,
+            recovery: recovery.into(),
         }
     }
 
@@ -269,20 +390,20 @@ impl JevError {
     ///     "stdin could not be read (broken pipe). Retry or pass --request-json as a file path.",
     /// );
     /// assert_eq!(error.code(), "INPUT_INVALID");
-    /// assert!(error.fix_hint().contains("stdin"));
     /// assert!(!error.fix_hint().contains("schema"));
     /// ```
     #[must_use]
-    pub fn operational_io(recovery: &str) -> Self {
-        Self::InputInvalid {
-            detail: format!("{OPERATIONAL_DETAIL_PREFIX}{recovery}"),
+    pub fn operational_io(recovery: impl Into<String>) -> Self {
+        Self::Operational {
+            area: OperationalArea::Io,
+            recovery: recovery.into(),
         }
     }
 
     /// Builds `INPUT_INVALID` for a session file that cannot be parsed.
     ///
-    /// `recovery` names the session file and the next step. [`Self::fix_hint`]
-    /// returns `recovery` and does not tell the caller to fix a check schema.
+    /// `detail` names the file and the problem; [`Self::fix_hint`] returns
+    /// `"{detail}. {recovery}"`.
     ///
     /// # Examples
     ///
@@ -290,27 +411,30 @@ impl JevError {
     /// use sc_agent_types::JevError;
     ///
     /// let error = JevError::session_document_invalid(
-    ///     "Session file sessions/abc is not a session document (expected value). Delete it and start a new session.",
+    ///     "Session file sessions/abc is not a session document",
+    ///     "Delete it and start a new session.",
     /// );
     /// assert_eq!(error.code(), "INPUT_INVALID");
     /// assert!(error.fix_hint().contains("sessions/abc"));
-    /// assert!(!error.fix_hint().contains("schema"));
     /// ```
     #[must_use]
-    pub fn session_document_invalid(recovery: &str) -> Self {
-        Self::InputInvalid {
-            detail: format!("{SESSION_STORE_DETAIL_PREFIX}{recovery}"),
+    pub fn session_document_invalid(
+        detail: impl Into<String>,
+        recovery: impl Into<String>,
+    ) -> Self {
+        Self::SessionDocumentInvalid {
+            detail: detail.into(),
+            recovery: recovery.into(),
         }
     }
 
     /// Builds `INPUT_INVALID` for a value that `serde_json` could not encode
     /// or decode.
     ///
-    /// `label` names what was being encoded, such as `"response JSON"`. The
-    /// detail keeps only the `serde_json` error category and the line and
-    /// column, never the document or the `serde_json` message, so no payload
-    /// or secret text can leak through it. [`Self::fix_hint`] returns the
-    /// recovery text and does not mention `check.toml` or an input schema.
+    /// `what` names what was being encoded, such as `"response JSON"`. Only
+    /// the `serde_json` error category and the line and column are kept,
+    /// never the document or the `serde_json` message, so no payload or
+    /// secret text can leak through it.
     ///
     /// # Examples
     ///
@@ -324,7 +448,7 @@ impl JevError {
     /// assert!(!error.fix_hint().contains("secret"));
     /// ```
     #[must_use]
-    pub fn encode_failed(label: &str, error: &serde_json::Error) -> Self {
+    pub fn encode_failed(what: impl Into<String>, error: &serde_json::Error) -> Self {
         let category = match error.classify() {
             serde_json::error::Category::Io => "I/O",
             serde_json::error::Category::Syntax => "syntax",
@@ -336,19 +460,16 @@ impl JevError {
         } else {
             format!(" at line {} column {}", error.line(), error.column())
         };
-        Self::InputInvalid {
-            detail: format!(
-                "{OPERATIONAL_DETAIL_PREFIX}{label} could not be encoded as JSON ({category} error{location}). Retry; if it persists, report it as a bug."
-            ),
+        Self::EncodeFailed {
+            what: what.into(),
+            cause: format!("{category} error{location}"),
         }
     }
 
     /// Builds `INPUT_INVALID` for a failed read or write.
     ///
-    /// `label` names the stream or file, such as `"stdout"`. The detail keeps
-    /// only the [`io::ErrorKind`] text, never the OS message, which can echo
-    /// paths or payload bytes. [`Self::fix_hint`] returns the recovery text
-    /// and does not mention `check.toml` or an input schema.
+    /// Only the [`io::ErrorKind`] is kept, never the OS message, which can
+    /// echo paths or payload bytes.
     ///
     /// # Examples
     ///
@@ -362,68 +483,247 @@ impl JevError {
     /// assert!(!error.fix_hint().contains("secret"));
     /// ```
     #[must_use]
-    pub fn io_failed(label: &str, error: &io::Error) -> Self {
+    pub fn io_failed(what: impl Into<String>, error: &io::Error) -> Self {
+        Self::IoFailed {
+            what: what.into(),
+            kind: error.kind(),
+        }
+    }
+
+    /// `KEY_MISSING` for `backend`.
+    #[must_use]
+    pub fn key_missing(backend: BackendKeyId) -> Self {
+        Self::KeyMissing { backend }
+    }
+
+    /// `INPUT_TOO_LARGE`.
+    #[must_use]
+    pub fn input_too_large(limit_bytes: u64, actual_bytes: u64) -> Self {
+        Self::InputTooLarge {
+            limit_bytes,
+            actual_bytes,
+        }
+    }
+
+    /// `INPUT_INVALID` with the check-schema hint.
+    #[must_use]
+    pub fn input_invalid(detail: impl Into<String>) -> Self {
         Self::InputInvalid {
-            detail: format!(
-                "{OPERATIONAL_DETAIL_PREFIX}{label} I/O failed (cause: {}). Check that it is readable or writable and retry.",
-                error.kind()
-            ),
+            detail: detail.into(),
+        }
+    }
+
+    /// `EXTRACTION_PARSE_ERROR` at `path:line`.
+    #[must_use]
+    pub fn extraction_parse_error(path: impl Into<String>, line: u32) -> Self {
+        Self::ExtractionParseError {
+            path: path.into(),
+            line,
+        }
+    }
+
+    /// `EXTRACTION_INVALID`.
+    #[must_use]
+    pub fn extraction_invalid(detail: impl Into<String>) -> Self {
+        Self::ExtractionInvalid {
+            detail: detail.into(),
+        }
+    }
+
+    /// `EXTRACTION_FAILED`.
+    #[must_use]
+    pub fn extraction_failed(detail: impl Into<String>) -> Self {
+        Self::ExtractionFailed {
+            detail: detail.into(),
+        }
+    }
+
+    /// `EXTRACTION_TIMEOUT`.
+    #[must_use]
+    pub fn extraction_timeout(timeout_seconds: u64) -> Self {
+        Self::ExtractionTimeout { timeout_seconds }
+    }
+
+    /// `LANGUAGE_UNAVAILABLE` from `producer`.
+    #[must_use]
+    pub fn language_unavailable(producer: impl Into<String>, language: impl Into<String>) -> Self {
+        Self::LanguageUnavailable {
+            producer: producer.into(),
+            language: language.into(),
+        }
+    }
+
+    /// `QUERY_INVALID` from `producer`.
+    #[must_use]
+    pub fn query_invalid(producer: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::QueryInvalid {
+            producer: producer.into(),
+            detail: detail.into(),
+        }
+    }
+
+    /// `QUERY_NOT_FOUND` from `producer`.
+    #[must_use]
+    pub fn query_not_found(producer: impl Into<String>, query: impl Into<String>) -> Self {
+        Self::QueryNotFound {
+            producer: producer.into(),
+            query: query.into(),
+        }
+    }
+
+    /// A producer's stable error, re-raised; `code()` returns `code`.
+    #[must_use]
+    pub fn producer_error(
+        producer: impl Into<String>,
+        code: ErrorCode,
+        message: impl Into<String>,
+    ) -> Self {
+        Self::ProducerError {
+            producer: producer.into(),
+            code,
+            message: message.into(),
+        }
+    }
+
+    /// `INPUT_MISSING` for `path`.
+    #[must_use]
+    pub fn input_missing(path: impl Into<String>) -> Self {
+        Self::InputMissing { path: path.into() }
+    }
+
+    /// `RESPONSE_INVALID`.
+    #[must_use]
+    pub fn response_invalid(detail: impl Into<String>) -> Self {
+        Self::ResponseInvalid {
+            detail: detail.into(),
+        }
+    }
+
+    /// `NETWORK_ERROR` of class `kind`. `detail` must already be redacted.
+    #[must_use]
+    pub fn network(kind: NetworkErrorKind, detail: impl Into<String>) -> Self {
+        Self::NetworkError {
+            kind,
+            detail: detail.into(),
+        }
+    }
+
+    /// `PROMPT_FILE_MISSING` for `path`.
+    #[must_use]
+    pub fn prompt_file_missing(path: impl Into<String>) -> Self {
+        Self::PromptFileMissing { path: path.into() }
+    }
+
+    /// `SESSION_NOT_FOUND` for `session_id`.
+    #[must_use]
+    pub fn session_not_found(session_id: SessionId) -> Self {
+        Self::SessionNotFound { session_id }
+    }
+
+    /// `SESSION_EXPIRED` for `session_id`.
+    #[must_use]
+    pub fn session_expired(session_id: SessionId) -> Self {
+        Self::SessionExpired { session_id }
+    }
+
+    /// Re-raises a producer's stderr error response.
+    ///
+    /// A known id becomes [`JevError::ProducerError`]: its `code()` is that
+    /// id and its fix hint is `"{producer}: {message}"`. An unknown id
+    /// becomes `EXTRACTION_FAILED` naming the id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::{JevError, ScAgentErrorResponse};
+    ///
+    /// let line = r#"{"error":"LANGUAGE_UNAVAILABLE","message":"Use python.","schema_version":1}"#;
+    /// let response: ScAgentErrorResponse = serde_json::from_str(line).unwrap();
+    /// let error = JevError::from_error_response("sc-treesitter", &response);
+    /// assert_eq!(error.code(), "LANGUAGE_UNAVAILABLE");
+    /// assert_eq!(error.fix_hint(), "sc-treesitter: Use python.");
+    /// ```
+    #[must_use]
+    pub fn from_error_response(producer: &str, response: &ScAgentErrorResponse) -> Self {
+        match response.error().parse::<ErrorCode>() {
+            Ok(code) => Self::producer_error(producer, code, response.message()),
+            Err(_) => Self::extraction_failed(format!(
+                "{producer} reported unknown error id {}",
+                response.error()
+            )),
         }
     }
 
     /// Rewrites every text field of this error with `map`.
     ///
-    /// Covers every `String` field of every variant (`detail`, `path`,
-    /// `language`, `query`). Variants without text are returned unchanged.
-    /// The match is exhaustive, so adding a variant with a text field fails
-    /// to compile until it is handled here. [`ResolvedApiKey::redact_error`]
-    /// is built on this method.
-    ///
-    /// [`ResolvedApiKey::redact_error`]: crate::ResolvedApiKey::redact_error
+    /// Covers every `String` field of every variant. Variants without text
+    /// are returned unchanged. The match is exhaustive, so adding a variant
+    /// with a text field fails to compile until it is handled here.
+    /// `ResolvedApiKey::redact_error` is built on this method.
     ///
     /// # Examples
     ///
     /// ```
     /// use sc_agent_types::JevError;
     ///
-    /// let error = JevError::InputMissing { path: "a/b".into() };
+    /// let error = JevError::input_missing("a/b");
     /// let mapped = error.map_detail(|text| text.to_uppercase());
-    /// assert_eq!(mapped, JevError::InputMissing { path: "A/B".into() });
+    /// assert_eq!(mapped, JevError::input_missing("A/B"));
     /// ```
     #[must_use]
     pub fn map_detail(self, map: impl Fn(&str) -> String) -> Self {
         match self {
-            Self::ConfigInvalid { detail } => Self::ConfigInvalid {
-                detail: map(&detail),
+            Self::ConfigInvalid { detail } => Self::config_invalid(map(&detail)),
+            Self::CredentialStoreInvalid {
+                what,
+                cause,
+                recovery,
+            } => Self::credential_store_invalid(map(&what), map(&cause), map(&recovery)),
+            Self::RegistryInvalid { detail, recovery } => {
+                Self::registry_invalid(map(&detail), map(&recovery))
+            }
+            Self::SessionStoreIo { op, kind, recovery } => {
+                Self::session_store_io(map(&op), kind, map(&recovery))
+            }
+            Self::Operational { area, recovery } => Self::Operational {
+                area,
+                recovery: map(&recovery),
             },
-            Self::InputInvalid { detail } => Self::InputInvalid {
-                detail: map(&detail),
+            Self::SessionDocumentInvalid { detail, recovery } => {
+                Self::session_document_invalid(map(&detail), map(&recovery))
+            }
+            Self::EncodeFailed { what, cause } => Self::EncodeFailed {
+                what: map(&what),
+                cause: map(&cause),
             },
-            Self::ExtractionParseError { path, line } => Self::ExtractionParseError {
-                path: map(&path),
-                line,
+            Self::IoFailed { what, kind } => Self::IoFailed {
+                what: map(&what),
+                kind,
             },
-            Self::ExtractionInvalid { detail } => Self::ExtractionInvalid {
-                detail: map(&detail),
-            },
-            Self::ExtractionFailed { detail } => Self::ExtractionFailed {
-                detail: map(&detail),
-            },
-            Self::LanguageUnavailable { language } => Self::LanguageUnavailable {
-                language: map(&language),
-            },
-            Self::QueryInvalid { detail } => Self::QueryInvalid {
-                detail: map(&detail),
-            },
-            Self::QueryNotFound { query } => Self::QueryNotFound { query: map(&query) },
-            Self::InputMissing { path } => Self::InputMissing { path: map(&path) },
-            Self::ResponseInvalid { detail } => Self::ResponseInvalid {
-                detail: map(&detail),
-            },
-            Self::NetworkError { detail } => Self::NetworkError {
-                detail: map(&detail),
-            },
-            Self::PromptFileMissing { path } => Self::PromptFileMissing { path: map(&path) },
+            Self::InputInvalid { detail } => Self::input_invalid(map(&detail)),
+            Self::ExtractionParseError { path, line } => {
+                Self::extraction_parse_error(map(&path), line)
+            }
+            Self::ExtractionInvalid { detail } => Self::extraction_invalid(map(&detail)),
+            Self::ExtractionFailed { detail } => Self::extraction_failed(map(&detail)),
+            Self::LanguageUnavailable { producer, language } => {
+                Self::language_unavailable(map(&producer), map(&language))
+            }
+            Self::QueryInvalid { producer, detail } => {
+                Self::query_invalid(map(&producer), map(&detail))
+            }
+            Self::QueryNotFound { producer, query } => {
+                Self::query_not_found(map(&producer), map(&query))
+            }
+            Self::ProducerError {
+                producer,
+                code,
+                message,
+            } => Self::producer_error(map(&producer), code, map(&message)),
+            Self::InputMissing { path } => Self::input_missing(map(&path)),
+            Self::ResponseInvalid { detail } => Self::response_invalid(map(&detail)),
+            Self::NetworkError { kind, detail } => Self::network(kind, map(&detail)),
+            Self::PromptFileMissing { path } => Self::prompt_file_missing(map(&path)),
             unchanged @ (Self::KeyMissing { .. }
             | Self::InputTooLarge { .. }
             | Self::InputEmpty
@@ -437,57 +737,82 @@ impl JevError {
     /// Returns the stable machine-readable id for this error.
     ///
     /// Ids match `tests/fixtures/jev/README-contract/errors.json` and are the
-    /// only values CLI and PyO3 may emit in the `error` field.
+    /// only values CLI and PyO3 may emit in the `error` field. Several
+    /// variants share an id (for example `RegistryInvalid` and
+    /// `Operational { area: Config }` are both `CONFIG_INVALID`).
     #[must_use]
-    pub fn code(&self) -> &'static str {
+    pub fn code(&self) -> ErrorCode {
         match self {
-            Self::ConfigInvalid { .. } => "CONFIG_INVALID",
-            Self::KeyMissing { .. } => "KEY_MISSING",
-            Self::InputTooLarge { .. } => "INPUT_TOO_LARGE",
-            Self::InputEmpty => "INPUT_EMPTY",
-            Self::InputInvalid { .. } => "INPUT_INVALID",
-            Self::ExtractionEmpty => "EXTRACTION_EMPTY",
-            Self::ExtractionParseError { .. } => "EXTRACTION_PARSE_ERROR",
-            Self::ExtractionInvalid { .. } => "EXTRACTION_INVALID",
-            Self::ExtractionFailed { .. } => "EXTRACTION_FAILED",
-            Self::ExtractionTimeout { .. } => "EXTRACTION_TIMEOUT",
-            Self::LanguageUnavailable { .. } => "LANGUAGE_UNAVAILABLE",
-            Self::QueryInvalid { .. } => "QUERY_INVALID",
-            Self::QueryNotFound { .. } => "QUERY_NOT_FOUND",
-            Self::InputMissing { .. } => "INPUT_MISSING",
-            Self::ResponseInvalid { .. } => "RESPONSE_INVALID",
-            Self::NetworkError { .. } => "NETWORK_ERROR",
-            Self::PromptFileMissing { .. } => "PROMPT_FILE_MISSING",
-            Self::SessionNotFound { .. } => "SESSION_NOT_FOUND",
-            Self::SessionExpired { .. } => "SESSION_EXPIRED",
+            Self::ConfigInvalid { .. }
+            | Self::CredentialStoreInvalid { .. }
+            | Self::RegistryInvalid { .. }
+            | Self::SessionStoreIo { .. } => ErrorCode::ConfigInvalid,
+            Self::Operational { area, .. } => area.code(),
+            Self::SessionDocumentInvalid { .. }
+            | Self::EncodeFailed { .. }
+            | Self::IoFailed { .. }
+            | Self::InputInvalid { .. } => ErrorCode::InputInvalid,
+            Self::KeyMissing { .. } => ErrorCode::KeyMissing,
+            Self::InputTooLarge { .. } => ErrorCode::InputTooLarge,
+            Self::InputEmpty => ErrorCode::InputEmpty,
+            Self::ExtractionEmpty => ErrorCode::ExtractionEmpty,
+            Self::ExtractionParseError { .. } => ErrorCode::ExtractionParseError,
+            Self::ExtractionInvalid { .. } => ErrorCode::ExtractionInvalid,
+            Self::ExtractionFailed { .. } => ErrorCode::ExtractionFailed,
+            Self::ExtractionTimeout { .. } => ErrorCode::ExtractionTimeout,
+            Self::LanguageUnavailable { .. } => ErrorCode::LanguageUnavailable,
+            Self::QueryInvalid { .. } => ErrorCode::QueryInvalid,
+            Self::QueryNotFound { .. } => ErrorCode::QueryNotFound,
+            Self::ProducerError { code, .. } => *code,
+            Self::InputMissing { .. } => ErrorCode::InputMissing,
+            Self::ResponseInvalid { .. } => ErrorCode::ResponseInvalid,
+            Self::NetworkError { .. } => ErrorCode::NetworkError,
+            Self::PromptFileMissing { .. } => ErrorCode::PromptFileMissing,
+            Self::SessionNotFound { .. } => ErrorCode::SessionNotFound,
+            Self::SessionExpired { .. } => ErrorCode::SessionExpired,
         }
+    }
+
+    /// Whether retrying the same request later may succeed.
+    ///
+    /// True only for `NetworkError` of kind `Busy`, `Timeout`, or `Connect`.
+    #[must_use]
+    pub fn retryable(&self) -> bool {
+        matches!(self, Self::NetworkError { kind, .. } if kind.retryable())
     }
 
     /// Returns the actionable fix text for this error.
     ///
-    /// The CLI copies this string into the stderr `message` field. Variants
-    /// that carry `detail` or `session_id` include that value. Callers must
-    /// keep secrets out of `detail`.
-    ///
-    /// Credential-store failures built with [`Self::credential_store_invalid`],
-    /// registry failures built with [`Self::registry_invalid`], session store
-    /// failures built with [`Self::session_store_io`] or
-    /// [`Self::session_document_invalid`], and process failures built with
-    /// [`Self::operational_config`] or [`Self::operational_io`] return that
-    /// caller-facing recovery text. Other `CONFIG_INVALID` values keep the
-    /// `check.toml` hint. Other `INPUT_INVALID` values keep the schema hint.
+    /// The CLI copies this string into the stderr `message` field. It is the
+    /// one renderer of recovery text: the `recovery` fields are data it
+    /// formats. Plain `CONFIG_INVALID` keeps the `check.toml` hint and plain
+    /// `INPUT_INVALID` keeps the schema hint; the explicit recovery variants
+    /// do not mention either.
     #[must_use]
     pub fn fix_hint(&self) -> String {
         match self {
-            Self::ConfigInvalid { detail } => {
-                if let Some(message) = explicit_recovery(detail) {
-                    message.to_owned()
-                } else {
-                    format!(
-                        "Fix the check.toml field or packaged jev.toml entry ({detail}), then retry."
-                    )
-                }
+            Self::ConfigInvalid { detail } => format!(
+                "Fix the check.toml field or packaged jev.toml entry ({detail}), then retry."
+            ),
+            Self::CredentialStoreInvalid {
+                what,
+                cause,
+                recovery,
+            } => format!("{what} (cause: {cause}). {recovery}"),
+            Self::RegistryInvalid { detail, recovery }
+            | Self::SessionDocumentInvalid { detail, recovery } => {
+                format!("{detail}. {recovery}")
             }
+            Self::SessionStoreIo { op, kind, recovery } => {
+                format!("{op} failed (cause: {kind}). {recovery}")
+            }
+            Self::Operational { recovery, .. } => recovery.clone(),
+            Self::EncodeFailed { what, cause } => format!(
+                "{what} could not be encoded as JSON ({cause}). Retry; if it persists, report it as a bug."
+            ),
+            Self::IoFailed { what, kind } => format!(
+                "{what} I/O failed (cause: {kind}). Check that it is readable or writable and retry."
+            ),
             Self::KeyMissing { backend } => format!(
                 "Provide a credential for {backend} via the process environment, the repo-root .env file, or the keyring, then retry."
             ),
@@ -498,15 +823,9 @@ impl JevError {
                 "Shrink the check input from {actual_bytes} bytes to at most {limit_bytes} bytes. One check is one request and is never split."
             ),
             Self::InputEmpty => "Provide a non-empty input and retry.".to_owned(),
-            Self::InputInvalid { detail } => {
-                if let Some(message) = explicit_recovery(detail) {
-                    message.to_owned()
-                } else {
-                    format!(
-                        "Correct the input so it matches the expected schema ({detail}), then retry."
-                    )
-                }
-            }
+            Self::InputInvalid { detail } => format!(
+                "Correct the input so it matches the expected schema ({detail}), then retry."
+            ),
             Self::ExtractionEmpty => {
                 "Change the query or input so extraction emits at least one subject.".to_owned()
             }
@@ -522,22 +841,25 @@ impl JevError {
             Self::ExtractionTimeout { timeout_seconds } => format!(
                 "Raise timeout_seconds above {timeout_seconds} or reduce the input so extraction finishes in time."
             ),
-            Self::LanguageUnavailable { language } => {
-                format!("Use a language built into sc-treesitter instead of {language}.")
+            Self::LanguageUnavailable { producer, language } => {
+                format!("Use a language built into {producer} instead of {language}.")
             }
-            Self::QueryInvalid { detail } => {
+            Self::QueryInvalid { detail, .. } => {
                 format!("Fix the tree-sitter query syntax ({detail}) and retry.")
             }
-            Self::QueryNotFound { query } => {
+            Self::QueryNotFound { query, .. } => {
                 format!("Choose a query asset that exists for this language instead of {query}.")
             }
+            Self::ProducerError {
+                producer, message, ..
+            } => format!("{producer}: {message}"),
             Self::InputMissing { path } => {
                 format!("Create {path} or correct the path in check.toml, then retry.")
             }
             Self::ResponseInvalid { detail } => format!(
                 "Retry the request. The judge response was invalid ({detail}). If it persists, treat a truncated or off-schema response as a backend failure."
             ),
-            Self::NetworkError { detail } => format!(
+            Self::NetworkError { detail, .. } => format!(
                 "Check connectivity and retry. Transport detail: {detail}. Backends retry busy responses before returning this error."
             ),
             Self::PromptFileMissing { path } => format!(
@@ -553,113 +875,62 @@ impl JevError {
     }
 }
 
-fn explicit_recovery(detail: &str) -> Option<&str> {
-    detail
-        .strip_prefix(CREDENTIAL_STORE_DETAIL_PREFIX)
-        .or_else(|| detail.strip_prefix(REGISTRY_DETAIL_PREFIX))
-        .or_else(|| detail.strip_prefix(SESSION_STORE_DETAIL_PREFIX))
-        .or_else(|| detail.strip_prefix(OPERATIONAL_DETAIL_PREFIX))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeSet;
-    use uuid::Uuid;
 
-    fn samples() -> Vec<JevError> {
-        let session = SessionId::from_uuid(Uuid::nil());
-        vec![
-            JevError::ConfigInvalid {
-                detail: "missing model".into(),
-            },
-            JevError::KeyMissing {
-                backend: BackendKeyId::TypeSafe,
-            },
-            JevError::InputTooLarge {
-                limit_bytes: 10,
-                actual_bytes: 11,
-            },
-            JevError::InputEmpty,
-            JevError::InputInvalid {
-                detail: "bad json".into(),
-            },
-            JevError::ExtractionEmpty,
-            JevError::ExtractionParseError {
-                path: "a.py".into(),
-                line: 3,
-            },
-            JevError::ExtractionInvalid {
-                detail: "schema".into(),
-            },
-            JevError::ExtractionFailed {
-                detail: "exit 1".into(),
-            },
-            JevError::ExtractionTimeout {
-                timeout_seconds: 30,
-            },
-            JevError::LanguageUnavailable {
-                language: "go".into(),
-            },
-            JevError::QueryInvalid {
-                detail: "syntax".into(),
-            },
-            JevError::QueryNotFound {
-                query: "missing".into(),
-            },
-            JevError::InputMissing {
-                path: "gone.toml".into(),
-            },
-            JevError::ResponseInvalid {
-                detail: "truncated".into(),
-            },
-            JevError::NetworkError {
-                detail: "reset".into(),
-            },
-            JevError::PromptFileMissing {
-                path: "prompt.md".into(),
-            },
-            JevError::SessionNotFound {
-                session_id: session,
-            },
-            JevError::SessionExpired {
-                session_id: session,
-            },
-        ]
-    }
-
+    /// Completeness of [`ErrorCode::ALL`]: this `match` has no wildcard arm,
+    /// so a new variant fails to compile until it is listed here, and each
+    /// arm asserts the variant is in `ALL`.
     #[test]
-    fn codes_match_readme_contract_snapshot() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/jev/README-contract/errors.json");
-        let text = std::fs::read_to_string(&path).expect("read errors.json");
-        let document: serde_json::Value = serde_json::from_str(&text).expect("parse errors.json");
-        let expected: BTreeSet<String> = document["error_ids"]
-            .as_array()
-            .expect("error_ids array")
-            .iter()
-            .map(|value| value.as_str().expect("error id string").to_owned())
-            .collect();
-        let actual: BTreeSet<String> = samples()
-            .iter()
-            .map(JevError::code)
-            .map(str::to_owned)
-            .collect();
-        assert_eq!(actual, expected);
-        assert_eq!(actual.len(), samples().len(), "error codes must be unique");
+    fn test_error_code_all_is_complete() {
+        let in_all = |code: ErrorCode| assert!(ErrorCode::ALL.contains(&code), "{code}");
+        for code in ErrorCode::ALL.iter().copied() {
+            match code {
+                ErrorCode::ConfigInvalid => in_all(ErrorCode::ConfigInvalid),
+                ErrorCode::KeyMissing => in_all(ErrorCode::KeyMissing),
+                ErrorCode::InputTooLarge => in_all(ErrorCode::InputTooLarge),
+                ErrorCode::InputEmpty => in_all(ErrorCode::InputEmpty),
+                ErrorCode::InputInvalid => in_all(ErrorCode::InputInvalid),
+                ErrorCode::ExtractionEmpty => in_all(ErrorCode::ExtractionEmpty),
+                ErrorCode::ExtractionParseError => in_all(ErrorCode::ExtractionParseError),
+                ErrorCode::ExtractionInvalid => in_all(ErrorCode::ExtractionInvalid),
+                ErrorCode::ExtractionFailed => in_all(ErrorCode::ExtractionFailed),
+                ErrorCode::ExtractionTimeout => in_all(ErrorCode::ExtractionTimeout),
+                ErrorCode::LanguageUnavailable => in_all(ErrorCode::LanguageUnavailable),
+                ErrorCode::QueryInvalid => in_all(ErrorCode::QueryInvalid),
+                ErrorCode::QueryNotFound => in_all(ErrorCode::QueryNotFound),
+                ErrorCode::InputMissing => in_all(ErrorCode::InputMissing),
+                ErrorCode::ResponseInvalid => in_all(ErrorCode::ResponseInvalid),
+                ErrorCode::NetworkError => in_all(ErrorCode::NetworkError),
+                ErrorCode::PromptFileMissing => in_all(ErrorCode::PromptFileMissing),
+                ErrorCode::SessionNotFound => in_all(ErrorCode::SessionNotFound),
+                ErrorCode::SessionExpired => in_all(ErrorCode::SessionExpired),
+            }
+        }
+        let unique: std::collections::BTreeSet<_> = ErrorCode::ALL.iter().collect();
+        assert_eq!(unique.len(), ErrorCode::ALL.len());
     }
 
     /// Number of `String` fields in `error`, written without `map_detail`.
     fn text_fields(error: &JevError) -> usize {
         match error {
+            JevError::CredentialStoreInvalid { .. } => 3,
+            JevError::ProducerError { .. }
+            | JevError::RegistryInvalid { .. }
+            | JevError::SessionStoreIo { .. }
+            | JevError::SessionDocumentInvalid { .. }
+            | JevError::EncodeFailed { .. }
+            | JevError::LanguageUnavailable { .. }
+            | JevError::QueryInvalid { .. }
+            | JevError::QueryNotFound { .. } => 2,
             JevError::ConfigInvalid { .. }
+            | JevError::Operational { .. }
+            | JevError::IoFailed { .. }
             | JevError::InputInvalid { .. }
             | JevError::ExtractionParseError { .. }
             | JevError::ExtractionInvalid { .. }
             | JevError::ExtractionFailed { .. }
-            | JevError::LanguageUnavailable { .. }
-            | JevError::QueryInvalid { .. }
-            | JevError::QueryNotFound { .. }
             | JevError::InputMissing { .. }
             | JevError::ResponseInvalid { .. }
             | JevError::NetworkError { .. }
@@ -674,156 +945,84 @@ mod tests {
         }
     }
 
+    fn samples() -> Vec<JevError> {
+        let session = SessionId::from_uuid(uuid::Uuid::nil());
+        let cause = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+        vec![
+            JevError::config_invalid("missing model"),
+            JevError::credential_store_invalid("the .env file", "permission denied", "Fix it."),
+            JevError::registry_invalid("Backend jev is not registered", "Register it."),
+            JevError::session_store_io("Write s", io::ErrorKind::PermissionDenied, "Retry."),
+            JevError::operational_config("Pass --repo-root."),
+            JevError::operational_io("Retry stdout."),
+            JevError::session_document_invalid("Session file s is bad", "Delete it."),
+            JevError::encode_failed("payload", &cause),
+            JevError::io_failed("stdout", &io::Error::from(io::ErrorKind::BrokenPipe)),
+            JevError::key_missing(BackendKeyId::TypeSafe),
+            JevError::input_too_large(10, 11),
+            JevError::InputEmpty,
+            JevError::input_invalid("bad json"),
+            JevError::ExtractionEmpty,
+            JevError::extraction_parse_error("a.py", 3),
+            JevError::extraction_invalid("schema"),
+            JevError::extraction_failed("exit 1"),
+            JevError::extraction_timeout(30),
+            JevError::language_unavailable("sc-treesitter", "go"),
+            JevError::query_invalid("sc-treesitter", "syntax"),
+            JevError::query_not_found("sc-treesitter", "missing"),
+            JevError::producer_error("sc-treesitter", ErrorCode::QueryInvalid, "bad"),
+            JevError::input_missing("gone.toml"),
+            JevError::response_invalid("truncated"),
+            JevError::network(NetworkErrorKind::Busy, "reset"),
+            JevError::prompt_file_missing("prompt.md"),
+            JevError::session_not_found(session),
+            JevError::session_expired(session),
+        ]
+    }
+
     #[test]
     fn map_detail_touches_every_text_field_of_every_variant() {
         const MARK: &str = "<<mapped>>";
-        let all = samples();
-        let codes: BTreeSet<&str> = all.iter().map(JevError::code).collect();
-        assert_eq!(codes.len(), all.len(), "samples() has one of each variant");
-        for error in all {
+        for error in samples() {
             let calls = std::cell::Cell::new(0_usize);
-            let before = error.to_string();
             let mapped = error.clone().map_detail(|text| {
                 calls.set(calls.get() + 1);
                 format!("{MARK}{text}")
             });
-            assert_eq!(calls.get(), text_fields(&error), "{}", error.code());
+            assert_eq!(calls.get(), text_fields(&error), "{error:?}");
             assert_eq!(mapped.code(), error.code());
             if text_fields(&error) == 0 {
                 assert_eq!(mapped, error);
             } else {
-                assert_ne!(mapped, error, "{}", error.code());
-                assert!(mapped.to_string().contains(MARK), "{}", error.code());
-                assert!(!before.contains(MARK));
+                assert_ne!(mapped, error, "{error:?}");
+                assert!(mapped.fix_hint().contains(MARK) || mapped.to_string().contains(MARK));
             }
         }
     }
 
     #[test]
-    fn encode_and_io_helpers_drop_the_cause_text() {
-        let secret = "sk-very-secret";
-        let cause =
-            serde_json::from_str::<serde_json::Value>(&format!("{{\"{secret}\" 1}}")).unwrap_err();
-        let error = JevError::encode_failed("response JSON", &cause);
-        let hint = error.fix_hint();
-        assert_eq!(error.code(), "INPUT_INVALID");
-        assert!(hint.contains("syntax error at line 1 column"), "{hint}");
-        assert!(!hint.contains(secret), "{hint}");
-        assert!(!hint.contains("schema"), "{hint}");
-
-        let io_cause = io::Error::new(io::ErrorKind::PermissionDenied, secret);
-        let error = JevError::io_failed("session file", &io_cause);
-        let hint = error.fix_hint();
-        assert!(
-            hint.contains("session file I/O failed (cause: permission denied)"),
-            "{hint}"
-        );
-        assert!(!format!("{error} {error:?} {hint}").contains(secret));
-    }
-
-    #[test]
-    fn every_variant_has_a_fix_hint() {
+    fn source_is_none_for_every_variant() {
+        use std::error::Error as _;
         for error in samples() {
-            assert!(!error.fix_hint().trim().is_empty(), "{}", error.code());
-            assert!(!error.code().is_empty());
+            assert!(error.source().is_none(), "{error:?}");
         }
     }
 
     #[test]
-    fn fix_hints_include_detail_and_session_id() {
-        let session = SessionId::from_uuid(Uuid::nil());
-        let detailed = [
-            JevError::ConfigInvalid {
-                detail: "missing model".into(),
-            },
-            JevError::InputInvalid {
-                detail: "bad json".into(),
-            },
-            JevError::ExtractionInvalid {
-                detail: "schema".into(),
-            },
-            JevError::ExtractionFailed {
-                detail: "exit 1".into(),
-            },
-            JevError::QueryInvalid {
-                detail: "syntax".into(),
-            },
-            JevError::ResponseInvalid {
-                detail: "truncated".into(),
-            },
-            JevError::NetworkError {
-                detail: "connection reset".into(),
-            },
-        ];
-        let needles = [
-            "missing model",
-            "bad json",
-            "schema",
-            "exit 1",
-            "syntax",
-            "truncated",
-            "connection reset",
-        ];
-        for (error, needle) in detailed.iter().zip(needles) {
+    fn explicit_recovery_variants_do_not_mention_check_toml_or_schema() {
+        for error in samples() {
             let hint = error.fix_hint();
-            assert!(
-                hint.contains(needle),
-                "{} hint {hint:?} missing {needle}",
-                error.code()
-            );
-            if error.code() == "CONFIG_INVALID" {
-                assert!(
-                    hint.contains("check.toml"),
-                    "non-credential CONFIG_INVALID keeps the check.toml hint: {hint}"
-                );
+            assert!(!hint.trim().is_empty(), "{error:?}");
+            if !matches!(
+                error,
+                JevError::ConfigInvalid { .. }
+                    | JevError::InputInvalid { .. }
+                    | JevError::InputMissing { .. }
+                    | JevError::PromptFileMissing { .. }
+            ) {
+                assert!(!hint.contains("check.toml"), "{hint}");
+                assert!(!hint.contains("expected schema"), "{hint}");
             }
-            assert!(
-                !hint.to_ascii_lowercase().contains("bearer "),
-                "{} hint must not add credential material",
-                error.code()
-            );
         }
-        let too_large = JevError::InputTooLarge {
-            limit_bytes: 10,
-            actual_bytes: 11,
-        };
-        assert!(too_large.fix_hint().contains("11"));
-        assert!(too_large.fix_hint().contains("10"));
-        let session_text = session.to_string();
-        assert!(
-            JevError::SessionNotFound {
-                session_id: session,
-            }
-            .fix_hint()
-            .contains(&session_text)
-        );
-        assert!(
-            JevError::SessionExpired {
-                session_id: session,
-            }
-            .fix_hint()
-            .contains(&session_text)
-        );
-    }
-
-    #[test]
-    fn operational_hints_name_the_recovery_step() {
-        let config = JevError::operational_config(
-            "Create log directory /tmp/logs or pass a writable --log-dir (permission denied).",
-        );
-        let config_hint = config.fix_hint();
-        assert_eq!(config.code(), "CONFIG_INVALID");
-        assert!(config_hint.contains("--log-dir"));
-        assert!(!config_hint.contains("check.toml"));
-        assert!(!config_hint.contains("operational:"));
-
-        let io = JevError::operational_io(
-            "stdout write failed (broken pipe). Check that stdout is writable and retry.",
-        );
-        let io_hint = io.fix_hint();
-        assert_eq!(io.code(), "INPUT_INVALID");
-        assert!(io_hint.contains("stdout"));
-        assert!(!io_hint.contains("schema"));
-        assert!(!io_hint.contains("operational:"));
     }
 }

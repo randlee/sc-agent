@@ -11,24 +11,45 @@ description = "Shared error, judge, and subjects types for sc-agent."
 readme = "README.md"
 keywords.workspace = true
 categories.workspace = true
-# Allowlist: repo-root fixtures and the cross-impl test stay out of the package.
+# Allowlist: repo-root fixtures and the integration tests stay out of the package.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
 [lints]
 workspace = true
 
 [features]
-default = []
-# JudgeBackend test double, contract helpers, and the unchecked
-# `ResolvedApiKey::new` for test keys. Unit tests compile these via cfg(test);
-# downstream crates enable the feature explicitly (dev-dependencies only).
-test-util = []
+# Module seams (ADR-SAG-0027). `error`, `envelope`, `ids`, `schema`, and
+# `cancel` are always on.
+default = ["judge", "secret", "obs"]
+# `judge` and `payload`: the judge contract and canonical payload bytes.
+judge = []
+# `secret`: `ResolvedApiKey`.
+secret = []
+# `observability::v2`: the `SessionLog` port.
+obs = []
+# `git`: argv-only `discover_toplevel` / `read_at_rev` helpers.
+git = []
+# `test_util::MockJudgeBackend`. Enabled by dev-dependencies and by the
+# `sc-jev-check/test-util` feature only (plan "Test seams").
+test-util = ["judge"]
 
 [dependencies]
-# Deliberate `=` lockstep with the sc-observability release train; revisited at Phase A review.
-sc-observability-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+# D0 spike outcome (boundaries/README.md "Dev-dependency and self edges"): no
+# self dev-dependency; integration targets that need a non-default feature
+# declare it here and their validation lines pass `--features`.
+[[test]]
+name = "mock"
+required-features = ["test-util"]
+
+[[test]]
+name = "git"
+required-features = ["git"]
