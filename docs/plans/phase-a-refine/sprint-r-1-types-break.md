@@ -114,7 +114,6 @@ owned_paths:
   # Added in the QA-1 fix round; one line each on why r-1 owns it.
   - "docs/architecture.md#Amendment (Phase A.1, r-1 — interim shapes) of ADR-SAG-0008, 0014, 0019 and their index A.1 markers (arch-qa ARCH-R1-001/002)"
   - "docs/architecture.md#Phase A crate graph sc-observability-types edge and sentence; ADR-SAG-0016 body pointer (ARCH-R1-005)"
-  - "docs/plans/phase-a-refine/plan.md#Test seams D0 sentence (REQ-QA-R1-005)"
   - "sc-lint.toml#sc-observability-types ownership record (delete; r-1 removes the only user; r-4 drops its deletion step)"
   - "crates/sc-agent-secrets/Cargo.toml#[dev-dependencies] sc-agent-types line (delete; redundant after the parent's 22ef273 edit)"
   - "clippy.toml#comment on the two transport readers (#[allow] -> #[expect])"

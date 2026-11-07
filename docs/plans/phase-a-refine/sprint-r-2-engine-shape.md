@@ -40,9 +40,11 @@ requirements:
   - REQ-SAG-0800
 adrs:
   - ADR-SAG-0001
+  - ADR-SAG-0002
   - ADR-SAG-0003
   - ADR-SAG-0004
   - ADR-SAG-0005
+  - ADR-SAG-0007
   - ADR-SAG-0008
   - ADR-SAG-0009
   - ADR-SAG-0010
@@ -50,12 +52,17 @@ adrs:
   - ADR-SAG-0013
   - ADR-SAG-0014
   - ADR-SAG-0015
+  - ADR-SAG-0017
   - ADR-SAG-0019
+  - ADR-SAG-0020
   - ADR-SAG-0021
   - ADR-SAG-0022
+  - ADR-SAG-0023  # binding once r-4 has made its r-4 part Active; r-2 does not cite its r-3b subsection
   - ADR-SAG-0024
   - ADR-SAG-0027
   - ADR-SAG-0029
+  # ADR-SAG-0008/0014/0019 bind through their r-1 interim amendments (Active, r-1),
+  # landed by the r-1 QA-1 fix round; replace this comment with the amendment id if one is assigned.
 owned_paths:
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/**"
@@ -74,6 +81,7 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0003 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0005 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0014 amendment (r-2)"
+  - "docs/architecture.md#ADR-SAG-0014 body inline marker 'Amended by ADR-SAG-0024 (Proposed, r-2)'"
   - "docs/architecture.md#ADR-SAG-0009 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0019 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0022 amendment (r-2)"
@@ -102,6 +110,9 @@ EXT-009, RBP-F005, RBP-F008, RBP-F009, RBQA-F004; contributes EXT-002,
 ARCHE-006/CR-001/ARCHP-002 (contract; e2e in r-3b), RBQA-F006 (caller),
 ARCH-006 (phase-end, `prepare` sentence).
 
+Labels `(Active, r-N)` in the quoted ADR wording below are the post-flip form of the
+`(Proposed, r-N)` markers used elsewhere in this doc.
+
 ## Deliverables
 
 ### D2 — single engine API (REQ-SAG-0620, ADR-SAG-0024)
@@ -124,7 +135,6 @@ ARCH-006 (phase-end, `prepare` sentence).
        pub fn sessions_dir(self, dir: impl Into<PathBuf>) -> Self;
        pub fn registry(self, registry: Arc<BackendRegistry>) -> Self;
        pub fn cancel(self, token: CancelToken) -> Self;
-       pub fn mode(self, mode: MultiBackendMode) -> Self; // honoured from r-2b
    }
 
    pub struct PreparedRun { /* private: owns RunConfig, Arc<PayloadBundle>, resolved prompt */ }
@@ -144,6 +154,11 @@ ARCH-006 (phase-end, `prepare` sentence).
    a run cannot see a different config than the one it was prepared with
    (RBP-F101, EXT-017). `run` builds the production registry from the config
    (`BackendRegistry::from_env`) unless `registry` was set.
+   `RunConfig` has **no `mode` setter in r-2**: no r-2 deliverable reads a
+   mode, and the setter's only governing text is ADR-SAG-0025 (Proposed,
+   r-2b), so r-2b adds `RunConfig::mode(MultiBackendMode)` together with
+   ADR-SAG-0025 (plan "ADR ownership"). r-2's `run` records the r-1
+   default mode on `EqualInputRecord`, as r-1 does.
 2. **Backend precedence** (CPR-011): `RunConfig::backends` when set (CLI
    `--backend`, Python `backends=`), else the source document's `backends`
    (check.toml or caller request), else `[jev]`. `test_backend_precedence`
@@ -220,14 +235,31 @@ ARCH-006 (phase-end, `prepare` sentence).
      `session_id: null`, `warnings: ["session not saved: …"]` (produced at
      runtime from r-2b on; r-2 pins it through `test_builder`).
 
-   The integration target enables `test-util` through the self
-   dev-dependency `sc-jev-check = { path = ".", features = ["test-util"] }`
-   (r-2 owns `crates/sc-jev-check/Cargo.toml` except r-1's `test-util`
-   feature line, `test-util = ["sc-agent-types/test-util"]`, which it keeps;
-   it switches `sc-agent-types` to `features = ["git"]` for D2.4; the self
-   dev-dependency has no `version` key). ADR-SAG-0022's sentence that this
-   crate's own tests see the scripted registry through `cfg(test)` is
-   corrected by the same self dev-dependency (ADR-SAG-0022 r-2 amendment).
+   **`equal_input` in the samples is a shape pin.** Every sample carries
+   `equal_input` serialized exactly as the Active r-1 `EqualInputRecord`
+   (r-1 interim amendment of ADR-SAG-0008/0014/0019); r-2 adds no field and
+   changes no spelling. `leak = any Failed`, how each `Attestation` value is
+   derived and the session-save-failure runtime behaviour are ADR-SAG-0025
+   (r-2b), so `jev_failed_haiku_ok.json` and `session_save_failed.json` are
+   built with `RunResponse::test_builder` and claim no r-2 runtime
+   behaviour. `dry_run.json` is produced by a real dry run: nothing is sent,
+   so every backend is `NotSent` and `equal` is false (ADR-SAG-0024 r-2
+   bullet below).
+
+   The integration targets that need `test-util` (at least `run_response`,
+   for `test_builder`) are declared
+   `[[test]] name = "<t>" required-features = ["test-util"]`, and every
+   validation line for an `sc-jev-check` integration target passes
+   `--features test-util`. There is **no self dev-dependency**: r-1's D0
+   spike (`boundaries/README.md` "Dev-dependency and self edges") found
+   that sc-boundary flags a path-only self edge (`SCB-MANIFEST-002`) and a
+   versioned one cannot be packaged. r-2 owns `crates/sc-jev-check/Cargo.toml`
+   except r-1's `test-util` feature line,
+   `test-util = ["sc-agent-types/test-util"]`, which it keeps; it switches
+   `sc-agent-types` to `features = ["git"]` for D2.4 and adds the `[[test]]`
+   entries. ADR-SAG-0022's sentence that this crate's own tests see the
+   scripted registry through `cfg(test)` is corrected in the ADR-SAG-0022
+   r-2 amendment, whose "Correction" sentence r-2 rewords (see ADR text).
 7. **The four old entry points are deleted with no shims:** `build_request`,
    `run_check`, `run_request`, `prepare_caller_request`, and `CheckResult`,
    `BuiltRequest`, `RunRequest`, `PreparedCallerRequest`, `RunOptions`.
@@ -318,6 +350,42 @@ ADR-SAG-0029 (b)'s "Everything else in ADR-SAG-0022 stands"; 0029 (b)'s
 `_testing.run_check_scripted` seam and string-shorthand rule are unchanged);
 ADR-SAG-0019 r-2 amendment (`RunConfig`); ADR-SAG-0003 r-2
 amendment (toplevel repo root); Rust API patterns Extractor note withdrawn.
+
+**ADR-SAG-0024 bullet added before the flip** (r-2 owns ADR-SAG-0024 and
+inserts this bullet after the `RunResponse` bullet, then flips the whole
+ADR; plan review 4, pre-screen r-2 fix 2):
+
+> - (Active, r-2) `equal_input` is the serialized r-1 `EqualInputRecord`
+>   (r-1 interim amendment of ADR-SAG-0008/0014/0019): r-2 pins its
+>   serialized shape in every `RunResponse` sample and adds no field. A
+>   dry run sends nothing, so every backend is `NotSent` and `equal` is
+>   false. `leak = any Failed`, the derivation of every other `Attestation`
+>   value and the session-save-failure behaviour (`session_saved = false`,
+>   one `warnings` entry, answers kept) are ADR-SAG-0025 (r-2b); until
+>   r-2b the samples that show them (`jev_failed_haiku_ok.json`,
+>   `session_save_failed.json`) are built with `RunResponse::test_builder`
+>   and are shape pins only. `RunConfig` has no `mode` setter until r-2b
+>   (ADR-SAG-0025).
+
+**ADR-SAG-0022 r-2 amendment, "Correction" sentence reworded** (D0
+outcome 4 of r-1, `boundaries/README.md`). Replace
+"`sc-jev-check`'s integration targets enable `test-util` through a
+self-referencing dev-dependency (plan.md "Test seams")" with:
+
+> `sc-jev-check`'s integration targets enable `test-util` through
+> `[[test]] required-features = ["test-util"]` and `--features test-util`
+> on their validation lines (no self dev-dependency; `boundaries/README.md`
+> "Dev-dependency and self edges").
+
+**Markers r-2 flips and markers it must not touch.** r-2 flips: the
+ADR-SAG-0024 Status line and index row; its own r-2 subsections of 0003,
+0005, 0009, 0014, 0019, 0022 and the Rust API patterns amendment; the
+"(Proposed, r-2)" markers in index rows 0003, 0005, 0009, 0014, 0019, 0022
+and 0029; and the inline "Amended by ADR-SAG-0024 (Proposed, r-2)" line
+under the ADR-SAG-0014 body. It must **not** touch the r-2b markers that
+share cells with them: "ADR-SAG-0025 (Proposed, r-2b)" in index rows 0019
+and 0022 (and rows 0004 and 0008), the r-2b subsections of 0019 and 0022,
+or the r-1, r-3, r-4 and r-5 markers in rows 0005, 0009, 0022 and 0029.
 REQ-SAG-0601 amended: "`prepare`/`run` library API; dry-run via
 `RunConfig::dry_run`". REQ-SAG-0710 amended: "`data` is the `RunResponse`
 serialization (ADR-SAG-0014 r-2 amendment); the primary backend is the first
@@ -335,15 +403,16 @@ rewrites the lines around it.
 | --- | --- |
 | req:REQ-SAG-0620 | Facade lists only `prepare`/`run`/`discover_repo_root` as run entry points (sc-lint facade check); `test_run_response_contract` pins the five samples (incl. the Haiku-primary `jev_failed_haiku_ok.json` and `session_save_failed.json`); `test_backend_failure_response_derived_from_error`; `test_backend_precedence`; `test_prepared_run_owns_config` |
 | req:REQ-SAG-0710 (amended) | `jev_failed_haiku_ok.json`: Haiku primary, `primary_backend: "haiku"`, no Jev fields at top level; `single_jev.json`: Jev response verbatim at top level, answers with `confidence`, `answers` key once (`test_run_response_contract`) |
-| req:REQ-SAG-0601 (amended) | `cargo test -p sc-jev-check --test run_response -- test_run_response_contract --exact` and `-- test_dry_run_reports_over_limit --exact` each print `1 passed`: `prepare`/`run` is the library API and `RunConfig::dry_run` produces `dry_run.json` |
+| req:REQ-SAG-0601 (amended) | `cargo test -p sc-jev-check --features test-util --test run_response -- test_run_response_contract --exact` and `-- test_dry_run_reports_over_limit --exact` each print `1 passed`: `prepare`/`run` is the library API and `RunConfig::dry_run` produces `dry_run.json` |
 | req:REQ-SAG-0607 | `SessionStore` trait and `install_registry` gone (compile); `test_session_written_once_only_with_llm`; `test_ask_takes_registry`; concurrency tests above |
 | req:REQ-SAG-0312 | `test_command_path_placeholder_from_check_toml`; `test_command_placeholder_without_path_is_config_invalid`; `test_command_path_symlink_outside_root_refused` |
 | req:REQ-SAG-0313 | `test_command_stderr_error_response_reraised`; `test_command_stderr_unknown_code_is_extraction_failed` |
 | req:REQ-SAG-0314 | No `refuse_over_cap` on the request path; no `max_input_bytes`; `test_payload_between_old_caps_refused_by_backend_before_send`; `test_dry_run_reports_over_limit` |
-| adr:ADR-SAG-0024 | Status Active; text matches signatures; header lists the amended ADRs incl. 0003 and 0014; index row Active |
-| adr:ADR-SAG-0005, 0009, 0014, 0019, 0022, 0003 | r-2 subsections Active |
+| adr:ADR-SAG-0024 | Status Active; text matches signatures (no `RunConfig::mode`); the `equal_input` shape-pin bullet above is present verbatim; header lists the amended ADRs incl. 0003 and 0014; index row Active |
+| adr:ADR-SAG-0005, 0009, 0014, 0019, 0022, 0003, 0029 | r-2 subsections Active; Rust API patterns amendment (r-2) Active; the r-2 "Amended by" markers in index rows 0003, 0005, 0009, 0014, 0019, 0022 and 0029 and the inline marker under the ADR-SAG-0014 body read Active; the ADR-SAG-0022 r-2 "Correction" sentence reads as reworded above; the r-2b markers in rows 0004, 0008, 0019 and 0022 still read "(Proposed, r-2b)" |
+| adr:ADR-SAG-0002, 0007, 0017, 0020, 0023 | Regression: cross-impl digests unchanged (0002); `cargo test -p sc-jev-backends --test llm` green and no backend file changed (0007); `cargo publish --dry-run` below exits 0 for the published set (0017); `BackendRegistry::from_env` reads keys only through `sc_agent_secrets::resolve_key` and the command child keeps a-10's `env_clear()` allowlist with no API-key variable (0020, D11.2; `cargo test -p sc-jev-check --features test-util --test command` green); `bash .github/scripts/check-exact-pins.sh` green (0023, r-4 part) |
 | adr:ADR-SAG-0021 | Path precedence tests in `sc-ai` and `sc-jev-py` unchanged and green |
-| boundary:jev-check | Regression: README parity rows, cross-impl digests, session 0600/expiry tests; `cargo tree -p sc-jev-check --depth 1` has no `ureq`; no `#[allow(` under `crates/`. Per added id: REQ-SAG-0300/0301/0302 `cargo test -p sc-jev-check --lib -- extract::` and `test_repo_root_from_subdirectory`; REQ-SAG-0502 `test_payload_between_old_caps_refused_by_backend_before_send`; REQ-SAG-0503 `cargo test -p sc-jev-check --lib -- run::prompt::`; REQ-SAG-0600 `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0603 `test_run_response_contract` (`jev_haiku.json`); REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0305 `cargo test -p sc-jev-check --test command`; REQ-SAG-0602 `test_run_response_contract` (`equal_input` in every sample); REQ-SAG-0700/0701 `cargo test -p sc-ai --test cli`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`; NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-ai --test cli`; NFR-SAG-0003 `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0800 pytest below |
+| boundary:jev-check | Regression: README parity rows, cross-impl digests, session 0600/expiry tests; `cargo tree -p sc-jev-check --depth 1` has no `ureq`; no `#[allow(` under `crates/`. Per added id: REQ-SAG-0300/0301/0302 `cargo test -p sc-jev-check --lib -- extract::` and `test_repo_root_from_subdirectory`; REQ-SAG-0502 `test_payload_between_old_caps_refused_by_backend_before_send`; REQ-SAG-0503 `cargo test -p sc-jev-check --lib -- run::prompt::`; REQ-SAG-0600 `cargo test -p sc-jev-check --features test-util --test sessions_exact`; REQ-SAG-0603 `test_run_response_contract` (`jev_haiku.json`); REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0305 `cargo test -p sc-jev-check --features test-util --test command`; REQ-SAG-0602 `test_run_response_contract` (`equal_input` in every sample); REQ-SAG-0700/0701 `cargo test -p sc-ai --test cli`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`; NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-ai --test cli`; NFR-SAG-0003 `cargo test -p sc-jev-check --features test-util --test sessions_exact`; REQ-SAG-0800 pytest below |
 | boundary:test-util | `cargo tree -p sc-jev-check -e normal,features` shows no `test-util` feature (dev-only) |
 
 ## Required validation
@@ -351,25 +420,25 @@ rewrites the lines around it.
 ```bash
 just lint
 just test
-cargo test -p sc-jev-check --test run_response -- test_run_response_contract --exact
-cargo test -p sc-jev-check --test run_response -- test_backend_failure_response_derived_from_error --exact
-cargo test -p sc-jev-check --test run_response -- test_backend_precedence --exact
-cargo test -p sc-jev-check --test run_response -- test_prepared_run_owns_config --exact
-cargo test -p sc-jev-check --test run_response -- test_repo_root_from_subdirectory --exact
-cargo test -p sc-jev-check --test run_response -- test_dry_run_reports_over_limit --exact
-cargo test -p sc-jev-check --test session -- test_session_written_once_only_with_llm --exact
-cargo test -p sc-jev-check --test session -- test_ask_takes_registry --exact
-cargo test -p sc-jev-check --test session -- test_two_stores_same_dir_last_writer_wins --exact
-cargo test -p sc-jev-check --test session -- test_save_error_removes_tmp --exact
-cargo test -p sc-jev-check --test session -- test_stale_tmp_swept --exact
-cargo test -p sc-jev-check --test command -- test_command_path_placeholder_from_check_toml --exact
-cargo test -p sc-jev-check --test command -- test_command_placeholder_without_path_is_config_invalid --exact
-cargo test -p sc-jev-check --test command -- test_command_path_symlink_outside_root_refused --exact
-cargo test -p sc-jev-check --test command -- test_command_stderr_error_response_reraised --exact
-cargo test -p sc-jev-check --test command -- test_command_stderr_unknown_code_is_extraction_failed --exact
-cargo test -p sc-jev-check --test caps -- test_payload_between_old_caps_refused_by_backend_before_send --exact
-cargo test -p sc-jev-check --test sessions_exact
-cargo test -p sc-jev-check --test command
+cargo test -p sc-jev-check --features test-util --test run_response -- test_run_response_contract --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_backend_failure_response_derived_from_error --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_backend_precedence --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_prepared_run_owns_config --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_repo_root_from_subdirectory --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_dry_run_reports_over_limit --exact
+cargo test -p sc-jev-check --features test-util --test session -- test_session_written_once_only_with_llm --exact
+cargo test -p sc-jev-check --features test-util --test session -- test_ask_takes_registry --exact
+cargo test -p sc-jev-check --features test-util --test session -- test_two_stores_same_dir_last_writer_wins --exact
+cargo test -p sc-jev-check --features test-util --test session -- test_save_error_removes_tmp --exact
+cargo test -p sc-jev-check --features test-util --test session -- test_stale_tmp_swept --exact
+cargo test -p sc-jev-check --features test-util --test command -- test_command_path_placeholder_from_check_toml --exact
+cargo test -p sc-jev-check --features test-util --test command -- test_command_placeholder_without_path_is_config_invalid --exact
+cargo test -p sc-jev-check --features test-util --test command -- test_command_path_symlink_outside_root_refused --exact
+cargo test -p sc-jev-check --features test-util --test command -- test_command_stderr_error_response_reraised --exact
+cargo test -p sc-jev-check --features test-util --test command -- test_command_stderr_unknown_code_is_extraction_failed --exact
+cargo test -p sc-jev-check --features test-util --test caps -- test_payload_between_old_caps_refused_by_backend_before_send --exact
+cargo test -p sc-jev-check --features test-util --test sessions_exact
+cargo test -p sc-jev-check --features test-util --test command
 cargo test -p sc-jev-check --lib -- extract::
 cargo test -p sc-jev-check --lib -- run::
 cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact
