@@ -22,7 +22,7 @@ name = "treesitter"
 
 [public]
 facade = "sc_treesitter::extract, sc_treesitter::ExtractInput, sc_treesitter::language, sc_treesitter::languages, sc_treesitter::LanguageInfo, sc_treesitter::queries, sc_treesitter::query_source, sc_treesitter::QueryInfo, sc_treesitter::subjects_to_json_bytes, sc_treesitter::PRODUCER_NAME, sc_treesitter::PRODUCER_MODE"
-notes = "Subjects producer; library plus the sc-treesitter binary (src/main.rs). Stdout is sc/subjects/1 JSON. Links no judge, secrets or HTTP crate (docs/sc-treesitter/architecture.md, ADR-SAG-0015)."
+notes = "Subjects producer; library plus the sc-treesitter binary (src/main.rs, clap parser in src/cli/). Stdout is sc/subjects/1 JSON. Links no judge, secrets or HTTP crate (docs/sc-treesitter/architecture.md, ADR-SAG-0015). sc-agent-types is a default-features = false dependency: the library uses only its always-on error, ids, envelope and schema modules; the sc-agent-types git feature is enabled only by this crate's cli feature (binary git reads, RBQA-F006). clap and mimalloc are optional, behind cli (ADR-SAG-0023)."
 
 [implementation]
 type = "marker"
@@ -35,7 +35,9 @@ roots = ["extract"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["mimalloc", "sc-agent-types", "serde_json", "tree-sitter", "tree-sitter-python", "tree-sitter-rust"]
+# `clap` and `mimalloc` are optional (feature `cli`, binary only); r-3c
+# records them here, closing the r-4 deferral (CPR-M212).
+allowed_dependencies = ["clap", "mimalloc", "sc-agent-types", "serde_json", "tree-sitter", "tree-sitter-python", "tree-sitter-rust"]
 forbidden_edges = [
     { from = "sc-treesitter", to = "sc-jev" },
     { from = "sc-treesitter", to = "sc-jev-backends" },
