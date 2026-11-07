@@ -415,8 +415,6 @@ Local equivalents of every CI job: [`docs/development/ci.md`](../../development/
 
 Phase A is not closed. Open at phase end:
 
-- `.gitattributes` for byte-compared fixtures (LF / `-text`) so the CI `core.autocrlf false` workaround in
-  `sc-agent-ci.yml` can be removed; code track follow-up (FTQ-005 / QA-003 / REQ-QA-A10-005).
 - Bead **`agt-luna-live-count`** — Luna live token count is unverified
   (resolved decision **4**); requested feature **8** stays open until a key
   exists and the a-5 probe runs once with its output attached.

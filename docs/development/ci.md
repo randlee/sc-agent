@@ -13,9 +13,9 @@ Two consumer-owned workflows run on pull requests. Neither is a kit file;
 Every job pins its actions to commit SHAs. Toolchain `1.94.1`, Python `3.11.9`,
 maturin `1.16.0`, pytest `8.4.2` and just `1.58.0` are exact; maturin, pytest
 and their transitive dependencies install from the hash-pinned
-`tests/fixtures/jev-python/constraints.txt`. Every job sets
-`core.autocrlf false` before checkout so Windows keeps LF in the committed
-fixtures that tests compare byte for byte. Every step has a timeout. No step
+`tests/fixtures/jev-python/constraints.txt`. The repo `.gitattributes` keeps
+LF on every platform and leaves byte-compared fixtures unconverted, so no job
+needs a `core.autocrlf` override. Every step has a timeout. No step
 retries; bounded cargo network-fetch retries only (`CARGO_NET_RETRY=2`).
 
 | Job | Runners | Local equivalent |
@@ -63,18 +63,6 @@ features to maturin.
 
 ### Known limits
 
-- **CRLF workaround, not a fix.** Every job sets `core.autocrlf false` before checkout because the
-  sc-treesitter golden-byte fixture test compares committed bytes exactly and Windows runners default to
-  CRLF. The repo-level fix is a `.gitattributes` pinning `tests/fixtures/**` (and other byte-compared
-  fixtures) to LF or `-text`; it is outside this branch's allowed paths and is tracked under
-  "Phase close notes / open items" in `docs/plans/phase-a/plan.md`. Once it lands the five
-  `Keep LF line endings` steps can be dropped. Local Windows checkouts with `autocrlf=true` see the same
-  failure until then.
-
-- **`doc` is `continue-on-error`.** The workspace has 11 rustdoc warnings at
-  `d4a0111`, so the step shows green while it fails. Removal condition: QA-005
-  (rustdoc warnings fixed) lands from the phase-end code track, and that
-  change removes the flag.
 - **`just setup` / `just lint` run on ubuntu-24.04 only.** On windows-2022 the
   managed sc-lint bootstrap (`.sc-lint/bootstrap.py`, sc-lint 0.8.0) prints
   "verified sc-lint release activated" and then fails with
