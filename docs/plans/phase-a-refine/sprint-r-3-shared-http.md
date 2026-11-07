@@ -127,7 +127,9 @@ local `rg` check.)
      so the feature cannot open plain HTTP to the network even if a build
      enables it by mistake (and the `test-util` `cargo tree` gate keeps it
      out of normal graphs). `test_release_build_refuses_http` (target
-     `ureq`) asserts `Endpoint::parse("http://…")` is refused.
+     `ureq`, needs `--features test-util`) and the `--lib` unit test
+     `ureq_transport::tests::test_endpoint_parse_refuses_http` (runs without
+     any feature) both assert `Endpoint::parse("http://…")` is refused.
    - `transport`: `pub trait Transport: Send + Sync { fn send(&self, req: &HttpRequest) -> Result<HttpResponse, JevError>; }`.
      Open (test transports implement it). Direct `Transport::send` callers
      bypass busy retry **and** redaction; rustdoc says so, and production
