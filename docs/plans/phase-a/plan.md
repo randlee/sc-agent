@@ -415,6 +415,7 @@ Local equivalents of every CI job: [`docs/development/ci.md`](../../development/
 
 Phase A is not closed. Open at phase end:
 
+- Architectural refinement (D1–D13): planned in [`../phase-a-refine/plan.md`](../phase-a-refine/plan.md) (PR #19).
 - Bead **`agt-luna-live-count`** — Luna live token count is unverified
   (resolved decision **4**); requested feature **8** stays open until a key
   exists and the a-5 probe runs once with its output attached.

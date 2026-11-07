@@ -144,3 +144,50 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 
 Sprint docs under `docs/plans/phase-a/` list REQ ids in YAML frontmatter.
 Phase plan: [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md).
+
+## Phase A.1 — refinement (proposed)
+
+Each row and amendment carries a marker `(Proposed, r-N)` that its owning
+sprint flips to `(Active, r-N)`. When two sprints of one wave edit adjacent
+rows, the second to merge resolves the textual conflict, keeping both rows
+verbatim. Plan: [`plans/phase-a-refine/plan.md`](plans/phase-a-refine/plan.md).
+
+| ID | Requirement |
+| --- | --- |
+| REQ-SAG-0105 | Open backend set: `#[non_exhaustive]` ids; static facts on `BackendDescriptor` rows in one `BACKENDS` catalog; `JudgeBackend::capabilities()` derived from the descriptor; production dispatch is one factory table checked by `test_every_backend_has_factory`; elsewhere code branches on descriptor facts, never on id equality (test-and-review convention, ADR-SAG-0009) — (Proposed, r-1) |
+| REQ-SAG-0106 | Explicit `JevError` variants with unchanged `code()` ids, producer-neutral variants, `ProducerError`, `retryable()`, no detail-prefix parsing — (Proposed, r-1) |
+| REQ-SAG-0107 | `sc-agent-types` has no `sc-observability*` dependency; session log port uses local `LogRejected`; module seams are cargo features (`judge`, `secret`, `obs` default; `git`, `test-util` non-default; `cancel` core), every combination builds — (Proposed, r-1) |
+| REQ-SAG-0108 | `SubjectsDocument` is the one validated subjects type (private fields; validated on deserialize and by `SubjectsBuilder::build`); it and the id-assigning `SubjectsBuilder` live in `sc-agent-types`; producer and consumer share them — (Proposed, r-1) |
+| REQ-SAG-0109 | `crates/workspace-tests` (`publish = false`, no pyo3/tree-sitter in its graph) hosts cross-crate proofs incl. `jev_cross_impl`, a real `sc-treesitter` → `check.toml` e2e test, CLI/Python parity and git-read parity — (Proposed, r-3b) |
+| REQ-SAG-0133 | Both released binaries (`sc-ai`, `sc-treesitter`) documented with per-channel coverage — (Proposed, r-4) |
+| REQ-SAG-0134 | CI proves `mimalloc` is absent from `--no-default-features` library builds of `sc-ai` and `sc-treesitter` — (Proposed, r-4) |
+| REQ-SAG-0135 | CI proves `clap` is absent from `--no-default-features` library builds of `sc-ai` and `sc-treesitter` (`cargo tree` gates) — (Proposed, r-3b) |
+| NFR-SAG-0004 | Library deps use caret ranges; `=` pins only for lockstep listed in ADR-SAG-0023, checked by `check-exact-pins.sh` — (Proposed, r-4) |
+| REQ-SAG-0312 | `command` input `path` field (`RepoRelativePath`) settable in `check.toml`, substituted for `{path}` — (Proposed, r-2) |
+| REQ-SAG-0313 | Command producer stderr `ScAgentErrorResponse` re-raised with its code (`ProducerError`) — (Proposed, r-2) |
+| REQ-SAG-0314 | Request byte cap has one owner per backend (descriptor limit), enforced in `validate_for_send` before any send; dry-run reports `payload_bytes` and per-backend `over_limit` without failing — (Proposed, r-2) |
+| REQ-SAG-0402 | One shared HTTP layer (`sc-agent-http`) for all backend families — (Proposed, r-3) |
+| REQ-SAG-0403 | Both backends validate `CanonicalJudgePayload` by deserializing; Jev body is a JSON envelope (no byte-splice) — (Proposed, r-5, blocked) |
+| REQ-SAG-0604 | Per-backend results; a failure keeps other answers; `leak` = any failed; consumers print the envelope on stdout and the first failure on stderr and exit 2 / raise with `.response` — (Proposed, r-3b) |
+| REQ-SAG-0605 | Multi-backend runs independent by default; `chain_context` explicit (CLI flag, Python kwarg) and recorded — (Proposed, r-3b) |
+| REQ-SAG-0606 | `equal` computed from backend-reported digests of the canonical blob recovered from each final wire body — (Proposed, r-2b) |
+| REQ-SAG-0607 | Stateless `FileSessionStore` with a written no-lock concurrency model; session written once per run, only when an `ask`-capable backend returned `Ok` — (Proposed, r-2) |
+| REQ-SAG-0620 | One engine API (`prepare` → `run`) and one `RunResponse` with one serialization printed by every consumer — (Proposed, r-2) |
+| REQ-SAG-0712 | `sc-ai` and `sc-treesitter` parse argv with clap derive behind the `cli` feature; error contract unchanged — (Proposed, r-3b) |
+
+### Phase A.1 amendments to existing rows
+
+| ID | Amendment |
+| --- | --- |
+| REQ-SAG-0101 | "One variant per id" becomes "every variant maps to exactly one id in `errors.json`; an id may have several variants" — (Proposed, r-1) |
+| REQ-SAG-0103 | The a-1 frozen contract is unfrozen once by r-1 (types break) and re-frozen at r-1 merge; later changes are additive — (Proposed, r-1) |
+| REQ-SAG-0120 | The `observability::v2::SessionLog` port stays in `sc-agent-types` but no longer depends on `sc-observability-types`: `emit` returns the local `LogRejected`; the module is behind the default `obs` feature — (Proposed, r-1) |
+| REQ-SAG-0121 | Noop and test-util doubles stay; "trim deps" is done for `sc-observability-types` (dependency and root entry removed); module deletion still waits on upstream v2 — (Proposed, r-1) |
+| NFR-SAG-0001 | `ScAgentErrorResponse` is `{error, message}` plus `schema_version` (always `1`), `retryable` (only when `true`) and `details` (only for producer errors), in that key order; readers accept `schema_version` absent or `1` and deny unknown keys, so any added key (top level or in `details`) is breaking and bumps `schema_version` — (Proposed, r-1) |
+| REQ-SAG-0701 | stderr is one `ScAgentErrorResponse` line per NFR-SAG-0001 (amended): `{error, message, schema_version, ...}`, exit 2 — (Proposed, r-1) |
+| REQ-SAG-0601 | `run_check` / dry-run library API becomes `prepare`/`run` with `RunConfig::dry_run` — (Proposed, r-2) |
+| REQ-SAG-0710 | `data` is the `RunResponse` serialization (ADR-SAG-0014 r-2 amendment): the primary backend is the first `Ok` backend in `BackendSet` order and its answers are at the top level (the verbatim Jev response when Jev is primary); plus `session_id`, `results`, `equal_input`, `warnings` — (Proposed, r-2) |
+| REQ-SAG-0505 | Busy retry (owner decision 2026-11-06): 429/502/529 only; 4 sends; valid Retry-After honoured, clamped 0–30 s; Retry-After grammar ASCII digits with optional fraction, ≤ 32 bytes, else malformed; absent or malformed Retry-After → exponential backoff 1, 2, 4, 8 … s capped at 30 s (the default 4 sends give at most three waits: 1, 2, 4 s); ≤ 250 ms jitter; 90 s budget for starting attempts (in-flight attempt keeps its 120 s timeout); connect/DNS failures are not retried — `NETWORK_ERROR`, `retryable() == true`, caller decides — (Proposed, r-3) |
+| REQ-SAG-0130 | Consumer input publishes `sc-agent-http` (publish order 3) — (Proposed, r-3) |
+| REQ-SAG-0130 | Consumer input publishes `sc-agent-compose` (internal support, directly after `sc-jev-check`; owner decision 2026-11-06); no crates.io publish until D9 resolves — (Proposed, r-3b) |
+| REQ-SAG-0711 | `sc-ai` wires the logger through `sc_agent_compose::obs` — (Proposed, r-3b) |
