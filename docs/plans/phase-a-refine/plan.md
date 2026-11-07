@@ -280,7 +280,7 @@ package name and version so `sc-jev` does not match `sc-jev-check`:
 | `sc-treesitter` *(lib)* | `mimalloc`, `clap`, `sc-observability`; `-e normal,features -i sc-agent-types`: features `judge`, `secret`, `obs`, `git` | r-4 (mimalloc), r-3c (local clap and features), r-3b (script) |
 | `sc-jev-py` | depth-1 `sc-observability`, `ureq` | r-3b |
 | `sc-ai`, `sc-jev-py` | `-e normal -d` (duplicate versions): `sc-jev-check`, `sc-agent-types`, `sc-agent-compose`. Compose's signatures name `sc-jev-check` types and only compose is `=`-pinned, so a split version would give two incompatible `RunResponse` types (RBQA-F106 (b)) | r-3b |
-| `workspace-tests` | `pyo3`, `tree-sitter` (`-e normal,dev`). In the "dev edges ignored" branch also: the workspace crates in `cargo tree -p workspace-tests -e dev --depth 1` (third-party names filtered out) must be exactly `sc-agent-types`, `sc-jev-check`, `sc-agent-compose` (exact set comparison, not an absence pattern) | r-3b |
+| `workspace-tests` | `pyo3`, `tree-sitter` (`-e normal,dev`). (Dev edges are counted by `sc-boundary` per the D0 outcome, so the dev set is policed by the manifest, not by a tree row.) | r-3b |
 | every workspace crate | `-e normal,features` (no dev edges): feature `test-util` of any workspace crate | r-3b |
 
 ### New boundary manifests
@@ -355,8 +355,7 @@ notes = "Composition-root support for sc-ai and sc-jev-py. Published as internal
 roots = ["obs", "paths", "compose"]
 
 [dependencies]
-# "workspace-tests" is listed only in the "dev edges counted" branch of r-1's
-# D0 spike; in the "ignored" branch it would be a stale permission.
+# "workspace-tests" is listed because dev edges are counted (r-1 D0 outcome 4).
 allowed_dependents = ["sc-ai", "sc-jev-py", "workspace-tests"]
 allowed_dependencies = ["sc-agent-types", "sc-jev-check", "sc-observability", "serde_json"]
 forbidden_edges = [
@@ -377,19 +376,13 @@ forbidden_test_bypasses = []
 ```
 
 `boundaries/workspace-tests/workspace-tests.toml` (r-3b), full text below.
-`allowed_dependencies` is the exact workspace dev set. How `sc-boundary`
-treats a dev-only workspace edge, and whether it accepts `facade = ""`, is
-settled in wave 1 by r-1's D0 spike and recorded in `boundaries/README.md`
-(RBQA-F101). If dev edges count, this text lands as written and the three
-dependency manifests (`sc-agent-types`, `sc-jev-check`, `sc-agent-compose`)
-add `workspace-tests` to `allowed_dependents`. If they are ignored, this
-text still lands as written (`allowed_dependencies` documents the set for
-review), no dependent manifest gains `workspace-tests` (it would be a stale
-permission), and the dev set is policed by the `workspace-tests` row of the
-gate table. Third-party dev-deps (`serde_json`, `tempfile`) are checked only
-by that row; `sc-boundary` does not check third-party names. If the spike
-shows the schema rejects `facade = ""`, the facade is
-`"workspace_tests"` (the empty crate root) instead.
+`allowed_dependencies` is the exact workspace dev set. r-1's D0 spike settled
+how `sc-boundary` treats dev-only workspace edges (outcome 4, `boundaries/README.md`
+"Dev-dependency and self edges"): dev edges are counted, so this text lands as
+written and the three dependency manifests (`sc-agent-types`, `sc-jev-check`,
+`sc-agent-compose`) add `workspace-tests` to `allowed_dependents`. Third-party
+dev-deps (`serde_json`, `tempfile`) are not checked by `sc-boundary`. The schema
+rejects `facade = ""`, so the facade is `"workspace_tests"` (the empty crate root).
 
 ```toml
 boundary_id = "BOUNDARY-workspace-tests"
@@ -398,7 +391,7 @@ owner_crate_path = "workspace_tests"
 name = "workspace-tests"
 
 [public]
-facade = ""
+facade = "workspace_tests"
 notes = "publish = false (ADR-SAG-0028). Cross-crate proofs only: no normal dependencies and an empty src/lib.rs; dev-dependencies on sc-agent-types (features = [git]), sc-jev-check, sc-agent-compose, serde_json, tempfile. The bin-path helper is tests/support/bin_path.rs. sc-treesitter and sc-ai are driven as built binaries (cargo build --features cli --message-format=json), never linked, so pyo3 and tree-sitter stay out of this graph. Source scans read files and link nothing."
 
 [implementation]
@@ -443,12 +436,10 @@ state = "concrete_landed"
 Edits to existing manifests: `sc-agent-types` facade (`schema::subjects`,
 `git`, features, `test-util`), `-sc-observability-types` from its
 dependency list (r-1), `allowed_dependents` `+sc-agent-http` (r-3),
-`+sc-agent-compose` and, only in the "dev edges counted" branch,
-`+workspace-tests` (r-3b); `sc-jev` / `sc-jev-backends`
+`+sc-agent-compose` and `+workspace-tests` (r-3b; dev edges are counted); `sc-jev` / `sc-jev-backends`
 `allowed_dependencies` `-ureq +sc-agent-http`, forbidden `ureq` direct is
 enforced by the r-3 ownership record (r-3); `sc-jev-check` facade rewritten
-(r-2), `allowed_dependents` `+sc-agent-compose` and, only in the "counted"
-branch, `+workspace-tests` (r-3b); the "counted, self entries accepted"
+(r-2), `allowed_dependents` `+sc-agent-compose` and `+workspace-tests` (r-3b); the "counted, self entries accepted"
 branch (each crate with a self dev-dependency lists itself) was NOT taken —
 D0 resolved to outcome 4 (`boundaries/README.md`), so no self entries exist;
 `sc-ai` / `sc-jev-py` `allowed_dependencies` `-sc-observability

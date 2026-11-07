@@ -144,6 +144,12 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
    amendment) builds over r-1's `MockJudgeBackend`, so it reports the digest
    of the bundle it received; `test_equal_false_when_backend_digest_differs`
    uses `MockJudgeBackend::with_reported_digest`.
+   Recovery runs on the serialized body **before** it is handed to
+   `send_with_busy_retry`. A body that cannot be parsed for recovery is a
+   `JevError` with code `INPUT_INVALID` (`JevError::encode_failed`-style:
+   category plus position only); that backend becomes `Failed` with nothing
+   sent, and the message, fix hint and details carry no body or key bytes
+   (`test_digest_recovery_error_carries_no_body_bytes`).
 
    **Scripted-answers schema** (CPR-208; the one format behind
    `register_scripted_backends(ids, answers: Value)`, r-3b's hidden
@@ -240,9 +246,9 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
      r-2b); bullet 2 (session document v2) stays in force." Bullet 1's label
      becomes "(Superseded by ADR-SAG-0025, r-2b; last sentence in force)".
    - *ADR-SAG-0019 r-1 interim.* Bullet 1 is superseded in part: its first
-     two sentences (per-backend `Attestation`; `equal` true only when every
-     backend is `Matched`) stay in force and are restated by the r-2b
-     subsection; the sentences "Until r-2b lands backend-side hashing, no
+     sentence (per-backend `Attestation`; `equal` derived, true only when every
+     backend is `Matched`) and its last sentence (one shared bundle) stay in
+     force and are restated by the r-2b subsection; the middle sentence "Until r-2b lands backend-side hashing, no
      backend reports `JudgeOutcome.input_sha256`, so the engine records
      `Unattested` for every backend it sent to and **a live run reports
      `equal = false`**" are superseded by the ADR-SAG-0019 r-2b subsection
@@ -267,8 +273,8 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
      r-2b adds this line at the end of ADR-SAG-0025 bullet 3 (r-2b-owned):
      "From r-2b every backend that sends sets `input_sha256`; the ADR-SAG-0014
      r-1 interim clause 'null until r-2b backend hashing' no longer holds
-     (`input_sha256` is null only for a backend that was not sent or
-     failed)."
+     (`input_sha256` is null only for a backend that was not sent, failed,
+     or reported no digest — `Unattested`)."
 
    **Markers r-2b must not touch** (plan review 5, ARCH-R2B-004). r-2b flips
    only the ADR-SAG-0025 Status line, header and index row Status cell (as

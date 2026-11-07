@@ -149,7 +149,7 @@ ARCHC-002, ARCHC-003.
 | --- | --- |
 | req:REQ-SAG-0403 | Both backends deserialize `CanonicalJudgePayload`; no byte-splice; `test_envelope_robust_to_key_ordering` |
 | adr:ADR-SAG-0005 | r-5 subsection Active, including the ADR-SAG-0019-unchanged sentence and the branch sentence (Branch A: object-shape path deleted) |
-| adr:ADR-SAG-0002 | Branch B or both: r-5 subsection Active as quoted above and index marker "A.1 subsection (Active, r-5)"; `jev_cross_impl` digests unchanged for array payloads; a test rejects a payload with both `questions` and `criteria` and one with neither (`INPUT_INVALID`). Branch A: ADR-SAG-0002 text and row unchanged |
+| adr:ADR-SAG-0002 | Branch B or both: r-5 subsection Active as quoted above and index marker "A.1 subsection (Active, r-5)"; `jev_cross_impl` digests unchanged for array payloads; `test_payload_requires_exactly_one_of_questions_or_criteria` rejects a payload with both `questions` and `criteria` and one with neither (`INPUT_INVALID`). Branch A: ADR-SAG-0002 text and row unchanged |
 | adr:ADR-SAG-0001, 0020, 0026, 0027 | Validation failures map through `ErrorCode` (`cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`); no `disallowed_methods` expect outside `crates/sc-agent-http/src/ureq_transport.rs` and the ADR-SAG-0028 spawn sites (`cargo test -p workspace-tests --test source_scans`); `cargo test -p sc-jev --test jev_api` green over the `sc-agent-http` transport |
 | boundary:jev | `jev_cross_impl` and `cross_impl_branches` digests unchanged; `test_digest_detects_faulty_wire_builder` and `test_real_wire_builder_reports_prompt_digest` still green. Regression: REQ-SAG-0401 `cargo test -p sc-agent-http --test retry` (busy retry unchanged); REQ-SAG-0500/0501 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-jev-backends --features test-util --test wire` (Haiku/Luna embed the same canonical bytes) |
 
@@ -159,6 +159,7 @@ ARCHC-002, ARCHC-003.
 just lint
 just test
 cargo test -p sc-jev --features test-util --test wire -- test_envelope_robust_to_key_ordering --exact
+cargo test -p sc-agent-types --test judge -- test_payload_requires_exactly_one_of_questions_or_criteria --exact   # Branch B / both only
 cargo test -p sc-jev --features test-util --test wire -- test_digest_detects_faulty_wire_builder --exact
 cargo test -p sc-jev --features test-util --test wire -- test_real_wire_builder_reports_prompt_digest --exact
 cargo test -p sc-jev --test jev_api

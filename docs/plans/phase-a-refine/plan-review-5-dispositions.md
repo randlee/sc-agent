@@ -40,3 +40,15 @@ Abbreviations: `plan` = `plan.md`, `r-N` = that sprint doc.
   fallback replaces. This revision is limited to cross-references and
   ownership rows in plan. r-3b's text is now unconditional and takes
   precedence for r-3b. A later plan edit can remove the conditional.
+
+## Verification follow-ups (arch-qa, PR 24)
+
+| id | disposition | where |
+| --- | --- | --- |
+| ARCH-V-001 | applied — plan.md manifest TOML `facade = "workspace_tests"`; D0 conditional collapsed to outcome 4 in the manifests section, gate table and boundary map | plan.md |
+| ARCH-V-002 | applied — D5 defines the recovery path: before send; parse failure = INPUT_INVALID, backend Failed, nothing sent, no body/key bytes | r-2b D5 |
+| ARCH-V-003 | applied — sentence-precise supersession wording for the ADR-0019 interim | r-2b D7 |
+| ARCH-V-004 | applied — pointer line names Unattested | r-2b D7 |
+| ARCH-V-005 | applied — test named and validation line added (Branch B / both) | r-5 acceptance, validation |
+| ARCH-V-006 | applied — row limited to the CLI path (Python side has no override kwarg today) | r-3b acceptance |
+
