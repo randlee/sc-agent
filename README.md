@@ -43,3 +43,8 @@ Success writes one JSON object to stdout:
 echoes the repo root, `check.toml`, and `--llm-system-prompt-file` path that
 the command consumed. Failure exits 2 and writes `{"error","message"}` to
 stderr. `error` is a `JevError` code.
+
+## Development
+
+CI jobs and the local command for each one: [`docs/development/ci.md`](docs/development/ci.md).
+Release dry-run: [`docs/development/sc-publish.md`](docs/development/sc-publish.md).

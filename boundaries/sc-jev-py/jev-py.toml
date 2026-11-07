@@ -1,11 +1,28 @@
+# Boundary manifest for sc-jev-py. Checked by `sc-lint lint sc-boundary` (`just lint`).
+#
+# Conventions (Phase A phase-end, RBQA-F001 option B):
+# - `allowed_dependencies` lists EVERY direct normal (non-dev) dependency in
+#   crates/sc-jev-py/Cargo.toml, workspace and third-party, including optional and
+#   target-specific ones. Dev-dependencies are not listed.
+# - `forbidden_edges` are direct edges only; transitive reachability is not
+#   checked.
+# - What sc-lint 0.8.0 enforces from this file: workspace-to-workspace edges
+#   (SCB-DEPENDENCY-001 unlisted edge, -002 unlisted dependent, -003 forbidden
+#   edge present, -004 stale dependent permission). Third-party names here are
+#   accepted but not enforced by sc-boundary; the third-party edges that matter
+#   are enforced by the `global_dependency_ownership` records in sc-lint.toml
+#   (SCB-MANIFEST-004). Enforcement is Cargo-edge only: sc-lint 0.8.0 accepts
+#   `references.forbidden` entries but does not report on them, so this file
+#   declares none.
+
 boundary_id = "BOUNDARY-jev-py"
 owner_package = "sc-jev-py"
 owner_crate_path = "sc_jev_py"
 name = "jev-py"
 
 [public]
-facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session"
-notes = "PyO3 over sc-jev-check. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). Feature test-util only forwards scripted answers to sc-jev-check (ADR-SAG-0022)."
+facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session, sc_jev_py::CheckResult, sc_jev_py::canonical_bytes, sc_jev_py::canonical_sha256, sc_jev_py::default_log_root, sc_jev_py::resolve_log_root, sc_jev_py::resolve_session_dir, sc_jev_py::log_file"
+notes = "PyO3 over sc-jev-check; facade items are also the Python module surface. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). Feature test-util only forwards scripted answers to sc-jev-check (ADR-SAG-0022)."
 
 [implementation]
 type = "marker"
@@ -18,19 +35,27 @@ roots = ["build_request", "run_check", "Session", "canonical_bytes"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-jev-check", "sc-agent-types", "sc-observability", "pyo3", "serde_json"]
-forbidden_edges = [{ from = "sc-jev-py", to = "sc-jev" }]
+allowed_dependencies = ["pyo3", "sc-agent-types", "sc-jev-check", "sc-observability", "serde_json"]
+forbidden_edges = [
+    { from = "sc-jev-py", to = "sc-jev" },
+]
 
+# Required by the sc-lint 0.8.0 inventory schema. Not enforced: the
+# validator accepts entries here but reports nothing for them.
 [references]
 scope = "outside_owner_crate"
 forbidden = []
 
+# Required by the schema. Declarative: sc-lint 0.8.0 reports nothing for
+# these fields. Paths name the feature-gated (`test-util`) test doubles.
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
+# The sc-lint rules that check this boundary on every `just lint`. Listing
+# them here is documentation; sc-lint 0.8.0 does not read this field.
 [enforcement]
-lint_rules = []
+lint_rules = ["SCB-DEPENDENCY-001", "SCB-DEPENDENCY-002", "SCB-DEPENDENCY-003", "SCB-DEPENDENCY-004", "SCB-MANIFEST-004"]
 review_gates = []
 
 [status]
