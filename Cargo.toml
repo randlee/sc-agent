@@ -48,3 +48,10 @@ tempfile = "3"
 # Every crate, sc-jev-py included, opts in with `[lints] workspace = true`.
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# ADR-SAG-0020 r-3 amendment: a lint suppression must be a visible
+# `#[expect(.., reason = "..")]`, so a second `ResolvedApiKey::as_str` call
+# site (clippy.toml `disallowed-methods`) cannot hide behind `#[allow]`.
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
