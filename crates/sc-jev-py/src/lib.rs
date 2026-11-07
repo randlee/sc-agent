@@ -32,6 +32,9 @@
 //! import sc_jev_py as jev
 //! result = jev.run_check("check.toml", backends=["jev"], dry_run=False)
 //! ```
+//!
+//! The wheel ships type stubs (`sc_jev_py.pyi`, installed as `__init__.pyi`)
+//! and a `py.typed` marker.
 
 #![warn(missing_docs)]
 
@@ -43,12 +46,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyModuleMethods;
 
 use crate::error::JevError;
-
-#[doc(inline)]
-pub use run::{
-    CheckResult, Session, build_request, canonical_bytes, canonical_sha256, default_log_root,
-    log_file, resolve_log_root, resolve_session_dir, run_check,
-};
 
 /// Registers the Python entry points.
 ///
@@ -66,13 +63,14 @@ pub use run::{
 /// `build_request` calls `sc_jev_check::run::build_request`. `run_check` calls
 /// `sc_jev_check::run::run_check`. This module does not run extractors,
 /// reimplement payload canonicalization or Jev HTTP, or implement
-/// `JudgeBackend` (ADR-SAG-0005, ADR-SAG-0009). Feature `test-util` may
-/// forward `scripted_answers` into `sc-jev-check` (ADR-SAG-0022). Live runs
-/// resolve keys inside `sc-jev-check`.
+/// `JudgeBackend` (ADR-SAG-0005, ADR-SAG-0009). `run_check` has one signature
+/// in every build. Feature `test-util` adds the `_testing` submodule, whose
+/// `run_check_scripted` forwards scripted answers into `sc-jev-check`
+/// (ADR-SAG-0022). Live runs resolve keys inside `sc-jev-check`.
 #[pymodule]
 fn sc_jev_py(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<CheckResult>()?;
-    module.add_class::<Session>()?;
+    module.add_class::<run::CheckResult>()?;
+    module.add_class::<run::Session>()?;
     module.add_function(wrap_pyfunction!(run::build_request, module)?)?;
     module.add_function(wrap_pyfunction!(run::run_check, module)?)?;
     module.add_function(wrap_pyfunction!(run::canonical_bytes, module)?)?;
@@ -82,5 +80,14 @@ fn sc_jev_py(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run::resolve_session_dir, module)?)?;
     module.add_function(wrap_pyfunction!(run::log_file, module)?)?;
     module.add("JevError", module.py().get_type::<JevError>())?;
+    #[cfg(feature = "test-util")]
+    {
+        let testing = PyModule::new(module.py(), "_testing")?;
+        testing.add_function(wrap_pyfunction!(
+            run::testing::run_check_scripted,
+            &testing
+        )?)?;
+        module.add_submodule(&testing)?;
+    }
     Ok(())
 }

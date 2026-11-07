@@ -34,7 +34,20 @@ command = ["sc-treesitter", "extract", "--language", "python", "--query", "branc
 
 ### `file` / `table-column`
 
-`file` reads the repo-relative path at `rev` (`WORKTREE` is the working tree; any other rev is `git show`).
+`file` reads the repo-relative path at `rev`. `WORKTREE` is the working tree:
+the path is canonicalized and must stay under the canonical repo root, so a
+symlink that leaves the repo is `INPUT_INVALID`. Any other rev resolves
+`<rev>:./<path>` once with `git rev-parse --verify --end-of-options`, then
+reads that object id with `git cat-file`. Both reads stop at 8 MiB
+(`INPUT_TOO_LARGE`).
+
+**Known test limitation (Windows).** The symlink-escape tests
+(`extract::read::tests::committed_symlink_outside_the_repo_is_input_invalid`
+and `symlink_inside_the_repo_is_read`) are `#[cfg(unix)]`: creating a symlink
+on Windows needs Developer Mode or `SeCreateSymbolicLinkPrivilege`, which a
+test cannot rely on. The containment check itself (`canonicalize` then
+`starts_with` the canonical root) is platform-neutral code and runs on
+Windows; only the symlink fixture is Unix-only.
 
 `table-column` splits rows on unescaped `|` only. A cell may contain `\|`, which is one literal `|` and does not open a new column (REQ-SAG-0309).
 

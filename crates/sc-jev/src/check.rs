@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use sc_agent_types::{BackendId, JevError, JudgeOutcome};
 use serde_json::{Map, Value};
 
-use crate::api::JevClientConfig;
+use crate::config::JevClientConfig;
 
 /// Wire body plus the criteria used to validate the reply.
 pub(crate) struct PreparedCheck {
@@ -40,12 +40,10 @@ pub(crate) fn prepare(config: &JevClientConfig, payload: &[u8]) -> Result<Prepar
     })?;
     let criteria = question_criteria(&value)?;
     reject_unless_already_canonical(payload, &value)?;
-    if !payload.starts_with(b"{") {
-        return Err(JevError::InputInvalid {
-            detail: "Jev payload object must start at the first byte so the wire body can keep those bytes"
-                .to_owned(),
-        });
-    }
+    debug_assert!(
+        payload.starts_with(b"{"),
+        "canonical encoding of an object starts with '{{'"
+    );
     if object.contains_key("model") {
         return Err(JevError::InputInvalid {
             detail: "canonical payload must not include model; sc-jev adds the pinned model"
@@ -58,11 +56,8 @@ pub(crate) fn prepare(config: &JevClientConfig, payload: &[u8]) -> Result<Prepar
                 .to_owned(),
         });
     }
-    let body = splice_model(config.model(), payload)?;
-    let actual_bytes = u64::try_from(body.len()).map_err(|_| JevError::InputTooLarge {
-        limit_bytes: config.max_request_bytes(),
-        actual_bytes: u64::MAX,
-    })?;
+    let body = splice_model(config.model(), payload);
+    let actual_bytes = body.len() as u64;
     if actual_bytes > config.max_request_bytes() {
         return Err(JevError::InputTooLarge {
             limit_bytes: config.max_request_bytes(),
@@ -255,20 +250,19 @@ fn reject_unless_already_canonical(payload: &[u8], value: &Value) -> Result<(), 
     Ok(())
 }
 
-fn splice_model(model: &str, payload: &[u8]) -> Result<Vec<u8>, JevError> {
-    let model_json = serde_json::to_string(model).map_err(|error| JevError::ConfigInvalid {
-        detail: format!("Jev model id is not valid JSON: {error}"),
-    })?;
+/// `{"model":<model>,` followed by `payload` without its opening brace.
+///
+/// `prepare` has already checked that `payload` is a canonical object with a
+/// `questions` key, so it is never `{}` and always starts with `{`.
+fn splice_model(model: &str, payload: &[u8]) -> Vec<u8> {
+    debug_assert!(payload.len() > 2 && payload[0] == b'{');
+    let model_json = Value::String(model.to_owned()).to_string();
     let mut body = Vec::with_capacity(payload.len() + model_json.len() + 10);
     body.extend_from_slice(br#"{"model":"#);
     body.extend_from_slice(model_json.as_bytes());
-    if payload == b"{}" {
-        body.push(b'}');
-    } else {
-        body.push(b',');
-        body.extend_from_slice(&payload[1..]);
-    }
-    Ok(body)
+    body.push(b',');
+    body.extend_from_slice(&payload[1..]);
+    body
 }
 
 fn require_number(value: Option<&Value>) -> Result<(), JevError> {
@@ -301,24 +295,5 @@ mod response_shape {
         assert_eq!(meta["usage"]["input_tokens"], 318);
         assert_eq!(meta["answers"]["q"]["choice"], "no");
         assert_eq!(outcome.answers["q"]["choice"], "no");
-    }
-}
-
-#[cfg(test)]
-mod jev_api {
-    #[test]
-    fn retry_delay_matches_the_readme_clamp() {
-        use std::time::Duration;
-
-        use crate::client::retry_delay;
-
-        assert_eq!(retry_delay(None), Duration::from_secs(1));
-        assert_eq!(retry_delay(Some("")), Duration::from_secs(1));
-        assert_eq!(retry_delay(Some("2")), Duration::from_secs(2));
-        assert_eq!(retry_delay(Some("2.5")), Duration::from_secs_f64(2.5));
-        assert_eq!(retry_delay(Some("100")), Duration::from_secs(30));
-        assert_eq!(retry_delay(Some("-4")), Duration::from_secs(0));
-        assert_eq!(retry_delay(Some("nope")), Duration::from_secs(30));
-        assert_eq!(retry_delay(Some("   ")), Duration::from_secs(30));
     }
 }

@@ -39,3 +39,9 @@ ureq = "3.5.1"
 sc-observability = "=1.5.0"
 sc-observability-types = "=1.5.0"
 mimalloc = "=0.1.52"
+# Dev-only. Tests use tempfile::TempDir instead of hand-rolled temp dirs.
+tempfile = "3"
+
+# Every crate, sc-jev-py included, opts in with `[lints] workspace = true`.
+[workspace.lints.rust]
+unsafe_code = "forbid"

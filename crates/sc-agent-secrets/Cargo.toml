@@ -14,11 +14,8 @@ categories.workspace = true
 # Allowlist of packaged files.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
-[features]
-default = []
-# In-memory env and keyring doubles for tests (ADR-SAG-0020).
-# Production builds omit them.
-test-util = []
+[lints]
+workspace = true
 
 [dependencies]
 # No default features: platform keystores are enabled per target below.
@@ -37,4 +34,6 @@ keyring = { version = "3.6", features = ["windows-native"] }
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
-tempfile = "3"
+# Unit tests build fixed keys with the test-only `ResolvedApiKey::new`.
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types", features = ["test-util"] }
+tempfile.workspace = true

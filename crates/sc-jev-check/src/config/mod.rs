@@ -1,18 +1,24 @@
 //! `check.toml`, packaged `jev.toml`, and LLM prompt paths.
 //!
-//! Prompt text is not sent from this module. Callers in a later sprint inject
-//! the resolved file into `JudgeRequest`. Production prose lives in
-//! `assets/llm-evaluator-system.md`.
+//! Prompt text is not sent from this module; the run facade injects it into
+//! `JudgeRequest`. Production prose lives in `assets/llm-evaluator-system.md`
+//! and is compiled in as [`PACKAGED_SYSTEM_PROMPT`]. That constant is the
+//! only source of the packaged prompt; packaged `jev.toml` carries limits
+//! only and is parsed once per process.
 
 #![warn(missing_docs)]
 
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
 use sc_agent_types::{InputSpec, JevError};
 use serde::Deserialize;
 
 /// Packaged evaluator instructions (`include_str` of the asset file).
 pub const PACKAGED_SYSTEM_PROMPT: &str = include_str!("../../assets/llm-evaluator-system.md");
+
+/// Display name of the packaged system prompt in [`ResolvedPromptPath::path`].
+pub const PACKAGED_SYSTEM_PROMPT_NAME: &str = "llm-evaluator-system.md";
 
 const PACKAGED_JEV_TOML: &str = include_str!("../../assets/jev.toml");
 
@@ -34,24 +40,11 @@ pub struct ResolvedPromptPath {
     pub origin: PromptOrigin,
 }
 
-/// One packaged vendor model pin.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VendorPin {
-    /// Provider id (`typesafe`, `anthropic`, `openai`).
-    pub provider: String,
-    /// Model id the later HTTP client should use.
-    pub model: String,
-}
-
 /// Defaults loaded from packaged `assets/jev.toml`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PackagedConfig {
     /// Canonical payload byte cap (`INPUT_TOO_LARGE` above this).
     pub max_input_bytes: u64,
-    /// Asset file name of the packaged system prompt.
-    pub system_prompt_file: String,
-    /// Vendor pins keyed by provider id.
-    pub vendors: BTreeMap<String, VendorPin>,
 }
 
 /// A parsed `check.toml`.
@@ -74,29 +67,34 @@ impl CheckSpec {
     /// Selects the system-prompt path without reading the file.
     ///
     /// `check.toml` wins when `system_prompt_file` is set. Otherwise the
-    /// packaged asset path is used.
+    /// packaged asset ([`PACKAGED_SYSTEM_PROMPT_NAME`]) is used.
     #[must_use]
-    pub fn resolve_prompt_path<'a>(&'a self, packaged: &'a PackagedConfig) -> ResolvedPromptPath {
+    pub fn resolve_prompt_path(&self) -> ResolvedPromptPath {
         match &self.system_prompt_file {
             Some(path) => ResolvedPromptPath {
                 path: path.clone(),
                 origin: PromptOrigin::CheckToml,
             },
             None => ResolvedPromptPath {
-                path: packaged.system_prompt_file.clone(),
+                path: PACKAGED_SYSTEM_PROMPT_NAME.to_owned(),
                 origin: PromptOrigin::PackagedAsset,
             },
         }
     }
 }
 
-/// Loads packaged vendor pins, the byte cap, and the prompt asset path.
+/// Returns the packaged byte cap from `assets/jev.toml`.
+///
+/// The compiled-in file is parsed once per process and cached.
 ///
 /// # Errors
 ///
 /// Returns [`JevError::ConfigInvalid`] when `assets/jev.toml` is malformed.
 pub fn load_packaged_config() -> Result<PackagedConfig, JevError> {
-    parse_packaged(PACKAGED_JEV_TOML)
+    static PACKAGED: OnceLock<Result<PackagedConfig, JevError>> = OnceLock::new();
+    PACKAGED
+        .get_or_init(|| parse_packaged(PACKAGED_JEV_TOML))
+        .clone()
 }
 
 /// Parses `check.toml` text.
@@ -162,37 +160,8 @@ fn parse_packaged(text: &str) -> Result<PackagedConfig, JevError> {
             detail: "jev.toml limits.max_input_bytes must be greater than zero".into(),
         });
     }
-    if raw.llm_judge.system_prompt_file.is_empty() {
-        return Err(JevError::ConfigInvalid {
-            detail: "jev.toml llm_judge.system_prompt_file is empty".into(),
-        });
-    }
-    let mut vendors = BTreeMap::new();
-    for (provider, pin) in raw.vendors {
-        if pin.provider != provider || pin.model.is_empty() {
-            return Err(JevError::ConfigInvalid {
-                detail: format!("jev.toml vendor {provider} pin is incomplete"),
-            });
-        }
-        vendors.insert(
-            provider,
-            VendorPin {
-                provider: pin.provider,
-                model: pin.model,
-            },
-        );
-    }
-    for required in ["typesafe", "anthropic", "openai"] {
-        if !vendors.contains_key(required) {
-            return Err(JevError::ConfigInvalid {
-                detail: format!("jev.toml is missing vendor {required}"),
-            });
-        }
-    }
     Ok(PackagedConfig {
         max_input_bytes: raw.limits.max_input_bytes,
-        system_prompt_file: raw.llm_judge.system_prompt_file,
-        vendors,
     })
 }
 
@@ -231,21 +200,12 @@ struct RawLlmJudge {
 #[serde(deny_unknown_fields)]
 struct RawPackaged {
     limits: RawLimits,
-    llm_judge: RawLlmJudge,
-    vendors: BTreeMap<String, RawVendor>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLimits {
     max_input_bytes: u64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawVendor {
-    provider: String,
-    model: String,
 }
 
 #[cfg(test)]
@@ -260,18 +220,27 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/llm-evaluator-system.md");
         let disk = std::fs::read_to_string(path).expect("asset");
         assert_eq!(disk, PACKAGED_SYSTEM_PROMPT);
-        assert!(PACKAGED_SYSTEM_PROMPT.contains("PACKAGED-PROMPT-TOKEN-a3"));
+        assert_eq!(
+            PACKAGED_SYSTEM_PROMPT,
+            include_str!("../../assets/llm-evaluator-system.md")
+        );
+        assert!(
+            !PACKAGED_SYSTEM_PROMPT.contains("TOKEN"),
+            "the shipped prompt carries no test sentinel"
+        );
         assert!(PACKAGED_SYSTEM_PROMPT.contains("canonical judge payload"));
     }
 
     #[test]
-    fn payload_packaged_jev_toml_pins_vendors() {
+    fn payload_packaged_jev_toml_sets_the_byte_cap() {
         let packaged = load_packaged_config().expect("jev.toml");
         assert_eq!(packaged.max_input_bytes, 200_000);
-        assert_eq!(packaged.system_prompt_file, "llm-evaluator-system.md");
-        assert_eq!(packaged.vendors["typesafe"].model, "jev");
-        assert_eq!(packaged.vendors["anthropic"].model, "haiku");
-        assert_eq!(packaged.vendors["openai"].model, "luna");
+        assert_eq!(load_packaged_config().expect("cached"), packaged);
+        assert!(parse_packaged("[limits]\nmax_input_bytes = 0\n").is_err());
+        assert!(
+            parse_packaged("[limits]\nmax_input_bytes = 1\n[vendors.x]\nmodel = \"m\"\n").is_err(),
+            "vendor pins are no longer part of jev.toml"
+        );
     }
 
     #[test]
@@ -297,7 +266,6 @@ mod tests {
 
     #[test]
     fn check_prompt_path_overrides_the_packaged_asset() {
-        let packaged = load_packaged_config().expect("packaged");
         let spec = load_check_str(
             r#"
             [questions]
@@ -308,7 +276,7 @@ mod tests {
             "#,
         )
         .expect("check");
-        let resolved = spec.resolve_prompt_path(&packaged);
+        let resolved = spec.resolve_prompt_path();
         assert_eq!(resolved.path, "prompt.md");
         assert_eq!(resolved.origin, PromptOrigin::CheckToml);
 
@@ -319,7 +287,7 @@ mod tests {
             "#,
         )
         .expect("bare");
-        let resolved = bare.resolve_prompt_path(&packaged);
+        let resolved = bare.resolve_prompt_path();
         assert_eq!(resolved.origin, PromptOrigin::PackagedAsset);
         assert_eq!(resolved.path, "llm-evaluator-system.md");
     }

@@ -59,6 +59,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
+            # Content-keyed publish dirs (one per source state) are not
+            # reused across commits; keep them out of the cache.
+            !target/sc-publish-dry-run
           key: sc-publish-dry-run-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sc-publish-dry-run-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-

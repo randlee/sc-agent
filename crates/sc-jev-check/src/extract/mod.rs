@@ -8,6 +8,7 @@
 mod command;
 mod file;
 mod read;
+mod sanitize;
 mod subjects;
 mod table;
 
@@ -42,7 +43,7 @@ pub trait Extractor: private::Sealed {
     /// # Errors
     ///
     /// Returns [`JevError`] when the path, document, or command result is
-    /// unusable. Command `{path}` substitution uses [`CommandExtractor::extract_with_source`].
+    /// unusable. A command input's `{path}` placeholder has no value here.
     fn extract(
         &self,
         repo: &RepoRoot,
@@ -51,23 +52,18 @@ pub trait Extractor: private::Sealed {
     ) -> Result<Vec<Subject>, JevError>;
 }
 
-#[doc(inline)]
-pub use command::CommandExtractor;
-#[doc(inline)]
-pub use file::FileExtractor;
-#[doc(inline)]
-pub use read::{read_repo_bytes, read_repo_text};
-#[doc(inline)]
-pub use subjects::{SubjectsExtractor, parse_subjects_bytes, validate_subjects_document};
-#[doc(inline)]
-pub use table::TableColumnExtractor;
+pub(crate) use command::CommandExtractor;
+pub(crate) use file::FileExtractor;
+pub(crate) use read::{read_repo_bytes, read_repo_text};
+pub(crate) use subjects::SubjectsExtractor;
+pub(crate) use table::TableColumnExtractor;
 
 /// Runs the extractor selected by `input.kind`.
 ///
 /// # Errors
 ///
 /// Returns the extractor's [`JevError`]. Command inputs do not receive a
-/// `{path}` value here; pass that through [`CommandExtractor::extract_with_source`].
+/// `{path}` value here, so `{path}` in their argv is `CONFIG_INVALID`.
 pub fn extract_input(repo: &RepoRoot, rev: &Rev, input: &InputSpec) -> Result<Extracted, JevError> {
     match input {
         InputSpec::File { .. } => file::extract_file(repo, rev, input),
@@ -92,30 +88,16 @@ pub fn extractor_for(input: &InputSpec) -> &'static dyn Extractor {
 pub(crate) mod test_support {
     use std::path::{Path, PathBuf};
     use std::process::Command;
-    use std::sync::atomic::{AtomicU64, Ordering};
 
-    static SEQ: AtomicU64 = AtomicU64::new(0);
+    use crate::deadline::spawn_with_deadline;
 
-    pub struct TempDir(PathBuf);
-
-    impl TempDir {
-        pub fn path(&self) -> &Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
+    pub use tempfile::TempDir;
 
     pub fn temp_dir(label: &str) -> TempDir {
-        let n = SEQ.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("sc-jev-check-{label}-{}-{n}", std::process::id()));
-        std::fs::create_dir_all(&path).expect("temp dir");
-        TempDir(path)
+        tempfile::Builder::new()
+            .prefix(&format!("sc-jev-check-{label}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     pub fn fixture_root() -> PathBuf {
@@ -134,35 +116,8 @@ pub(crate) mod test_support {
 
     pub fn git_fixture() -> (TempDir, String) {
         let dir = copy_fixture();
-        git(
-            dir.path(),
-            &[
-                "-c",
-                "commit.gpgsign=false",
-                "-c",
-                "user.email=jev-check@example.com",
-                "-c",
-                "user.name=jev-check",
-                "init",
-            ],
-        );
-        git(dir.path(), &["add", "."]);
-        git(
-            dir.path(),
-            &[
-                "-c",
-                "commit.gpgsign=false",
-                "-c",
-                "core.hooksPath=/dev/null",
-                "-c",
-                "user.email=jev-check@example.com",
-                "-c",
-                "user.name=jev-check",
-                "commit",
-                "-m",
-                "init",
-            ],
-        );
+        git(dir.path(), &["init", "-q"]);
+        commit_all(dir.path(), "init");
         let sha = git_stdout(dir.path(), &["rev-parse", "HEAD"]);
         (dir, sha.trim().to_owned())
     }
@@ -171,13 +126,41 @@ pub(crate) mod test_support {
         if cfg!(windows) { "python" } else { "python3" }
     }
 
-    fn git(cwd: &Path, args: &[&str]) {
-        let output = Command::new("git")
+    /// Git with no global or system config, no terminal prompt, and a fixed
+    /// identity.
+    pub fn git_command(cwd: &Path) -> Command {
+        let mut command = Command::new("git");
+        command
             .arg("-C")
             .arg(cwd)
-            .args(args)
-            .output()
-            .expect("git");
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_CONFIG_GLOBAL", null_device())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .args([
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "user.email=jev-check@example.com",
+                "-c",
+                "user.name=jev-check",
+            ]);
+        command
+    }
+
+    fn null_device() -> &'static str {
+        if cfg!(windows) { "NUL" } else { "/dev/null" }
+    }
+
+    /// Stages everything under `cwd` and commits it.
+    pub fn commit_all(cwd: &Path, message: &str) {
+        git(cwd, &["add", "-A"]);
+        git(cwd, &["commit", "-q", "-m", message]);
+    }
+
+    pub fn git(cwd: &Path, args: &[&str]) {
+        let output = spawn_with_deadline(git_command(cwd).args(args), None);
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",
@@ -186,12 +169,7 @@ pub(crate) mod test_support {
     }
 
     fn git_stdout(cwd: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(cwd)
-            .args(args)
-            .output()
-            .expect("git output");
+        let output = spawn_with_deadline(git_command(cwd).args(args), None);
         assert!(output.status.success(), "git {args:?} failed");
         String::from_utf8(output.stdout).expect("utf-8")
     }

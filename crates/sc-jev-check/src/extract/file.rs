@@ -9,7 +9,7 @@ use super::read::read_repo_text;
 
 /// Reads one repo-relative file into a single subject.
 #[derive(Debug, Clone, Copy)]
-pub struct FileExtractor;
+pub(crate) struct FileExtractor;
 
 impl Sealed for FileExtractor {}
 

@@ -6,7 +6,7 @@
 #   test      just setup + just lint (ubuntu only); cargo clippy --all-features
 #             and cargo test (all three OSes)
 #   python    just test-python (maturin develop + jev-python pytest)
-#   features  cargo hack --each-feature check -p sc-treesitter
+#   features  cargo hack --each-feature test -p sc-treesitter
 #   doc       cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings
 #   coverage  cargo llvm-cov summary, uploaded as an artifact
 #
@@ -55,12 +55,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      # Committed fixtures are compared byte for byte; keep LF on Windows
-      # (runner default core.autocrlf=true rewrites them to CRLF).
-      - name: Keep LF line endings
-        timeout-minutes: 1
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -127,12 +121,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      # Committed fixtures are compared byte for byte; keep LF on Windows
-      # (runner default core.autocrlf=true rewrites them to CRLF).
-      - name: Keep LF line endings
-        timeout-minutes: 1
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -182,12 +170,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      # Committed fixtures are compared byte for byte; keep LF on Windows
-      # (runner default core.autocrlf=true rewrites them to CRLF).
-      - name: Keep LF line endings
-        timeout-minutes: 1
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -215,25 +197,15 @@ jobs:
           restore-keys: |
             sc-agent-ci-features-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
-      # `check` only: the per-language sc-treesitter tests are not yet
-      # feature-gated, so `--no-default-features` tests do not build. This
-      # step switches to `cargo hack --each-feature test -p sc-treesitter`
-      # once the phase-end code track (wave 3) gates them.
-      - name: cargo hack --each-feature check -p sc-treesitter
+      - name: cargo hack --each-feature test -p sc-treesitter
         timeout-minutes: 20
-        run: cargo hack --each-feature check -p sc-treesitter
+        run: cargo hack --each-feature test -p sc-treesitter
 
   doc:
     name: rustdoc (-D warnings)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      # Committed fixtures are compared byte for byte; keep LF on Windows
-      # (runner default core.autocrlf=true rewrites them to CRLF).
-      - name: Keep LF line endings
-        timeout-minutes: 1
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -261,13 +233,8 @@ jobs:
           restore-keys: |
             sc-agent-ci-doc-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
-      # continue-on-error while the 11 rustdoc warnings at d4a0111 are open.
-      # Removal condition: QA-005 (rustdoc warnings fixed) lands from the
-      # phase-end code track; that change deletes this flag so the step gates
-      # the PR (FTQ-004).
       - name: cargo doc --workspace --no-deps
         timeout-minutes: 20
-        continue-on-error: true
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps
@@ -277,12 +244,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      # Committed fixtures are compared byte for byte; keep LF on Windows
-      # (runner default core.autocrlf=true rewrites them to CRLF).
-      - name: Keep LF line endings
-        timeout-minutes: 1
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 

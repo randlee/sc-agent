@@ -22,11 +22,11 @@ name = "jev"
 
 [public]
 facade = "sc_jev::JevClient, sc_jev::JevClientConfig, sc_jev::JevTransport, sc_jev::HttpsTransport, sc_jev::WireRequest, sc_jev::WireResponse, sc_jev::RetryDelay, sc_jev::ThreadRetryDelay"
-notes = "TypeSafe check/judge HTTP. Transport and resolved key are construction state. The api and client modules are also public today (second path to the same items); narrowing is on the phase-end code track."
+notes = "TypeSafe check/judge HTTP. Transport and resolved key are construction state. The config and client modules are private; the root re-exports are the only public path."
 
 [implementation]
 type = "marker"
-module = "sc_jev::client"
+module = "sc_jev"
 visibility = "public"
 constructor = "public"
 

@@ -1,7 +1,8 @@
 //! Query assets compiled into the binary.
 //!
 //! `--language python --query branches` loads
-//! `assets/queries/python/branches.scm`.
+//! `assets/queries/python/branches.scm`. Each grammar's assets hang off its
+//! row in the grammar table, so a disabled grammar contributes no queries.
 
 use sc_agent_types::JevError;
 
@@ -9,31 +10,31 @@ use crate::grammar;
 
 /// One named query asset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct QueryInfo {
     /// Grammar id the query is written for.
     pub language: &'static str,
     /// Asset name without the `.scm` suffix (`--query`).
     pub name: &'static str,
+    /// Asset bytes, including the trailing newline.
+    ///
+    /// Producers hash these exact bytes into `producer.query_sha256`.
+    pub source: &'static str,
 }
 
-struct Asset {
-    language: &'static str,
-    name: &'static str,
-    source: &'static str,
-}
+#[cfg(feature = "python")]
+pub(crate) const PYTHON: &[QueryInfo] = &[QueryInfo {
+    language: "python",
+    name: "branches",
+    source: include_str!("../assets/queries/python/branches.scm"),
+}];
 
-const ASSETS: &[Asset] = &[
-    Asset {
-        language: "python",
-        name: "branches",
-        source: include_str!("../assets/queries/python/branches.scm"),
-    },
-    Asset {
-        language: "rust",
-        name: "match-arms",
-        source: include_str!("../assets/queries/rust/match-arms.scm"),
-    },
-];
+#[cfg(feature = "rust")]
+pub(crate) const RUST: &[QueryInfo] = &[QueryInfo {
+    language: "rust",
+    name: "match-arms",
+    source: include_str!("../assets/queries/rust/match-arms.scm"),
+}];
 
 /// Returns query assets for `language`, or every compiled-in language.
 ///
@@ -41,19 +42,14 @@ const ASSETS: &[Asset] = &[
 ///
 /// Returns [`JevError::LanguageUnavailable`] when `language` is set and that
 /// grammar is not compiled into this build.
-pub fn queries(language: Option<&str>) -> Result<Vec<QueryInfo>, JevError> {
-    if let Some(language) = language {
-        grammar::language(language)?;
+pub fn queries(language: Option<&str>) -> Result<Vec<&'static QueryInfo>, JevError> {
+    match language {
+        Some(id) => Ok(grammar::lookup(id)?.queries.iter().collect()),
+        None => Ok(grammar::all()
+            .iter()
+            .flat_map(|grammar| grammar.queries)
+            .collect()),
     }
-    Ok(ASSETS
-        .iter()
-        .filter(|asset| language.is_none_or(|id| asset.language == id))
-        .filter(|asset| grammar::language(asset.language).is_ok())
-        .map(|asset| QueryInfo {
-            language: asset.language,
-            name: asset.name,
-        })
-        .collect())
 }
 
 /// Returns the query text for `language` and `name`.
@@ -66,10 +62,10 @@ pub fn queries(language: Option<&str>) -> Result<Vec<QueryInfo>, JevError> {
 /// Returns [`JevError::LanguageUnavailable`] when the grammar is not compiled
 /// in, and [`JevError::QueryNotFound`] when the asset name is missing.
 pub fn query_source(language: &str, name: &str) -> Result<&'static str, JevError> {
-    grammar::language(language)?;
-    ASSETS
+    grammar::lookup(language)?
+        .queries
         .iter()
-        .find(|asset| asset.language == language && asset.name == name)
+        .find(|asset| asset.name == name)
         .map(|asset| asset.source)
         .ok_or_else(|| JevError::QueryNotFound {
             query: name.to_owned(),

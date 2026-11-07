@@ -1,9 +1,8 @@
 //! `subjects` extractor.
 //!
-//! Reads a `sc/subjects/1` document from a repo-relative path, or from stdin
-//! when the path is `-`.
-
-use std::io::Read;
+//! Reads a `sc/subjects/1` document from a repo-relative path. The engine
+//! never reads process stdin: `-` is refused with a pointer to
+//! `--request-json -` or a committed file.
 
 use sc_agent_types::{
     InputSpec, JevError, RepoRoot, Rev, SUBJECTS_SCHEMA_V1, Subject, SubjectsDocument,
@@ -16,7 +15,7 @@ use super::read::read_repo_bytes;
 
 /// Validates `sc/subjects/1` and returns its subjects.
 #[derive(Debug, Clone, Copy)]
-pub struct SubjectsExtractor;
+pub(crate) struct SubjectsExtractor;
 
 impl Sealed for SubjectsExtractor {}
 
@@ -45,17 +44,12 @@ pub(crate) fn extract_subjects(
             detail: "subjects extractor received a different input kind".into(),
         });
     };
-    let bytes = if path == "-" {
-        let mut bytes = Vec::new();
-        std::io::stdin()
-            .read_to_end(&mut bytes)
-            .map_err(|error| JevError::ExtractionFailed {
-                detail: format!("stdin read failed: {error}"),
-            })?;
-        bytes
-    } else {
-        read_repo_bytes(repo, rev, path)?
-    };
+    if path == "-" {
+        return Err(JevError::ConfigInvalid {
+            detail: "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path".into(),
+        });
+    }
+    let bytes = read_repo_bytes(repo, rev, path)?;
     parse_subjects_bytes(&bytes)
 }
 
@@ -63,10 +57,10 @@ pub(crate) fn extract_subjects(
 ///
 /// # Errors
 ///
-/// Returns [`JevError::ExtractionInvalid`] when the document is not the
-/// schema, [`JevError::ExtractionEmpty`] when `subjects` is empty, and
-/// [`JevError::InputInvalid`] when the bytes are not JSON.
-pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
+/// Returns [`JevError::ExtractionInvalid`] when the bytes are not JSON or
+/// the document is not the schema, and [`JevError::ExtractionEmpty`] when
+/// `subjects` is empty.
+pub(crate) fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
     let document: SubjectsDocument =
         serde_json::from_slice(bytes).map_err(|error| JevError::ExtractionInvalid {
             detail: format!("subjects JSON: {error}"),
@@ -78,12 +72,15 @@ pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
     })
 }
 
-/// Checks schema id, id rules, spans, and sort order.
+/// Checks schema id, id rules, spans, sort order, and the helper-capture rule.
+///
+/// A capture name beginning with `_` (a query helper, stored without `@`)
+/// must not appear.
 ///
 /// # Errors
 ///
 /// Returns [`JevError::ExtractionEmpty`] or [`JevError::ExtractionInvalid`].
-pub fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), JevError> {
+pub(crate) fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), JevError> {
     if document.schema != SUBJECTS_SCHEMA_V1 {
         return Err(JevError::ExtractionInvalid {
             detail: format!(
@@ -103,7 +100,9 @@ pub fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), Jev
     let mut previous: Option<(u32, &str)> = None;
     let mut line_counts: Vec<(u32, u32)> = Vec::new();
     for subject in &document.subjects {
-        if subject.capture.starts_with("@_") {
+        // Capture names are stored without `@`; query helpers (`@_name`)
+        // arrive as `_name`. Producers drop them, so one here is a leak.
+        if subject.capture.trim_start_matches('@').starts_with('_') {
             return Err(JevError::ExtractionInvalid {
                 detail: format!("helper capture {} must not be emitted", subject.capture),
             });
@@ -209,6 +208,19 @@ mod tests {
     }
 
     #[test]
+    fn subjects_stdin_path_is_config_invalid() {
+        let repo = RepoRoot::new(workspace_root());
+        let error = extract_subjects(
+            &repo,
+            &Rev::worktree(),
+            &InputSpec::Subjects { path: "-".into() },
+        )
+        .expect_err("stdin");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        assert!(error.fix_hint().contains("--request-json -"));
+    }
+
+    #[test]
     fn subjects_rejects_wrong_schema() {
         let mut value = minimal_value();
         value["schema"] = serde_json::json!("sc/subjects/0");
@@ -229,10 +241,12 @@ mod tests {
     #[test]
     fn subjects_helper_capture_is_rejected() {
         let mut value = minimal_value();
-        value["subjects"][0]["capture"] = serde_json::json!("@_skip");
-        let error =
-            parse_subjects_bytes(&serde_json::to_vec(&value).expect("bytes")).expect_err("helper");
-        assert_eq!(error.code(), "EXTRACTION_INVALID");
+        for helper in ["_skip", "@_skip"] {
+            value["subjects"][0]["capture"] = serde_json::json!(helper);
+            let error = parse_subjects_bytes(&serde_json::to_vec(&value).expect("bytes"))
+                .expect_err("helper");
+            assert_eq!(error.code(), "EXTRACTION_INVALID", "{helper}");
+        }
     }
 
     #[test]

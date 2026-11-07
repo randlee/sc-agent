@@ -15,6 +15,9 @@ categories = ["command-line-utilities"]
 # warning); tests that read repo-root fixtures run from the workspace only.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
+[lints]
+workspace = true
+
 [dependencies]
 # Deliberate `=` pin: the binary ships the allocator it was tested with; revisited at Phase A review.
 mimalloc.workspace = true
@@ -28,6 +31,8 @@ uuid.workspace = true
 
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
+sc-jev-check = { path = "../sc-jev-check", version = "0.1.0", features = ["test-util"] }
+tempfile.workspace = true
 
 [[bin]]
 name = "sc-ai"

@@ -18,6 +18,11 @@ pub struct SubjectsSource {
     /// Git revision, or `HEAD` when the producer recorded that name.
     pub rev: Rev,
     /// Git blob id of the source bytes.
+    ///
+    /// Plain `String` by decision (a-10, RBP-F011): a validating `BlobSha`
+    /// newtype would tighten what `sc/subjects/1` documents from command
+    /// extractors deserialize to, which is the same contract question as
+    /// `Rev` deserialize validation and is deferred to Phase A.1 r-1.
     pub blob_sha: String,
 }
 
@@ -61,7 +66,8 @@ pub struct Span {
 pub struct Subject {
     /// `{path}:{start_line}` or `{path}:{start_line}:{n}` for later same-line hits.
     pub id: String,
-    /// Capture name. Names starting with `@_` are not emitted.
+    /// Capture name, stored without `@`. Names starting with `_` (query
+    /// helper captures `@_…`) are not emitted.
     pub capture: String,
     /// UTF-8 slice `[start_byte, end_byte)` of the source.
     pub text: String,

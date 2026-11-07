@@ -1,0 +1,206 @@
+# Phase A a-10 hardening — per-id dispositions
+
+Branch `sprint/a-10-phase-end-hardening` (PR 20). One row per finding id per
+assignment: the three code waves
+(`.cursor/phase-a-orchestration/wave6-dev/fix-a-10-code-wave{1,2,3}.xml`)
+the QA-1 fix round (`fix-a-10-code-qa1.xml`), and the QA-2 follow-up
+(`wave6-qa/a-10-code-qa2/*.json`). An id that appears in
+more than one wave or group has one row each. Evidence is `file:line` at the
+QA-2 head; a deferred row names the owner.
+
+Status values: **implemented** (code, test, or doc change landed) or
+**deferred** (not done here; reason and owner given). Architectural items
+are never implemented here; they are D1–D13 in `PHASE-A-REVIEW.md`
+section 4 or the Phase A.1 plan (r-*).
+
+
+**Totals:** 162 rows; 152 implemented, 10 deferred.
+
+| Id | Wave / group | Status | Reason or note | Evidence |
+| --- | --- | --- | --- | --- |
+| RBP-F004 | wave 1 A | implemented | FromStr for BackendId / BackendKeyId; kebab aliases rejected | `crates/sc-agent-types/src/ids.rs:236`<br>`crates/sc-agent-types/src/ids.rs:173` |
+| ARCHE-010 | wave 1 A | implemented | same FromStr helpers (types half) | `crates/sc-agent-types/src/ids.rs:236` |
+| ARCHP-017 | wave 1 A | implemented | same FromStr helpers (types half) | `crates/sc-agent-types/src/ids.rs:236` |
+| ARCHC-022 | wave 1 A | implemented | BackendId::key_id and is_llm | `crates/sc-agent-types/src/ids.rs:216`<br>`crates/sc-agent-types/src/ids.rs:228` |
+| RBP-F003 | wave 1 A | implemented | Rev::parse edge entry point | `crates/sc-agent-types/src/ids.rs:307` |
+| RBP-F002 | wave 1 A | implemented | encode_failed / io_failed helpers | `crates/sc-agent-types/src/error.rs:327`<br>`crates/sc-agent-types/src/error.rs:365` |
+| ARCHC-025 | wave 1 A | implemented | map_detail over every text field, exhaustive test; redact_error built on it | `crates/sc-agent-types/src/error.rs:394`<br>`crates/sc-agent-types/src/error.rs:678` |
+| RBP-F010 | wave 1 A | implemented | redact_error on map_detail; try_new (new sealed in QA-1) | `crates/sc-agent-types/src/secret.rs:62`<br>`crates/sc-agent-types/src/secret.rs:112` |
+| ARCHC-014 | wave 1 A | implemented | ResolvedApiKey::try_new single rule set; normalized_* removed | `crates/sc-agent-types/src/secret.rs:62` |
+| ARCHC-016 | wave 1 A | implemented | PayloadBundle fields private, accessors, into_parts | `crates/sc-agent-types/src/judge.rs:66`<br>`crates/sc-agent-types/src/judge.rs:85` |
+| RBP-F011 | wave 1 A | implemented | PayloadBundle part (operation/BlobSha/QuestionId see QA-1 rows) | `crates/sc-agent-types/src/judge.rs:85` |
+| ARCHC-023 | wave 1 A | implemented | no-op deny_unknown_fields removed from ScAgentErrorResponse; no Default for SessionId | `crates/sc-agent-types/src/ids.rs:120` |
+| RBP-F014 | wave 1 A | implemented | SessionLog documented as intentionally open | `crates/sc-agent-types/src/observability/v2.rs:93` |
+| ARCHC-009 | wave 1 A | implemented | stale a-1 comment gone; RecordingSessionLog/RejectingSessionLog deleted (no matches in crates/) | `crates/sc-agent-types/src/test_util.rs:12` |
+| QA-005 | wave 1 A | implemented | rustdoc link fixed; doc gate is -D warnings | `.github/workflows/sc-agent-ci.yml:239` |
+| ARCHC-015 | wave 1 B | implemented | unquoted trailing ` #` comment stripped; dialect documented | `crates/sc-agent-secrets/src/dotenv.rs:137`<br>`crates/sc-agent-secrets/src/dotenv.rs:191` |
+| ARCHC-014 | wave 1 B | implemented | resolve paths construct via try_new | `crates/sc-agent-secrets/src/resolve.rs:70` |
+| ARCHC-009 | wave 1 B | implemented | MapEnv / MapKeyring cfg(test); test-util feature removed | `crates/sc-agent-secrets/src/resolve.rs:216`<br>`crates/sc-agent-secrets/Cargo.toml:36` |
+| ARCHC-017 | wave 1 B | implemented | env_var_name pub(crate); sc-jev api->config, modules private | `crates/sc-jev/src/lib.rs:24`<br>`crates/sc-jev/src/lib.rs:23` |
+| QA-005 | wave 1 B | implemented | sc-agent-secrets rustdoc links fixed (doc gate green) | `.github/workflows/sc-agent-ci.yml:239` |
+| QA-003 | wave 1 C | implemented | one retry_policy, verbatim in both crates, byte-compared in QA-1 | `crates/sc-jev/src/retry_policy.rs:26`<br>`crates/sc-jev/src/lib.rs:41` |
+| ARCHC-013 | wave 1 C | implemented | same retry_policy module | `crates/sc-jev-backends/src/retry_policy.rs:26` |
+| RBP-F006 | wave 1 C | implemented | interim alignment; crate merge is D5 | `crates/sc-jev-backends/src/retry_policy.rs:29` |
+| ARCHC-007 | wave 1 C | implemented | Client::judge prepares once | `crates/sc-jev-backends/src/backend.rs:110` |
+| ARCHC-012 | wave 1 C | implemented | unreachable branches removed; stated invariants are debug_assert | `crates/sc-jev/src/check.rs:43` |
+| RSH-006 | wave 1 C | implemented | one ureq Agent per transport; connect timeout; versioned User-Agent | `crates/sc-jev/src/client/https.rs:62`<br>`crates/sc-jev-backends/src/transport.rs:197` |
+| ARCHC-020 | wave 1 C | implemented | same agent/UA change | `crates/sc-jev/src/client/https.rs:66` |
+| EXT-008 | wave 1 C | implemented | Haiku/Luna generated by one private macro; public names unchanged | `crates/sc-jev-backends/src/backend.rs:225` |
+| ARCHC-024 | wave 1 C | implemented | macro; no extra Arc; non_text_blocks | `crates/sc-jev-backends/src/wire.rs:133` |
+| ARCHC-018 | wave 1 C | implemented | with_timeouts(connect, request) | `crates/sc-jev-backends/src/backend.rs:278` |
+| ARCHC-019 | wave 1 C | implemented | from_toml via deny_unknown_fields raw struct | `crates/sc-jev/src/config.rs:28` |
+| ARCHC-011 | wave 1 C | implemented | probabilities kept (D10); documented as derived | `crates/sc-agent-types/src/judge.rs:118` |
+| RSH-005 | wave 1 C | implemented | 90 s retry deadline + jitter (cancellation is Phase A.1) | `crates/sc-jev/src/retry_policy.rs:15`<br>`crates/sc-jev/src/retry_policy.rs:13` |
+| QA-002 | wave 1 C | implemented | loopback transport tests; rust-qa: sc-jev 89.9%, sc-jev-backends 93.4% line | `crates/sc-jev/src/client/https.rs:227`<br>`crates/sc-jev-backends/src/transport.rs:415` |
+| QA-005 | wave 1 C | implemented | sc-jev / sc-jev-backends rustdoc links fixed | `.github/workflows/sc-agent-ci.yml:239` |
+| RBQA-F012 | wave 1 D | implemented | workspace unsafe_code = forbid | `Cargo.toml:47` |
+| RBQA-F008 | wave 1 D | implemented | clippy disallowed-methods on as_str; two allow sites | `clippy.toml:6`<br>`crates/sc-jev/src/client/https.rs:85`<br>`crates/sc-jev-backends/src/transport.rs:82` |
+| QA-007 | wave 1 D | implemented | tempfile workspace dev-dependency (TempDir part) | `Cargo.toml:42` |
+| ARCHP-021 | wave 1 D | implemented | tempfile workspace dev-dependency | `Cargo.toml:42` |
+| QA-005 | wave 1 D | implemented | doc warnings owned by wave 1 removed | `.github/workflows/sc-agent-ci.yml:10` |
+| RSH-001 | wave 2 A | implemented | env_clear + allowlist; GIT_TERMINAL_PROMPT=0; sentinel test | `crates/sc-jev-check/src/extract/sanitize.rs:38`<br>`crates/sc-jev-check/src/extract/command.rs:575` |
+| RSH-002 | wave 2 A | implemented | canonical containment, regular file, take(MAX+1), cat-file -s precheck | `crates/sc-jev-check/src/extract/read.rs:126` |
+| CR-006 | wave 2 A | implemented | symlink escape refused | `crates/sc-jev-check/src/extract/read.rs:359` |
+| ARCHE-024 | wave 2 A | implemented | same containment fix | `crates/sc-jev-check/src/extract/read.rs:114` |
+| RSH-003 | wave 2 A | implemented | system prompt read capped via take(limit+1) | `crates/sc-jev-check/src/run/prompt.rs:82` |
+| CR-002 | wave 2 A | implemented | `{rev}:./{relative}` spec | `crates/sc-jev-check/src/extract/read.rs:146`<br>`crates/sc-jev-check/src/extract/read.rs:265` |
+| CR-007 | wave 2 A | implemented | RepoRoot absolutized at construction | `crates/sc-ai/src/command.rs:763` |
+| CR-008 | wave 2 A | implemented | blob type check, typed failure classes, sanitized stderr tail | `crates/sc-jev-check/src/extract/read.rs:236`<br>`crates/sc-jev-check/src/extract/sanitize.rs:13` |
+| ARCHE-015 | wave 2 A | implemented | same classification | `crates/sc-jev-check/src/extract/read.rs:232` |
+| CR-003 | wave 2 A | implemented | single-pass expand_placeholders (+ test) | `crates/sc-jev-check/src/payload/mod.rs:155`<br>`crates/sc-jev-check/src/payload/mod.rs:195` |
+| CR-004 | wave 2 A | implemented | --check normalised lexically; --rev with --request-json rejected | `crates/sc-ai/src/command.rs:43` |
+| ARCHE-023 | wave 2 A | implemented | same CLI normalisation | `crates/sc-ai/src/command.rs:130` |
+| ARCHE-021 | wave 2 A | implemented | subjects `-` path refused with hint | `crates/sc-jev-check/src/extract/subjects.rs:47` |
+| ARCHE-008 | wave 2 A | implemented | packaged prompt token deleted; asset equality test | `crates/sc-jev-check/src/config/mod.rs:5` |
+| CR-015 | wave 2 A | implemented | unique create_new tmp, cleanup, parent fsync, 0700 dir | `crates/sc-jev-check/src/session/mod.rs:563`<br>`crates/sc-jev-check/src/session/mod.rs:535` |
+| RSH-004 | wave 2 A | implemented | same session write hardening | `crates/sc-jev-check/src/session/mod.rs:563` |
+| CR-014 | wave 2 A | implemented | log flush failure is an envelope warning | `crates/sc-ai/src/command.rs:423` |
+| ARCHE-010 | wave 2 B | implemented | one validate_question_set / validate_state; FromStr and Rev::parse at edges | `crates/sc-jev-check/src/payload/questions.rs:84`<br>`crates/sc-jev-check/src/payload/questions.rs:124` |
+| CR-011 | wave 2 B | implemented | same validators | `crates/sc-jev-check/src/payload/questions.rs:84` |
+| RBP-F004 | wave 2 B | implemented | registry uses BackendId::key_id; parsing via from_str | `crates/sc-jev-check/src/registry/mod.rs:104`<br>`crates/sc-ai/src/command.rs:738` |
+| ARCHE-009 | wave 2 B | implemented | VendorPin / vendors tables gone; packaged config parsed once | `crates/sc-jev-check/src/config/mod.rs:12` |
+| RBQA-F004 | wave 2 B | implemented | routine part only; byte-cap owner is D13 | `crates/sc-jev-check/src/config/mod.rs:12` |
+| ARCHE-014 | wave 2 B | implemented | in-loop validate only when session context was appended | `crates/sc-jev-check/src/run/mod.rs:300` |
+| ARCHE-019 | wave 2 B | implemented | dry run builds no store or logger | `crates/sc-jev-check/src/run/mod.rs:76` |
+| ARCHE-020 | wave 2 B | implemented | table cell byte span; multiple producers refused | `crates/sc-jev-check/src/equal_input/mod.rs:55` |
+| ARCHP-001 | wave 2 B | implemented | helper-capture rule uses `_` prefix (consumer part) | `crates/sc-jev-check/src/extract/subjects.rs:105`<br>`crates/sc-agent-types/src/subjects.rs:69` |
+| RBP-F015 | wave 2 B | implemented | run/session literals routed via typed constructors (residual closed in QA-1) | `crates/sc-jev-check/src/run/mod.rs:272` |
+| RBP-F002 | wave 2 B | implemented | encode_failed at sc-ai sites | `crates/sc-ai/src/command.rs:621` |
+| CR-012 | wave 2 B | implemented | subjects.rs doc says ExtractionInvalid | `crates/sc-jev-check/src/extract/subjects.rs:60` |
+| CR-016 | wave 2 B | implemented | --flag=value may start with `-`; help only in slots 1-2 (clap is D12) | `crates/sc-ai/src/command.rs:76` |
+| ARCHE-018 | wave 2 B | implemented | bug part only; clap is D12 | `crates/sc-ai/src/command.rs:76` |
+| ARCHE-016 | wave 2 C | implemented | exact.rs -> tests/sessions_exact.rs; inline tests split | `crates/sc-jev-check/tests/sessions_exact.rs:1`<br>`crates/sc-jev-check/src/run/tests.rs:5` |
+| RBP-F015 | wave 2 C | implemented | test layout part | `crates/sc-jev-check/src/session/tests.rs:4` |
+| QA-007 | wave 2 C | implemented | hand-rolled temp dirs replaced by tempfile (show-toplevel part in QA-1) | `crates/sc-jev-check/src/extract/mod.rs:94` |
+| ARCHP-021 | wave 2 C | implemented | TempDir in sc-jev-check / sc-ai tests | `crates/sc-jev-check/src/extract/mod.rs:94` |
+| ARCHE-017 | wave 2 C | implemented | engine internals pub(crate); facades updated | `boundaries/sc-jev-check/jev-check.toml:24` |
+| RBQA-F011 | wave 2 C | implemented | same visibility pass | `boundaries/sc-ai/sc-ai-cli.toml:24` |
+| EXT-003 | wave 2 C | implemented | CLI half: ExecuteOverrides and observe seams are #[doc(hidden)] but NOT feature-gated: a self dev-dependency for a test-support feature is rejected by sc-boundary and crates.io publish (reason in code) | `crates/sc-ai/src/lib.rs:33` |
+| CR-013 | wave 2 C | implemented | cross-impl fixture extended; references regenerated | `tests/fixtures/jev/cross_impl/logical.json:11` |
+| FTQ-003 | wave 2 C | implemented | spawn_with_deadline (now the shared tests/support/deadline.rs) | `tests/support/deadline.rs:47` |
+| QA-005 | wave 2 C | implemented | no rustdoc warnings in sc-jev-check / sc-ai | `.github/workflows/sc-agent-ci.yml:239` |
+| CR-005 | wave 3 A | implemented | rev-parse --verify --end-of-options, cat-file on the id; leading-dash rev rejected | `crates/sc-treesitter/src/git_io.rs:142`<br>`crates/sc-treesitter/tests/cli.rs:156` |
+| RBQA-F006 | wave 3 A | implemented | same git read rewrite | `crates/sc-treesitter/src/git_io.rs:134` |
+| ARCHP-004 | wave 3 A | implemented | same git read rewrite; 40/64-hex ids | `crates/sc-treesitter/src/git_io.rs:212` |
+| CR-010 | wave 3 A | implemented | canonicalize_lenient before strip_prefix | `crates/sc-treesitter/src/git_io.rs:287` |
+| ARCHP-007 | wave 3 A | implemented | one cfg-gated GRAMMARS table | `crates/sc-treesitter/src/grammar.rs:7` |
+| QA-006 | wave 3 A | implemented | feature-gated tests; CI runs cargo hack --each-feature test | `.github/workflows/sc-agent-ci.yml:9` |
+| ARCHP-008 | wave 3 A | implemented | slice once; has_error skip; MISSING node rule | `crates/sc-treesitter/src/extract.rs:217` |
+| ARCHP-010 | wave 3 A | implemented | non_exhaustive infos; ExtractInput::new + setters | `crates/sc-treesitter/src/extract.rs:59` |
+| ARCHP-011 | wave 3 A | implemented | --version / -V; help slots (clap is D12) | `crates/sc-treesitter/tests/cli.rs:360` |
+| ARCHP-012 | wave 3 A | implemented | duplicate .scm fixture deleted | `crates/sc-treesitter/assets/queries/python/branches.scm:1` |
+| ARCHP-003 | wave 3 A | implemented | routine part: missing positional and span overflow are INPUT_INVALID (ADR-SAG-0029 c) | `crates/sc-treesitter/tests/cli.rs:344`<br>`crates/sc-treesitter/src/extract.rs:317` |
+| QA-005 | wave 3 A | implemented | sc-treesitter rustdoc warning removed | `.github/workflows/sc-agent-ci.yml:239` |
+| FTQ-003 | wave 3 A | implemented | treesitter tests use the shared bounded runner | `crates/sc-treesitter/tests/support/mod.rs:29` |
+| ARCHP-013 | wave 3 B | implemented | build_request under py.detach; sentinel-handshake test (QA-1) | `crates/sc-jev-py/src/run.rs:415`<br>`crates/sc-jev-py/src/run.rs:1067` |
+| ARCHP-015 | wave 3 B | implemented | LoggerInner Drop flush+shutdown | `crates/sc-jev-py/src/logging.rs:48` |
+| ARCHP-016 | wave 3 B | implemented | Weak registry keyed by canonical root | `crates/sc-jev-py/src/logging.rs:78` |
+| ARCHP-017 | wave 3 B | implemented | backends via from_str, revs via Rev::parse | `crates/sc-jev-py/src/run.rs:157` |
+| EXT-003 | wave 3 B | implemented | one run_check; _testing.run_check_scripted under test-util | `crates/sc-jev-py/src/lib.rs:85`<br>`crates/sc-jev-py/src/run.rs:549` |
+| RBP-F013 | wave 3 B | implemented | parsing part (shared logic owner is D2) | `crates/sc-jev-py/src/run.rs:157` |
+| ARCHP-018 | wave 3 B | implemented | pub(crate) pyfunctions; expect(too_many_arguments) | `crates/sc-jev-py/src/run.rs:491` |
+| ARCHP-019 | wave 3 B | implemented | PathBuf params, frozen classes, .pyi + py.typed in the wheel (verified by maturin build) | `crates/sc-jev-py/sc_jev_py.pyi:47`<br>`crates/sc-jev-py/src/run.rs:253` |
+| ARCHP-020 | wave 3 B | implemented | duplicate cross-impl comparison removed (routine part; hosting is D7) | `crates/sc-jev-py/Cargo.toml:53` |
+| ARCHP-021 | wave 3 B | implemented | TempDir in sc-jev-py tests | `crates/sc-jev-py/src/logging.rs:299` |
+| ARCHP-022 | wave 3 B | implemented | shorthand normalised in register_scripted_backends | `crates/sc-jev-check/src/registry/scripted.rs:242` |
+| FTQ-002 | wave 3 B | implemented | pure default_log_root_from | `crates/sc-jev-py/src/logging.rs:177` |
+| QA-005 | wave 3 B | implemented | sc-jev-py rustdoc warnings removed | `.github/workflows/sc-agent-ci.yml:239` |
+| QA-008 | wave 3 B | implemented | invariant expects carry messages and a proving test | `crates/sc-jev-py/src/logging.rs:354` |
+| QA-005 | wave 3 C | implemented | doc gate hard (no continue-on-error) | `.github/workflows/sc-agent-ci.yml:236` |
+| FTQ-005 | wave 3 C | implemented | .gitattributes pins LF; autocrlf steps removed | `.gitattributes:4` |
+| REQ-QA-A10-005 | wave 3 C | implemented | same .gitattributes change | `.gitattributes:4` |
+| merge integrate/phase-a | wave 3 C | implemented | branch is 0 commits behind origin/integrate/phase-a at QA-1 | `docs/plans/phase-a/plan.md:414` |
+| CI-001 | QA-1 A | implemented | WORKTREE hash via hash-object --stdin --no-filters; Windows green on e1865b7 (run 42357668732) | `crates/sc-treesitter/src/git_io.rs:103`<br>`crates/sc-treesitter/tests/cli.rs:267` |
+| RSH observation (hash-object filters) | QA-1 A | implemented | id matches the returned bytes; no clean filters | `crates/sc-treesitter/src/git_io.rs:107` |
+| ARCH-001 | QA-1 B | implemented | ADR-SAG-0029 (b) amends ADR-SAG-0022 | `docs/architecture.md:425` |
+| ARCH-002 | QA-1 B | implemented | ADR-SAG-0029 (a) amends ADR-SAG-0020 | `docs/architecture.md:406` |
+| ARCH-003 | QA-1 B | implemented | secrets facade drops MapEnv/MapKeyring; notes fixed. `just lint` green on 9482380 (QA-2 code head; the later commit is docs-only): local `compatibility.check: ok`, `lint.ci.consumer: pass (3 steps)`; `sc-lint lint sc-boundary --json` = sc-lint-boundary 0.8.0 status pass, 0 findings, 9 crates scanned; CI [test (ubuntu-24.04)](https://github.com/randlee/sc-agent/actions/runs/42361431082/job/128370466596) `just lint` step: `compatibility.check: ok`, `lint.ci.consumer: ok` | `boundaries/sc-agent-secrets/agent-secrets.toml:25` |
+| ARCH-004 | QA-1 B | deferred | ADR-SAG-0016 version-form text belongs to the D8 amendment; noted in ADR-SAG-0029 | `docs/architecture.md:461` |
+| REQ-QA-001 | QA-1 B | implemented | ADR-SAG-0022 bullet marked superseded with pointer | `docs/architecture.md:165` |
+| REQ-QA-002 | QA-1 B | implemented | sc-jev-py architecture and sprint a-8 name run_check_scripted | `docs/sc-jev-py/architecture.md:29`<br>`docs/plans/phase-a/sprint-a-8-pyo3-wrapper.md:70` |
+| REQ-QA-003 | QA-1 B | implemented | plan.md rows: doc gate hard, feature matrix runs test; run ids kept as history; ci.md matches workflow | `docs/plans/phase-a/plan.md:406`<br>`docs/plans/phase-a/plan.md:423` |
+| REQ-QA-004 | QA-1 B | implemented | jev-py facade is the Python module surface (path syntax required by sc-boundary) | `boundaries/sc-jev-py/jev-py.toml:30` |
+| REQ-QA-005 | QA-1 C | implemented | error-code dispositions in ADR-SAG-0029 (c); all ids in errors.json | `docs/architecture.md:440`<br>`crates/sc-agent-types/src/error.rs:632` |
+| REQ-QA-006 | QA-1 B | implemented | sc-treesitter API notes | `docs/sc-treesitter/architecture.md:29` |
+| REQ-QA-007 | QA-1 C | implemented | this table | `docs/plans/phase-a/a-10-hardening-dispositions.md:1` |
+| REQ-QA-008 | QA-1 C | implemented | D1-D13 section below | `docs/plans/phase-a/a-10-hardening-dispositions.md:184` |
+| REQ-QA-009 | QA-1 B | implemented | ADR-SAG-0020 test-util sentence superseded; sprint a-4 owned path fixed; jev.toml lists root re-exports only | `docs/architecture.md:236`<br>`docs/plans/phase-a/sprint-a-4-backend-jev.md:34`<br>`boundaries/sc-jev/jev.toml:25` |
+| FTQ-006 | QA-1 D | implemented | bounded accept loop, stream timeouts, finish recv_timeout + count panic; copies byte-compared | `crates/sc-jev/src/test_server.rs:142`<br>`crates/sc-jev/src/lib.rs:41` |
+| FTQ-007 | QA-1 D | implemented | sentinel handshake in Rust and Python; drop guard / try-finally | `crates/sc-jev-py/src/run.rs:1041`<br>`tests/fixtures/jev-python/tests/test_run_check_and_ask.py:209` |
+| FTQ-008 | QA-1 D | implemented | shared tests/support/deadline.rs for git helper, env re-exec, cross-impl; GIT_CONFIG_NOSYSTEM | `crates/sc-jev-check/src/extract/mod.rs:138`<br>`crates/sc-jev-check/src/extract/command.rs:588`<br>`tests/jev_cross_impl/main.rs:30` |
+| FTQ-009 | QA-1 D | implemented | closed_port() guard holds the listener; redirects use invalid.test | `crates/sc-jev/src/test_server.rs:169`<br>`crates/sc-jev/src/test_server.rs:179` |
+| FTQ-010 | QA-1 D | implemented | Reply::Stall waits on a release signal | `crates/sc-jev/src/test_server.rs:238` |
+| RSH-007 | QA-1 E | implemented | 8 MiB cap: metadata + take(MAX+1); cat-file -s before blob | `crates/sc-treesitter/src/git_io.rs:35`<br>`crates/sc-treesitter/src/git_io.rs:161`<br>`crates/sc-treesitter/tests/cli.rs:250` |
+| RSH-008 | QA-1 E | implemented | spec resolved once by rev-parse; -t/-s/blob on the id | `crates/sc-jev-check/src/extract/read.rs:147`<br>`crates/sc-jev-check/src/extract/read.rs:187` |
+| RBP-F010 | QA-1 E | implemented | ResolvedApiKey::new only under cfg(test)/test-util; callers were all test code (registry/mod.rs:218 is in mod tests) | `crates/sc-agent-types/src/secret.rs:91` |
+| RBP-F011 LogOperation | QA-1 E | implemented | enum with Display/FromStr; JSONL strings unchanged (golden test) | `crates/sc-agent-types/src/observability/v2.rs:40` |
+| RBP-F011 BlobSha | QA-1 E | deferred | r-1: a validating newtype tightens what sc/subjects/1 deserializes from command extractors (same question as Rev deserialize); doc line records it | `crates/sc-agent-types/src/subjects.rs:22` |
+| RBP-F011 QuestionId | QA-1 E | deferred | r-1: touches the frozen judge contract; doc line records it | `crates/sc-agent-types/src/judge.rs:20` |
+| RBP-F015 | QA-1 E | implemented | clock faults via session_store_io, payload UTF-8 via operational_io (+ test) | `crates/sc-jev-check/src/session/mod.rs:521`<br>`crates/sc-jev-check/src/session/tests.rs:160` |
+| RBP-F002 | QA-1 E | implemented | setattr failure chained as __cause__; read.rs reports valid_up_to offset | `crates/sc-jev-py/src/error.rs:32`<br>`crates/sc-jev-check/src/extract/read.rs:63` |
+| RBP obs: substitute_placeholders | QA-1 E | implemented | reuses single-pass expand_placeholders (+ test) | `crates/sc-jev-check/src/extract/command.rs:138`<br>`crates/sc-jev-check/src/extract/command.rs:529` |
+| RBP obs: Haiku/Luna new Result | QA-1 E | implemented | kept Result (matches JevClient::new); doc line + pinning test | `crates/sc-jev-backends/src/backend.rs:248`<br>`crates/sc-jev-backends/tests/llm.rs:213` |
+| RBP obs: payload_text lossy | QA-1 E | implemented | expect with message | `crates/sc-jev-py/src/run.rs:90` |
+| RBP obs: Rev deserialize validation | QA-1 E | deferred | Phase A.1 r-1 (wire contract of Rev) | — |
+| RBP obs: ExtractInput required-field constructor | QA-1 E | deferred | Phase A.1 r-3c | — |
+| RBP obs: retry_policy duplication | QA-1 E | deferred | r-2b / D5 (one HTTP layer); drift now prevented by the byte-compare test | `crates/sc-jev/src/lib.rs:39` |
+| RBP obs: serde spelling open_ai_luna vs openai_luna | QA-1 E | deferred | D6 wire decision; divergence stays pinned by test | `crates/sc-agent-types/src/ids.rs:244` |
+| RBP obs: encode_failed INPUT_INVALID semantics | QA-1 E | deferred | RBP-F001 / r-1 (error type design, D6); wire id unchanged | `crates/sc-agent-types/src/error.rs:327` |
+| RBP obs: logging.rs raw {error} interpolation | QA-1 E | deferred | r-2; io/observability errors only, no payload text | — |
+| QA-004 | QA-1 F | implemented | adapters stay per root (location is D2; D7 drops the obs-types dep from sc-agent-types), so both compare to one golden | `tests/fixtures/observability/session-event.json:17`<br>`crates/sc-ai/src/observe.rs:223`<br>`crates/sc-jev-py/src/logging.rs:339` |
+| QA-007 | QA-1 F | implemented | show-toplevel lookups documented: different error mapping by design; sharing is D2 | `crates/sc-ai/src/command.rs:750`<br>`crates/sc-treesitter/src/git_io.rs:312` |
+| rust-qa note: symlink tests cfg(unix) | QA-1 F | implemented | documented Windows limitation | `docs/sc-jev-check/extraction.md:44` |
+| FTQ-011 | QA-2 | implemented | every wait bounded: stdin on its own thread, drains via recv_timeout with 5 s grace and a grandchild report, Unix process-group kill; unix tests with a pipe-holding `sleep 30 &` grandchild | `tests/support/deadline.rs:38`<br>`tests/support/deadline.rs:158`<br>`tests/support/deadline.rs:185`<br>`tests/support/deadline.rs:202` |
+| QA-009 | QA-2 | implemented | same runner fix; unread stdin test | `tests/support/deadline.rs:219` |
+| ARCH-005 | QA-2 | implemented | green `just lint` recorded in the ARCH-003 row and in plan.md | `docs/plans/phase-a/plan.md:403` |
+| ARCH-006 | QA-2 | implemented | [testing] comments reworded (no feature; cfg(test) doubles) | `boundaries/sc-agent-secrets/agent-secrets.toml:50`<br>`boundaries/sc-jev-py/jev-py.toml:56` |
+| REQ-QA-201 | QA-2 | implemented | sprint a-2 lines carry the ADR-SAG-0029 (a) pointer; stale root Cargo.toml lint comment fixed | `docs/plans/phase-a/sprint-a-2-agent-secrets.md:45`<br>`docs/plans/phase-a/sprint-a-2-agent-secrets.md:61`<br>`Cargo.toml:45` |
+| QA-010 | QA-2 | implemented | documented: tests do not run from a packaged .crate; no gating | `docs/development/ci.md:78` |
+| QA-011 | QA-2 | implemented | content key includes untracked non-ignored files; key dirs not pruned (documented) and excluded from the CI target cache | `scripts/sc-publish-dry-run.sh:172`<br>`scripts/sc-publish-dry-run.sh:25`<br>`.github/workflows/sc-publish-dry-run.yml:64` |
+| FTQ-012 | QA-2 | implemented | same content-key fix | `scripts/sc-publish-dry-run.sh:164` |
+| QA-004 residual | QA-2 | implemented | golden keyed by operation; both adapters checked for Ask and Judge | `tests/fixtures/observability/session-event.json:21`<br>`crates/sc-ai/src/observe.rs:193` |
+| ARCH-004 (carried) | QA-2 | deferred | unchanged: D8 owns the ADR-SAG-0016 version text | `docs/architecture.md:461` |
+
+## D1–D13 (PHASE-A-REVIEW.md section 4): no implementation
+
+No code changed for any of D1–D13 on this branch. Where a routine id touched
+the same area, the authorising routine id is named.
+
+| Decision | Code changed? | Notes |
+| --- | --- | --- |
+| D1 backend openness | No | `BackendId` / `BackendKeyId` gained `FromStr`, `key_id`, `is_llm` under routine **RBP-F004 / ARCHE-010 / ARCHC-022**; no `#[non_exhaustive]`, no variants, no capabilities. `FromStr` follows the documented `Display` spelling. |
+| D2 shared consumer logic | No | QA-004 adapters and QA-007 repo discovery stay per crate and are documented/tested as such; no `sc-agent-compose`, no engine API change. |
+| D3 multi-backend semantics | No | Untouched. |
+| D4 session store shape | No | **CR-015 / RSH-004** hardened file writes only; no trait or registry change. |
+| D5 one HTTP layer | No | **QA-003 / ARCHC-013** interim: one `retry_policy.rs` copied verbatim, now byte-compared by a test; no `sc-agent-http`. |
+| D6 error type design | No | New constructors (`encode_failed`, `io_failed`, `map_detail`) map to existing ids (**RBP-F002 / ARCHC-025**); serde spelling `open_ai_luna` unchanged and pinned by test (RBP observation deferred to D6). |
+| D7 sc-agent-types scope | No | `sc-observability-types` still a dependency of `sc-agent-types`; the QA-004 adapter was deliberately **not** moved into it. `LogOperation` (**RBP-F011**) adds no dependency. |
+| D8 pins, allocator, binaries | No | ADR-SAG-0016 version text (ARCH-004) deferred; mimalloc still unconditional. |
+| D9 Jev wire body | No | Untouched. |
+| D10 JudgeBackend shape | No | `probabilities` kept (**ARCHC-011** doc only); Haiku/Luna `new` keeps `Result`. |
+| D11 command-producer contract | No | Untouched (no `path` on `InputSpec::Command`). |
+| D12 CLI parsing | No | **CR-016 / ARCHE-018 / ARCHP-011** fixed parser bugs only; no clap. |
+| D13 small ADR wording | No | ADR-SAG-0005 / sealed `Extractor` / byte cap untouched (max_input_bytes stays 200000). |
+
+`ResolvedApiKey::try_new` and the sealing of `new` are routine
+**ARCHC-014 / RBP-F010**, recorded in ADR-SAG-0029 (a).

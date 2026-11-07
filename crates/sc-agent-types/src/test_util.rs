@@ -62,11 +62,10 @@ impl JudgeBackend for MockJudgeBackend {
     }
 }
 
-/// Field names every `JudgeOutcome` carries.
+/// Field names every serialized `JudgeOutcome` carries, in serde order.
 ///
-/// `sc-jev` and `sc-jev-backends` must fill this same set. Those crates are
-/// stubs in sprint a-1, so the contract test below covers [`MockJudgeBackend`]
-/// only. Later sprints call this helper on their backends.
+/// Contract tests in `sc-jev` and `sc-jev-backends` compare their outcomes'
+/// serialized keys to this list so both backend families fill the same set.
 #[must_use]
 pub fn judge_outcome_field_names() -> &'static [&'static str] {
     &["answers", "backend", "probabilities", "provider_meta"]
@@ -111,7 +110,7 @@ mod tests {
         assert!(judged.provider_meta.is_some());
         assert!(matches!(judged.answers, Value::Object(_)));
         let req = request();
-        assert_eq!(req.payload.sha256, Sha256Digest::of(&req.payload.bytes));
+        assert_eq!(req.payload.sha256(), &Sha256Digest::of(req.payload.bytes()));
     }
 
     #[test]

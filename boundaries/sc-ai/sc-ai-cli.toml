@@ -21,8 +21,8 @@ owner_crate_path = "sc_ai"
 name = "sc-ai-cli"
 
 [public]
-facade = "sc_ai::execute, sc_ai::reads_stdin, sc_ai::ExecuteOverrides, sc_ai::Clock, sc_ai::ENVELOPE_VERSION, sc_ai::OP_RUN, sc_ai::OP_DRY_RUN, sc_ai::OP_ASK, sc_ai::ObservabilitySessionLog, sc_ai::default_log_root, sc_ai::default_sessions_dir, sc_ai::session_log_file, sc_ai::DEFAULT_LOG_ROOT_DIR, sc_ai::LOG_ROOT_ENV"
-notes = "argv to sc-jev-check; library plus the sc-ai binary (src/main.rs). No HTTP client in this crate (ADR-SAG-0010)."
+facade = "sc_ai::execute, sc_ai::reads_stdin, sc_ai::ENVELOPE_VERSION, sc_ai::OP_RUN, sc_ai::OP_DRY_RUN, sc_ai::OP_ASK"
+notes = "argv to sc-jev-check; library plus the sc-ai binary (src/main.rs). No HTTP client in this crate (ADR-SAG-0010). execute_with_overrides, ExecuteOverrides, Clock, ObservabilitySessionLog and session_log_file are doc(hidden) test seams for tests/cli.rs and are not part of the API (cargo cannot enable a crate's own feature for its integration tests without a self dev-dependency, which sc-lint and crates.io publish reject)."
 
 [implementation]
 type = "marker"

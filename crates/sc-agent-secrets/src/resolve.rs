@@ -1,7 +1,7 @@
 //! Credential lookup: process env, repo-root `.env`, then keyring.
 
 use std::collections::BTreeMap;
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 use std::fmt;
 
 use sc_agent_types::{BackendKeyId, JevError, RepoRoot, ResolvedApiKey};
@@ -66,9 +66,11 @@ pub trait KeyringSource: Send + Sync {
 ///
 /// Returns [`JevError::KeyMissing`] (`KEY_MISSING`) when every source lacks a
 /// non-empty key. Returns [`JevError::ConfigInvalid`] when `.env` or the
-/// keyring cannot be read. That error carries a sanitized cause and a
-/// recovery hint ([`JevError::credential_store_invalid`]). Neither error
-/// includes secret material.
+/// keyring cannot be read, or when the first non-empty key contains interior
+/// whitespace or a control character ([`ResolvedApiKey::try_new`]). That
+/// error carries a sanitized cause and a recovery hint
+/// ([`JevError::credential_store_invalid`]). Neither error includes secret
+/// material.
 ///
 /// # Panics
 ///
@@ -82,7 +84,7 @@ pub trait KeyringSource: Send + Sync {
 ///
 /// let root = RepoRoot::new(".");
 /// let key = resolve_key(BackendKeyId::TypeSafe, &root)?;
-/// let _secret = key.as_str();
+/// assert_eq!(key.to_string(), "[redacted]");
 /// # Ok::<(), sc_agent_types::JevError>(())
 /// ```
 pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<ResolvedApiKey, JevError> {
@@ -104,7 +106,8 @@ pub fn resolve_key(id: BackendKeyId, repo_root: &RepoRoot) -> Result<ResolvedApi
 /// # Errors
 ///
 /// Returns [`JevError::KeyMissing`] when no source has a non-empty key.
-/// Returns [`JevError::ConfigInvalid`] when `.env` or `keyring` cannot be read.
+/// Returns [`JevError::ConfigInvalid`] when `.env` or `keyring` cannot be
+/// read, or when the selected key fails [`ResolvedApiKey::try_new`].
 /// The config error names a sanitized cause and a recovery step. Error text
 /// does not include secret material.
 ///
@@ -120,8 +123,8 @@ pub fn resolve_key_with(
 ) -> Result<ResolvedApiKey, JevError> {
     let var_name = env_var_name(id);
     let process_value = env.var(var_name);
-    if let Some(secret) = process_value.as_deref().and_then(usable_secret) {
-        return Ok(ResolvedApiKey::new(secret));
+    if let Some(raw) = process_value.clone().filter(|value| is_present(value)) {
+        return ResolvedApiKey::try_new(id, raw);
     }
 
     let key_from_dotenv = process_value.is_none();
@@ -133,10 +136,8 @@ pub fn resolve_key_with(
         BTreeMap::new()
     };
 
-    if key_from_dotenv
-        && let Some(secret) = dotenv.get(var_name).and_then(|value| usable_secret(value))
-    {
-        return Ok(ResolvedApiKey::new(secret));
+    if key_from_dotenv && let Some(raw) = dotenv.get(var_name).filter(|value| is_present(value)) {
+        return ResolvedApiKey::try_new(id, raw.clone());
     }
 
     let service = keyring_service(id, env, &dotenv);
@@ -145,16 +146,14 @@ pub fn resolve_key_with(
         return Err(missing(id));
     }
     match keyring.password(&service, account)? {
-        Some(secret) => usable_secret(&secret)
-            .map(ResolvedApiKey::new)
-            .ok_or_else(|| missing(id)),
-        None => Err(missing(id)),
+        Some(raw) if is_present(&raw) => ResolvedApiKey::try_new(id, raw),
+        _ => Err(missing(id)),
     }
 }
 
 /// Returns the environment variable name for `id`.
 #[must_use]
-pub fn env_var_name(id: BackendKeyId) -> &'static str {
+pub(crate) fn env_var_name(id: BackendKeyId) -> &'static str {
     match id {
         BackendKeyId::TypeSafe => TYPESAFE_API_KEY_VAR,
         BackendKeyId::Anthropic => ANTHROPIC_API_KEY_VAR,
@@ -187,6 +186,15 @@ fn keyring_service(
     env_var_name(id).to_owned()
 }
 
+/// Whether a source holds a value worth sealing.
+///
+/// A blank value counts as absent so the next source is tried. Everything
+/// else goes to [`ResolvedApiKey::try_new`], which owns the normalization
+/// rules.
+fn is_present(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
 fn usable_secret(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -203,13 +211,13 @@ fn missing(id: BackendKeyId) -> JevError {
 /// In-memory environment map for tests.
 ///
 /// [`Debug`] prints variable names and omits values.
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 #[derive(Clone, Default)]
 pub struct MapEnv {
     vars: BTreeMap<String, String>,
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl MapEnv {
     /// Builds a map from `(name, value)` pairs.
     #[must_use]
@@ -228,7 +236,7 @@ impl MapEnv {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl fmt::Debug for MapEnv {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -238,7 +246,7 @@ impl fmt::Debug for MapEnv {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl EnvSource for MapEnv {
     fn var(&self, name: &str) -> Option<String> {
         self.vars.get(name).cloned()
@@ -249,14 +257,14 @@ impl EnvSource for MapEnv {
 ///
 /// Entries are visible only for the account given at construction. [`Debug`]
 /// prints the account and service names and omits secrets.
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 #[derive(Clone)]
 pub struct MapKeyring {
     account: String,
     entries: BTreeMap<String, String>,
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl MapKeyring {
     /// Builds a store whose secrets are returned only for `account`.
     #[must_use]
@@ -276,7 +284,7 @@ impl MapKeyring {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl fmt::Debug for MapKeyring {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -287,7 +295,7 @@ impl fmt::Debug for MapKeyring {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(test)]
 impl KeyringSource for MapKeyring {
     fn password(&self, service: &str, account: &str) -> Result<Option<String>, JevError> {
         if account != self.account {
@@ -309,6 +317,11 @@ mod tests {
 
     const SECRET: &str = "super-secret-value";
 
+    /// Expected key, compared by value so tests never read the secret.
+    fn sealed(secret: &str) -> ResolvedApiKey {
+        ResolvedApiKey::new(secret.to_owned())
+    }
+
     fn assert_no_secret(error: &JevError, secret: &str) {
         let rendered = format!("{error} {error:?} {}", error.fix_hint());
         assert!(!rendered.contains(secret), "{rendered}");
@@ -322,7 +335,7 @@ mod tests {
         let keyring = MapKeyring::new("tester", [("OPENAI_API_KEY", "from-keyring")]);
         let key =
             resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-        assert_eq!(key.as_str(), "from-env");
+        assert_eq!(key, sealed("from-env"));
     }
 
     #[test]
@@ -338,7 +351,7 @@ mod tests {
             "tester",
         )
         .unwrap();
-        assert_eq!(key.as_str(), "from-env");
+        assert_eq!(key, sealed("from-env"));
     }
 
     #[test]
@@ -378,7 +391,7 @@ mod tests {
             "tester",
         )
         .unwrap();
-        assert_eq!(key.as_str(), "from-keyring");
+        assert_eq!(key, sealed("from-keyring"));
     }
 
     #[test]
@@ -401,10 +414,10 @@ mod tests {
             "tester",
         )
         .unwrap();
-        assert_eq!(anthropic.as_str(), "from-custom");
+        assert_eq!(anthropic, sealed("from-custom"));
         let openai =
             resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-        assert_eq!(openai.as_str(), "from-openai");
+        assert_eq!(openai, sealed("from-openai"));
     }
 
     #[test]
@@ -425,7 +438,7 @@ mod tests {
             "alice",
         )
         .unwrap();
-        assert_eq!(key.as_str(), "from-custom");
+        assert_eq!(key, sealed("from-custom"));
     }
 
     #[test]
@@ -447,7 +460,7 @@ mod tests {
             "tester",
         )
         .unwrap();
-        assert_eq!(key.as_str(), "from-env-ring");
+        assert_eq!(key, sealed("from-env-ring"));
     }
 
     #[test]
@@ -491,7 +504,7 @@ mod tests {
         let keyring = MapKeyring::new("tester", Vec::<(&str, &str)>::new());
         let key =
             resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-        assert_eq!(key.as_str(), "from-env");
+        assert_eq!(key, sealed("from-env"));
     }
 
     #[test]
@@ -546,7 +559,58 @@ mod tests {
         let rendered = format!("{resolved:?} {resolved}");
         assert!(rendered.contains("[redacted]"));
         assert!(!rendered.contains(SECRET));
-        assert_eq!(resolved.as_str(), SECRET);
+        assert_eq!(resolved, sealed(SECRET));
+    }
+
+    #[test]
+    fn keys_are_normalized_once_by_try_new() {
+        let repo = TempRepo::new(Some("OPENAI_API_KEY=  from-dotenv  \n"));
+        let keyring = MapKeyring::new("tester", [("TYPESAFE_API_KEY", " from-keyring\n")]);
+        let trimmed = resolve_key_with(
+            BackendKeyId::OpenAi,
+            &repo.root(),
+            &MapEnv::default(),
+            &keyring,
+            "tester",
+        )
+        .unwrap();
+        assert_eq!(trimmed, sealed("from-dotenv"));
+        let from_ring = resolve_key_with(
+            BackendKeyId::TypeSafe,
+            &repo.root(),
+            &MapEnv::default(),
+            &keyring,
+            "tester",
+        )
+        .unwrap();
+        assert_eq!(from_ring, sealed("from-keyring"));
+
+        for (source_env, source_dotenv) in [
+            (Some(format!("{SECRET} pasted twice")), None),
+            (None, Some(format!("ANTHROPIC_API_KEY={SECRET}\tx\n"))),
+        ] {
+            let repo = TempRepo::new(source_dotenv.as_deref());
+            let env = MapEnv::with(
+                source_env
+                    .into_iter()
+                    .map(|value| ("ANTHROPIC_API_KEY".to_owned(), value)),
+            );
+            let error = resolve_key_with(
+                BackendKeyId::Anthropic,
+                &repo.root(),
+                &env,
+                &MapKeyring::new("tester", Vec::<(&str, &str)>::new()),
+                "tester",
+            )
+            .unwrap_err();
+            assert_eq!(error.code(), "CONFIG_INVALID");
+            assert!(
+                error
+                    .fix_hint()
+                    .contains("whitespace or a control character")
+            );
+            assert_no_secret(&error, SECRET);
+        }
     }
 
     #[test]
@@ -573,7 +637,7 @@ mod tests {
             "tester",
         )
         .unwrap();
-        assert_eq!(key.as_str(), "from-dotenv");
+        assert_eq!(key, sealed("from-dotenv"));
         assert_eq!(std::env::var(name).ok(), before.ok());
     }
 }

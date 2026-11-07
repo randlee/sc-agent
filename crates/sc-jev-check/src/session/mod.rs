@@ -7,17 +7,31 @@
 //!
 //! [`SessionStore`] is an open extension point. [`FileSessionStore`] is the
 //! Phase A implementation.
+//!
+//! # Durability and concurrency
+//!
+//! A session file is replaced atomically: the new document goes to a unique
+//! `.{id}.{pid}.{nonce}.tmp` file created with `create_new`, is synced, then
+//! renamed over the session file, and the directory is synced on Unix. A
+//! failed write removes its temporary file. Session directories this store
+//! creates are mode `0700` on Unix and session files are mode `0600`.
+//!
+//! The store assumes **one writer per session**. Clones of one store in one
+//! process serialize read-modify-write through a shared lock. Two processes
+//! that update the same session at the same time (two concurrent `ask`
+//! calls) can lose one update; neither corrupts the file. There is no
+//! cross-process lock.
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, LogOperation, SharedSessionLog};
 use sc_agent_types::{
     BackendId, JevError, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle, SessionId,
 };
@@ -105,8 +119,9 @@ pub struct FileSessionStore {
 impl FileSessionStore {
     /// Creates a store rooted at `dir`, creating the directory when needed.
     ///
-    /// The directory's existing mode is left unchanged. Session files created
-    /// later are mode `0600`.
+    /// Directories created here are mode `0700` on Unix. An existing
+    /// directory's mode is left unchanged. Session files created later are
+    /// mode `0600`.
     ///
     /// # Errors
     ///
@@ -114,10 +129,11 @@ impl FileSessionStore {
     /// The code is `CONFIG_INVALID`. The fix hint names `dir`.
     pub fn new(dir: impl Into<PathBuf>, session_log: SharedSessionLog) -> Result<Self, JevError> {
         let dir = dir.into();
-        fs::create_dir_all(&dir).map_err(|error| {
+        create_private_dir(&dir).map_err(|error| {
             JevError::session_store_io(&format!(
-                "Create session directory {} or choose a writable directory ({error}).",
-                dir.display()
+                "Create session directory {} or choose a writable directory (cause: {}).",
+                dir.display(),
+                error.kind()
             ))
         })?;
         Ok(Self {
@@ -186,8 +202,8 @@ impl FileSessionStore {
             session_id,
             backend,
             created_at,
-            payload_utf8: utf8_payload(&bundle.bytes)?,
-            prompt_sha256: bundle.sha256.clone(),
+            payload_utf8: utf8_payload(bundle.bytes())?,
+            prompt_sha256: bundle.sha256().clone(),
             system_prompt,
             outcomes: Vec::new(),
             follow_ups: Vec::new(),
@@ -210,7 +226,7 @@ impl FileSessionStore {
     /// [`JevError::session_store_io`] when the file cannot be read, and
     /// [`JevError::session_document_invalid`] when the file is not a session
     /// document. The fix hint names the session file.
-    pub fn load_raw(&self, id: &SessionId) -> Result<StoredSession, JevError> {
+    pub(crate) fn load_raw(&self, id: &SessionId) -> Result<StoredSession, JevError> {
         let _guard = self
             .io
             .lock()
@@ -289,7 +305,7 @@ impl FileSessionStore {
                 return Err(session_io(
                     &path,
                     &self.dir,
-                    &format!("could not be opened ({error})"),
+                    &format!("could not be opened (cause: {})", error.kind()),
                 ));
             }
         };
@@ -297,7 +313,11 @@ impl FileSessionStore {
         file.take(MAX_SESSION_BYTES.saturating_add(1))
             .read_to_end(&mut bytes)
             .map_err(|error| {
-                session_io(&path, &self.dir, &format!("could not be read ({error})"))
+                session_io(
+                    &path,
+                    &self.dir,
+                    &format!("could not be read (cause: {})", error.kind()),
+                )
             })?;
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_SESSION_BYTES {
             return Err(session_parse(
@@ -306,7 +326,10 @@ impl FileSessionStore {
             ));
         }
         let document: SessionDocument = serde_json::from_slice(&bytes).map_err(|error| {
-            session_parse(&path, &format!("is not a session document ({error})"))
+            session_parse(
+                &path,
+                &format!("is not a session document ({})", json_cause(&error)),
+            )
         })?;
         if document.version != SESSION_VERSION || document.session_id != *id {
             return Err(session_parse(
@@ -323,10 +346,18 @@ impl FileSessionStore {
 
     fn write_document(&self, document: &SessionDocument) -> Result<(), JevError> {
         let path = self.path(&document.session_id);
-        let bytes = serde_json::to_vec(document)
-            .map_err(|error| session_parse(&path, &format!("could not be encoded ({error})")))?;
+        let bytes = serde_json::to_vec(document).map_err(|error| {
+            session_parse(
+                &path,
+                &format!("could not be encoded ({})", json_cause(&error)),
+            )
+        })?;
         write_private(&path, &bytes).map_err(|error| {
-            session_io(&path, &self.dir, &format!("could not be written ({error})"))
+            session_io(
+                &path,
+                &self.dir,
+                &format!("could not be written (cause: {})", error.kind()),
+            )
         })
     }
 
@@ -345,15 +376,15 @@ impl SessionStore for FileSessionStore {
 
     fn ask(&self, id: &SessionId, follow_up: &str) -> Result<JudgeOutcome, JevError> {
         if follow_up.trim().is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: "follow-up text is empty".into(),
-            });
+            return Err(follow_up_invalid(
+                "The follow-up text is empty. Pass non-empty text to ask.",
+            ));
         }
         let stored = self.load(id)?;
-        if !is_llm(stored.backend) {
-            return Err(JevError::InputInvalid {
-                detail: "Jev sessions have no rationale field; ask a Haiku or Luna session".into(),
-            });
+        if !stored.backend.is_llm() {
+            return Err(follow_up_invalid(
+                "Jev sessions have no rationale field. Ask a Haiku or Luna session instead.",
+            ));
         }
         let backend = self.backend(stored.backend)?;
         let mut prompt = stored.system_prompt.clone().unwrap_or_default();
@@ -377,8 +408,8 @@ impl SessionStore for FileSessionStore {
             LogEvent {
                 session_id: *id,
                 backend: stored.backend,
-                prompt_sha256: stored.payload.sha256.clone(),
-                operation: "ask".to_owned(),
+                prompt_sha256: stored.payload.sha256().clone(),
+                operation: LogOperation::Ask,
             },
         );
         let outcome = judged?;
@@ -413,7 +444,7 @@ impl std::fmt::Debug for FileSessionStore {
 /// # Errors
 ///
 /// Returns [`JevError::InputInvalid`] when the answers cannot be encoded.
-pub fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String, JevError> {
+pub(crate) fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String, JevError> {
     if outcomes.is_empty() {
         return Ok(String::new());
     }
@@ -424,9 +455,8 @@ pub fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String, JevEr
             answers: &outcome.answers,
         })
         .collect();
-    let json = serde_json::to_string(&prior).map_err(|error| JevError::InputInvalid {
-        detail: format!("session context encoding failed: {error}"),
-    })?;
+    let json = serde_json::to_string(&prior)
+        .map_err(|error| JevError::encode_failed("session context", &error))?;
     Ok(format!("\n\n{SESSION_CONTEXT_HEADER}\n{json}"))
 }
 
@@ -434,8 +464,14 @@ pub(crate) fn emit_log(log: &SharedSessionLog, event: LogEvent) {
     let _ = log.try_log(event);
 }
 
-pub(crate) fn is_llm(id: BackendId) -> bool {
-    matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
+/// `serde_json` failure without its message, which can quote document values.
+fn json_cause(error: &serde_json::Error) -> String {
+    format!(
+        "{:?} error at line {} column {}",
+        error.classify(),
+        error.line(),
+        error.column()
+    )
 }
 
 fn session_io(path: &Path, dir: &Path, problem: &str) -> JevError {
@@ -453,20 +489,42 @@ fn session_parse(path: &Path, problem: &str) -> JevError {
     ))
 }
 
-fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
-    String::from_utf8(bytes.to_vec()).map_err(|_| JevError::InputInvalid {
-        detail: "canonical payload is not UTF-8".into(),
+/// Canonical payload bytes as UTF-8 text.
+///
+/// The one definition in this crate; session files store the payload as text.
+///
+/// # Errors
+///
+/// Returns [`JevError::InputInvalid`] built by
+/// [`JevError::operational_io`] when the bytes are not UTF-8. Canonical
+/// payload bytes are always UTF-8, so this is an internal invariant failure,
+/// not a schema problem; the fix hint says so (RBP-F015).
+pub(crate) fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
+    String::from_utf8(bytes.to_vec()).map_err(|error| {
+        JevError::operational_io(&format!(
+            "the canonical payload was not UTF-8 (first invalid byte at offset {}); this is an internal error, report it with the check that produced it",
+            error.utf8_error().valid_up_to()
+        ))
     })
+}
+
+/// `INPUT_INVALID` for a refused `ask` whose fix hint is `recovery` verbatim.
+fn follow_up_invalid(recovery: &str) -> JevError {
+    JevError::operational_io(recovery)
 }
 
 fn unix_ms(time: SystemTime) -> Result<u64, JevError> {
     let elapsed = time
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| JevError::ConfigInvalid {
-            detail: "session clock is before the unix epoch".into(),
+        .map_err(|_| {
+            JevError::session_store_io(
+                "the system clock is before the unix epoch, so the session timestamp cannot be written. Fix the system clock and retry.",
+            )
         })?;
-    u64::try_from(elapsed.as_millis()).map_err(|_| JevError::ConfigInvalid {
-        detail: "session clock is out of range".into(),
+    u64::try_from(elapsed.as_millis()).map_err(|_| {
+        JevError::session_store_io(
+            "the system clock is out of range for a session timestamp. Fix the system clock and retry.",
+        )
     })
 }
 
@@ -474,25 +532,75 @@ fn system_time_from_unix_ms(millis: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_millis(millis)
 }
 
+fn create_private_dir(dir: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir)
+}
+
+/// Unique temporary sibling of `path`: `.{name}.{pid}.{nonce}.tmp`.
+fn tmp_path(path: &Path) -> PathBuf {
+    static NONCE: AtomicU64 = AtomicU64::new(0);
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("session");
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.subsec_nanos());
+    let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+    path.with_file_name(format!(
+        ".{name}.{}.{nanos:08x}{nonce:04x}.tmp",
+        std::process::id()
+    ))
+}
+
 fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp_name = match path.file_name().and_then(|name| name.to_str()) {
-        Some(name) => format!(".{name}.tmp"),
-        None => ".session.tmp".to_owned(),
-    };
-    let tmp = path.with_file_name(tmp_name);
     let mut options = OpenOptions::new();
-    options.write(true).create(true).truncate(true);
+    options.write(true).create_new(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(&tmp)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    tighten_0600(&tmp)?;
-    fs::rename(&tmp, path)?;
+    let (tmp, mut file) = loop {
+        let tmp = tmp_path(path);
+        match options.open(&tmp) {
+            Ok(file) => break (tmp, file),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+    };
+    let written = file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .and_then(|()| tighten_0600(&tmp));
+    drop(file);
+    if let Err(error) = written.and_then(|()| fs::rename(&tmp, path)) {
+        let _ = fs::remove_file(&tmp);
+        return Err(error);
+    }
     tighten_0600(path)?;
+    sync_parent(path)
+}
+
+/// Syncs the directory entry after a rename so the new file survives a crash.
+fn sync_parent(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        if let Some(parent) = path.parent() {
+            File::open(parent)?.sync_all()?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
     Ok(())
 }
 
@@ -546,193 +654,4 @@ impl StoredSession {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use sc_agent_types::observability::v2::NoopSessionLog;
-    use sc_agent_types::{JudgeBackend, JudgeRequest};
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    struct SharedBackend {
-        prompts: Arc<Mutex<Vec<String>>>,
-    }
-
-    impl JudgeBackend for SharedBackend {
-        fn id(&self) -> BackendId {
-            BackendId::AnthropicHaiku
-        }
-
-        fn validate_for_send(&self, _request: &JudgeRequest) -> Result<(), JevError> {
-            Ok(())
-        }
-
-        fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-            self.prompts
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push(
-                    request
-                        .llm
-                        .as_ref()
-                        .map(|llm| llm.system_prompt.clone())
-                        .unwrap_or_default(),
-                );
-            Ok(JudgeOutcome {
-                answers: serde_json::json!({"relevant": {"choice": "yes"}}),
-                backend: BackendId::AnthropicHaiku,
-                probabilities: None,
-                provider_meta: None,
-            })
-        }
-    }
-
-    fn bundle() -> PayloadBundle {
-        PayloadBundle::from_canonical_bytes(br#"{"questions":[],"state":[]}"#.to_vec())
-    }
-
-    fn store(ttl: Duration) -> (FileSessionStore, crate::extract::test_support::TempDir) {
-        let dir = crate::extract::test_support::temp_dir("session");
-        let session = FileSessionStore::new(dir.path(), Arc::new(NoopSessionLog))
-            .expect("store")
-            .with_ttl(ttl);
-        (session, dir)
-    }
-
-    #[test]
-    fn test_session_round_trip() {
-        let (store, _dir) = store(Duration::from_secs(3600));
-        let prompts = Arc::new(Mutex::new(Vec::new()));
-        let mut registry = BackendRegistry::new();
-        registry
-            .register(Arc::new(SharedBackend {
-                prompts: Arc::clone(&prompts),
-            }))
-            .expect("register");
-        store.install_registry(registry);
-        let payload = bundle();
-        let id = store
-            .open(
-                BackendId::AnthropicHaiku,
-                &payload,
-                Some("base prompt".to_owned()),
-            )
-            .expect("create");
-        let loaded = store.load(&id).expect("load");
-        assert_eq!(loaded.session_id, id);
-        assert_eq!(loaded.payload.bytes, payload.bytes);
-        assert_eq!(loaded.payload.sha256, payload.sha256);
-        assert_eq!(loaded.system_prompt.as_deref(), Some("base prompt"));
-        let again = FileSessionStore::new(store.dir(), Arc::new(NoopSessionLog))
-            .expect("reopen")
-            .with_ttl(Duration::from_secs(3600));
-        again.install_registry(
-            store
-                .registry
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-        );
-        let outcome = again.ask(&id, "why?").expect("ask");
-        assert_eq!(outcome.backend, BackendId::AnthropicHaiku);
-        assert_eq!(outcome.answers["relevant"]["choice"], "yes");
-        let prompt = prompts
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        assert!(prompt[0].contains("base prompt"));
-        assert!(prompt[0].contains("why?"));
-        let round = store.load(&id).expect("after ask");
-        assert_eq!(round.outcomes.len(), 1);
-        assert_eq!(round.follow_ups, ["why?"]);
-        let missing = SessionId::new();
-        assert_eq!(
-            store.load(&missing).expect_err("missing").code(),
-            "SESSION_NOT_FOUND"
-        );
-    }
-
-    #[test]
-    fn test_session_file_mode_0600() {
-        let (store, _dir) = store(Duration::from_secs(60));
-        let id = store.create(BackendId::Jev, &bundle()).expect("create");
-        let path = store.path(&id);
-        assert_eq!(
-            path.file_name().and_then(|name| name.to_str()),
-            Some(id.to_string().as_str())
-        );
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = fs::metadata(&path).expect("meta").permissions().mode() & 0o777;
-            assert_eq!(mode, 0o600);
-        }
-    }
-
-    #[test]
-    fn test_session_expiry_uses_created_at() {
-        let now = Arc::new(AtomicU64::new(1_700_000_000_000));
-        let clock_now = Arc::clone(&now);
-        let (store, _dir) = store(Duration::from_secs(60));
-        let store = store.with_clock(move || {
-            UNIX_EPOCH + Duration::from_millis(clock_now.load(Ordering::Relaxed))
-        });
-        let id = store.create(BackendId::Jev, &bundle()).expect("create");
-        let path = store.path(&id);
-        let text = fs::read_to_string(&path).expect("session json");
-        let document: Value = serde_json::from_str(&text).expect("json");
-        assert_eq!(document["created_at"], 1_700_000_000_000_u64);
-        file_set_modified(&path, UNIX_EPOCH + Duration::from_secs(4_000_000_000));
-        store.load(&id).expect("fresh created_at ignores mtime");
-        now.store(1_700_000_000_000 + 60_000, Ordering::Relaxed);
-        file_set_modified(&path, UNIX_EPOCH + Duration::from_millis(1_700_000_000_000));
-        let expired = store.load(&id).expect_err("expired");
-        assert_eq!(expired.code(), "SESSION_EXPIRED");
-        assert!(expired.fix_hint().contains(&id.to_string()));
-    }
-
-    #[test]
-    fn session_parse_hint_names_the_file() {
-        let (store, _dir) = store(Duration::from_secs(60));
-        let id = store.create(BackendId::Jev, &bundle()).expect("create");
-        let path = store.path(&id);
-        fs::write(&path, b"not-json").expect("corrupt");
-        let error = store.load(&id).expect_err("parse");
-        assert_eq!(error.code(), "INPUT_INVALID");
-        let hint = error.fix_hint();
-        assert!(
-            hint.contains(&path.display().to_string()),
-            "parse hint names the session file: {hint}"
-        );
-        assert!(
-            !hint.contains("check.toml"),
-            "parse hint is not a check.toml hint: {hint}"
-        );
-        assert!(
-            !hint.to_ascii_lowercase().contains("schema"),
-            "parse hint is not a schema hint: {hint}"
-        );
-    }
-
-    #[test]
-    fn session_directory_failure_names_the_directory() {
-        let parent = crate::extract::test_support::temp_dir("session-file-parent");
-        let blocker = parent.path().join("not-a-directory");
-        fs::write(&blocker, b"x").expect("blocker");
-        let nested = blocker.join("sessions");
-        let error =
-            FileSessionStore::new(nested.as_path(), Arc::new(NoopSessionLog)).expect_err("dir");
-        assert_eq!(error.code(), "CONFIG_INVALID");
-        let hint = error.fix_hint();
-        assert!(
-            hint.contains(&nested.display().to_string()),
-            "directory hint names the session directory: {hint}"
-        );
-        assert!(
-            !hint.contains("check.toml"),
-            "directory hint is not a check.toml hint: {hint}"
-        );
-    }
-
-    fn file_set_modified(path: &Path, time: SystemTime) {
-        let file = File::options().write(true).open(path).expect("open");
-        file.set_modified(time).expect("mtime");
-    }
-}
+mod tests;
