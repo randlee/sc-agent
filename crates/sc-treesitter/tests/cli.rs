@@ -243,6 +243,35 @@ fn cli_sha256_repository_is_accepted() {
     assert_eq!(worktree, sha);
 }
 
+/// A `WORKTREE` read hashes the returned bytes, not a filesystem path, so it
+/// works with Windows verbatim (`\\?\`) canonical paths and skips clean
+/// filters. The file is committed with CRLF bytes under `-text`; switching
+/// the attribute to `text` would make a filtered hash normalise to LF.
+#[cfg(feature = "python")]
+#[test]
+fn cli_worktree_sha_is_the_blob_of_the_raw_bytes() {
+    let dir = temp_repo(None);
+    std::fs::write(dir.path().join(".gitattributes"), "crlf.py -text\n").expect("attrs");
+    std::fs::write(
+        dir.path().join("crlf.py"),
+        "def f(x):\r\n    return Refusal(x)\r\n",
+    )
+    .expect("write");
+    commit_all(dir.path(), "crlf");
+    let head = blob_sha(&run(dir.path(), &extract_args("HEAD", "crlf.py")));
+    let worktree = blob_sha(&run(dir.path(), &extract_args("WORKTREE", "crlf.py")));
+    assert_eq!(worktree, head);
+    std::fs::write(dir.path().join(".gitattributes"), "crlf.py text\n").expect("attrs");
+    let filtered = git(dir.path(), &["hash-object", "--", "crlf.py"]);
+    assert_ne!(
+        String::from_utf8_lossy(trim_newline(&filtered.stdout)),
+        head,
+        "fixture must make a filtered hash differ"
+    );
+    let unfiltered = blob_sha(&run(dir.path(), &extract_args("WORKTREE", "crlf.py")));
+    assert_eq!(unfiltered, head, "clean filters must not apply");
+}
+
 /// An absolute path through a symlinked directory (macOS `/tmp`) names a
 /// file inside the repository and must be accepted.
 #[cfg(all(unix, feature = "python"))]

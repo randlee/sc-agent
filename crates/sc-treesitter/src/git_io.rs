@@ -9,15 +9,19 @@
 //! classified by exit status plus `git cat-file -e`, never by git's English
 //! stderr. Every git call runs with `LC_ALL=C` and `GIT_TERMINAL_PROMPT=0`.
 //!
+//! A `WORKTREE` read hashes the bytes it returns with
+//! `git hash-object -t blob --stdin --no-filters`, so the id is the blob id
+//! of exactly those bytes and git never sees a filesystem path.
+//!
 //! Path rules match `sc-jev-check`'s repo-relative reads: no absolute path
 //! after resolution, no `..`, no backslash, no `:`, no NUL, and no drive
 //! prefix. An absolute argument is canonicalized (through symlinks such as
 //! macOS `/tmp`) and must sit under the canonical repository toplevel.
 
 use std::ffi::OsStr;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use sc_agent_types::{JevError, Rev};
 
@@ -69,21 +73,47 @@ fn read_worktree(repo: &Path, path: String) -> Result<Blob, JevError> {
         });
     }
     let bytes = std::fs::read(&full).map_err(|error| JevError::io_failed(&path, &error))?;
-    let hashed = run_git(
-        repo,
-        [
-            OsStr::new("hash-object"),
-            OsStr::new("--"),
-            full.as_os_str(),
-        ],
-    )?;
-    if !hashed.status.success() {
+    let sha = hash_bytes(repo, &bytes, &path)?;
+    Ok(Blob { path, bytes, sha })
+}
+
+/// Hashes `bytes` as a blob with `git hash-object -t blob --stdin --no-filters`.
+///
+/// Hashing the bytes already read (not the path) keeps the id and the
+/// returned bytes in step even if the file changes between calls, skips clean
+/// filters (`autocrlf`, attributes) so the id is that of the raw bytes, and
+/// never hands git a platform path (Windows `canonicalize` yields `\\?\`
+/// verbatim paths git cannot open). The repository's object format (SHA-1 or
+/// SHA-256) applies because the command runs inside `repo`.
+fn hash_bytes(repo: &Path, bytes: &[u8], path: &str) -> Result<String, JevError> {
+    let mut child = git_command()
+        .arg("-C")
+        .arg(repo)
+        .args(["hash-object", "-t", "blob", "--stdin", "--no-filters"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| JevError::io_failed("git process spawn", &error))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| JevError::ExtractionFailed {
+            detail: format!("git hash-object stdin unavailable for {path}"),
+        })?;
+    // Write on the current thread is safe: hash-object reads all of stdin
+    // before it prints the 40/64-byte id, so stdout cannot fill first.
+    let written = stdin.write_all(bytes);
+    drop(stdin);
+    let hashed = child
+        .wait_with_output()
+        .map_err(|error| JevError::io_failed("git hash-object", &error))?;
+    if written.is_err() || !hashed.status.success() {
         return Err(JevError::ExtractionFailed {
             detail: format!("git hash-object failed for {path}"),
         });
     }
-    let sha = object_id(&hashed.stdout, "git hash-object")?;
-    Ok(Blob { path, bytes, sha })
+    object_id(&hashed.stdout, "git hash-object")
 }
 
 fn read_at_rev(repo: &Path, rev: &Rev, path: String) -> Result<Blob, JevError> {
