@@ -28,6 +28,7 @@ requirements:
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
+  - ADR-SAG-0003  # untouched: run/** and registry/** sit beside r-2's repo-root and .env logic; r-2b changes neither
   - ADR-SAG-0004
   - ADR-SAG-0005
   - ADR-SAG-0006
@@ -35,9 +36,12 @@ adrs:
   - ADR-SAG-0008
   - ADR-SAG-0009
   - ADR-SAG-0012
+  - ADR-SAG-0013  # every send emits one LogEvent, Failed included; a session-save failure adds none
   - ADR-SAG-0014
   - ADR-SAG-0019
+  - ADR-SAG-0020  # r-3 amendment (Active after wave 2): single read site, redaction in send_with_busy_retry; digest recovery adds no read site and never carries body or key bytes
   - ADR-SAG-0022
+  - ADR-SAG-0023  # untouched in substance: three Cargo.toml files gain a test-util feature, no dependency pin changes
   - ADR-SAG-0024
   - ADR-SAG-0025
   - ADR-SAG-0026  # HTTP half only (Active after r-3); r-2b relies on no compose-half bullet
@@ -65,7 +69,10 @@ owned_paths:
   - "docs/sc-jev-check/**"
   - "docs/architecture.md#ADR-SAG-0004 amendment (r-2b)"
   - "docs/architecture.md#ADR-SAG-0008 amendment (r-2b)"
+  - "docs/architecture.md#ADR-SAG-0008 amendment (r-1 interim) (Status line and bullet 1 only; D7)"
   - "docs/architecture.md#ADR-SAG-0019 amendment (r-2b)"
+  - "docs/architecture.md#ADR-SAG-0019 amendment (r-1 interim) (Status line, bullet 1 and the bullet-2 sentence \"r-1 records ChainContext, its actual behaviour\" only; D7)"
+  - "docs/architecture.md#ADR-SAG-0019 body, italic \"Amended by the r-1 interim amendment below\" line (D7)"
   - "docs/architecture.md#ADR-SAG-0022 amendment (r-2b)"
   - "docs/architecture.md#ADR-SAG-0025"
   - "docs/architecture.md#ADR index row ADR-SAG-0025"
@@ -137,6 +144,12 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
    amendment) builds over r-1's `MockJudgeBackend`, so it reports the digest
    of the bundle it received; `test_equal_false_when_backend_digest_differs`
    uses `MockJudgeBackend::with_reported_digest`.
+   Recovery runs on the serialized body **before** it is handed to
+   `send_with_busy_retry`. A body that cannot be parsed for recovery is a
+   `JevError` with code `INPUT_INVALID` (`JevError::encode_failed`-style:
+   category plus position only); that backend becomes `Failed` with nothing
+   sent, and the message, fix hint and details carry no body or key bytes
+   (`test_digest_recovery_error_carries_no_body_bytes`).
 
    **Scripted-answers schema** (CPR-208; the one format behind
    `register_scripted_backends(ids, answers: Value)`, r-3b's hidden
@@ -214,6 +227,67 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
    row Status cell "Active (r-2b); consumer-output bullet Proposed (r-3b)".
    r-3b flips that bullet, the Status line and the cell to Active.
 
+   **What the r-2b amendments supersede in the r-1 interim subsections**
+   (plan review 5, ARCH-R2B-003). The r-1 interim subsections say
+   "Superseded by ADR-SAG-0025 (r-2b) when that lands" as a whole, but parts
+   of them stay in force. At flip time r-2b rewrites each interim Status line
+   and marks the superseded sentences, sentence by sentence:
+
+   - *ADR-SAG-0008 r-1 interim.* Bullet 1 ("The run engine is unchanged in
+     behaviour: later LLM backends still receive earlier answers as session
+     context … `EqualInputRecord.mode = ChainContext`. Every backend gets the
+     same `Arc<PayloadBundle>`.") is superseded by the ADR-SAG-0008 r-2b
+     subsection and ADR-SAG-0025 bullet 1, except its last sentence (one
+     shared `Arc<PayloadBundle>`), which stays in force. Bullet 2 (session
+     **document version 2**, v1 rejected as `SessionDocumentInvalid`,
+     `check_against` on load) stays in force unchanged. New Status line:
+     "Active (Phase A.1, landed in r-1). Bullet 1, except its last sentence,
+     is superseded by the r-2b amendment below and ADR-SAG-0025 (Active,
+     r-2b); bullet 2 (session document v2) stays in force." Bullet 1's label
+     becomes "(Superseded by ADR-SAG-0025, r-2b; last sentence in force)".
+   - *ADR-SAG-0019 r-1 interim.* Bullet 1 is superseded in part: its first
+     sentence (per-backend `Attestation`; `equal` derived, true only when every
+     backend is `Matched`) and its last sentence (one shared bundle) stay in
+     force and are restated by the r-2b subsection; the middle sentence "Until r-2b lands backend-side hashing, no
+     backend reports `JudgeOutcome.input_sha256`, so the engine records
+     `Unattested` for every backend it sent to and **a live run reports
+     `equal = false`**" are superseded by the ADR-SAG-0019 r-2b subsection
+     and ADR-SAG-0025 bullet 3. Bullet 2's sentence "r-1 records
+     `ChainContext`, its actual behaviour" is superseded by ADR-SAG-0025
+     bullet 1 (the engine records the mode the caller chose, `Independent`
+     by default). The rest of bullet 2 (`JudgeRequest` carries
+     `Arc<PayloadBundle>` and a `CancelToken`; `JudgeRequest.llm` unchanged;
+     `MultiBackendMode` recorded on `EqualInputRecord.mode`) stays in force.
+     New Status line: "Active (Phase A.1, landed in r-1). The 'Until r-2b …
+     `equal = false`' sentences of bullet 1 and the 'r-1 records
+     `ChainContext`' sentence of bullet 2 are superseded by the r-2b
+     amendment below and ADR-SAG-0025 (Active, r-2b); the rest stays in
+     force." The italic line under the ADR-SAG-0019 body ("…is false on live
+     runs until r-2b.") becomes "*Amended by the r-1 interim amendment and
+     the r-2b amendment below: `equal` is derived from per-backend
+     attestations computed from backend-reported digests.*"
+   - *ADR-SAG-0014 r-1 interim.* r-2's ADR text list supersedes this
+     subsection by ADR-SAG-0024 as a whole and does not drop the clause
+     "`input_sha256` (null until r-2b backend hashing)" in bullet 2; r-2 is
+     in flight, so r-2b does not edit ADR-SAG-0014 or r-2's text. Instead
+     r-2b adds this line at the end of ADR-SAG-0025 bullet 3 (r-2b-owned):
+     "From r-2b every backend that sends sets `input_sha256`; the ADR-SAG-0014
+     r-1 interim clause 'null until r-2b backend hashing' no longer holds
+     (`input_sha256` is null only for a backend that was not sent, failed,
+     or reported no digest — `Unattested`)."
+
+   **Markers r-2b must not touch** (plan review 5, ARCH-R2B-004). r-2b flips
+   only the ADR-SAG-0025 Status line, header and index row Status cell (as
+   split above), its own r-2b subsections of 0004, 0008, 0019 and 0022, the
+   "(Proposed, r-2b)" markers in index rows 0004, 0008, 0019 and 0022, and
+   the r-1 interim Status lines and labels named above. It does not touch
+   the ADR-SAG-0026 index row (Status cell "HTTP half r-3; compose half
+   r-3b") or any ADR-SAG-0026 text, the "(Proposed, r-3b)" markers in index
+   rows 0010, 0011, 0013, 0016, 0017, 0020, 0023 and 0028, the "A.1
+   subsection (Active, r-1)" markers in rows 0008, 0014 and 0019, or any r-2
+   marker (rows 0003, 0005, 0009, 0014, 0019, 0022, 0029), which r-2 flipped
+   in wave 2.
+
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
@@ -224,7 +298,11 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
 | adr:ADR-SAG-0022 | r-2b subsection Active (scripted backend reports the received digest; per-backend scripted-answers form); `test_scripted_shared_form_unchanged`, `test_scripted_per_backend_failure`, `test_scripted_validate_stage_not_sent`, `test_scripted_invalid_form_rejected` |
 | adr:ADR-SAG-0005, 0007 | Regression: backends still do not re-canonicalize the wire body (digest re-encoding is attestation-only and never feeds the wire body; the byte-exact Jev body regression `cargo test -p sc-jev --test jev_api` and `cargo test -p sc-jev-backends --test llm` stay green); retries only via `BusyPolicy` (`test_no_resend_on_timeout`) |
 | adr:ADR-SAG-0004 | `test_chain_context_augmented_request_revalidated` (over-cap chained request refused before send; that backend `Failed`, `leak = true`) |
-| adr:ADR-SAG-0008 | `test_independent_default_no_prior_answers_in_prompt`; `test_chain_context_recorded_and_applied` |
+| adr:ADR-SAG-0008 | `test_independent_default_no_prior_answers_in_prompt`; `test_chain_context_recorded_and_applied`; the r-1 interim Status line and bullet-1 label read as in D7 and bullet 2 (session document v2) is unchanged |
+| adr:ADR-SAG-0019 | r-2b subsection Active; the r-1 interim Status line and the body's italic line read as in D7, and the `Arc<PayloadBundle>` / `CancelToken` sentences of interim bullet 2 are unchanged |
+| adr:ADR-SAG-0020 | Digest recovery adds no secret read site and no redaction path: no new `ResolvedApiKey::as_str` call and no new `expect(clippy::disallowed_methods)` under r-2b's owned paths (`cargo clippy --workspace --all-targets -- -D warnings`; `! rg -n 'disallowed_methods' crates/sc-jev/src crates/sc-jev-backends/src crates/sc-jev-check/src/run crates/sc-jev-check/src/equal_input`); a body that cannot be parsed for recovery yields an error whose message, fix hint and `details` carry no body or key bytes (`test_digest_recovery_error_carries_no_body_bytes` in each `wire` target, asserting the error JSON contains neither a sentinel key nor a sentinel payload string) |
+| adr:ADR-SAG-0013 | Every `judge` call emits exactly one `LogEvent` (`Operation::Judge`, that backend's id, the run's `prompt_sha256`) through `SharedSessionLog`, including a backend that ends `Failed`; a backend refused at validation (`NotSent`) emits none (`test_failed_backend_emits_one_log_event`). A session-save failure keeps the events already emitted, adds no `LogEvent` of its own and puts no path or secret in any event (`test_session_save_failure_log_events_unchanged`) |
+| adr:ADR-SAG-0003, 0023 | Untouched in substance. No r-2b file reads `.env` or resolves the repo root except through r-2's `discover_repo_root` (`just test` keeps r-2's repo-root tests green); the three `Cargo.toml` edits add only a `test-util` feature and no dependency pin (`bash .github/scripts/check-exact-pins.sh` green) |
 | boundary:jev-check | `test_partial_failure_keeps_answers`; `test_all_failed_returns_err`; `test_leak_true_iff_any_failed`; `test_no_resend_on_timeout`; `test_session_save_failure_keeps_answers`; cross-impl digests unchanged; `test-util` absent from `cargo tree -p sc-jev -e normal,features` and the same for `sc-jev-backends`. Regression per listed id: REQ-SAG-0602/0603 `cargo test -p sc-jev-check --features test-util --test multi_backend`; REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0710 `test_run_response_contract`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact` (`results[].error`); NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm`; NFR-SAG-0003 `cargo test -p sc-jev-check --features test-util --test sessions_exact` |
 
 ## Required validation
@@ -242,10 +320,14 @@ cargo test -p sc-jev-check --features test-util --test multi_backend -- test_no_
 cargo test -p sc-jev-check --features test-util --test multi_backend -- test_session_save_failure_keeps_answers --exact
 cargo test -p sc-jev-check --features test-util --test multi_backend -- test_equal_false_when_backend_digest_differs --exact
 cargo test -p sc-jev-check --features test-util --test multi_backend -- test_equal_true_when_all_digests_match --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_failed_backend_emits_one_log_event --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_session_save_failure_log_events_unchanged --exact
 cargo test -p sc-jev --features test-util --test wire -- test_real_wire_builder_reports_prompt_digest --exact
 cargo test -p sc-jev --features test-util --test wire -- test_digest_detects_faulty_wire_builder --exact
 cargo test -p sc-jev-backends --features test-util --test wire -- test_real_wire_builder_reports_prompt_digest --exact
 cargo test -p sc-jev-backends --features test-util --test wire -- test_digest_detects_faulty_wire_builder --exact
+cargo test -p sc-jev --features test-util --test wire -- test_digest_recovery_error_carries_no_body_bytes --exact
+cargo test -p sc-jev-backends --features test-util --test wire -- test_digest_recovery_error_carries_no_body_bytes --exact
 cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_shared_form_unchanged --exact
 cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_per_backend_failure --exact
 cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_validate_stage_not_sent --exact
@@ -260,6 +342,9 @@ cargo test -p sc-jev-backends --test llm
 test -z "$(cargo tree -p sc-jev -e normal,features | grep -F '"test-util"')"
 test -z "$(cargo tree -p sc-jev-backends -e normal,features | grep -F '"test-util"')"
 ! rg -n '#!?\[allow\(' crates/
+cargo clippy --workspace --all-targets -- -D warnings
+! rg -n 'disallowed_methods' crates/sc-jev/src crates/sc-jev-backends/src crates/sc-jev-check/src/run crates/sc-jev-check/src/equal_input
+bash .github/scripts/check-exact-pins.sh
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-agent-http -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```
 

@@ -280,7 +280,7 @@ package name and version so `sc-jev` does not match `sc-jev-check`:
 | `sc-treesitter` *(lib)* | `mimalloc`, `clap`, `sc-observability`; `-e normal,features -i sc-agent-types`: features `judge`, `secret`, `obs`, `git` | r-4 (mimalloc), r-3c (local clap and features), r-3b (script) |
 | `sc-jev-py` | depth-1 `sc-observability`, `ureq` | r-3b |
 | `sc-ai`, `sc-jev-py` | `-e normal -d` (duplicate versions): `sc-jev-check`, `sc-agent-types`, `sc-agent-compose`. Compose's signatures name `sc-jev-check` types and only compose is `=`-pinned, so a split version would give two incompatible `RunResponse` types (RBQA-F106 (b)) | r-3b |
-| `workspace-tests` | `pyo3`, `tree-sitter` (`-e normal,dev`). In the "dev edges ignored" branch also: the workspace crates in `cargo tree -p workspace-tests -e dev --depth 1` (third-party names filtered out) must be exactly `sc-agent-types`, `sc-jev-check`, `sc-agent-compose` (exact set comparison, not an absence pattern) | r-3b |
+| `workspace-tests` | `pyo3`, `tree-sitter` (`-e normal,dev`). (Dev edges are counted by `sc-boundary` per the D0 outcome, so the dev set is policed by the manifest, not by a tree row.) | r-3b |
 | every workspace crate | `-e normal,features` (no dev edges): feature `test-util` of any workspace crate | r-3b |
 
 ### New boundary manifests
@@ -355,8 +355,7 @@ notes = "Composition-root support for sc-ai and sc-jev-py. Published as internal
 roots = ["obs", "paths", "compose"]
 
 [dependencies]
-# "workspace-tests" is listed only in the "dev edges counted" branch of r-1's
-# D0 spike; in the "ignored" branch it would be a stale permission.
+# "workspace-tests" is listed because dev edges are counted (r-1 D0 outcome 4).
 allowed_dependents = ["sc-ai", "sc-jev-py", "workspace-tests"]
 allowed_dependencies = ["sc-agent-types", "sc-jev-check", "sc-observability", "serde_json"]
 forbidden_edges = [
@@ -377,19 +376,13 @@ forbidden_test_bypasses = []
 ```
 
 `boundaries/workspace-tests/workspace-tests.toml` (r-3b), full text below.
-`allowed_dependencies` is the exact workspace dev set. How `sc-boundary`
-treats a dev-only workspace edge, and whether it accepts `facade = ""`, is
-settled in wave 1 by r-1's D0 spike and recorded in `boundaries/README.md`
-(RBQA-F101). If dev edges count, this text lands as written and the three
-dependency manifests (`sc-agent-types`, `sc-jev-check`, `sc-agent-compose`)
-add `workspace-tests` to `allowed_dependents`. If they are ignored, this
-text still lands as written (`allowed_dependencies` documents the set for
-review), no dependent manifest gains `workspace-tests` (it would be a stale
-permission), and the dev set is policed by the `workspace-tests` row of the
-gate table. Third-party dev-deps (`serde_json`, `tempfile`) are checked only
-by that row; `sc-boundary` does not check third-party names. If the spike
-shows the schema rejects `facade = ""`, the facade is
-`"workspace_tests"` (the empty crate root) instead.
+`allowed_dependencies` is the exact workspace dev set. r-1's D0 spike settled
+how `sc-boundary` treats dev-only workspace edges (outcome 4, `boundaries/README.md`
+"Dev-dependency and self edges"): dev edges are counted, so this text lands as
+written and the three dependency manifests (`sc-agent-types`, `sc-jev-check`,
+`sc-agent-compose`) add `workspace-tests` to `allowed_dependents`. Third-party
+dev-deps (`serde_json`, `tempfile`) are not checked by `sc-boundary`. The schema
+rejects `facade = ""`, so the facade is `"workspace_tests"` (the empty crate root).
 
 ```toml
 boundary_id = "BOUNDARY-workspace-tests"
@@ -398,7 +391,7 @@ owner_crate_path = "workspace_tests"
 name = "workspace-tests"
 
 [public]
-facade = ""
+facade = "workspace_tests"
 notes = "publish = false (ADR-SAG-0028). Cross-crate proofs only: no normal dependencies and an empty src/lib.rs; dev-dependencies on sc-agent-types (features = [git]), sc-jev-check, sc-agent-compose, serde_json, tempfile. The bin-path helper is tests/support/bin_path.rs. sc-treesitter and sc-ai are driven as built binaries (cargo build --features cli --message-format=json), never linked, so pyo3 and tree-sitter stay out of this graph. Source scans read files and link nothing."
 
 [implementation]
@@ -443,12 +436,10 @@ state = "concrete_landed"
 Edits to existing manifests: `sc-agent-types` facade (`schema::subjects`,
 `git`, features, `test-util`), `-sc-observability-types` from its
 dependency list (r-1), `allowed_dependents` `+sc-agent-http` (r-3),
-`+sc-agent-compose` and, only in the "dev edges counted" branch,
-`+workspace-tests` (r-3b); `sc-jev` / `sc-jev-backends`
+`+sc-agent-compose` and `+workspace-tests` (r-3b; dev edges are counted); `sc-jev` / `sc-jev-backends`
 `allowed_dependencies` `-ureq +sc-agent-http`, forbidden `ureq` direct is
 enforced by the r-3 ownership record (r-3); `sc-jev-check` facade rewritten
-(r-2), `allowed_dependents` `+sc-agent-compose` and, only in the "counted"
-branch, `+workspace-tests` (r-3b); the "counted, self entries accepted"
+(r-2), `allowed_dependents` `+sc-agent-compose` and `+workspace-tests` (r-3b); the "counted, self entries accepted"
 branch (each crate with a self dev-dependency lists itself) was NOT taken —
 D0 resolved to outcome 4 (`boundaries/README.md`), so no self entries exist;
 `sc-ai` / `sc-jev-py` `allowed_dependencies` `-sc-observability
@@ -567,14 +558,17 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 
 | ADR | Change | Landing sprint |
 | --- | --- | --- |
+| ADR-SAG-0002 | Branch B or both of D9 only: optional `criteria` field (`CriteriaSpec`), exactly one of `questions`/`criteria`, array payloads byte-identical (r-5 inserts the subsection and its index marker) | r-5 (blocked) |
 | ADR-SAG-0003 | repo root = git toplevel for both consumers | r-2 |
 | ADR-SAG-0004 | each `ChainContext`-augmented request re-validated before its own send | r-2b |
 | ADR-SAG-0005 | runs the four consumer extractor kinds (no ADR-0024/`prepare` reference) | r-4 |
 | ADR-SAG-0005 | public assembly entry is `prepare`; `run::build_request` sentence superseded | r-2 |
+| ADR-SAG-0014 | r-1 interim: typed `answers` written once; `JudgeOutcome` entries; `equal_input` shape. Superseded by ADR-SAG-0024 (r-2) as a whole; the "null until r-2b" clause is made false by an r-2b-owned pointer in ADR-SAG-0025 | r-1 |
 | ADR-SAG-0014 | `data` is the `RunResponse` serialization; primary backend = first `Ok`; `warnings` | r-2 |
 | ADR-SAG-0005 | canonical-only schema + Jev JSON envelope (D9) | r-5 (blocked) |
 | ADR-SAG-0006 | transports live in `sc-agent-http` | r-3 |
 | ADR-SAG-0007 | busy-retry policy (owner decision (b), decided); Retry-After grammar; cancel latency ≤ 120 s | r-3 |
+| ADR-SAG-0008 | r-1 interim: engine behaviour recorded as `ChainContext`; session document v2. Bullet 1 (except its last sentence) superseded by ADR-SAG-0025 (r-2b); bullet 2 stays in force; r-2b rewrites the Status line (r-2b D7) | r-1 |
 | ADR-SAG-0008 | independent default; `chain_context` explicit | r-2b |
 | ADR-SAG-0009 | descriptor + catalog; open = additive; factory table + test-and-review dispatch convention; `register` for existing ids only; `JudgeBackend` intentionally open | r-1 |
 | ADR-SAG-0009 | entry point is `prepare`/`run`; `run_check` deleted | r-2 |
@@ -587,6 +581,7 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 | ADR-SAG-0017 | two released binaries + per-channel coverage | r-4 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-http` | r-3 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-compose` | r-3b |
+| ADR-SAG-0019 | r-1 interim: per-backend `Attestation`, derived `equal`; `Arc<PayloadBundle>` + `CancelToken`. The "until r-2b … `equal = false`" and "r-1 records `ChainContext`" sentences superseded by ADR-SAG-0025 (r-2b); the rest stays in force; r-2b rewrites the Status line (r-2b D7) | r-1 |
 | ADR-SAG-0019 | `RunOptions` text → `RunConfig` | r-2 |
 | ADR-SAG-0019 | equal-input from backend-reported digest | r-2b |
 | ADR-SAG-0020 | unchecked `ResolvedApiKey::new` gone in every build; `Arc<str>`; constructors infallible; the two `#[allow]` sites become `#[expect]`. Supersedes the named ADR-SAG-0029 (a) sentences | r-1 |
@@ -615,7 +610,13 @@ ADR-SAG-0023..0028 are written by this plan PR (conventions). Plan review 4
 made two exceptions to "never adds or removes an entry": r-3 adds the
 ADR-SAG-0020 "A.1 subsection (Proposed, r-3b)" marker when it moves the
 `source_scans` clause out, and r-2b splits ADR-SAG-0025 bullet 2; both are
-written out verbatim in the sprint docs.
+written out verbatim in the sprint docs. Plan review 5 adds a third: in
+D9 Branch B or "both", r-5 adds the "A.1 subsection (Active, r-5)" marker
+to the ADR-SAG-0002 row with its new subsection (the branch is unknown until
+owner decision (c)). The r-1 interim rows above are already marked in the
+index ("A.1 subsection (Active, r-1)" in rows 0008, 0014, 0019); the
+sentence-level supersession is written by r-2b, which owns the interim
+Status lines of 0008 and 0019 for that purpose.
 
 **No shape on another sprint's Proposed text.** A sprint may not ship a
 code shape whose only governing text is another sprint's Proposed

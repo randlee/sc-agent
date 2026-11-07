@@ -46,6 +46,8 @@ adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
   - ADR-SAG-0003
+  - ADR-SAG-0005  # compose calls prepare/run and never PayloadBuilder
+  - ADR-SAG-0008  # r-2b amendment (Active after wave 3): Independent default, ChainContext explicit; ComposeInputs::mode and both consumers' flag/kwarg
   - ADR-SAG-0009
   - ADR-SAG-0010
   - ADR-SAG-0011
@@ -55,6 +57,7 @@ adrs:
   - ADR-SAG-0016
   - ADR-SAG-0017
   - ADR-SAG-0018
+  - ADR-SAG-0019  # prompt precedence: ComposeInputs::system_prompt_override and the clap port of --llm-system-prompt-file
   - ADR-SAG-0020
   - ADR-SAG-0021
   - ADR-SAG-0022
@@ -106,8 +109,9 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0020 amendment (r-3b) (inserted as Proposed by r-3; r-3b flips it)"
   - "docs/architecture.md#ADR-SAG-0025 r-3b bullet (REQ-SAG-0604 consumer output), Status line (r-3b clause)"
   - "docs/architecture.md#ADR-SAG-0023 amendment (r-3b)"
+  - "docs/architecture.md#ADR-SAG-0023 Status line (r-3b clause)"
   - "docs/architecture.md#ADR-SAG-0026 Status line and compose half"
-  - "docs/architecture.md#ADR-SAG-0028"
+  - "docs/architecture.md#ADR-SAG-0028 (incl. its Status line)"
   - "docs/architecture.md#ADR index row ADR-SAG-0016 (Title cell)"
   - "docs/architecture.md#ADR index row ADR-SAG-0023 (Status cell: compose pin)"
   - "docs/architecture.md#ADR index Amended-by marker (r-3b) in ADR-SAG-0010, 0011, 0013, 0016, 0017, 0020"
@@ -266,13 +270,16 @@ graph); contributes ARCHE-002 (consumer flag).
 
 0. **Apply the r-1 spike result** (RBQA-F101; the spike ran in wave 1,
    r-1 D0, and is recorded in `boundaries/README.md` "Dev-dependency and
-   self edges"). Write `boundaries/workspace-tests/workspace-tests.toml` and
-   the dependents' `allowed_dependents` per the recorded branch (plan.md
-   "New boundary manifests"): dev edges counted → `+workspace-tests` on
-   `sc-agent-types`, `sc-jev-check`, `sc-agent-compose`; ignored → no
-   dependent change, compose's `allowed_dependents` omits `workspace-tests`,
-   and the `cargo-tree-gates.sh` dev-set row compares the exact workspace dev
-   set. The PR names the branch it applied. The same `boundaries/README.md`
+   self edges"). The recorded result is outcome 4, **dev edges counted**.
+   Write `boundaries/workspace-tests/workspace-tests.toml` (plan.md "New
+   boundary manifests") with its three workspace dev-dependencies
+   (`sc-agent-types`, `sc-jev-check`, `sc-agent-compose`) in its dependency
+   allowlist (`boundaries/README.md` case 1b accepts `allowed_dependencies`
+   or `allowed_dev_dependencies`) and `facade = "workspace_tests"` (the
+   spike showed `facade = ""` is rejected), and add `+workspace-tests` to
+   `allowed_dependents` of `sc-agent-types`, `sc-jev-check` and
+   `sc-agent-compose`. `sc-boundary` polices the workspace dev edges, so
+   `cargo-tree-gates.sh` has no workspace-tests dev-set row. The same `boundaries/README.md`
    edit drops `sc-observability-types` from the `SCB-MANIFEST-004` row
    (record deleted by r-4).
 1. `crates/workspace-tests` (`publish = false`; `[lints] workspace = true`;
@@ -417,14 +424,21 @@ graph); contributes ARCHE-002 (consumer flag).
    `crates/sc-ai/tests/argv.rs`, declared in `crates/sc-ai/Cargo.toml` as
    `[[test]] name = "argv" required-features = ["cli"]` (it runs the
    `cli`-gated binary; r-4 already gates `cli`). Delete the hand-rolled
-   parser and its flag tables.
+   parser and its flag tables. `--llm-system-prompt-file` maps to
+   `ComposeInputs::system_prompt_override` (ADR-SAG-0019 precedence, item 1);
+   new `test_cli_system_prompt_file_overrides_check_toml` in
+   `crates/sc-ai/tests/cli.rs` runs a check whose `check.toml` names one
+   prompt file and the flag another (scripted Haiku backend,
+   `--features test-util`), and asserts the saved session document records
+   the flag's prompt text.
 2. CI (`sc-agent-ci.yml` + `cargo-tree-gates.sh`): add every row of the
    plan.md `cargo tree` gate table not yet scripted (clap for both libraries,
    ureq, pyo3, tree-sitter, sc-observability, the `sc-treesitter` →
    `sc-agent-types` feature row r-3c checks locally, the `sc-agent-http` →
    `sc-agent-types` `secret`-only feature row r-3 checks locally, the
    `test-util` row, the duplicate-version rows for `sc-ai` and `sc-jev-py`,
-   the `workspace-tests` dev-set row in the "ignored" branch), each run with
+   and no `workspace-tests` dev-set row, since `sc-boundary` counts dev
+   edges (D7.0)), each run with
    default features **and** `--no-default-features` except *(lib)* rows, with
    word-bounded patterns; the public-API check in the form r-3 proved with
    its canary (`cargo doc -p sc-agent-http`, with deps, then the `ureq/<kind>.`
@@ -441,18 +455,24 @@ graph); contributes ARCHE-002 (consumer flag).
 ### Manifests
 
 Root `Cargo.toml` members `sc-agent-compose`, `workspace-tests`. Boundary
-manifests: `sc-agent-compose` and `workspace-tests` (full text in plan.md,
-per the r-1 D0 branch); `sc-ai`, `sc-jev-py` `allowed_dependencies
+manifests: `sc-agent-compose` and `workspace-tests` (full text in plan.md;
+dev edges counted, D7.0); `sc-ai`, `sc-jev-py` `allowed_dependencies
 -sc-observability +sc-agent-compose` with forbidden `sc-observability`,
 `ureq`, and `sc-ai` `+clap`, `+mimalloc` (optional; r-4 recorded this
 deferral); `sc-jev-check` and `sc-agent-types` `allowed_dependents
-+sc-agent-compose`, and `+workspace-tests` only in the "dev edges counted"
-branch (the same condition holds for compose's `allowed_dependents`).
++sc-agent-compose +workspace-tests`; compose's `allowed_dependents` is
+`sc-ai`, `sc-jev-py`, `workspace-tests`.
 `sc-agent-compose` and `workspace-tests` both have `[lints] workspace = true`.
 `crates/sc-ai/Cargo.toml` gains `[[test]] name = "argv" required-features = ["cli"]`
 (D12.1).
 
 ### ADR text
+
+**Wave-4 pre-flight** (plan review 5, pre-screen r-3b). Before
+development starts, confirm that r-3 landed the ADR-SAG-0020 "Amendment
+(Phase A.1, r-3b)" Proposed subsection (the `source_scans` bullet below) and
+the "A.1 subsection (Proposed, r-3b)" marker in the ADR-SAG-0020 index row;
+if not, r-3b inserts both, verbatim as below, before flipping them.
 
 ADR-SAG-0026 compose half → Active and its ADR-level Status → Active;
 ADR-SAG-0016 r-3b amendment (adapter in published `sc-agent-compose`;
@@ -461,7 +481,10 @@ supersedes "do not publish a separate observability crate" for that crate)
 in sc-agent-compose" in its heading and index title cell; ADR-SAG-0017 r-3b
 amendment (published library set + publish order gains `sc-agent-compose`)
 → Active; ADR-SAG-0023 r-3b amendment subsection (compose pin in force) →
-Active; ADR-SAG-0028 (`workspace-tests`: purpose, dev-only edges, the
+Active, and the ADR-SAG-0023 Status line becomes "Active (Phase A.1) —
+landed in r-4; its r-3b subsection landed in r-3b"; ADR-SAG-0028 Status
+line "Active (Phase A.1) — landed in r-3b" and every bullet label
+"(Active, r-3b)"; ADR-SAG-0028 (`workspace-tests`: purpose, dev-only edges, the
 built-binary contract, forbidden edges, spike outcome) → Active, with its
 index row; ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013 r-3b amendments →
 Active; A.1 crate graph section added.
@@ -489,6 +512,20 @@ exactly this bullet; r-3b flips the subsection, its bullet label and the
 that bullet to Active, sets the ADR-SAG-0025 Status line to "Active" and the
 index row Status cell to "Active" (D3.2 delivers it).
 
+**ADR-SAG-0028 "Dev-only edges" bullet states the recorded outcome** (plan
+review 5, ARCH-R3B-003; D0 outcome 4 of r-1, `boundaries/README.md`). Replace
+the conditional sentences "Whether `sc-boundary` checks dev edges is settled
+in wave 1 by r-1's spike and recorded in `boundaries/README.md`; if it does
+not, `cargo-tree-gates.sh` polices the exact dev set." with:
+
+> `sc-boundary` counts dev-only workspace edges (r-1's D0 spike, outcome 4,
+> `boundaries/README.md` "Dev-dependency and self edges"): the
+> `workspace-tests` manifest lists `sc-agent-types`, `sc-jev-check` and
+> `sc-agent-compose` in its dependency allowlist, and each of those three
+> lists `workspace-tests` in `allowed_dependents`. There is no
+> `cargo-tree-gates.sh` dev-set row. The third-party dev-dependencies
+> (`serde_json`, `tempfile`) are not checked by `sc-boundary`.
+
 **ADR-SAG-0028 self dev-dependency sentence reworded** (D0 outcome 4 of
 r-1, `boundaries/README.md`). In the "Built-binary contract" bullet,
 replace "which has `test-util` on through its self dev-dependency" with
@@ -499,7 +536,8 @@ dev-dependency; `boundaries/README.md`, section Dev-dependency and self edges)".
 **Markers r-3b flips and markers it must not touch.** r-3b flips only the
 "(Proposed, r-3b)" markers in index rows 0010, 0011, 0013, 0016, 0017,
 0020 and 0023 (compose pin), the compose-half parts of the ADR-SAG-0026
-row, the ADR-SAG-0025 Status cell and the ADR-SAG-0028 row. In the
+row, the ADR-SAG-0025 Status cell and the ADR-SAG-0028 row, plus the
+ADR-SAG-0023 and ADR-SAG-0028 Status lines named above. In the
 ADR-SAG-0017 cell ("Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0026
 (Proposed, r-3), (Proposed, r-3b)") it flips only the last "(Proposed,
 r-3b)"; the r-4 and r-3 markers there belong to r-4 and r-3, which have
@@ -520,7 +558,7 @@ below.
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0109 | `cargo test -p workspace-tests` runs the six targets above; `sc-jev-py/Cargo.toml` has no `[[test]]`; `cargo tree -p workspace-tests -e normal,dev` has no `pyo3`/`tree-sitter`; the manifests follow the r-1 D0 branch recorded in `boundaries/README.md` |
+| req:REQ-SAG-0109 | `cargo test -p workspace-tests` runs the six targets above; `sc-jev-py/Cargo.toml` has no `[[test]]`; `cargo tree -p workspace-tests -e normal,dev` has no `pyo3`/`tree-sitter`; the manifests follow D0 outcome 4 (dev edges counted): `workspace-tests` is in `allowed_dependents` of `sc-agent-types`, `sc-jev-check` and `sc-agent-compose`, and `just lint` reports no `SCB-DEPENDENCY-001`/`-002`/`-004` |
 | req:REQ-SAG-0711 (amended) | `cargo test -p sc-agent-compose --test obs` green; `grep -q 'sc_agent_compose::obs' docs/sc-ai/requirements.md` and the root row says the same |
 | req:REQ-SAG-0130 (amended, r-3b bullet) | `release/sc-publish-consumer-input.json` lists `sc-agent-compose` directly after `sc-jev-check`; the `cargo publish --dry-run` below packages it in that position and exits 0 |
 | req:REQ-SAG-0604 | `test_partial_failure_keeps_answers` (r-2b) still green; `test_cli_partial_failure_both_streams_exit_2`; pytest `test_partial_failure_raises_with_response` |
@@ -528,7 +566,11 @@ below.
 | req:REQ-SAG-0712 | No hand-rolled argv tables in either binary; `sc-ai` and `sc-treesitter` `tests/argv.rs` green |
 | req:REQ-SAG-0135 | `cargo-tree-gates.sh` clap rows pass in CI for both libraries |
 | adr:ADR-SAG-0026 | Compose half and ADR-level Status Active; `sc-ai`/`sc-jev-py` contain no adapter or path-default code (the moved files are deleted); `ComposeInputs` has no public field |
-| adr:ADR-SAG-0028 | Status Active; index row Active; text matches the manifest and the spike outcome |
+| adr:ADR-SAG-0028 | Status line and index row Active; the "Dev-only edges" bullet reads as above (no conditional; dev edges counted) and matches the four manifests |
+| adr:ADR-SAG-0023 | r-3b subsection Active; Status line reads as above; `bash .github/scripts/check-exact-pins.sh` green with the compose pin |
+| adr:ADR-SAG-0008 | Independent is the default in `ComposeInputs::new`, `sc-ai jev run` and `sc_jev_py.run_check`; `ChainContext` only on request (`test_cli_chain_context_flag`, pytest `test_chain_context_kwarg`; `equal_input.mode` in both outputs matches the request) |
+| adr:ADR-SAG-0019 | Prompt precedence unchanged: `--llm-system-prompt-file` (clap) reaches `ComposeInputs::system_prompt_override` and wins over `check.toml` and the packaged default (`test_cli_system_prompt_file_overrides_check_toml`, D12.1; regression `cargo test -p sc-jev-check --lib -- run::prompt::`); Jev-only runs still need no prompt file |
+| adr:ADR-SAG-0005 | Compose and both roots call `sc_jev_check::{prepare, run}` only and never `PayloadBuilder`: `! rg -n 'PayloadBuilder' crates/sc-agent-compose/src crates/sc-ai/src crates/sc-jev-py/src` |
 | adr:ADR-SAG-0016, 0017, 0010, 0011, 0013, 0023 | r-3b subsections Active; ADR-SAG-0016 retitled; in rows 0016 and 0017 only the r-3b markers changed |
 | adr:ADR-SAG-0020 | r-3b subsection Active with the bullet above; index row marker "(Active, r-3b)"; `cargo test -p workspace-tests --test source_scans -- test_disallowed_methods_expect_sites --exact` and `-- test_every_crate_inherits_workspace_lints --exact` print `1 passed` |
 | adr:ADR-SAG-0025 | consumer-output bullet, Status line and index row Status cell Active; `test_cli_partial_failure_both_streams_exit_2`; pytest `test_partial_failure_raises_with_response` |
@@ -558,6 +600,9 @@ cargo test -p workspace-tests --test source_scans -- test_env_reads_only_in_owne
 cargo test -p workspace-tests --test test_util_off -- test_test_util_absent_from_normal_graph --exact
 cargo test -p workspace-tests --test test_util_off -- test_release_binary_rejects_scripted_answers --exact
 cargo clippy --workspace --all-targets -- -D warnings
+! rg -n 'PayloadBuilder' crates/sc-agent-compose/src crates/sc-ai/src crates/sc-jev-py/src
+cargo test -p sc-ai --features test-util --test cli -- test_cli_system_prompt_file_overrides_check_toml --exact
+cargo test -p sc-jev-check --lib -- run::prompt::
 cargo test -p sc-agent-compose --test obs
 cargo test -p sc-jev-check --features test-util --test sessions_exact
 cargo test -p sc-treesitter --test cli
