@@ -376,3 +376,7 @@ against TypeSafe with Rand-provided key, artifact attached to phase PR.
 
 Phase A plan and sprint docs were approved when PR #4 merged on 2026-11-02.
 Implementation is in progress on `integrate/phase-a`.
+
+## Phase close notes
+
+- Architectural refinement (D1–D13): see [`../phase-a-refine/plan.md`](../phase-a-refine/plan.md).

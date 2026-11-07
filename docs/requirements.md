@@ -144,3 +144,27 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 
 Sprint docs under `docs/plans/phase-a/` list REQ ids in YAML frontmatter.
 Phase plan: [`docs/plans/phase-a/plan.md`](plans/phase-a/plan.md).
+
+## Phase A.1 — refinement (proposed)
+
+| ID | Requirement |
+| --- | --- |
+| REQ-SAG-0105 | Open backend set: `#[non_exhaustive]` ids, one `BACKENDS` catalog, required `JudgeBackend::capabilities()`; engine reads capabilities, never matches ids — **Proposed (Phase A.1)**, r-1 |
+| REQ-SAG-0106 | Explicit `JevError` variants with unchanged `code()` ids, producer-neutral variants, `retryable()`, no detail-prefix parsing — **Proposed (Phase A.1)**, r-1 |
+| REQ-SAG-0107 | `sc-agent-types` has no `sc-observability*` dependency; session log port uses local `LogRejected` — **Proposed (Phase A.1)**, r-1 |
+| REQ-SAG-0108 | Subjects `validate` and id-assigning `SubjectsBuilder` live in `sc-agent-types`; producer and consumer share them — **Proposed (Phase A.1)**, r-1 |
+| REQ-SAG-0109 | `crates/workspace-tests` (`publish = false`) hosts cross-crate proofs incl. `jev_cross_impl` and a real `sc-treesitter` → `check.toml` e2e test — **Proposed (Phase A.1)**, r-3b |
+| REQ-SAG-0133 | Both released binaries (`sc-ai`, `sc-treesitter`) documented with per-channel coverage — **Proposed (Phase A.1)**, r-4 |
+| REQ-SAG-0134 | CI feature matrix proves binary-only deps (`mimalloc`, `clap`) are absent from `--no-default-features` library builds — **Proposed (Phase A.1)**, r-4 |
+| NFR-SAG-0004 | Library deps use caret ranges; `=` pins only for lockstep listed in ADR-SAG-0023 — **Proposed (Phase A.1)**, r-4 |
+| REQ-SAG-0312 | `command` input `path` field settable in `check.toml`, substituted for `{path}` — **Proposed (Phase A.1)**, r-2 |
+| REQ-SAG-0313 | Command producer stderr `ScAgentErrorResponse` re-raised with its code — **Proposed (Phase A.1)**, r-2 |
+| REQ-SAG-0314 | Request byte cap has one owner per backend, enforced in `validate_for_send` before any send — **Proposed (Phase A.1)**, r-2 |
+| REQ-SAG-0402 | One shared HTTP layer (`sc-agent-http`) for all backend families — **Proposed (Phase A.1)**, r-3 |
+| REQ-SAG-0403 | Both backends validate `CanonicalJudgePayload` by deserializing; Jev body is a JSON envelope (no byte-splice) — **Proposed (Phase A.1)**, r-5, blocked |
+| REQ-SAG-0604 | Per-backend results; a failure keeps other answers; `leak` = any failed — **Proposed (Phase A.1)**, r-2b |
+| REQ-SAG-0605 | Multi-backend runs independent by default; `chain_context` explicit and recorded — **Proposed (Phase A.1)**, r-2b |
+| REQ-SAG-0606 | `equal` computed from backend-reported canonical digests — **Proposed (Phase A.1)**, r-2b |
+| REQ-SAG-0607 | Stateless `FileSessionStore`; session written once per run, only when an `ask`-capable backend took part — **Proposed (Phase A.1)**, r-2 |
+| REQ-SAG-0620 | One engine API (`prepare` → `run`) and one `RunResponse` serialized by every consumer — **Proposed (Phase A.1)**, r-2 |
+| REQ-SAG-0712 | `sc-ai` and `sc-treesitter` parse argv with clap derive behind the `cli` feature; error contract unchanged — **Proposed (Phase A.1)**, r-3b |
