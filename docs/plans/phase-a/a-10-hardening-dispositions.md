@@ -111,7 +111,7 @@ section 4 or the Phase A.1 plan (r-*).
 | ARCHP-003 | wave 3 A | implemented | routine part: missing positional and span overflow are INPUT_INVALID (ADR-SAG-0029 c) | `crates/sc-treesitter/tests/cli.rs:344`<br>`crates/sc-treesitter/src/extract.rs:317` |
 | QA-005 | wave 3 A | implemented | sc-treesitter rustdoc warning removed | `.github/workflows/sc-agent-ci.yml:239` |
 | FTQ-003 | wave 3 A | implemented | treesitter tests use the shared bounded runner | `crates/sc-treesitter/tests/support/mod.rs:29` |
-| ARCHP-013 | wave 3 B | implemented | build_request under py.detach; sentinel-handshake test (QA-1) | `crates/sc-jev-py/src/run.rs:415`<br>`crates/sc-jev-py/src/run.rs:1064` |
+| ARCHP-013 | wave 3 B | implemented | build_request under py.detach; sentinel-handshake test (QA-1) | `crates/sc-jev-py/src/run.rs:415`<br>`crates/sc-jev-py/src/run.rs:1067` |
 | ARCHP-015 | wave 3 B | implemented | LoggerInner Drop flush+shutdown | `crates/sc-jev-py/src/logging.rs:48` |
 | ARCHP-016 | wave 3 B | implemented | Weak registry keyed by canonical root | `crates/sc-jev-py/src/logging.rs:78` |
 | ARCHP-017 | wave 3 B | implemented | backends via from_str, revs via Rev::parse | `crates/sc-jev-py/src/run.rs:157` |
@@ -145,7 +145,7 @@ section 4 or the Phase A.1 plan (r-*).
 | REQ-QA-008 | QA-1 C | implemented | D1-D13 section below | `docs/plans/phase-a/a-10-hardening-dispositions.md:173` |
 | REQ-QA-009 | QA-1 B | implemented | ADR-SAG-0020 test-util sentence superseded; sprint a-4 owned path fixed; jev.toml lists root re-exports only | `docs/architecture.md:236`<br>`docs/plans/phase-a/sprint-a-4-backend-jev.md:34`<br>`boundaries/sc-jev/jev.toml:25` |
 | FTQ-006 | QA-1 D | implemented | bounded accept loop, stream timeouts, finish recv_timeout + count panic; copies byte-compared | `crates/sc-jev/src/test_server.rs:142`<br>`crates/sc-jev/src/lib.rs:41` |
-| FTQ-007 | QA-1 D | implemented | sentinel handshake in Rust and Python; drop guard / try-finally | `crates/sc-jev-py/src/run.rs:1039`<br>`tests/fixtures/jev-python/tests/test_run_check_and_ask.py:209` |
+| FTQ-007 | QA-1 D | implemented | sentinel handshake in Rust and Python; drop guard / try-finally | `crates/sc-jev-py/src/run.rs:1041`<br>`tests/fixtures/jev-python/tests/test_run_check_and_ask.py:209` |
 | FTQ-008 | QA-1 D | implemented | shared tests/support/deadline.rs for git helper, env re-exec, cross-impl; GIT_CONFIG_NOSYSTEM | `crates/sc-jev-check/src/extract/mod.rs:138`<br>`crates/sc-jev-check/src/extract/command.rs:588`<br>`tests/jev_cross_impl/main.rs:30` |
 | FTQ-009 | QA-1 D | implemented | closed_port() guard holds the listener; redirects use invalid.test | `crates/sc-jev/src/test_server.rs:169`<br>`crates/sc-jev/src/test_server.rs:179` |
 | FTQ-010 | QA-1 D | implemented | Reply::Stall waits on a release signal | `crates/sc-jev/src/test_server.rs:238` |
