@@ -40,6 +40,7 @@ jobs:
       release_version: ${{ steps.meta.outputs.release_version }}
       release_target: ${{ steps.meta.outputs.release_target }}
       build_ref: ${{ steps.release-ref.outputs.build_ref }}
+      crates_already_published: ${{ steps.retry_channels.outputs.crates_already_published }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -70,6 +71,20 @@ jobs:
           echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "release_target=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Read channel retry selection
+        id: retry_channels
+        shell: bash
+        env:
+          ALREADY_PUBLISHED_CHANNELS: ${{ inputs.already_published_channels }}
+        run: |
+          set -euo pipefail
+          channels=",${ALREADY_PUBLISHED_CHANNELS//[[:space:]]/},"
+          if [[ "$channels" == *,crates_io,* ]]; then
+            echo "crates_already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "crates_already_published=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Verify immutable release prerequisite before publication
         shell: bash
@@ -256,7 +271,7 @@ jobs:
           path: ${{ env.ARCHIVE }}
 
   publish:
-    if: ${{ needs.gate-and-tag.outputs.release_target == 'production' && needs.release-plan.outputs.has_crates == 'true' }}
+    if: ${{ needs.gate-and-tag.outputs.release_target == 'production' && needs.release-plan.outputs.has_crates == 'true' && needs.gate-and-tag.outputs.crates_already_published != 'true' }}
     needs: [gate-and-tag, release-plan]
     runs-on: ubuntu-latest
     environment: crates-io
@@ -311,6 +326,7 @@ jobs:
             local crate="$1"
             local wait_seconds="${2:-0}"
             local cargo_manifest="$3"
+            local verify_visibility="${4:-false}"
             if crate_exists "$crate" "$version"; then
               echo "${crate} ${version} already published; skipping"
               return 0
@@ -319,11 +335,15 @@ jobs:
             if [[ "$wait_seconds" != "0" ]]; then
               sleep "$wait_seconds"
             fi
+            if [[ "$verify_visibility" == "true" ]] && ! crate_exists "$crate" "$version"; then
+              echo "${crate}@${version} is not visible after upload; stopping before dependent crates" >&2
+              exit 1
+            fi
           }
 
-          while IFS='|' read -r package wait_secs cargo_manifest; do
-            publish_if_missing "$package" "${wait_secs:-0}" "$cargo_manifest"
-          done < <(python3 .github/scripts/release_artifacts.py list-publish-plan --include-manifest --manifest "${RELEASE_ARTIFACT_MANIFEST}")
+          while IFS='|' read -r package wait_secs cargo_manifest verify_visibility; do
+            publish_if_missing "$package" "${wait_secs:-0}" "$cargo_manifest" "${verify_visibility:-false}"
+          done < <(python3 .github/scripts/release_artifacts.py list-publish-plan --include-manifest --include-visibility --manifest "${RELEASE_ARTIFACT_MANIFEST}")
 
   release-plan:
     needs: gate-and-tag
@@ -600,36 +620,53 @@ jobs:
         if: ${{ steps.published_release_probe.outputs.release_state == 'complete' && inputs.replace_release_assets == true }}
         run: echo "replace_release_assets=true; deliberately replacing assets on published release ${{ needs.gate-and-tag.outputs.release_tag }} (their SHA256s will change)."
 
+      - name: Initialize release staging paths
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RELEASE_DOWNLOAD_DIR=$RUNNER_TEMP/release-artifacts" >> "$GITHUB_ENV"
+          echo "RELEASE_ASSET_DIR=$RUNNER_TEMP/release-assets" >> "$GITHUB_ENV"
+
       - name: Download all artifacts
         if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
         uses: actions/download-artifact@v7
         with:
-          path: artifacts
+          path: ${{ env.RELEASE_DOWNLOAD_DIR }}
 
       - name: Collect archives
         if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
+        shell: bash
         run: |
-          mkdir -p release
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.tgz' \) -exec mv {} release/ \;
-          find artifacts -type f -name '*.whl' -exec mv {} release/ \;
-          ls -la release/
+          set -euo pipefail
+          # The preceding setup step supplies runner-temp staging paths in
+          # Actions.  Keep the historical relative paths as deterministic
+          # fallbacks so this step is also independently runnable.
+          RELEASE_DOWNLOAD_DIR="${RELEASE_DOWNLOAD_DIR:-artifacts}"
+          RELEASE_ASSET_DIR="${RELEASE_ASSET_DIR:-release}"
+          # SDK-only builds may have no uploaded artifacts (and no download directory).
+          mkdir -p "$RELEASE_DOWNLOAD_DIR" "$RELEASE_ASSET_DIR"
+          find "$RELEASE_DOWNLOAD_DIR" -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.tgz' -o -name '*.whl' \) -exec mv -f {} "$RELEASE_ASSET_DIR/" \;
+          ls -la "$RELEASE_ASSET_DIR/"
 
       - name: Verify collected Python distributions
         if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
-        run: python3 .github/scripts/release_artifacts.py verify-python-release-assets --manifest "$RELEASE_ARTIFACT_MANIFEST" --asset-dir release
+        run: python3 .github/scripts/release_artifacts.py verify-python-release-assets --manifest "$RELEASE_ARTIFACT_MANIFEST" --asset-dir "$RELEASE_ASSET_DIR"
 
       - name: Generate checksums
         if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
-        working-directory: release
+        working-directory: ${{ env.RELEASE_ASSET_DIR }}
+        shell: bash
         run: |
-          files=()
-          for pattern in *.tar.gz *.zip *.whl *.tgz; do
-            for file in $pattern; do
-              [[ -e "$file" ]] || continue
-              files+=("$file")
-            done
-          done
-          sha256sum "${files[@]}" > checksums.txt
+          set -euo pipefail
+          shopt -s nullglob
+          files=(*.tar.gz *.zip *.whl *.tgz)
+          # GitHub release assets must contain at least one byte; no files means no hashes.
+          if (( ${#files[@]} )); then
+            sha256sum "${files[@]}" > checksums.txt
+          else
+            printf '# No packaged release assets.\n' > checksums.txt
+          fi
 
       - name: Create GitHub Release
         if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
@@ -638,7 +675,7 @@ jobs:
           tag_name: ${{ needs.gate-and-tag.outputs.release_tag }}
           generate_release_notes: true
           files: |
-            release/*
+            ${{ env.RELEASE_ASSET_DIR }}/*
 
       - name: Verify finalized release immutability before downstream publication
         shell: bash

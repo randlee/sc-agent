@@ -58,7 +58,9 @@ tmp/
 #.idea/
 
 # sc-publish kit bootstrap cache (pinned clone, see release/sc-publish-pin.toml)
+# and the sc-compose renderer venv created by bootstrap_sc_compose.py.
 .sc-publish-kit/
+.sc-publish-venv/
 
 # Local sc-lint bootstrap environment. Commit `.sc-lint/bootstrap.py` only.
 .sc-lint/venv/

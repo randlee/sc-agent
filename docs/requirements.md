@@ -129,7 +129,7 @@ the **`sc-ai`** CLI. Behavioural contract for errors and parity rows:
 | --- | --- |
 | REQ-SAG-0130 | sc-publish consumer input enables **crates.io**, **pypi**, **homebrew**, **scoop**, **winget** + `sc-ai` release binaries |
 | REQ-SAG-0131 | `docs/development/sc-publish.md`; do not hand-edit rendered publish manifests |
-| REQ-SAG-0132 | Release preflight CI green; local preflight script matches kit |
+| REQ-SAG-0132 | Consumer-owned **`sc-publish dry-run`** workflow green on every PR: `install.py --dry-run` drift check, manifest validation, version lockstep, consumer preflight, `cargo publish --dry-run`, `maturin build`; it runs the same script as the local recipe. The kit's Release Preflight is `workflow_dispatch`-only and is run by the publisher at release time |
 | REQ-SAG-0803 | **First release:** all five channels via sc-publish — **a-9** installs kit + consumer input + preflight + publish dry-run in CI |
 
 ## Phase B (draft — not scheduled)

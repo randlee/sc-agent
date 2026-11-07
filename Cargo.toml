@@ -19,6 +19,10 @@ authors = ["Rand Lee <github@randlee.com>"]
 license = "MIT"
 repository = "https://github.com/randlee/sc-agent"
 homepage = "https://github.com/randlee/sc-agent"
+# Shared crates.io metadata. Crates add their own `keywords` / `categories`
+# when the shared values do not fit (sc-ai, sc-treesitter).
+keywords = ["llm", "evaluation", "jev", "sc-agent"]
+categories = ["development-tools"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -26,3 +30,12 @@ serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
 uuid = { version = "1", features = ["serde", "v4"] }
+toml = "1.1.8"
+ureq = "3.5.1"
+# Dependency pinning policy (docs/development/sc-publish.md): the `=` pins
+# below are deliberate lockstep with the sc-observability release train and
+# with the sc-ai / sc-treesitter binaries' tested allocator. Caret relaxation
+# for library crates is revisited at the Phase A architectural review.
+sc-observability = "=1.5.0"
+sc-observability-types = "=1.5.0"
+mimalloc = "=0.1.52"

@@ -8,6 +8,9 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "PyO3 bindings over sc-jev-check."
+readme = "README.md"
+# Ships to PyPI as a maturin wheel only (sprint a-9); never to crates.io.
+publish = false
 
 [lib]
 name = "sc_jev_py"
@@ -26,10 +29,18 @@ test-util = ["sc-jev-check/test-util"]
 pyo3 = { version = "0.26", features = ["abi3-py311"] }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-jev-check = { path = "../sc-jev-check", version = "0.1.0" }
-sc-observability = "=1.5.0"
+# Deliberate `=` lockstep with the sc-observability release train; revisited at Phase A review.
+sc-observability.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
 # `cargo test` enables this so Rust tests can register scripted judges.
 # Maturin and `cargo build` do not. The publish wheel leaves `test-util` off.
 sc-jev-check = { path = "../sc-jev-check", version = "0.1.0", features = ["test-util"] }
+
+# Workspace-only Rust/Python canonical-bytes test (REQ-SAG-0102). It lives at
+# the repo root and is hosted here because this crate is `publish = false`, so
+# the test never lands in (or warns about) a crates.io package.
+[[test]]
+name = "jev_cross_impl"
+path = "../../tests/jev_cross_impl/main.rs"

@@ -1,7 +1,7 @@
 ---
 id: a-9
 phase: a
-status: planned
+status: complete
 closure_type: integration
 target_boundary: release
 track: publish
@@ -17,9 +17,13 @@ requirements:
   - REQ-SAG-0131
   - REQ-SAG-0132
   - REQ-SAG-0803
+  - REQ-SAG-0802
+  - NFR-SAG-0002
 adrs:
+  - ADR-SAG-0011
   - ADR-SAG-0017
   - ADR-SAG-0018
+  - ADR-SAG-0022
 owned_paths:
   - "release/sc-publish-pin.toml"
   - "release/sc-publish-consumer-input.json"
@@ -32,6 +36,10 @@ owned_paths:
   - ".github/workflows/release-preflight.yml"
   - ".github/workflows/release.yml"
   - ".github/workflows/pypi-publish.yml"
+  - "scripts/sc-publish-dry-run.sh"
+  - ".github/workflows/sc-publish-dry-run.yml"
+  - "crates/sc-jev-py/Cargo.toml"
+  - "crates/sc-jev-py/pyproject.toml"
 ---
 
 # Sprint a-9 — sc-publish kit, preflight, first-release dry-run
@@ -43,7 +51,7 @@ Install the shared **[sc-publish](https://github.com/randlee/sc-publish)** kit
 complete **`release/sc-publish-consumer-input.json`** for sc-agent (Rust crate
 order, `sc-jev-py`, **`sc-treesitter`**, **`sc-ai` release binaries**, and channels
 **crates.io**, **PyPI**, **homebrew**, **scoop**, **winget**), run `install.py`,
-then prove **release preflight** and publish dry-run in CI.
+then prove the release dry-run (drift check, preflight, publish dry-run) in PR CI.
 
 ## Deliverables
 
@@ -54,8 +62,16 @@ then prove **release preflight** and publish dry-run in CI.
    **crates.io**, **pypi**, **homebrew**, **scoop**, **winget**.
 2. **REQ-SAG-0131** — `docs/development/sc-publish.md` (install, pin bump,
    dry-run drift check); `.gitignore` entries for `.sc-publish-kit/`, venv cache.
-3. **REQ-SAG-0132** — `release-preflight` workflow green on PR; documented
-   local recipe matches CI (`run-consumer-preflight.sh` or kit equivalent).
+3. **REQ-SAG-0132** — consumer-owned `sc-publish dry-run` workflow
+   (`.github/workflows/sc-publish-dry-run.yml`) green on every PR. It runs
+   `scripts/sc-publish-dry-run.sh`, the documented local recipe: `install.py
+   --dry-run` drift check, manifest validation, version lockstep, consumer
+   preflight (`run-consumer-preflight.sh`), `cargo publish --dry-run`, and
+   `maturin build`. The kit's Release Preflight (`release-preflight.yml`) is
+   `workflow_dispatch`-only and is run by the publisher at release time.
+   Evidence: PR #17, GitHub Actions run
+   [42339767937](https://github.com/randlee/sc-agent/actions/runs/42339767937),
+   check `sc-publish dry-run / dry-run`, green.
 4. **REQ-SAG-0803** — First-release checklist: `cargo publish --dry-run` order
    for workspace crates (including **`sc-treesitter`**); `maturin build` for `sc-jev-py`;
    tag/release gate documented in `docs/development/sc-publish.md`.
@@ -63,13 +79,25 @@ then prove **release preflight** and publish dry-run in CI.
    channel contracts; change consumer input + re-install.
 6. **ADR-SAG-0017** — Phase A close satisfies **first release surfaces** via sc-publish — not ad-hoc workflow edits.
 
+**Decisions recorded in this sprint.** The PR gate is consumer-owned
+(`scripts/sc-publish-dry-run.sh` plus `.github/workflows/sc-publish-dry-run.yml`)
+because the kit ships no PR-triggered preflight; `install.py` never writes
+either path, so ADR-SAG-0018 still holds. `sc-jev-py` ships to PyPI only
+(ADR-SAG-0011): its `Cargo.toml` sets `publish = false` and it is not in the
+consumer `crates` list. Its `pyproject.toml` `[project].version` is static
+because the kit's `sync-python-version` rejects dynamic versions. The maturin
+feature list keeps `test-util` off in the published wheel (ADR-SAG-0022).
+The workspace `jev_cross_impl` test target (`tests/jev_cross_impl/`) is hosted
+by `sc-jev-py` because that crate is `publish = false`, so no crates.io package
+carries a `[[test]]` path outside its own directory.
+
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0130 | Consumer JSON lists facade + all publish crates/channels |
 | req:REQ-SAG-0131 | Install doc + pin bump recipe |
-| req:REQ-SAG-0132 | Release preflight workflow green |
+| req:REQ-SAG-0132 | `sc-publish dry-run` workflow green on PR (run 42339767937 on PR #17); kit Release Preflight is dispatch-only, run by the publisher at release |
 | req:REQ-SAG-0803 | Dry-run publish order documented and exercised |
 | boundary:release | Kit dry-run renders five channels |
 
@@ -82,18 +110,10 @@ just test
 test -f release/sc-publish-pin.toml
 test -f release/sc-publish-consumer-input.json
 test -f docs/development/sc-publish.md
-SC_PUBLISH_REVISION="$(sed -n 's/^revision = "\([0-9a-f]*\)"/\1/p' release/sc-publish-pin.toml)"
-git clone --depth 1 "https://github.com/randlee/sc-publish" .sc-publish-kit
-git -C .sc-publish-kit fetch origin "$SC_PUBLISH_REVISION" --depth 1
-git -C .sc-publish-kit checkout "$SC_PUBLISH_REVISION"
-publish_python="$(python3 .sc-publish-kit/plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py --venv .sc-publish-venv)"
-"$publish_python" .sc-publish-kit/plugins/sc-publish/install.py --dry-run --input release/sc-publish-consumer-input.json .
-test $? -eq 0
 test -f release/publish-artifacts.toml
-bash .github/scripts/run-consumer-preflight.sh
-cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
-maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
-test -n "$(ls /tmp/sc-agent-wheels/*.whl 2>/dev/null | head -1)"
+# Kit clone at the pin, install.py --dry-run, manifest + lockstep, consumer
+# preflight, cargo publish --dry-run --locked (manifest order), maturin build.
+SC_AGENT_WHEEL_DIR="$(mktemp -d)/sc-agent-wheels" bash scripts/sc-publish-dry-run.sh
 ```
 
 Expected: dry-run exit 0; preflight exit 0; rendered manifests and workflows

@@ -1,5 +1,5 @@
-# Wheel CI (maturin build + tests/fixtures/jev-python pytest) is sprint a-9
-# (REQ-SAG-0803). This sprint proves the wheel with local maturin build.
+# Wheels are built and published by the sc-publish kit (sprint a-9,
+# REQ-SAG-0803). See docs/development/sc-publish.md.
 [build-system]
 requires = ["maturin>=1.8,<2"]
 build-backend = "maturin"
@@ -9,7 +9,28 @@ name = "sc-jev-py"
 description = "PyO3 bindings over sc-jev-check."
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dynamic = ["version"]
+readme = "README.md"
+authors = [{ name = "Rand Lee", email = "github@randlee.com" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Testing",
+]
+# Static and equal to [workspace.package].version: sc-publish
+# `sync-python-version` rejects dynamic versions (sprint a-9).
+version = "0.1.0"
+
+[project.urls]
+Homepage = "https://github.com/randlee/sc-agent"
+Repository = "https://github.com/randlee/sc-agent"
 
 [tool.maturin]
 # Publish and the default build. `test-util` stays off here (ADR-SAG-0022).

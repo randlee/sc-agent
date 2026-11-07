@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "Shared error, judge, and subjects types for sc-agent."
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+# Allowlist: repo-root fixtures and the cross-impl test stay out of the package.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
 [features]
 default = []
@@ -16,13 +21,10 @@ default = []
 test-util = []
 
 [dependencies]
-sc-observability-types = "=1.5.0"
+# Deliberate `=` lockstep with the sc-observability release train; revisited at Phase A review.
+sc-observability-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
-
-[[test]]
-name = "jev_cross_impl"
-path = "../../tests/jev_cross_impl/main.rs"
