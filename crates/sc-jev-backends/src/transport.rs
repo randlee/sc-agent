@@ -277,7 +277,7 @@ fn read_response(mut response: ureq::http::Response<ureq::Body>) -> Result<HttpR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_server::{LoopbackServer, Reply, closed_port_url};
+    use crate::test_server::{LoopbackServer, Reply, UNREACHED_URL, closed_port};
 
     const KEY: &str = "sk-loopback-secret";
 
@@ -374,11 +374,10 @@ mod tests {
 
     #[test]
     fn error_statuses_and_redirects_are_responses() {
-        let target = closed_port_url();
         let server = LoopbackServer::start(vec![
             Reply::status(429, &[("Retry-After", "1.5")], b"busy"),
             Reply::status(500, &[], b"boom"),
-            Reply::status(301, &[("Location", target.as_str())], b""),
+            Reply::status(301, &[("Location", UNREACHED_URL)], b""),
         ]);
         let transport = UreqTransport::loopback_for_tests();
         let mut statuses = Vec::new();
@@ -414,7 +413,8 @@ mod tests {
 
     #[test]
     fn timeout_refused_and_malformed_requests_are_network_errors() {
-        let server = LoopbackServer::start(vec![Reply::Stall(Duration::from_millis(800))]);
+        // The server holds the connection until `finish` releases it.
+        let server = LoopbackServer::start(vec![Reply::Stall]);
         let transport = UreqTransport::loopback_for_tests();
         let error = transport
             .send(request(
@@ -428,13 +428,14 @@ mod tests {
         assert_no_key(&error);
         server.finish();
 
+        let closed = closed_port();
         let refused = transport
             .send(request(
-                &closed_port_url(),
+                &closed.url(),
                 AuthScheme::Bearer,
-                Duration::from_secs(2),
+                Duration::from_millis(300),
             ))
-            .expect_err("refused");
+            .expect_err("unanswered");
         assert_eq!(refused.code(), "NETWORK_ERROR");
         assert_no_key(&refused);
 

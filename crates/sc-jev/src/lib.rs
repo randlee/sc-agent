@@ -26,6 +26,7 @@ mod retry_policy;
 #[cfg(test)]
 mod test_server;
 
+
 #[doc(inline)]
 pub use client::{
     HttpsTransport, JevClient, JevTransport, RetryDelay, ThreadRetryDelay, WireRequest,
@@ -33,3 +34,21 @@ pub use client::{
 };
 #[doc(inline)]
 pub use config::JevClientConfig;
+
+/// The verbatim copies shared with `sc-jev-backends` must stay identical.
+#[cfg(test)]
+mod shared_copies {
+    #[test]
+    fn retry_policy_and_test_server_match_the_sc_jev_backends_copies() {
+        assert_eq!(
+            include_str!("retry_policy.rs"),
+            include_str!("../../sc-jev-backends/src/retry_policy.rs"),
+            "retry_policy.rs copies drifted; edit both together"
+        );
+        assert_eq!(
+            include_str!("test_server.rs"),
+            include_str!("../../sc-jev-backends/src/test_server.rs"),
+            "test_server.rs copies drifted; edit both together"
+        );
+    }
+}

@@ -1,8 +1,9 @@
 //! Busy-retry policy shared by the Jev and LLM clients.
 //!
 //! This file is copied verbatim into `sc-jev` and `sc-jev-backends` (interim
-//! until the crate-layout decision D5). Each copy runs the same table test, so
-//! the two cannot drift silently. Edit both copies together.
+//! until the crate-layout decision D5). A unit test in `sc-jev` (`lib.rs`,
+//! `shared_copies`) compares the two files byte for byte, so they cannot
+//! drift. Edit both copies together.
 //!
 //! - Busy statuses are [`BUSY_STATUSES`]: 429, 502, and 529. The body is
 //!   resent unchanged.

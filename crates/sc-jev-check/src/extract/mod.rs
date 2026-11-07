@@ -89,6 +89,8 @@ pub(crate) mod test_support {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
+    use crate::deadline::spawn_with_deadline;
+
     pub use tempfile::TempDir;
 
     pub fn temp_dir(label: &str) -> TempDir {
@@ -124,7 +126,8 @@ pub(crate) mod test_support {
         if cfg!(windows) { "python" } else { "python3" }
     }
 
-    /// Git with no global config, no terminal prompt, and a fixed identity.
+    /// Git with no global or system config, no terminal prompt, and a fixed
+    /// identity.
     pub fn git_command(cwd: &Path) -> Command {
         let mut command = Command::new("git");
         command
@@ -132,6 +135,7 @@ pub(crate) mod test_support {
             .arg(cwd)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_CONFIG_GLOBAL", null_device())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
             .args([
                 "-c",
                 "commit.gpgsign=false",
@@ -156,7 +160,7 @@ pub(crate) mod test_support {
     }
 
     pub fn git(cwd: &Path, args: &[&str]) {
-        let output = git_command(cwd).args(args).output().expect("git");
+        let output = spawn_with_deadline(git_command(cwd).args(args), None);
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",
@@ -165,7 +169,7 @@ pub(crate) mod test_support {
     }
 
     fn git_stdout(cwd: &Path, args: &[&str]) -> String {
-        let output = git_command(cwd).args(args).output().expect("git output");
+        let output = spawn_with_deadline(git_command(cwd).args(args), None);
         assert!(output.status.success(), "git {args:?} failed");
         String::from_utf8(output.stdout).expect("utf-8")
     }

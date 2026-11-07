@@ -1034,52 +1034,87 @@ mod tests {
         });
     }
 
-    /// `build_request` releases the GIL, so a Python thread keeps counting
-    /// while a slow command extractor runs (here it times out after 1 s).
+    /// Stops and joins the Python worker even when an assertion panics.
+    struct WorkerGuard(Py<pyo3::types::PyDict>);
+
+    impl Drop for WorkerGuard {
+        fn drop(&mut self) {
+            Python::attach(|py| {
+                let _ = py.run(
+                    c"stop.set()\nworker.join(30)\n",
+                    Some(self.0.bind(py)),
+                    None,
+                );
+            });
+        }
+    }
+
+    /// `build_request` releases the GIL while a command extractor runs.
+    ///
+    /// Sentinel handshake (FTQ-007), no rate or tick count: the extractor
+    /// writes `started`, then polls up to 20 s for `ack`. A Python worker
+    /// thread waits for `started` and writes `ack`; it can only run if the
+    /// GIL is free. With `ack` the extractor prints a non-subjects document
+    /// (`EXTRACTION_INVALID`); without it the extractor exits 3
+    /// (`EXTRACTION_FAILED`). The extractor timeout (60 s) is above both
+    /// bounds.
     #[cfg(unix)]
     #[test]
     fn build_request_releases_the_gil_during_a_slow_extractor() {
         let root = temp_dir("gil");
         let repo = root.path();
+        let started = repo.join("started");
+        let ack = repo.join("ack");
         write_questions(repo, "Slow:\n\n{slow}");
+        let script = "touch \"$1\"; i=0; while [ ! -e \"$2\" ]; do i=$((i+1)); [ $i -gt 400 ] && exit 3; sleep 0.05; done; echo not-subjects";
+        let command = serde_json::to_string(&[
+            "sh",
+            "-c",
+            script,
+            "sh",
+            started.to_str().expect("utf8 path"),
+            ack.to_str().expect("utf8 path"),
+        ])
+        .expect("argv");
         std::fs::write(
             repo.join("check.toml"),
-            "[questions]\npath = \"questions.json\"\n\n[inputs.slow]\nkind = \"command\"\ncommand = [\"sleep\", \"5\"]\ntimeout_seconds = 1\n",
+            format!(
+                "[questions]\npath = \"questions.json\"\n\n[inputs.slow]\nkind = \"command\"\ncommand = {command}\ntimeout_seconds = 60\n"
+            ),
         )
         .expect("check");
         Python::initialize();
         Python::attach(|py| {
             let scope = pyo3::types::PyDict::new(py);
+            scope
+                .set_item("started", started.to_str().expect("utf8 path"))
+                .expect("started");
+            scope
+                .set_item("ack", ack.to_str().expect("utf8 path"))
+                .expect("ack");
             py.run(
-                c"import threading, time\nticks = [0]\nstop = threading.Event()\ndef spin():\n    while not stop.is_set():\n        ticks[0] += 1\n        time.sleep(0.01)\nworker = threading.Thread(target=spin)\nworker.start()\n",
+                c"import os, threading, time\nstop = threading.Event()\ndef answer():\n    deadline = time.monotonic() + 20\n    while not stop.is_set() and time.monotonic() < deadline:\n        if os.path.exists(started):\n            open(ack, 'w').close()\n            return\n        time.sleep(0.01)\nworker = threading.Thread(target=answer)\nworker.start()\n",
                 Some(&scope),
                 None,
             )
             .expect("start thread");
+            let _guard = WorkerGuard(scope.clone().unbind());
             let error = build_request(
                 py,
                 PathBuf::from("check.toml"),
                 Some(repo.to_path_buf()),
                 "WORKTREE",
             )
-            .expect_err("extractor times out");
-            py.run(c"stop.set()\nworker.join()\n", Some(&scope), None)
-                .expect("stop thread");
+            .expect_err("extractor output is not a subjects document");
             let code: String = error
                 .value(py)
                 .getattr("code")
                 .expect("code")
                 .extract()
                 .expect("str");
-            assert_eq!(code, "EXTRACTION_TIMEOUT");
-            let ticks: u64 = py
-                .eval(c"ticks[0]", Some(&scope), None)
-                .expect("ticks")
-                .extract()
-                .expect("int");
-            assert!(
-                ticks >= 20,
-                "Python thread starved while the GIL was held: {ticks}"
+            assert_eq!(
+                code, "EXTRACTION_INVALID",
+                "EXTRACTION_FAILED means the worker never ran: the GIL was held"
             );
         });
     }

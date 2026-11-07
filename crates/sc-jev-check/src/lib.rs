@@ -9,3 +9,8 @@ pub mod payload;
 pub mod registry;
 pub mod run;
 pub mod session;
+
+/// Shared bounded subprocess runner for unit tests (FTQ-008).
+#[cfg(test)]
+#[path = "../../../tests/support/deadline.rs"]
+mod deadline;

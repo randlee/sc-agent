@@ -140,7 +140,7 @@ mod tests {
     use sc_agent_types::{JudgeBackend, JudgeRequest, ResolvedApiKey, payload_bundle_from_value};
 
     use super::*;
-    use crate::test_server::{LoopbackServer, Reply, closed_port_url};
+    use crate::test_server::{LoopbackServer, Reply, UNREACHED_URL, closed_port};
     use crate::{JevClient, JevClientConfig, RetryDelay};
 
     const KEY: &str = "sk-loopback-secret";
@@ -203,10 +203,9 @@ mod tests {
 
     #[test]
     fn redirects_are_not_followed() {
-        let target = closed_port_url();
         let server = LoopbackServer::start(vec![Reply::status(
             302,
-            &[("Location", target.as_str())],
+            &[("Location", UNREACHED_URL)],
             b"",
         )]);
         let response = send(&server.url("/moved"), Duration::from_secs(5)).expect("302");
@@ -226,14 +225,17 @@ mod tests {
 
     #[test]
     fn timeout_and_refused_connection_are_network_errors() {
-        let server = LoopbackServer::start(vec![Reply::Stall(Duration::from_millis(800))]);
+        // The server holds the connection until `finish` releases it, so the
+        // only clock in play is the client timeout under test.
+        let server = LoopbackServer::start(vec![Reply::Stall]);
         let error = send(&server.url("/slow"), Duration::from_millis(150)).expect_err("timeout");
         assert_eq!(error.code(), "NETWORK_ERROR");
         assert!(error.to_string().contains("Jev connection failed"));
         assert_no_key(&error);
         server.finish();
 
-        let refused = send(&closed_port_url(), Duration::from_secs(2)).expect_err("refused");
+        let closed = closed_port();
+        let refused = send(&closed.url(), Duration::from_millis(300)).expect_err("unanswered");
         assert_eq!(refused.code(), "NETWORK_ERROR");
         assert_no_key(&refused);
     }

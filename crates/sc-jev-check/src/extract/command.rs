@@ -550,7 +550,8 @@ sys.stdout.write(json.dumps(doc))
     #[test]
     fn command_extractor_child_env_excludes_secrets() {
         let exe = std::env::current_exe().expect("test binary");
-        let output = Command::new(exe)
+        let mut command = Command::new(exe);
+        command
             .args([
                 "--exact",
                 "extract::command::tests::env_probe_child",
@@ -559,10 +560,8 @@ sys.stdout.write(json.dumps(doc))
                 "--test-threads=1",
             ])
             .env(PROBE_ENV, PROBE_VALUE)
-            .env(PROBE_SECRET_ENV, PROBE_VALUE)
-            .stdin(Stdio::null())
-            .output()
-            .expect("re-run test binary");
+            .env(PROBE_SECRET_ENV, PROBE_VALUE);
+        let output = crate::deadline::spawn_with_deadline(&mut command, None);
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             output.status.success(),

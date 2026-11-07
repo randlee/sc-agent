@@ -1,15 +1,18 @@
 //! CLI parity for `jev run`, `dry-run`, and `ask`.
 //!
 //! Every subprocess goes through [`spawn_with_deadline`], so a hung child
-//! fails the test after 60 seconds instead of stalling CI.
+//! fails the test after 60 seconds instead of stalling CI. The runner is the
+//! shared `tests/support/deadline.rs`.
 
-use std::io::{Read, Write};
+#[path = "../../../tests/support/deadline.rs"]
+mod deadline;
+
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
+use deadline::spawn_with_deadline;
 use sc_agent_types::BackendId;
 use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::NoopSessionLog;
@@ -21,57 +24,6 @@ use sc_jev_check::registry::{BackendRegistry, RequestLog, ScriptedJudge};
 use serde_json::Value;
 use tempfile::TempDir;
 
-/// Longest a subprocess may run before the test kills it.
-const SUBPROCESS_DEADLINE: Duration = Duration::from_secs(60);
-
-/// Runs `command` to completion within [`SUBPROCESS_DEADLINE`].
-///
-/// stdout and stderr drain on threads so a full pipe cannot block the child.
-/// `try_wait` polls the deadline; on expiry the child is killed and reaped
-/// and the test panics with the captured stderr.
-fn spawn_with_deadline(command: &mut Command, stdin: Option<&[u8]>) -> Output {
-    command
-        .stdin(if stdin.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = command.spawn().expect("spawn subprocess");
-    if let Some(bytes) = stdin {
-        child
-            .stdin
-            .take()
-            .expect("piped stdin")
-            .write_all(bytes)
-            .expect("write stdin");
-    }
-    let stdout = drain(child.stdout.take().expect("piped stdout"));
-    let stderr = drain(child.stderr.take().expect("piped stderr"));
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait().expect("poll subprocess") {
-            Some(status) => break status,
-            None if started.elapsed() >= SUBPROCESS_DEADLINE => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let stderr = stderr.join().unwrap_or_default();
-                panic!(
-                    "subprocess exceeded {SUBPROCESS_DEADLINE:?}; stderr: {}",
-                    String::from_utf8_lossy(&stderr)
-                );
-            }
-            None => thread::sleep(Duration::from_millis(20)),
-        }
-    };
-    Output {
-        status,
-        stdout: stdout.join().expect("stdout reader"),
-        stderr: stderr.join().expect("stderr reader"),
-    }
-}
-
 /// `Command::output` with [`SUBPROCESS_DEADLINE`] and no stdin.
 trait RunWithDeadline {
     fn run_with_deadline(&mut self) -> Output;
@@ -81,14 +33,6 @@ impl RunWithDeadline for Command {
     fn run_with_deadline(&mut self) -> Output {
         spawn_with_deadline(self, None)
     }
-}
-
-fn drain(mut pipe: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
-    thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = pipe.read_to_end(&mut bytes);
-        bytes
-    })
 }
 
 fn temp_dir(label: &str) -> TempDir {

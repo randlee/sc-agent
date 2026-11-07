@@ -1,19 +1,15 @@
 //! Subprocess helpers for the CLI tests.
 //!
-//! Copied from `sc-ai`'s `tests/cli.rs` (sharing test support across crates
-//! is a Phase A.1 decision). Every subprocess goes through
-//! [`spawn_with_deadline`], so a hung child fails the test after
-//! [`SUBPROCESS_DEADLINE`] instead of stalling CI. Git runs with the global
-//! config disabled and no terminal prompt.
+//! Every subprocess goes through [`spawn_with_deadline`], which wraps the
+//! workspace's one bounded runner (`tests/support/deadline.rs`), so a hung
+//! child fails the test instead of stalling CI. Git runs with the global and
+//! system config disabled and no terminal prompt.
 
-use std::io::Read;
+#[path = "../../../../tests/support/deadline.rs"]
+mod deadline;
+
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
-
-/// Longest a subprocess may run before the test kills it.
-pub const SUBPROCESS_DEADLINE: Duration = Duration::from_secs(60);
+use std::process::{Command, Output};
 
 /// Platform null device used for `GIT_CONFIG_GLOBAL`.
 pub fn null_device() -> &'static str {
@@ -28,48 +24,9 @@ pub fn isolate_git(command: &mut Command) -> &mut Command {
         .env("GIT_TERMINAL_PROMPT", "0")
 }
 
-/// Runs `command` to completion within [`SUBPROCESS_DEADLINE`].
-///
-/// stdout and stderr drain on threads so a full pipe cannot block the child.
-/// `try_wait` polls the deadline; on expiry the child is killed and reaped
-/// and the test panics with the captured stderr.
+/// Runs `command` to completion within the shared deadline, no stdin.
 pub fn spawn_with_deadline(command: &mut Command) -> Output {
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = command.spawn().expect("spawn subprocess");
-    let stdout = drain(child.stdout.take().expect("piped stdout"));
-    let stderr = drain(child.stderr.take().expect("piped stderr"));
-    let started = Instant::now();
-    let exit = loop {
-        match child.try_wait().expect("poll subprocess") {
-            Some(exit) => break exit,
-            None if started.elapsed() >= SUBPROCESS_DEADLINE => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let stderr = stderr.join().unwrap_or_default();
-                panic!(
-                    "subprocess exceeded {SUBPROCESS_DEADLINE:?}; stderr: {}",
-                    String::from_utf8_lossy(&stderr)
-                );
-            }
-            None => thread::sleep(Duration::from_millis(20)),
-        }
-    };
-    Output {
-        status: exit,
-        stdout: stdout.join().expect("stdout reader"),
-        stderr: stderr.join().expect("stderr reader"),
-    }
-}
-
-fn drain(mut pipe: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
-    thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = pipe.read_to_end(&mut bytes);
-        bytes
-    })
+    deadline::spawn_with_deadline(command, None)
 }
 
 /// Runs `git args` in `dir` with a fixed identity; panics on failure.

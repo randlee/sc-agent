@@ -204,8 +204,34 @@ def test_jev_ask_and_missing_check_map_error_codes(
         assert name in unknown.value.message
 
 
+# Extractor half of the GIL handshake: announce start, then wait (bounded)
+# for the Python worker's acknowledgement.
+_HANDSHAKE_SCRIPT = """
+import pathlib, sys, time
+started, ack = map(pathlib.Path, sys.argv[1:3])
+started.write_text("1")
+deadline = time.monotonic() + 20
+while not ack.exists():
+    if time.monotonic() > deadline:
+        sys.exit(3)
+    time.sleep(0.01)
+print("not-subjects")
+"""
+
+
 def test_build_request_releases_the_gil(tmp_path: Path) -> None:
+    """Sentinel handshake (FTQ-007), no tick count.
+
+    The extractor writes ``started`` and polls up to 20 s for ``ack``. The
+    worker thread writes ``ack`` once it sees ``started``, which it can only
+    do while ``build_request`` has released the GIL. With ``ack`` the
+    extractor prints a non-subjects document (EXTRACTION_INVALID); without
+    it the extractor exits 3 (EXTRACTION_FAILED).
+    """
     repo = _repo(tmp_path, "Slow:\n\n{slow}")
+    started = tmp_path / "started"
+    ack = tmp_path / "ack"
+    argv = [sys.executable, "-c", _HANDSHAKE_SCRIPT, str(started), str(ack)]
     (repo / "check.toml").write_text(
         "\n".join(
             [
@@ -214,28 +240,31 @@ def test_build_request_releases_the_gil(tmp_path: Path) -> None:
                 "",
                 "[inputs.slow]",
                 'kind = "command"',
-                f"command = [{json.dumps(sys.executable)}, \"-c\", \"import time; time.sleep(5)\"]",
-                "timeout_seconds = 1",
+                f"command = {json.dumps(argv)}",
+                "timeout_seconds = 60",
                 "",
             ]
         ),
         encoding="utf-8",
     )
-    ticks = [0]
     stop = threading.Event()
 
-    def spin() -> None:
-        while not stop.is_set():
-            ticks[0] += 1
+    def answer() -> None:
+        deadline = time.monotonic() + 20
+        while not stop.is_set() and time.monotonic() < deadline:
+            if started.exists():
+                ack.write_text("1")
+                return
             time.sleep(0.01)
 
-    worker = threading.Thread(target=spin)
+    worker = threading.Thread(target=answer)
     worker.start()
     try:
         with pytest.raises(sc_jev_py.JevError) as caught:
             sc_jev_py.build_request("check.toml", repo_root=repo)
     finally:
         stop.set()
-        worker.join()
-    assert caught.value.code == "EXTRACTION_TIMEOUT"
-    assert ticks[0] >= 20, ticks[0]
+        worker.join(30)
+    assert caught.value.code == "EXTRACTION_INVALID", (
+        "EXTRACTION_FAILED means the worker never ran: the GIL was held"
+    )
