@@ -50,3 +50,8 @@ sc-boundary 0.8.0 accepts third-party names in `allowed_dependencies` and
 them in step with the manifests. Enforcement is Cargo-edge only: no rule
 restricts which code may call a given item (for example
 `ResolvedApiKey::as_str`).
+
+`sc-lint.toml` is marked "Managed by sc-lint". `sc-lint init --just`
+regeneration would drop the hand-added `global_dependency_ownership` records
+(and the `jev-python` test layer and the justfile recipes); re-apply them after
+regenerating.

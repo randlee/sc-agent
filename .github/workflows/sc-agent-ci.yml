@@ -3,15 +3,17 @@
 # surface is checked separately by sc-publish-dry-run.yml.
 #
 # Jobs and their local equivalents (docs/development/ci.md):
-#   test      just setup; just lint; cargo clippy --all-features; cargo test
+#   test      just setup + just lint (ubuntu only); cargo clippy --all-features
+#             and cargo test (all three OSes)
 #   python    just test-python (maturin develop + jev-python pytest)
 #   features  cargo hack --each-feature check -p sc-treesitter
 #   doc       cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings
 #   coverage  cargo llvm-cov summary, uploaded as an artifact
 #
 # Determinism: every action is pinned to a commit SHA, the runner images,
-# toolchain, Python, maturin, just and cargo tools are exact, every step has a
-# timeout, and no step retries.
+# toolchain, Python (exact patch), maturin, just and cargo tools are exact,
+# Python tools install from a hash-pinned lock, and every step has a timeout.
+# No step retries; bounded cargo network-fetch retries only (CARGO_NET_RETRY).
 name: sc-agent CI
 
 on:
@@ -31,7 +33,9 @@ concurrency:
 
 env:
   RUST_TOOLCHAIN: "1.94.1"
-  PYTHON_VERSION: "3.11"
+  # Exact patch: the newest 3.11 that actions/python-versions ships for
+  # ubuntu-24.04, macos-15 (arm64) and windows-2022.
+  PYTHON_VERSION: "3.11.9"
   MATURIN_VERSION: "1.16.0"
   PYTEST_VERSION: "8.4.2"
   JUST_VERSION: "1.58.0"
@@ -49,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -70,7 +74,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # just setup / just lint run on ubuntu only: sc-boundary, fmt and clippy
+      # results do not depend on the host, and the managed sc-lint bootstrap
+      # fails to activate on Windows (docs/development/ci.md, Known limits).
       - name: Install just
+        if: matrix.os == 'ubuntu-24.04'
         uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
         timeout-minutes: 5
         with:
@@ -89,10 +97,12 @@ jobs:
             sc-agent-ci-test-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
       - name: just setup (checksum-verified sc-lint)
+        if: matrix.os == 'ubuntu-24.04'
         timeout-minutes: 5
         run: just setup
 
       - name: just lint (sc-boundary, fmt, clippy)
+        if: matrix.os == 'ubuntu-24.04'
         timeout-minutes: 20
         run: just lint
 
@@ -109,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -149,9 +159,12 @@ jobs:
       # Python 3.11 venv, maturin ${MATURIN_VERSION}, `maturin develop
       # --features extension-module,test-util -m crates/sc-jev-py/Cargo.toml`,
       # then `pytest tests/fixtures/jev-python -q`. The recipe reads
-      # MATURIN_VERSION and PYTEST_VERSION from the environment.
+      # MATURIN_VERSION and PYTEST_VERSION from the environment. The venv lives
+      # in RUNNER_TEMP (outside the cached target/) and is recreated each run.
       - name: maturin develop + pytest (just test-python)
         timeout-minutes: 30
+        env:
+          JEV_VENV: ${{ runner.temp }}/jev-python-venv
         run: just test-python
 
   features:
@@ -226,9 +239,10 @@ jobs:
           restore-keys: |
             sc-agent-ci-doc-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
-      # continue-on-error while the 11 rustdoc warnings at d4a0111 are open;
-      # the phase-end code track fixes them (QA-005), then this flag is
-      # removed and the step gates the PR.
+      # continue-on-error while the 11 rustdoc warnings at d4a0111 are open.
+      # Removal condition: QA-005 (rustdoc warnings fixed) lands from the
+      # phase-end code track; that change deletes this flag so the step gates
+      # the PR (FTQ-004).
       - name: cargo doc --workspace --no-deps
         timeout-minutes: 20
         continue-on-error: true

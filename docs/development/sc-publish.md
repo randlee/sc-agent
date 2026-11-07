@@ -54,6 +54,8 @@ pin and re-run install. `install.py` overwrites kit paths without warning.
 
 These are sc-publish kit limitations. Fix them in the kit and bump the pin;
 do not hand-edit kit or rendered files (ADR-SAG-0018). Neither is filed yet.
+sc-lint kit issues (Windows bootstrap) are listed separately in
+[`ci.md`](ci.md#upstream-issues-to-file-sc-lint).
 
 1. **Scoop template is single-binary.** The Scoop manifest takes one `bin`
    entry, so only `sc-ai.exe` gets a shim; `sc-treesitter.exe` is in the

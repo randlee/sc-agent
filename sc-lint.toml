@@ -30,6 +30,9 @@ command = ["just", "test-python"]
 # third-party edges in each manifest's forbidden_edges mechanical. Each record
 # checks direct manifest declarations and `use` paths under the allowed crate
 # directories. Keep in sync with boundaries/*/*.toml allowed_dependencies.
+# These records, the jev-python test layer and the justfile test-python recipe
+# are hand-added: `sc-lint init --just` regeneration would drop them, so
+# re-apply them after regenerating.
 
 [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
 dependency = "ureq"
@@ -91,5 +94,5 @@ source_message = "Only sc-agent-types may depend on sc-observability-types (v2 s
 dependency = "mimalloc"
 allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-treesitter/Cargo.toml"]
 allowed_source_roots = ["crates/sc-ai", "crates/sc-treesitter"]
-manifest_message = "Only the crates that ship a binary (sc-ai, sc-treesitter) may depend on mimalloc."
-source_message = "Only the crates that ship a binary (sc-ai, sc-treesitter) may depend on mimalloc."
+manifest_message = "Only sc-ai and sc-treesitter may depend on mimalloc. Interim policy recording today's edges, pending the Phase A allocator/pin ADR (decision D8 in PHASE-A-REVIEW.md)."
+source_message = "Only sc-ai and sc-treesitter may depend on mimalloc. Interim policy recording today's edges, pending the Phase A allocator/pin ADR (decision D8 in PHASE-A-REVIEW.md)."
