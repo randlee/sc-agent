@@ -56,3 +56,9 @@ required-features = ["cli"]
 name = "cli"
 path = "tests/cli.rs"
 required-features = ["cli"]
+
+# argv edge cases of the clap parser; also runs the binary (CPR-207).
+[[test]]
+name = "argv"
+path = "tests/argv.rs"
+required-features = ["cli"]

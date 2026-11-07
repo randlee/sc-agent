@@ -1,5 +1,8 @@
 //! CLI process checks, including the committed branches fixture.
 //!
+//! Argv edge cases (help, version, hyphen values, duplicates) live in
+//! `tests/argv.rs`; the ADR-SAG-0029 (c) error-code assertions stay here.
+//!
 //! Subprocesses run through `support::spawn_with_deadline`; git runs with
 //! the global config disabled. Grammar-specific tests are gated on the
 //! grammar's Cargo feature.
@@ -355,29 +358,6 @@ fn cli_missing_positional_is_input_invalid() {
             .expect("message")
             .contains("source path")
     );
-}
-
-#[test]
-fn cli_version_prints_name_and_version() {
-    let dir = TempDir::new().expect("temp");
-    let expected = format!("sc-treesitter {}\n", env!("CARGO_PKG_VERSION"));
-    for flag in ["--version", "-V"] {
-        let output = run(dir.path(), &[flag]);
-        assert!(output.status.success(), "{flag}");
-        assert_eq!(String::from_utf8_lossy(&output.stdout), expected);
-    }
-}
-
-#[test]
-fn cli_help_only_in_the_first_two_slots() {
-    let dir = TempDir::new().expect("temp");
-    for args in [vec!["--help"], vec!["-h"], vec!["extract", "--help"]] {
-        let output = run(dir.path(), &args);
-        assert!(output.status.success(), "{args:?}");
-        assert!(String::from_utf8_lossy(&output.stdout).contains("sc-treesitter extract"));
-    }
-    let late = run(dir.path(), &["extract", "--language", "python", "--help"]);
-    assert_eq!(error_json(&late)["error"], "INPUT_INVALID");
 }
 
 #[cfg(all(feature = "python", feature = "rust"))]
