@@ -19,7 +19,7 @@ Normative JSON (Phase A example):
     "version": "0.1.0",
     "language": "python",
     "grammar": "tree-sitter-python",
-    "grammar_version": "0.23.6",
+    "grammar_version": "0.25.0",
     "query_sha256": "<hex>",
     "mode": "matches"
   },
@@ -47,7 +47,7 @@ Normative JSON (Phase A example):
 | **id** | `{path}:{start_line}` for the first subject on that line; further subjects on the same line get `:1`, `:2`, … in `(start_byte, capture)` order |
 | **text** | Half-open UTF-8 slice **`[start_byte, end_byte)`** from source bytes |
 | **order** | Sort emitted subjects by `(start_byte, capture)` |
-| **helpers** | Capture names `@_…` never appear in `subjects` |
+| **helpers** | Helper captures never appear in `subjects`. A helper capture is a capture name beginning with `_` (stored without `@`), for example `_fn` for `@_fn` in the query |
 | **empty** | Zero subjects → `EXTRACTION_EMPTY` |
 | **parse errors** | ERROR node inside a subject span → `EXTRACTION_PARSE_ERROR` (path + line) |
 | **query mode** | Tree-sitter producers run **`matches`** only; record `"mode": "matches"` in `producer` |

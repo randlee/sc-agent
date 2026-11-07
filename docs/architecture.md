@@ -1,6 +1,6 @@
 # sc-agent architecture
 
-**Status:** Draft (Phase A planning)  
+**Status:** Active (Phase A implemented on `integrate/phase-a`)  
 **Owner:** sc-agent maintainers
 
 ## System shape
@@ -27,17 +27,61 @@ sc-ai (binary) ── sc-observability v2 Logger → SessionLog adapter
         ├── sc-jev-backends (Haiku/Luna JudgeBackend impls)
         ├── sc-agent-secrets
         └── sc-agent-types (temporary observability::v2 shim)
+                └── sc-observability-types (=1.5.0, v2 port types)
 
 sc-jev-py (PyO3) → sc-jev-check
+
+sc-treesitter (library + binary) → sc-agent-types
 ```
 
+Every workspace crate depends on `sc-agent-types`; the graph shows the edge
+once. `sc-agent-types` is the only crate that depends on
+`sc-observability-types` (ADR-SAG-0016).
+
 `sc-jev` and `sc-jev-backends` do not depend on each other.
+
+**`sc-treesitter`** is the `sc/subjects/1` producer (ADR-SAG-0015). It depends
+on `sc-agent-types` and links no judge, secrets or HTTP crate. No workspace
+crate depends on it; `sc-jev-check` reaches it only by running its binary
+through a `command` input. The crate ships a **second released binary**, `sc-treesitter`,
+alongside `sc-ai`. Direct dependencies of every crate are listed in its
+`boundaries/<crate>/*.toml` manifest ([`boundaries/README.md`](../boundaries/README.md)).
 
 **Jev API:** All TypeSafe Jev HTTP lives in **`sc-jev`** (REQ-SAG-0110).  
 **Trait boundary:** `JudgeBackend` and shared domain types live in
 `sc-agent-types`. LLM comparison backends implement the trait in
 `sc-jev-backends`. Local judge (decider-4b / cyprid) adds a backend later
 without changing callers.
+
+## ADR index
+
+ADR sections below keep their original order. This table lists them in id
+order.
+
+| ADR | Title | Status | Amends / amended by |
+| --- | --- | --- | --- |
+| ADR-SAG-0001 | Error enum is CLI authority | Active | — |
+| ADR-SAG-0002 | Canonical judge payload bytes | Active | — |
+| ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020 |
+| ADR-SAG-0004 | One check, one request | Active | — |
+| ADR-SAG-0005 | Facade owns payload assembly | Active | — |
+| ADR-SAG-0006 | Transport injection | Active | — |
+| ADR-SAG-0007 | API-direct LLM backends | Active | — |
+| ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | — |
+| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022 |
+| ADR-SAG-0010 | CLI thin adapter | Active | — |
+| ADR-SAG-0011 | Python via sc-jev-py wheel | Active | — |
+| ADR-SAG-0012 | sc-jev owns Jev API | Active | — |
+| ADR-SAG-0013 | Session JSONL via sc-observability v2 | Active | Amended by ADR-SAG-0021 |
+| ADR-SAG-0014 | CLI success body | Active | — |
+| ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
+| ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | — |
+| ADR-SAG-0017 | First release surfaces | Active | — |
+| ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
+| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | — |
+| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003 |
+| ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
+| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009 |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 

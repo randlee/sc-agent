@@ -46,8 +46,27 @@ pin and re-run install. `install.py` overwrites kit paths without warning.
   `randlee/homebrew-tap`. It installs both binaries and tests `sc-ai --version`.
 - **Scoop**: `bucket/sc-ai.json` in `randlee/scoop-bucket`, shimming
   `bin/sc-ai.exe`. The kit's Scoop template takes a single `bin` entry, so
-  `sc-treesitter.exe` ships in the archive without a shim.
-- **WinGet**: identifier `randlee.sc-ai`.
+  `sc-treesitter.exe` ships in the archive without a shim (upstream issue 1
+  below).
+- **WinGet**: identifier `randlee.sc-ai`. It names only `sc-ai`.
+
+### Upstream kit issues to file
+
+These are sc-publish kit limitations. Fix them in the kit and bump the pin;
+do not hand-edit kit or rendered files (ADR-SAG-0018). Neither is filed yet.
+
+1. **Scoop template is single-binary.** The Scoop manifest takes one `bin`
+   entry, so only `sc-ai.exe` gets a shim; `sc-treesitter.exe` is in the
+   archive but not on `PATH`. Homebrew installs both binaries; WinGet names
+   only `randlee.sc-ai`. Ask: accept a list of release binaries per channel.
+   (Phase-end ARCH-002. Whether ADR-SAG-0017 should name both binaries and the
+   per-channel coverage is phase-end decision D8, not this doc.)
+2. **`list-publish-plan` ignores `publish: false`.** `release_artifacts.py
+   list-publish-plan` prints every entry in the consumer `crates` list without
+   checking its `publish` flag, and `cargo publish` and the dry-run consume
+   that list. sc-agent avoids the gap by leaving `sc-jev-py` (`publish =
+   false`) out of `crates` entirely. Ask: skip entries with `publish: false`
+   in the plan, or reject them in `validate-manifest`.
 
 ## Install
 
