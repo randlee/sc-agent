@@ -26,8 +26,8 @@ pub type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 ///
 /// Production calls [`execute`], which uses [`Self::default`]. A registry
 /// skips key resolution and HTTP construction inside `sc-jev-check`. A
-/// session log replaces the v2 file logger. Public only with the
-/// `test-support` feature.
+/// session log replaces the v2 file logger. Hidden from docs; a test seam
+/// for `tests/cli.rs`, not part of the API.
 #[derive(Default)]
 pub struct ExecuteOverrides {
     /// Backends used instead of `registry_for_repo`.
@@ -63,7 +63,7 @@ pub fn execute(args: &[String], stdin: &[u8]) -> Result<Vec<u8>, JevError> {
     execute_with_overrides(args, stdin, ExecuteOverrides::default())
 }
 
-/// [`execute`] with test overrides (`test-support` feature).
+/// [`execute`] with test overrides. Hidden test seam, not part of the API.
 ///
 /// # Errors
 ///

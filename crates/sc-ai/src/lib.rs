@@ -30,9 +30,11 @@ pub use command::{execute, reads_stdin};
 #[doc(inline)]
 pub use envelope::{ENVELOPE_VERSION, OP_ASK, OP_DRY_RUN, OP_RUN};
 
-#[cfg(feature = "test-support")]
+// Test seams for `tests/cli.rs`, not part of the API. A crate cannot turn on
+// its own cargo feature for its integration tests without a self
+// dev-dependency, which the boundary lint and crates.io publish reject, so
+// these are hidden rather than feature-gated.
 #[doc(hidden)]
 pub use command::{Clock, ExecuteOverrides, execute_with_overrides};
-#[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub use observe::{ObservabilitySessionLog, session_log_file};

@@ -8,14 +8,17 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use sc_agent_types::observability::v2::{EventError, LogEvent, NoopSessionLog, SessionLog};
-use sc_agent_types::{BackendId, PayloadBundle, RepoRoot, Rev, SessionId};
+use sc_agent_types::{
+    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, PayloadBundle, RepoRoot, Rev,
+    SessionId,
+};
 use sc_jev_check::config::{PACKAGED_SYSTEM_PROMPT, load_check_at};
-use sc_jev_check::registry::{BackendRegistry, RequestLog, ScriptedJudge};
+use sc_jev_check::registry::BackendRegistry;
 use sc_jev_check::run::{RunOptions, run_check};
 use sc_jev_check::session::{FileSessionStore, SESSION_CONTEXT_HEADER, SessionStore};
 use tempfile::TempDir;
@@ -47,11 +50,86 @@ fn bare_repo() -> TempDir {
     dir
 }
 
-fn judge(id: BackendId, choice: &str) -> ScriptedJudge {
-    ScriptedJudge::new(id, serde_json::json!({"relevant": {"choice": choice}}))
+/// Requests seen by one or more [`Capture`] judges.
+#[derive(Clone, Default)]
+struct RequestLog(Arc<Mutex<Vec<JudgeRequest>>>);
+
+impl RequestLog {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn snapshot(&self) -> Vec<JudgeRequest> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
 }
 
-fn registry(judges: &[&ScriptedJudge]) -> BackendRegistry {
+/// Recording judge for this file only.
+///
+/// The crate's `ScriptedJudge` is behind its own `test-util` feature, and an
+/// integration test cannot enable its own crate's feature without a self
+/// dev-dependency (refused by the boundary lint and by crates.io publish).
+/// This mirrors the `ScriptedJudge` calls the tests use.
+#[derive(Clone)]
+struct Capture {
+    id: BackendId,
+    choice: String,
+    requests: RequestLog,
+}
+
+impl Capture {
+    fn with_request_log(mut self, log: &RequestLog) -> Self {
+        self.requests = log.clone();
+        self
+    }
+
+    fn requests(&self) -> Vec<JudgeRequest> {
+        self.requests.snapshot()
+    }
+}
+
+impl JudgeBackend for Capture {
+    fn id(&self) -> BackendId {
+        self.id
+    }
+
+    fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
+        if self.id.is_llm() && request.llm.is_none() {
+            return Err(JevError::InputInvalid {
+                detail: "LLM system prompt is required".into(),
+            });
+        }
+        Ok(())
+    }
+
+    fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
+        self.validate_for_send(request)?;
+        self.requests
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(request.clone());
+        Ok(JudgeOutcome {
+            answers: serde_json::json!({"relevant": {"choice": self.choice}}),
+            backend: self.id,
+            probabilities: None,
+            provider_meta: None,
+        })
+    }
+}
+
+fn judge(id: BackendId, choice: &str) -> Capture {
+    Capture {
+        id,
+        choice: choice.to_owned(),
+        requests: RequestLog::new(),
+    }
+}
+
+fn registry(judges: &[&Capture]) -> BackendRegistry {
     let mut registry = BackendRegistry::new();
     for judge in judges {
         registry

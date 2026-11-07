@@ -46,10 +46,6 @@ pub fn default_sessions_dir(repo: &RepoRoot) -> PathBuf {
 }
 
 /// JSONL path the v2 file sink writes for this service.
-#[cfg_attr(
-    not(feature = "test-support"),
-    allow(dead_code, reason = "read only by sc-ai's own tests")
-)]
 #[must_use]
 pub fn session_log_file(log_root: &Path) -> PathBuf {
     log_root
