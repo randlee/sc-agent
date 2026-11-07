@@ -21,8 +21,8 @@ owner_crate_path = "sc_jev_backends"
 name = "jev-backends"
 
 [public]
-facade = "sc_jev_backends::AnthropicHaikuBackend, sc_jev_backends::OpenAiLunaBackend, sc_jev_backends::BackendTransport, sc_jev_backends::UreqTransport, sc_jev_backends::HttpRequest, sc_jev_backends::HttpResponse, sc_jev_backends::RetrySleeper, sc_jev_backends::DEFAULT_CONNECT_TIMEOUT, sc_jev_backends::DEFAULT_REQUEST_TIMEOUT"
-notes = "Haiku and Luna JudgeBackend implementations. API key and HTTP transport are construction state."
+facade = "sc_jev_backends::AnthropicHaikuBackend, sc_jev_backends::OpenAiLunaBackend"
+notes = "Haiku and Luna JudgeBackend implementations: provider wire bodies and reply parsers (ADR-SAG-0019). From r-3 HTTP, busy retry, caps and redaction are sc-agent-http: both backends are generic over T: sc_agent_http::Transport = UreqTransport; API key, transport, BusyPolicy and CancelToken are construction state. Tests use the sc-agent-http test-util doubles through the dev-dependency."
 
 [implementation]
 type = "marker"
@@ -35,9 +35,10 @@ roots = ["AnthropicHaikuBackend", "OpenAiLunaBackend"]
 
 [dependencies]
 allowed_dependents = ["sc-jev-check"]
-allowed_dependencies = ["sc-agent-types", "serde_json", "ureq"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-types", "serde_json"]
 forbidden_edges = [
     { from = "sc-jev-backends", to = "sc-jev" },
+    { from = "sc-jev-backends", to = "ureq" },
 ]
 
 # Required by the sc-lint 0.8.0 inventory schema. Not enforced: the

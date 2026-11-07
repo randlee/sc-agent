@@ -21,8 +21,8 @@ owner_crate_path = "sc_jev"
 name = "jev"
 
 [public]
-facade = "sc_jev::JevClient, sc_jev::JevClientConfig, sc_jev::JevTransport, sc_jev::HttpsTransport, sc_jev::WireRequest, sc_jev::WireResponse, sc_jev::RetryDelay, sc_jev::ThreadRetryDelay"
-notes = "TypeSafe check/judge HTTP. Transport and resolved key are construction state. The config and client modules are private; the root re-exports are the only public path."
+facade = "sc_jev::JevClient, sc_jev::JevClientConfig"
+notes = "TypeSafe check/judge wire format (every Jev API operation, ADR-SAG-0012). From r-3 HTTP, busy retry, caps and redaction are sc-agent-http: JevClient<T: sc_agent_http::Transport = UreqTransport>; transport, resolved key, BusyPolicy and CancelToken are construction state. Tests use the sc-agent-http test-util doubles through the dev-dependency. The config and client modules are private; the root re-exports are the only public path."
 
 [implementation]
 type = "marker"
@@ -35,9 +35,10 @@ roots = ["JevClient"]
 
 [dependencies]
 allowed_dependents = ["sc-jev-check"]
-allowed_dependencies = ["sc-agent-types", "serde_json", "toml", "ureq"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-types", "serde", "serde_json", "toml"]
 forbidden_edges = [
     { from = "sc-jev", to = "sc-jev-backends" },
+    { from = "sc-jev", to = "ureq" },
 ]
 
 # Required by the sc-lint 0.8.0 inventory schema. Not enforced: the
