@@ -61,7 +61,8 @@ adrs:
   - ADR-SAG-0024
   - ADR-SAG-0027
   - ADR-SAG-0029
-  - "plus the r-1 interim amendment of ADR-SAG-0008/0014/0019 (Active, r-1)"
+  # ADR-SAG-0008/0014/0019 bind through their r-1 interim amendments (Active, r-1),
+  # landed by the r-1 QA-1 fix round; replace this comment with the amendment id if one is assigned.
 owned_paths:
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/**"
@@ -109,6 +110,9 @@ EXT-009, RBP-F005, RBP-F008, RBP-F009, RBQA-F004; contributes EXT-002,
 ARCHE-006/CR-001/ARCHP-002 (contract; e2e in r-3b), RBQA-F006 (caller),
 ARCH-006 (phase-end, `prepare` sentence).
 
+Labels `(Active, r-N)` in the quoted ADR wording below are the post-flip form of the
+`(Proposed, r-N)` markers used elsewhere in this doc.
+
 ## Deliverables
 
 ### D2 — single engine API (REQ-SAG-0620, ADR-SAG-0024)
@@ -153,7 +157,7 @@ ARCH-006 (phase-end, `prepare` sentence).
    `RunConfig` has **no `mode` setter in r-2**: no r-2 deliverable reads a
    mode, and the setter's only governing text is ADR-SAG-0025 (Proposed,
    r-2b), so r-2b adds `RunConfig::mode(MultiBackendMode)` together with
-   ADR-SAG-0025 (plan "ADR index ownership"). r-2's `run` records the r-1
+   ADR-SAG-0025 (plan "ADR ownership"). r-2's `run` records the r-1
    default mode on `EqualInputRecord`, as r-1 does.
 2. **Backend precedence** (CPR-011): `RunConfig::backends` when set (CLI
    `--backend`, Python `backends=`), else the source document's `backends`

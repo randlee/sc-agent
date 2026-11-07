@@ -448,9 +448,9 @@ dependency list (r-1), `allowed_dependents` `+sc-agent-http` (r-3),
 `allowed_dependencies` `-ureq +sc-agent-http`, forbidden `ureq` direct is
 enforced by the r-3 ownership record (r-3); `sc-jev-check` facade rewritten
 (r-2), `allowed_dependents` `+sc-agent-compose` and, only in the "counted"
-branch, `+workspace-tests` (r-3b); in the "counted, self entries accepted"
-branch each crate with a self dev-dependency lists itself, in the sprint
-that adds the self edge (r-1 D0);
+branch, `+workspace-tests` (r-3b); the "counted, self entries accepted"
+branch (each crate with a self dev-dependency lists itself) was NOT taken —
+D0 resolved to outcome 4 (`boundaries/README.md`), so no self entries exist;
 `sc-ai` / `sc-jev-py` `allowed_dependencies` `-sc-observability
 +sc-agent-compose`, forbidden `sc-observability`, `ureq` (r-3b), `sc-ai`
 `+clap`, `+mimalloc` optional (r-3b; r-4 adds the dependency and the
@@ -773,9 +773,9 @@ cargo test -p workspace-tests --test consumer_parity -- test_cli_and_python_data
 cargo test -p workspace-tests --test git_read_parity
 cargo test -p workspace-tests --test source_scans
 cargo test -p workspace-tests --test test_util_off
-cargo test -p sc-jev-check --test run_response -- test_run_response_contract --exact
-cargo test -p sc-jev-check --test multi_backend -- test_partial_failure_keeps_answers --exact
-cargo test -p sc-jev-check --test multi_backend -- test_equal_false_when_backend_digest_differs --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_run_response_contract --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_partial_failure_keeps_answers --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_equal_false_when_backend_digest_differs --exact
 cargo hack check -p sc-treesitter --feature-powerset --no-dev-deps
 cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps
 cargo hack --each-feature test -p sc-treesitter

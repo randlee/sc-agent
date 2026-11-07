@@ -45,3 +45,14 @@ subsection. Abbreviations: `plan` = `plan.md`, `r-N` = that sprint doc.
 | r-3b: ADR-SAG-0020 `source_scans` bullet | Applied as an r-3b deliverable: r-3 inserts it as Proposed, and r-3b flips it and its marker | r-3b `owned_paths`, "ADR text", acceptance `adr:ADR-SAG-0020` |
 | Convention: no shape on another sprint's Proposed text | Applied. The new paragraph sits in the ADR ownership section, because plan.md has no heading named "ADR index ownership" | plan "ADR ownership" |
 | REQ-QA-R1-005: plan "Test seams" still says self dev-dependency after D0 outcome 4 | Applied. "Test seams" now states outcome 4, points at `boundaries/README.md`, and says `[[test]] required-features` plus `--features test-util`. It names the Proposed ADR-SAG-0022 r-2 "Correction" sentence (r-2 rewords it) and the ADR-SAG-0028 "Built-binary contract" sentence (r-3b rewords it). Both sprint docs carry the replacement wording. The self-dev-dependency lines in r-2, r-3, r-2b and r-3b and the plan boundary-map cell for r-2 now use `required-features`. Their validation lines gain `--features test-util` | plan "Test seams", boundary map `sc-jev-check` row; r-2 D2.6 and "ADR text"; r-3 deliverable 1; r-2b deliverables 5–6; r-3b D3.3, D7.2 and "ADR text"; validation blocks |
+
+## Verification follow-ups (arch-qa, PR 23)
+
+| id | disposition | where |
+| --- | --- | --- |
+| V-001 | applied — `--features test-util` on the three sc-jev-check plan validation lines | plan.md validation |
+| V-002 | applied — cross-reference now "ADR ownership" | r-2 D2.1 |
+| V-003 | applied — boundary-map sentence marked not taken (outcome 4) | plan.md boundary map |
+| V-004 | applied — interim-amendment note is a YAML comment; post-flip label note added | r-2 frontmatter, Deliverables |
+| V-005 | applied — note on feature-independence + a `--lib` parse-refusal test line | r-3 validation |
+

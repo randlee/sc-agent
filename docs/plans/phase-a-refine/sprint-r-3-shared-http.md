@@ -350,6 +350,9 @@ cargo test -p sc-agent-http --features test-util --test retry -- test_transport_
 cargo test -p sc-agent-http --features test-util --test retry -- test_exhaustion_reason_distinguishable --exact
 cargo test -p sc-agent-http --features test-util --test ureq
 cargo test -p sc-agent-http --features test-util --test ureq -- test_release_build_refuses_http --exact
+# `Endpoint::parse` is feature-independent, so running this test with test-util on still proves the
+# refusal; the `--lib` unit test `ureq_transport::tests::test_endpoint_parse_refuses_http` runs without it.
+cargo test -p sc-agent-http --lib -- ureq_transport::tests::test_endpoint_parse_refuses_http --exact
 cargo test -p sc-agent-http --lib -- ureq_transport::tests::test_ureq_agent_config_values --exact
 cargo doc -p sc-agent-http && ! grep -rlE 'ureq/(struct|enum|trait|type|fn|union)\.|title="(struct|enum|trait|type|fn|union) ureq::' target/doc/sc_agent_http/
 test -z "$(rg -l 'disallowed_methods' crates/ | grep -v '^crates/sc-agent-http/src/ureq_transport.rs$')"
