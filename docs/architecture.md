@@ -76,33 +76,33 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | --- | --- | --- | --- |
 | ADR-SAG-0001 | Error enum is CLI authority | Active | Amended by ADR-SAG-0027 (Active, r-1) |
 | ADR-SAG-0002 | Canonical judge payload bytes | Active | — |
-| ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020; ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020; ADR-SAG-0024 (Active, r-2) |
 | ADR-SAG-0004 | One check, one request | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2); A.1 subsections (Active, r-4), (Proposed, r-5) |
+| ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Active, r-2); A.1 subsections (Active, r-4), (Proposed, r-5) |
 | ADR-SAG-0006 | Transport injection | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0007 | API-direct LLM backends | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0027 (Active, r-1); ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0027 (Active, r-1); ADR-SAG-0024 (Active, r-2) |
 | ADR-SAG-0010 | CLI thin adapter | Active | Amended by ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0011 | Python via sc-jev-py wheel | Active | Amended by ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0012 | sc-jev owns Jev API | Active | — |
 | ADR-SAG-0013 | Session JSONL via sc-observability v2 | Active | Amended by ADR-SAG-0021; ADR-SAG-0026 (Proposed, r-3b) |
-| ADR-SAG-0014 | CLI success body | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0014 | CLI success body | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Active, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
 | ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0027 (Active, r-1); ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
-| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Active, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
-| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0024 (Active, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0023 | Dependency pins, allocator, released binaries | Active (r-4; compose pin r-3b) | Amends ADR-SAG-0016, ADR-SAG-0017 |
-| ADR-SAG-0024 | Engine entry point and response contract | Proposed (r-2) | Amends ADR-SAG-0003, ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022 |
+| ADR-SAG-0024 | Engine entry point and response contract | Active (r-2) | Amends ADR-SAG-0003, ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022; supersedes the `data` bullet of the ADR-SAG-0014 A.1 r-1 interim subsection (its other bullets stay in force); relies on the ADR-SAG-0008 / 0019 r-1 interim subsections, which stay in force until ADR-SAG-0025 (r-2b) |
 | ADR-SAG-0025 | Multi-backend semantics and equal-input attestation | Proposed (r-2b) | Amends ADR-SAG-0004, ADR-SAG-0008, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0026 | Shared HTTP crate and composition crate | Proposed (HTTP half r-3; compose half r-3b) | Amends ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0020, ADR-SAG-0017 (HTTP half); ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013, ADR-SAG-0016, ADR-SAG-0017 (compose half) |
 | ADR-SAG-0027 | Error taxonomy and extensibility | Active (r-1) | Amends ADR-SAG-0001, ADR-SAG-0009, ADR-SAG-0016 |
 | ADR-SAG-0028 | workspace-tests crate | Proposed (r-3b) | — |
-| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Active, r-1), (Proposed, r-3) and of (b) (Active, r-1), (Proposed, r-2) |
+| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Active, r-1), (Proposed, r-3) and of (b) (Active, r-1), (Active, r-2) |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 
@@ -140,9 +140,9 @@ errors happens before any backend call (ADR-SAG-0004).
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) The public assembly entry point is `prepare`
+- (Active, r-2) The public assembly entry point is `prepare`
   (ADR-SAG-0024). The sentences "`run::build_request` is the public assembly
   entry" and "`run_check` uses that same assembly" above are superseded.
 
@@ -226,9 +226,9 @@ Amended by ADR-SAG-0022.
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) The sentence "Callers keep `run_check(..., backends:
+- (Active, r-2) The sentence "Callers keep `run_check(..., backends:
   &[BackendId])`" is superseded: callers use `prepare`/`run` (ADR-SAG-0024)
   with `RunConfig::backends(BackendSet)`. `run_check` is deleted. A new
   backend still needs no CLI or PyO3 signature change.
@@ -298,17 +298,19 @@ and not a second `run_check` policy.
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) The scripted registry is passed via `RunConfig::registry`
+- (Active, r-2) The scripted registry is passed via `RunConfig::registry`
   (ADR-SAG-0024), not `RunOptions::registry`; the sentences "not a second
   `run_check` policy" and "`run_check`'s parameters stay unchanged" now read
   against `prepare`/`run`. `register_scripted_backends` and its `test-util`
   gating are unchanged. Correction: an integration test target does not
   compile the library with `cfg(test)`, so "this crate's own `cargo test` …
   sees the function without enabling the feature" holds only for unit
-  tests; `sc-jev-check`'s integration targets enable `test-util` through a
-  self-referencing dev-dependency (plan.md "Test seams"). For that one
+  tests; `sc-jev-check`'s integration targets enable `test-util` through
+  `[[test]] required-features = ["test-util"]` and `--features test-util`
+  on their validation lines (no self dev-dependency; `boundaries/README.md`
+  "Dev-dependency and self edges"). For that one
   sentence this supersedes ADR-SAG-0029 (b)'s "Everything else in
   ADR-SAG-0022 stands"; 0029 (b)'s `run_check` signature and
   `_testing.run_check_scripted` rules are unchanged.
@@ -387,9 +389,9 @@ per-backend attestations and is false on live runs until r-2b.*
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) The `RunOptions` field list above is replaced by
+- (Active, r-2) The `RunOptions` field list above is replaced by
   `RunConfig` (ADR-SAG-0024). The prompt precedence is unchanged.
 
 ### Amendment (Phase A.1, r-2b)
@@ -414,9 +416,9 @@ Amended by ADR-SAG-0020.
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) "Repo root" for `.env` lookup is
+- (Active, r-2) "Repo root" for `.env` lookup is
   `sc_jev_check::run::discover_repo_root`: the git toplevel of the start
   directory, or the start directory (absolutized) outside git. Both `sc-ai`
   and `sc-jev-py` use it. Behaviour change: `sc-jev-py` called from a
@@ -782,12 +784,15 @@ backends normalize to the same answer shape before printing.
 *Amended by the r-1 interim amendment below: `answers` is written once from
 the typed answers; other per-answer keys stay in `provider_meta`.*
 
-Amended by ADR-SAG-0024 (Proposed, r-2).
+Amended by ADR-SAG-0024 (Active, r-2).
 
 ### Amendment (Phase A.1, r-1 — interim shapes)
 
-**Status:** Active (Phase A.1, landed in r-1). Superseded by ADR-SAG-0024
-(r-2) when that lands.
+**Status:** Active (Phase A.1, landed in r-1). The first bullet is
+superseded by the ADR-SAG-0014 r-2 amendment (ADR-SAG-0024, Active, r-2),
+which restates it for the primary backend; the `outcomes[]` entry shape
+(now `results[].outcome`) and `equal_input` shape bullets stay in force
+(ADR-SAG-0024 pins the `equal_input` shape in every `RunResponse` sample).
 
 - (Active, r-1) The data that `data` is built from is typed. For a Jev
   primary outcome, the response fields other than `answers` are copied from
@@ -807,9 +812,9 @@ Amended by ADR-SAG-0024 (Proposed, r-2).
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) `data` is the single serialization of
+- (Active, r-2) `data` is the single serialization of
   `sc_jev_check::run::RunResponse` (ADR-SAG-0024), printed unchanged by every
   consumer. The **primary backend** is the first backend in `BackendSet`
   order whose status is `Ok`; `primary_backend` names it. If it is Jev, its
@@ -932,9 +937,9 @@ r-3, ADR-SAG-0022 r-1 and r-2 (plan.md "Plan PR route").
 
 ### Amendment (Phase A.1, r-2)
 
-**Status:** Proposed (Phase A.1) — lands in r-2.
+**Status:** Active (Phase A.1, landed in r-2).
 
-- (Proposed, r-2) The "Extractor sealing" bullet (RBP-F004) is withdrawn: the
+- (Active, r-2) The "Extractor sealing" bullet (RBP-F004) is withdrawn: the
   `Extractor` trait is removed and `extract_input` matches the four
   `config::InputSpec` kinds directly. A new kind is an `InputSpec` variant
   plus an ADR.
@@ -1004,18 +1009,18 @@ Proposed and lands in r-3b.
 
 ## ADR-SAG-0024 — Engine entry point and response contract
 
-**Status:** Proposed (Phase A.1) — lands in r-2. Amends ADR-SAG-0003,
+**Status:** Active (Phase A.1, landed in r-2). Amends ADR-SAG-0003,
 ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022.
 
-- (Proposed, r-2) `sc-jev-check`'s only run API is
+- (Active, r-2) `sc-jev-check`'s only run API is
   `prepare(CheckSource, RunConfig) -> PreparedRun` then
   `run(PreparedRun) -> RunResponse`, plus `discover_repo_root(&Path)`.
   `PreparedRun` owns its config. `build_request`, `run_check`, `run_request`
   and `prepare_caller_request` are deleted (no shims; nothing published).
-- (Proposed, r-2) Backend selection: `RunConfig::backends` if set, else the
+- (Active, r-2) Backend selection: `RunConfig::backends` if set, else the
   source document's `backends`, else `[jev]`. `prepare` and dry-run read only
   static `BackendDescriptor` facts and construct no backend.
-- (Proposed, r-2) `RunResponse` (private fields) is the one result type
+- (Active, r-2) `RunResponse` (private fields) is the one result type
   every consumer (CLI, PyO3, future MCP) prints, and its single `Serialize`
   is the ADR-SAG-0014 `data` body (ADR-SAG-0014 r-2 amendment): the primary
   backend (first `Ok` in `BackendSet` order, possibly an LLM backend)
@@ -1030,19 +1035,51 @@ ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022.
   `{version, operation, data}` wrapper is `sc_jev_check::run::Envelope`.
   `RunResponse::first_failure()` / `is_partial()` decide exit codes and
   exceptions for every consumer. REQ-SAG-0620, REQ-SAG-0710 (amended).
-- (Proposed, r-2) Dry-run reports `payload_bytes` and, per selected backend,
+- (Active, r-2) `equal_input` is the serialized r-1 `EqualInputRecord`
+  (r-1 interim amendment of ADR-SAG-0008/0014/0019): r-2 pins its
+  serialized shape in every `RunResponse` sample and adds no field. A
+  dry run sends nothing, so every backend is `NotSent` and `equal` is
+  false. `leak = any Failed`, the derivation of every other `Attestation`
+  value and the session-save-failure behaviour (`session_saved = false`,
+  one `warnings` entry, answers kept) are ADR-SAG-0025 (r-2b); until
+  r-2b the samples that show them (`jev_failed_haiku_ok.json`,
+  `session_save_failed.json`) are built with `RunResponse::test_builder`
+  and are shape pins only. `RunConfig` has no `mode` setter until r-2b
+  (ADR-SAG-0025).
+- (Active, r-2) Dry-run reports `payload_bytes` and, per selected backend,
   `request_limit_bytes` and `over_limit`; it does not fail on an over-limit
   payload. Each backend owns its byte cap and enforces it in
   `validate_for_send`; the engine does not pre-cap. REQ-SAG-0314.
-- (Proposed, r-2) `FileSessionStore` is stateless (`dir`, `ttl`, `clock`
+- (Active, r-2) `FileSessionStore` is stateless (`dir`, `ttl`, `clock`
   fn pointer). `ask` takes the `&BackendRegistry` and does not rewrite the
   file. No lock: `save` writes a `create_new` tmp named with pid + random,
   fsyncs, renames, fsyncs the parent, removes the tmp on error; last writer
   wins; readers are protected by digest and id re-verification; tmp files
   older than 1 h are swept by `FileSessionStore::new`. The session is written once at the end of `run`, only
   when a backend with `supports_session_ask` returned `Ok`. REQ-SAG-0607.
-- (Proposed, r-2) Repo-root discovery is the git toplevel for both consumers
+- (Active, r-2) Repo-root discovery is the git toplevel for both consumers
   (ADR-SAG-0003 r-2 amendment).
+- (Active, r-2) Landing details (shapes the bullets above imply, fixed at
+  r-2): `check.toml` takes a top-level `backends = [...]` list parsed as a
+  `BackendSet` (empty, repeated or unknown ids are `CONFIG_INVALID`); a
+  caller request's `backends` repeat is `INPUT_INVALID`. Each backend is
+  sent its own request: the shared `Arc<PayloadBundle>`, with LLM context
+  only for a backend whose descriptor `requires_llm_context`. A live run
+  that selects an `ask`-capable backend needs `RunConfig::sessions_dir`,
+  checked (`CONFIG_INVALID`) before any send; session files are
+  `<id>.json`. `primary_backend` is omitted when no backend returned `Ok`
+  (a dry run), and a Jev `provider_meta` key that the body writes itself is
+  not copied to the top level, so no key appears twice; the full
+  `provider_meta` stays under `results[].outcome`. `Envelope::ask(outcome,
+  session_id)` carries the outcome's answer fields by the same primary
+  rule plus `session_id`; the envelope version (`1`) and operation names
+  (`jev.run`, `jev.dry-run`, `jev.ask`) move with `Envelope` into
+  `sc_jev_check::run`. `discover_repo_root` returns `start` (absolutized)
+  when git cannot be run as well as outside a work tree. The production
+  registry is `BackendRegistry::from_env(&RepoRoot, &BackendSet)` or
+  `from_resolver(&BackendSet, Fn(BackendKeyId) -> Result<ResolvedApiKey,
+  JevError>)`; `RunConfig::registry(Arc<BackendRegistry>)` is the
+  no-secrets path (EXT-009).
 
 ## ADR-SAG-0025 — Multi-backend semantics and equal-input attestation
 

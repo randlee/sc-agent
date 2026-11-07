@@ -22,7 +22,8 @@ extension; it is not the primary deliverable.
 ## Contract
 
 PyO3 only — no duplicate Jev HTTP or canonicalization. `build_request` calls
-`sc_jev_check::run::build_request` and does not run extractors (ADR-SAG-0005).
+`sc_jev_check::run::prepare` and does not run extractors (ADR-SAG-0005,
+ADR-SAG-0024).
 `run_check` has one signature in every build and never takes
 `scripted_answers`; this crate does not implement `JudgeBackend`
 (ADR-SAG-0009). The test-util entry point is the separate function

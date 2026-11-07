@@ -571,10 +571,12 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 | ADR-SAG-0004 | each `ChainContext`-augmented request re-validated before its own send | r-2b |
 | ADR-SAG-0005 | runs the four consumer extractor kinds (no ADR-0024/`prepare` reference) | r-4 |
 | ADR-SAG-0005 | public assembly entry is `prepare`; `run::build_request` sentence superseded | r-2 |
+| ADR-SAG-0014 | A.1 r-1 interim shapes: typed `data` (Jev fields verbatim, `answers` once), `JudgeOutcome` entries, `equal_input` shape. Its `data` bullet is superseded by ADR-SAG-0024 (r-2); the entry and `equal_input` shape bullets stay in force (row added by r-2) | r-1 |
 | ADR-SAG-0014 | `data` is the `RunResponse` serialization; primary backend = first `Ok`; `warnings` | r-2 |
 | ADR-SAG-0005 | canonical-only schema + Jev JSON envelope (D9) | r-5 (blocked) |
 | ADR-SAG-0006 | transports live in `sc-agent-http` | r-3 |
 | ADR-SAG-0007 | busy-retry policy (owner decision (b), decided); Retry-After grammar; cancel latency ≤ 120 s | r-3 |
+| ADR-SAG-0008 | A.1 r-1 interim shapes: the engine records `ChainContext` (its actual behaviour); session document version 2, outcomes checked on load. Superseded by ADR-SAG-0025 when r-2b lands (row added by r-2 to reconcile the index, plan "ADR index table") | r-1 |
 | ADR-SAG-0008 | independent default; `chain_context` explicit | r-2b |
 | ADR-SAG-0009 | descriptor + catalog; open = additive; factory table + test-and-review dispatch convention; `register` for existing ids only; `JudgeBackend` intentionally open | r-1 |
 | ADR-SAG-0009 | entry point is `prepare`/`run`; `run_check` deleted | r-2 |
@@ -587,6 +589,7 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 | ADR-SAG-0017 | two released binaries + per-channel coverage | r-4 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-http` | r-3 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-compose` | r-3b |
+| ADR-SAG-0019 | A.1 r-1 interim shapes: per-backend `Attestation` with derived `equal` (every backend `Unattested` until r-2b), `JudgeRequest` carries `Arc<PayloadBundle>` + `CancelToken`, `MultiBackendMode` recorded. Superseded by ADR-SAG-0025 when r-2b lands (row added by r-2) | r-1 |
 | ADR-SAG-0019 | `RunOptions` text → `RunConfig` | r-2 |
 | ADR-SAG-0019 | equal-input from backend-reported digest | r-2b |
 | ADR-SAG-0020 | unchecked `ResolvedApiKey::new` gone in every build; `Arc<str>`; constructors infallible; the two `#[allow]` sites become `#[expect]`. Supersedes the named ADR-SAG-0029 (a) sentences | r-1 |
