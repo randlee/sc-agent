@@ -79,7 +79,7 @@ owned_paths:
   - "Cargo.toml"
   - "sc-lint.toml"
   - "clippy.toml#disallowed-methods std::process::Command::new entry"
-  - "crates/*/tests/** and crates/*/src/**/tests.rs#crate-level `#![expect(clippy::disallowed_methods, reason = ...)]` line only, where clippy flags `Command::new`"
+  - "crates/*/tests/** and crates/*/src/**/tests.rs#item-level `#[expect(clippy::disallowed_methods, reason = ...)]` on the spawning helper only, where clippy flags `Command::new`"
   - ".github/workflows/sc-agent-ci.yml"
   - ".github/scripts/cargo-tree-gates.sh"
   - "release/**"
@@ -340,8 +340,8 @@ graph); contributes ARCHE-002 (consumer flag).
        `cargo clippy --workspace --all-targets -D warnings`. This replaces
        the text-match `test_git_spawn_only_in_types_git` and
        `test_disallowed_methods_expect_only_in_ureq_transport` of round 3
-       (RBQA-F102 (d), RBQA-F003, RBQA-F006). r-3b adds the crate-level
-       expect line to each test file clippy flags.
+       (RBQA-F102 (d), RBQA-F003, RBQA-F006). r-3b adds the item-level
+       expect to the spawning helper in each test file clippy flags.
      - `test_lint_mechanism_present` (RBQA-F102 (b), (c); RBQA-F103 (c)):
        `clippy.toml` lists both disallowed paths; root `Cargo.toml`
        `[workspace.lints.clippy]` sets `allow_attributes = "deny"` and
