@@ -22,17 +22,29 @@
 # A requirement is exact when any comma-separated comparator starts with `=`
 # (`>=` and `<=` are ranges, not pins).
 #
-# Exit codes: 0 every pin is listed; 1 an unlisted pin, or a missing or empty
-# list; 2 usage error. Needs python3 (3.11+, for tomllib).
+# Exit codes: 0 every pin is listed; 1 an unlisted pin, a missing or empty
+# list, or no usable python3; 2 usage error. Needs bash and python3 3.11+
+# (tomllib). POSIX hosts only: CI runs it on ubuntu-24.04 (job `deps`).
 set -euo pipefail
 
 script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 check_tree() {
   local root="$1"
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "check-exact-pins: python3 (3.11+) is required" >&2
+    return 1
+  fi
   python3 -I - "$root" <<'PY'
-import os
 import sys
+
+if sys.version_info < (3, 11):
+    sys.exit(
+        "check-exact-pins: python3 3.11+ is required (tomllib); found "
+        + sys.version.split()[0]
+    )
+
+import os
 import tomllib
 
 root = sys.argv[1]
