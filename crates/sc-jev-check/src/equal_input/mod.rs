@@ -4,7 +4,6 @@
 //! bytes. `prompt_sha256` is the digest of those bytes. LLM system-prompt text
 //! is not part of the digest (ADR-SAG-0019).
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::collections::BTreeMap;

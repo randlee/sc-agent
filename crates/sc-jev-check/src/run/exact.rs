@@ -2,8 +2,6 @@
 //!
 //! The harness root is this file, so each function name is the full test name.
 
-#![forbid(unsafe_code)]
-
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};

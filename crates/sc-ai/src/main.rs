@@ -1,7 +1,5 @@
 //! `sc-ai` binary. JSON on stdout, typed errors on stderr, exit 2 on failure.
 
-#![forbid(unsafe_code)]
-
 use std::io::{self, Read, Write};
 use std::process::ExitCode;
 

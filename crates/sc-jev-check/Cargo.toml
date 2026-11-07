@@ -15,6 +15,9 @@ categories.workspace = true
 # warning); tests that read repo-root fixtures run from the workspace only.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**", "assets/**"]
 
+[lints]
+workspace = true
+
 [features]
 default = []
 # In-process scripted judges for tests (ADR-SAG-0022). Production builds

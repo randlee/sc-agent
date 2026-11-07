@@ -11,7 +11,6 @@
 //! statuses 429, 502, and 529 are retried with the same body, honoring
 //! `Retry-After` (0 to 30 s plus jitter) within a 90 s budget per call.
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod backend;

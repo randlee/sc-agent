@@ -19,7 +19,6 @@
 //! assert_eq!(ENVELOPE_VERSION, "1");
 //! ```
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod command;

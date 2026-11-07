@@ -14,6 +14,9 @@ categories.workspace = true
 # Allowlist of packaged files.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
+[lints]
+workspace = true
+
 [dependencies]
 # No default features: platform keystores are enabled per target below.
 # Targets without a keystore fall back to keyring's empty mock (no network).
@@ -31,4 +34,4 @@ keyring = { version = "3.6", features = ["windows-native"] }
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true

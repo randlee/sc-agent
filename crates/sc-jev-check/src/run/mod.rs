@@ -6,7 +6,6 @@
 //! and does not resolve keys or send. Judge sends emit one [`LogEvent`]
 //! through the injected [`SharedSessionLog`].
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod prompt;

@@ -14,6 +14,9 @@ categories.workspace = true
 # Allowlist: repo-root fixtures and the cross-impl test stay out of the package.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
+[lints]
+workspace = true
+
 [features]
 default = []
 # JudgeBackend test double and contract helpers. Unit tests compile this module

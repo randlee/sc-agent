@@ -10,7 +10,6 @@
 //! (ADR-SAG-0022). Production builds leave that feature off. It does not add
 //! a `run_check` parameter (ADR-SAG-0009).
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::sync::Arc;

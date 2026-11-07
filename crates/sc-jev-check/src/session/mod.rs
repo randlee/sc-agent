@@ -8,7 +8,6 @@
 //! [`SessionStore`] is an open extension point. [`FileSessionStore`] is the
 //! Phase A implementation.
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::fs::{self, File, OpenOptions};
