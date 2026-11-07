@@ -29,7 +29,12 @@ value or positional, repeated flag, no command) is one
 (ADR-SAG-0029 (c)). Value flags accept values that start with `-`, so
 `--language -h` is a language name and `--rev -p` reaches `Rev::parse`,
 which rejects it before git runs; a source path that starts with `-` follows
-`--`. Edge cases: `crates/sc-treesitter/tests/argv.rs`.
+`--`. A bare `sc-treesitter` with no command is an argument error
+(`INPUT_INVALID`, exit 2), not a help display: the binary is a producer
+that scripts call, so a missing command must fail visibly (REQ-SAG-0701;
+ADR-SAG-0029 (c) has no row for this case). Usage and version text always
+name `sc-treesitter`, whatever `argv[0]` is. Edge cases:
+`crates/sc-treesitter/tests/argv.rs`.
 
 **Git reads (Phase A.1, r-3c).** The binary finds the repository with
 `sc_agent_types::git::discover_toplevel` and reads a revision with

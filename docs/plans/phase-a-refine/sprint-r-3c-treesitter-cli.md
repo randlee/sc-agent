@@ -125,12 +125,14 @@ cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev
 ## Implementation notes
 
 Branch `sprint/r-3c-treesitter-cli`, one commit per deliverable (D1 `da64ff0`,
-D2 `6911372`, D3 `0f8ffa8`, D4 `1b1f1cf`). Every "Required validation" line,
-the workspace gates and `cargo test -p sc-agent-types --features git,test-util`
-passed at `1b1f1cf` (developer run; CI evidence is added by QA). r-3c owns no ADR text and flips
-no `(Proposed, r-3c)` marker (none exists). Governing ADRs, all Active:
-ADR-SAG-0001, 0015, 0017, 0023, 0027, 0029. The `argv` and `cli` validation lines
-carry `--features cli` (their `[[test]] required-features`; `cli` is also a
+D2 `6911372`, D3 `0f8ffa8`, D4 `1b1f1cf`), then one commit per QA-1 item
+(PR 25, reviewed at `39661a6`; listed below). Every "Required validation"
+line, the workspace gates and `cargo test -p sc-agent-types --features
+git,test-util` passed at the developer run on the fix-round head. PR 25 CI
+evidence: CI-RUN-PENDING. r-3c owns no ADR text and flips no `(Proposed,
+r-3c)` marker (none exists). Governing ADRs, all Active: ADR-SAG-0001, 0015,
+0017, 0023, 0027, 0029. The `argv` and `cli` validation lines carry
+`--features cli` (their `[[test]] required-features`; `cli` is also a
 default feature, so the bare commands run the same targets, and both forms
 passed).
 
@@ -138,28 +140,39 @@ passed).
 
 | Deviation | Touches | Why |
 | --- | --- | --- |
-| The `WORKTREE` read keeps a local `git hash-object -t blob --stdin --no-filters` call in `git_io.rs` (D3 names `hash_object` among the replaced paths) | RBQA-F006, D3; r-3b `Command::new` clippy entry | `sc_agent_types::git` has no hashing helper and `crates/sc-agent-types/**` is outside this sprint's `owned_paths`. The call uses the shared module's environment policy (`LC_ALL=C`, `GIT_TERMINAL_PROMPT=0`, `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE`/`GIT_OBJECT_DIRECTORY`/`GIT_ALTERNATE_OBJECT_DIRECTORIES` removed). Follow-up below |
-| `extract --language python --help` now prints help and exits 0 (a-10 test `cli_help_only_in_the_first_two_slots` expected `INPUT_INVALID`) | ARCHP-011, CR-016 | clap's `DisplayHelp` is exit 0 by D2. The a-10 intent, that a value such as `-h` is not swallowed as help, is kept by `allow_hyphen_values` (`test_hyphen_values_are_values_not_flags`) |
-| No arguments is `INPUT_INVALID` exit 2 (was help, exit 0) | ARCHP-011, ADR-SAG-0029 (c) | D2: only `DisplayHelp`/`DisplayVersion` exit 0 |
-| A value parser's own `JevError` (`Rev::parse`, `--captures`) is returned unwrapped rather than re-wrapped by clap's message; both are `INPUT_INVALID` | ADR-SAG-0029 (c) | one recovery text per error (`fix_hint`) |
-| `cli_version_prints_name_and_version` and the help test moved from `tests/cli.rs` to `tests/argv.rs` (`test_version_flag_exits_zero`, `test_help_prints_usage_and_exits_zero`); the 0029 (c) code assertions (missing positional, injection, unresolvable revision, tree, oversize, outside paths) stay in `tests/cli.rs` | REQ-SAG-0310, ADR-SAG-0029 | D2 ports argv edge cases to `argv.rs` |
+| D3's shared git reads go further than the `owned_paths` above: `sc_agent_types::git` gains `hash_blob` and `MAX_INPUT_BYTES`, and `Rev` gains `is_worktree` (QA-1 additions to `owned_paths`) | RBQA-F006, ADR-SAG-0027 | parent-authorized in the QA-1 fix round (REQ-QA-R3C-001, RBP-F001, RBQA-F001, RBQA-F003). With them `git_io.rs` spawns no process: its `git_command` / `hash_bytes` copy and duplicated environment policy are deleted, so r-3b's `Command::new` ban needs no `git_io.rs` expect and no r-3b routing remains for `sc-treesitter` (REQ-QA-R3C-002). `sc-jev-check` keeps its own `MAX_INPUT_BYTES` until r-2 migrates it |
+| `extract --language python --help` prints help and exits 0 (a-10 test `cli_help_only_in_the_first_two_slots` expected `INPUT_INVALID`) | REQ-SAG-0310, REQ-SAG-0701, NFR-SAG-0001; ARCHP-011, CR-016 | clap's `DisplayHelp` is exit 0 by D2. The a-10 intent, that a value such as `-h` is not swallowed as help, is kept by `allow_hyphen_values` (`test_hyphen_values_are_values_not_flags`) |
+| No arguments is `INPUT_INVALID`, exit 2, one `ScAgentErrorResponse` line (was help, exit 0) | REQ-SAG-0701, NFR-SAG-0001, REQ-SAG-0310; ADR-SAG-0029 (c) (no row of its own; recorded in `docs/sc-treesitter/architecture.md`) | D2: only `DisplayHelp`/`DisplayVersion` exit 0 |
+| A value parser's own `JevError` (`Rev::parse`, `--captures`) is returned unwrapped rather than re-wrapped by clap's message; both are `INPUT_INVALID` | ADR-SAG-0029 (c), NFR-SAG-0001 | one recovery text per error (`fix_hint`) |
+| `cli_version_prints_name_and_version` and the help test moved from `tests/cli.rs` to `tests/argv.rs` (`test_version_flag_exits_zero`, `test_help_prints_usage_and_exits_zero`); the 0029 (c) code assertions (missing positional, injection, unresolvable revision, tree, oversize, outside paths) stay in `tests/cli.rs` | REQ-SAG-0310, REQ-SAG-0701, NFR-SAG-0001, ADR-SAG-0029 | D2 ports argv edge cases to `argv.rs` |
 | Path validation uses `RepoRelativePath::try_from` plus a component normalizer; the local `validate_relative` and `object_id` copies are deleted (`BlobSha` validates ids) | RBP-F003, REQ-SAG-0108 | r-1 note: "`sc-treesitter`'s CLI path handling moves in r-3c" |
-| `cargo clippy -p sc-treesitter` alone prints clippy's config warning that `sc_agent_types::ResolvedApiKey::as_str` is unreachable (exit 0) | ADR-SAG-0029, `clippy.toml` | with `default-features = false` the `secret` module is not compiled for this package alone; workspace clippy (`--workspace`) is clean. `clippy.toml` is outside `owned_paths` |
+| `clippy.toml`'s `ResolvedApiKey::as_str` entry gets `allow-invalid = true` | ADR-SAG-0020, ADR-SAG-0029 | QA-001 (parent-authorized): with `default-features = false` the path is unreachable in a `-p sc-treesitter` clippy run, which warned; the `--all-features` workspace clippy still enforces it (its two `#[expect]` sites stay fulfilled) |
 | The tree-sitter pins keep the inline-table form | NFR-SAG-0004, ADR-SAG-0023 | `src/extract.rs` (its asserting test) is outside this sprint's `owned_paths` |
+
+**QA-1 fix round (PR 25).** CI-R3C-001: the Windows `test` job failed
+because clap built usage from `argv[0]` (`sc-treesitter.exe extract`);
+the `Cli` sets `bin_name`, and `usage_ignores_argv0` plus the argv help test
+pin `Usage: sc-treesitter `. RBQA-F002: `.github/scripts/cargo-tree-gates.sh`
+gains feature rows (parent-authorized edit of the r-4 script): the
+`--no-default-features` tree of `sc-treesitter` must enable no `judge`,
+`secret`, `obs`, `git` or `default` feature of `sc-agent-types`, and the
+default tree must enable `git` (positive control); removing
+`default-features = false` was checked to fail the row. FTQ-001: the test
+helper `isolate_git` removes the hook-inherited git variables and sets
+`GIT_CONFIG_SYSTEM` to the null device. FTQ-002: the shared
+`tests/support/deadline.rs` unit tests assert outcomes instead of elapsed
+time (parent-authorized).
 
 **Deferral closed.** r-4's CPR-M212 clap/mimalloc boundary-manifest
 deferral: `boundaries/sc-treesitter/treesitter.toml` now lists `clap` and
 `mimalloc` (optional). r-3b owns the `sc-ai` half.
 
-**Not done here (outside `owned_paths`).** The a-10 "RBP obs: ExtractInput
-required-field constructor" item deferred to r-3c touches
-`crates/sc-treesitter/src/extract.rs`, which this sprint does not own;
-`ExtractInput::new(language, query, source)` already takes the required
-fields. Recommended follow-ups: a `sc_agent_types::git` blob-hash helper
-(owner of `crates/sc-agent-types/src/git.rs`) so the last `git` spawn in
-`sc-treesitter` moves before r-3b's `Command::new` clippy entry, or r-3b's
-item-level expect on `git_io::git_command`; `allow-invalid = true` on the
-`clippy.toml` `as_str` entry if per-package clippy is gated.
+**a-10 item closed.** "RBP obs: ExtractInput required-field constructor"
+(`docs/plans/phase-a/a-10-hardening-dispositions.md`, QA-1 E, deferred to
+r-3c) is satisfied as is: `ExtractInput::new(language, query, source)`
+(`crates/sc-treesitter/src/extract.rs:56`) takes the three required
+fields, and `extract` rejects an empty `path`, `rev` or `blob_sha`
+(REQ-QA-R3C-005). No code change.
 
 ## This sprint does not close
 
