@@ -2,6 +2,8 @@
 //!
 //! Variant codes match `tests/fixtures/jev/README-contract/errors.json`.
 
+use std::io;
+
 use crate::ids::{BackendKeyId, SessionId};
 
 /// Marks a [`JevError::ConfigInvalid`] detail that describes a credential store.
@@ -301,6 +303,137 @@ impl JevError {
         }
     }
 
+    /// Builds `INPUT_INVALID` for a value that `serde_json` could not encode
+    /// or decode.
+    ///
+    /// `label` names what was being encoded, such as `"response JSON"`. The
+    /// detail keeps only the `serde_json` error category and the line and
+    /// column, never the document or the `serde_json` message, so no payload
+    /// or secret text can leak through it. [`Self::fix_hint`] returns the
+    /// recovery text and does not mention `check.toml` or an input schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let cause = serde_json::from_str::<serde_json::Value>("{\"secret\": ").unwrap_err();
+    /// let error = JevError::encode_failed("response JSON", &cause);
+    /// assert_eq!(error.code(), "INPUT_INVALID");
+    /// assert!(error.fix_hint().contains("response JSON"));
+    /// assert!(!error.fix_hint().contains("secret"));
+    /// ```
+    #[must_use]
+    pub fn encode_failed(label: &str, error: &serde_json::Error) -> Self {
+        let category = match error.classify() {
+            serde_json::error::Category::Io => "I/O",
+            serde_json::error::Category::Syntax => "syntax",
+            serde_json::error::Category::Data => "data",
+            serde_json::error::Category::Eof => "unexpected end of input",
+        };
+        let location = if error.line() == 0 {
+            String::new()
+        } else {
+            format!(" at line {} column {}", error.line(), error.column())
+        };
+        Self::InputInvalid {
+            detail: format!(
+                "{OPERATIONAL_DETAIL_PREFIX}{label} could not be encoded as JSON ({category} error{location}). Retry; if it persists, report it as a bug."
+            ),
+        }
+    }
+
+    /// Builds `INPUT_INVALID` for a failed read or write.
+    ///
+    /// `label` names the stream or file, such as `"stdout"`. The detail keeps
+    /// only the [`io::ErrorKind`] text, never the OS message, which can echo
+    /// paths or payload bytes. [`Self::fix_hint`] returns the recovery text
+    /// and does not mention `check.toml` or an input schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let cause = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "secret");
+    /// let error = JevError::io_failed("stdout", &cause);
+    /// assert_eq!(error.code(), "INPUT_INVALID");
+    /// assert!(error.fix_hint().contains("broken pipe"));
+    /// assert!(!error.fix_hint().contains("secret"));
+    /// ```
+    #[must_use]
+    pub fn io_failed(label: &str, error: &io::Error) -> Self {
+        Self::InputInvalid {
+            detail: format!(
+                "{OPERATIONAL_DETAIL_PREFIX}{label} I/O failed (cause: {}). Check that it is readable or writable and retry.",
+                error.kind()
+            ),
+        }
+    }
+
+    /// Rewrites every text field of this error with `map`.
+    ///
+    /// Covers every `String` field of every variant (`detail`, `path`,
+    /// `language`, `query`). Variants without text are returned unchanged.
+    /// The match is exhaustive, so adding a variant with a text field fails
+    /// to compile until it is handled here. [`ResolvedApiKey::redact_error`]
+    /// is built on this method.
+    ///
+    /// [`ResolvedApiKey::redact_error`]: crate::ResolvedApiKey::redact_error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::JevError;
+    ///
+    /// let error = JevError::InputMissing { path: "a/b".into() };
+    /// let mapped = error.map_detail(|text| text.to_uppercase());
+    /// assert_eq!(mapped, JevError::InputMissing { path: "A/B".into() });
+    /// ```
+    #[must_use]
+    pub fn map_detail(self, map: impl Fn(&str) -> String) -> Self {
+        match self {
+            Self::ConfigInvalid { detail } => Self::ConfigInvalid {
+                detail: map(&detail),
+            },
+            Self::InputInvalid { detail } => Self::InputInvalid {
+                detail: map(&detail),
+            },
+            Self::ExtractionParseError { path, line } => Self::ExtractionParseError {
+                path: map(&path),
+                line,
+            },
+            Self::ExtractionInvalid { detail } => Self::ExtractionInvalid {
+                detail: map(&detail),
+            },
+            Self::ExtractionFailed { detail } => Self::ExtractionFailed {
+                detail: map(&detail),
+            },
+            Self::LanguageUnavailable { language } => Self::LanguageUnavailable {
+                language: map(&language),
+            },
+            Self::QueryInvalid { detail } => Self::QueryInvalid {
+                detail: map(&detail),
+            },
+            Self::QueryNotFound { query } => Self::QueryNotFound { query: map(&query) },
+            Self::InputMissing { path } => Self::InputMissing { path: map(&path) },
+            Self::ResponseInvalid { detail } => Self::ResponseInvalid {
+                detail: map(&detail),
+            },
+            Self::NetworkError { detail } => Self::NetworkError {
+                detail: map(&detail),
+            },
+            Self::PromptFileMissing { path } => Self::PromptFileMissing { path: map(&path) },
+            unchanged @ (Self::KeyMissing { .. }
+            | Self::InputTooLarge { .. }
+            | Self::InputEmpty
+            | Self::ExtractionEmpty
+            | Self::ExtractionTimeout { .. }
+            | Self::SessionNotFound { .. }
+            | Self::SessionExpired { .. }) => unchanged,
+        }
+    }
+
     /// Returns the stable machine-readable id for this error.
     ///
     /// Ids match `tests/fixtures/jev/README-contract/errors.json` and are the
@@ -514,6 +647,78 @@ mod tests {
             .collect();
         assert_eq!(actual, expected);
         assert_eq!(actual.len(), samples().len(), "error codes must be unique");
+    }
+
+    /// Number of `String` fields in `error`, written without `map_detail`.
+    fn text_fields(error: &JevError) -> usize {
+        match error {
+            JevError::ConfigInvalid { .. }
+            | JevError::InputInvalid { .. }
+            | JevError::ExtractionParseError { .. }
+            | JevError::ExtractionInvalid { .. }
+            | JevError::ExtractionFailed { .. }
+            | JevError::LanguageUnavailable { .. }
+            | JevError::QueryInvalid { .. }
+            | JevError::QueryNotFound { .. }
+            | JevError::InputMissing { .. }
+            | JevError::ResponseInvalid { .. }
+            | JevError::NetworkError { .. }
+            | JevError::PromptFileMissing { .. } => 1,
+            JevError::KeyMissing { .. }
+            | JevError::InputTooLarge { .. }
+            | JevError::InputEmpty
+            | JevError::ExtractionEmpty
+            | JevError::ExtractionTimeout { .. }
+            | JevError::SessionNotFound { .. }
+            | JevError::SessionExpired { .. } => 0,
+        }
+    }
+
+    #[test]
+    fn map_detail_touches_every_text_field_of_every_variant() {
+        const MARK: &str = "<<mapped>>";
+        let all = samples();
+        let codes: BTreeSet<&str> = all.iter().map(JevError::code).collect();
+        assert_eq!(codes.len(), all.len(), "samples() has one of each variant");
+        for error in all {
+            let calls = std::cell::Cell::new(0_usize);
+            let before = error.to_string();
+            let mapped = error.clone().map_detail(|text| {
+                calls.set(calls.get() + 1);
+                format!("{MARK}{text}")
+            });
+            assert_eq!(calls.get(), text_fields(&error), "{}", error.code());
+            assert_eq!(mapped.code(), error.code());
+            if text_fields(&error) == 0 {
+                assert_eq!(mapped, error);
+            } else {
+                assert_ne!(mapped, error, "{}", error.code());
+                assert!(mapped.to_string().contains(MARK), "{}", error.code());
+                assert!(!before.contains(MARK));
+            }
+        }
+    }
+
+    #[test]
+    fn encode_and_io_helpers_drop_the_cause_text() {
+        let secret = "sk-very-secret";
+        let cause =
+            serde_json::from_str::<serde_json::Value>(&format!("{{\"{secret}\" 1}}")).unwrap_err();
+        let error = JevError::encode_failed("response JSON", &cause);
+        let hint = error.fix_hint();
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(hint.contains("syntax error at line 1 column"), "{hint}");
+        assert!(!hint.contains(secret), "{hint}");
+        assert!(!hint.contains("schema"), "{hint}");
+
+        let io_cause = io::Error::new(io::ErrorKind::PermissionDenied, secret);
+        let error = JevError::io_failed("session file", &io_cause);
+        let hint = error.fix_hint();
+        assert!(
+            hint.contains("session file I/O failed (cause: permission denied)"),
+            "{hint}"
+        );
+        assert!(!format!("{error} {error:?} {hint}").contains(secret));
     }
 
     #[test]

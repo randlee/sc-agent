@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -44,10 +45,49 @@ impl Rev {
     /// Revision string meaning the working tree rather than a commit.
     pub const WORKTREE: &'static str = "WORKTREE";
 
-    /// Wraps a git revision or [`Self::WORKTREE`].
+    /// Wraps a git revision or [`Self::WORKTREE`] without validation.
+    ///
+    /// Use this for revisions the program builds itself, such as
+    /// [`Self::worktree`] or a SHA read back from git. Text that comes from a
+    /// caller (CLI flags, Python arguments, `check.toml`) goes through
+    /// [`Self::parse`], which is the edge entry point.
     #[must_use]
     pub fn new(rev: impl Into<String>) -> Self {
         Self(rev.into())
+    }
+
+    /// Parses caller-supplied revision text.
+    ///
+    /// Accepts [`Self::WORKTREE`] or any text git may resolve. Rejects text
+    /// that git would read as an option or that cannot be one argv element:
+    /// empty text, a leading `-`, NUL, or any whitespace. This check does not
+    /// run git, so a well-formed name can still fail to resolve later.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JevError::InputInvalid`] when the text is empty, starts with
+    /// `-`, or contains NUL or whitespace.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::Rev;
+    ///
+    /// assert_eq!(Rev::parse("HEAD~1").unwrap().as_str(), "HEAD~1");
+    /// assert_eq!(Rev::parse("WORKTREE").unwrap(), Rev::worktree());
+    /// assert_eq!(Rev::parse("--output=x").unwrap_err().code(), "INPUT_INVALID");
+    /// ```
+    pub fn parse(text: &str) -> Result<Self, JevError> {
+        let well_formed = !text.is_empty()
+            && !text.starts_with('-')
+            && !text.chars().any(|ch| ch == '\0' || ch.is_whitespace());
+        if well_formed {
+            Ok(Self(text.to_owned()))
+        } else {
+            Err(JevError::InputInvalid {
+                detail: "revision must be WORKTREE or a git revision that is non-empty, does not start with '-', and has no whitespace or NUL".to_owned(),
+            })
+        }
     }
 
     /// Returns the working-tree sentinel.
@@ -76,7 +116,15 @@ pub struct SessionId(Uuid);
 
 impl SessionId {
     /// Creates a new random session id.
+    ///
+    /// `SessionId` does not implement [`Default`]: a default value that is a
+    /// fresh random UUID would surprise callers that expect `default()` to be
+    /// deterministic.
     #[must_use]
+    #[allow(
+        clippy::new_without_default,
+        reason = "a random id is not a sensible Default value"
+    )]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -91,12 +139,6 @@ impl SessionId {
     #[must_use]
     pub const fn as_uuid(self) -> Uuid {
         self.0
-    }
-}
-
-impl Default for SessionId {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -128,6 +170,25 @@ impl fmt::Display for BackendKeyId {
     }
 }
 
+impl FromStr for BackendKeyId {
+    type Err = JevError;
+
+    /// Parses the documented id: the [`Display`](fmt::Display) form.
+    ///
+    /// Only `typesafe`, `anthropic`, and `openai` are accepted. Kebab-case or
+    /// other aliases are not part of the contract.
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "typesafe" => Ok(Self::TypeSafe),
+            "anthropic" => Ok(Self::Anthropic),
+            "openai" => Ok(Self::OpenAi),
+            _ => Err(JevError::InputInvalid {
+                detail: format!("backend key {text} is not typesafe, anthropic, or openai"),
+            }),
+        }
+    }
+}
+
 /// Judge implementation id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -138,6 +199,69 @@ pub enum BackendId {
     AnthropicHaiku,
     /// OpenAI Luna, API-direct.
     OpenAiLuna,
+}
+
+impl BackendId {
+    /// Returns the credential this backend sends.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::{BackendId, BackendKeyId};
+    ///
+    /// assert_eq!(BackendId::Jev.key_id(), BackendKeyId::TypeSafe);
+    /// assert_eq!(BackendId::OpenAiLuna.key_id(), BackendKeyId::OpenAi);
+    /// ```
+    #[must_use]
+    pub const fn key_id(self) -> BackendKeyId {
+        match self {
+            Self::Jev => BackendKeyId::TypeSafe,
+            Self::AnthropicHaiku => BackendKeyId::Anthropic,
+            Self::OpenAiLuna => BackendKeyId::OpenAi,
+        }
+    }
+
+    /// Returns whether this backend is an LLM judge that needs a system prompt.
+    ///
+    /// Haiku and Luna read [`crate::JudgeRequest::llm`]; Jev ignores it.
+    #[must_use]
+    pub const fn is_llm(self) -> bool {
+        match self {
+            Self::Jev => false,
+            Self::AnthropicHaiku | Self::OpenAiLuna => true,
+        }
+    }
+}
+
+impl FromStr for BackendId {
+    type Err = JevError;
+
+    /// Parses the documented id: the [`Display`](fmt::Display) form.
+    ///
+    /// Only `jev`, `anthropic_haiku`, and `openai_luna` are accepted, so the
+    /// CLI, `check.toml`, and Python share one spelling. Kebab-case aliases
+    /// such as `anthropic-haiku` are deliberately rejected. The serde form of
+    /// [`Self::OpenAiLuna`] is currently `open_ai_luna` (a `snake_case`
+    /// artifact); that form is not accepted here.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::BackendId;
+    ///
+    /// assert_eq!("openai_luna".parse::<BackendId>().unwrap(), BackendId::OpenAiLuna);
+    /// assert_eq!("openai-luna".parse::<BackendId>().unwrap_err().code(), "INPUT_INVALID");
+    /// ```
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "jev" => Ok(Self::Jev),
+            "anthropic_haiku" => Ok(Self::AnthropicHaiku),
+            "openai_luna" => Ok(Self::OpenAiLuna),
+            _ => Err(JevError::InputInvalid {
+                detail: format!("backend {text} is not jev, anthropic_haiku, or openai_luna"),
+            }),
+        }
+    }
 }
 
 impl fmt::Display for BackendId {
@@ -248,6 +372,89 @@ mod tests {
         assert!(Sha256Digest::parse("A".repeat(64)).is_err());
         let ok = "ab".repeat(32);
         assert_eq!(Sha256Digest::parse(&ok).unwrap().as_str(), ok);
+    }
+
+    #[test]
+    fn backend_ids_round_trip_through_display_and_from_str() {
+        for id in [
+            BackendId::Jev,
+            BackendId::AnthropicHaiku,
+            BackendId::OpenAiLuna,
+        ] {
+            assert_eq!(id.to_string().parse::<BackendId>().unwrap(), id);
+            assert_eq!(id.is_llm(), id != BackendId::Jev);
+        }
+        for key in [
+            BackendKeyId::TypeSafe,
+            BackendKeyId::Anthropic,
+            BackendKeyId::OpenAi,
+        ] {
+            assert_eq!(key.to_string().parse::<BackendKeyId>().unwrap(), key);
+        }
+        assert_eq!(BackendId::AnthropicHaiku.key_id(), BackendKeyId::Anthropic);
+    }
+
+    /// Pins a known divergence: `rename_all = "snake_case"` splits `OpenAi`
+    /// into `open_ai`, so the serde form differs from `Display`, `FromStr`,
+    /// and the docs (`openai_luna`, `openai`). Changing serde changes the
+    /// wire form of `JudgeOutcome.backend`, which is a contract decision, so
+    /// this test records today's behaviour instead of fixing it.
+    #[test]
+    fn serde_form_of_openai_ids_differs_from_display() {
+        let wire = |value| serde_json::to_value(value).unwrap();
+        assert_eq!(wire(BackendId::Jev), "jev");
+        assert_eq!(wire(BackendId::AnthropicHaiku), "anthropic_haiku");
+        assert_eq!(wire(BackendId::OpenAiLuna), "open_ai_luna");
+        assert_eq!(
+            serde_json::to_value(BackendKeyId::OpenAi).unwrap(),
+            "open_ai"
+        );
+        assert_eq!(BackendId::OpenAiLuna.to_string(), "openai_luna");
+        assert!("open_ai_luna".parse::<BackendId>().is_err());
+    }
+
+    #[test]
+    fn backend_from_str_rejects_aliases_with_the_cli_message() {
+        for text in ["anthropic-haiku", "openai-luna", "Jev", "", "haiku"] {
+            let error = text.parse::<BackendId>().unwrap_err();
+            assert_eq!(error.code(), "INPUT_INVALID");
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "input is invalid: backend {text} is not jev, anthropic_haiku, or openai_luna"
+                )
+            );
+        }
+        let error = "open-ai".parse::<BackendKeyId>().unwrap_err();
+        assert_eq!(error.code(), "INPUT_INVALID");
+    }
+
+    #[test]
+    fn rev_parse_rejects_option_like_and_unsafe_text() {
+        for good in [
+            "WORKTREE",
+            "HEAD",
+            "HEAD~1",
+            "main",
+            "a1b2c3",
+            "refs/tags/v1.0",
+        ] {
+            assert_eq!(Rev::parse(good).unwrap().as_str(), good);
+        }
+        for bad in [
+            "",
+            "-",
+            "--output=/tmp/x",
+            "-n1",
+            "HEAD 1",
+            "a\tb",
+            "a\nb",
+            "a\0b",
+            " HEAD",
+        ] {
+            let error = Rev::parse(bad).unwrap_err();
+            assert_eq!(error.code(), "INPUT_INVALID", "{bad:?}");
+        }
     }
 
     #[test]

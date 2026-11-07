@@ -13,16 +13,16 @@ Two consumer-owned workflows run on pull requests. Neither is a kit file;
 Every job pins its actions to commit SHAs. Toolchain `1.94.1`, Python `3.11.9`,
 maturin `1.16.0`, pytest `8.4.2` and just `1.58.0` are exact; maturin, pytest
 and their transitive dependencies install from the hash-pinned
-`tests/fixtures/jev-python/constraints.txt`. Every job sets
-`core.autocrlf false` before checkout so Windows keeps LF in the committed
-fixtures that tests compare byte for byte. Every step has a timeout. No step
+`tests/fixtures/jev-python/constraints.txt`. The repo `.gitattributes` keeps
+LF on every platform and leaves byte-compared fixtures unconverted, so no job
+needs a `core.autocrlf` override. Every step has a timeout. No step
 retries; bounded cargo network-fetch retries only (`CARGO_NET_RETRY=2`).
 
 | Job | Runners | Local equivalent |
 | --- | --- | --- |
 | `test` | ubuntu-24.04, macos-15, windows-2022 | `just setup` and `just lint` (ubuntu-24.04 only), then on every OS `cargo clippy --workspace --all-targets --all-features -- -D warnings` and `cargo test --workspace` |
 | `python` | ubuntu-24.04, macos-15, windows-2022 | `just test-python` |
-| `features` | ubuntu-24.04 | `cargo hack --each-feature check -p sc-treesitter` |
+| `features` | ubuntu-24.04 | `cargo hack --each-feature test -p sc-treesitter` |
 | `doc` | ubuntu-24.04 | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` |
 | `coverage` | ubuntu-24.04 | `cargo llvm-cov --workspace --no-report`, then `cargo llvm-cov report` |
 
@@ -63,18 +63,6 @@ features to maturin.
 
 ### Known limits
 
-- **CRLF workaround, not a fix.** Every job sets `core.autocrlf false` before checkout because the
-  sc-treesitter golden-byte fixture test compares committed bytes exactly and Windows runners default to
-  CRLF. The repo-level fix is a `.gitattributes` pinning `tests/fixtures/**` (and other byte-compared
-  fixtures) to LF or `-text`; it is outside this branch's allowed paths and is tracked under
-  "Phase close notes / open items" in `docs/plans/phase-a/plan.md`. Once it lands the five
-  `Keep LF line endings` steps can be dropped. Local Windows checkouts with `autocrlf=true` see the same
-  failure until then.
-
-- **`doc` is `continue-on-error`.** The workspace has 11 rustdoc warnings at
-  `d4a0111`, so the step shows green while it fails. Removal condition: QA-005
-  (rustdoc warnings fixed) lands from the phase-end code track, and that
-  change removes the flag.
 - **`just setup` / `just lint` run on ubuntu-24.04 only.** On windows-2022 the
   managed sc-lint bootstrap (`.sc-lint/bootstrap.py`, sc-lint 0.8.0) prints
   "verified sc-lint release activated" and then fails with
@@ -83,13 +71,19 @@ features to maturin.
   managed file and is not patched here. Boundary, fmt and clippy results do
   not depend on the host; clippy `--all-features` and `cargo test` still run
   on all three OSes. Upstream issue 1 below.
-- **`features` runs `check`, not `test`.** The per-language sc-treesitter tests
-  are not feature-gated yet, so `--no-default-features` test builds fail. The
-  job switches to `cargo hack --each-feature test -p sc-treesitter` once they
-  are gated.
 - **Coverage is reported, not gated.** The job uploads `coverage/summary.txt`
   and `coverage/summary.json` as the `coverage-summary` artifact and writes the
   table to the job summary. Nothing is sent to a third-party service.
+
+- **Tests do not run from a packaged `.crate`.** Some `cfg(test)` code reads
+  files outside the crate directory: `sc-jev-check` (`lib.rs`), `sc-ai` and
+  `sc-treesitter` tests and `jev_cross_impl` include
+  `tests/support/deadline.rs` with `#[path]`, and `sc-jev`'s `shared_copies`
+  test uses `include_str!` on `sc-jev-backends` sources. Those paths are not in
+  the packaged `include` lists, so `cargo test` inside an extracted tarball
+  does not compile. Nothing runs tests from tarballs: `cargo publish
+  --dry-run` builds the library targets only, and every test job runs in the
+  workspace checkout. No gating is applied (QA-010).
 
 ## Upstream issues to file (sc-lint)
 

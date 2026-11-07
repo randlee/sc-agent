@@ -5,10 +5,13 @@
 //! resolved by the run facade from the CLI file, `check.toml`, or the
 //! packaged asset (ADR-SAG-0019).
 
-use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question};
+use std::path::Path;
+
+use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot};
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::questions::{validate_question_set, validate_state};
 use super::{encode_payload, refuse_over_cap};
 use crate::config::load_packaged_config;
 
@@ -39,20 +42,71 @@ pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, 
     let value: Value = serde_json::from_slice(bytes).map_err(request_json_error)?;
     reject_inline_prompt(&value)?;
     let document: RequestDocument = serde_json::from_value(value).map_err(request_json_error)?;
-    if document.questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON has no questions".into(),
-        });
-    }
-    validate_state(&document)?;
+    validate_question_set(&document.questions)?;
+    validate_state(&document.state, &document.questions)?;
     let bundle = encode_payload(&document.questions, &document.state)?;
     let packaged = load_packaged_config()?;
-    refuse_over_cap(&bundle.bytes, packaged.max_input_bytes)?;
+    refuse_over_cap(bundle.bytes(), packaged.max_input_bytes)?;
     let mut backends = Vec::with_capacity(document.backends.len());
     for name in &document.backends {
-        backends.push(parse_backend(name)?);
+        backends.push(name.parse::<BackendId>()?);
     }
     Ok(ParsedCallerRequest { bundle, backends })
+}
+
+/// Caller questions document prepared for [`crate::run::run_request`].
+///
+/// [`prepare_caller_request`] validates the document and builds the payload.
+/// `sc-ai` passes the result to [`crate::run::run_request`] and does not assemble bytes
+/// itself (ADR-SAG-0005, ADR-SAG-0010).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedCallerRequest {
+    /// Canonical payload shared by every backend.
+    pub bundle: PayloadBundle,
+    /// Backends to judge. CLI flags win over ids in the document.
+    pub backends: Vec<BackendId>,
+    /// LLM system prompt from the CLI file or the packaged default.
+    ///
+    /// `None` when no LLM backend is selected. The text is not part of
+    /// [`PayloadBundle::sha256`].
+    pub system_prompt: Option<String>,
+}
+
+/// Validates request JSON, builds one payload, and resolves the system prompt.
+///
+/// `flag_backends` are the `--backend` values. A non-empty slice replaces
+/// backends named in the document. When both are empty the backend is
+/// [`BackendId::Jev`]. Prompt precedence for this path is `prompt_file`, then
+/// the packaged default. [`crate::run::run_check`] applies `check.toml` on the check path.
+/// A `system_prompt` field in `bytes` is refused (ADR-SAG-0019).
+///
+/// # Errors
+///
+/// Returns [`JevError`] when the document, backend id, prompt file, or
+/// packaged asset is unusable. A Jev-only selection does not read
+/// `prompt_file`.
+pub fn prepare_caller_request(
+    bytes: &[u8],
+    flag_backends: &[BackendId],
+    repo: &RepoRoot,
+    prompt_file: Option<&Path>,
+) -> Result<PreparedCallerRequest, JevError> {
+    let parsed = parse_caller_request(bytes)?;
+    let backends = if !flag_backends.is_empty() {
+        flag_backends.to_vec()
+    } else if !parsed.backends.is_empty() {
+        parsed.backends
+    } else {
+        vec![BackendId::Jev]
+    };
+    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
+    let system_prompt =
+        crate::run::prompt::load_request_system_prompt(repo, prompt_file, needs_llm)?;
+    Ok(PreparedCallerRequest {
+        bundle: parsed.bundle,
+        backends,
+        system_prompt,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,42 +129,6 @@ fn reject_inline_prompt(value: &Value) -> Result<(), JevError> {
         });
     }
     Ok(())
-}
-
-fn validate_state(document: &RequestDocument) -> Result<(), JevError> {
-    for answer in &document.state {
-        let Some(question) = document
-            .questions
-            .iter()
-            .find(|question| question.id == answer.question_id)
-        else {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} is not in the question set",
-                    answer.question_id
-                ),
-            });
-        };
-        if !question
-            .choices
-            .iter()
-            .any(|choice| choice == &answer.choice)
-        {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} has a choice that is not in the question",
-                    answer.question_id
-                ),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn parse_backend(text: &str) -> Result<BackendId, JevError> {
-    serde_json::from_value(Value::String(text.to_owned())).map_err(|_| JevError::InputInvalid {
-        detail: format!("backend {text} is not jev, anthropic_haiku, or openai_luna"),
-    })
 }
 
 fn request_json_error(error: serde_json::Error) -> JevError {
@@ -146,11 +164,11 @@ mod tests {
     fn caller_request_builds_a_canonical_bundle() {
         let parsed = parse_caller_request(QUESTIONS.as_bytes()).expect("request");
         assert_eq!(parsed.backends, vec![BackendId::AnthropicHaiku]);
-        let text = std::str::from_utf8(&parsed.bundle.bytes).expect("utf8");
+        let text = std::str::from_utf8(parsed.bundle.bytes()).expect("utf8");
         assert!(text.contains("\"id\":\"relevant\""));
         assert!(text.contains("\"choice\":\"yes\""));
         assert!(!text.contains("system_prompt"));
-        assert_eq!(parsed.bundle.sha256.as_str().len(), 64);
+        assert_eq!(parsed.bundle.sha256().as_str().len(), 64);
     }
 
     #[test]
@@ -170,6 +188,24 @@ mod tests {
         assert!(hint.contains("check.toml"));
         assert!(hint.contains("packaged default"));
         assert!(!hint.contains("INLINE-PROMPT-TOKEN"));
+    }
+
+    #[test]
+    fn caller_json_uses_the_check_toml_rules() {
+        let repeated_state = br#"{"questions":[{"id":"q","prompt":"p","choices":["a","b"]}],"state":[{"question_id":"q","choice":"a"},{"question_id":"q","choice":"b"}]}"#;
+        let error = parse_caller_request(repeated_state).expect_err("repeat");
+        assert!(error.fix_hint().contains("repeats question q"));
+        let duplicate_id = br#"{"questions":[{"id":"q","prompt":"p","choices":["a"]},{"id":"q","prompt":"p","choices":["a"]}]}"#;
+        let error = parse_caller_request(duplicate_id).expect_err("duplicate");
+        assert!(error.fix_hint().contains("repeated"));
+        let empty_prompt = br#"{"questions":[{"id":"q","prompt":"  ","choices":["a"]}]}"#;
+        let error = parse_caller_request(empty_prompt).expect_err("empty");
+        assert!(error.fix_hint().contains("instructions are empty"));
+        let empty_id = br#"{"questions":[{"id":"","prompt":"p","choices":["a"]}]}"#;
+        assert_eq!(
+            parse_caller_request(empty_id).expect_err("id").code(),
+            "INPUT_INVALID"
+        );
     }
 
     #[test]

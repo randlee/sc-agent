@@ -31,7 +31,7 @@ adrs:
   - ADR-SAG-0019
   - ADR-SAG-0020
 owned_paths:
-  - "crates/sc-jev/src/api/**"
+  - "crates/sc-jev/src/config.rs"
   - "crates/sc-jev/src/client/**"
   - "crates/sc-jev/Cargo.toml"
   - "crates/sc-jev/src/lib.rs"

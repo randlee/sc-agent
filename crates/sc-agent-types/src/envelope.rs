@@ -13,7 +13,6 @@ use crate::error::JevError;
 /// Fields stay private so the only Rust constructor is [`Self::from_jev_error`].
 /// Neither field holds a secret (NFR-SAG-0002).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct ScAgentErrorResponse {
     /// [`JevError::code`] value.
     error: String,

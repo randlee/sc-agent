@@ -21,9 +21,8 @@ pub(crate) fn envelope(operation: &str, data: Value) -> Result<Vec<u8>, JevError
         "operation": operation,
         "data": data,
     });
-    let mut bytes = serde_json::to_vec(&value).map_err(|_| JevError::InputInvalid {
-        detail: "response JSON could not be encoded".into(),
-    })?;
+    let mut bytes = serde_json::to_vec(&value)
+        .map_err(|error| JevError::encode_failed("response JSON", &error))?;
     bytes.push(b'\n');
     Ok(bytes)
 }

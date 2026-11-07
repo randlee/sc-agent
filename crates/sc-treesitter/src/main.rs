@@ -7,9 +7,9 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use mimalloc::MiMalloc;
-use sc_agent_types::{JevError, ScAgentErrorResponse};
+use sc_agent_types::{JevError, Rev, ScAgentErrorResponse};
 use sc_treesitter::{
-    ExtractInput, extract, languages, queries, query_source, subjects_to_json_bytes,
+    ExtractInput, PRODUCER_NAME, extract, languages, queries, query_source, subjects_to_json_bytes,
 };
 
 mod git_io;
@@ -21,18 +21,19 @@ const HELP: &str = "\
 sc-treesitter extract --language L --query Q [--captures name,name] [--rev HEAD] <path>
 sc-treesitter languages
 sc-treesitter queries [--language L]
+sc-treesitter --version
 
-<path> is repo-relative. --rev HEAD reads `git show`. --rev WORKTREE reads the
-working tree. --captures is an allow-list. Execution always uses matches mode.
+<path> is repo-relative, or absolute inside the repository. --rev HEAD reads the
+blob with `git cat-file`. --rev WORKTREE reads the working tree. A revision may
+not start with `-`. --captures is an allow-list. Execution always uses matches
+mode.
 ";
 
 fn main() -> ExitCode {
     match dispatch(std::env::args().skip(1)) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
-                emit(&JevError::ExtractionFailed {
-                    detail: format!("stdout write failed: {error}"),
-                });
+                emit(&JevError::io_failed("stdout", &error));
                 return ExitCode::from(2);
             }
             ExitCode::SUCCESS
@@ -60,8 +61,9 @@ fn emit(error: &JevError) {
 fn dispatch(args: impl Iterator<Item = String>) -> Result<Vec<u8>, JevError> {
     match parse(args)? {
         Cli::Help => Ok(HELP.as_bytes().to_vec()),
+        Cli::Version => Ok(format!("{PRODUCER_NAME} {}\n", env!("CARGO_PKG_VERSION")).into_bytes()),
         Cli::Languages => {
-            let ids: Vec<&str> = languages().iter().map(|info| info.id).collect();
+            let ids: Vec<&str> = languages().map(|info| info.id).collect();
             json_line(&serde_json::json!(ids))
         }
         Cli::Queries { language } => {
@@ -92,30 +94,28 @@ fn dispatch(args: impl Iterator<Item = String>) -> Result<Vec<u8>, JevError> {
             } else {
                 Some(capture_refs.as_slice())
             };
-            let document = extract(&ExtractInput {
-                language: &language,
-                query: query_text,
-                captures: allow,
-                source: &blob.bytes,
-                path: &blob.path,
-                rev: &rev,
-                blob_sha: &blob.sha,
-            })?;
+            let document = extract(
+                &ExtractInput::new(&language, query_text, &blob.bytes)
+                    .with_captures(allow)
+                    .with_path(&blob.path)
+                    .with_rev(rev.as_str())
+                    .with_blob_sha(&blob.sha),
+            )?;
             subjects_to_json_bytes(&document)
         }
     }
 }
 
 fn json_line(value: &serde_json::Value) -> Result<Vec<u8>, JevError> {
-    let mut bytes = serde_json::to_vec(value).map_err(|error| JevError::ExtractionFailed {
-        detail: format!("json encoding failed: {error}"),
-    })?;
+    let mut bytes = serde_json::to_vec(value)
+        .map_err(|error| JevError::encode_failed("listing JSON", &error))?;
     bytes.push(b'\n');
     Ok(bytes)
 }
 
 enum Cli {
     Help,
+    Version,
     Languages,
     Queries {
         language: Option<String>,
@@ -124,18 +124,29 @@ enum Cli {
         language: String,
         query: String,
         captures: Vec<String>,
-        rev: String,
+        rev: Rev,
         path: String,
     },
 }
 
 fn parse(args: impl Iterator<Item = String>) -> Result<Cli, JevError> {
     let args: Vec<String> = args.collect();
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+    // `--help` counts only as the command or the first argument after it, so
+    // a value such as a path named `-h` later on is not swallowed.
+    let is_help = |arg: &String| arg == "--help" || arg == "-h";
+    if args.is_empty() || args.iter().take(2).any(is_help) {
         return Ok(Cli::Help);
     }
     match args[0].as_str() {
         "help" => Ok(Cli::Help),
+        "--version" | "-V" => {
+            if args.len() != 1 {
+                return Err(JevError::InputInvalid {
+                    detail: "--version does not take arguments".into(),
+                });
+            }
+            Ok(Cli::Version)
+        }
         "languages" => {
             if args.len() != 1 {
                 return Err(JevError::InputInvalid {
@@ -193,7 +204,7 @@ fn parse_extract(args: &[String]) -> Result<Cli, JevError> {
             continue;
         }
         if let Some(value) = flag_value("--rev", args, &mut index)? {
-            assign_once("rev", &mut rev, value)?;
+            assign_once("rev", &mut rev, Rev::parse(&value)?)?;
             continue;
         }
         if args[index].starts_with('-') {
@@ -215,14 +226,14 @@ fn parse_extract(args: &[String]) -> Result<Cli, JevError> {
     let query = query.ok_or_else(|| JevError::InputInvalid {
         detail: "extract requires --query".into(),
     })?;
-    let path = path.ok_or_else(|| JevError::InputMissing {
-        path: "(missing)".into(),
+    let path = path.ok_or_else(|| JevError::InputInvalid {
+        detail: "extract requires a source path".into(),
     })?;
     Ok(Cli::Extract {
         language,
         query,
         captures: captures.unwrap_or_default(),
-        rev: rev.unwrap_or_else(|| "HEAD".to_owned()),
+        rev: rev.unwrap_or_else(|| Rev::new("HEAD")),
         path,
     })
 }

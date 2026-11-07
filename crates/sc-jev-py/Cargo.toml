@@ -14,15 +14,22 @@ publish = false
 
 [lib]
 name = "sc_jev_py"
-crate-type = ["cdylib", "rlib"]
+# cdylib only: the Python module is the whole surface. `cargo test` still
+# builds the unit tests from source.
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
 
 [features]
 default = []
 # Maturin enables this so the wheel does not link libpython. `cargo test`
 # leaves it off and links the interpreter.
 extension-module = ["pyo3/extension-module"]
-# Forwards `scripted_answers` to `sc-jev-check`'s test-only registry.
-# Production wheels leave this off (ADR-SAG-0022).
+# Adds the `sc_jev_py._testing` submodule (`run_check_scripted`), which
+# forwards scripted answers to `sc-jev-check`'s test-only registry. The
+# `run_check` signature is the same with or without it. Production wheels
+# leave this off (ADR-SAG-0022).
 test-util = ["sc-jev-check/test-util"]
 
 [dependencies]
@@ -37,6 +44,7 @@ serde_json.workspace = true
 # `cargo test` enables this so Rust tests can register scripted judges.
 # Maturin and `cargo build` do not. The publish wheel leaves `test-util` off.
 sc-jev-check = { path = "../sc-jev-check", version = "0.1.0", features = ["test-util"] }
+tempfile.workspace = true
 
 # Workspace-only Rust/Python canonical-bytes test (REQ-SAG-0102). It lives at
 # the repo root and is hosted here because this crate is `publish = false`, so

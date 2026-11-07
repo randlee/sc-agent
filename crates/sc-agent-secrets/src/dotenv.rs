@@ -3,6 +3,20 @@
 //! The parser never writes the process environment. A missing file yields no
 //! variables. Callers decide whether a parsed value may override a variable
 //! that is already set.
+//!
+//! # Dialect
+//!
+//! One `KEY=value` per line, optionally prefixed by `export `. Blank lines
+//! and lines starting with `#` are skipped, as are lines without `=` or
+//! with a key that is not `[A-Za-z_][A-Za-z0-9_]*`. A later line wins.
+//!
+//! - Unquoted values are trimmed. A `#` preceded by whitespace starts a
+//!   comment that runs to the end of the line (`KEY=v # note` is `v`); a `#`
+//!   with no whitespace before it is part of the value (`KEY=v#1` is `v#1`).
+//! - `'single'` quotes keep the text verbatim.
+//! - `"double"` quotes unescape `\n`, `\r`, `\t`, and `\<char>`.
+//! - A quoted value may be followed by whitespace and a `#` comment.
+//! - There is no variable expansion and no multi-line value.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -58,7 +72,7 @@ pub(crate) fn parse_dotenv(text: &str) -> BTreeMap<String, String> {
         if !is_env_name(key) {
             continue;
         }
-        vars.insert(key.to_owned(), unquote(value.trim()));
+        vars.insert(key.to_owned(), parse_value(value));
     }
     vars
 }
@@ -78,19 +92,57 @@ fn is_env_name(key: &str) -> bool {
     chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
-fn unquote(value: &str) -> String {
-    let bytes = value.as_bytes();
-    if bytes.len() >= 2 {
-        let quote = bytes[0];
-        if (quote == b'"' || quote == b'\'') && bytes[bytes.len() - 1] == quote {
-            let inner = &value[1..value.len() - 1];
-            if quote == b'\'' {
-                return inner.to_owned();
-            }
-            return unescape_double(inner);
-        }
+/// Decodes one raw value (everything after the first `=`).
+fn parse_value(raw: &str) -> String {
+    let value = raw.trim();
+    if let Some(quoted) = quoted_value(value) {
+        return quoted;
     }
-    value.to_owned()
+    strip_inline_comment(raw).trim().to_owned()
+}
+
+/// Returns the decoded text when `value` is one quoted string, optionally
+/// followed by whitespace and a `#` comment.
+fn quoted_value(value: &str) -> Option<String> {
+    let quote = value
+        .chars()
+        .next()
+        .filter(|ch| *ch == '"' || *ch == '\'')?;
+    let body = &value[1..];
+    let mut escaped = false;
+    let close = body.char_indices().find_map(|(index, ch)| {
+        if quote == '"' && escaped {
+            escaped = false;
+            return None;
+        }
+        if quote == '"' && ch == '\\' {
+            escaped = true;
+            return None;
+        }
+        (ch == quote).then_some(index)
+    })?;
+    let rest = body[close + 1..].trim_start();
+    if !(rest.is_empty() || rest.starts_with('#')) {
+        return None;
+    }
+    let inner = &body[..close];
+    Some(if quote == '"' {
+        unescape_double(inner)
+    } else {
+        inner.to_owned()
+    })
+}
+
+/// Cuts an unquoted value at the first `#` that follows whitespace.
+fn strip_inline_comment(raw: &str) -> &str {
+    let mut previous_is_space = false;
+    for (index, ch) in raw.char_indices() {
+        if ch == '#' && previous_is_space {
+            return &raw[..index];
+        }
+        previous_is_space = ch.is_whitespace();
+    }
+    raw
 }
 
 fn unescape_double(value: &str) -> String {
@@ -133,6 +185,32 @@ mod tests {
             Some("a\nb")
         );
         assert!(!vars.contains_key("1BAD"));
+    }
+
+    #[test]
+    fn unquoted_trailing_comment_is_stripped() {
+        let text = concat!(
+            "KEY=v # c\n",
+            "QUOTED=\"v # not comment\"\n",
+            "GLUED=v#notcomment\n",
+            "TAB=v\t# c\n",
+            "ONLY= # nothing\n",
+            "HASHFIRST=#kept\n",
+            "SINGLE='a # b' # c\n",
+            "DOUBLE=\"x\\\"y\" # c\n",
+            "TRAILING=\"x\" junk\n",
+        );
+        let vars = parse_dotenv(text);
+        let get = |key: &str| vars.get(key).map(String::as_str);
+        assert_eq!(get("KEY"), Some("v"));
+        assert_eq!(get("QUOTED"), Some("v # not comment"));
+        assert_eq!(get("GLUED"), Some("v#notcomment"));
+        assert_eq!(get("TAB"), Some("v"));
+        assert_eq!(get("ONLY"), Some(""));
+        assert_eq!(get("HASHFIRST"), Some("#kept"));
+        assert_eq!(get("SINGLE"), Some("a # b"));
+        assert_eq!(get("DOUBLE"), Some("x\"y"));
+        assert_eq!(get("TRAILING"), Some("\"x\" junk"));
     }
 
     #[test]

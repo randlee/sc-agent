@@ -14,10 +14,14 @@ categories.workspace = true
 # Allowlist: repo-root fixtures and the cross-impl test stay out of the package.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
+[lints]
+workspace = true
+
 [features]
 default = []
-# Test doubles for JudgeBackend and SessionLog. Unit tests compile this module
-# via cfg(test); downstream crates enable the feature explicitly.
+# JudgeBackend test double, contract helpers, and the unchecked
+# `ResolvedApiKey::new` for test keys. Unit tests compile these via cfg(test);
+# downstream crates enable the feature explicitly (dev-dependencies only).
 test-util = []
 
 [dependencies]

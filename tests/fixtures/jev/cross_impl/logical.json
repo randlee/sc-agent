@@ -8,8 +8,21 @@
   "questions": [
     {
       "choices": ["yes", "no"],
-      "prompt": "Does the café policy apply?",
+      "prompt": "Does the café policy apply?\n\tQuote: \"x\" back\\slash a/b \u001f del:\u007f sep:  emoji:😀",
       "id": "relevant"
     }
-  ]
+  ],
+  "escape_cases": {
+    "zeta": "last ascii key",
+    "Zeta": "uppercase sorts first",
+    "é": "non-ASCII key",
+    "￿": "U+FFFF key",
+    "😀": "non-BMP key",
+    "ctrl": "\u0000\u0001\b\f\r\u001f",
+    "slash": "/",
+    "quote": "\"",
+    "backslash": "\\",
+    "line_sep": "  ",
+    "del": "\u007f"
+  }
 }

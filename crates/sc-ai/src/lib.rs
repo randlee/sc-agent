@@ -19,7 +19,6 @@
 //! assert_eq!(ENVELOPE_VERSION, "1");
 //! ```
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod command;
@@ -27,11 +26,15 @@ mod envelope;
 mod observe;
 
 #[doc(inline)]
-pub use command::{Clock, ExecuteOverrides, execute, reads_stdin};
+pub use command::{execute, reads_stdin};
 #[doc(inline)]
 pub use envelope::{ENVELOPE_VERSION, OP_ASK, OP_DRY_RUN, OP_RUN};
-#[doc(inline)]
-pub use observe::{
-    DEFAULT_LOG_ROOT_DIR, LOG_ROOT_ENV, ObservabilitySessionLog, default_log_root,
-    default_sessions_dir, session_log_file,
-};
+
+// Test seams for `tests/cli.rs`, not part of the API. A crate cannot turn on
+// its own cargo feature for its integration tests without a self
+// dev-dependency, which the boundary lint and crates.io publish reject, so
+// these are hidden rather than feature-gated.
+#[doc(hidden)]
+pub use command::{Clock, ExecuteOverrides, execute_with_overrides};
+#[doc(hidden)]
+pub use observe::{ObservabilitySessionLog, session_log_file};

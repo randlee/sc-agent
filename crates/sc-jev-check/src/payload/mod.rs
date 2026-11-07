@@ -11,18 +11,20 @@ use std::collections::BTreeMap;
 mod caller;
 mod questions;
 
-pub(crate) use caller::parse_caller_request;
+#[doc(inline)]
+pub use caller::{PreparedCallerRequest, prepare_caller_request};
 
 use sc_agent_types::{
     CanonicalJudgePayload, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot, Rev,
     payload_bundle_from_value,
 };
 
-use crate::config::{CheckSpec, PackagedConfig, ResolvedPromptPath, load_packaged_config};
+use crate::config::{CheckSpec, load_packaged_config};
 use crate::extract::{Extracted, extract_input, read_repo_text};
 
+pub(crate) use questions::parse_state;
 #[doc(inline)]
-pub use questions::{QUESTION_SET_SCHEMA, STATE_SCHEMA, parse_question_set, parse_state};
+pub use questions::{QUESTION_SET_SCHEMA, parse_question_set};
 
 /// Byte cap applied while building one canonical payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,8 +37,6 @@ pub struct PayloadBuilder {
 pub struct BuiltPayload {
     /// Sorted compact JSON and its SHA-256. Prompt text is not included.
     pub bundle: PayloadBundle,
-    /// System-prompt path selected for a later inject step.
-    pub prompt: ResolvedPromptPath,
     /// Extractor output keyed by `[inputs.<name>]`.
     pub extractions: BTreeMap<String, Extracted>,
 }
@@ -87,17 +87,6 @@ impl PayloadBuilder {
         repo: &RepoRoot,
         rev: &Rev,
     ) -> Result<BuiltPayload, JevError> {
-        let packaged = load_packaged_config()?;
-        self.build_with_packaged(spec, repo, rev, &packaged)
-    }
-
-    fn build_with_packaged(
-        &self,
-        spec: &CheckSpec,
-        repo: &RepoRoot,
-        rev: &Rev,
-        packaged: &PackagedConfig,
-    ) -> Result<BuiltPayload, JevError> {
         let questions = parse_question_set(&read_repo_text(repo, rev, &spec.questions_path)?)?;
         let state = match &spec.state_path {
             Some(path) => parse_state(&read_repo_text(repo, rev, path)?, &questions)?,
@@ -109,10 +98,9 @@ impl PayloadBuilder {
         }
         let questions = substitute_inputs(questions, &extractions);
         let bundle = encode_payload(&questions, &state)?;
-        refuse_over_cap(&bundle.bytes, self.max_input_bytes)?;
+        refuse_over_cap(bundle.bytes(), self.max_input_bytes)?;
         Ok(BuiltPayload {
             bundle,
-            prompt: spec.resolve_prompt_path(packaged),
             extractions,
         })
     }
@@ -124,7 +112,7 @@ impl PayloadBuilder {
 ///
 /// Returns [`JevError::InputTooLarge`] and nothing else. Callers must not send
 /// after this error.
-pub fn refuse_over_cap(bytes: &[u8], limit_bytes: u64) -> Result<(), JevError> {
+pub(crate) fn refuse_over_cap(bytes: &[u8], limit_bytes: u64) -> Result<(), JevError> {
     let actual_bytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if actual_bytes > limit_bytes {
         Err(JevError::InputTooLarge {
@@ -140,27 +128,48 @@ fn substitute_inputs(
     mut questions: Vec<Question>,
     extractions: &BTreeMap<String, Extracted>,
 ) -> Vec<Question> {
-    let mut names: Vec<&str> = extractions.keys().map(String::as_str).collect();
-    names.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    for question in &mut questions {
-        for name in &names {
-            let Some(extracted) = extractions.get(*name) else {
-                continue;
-            };
-            let needle = format!("{{{name}}}");
-            if !question.prompt.contains(&needle) {
-                continue;
-            }
-            let replacement = extracted
+    let replacements: BTreeMap<&str, String> = extractions
+        .iter()
+        .map(|(name, extracted)| {
+            let joined = extracted
                 .subjects
                 .iter()
                 .map(|subject| subject.text.as_str())
                 .collect::<Vec<_>>()
                 .join("\n");
-            question.prompt = question.prompt.replace(&needle, &replacement);
-        }
+            (name.as_str(), joined)
+        })
+        .collect();
+    for question in &mut questions {
+        question.prompt = expand_placeholders(&question.prompt, &replacements);
     }
     questions
+}
+
+/// Replaces each `{name}` token in one left-to-right pass.
+///
+/// Replacement text is emitted verbatim and never scanned again, so an
+/// extracted subject that itself contains `{other}` stays literal. Braces
+/// that do not form a known `{name}` are kept. The command extractor's argv
+/// substitution uses the same function.
+pub(crate) fn expand_placeholders(text: &str, replacements: &BTreeMap<&str, String>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        if let Some(close) = after.find('}')
+            && let Some(replacement) = replacements.get(&after[..close])
+        {
+            out.push_str(replacement);
+            rest = &after[close + 1..];
+            continue;
+        }
+        out.push('{');
+        rest = after;
+    }
+    out.push_str(rest);
+    out
 }
 
 pub(crate) fn encode_payload(
@@ -171,9 +180,7 @@ pub(crate) fn encode_payload(
         questions: questions.to_vec(),
         state: state.to_vec(),
     })
-    .map_err(|error| JevError::InputInvalid {
-        detail: format!("payload encoding failed: {error}"),
-    })?;
+    .map_err(|error| JevError::encode_failed("canonical payload", &error))?;
     payload_bundle_from_value(&value)
 }
 
@@ -185,6 +192,46 @@ mod tests {
     use sc_agent_types::Rev;
 
     #[test]
+    fn placeholder_text_inside_a_subject_is_not_re_expanded() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("questions.json"),
+            r#"{"schema":"plan-anchoring/questions/1","questions":{"q":{"type":"choice","instructions":"A={a} B={b} {unknown}","criteria":{"no":"No.","yes":"Yes."}}}}"#,
+        )
+        .expect("questions");
+        std::fs::write(dir.path().join("a.txt"), "f\"{b}\" literal").expect("a");
+        std::fs::write(dir.path().join("b.txt"), "BEE").expect("b");
+        let spec = CheckSpec {
+            questions_path: "questions.json".into(),
+            state_path: None,
+            system_prompt_file: None,
+            inputs: BTreeMap::from([
+                (
+                    "a".into(),
+                    sc_agent_types::InputSpec::File {
+                        path: "a.txt".into(),
+                    },
+                ),
+                (
+                    "b".into(),
+                    sc_agent_types::InputSpec::File {
+                        path: "b.txt".into(),
+                    },
+                ),
+            ]),
+        };
+        let built = PayloadBuilder::packaged()
+            .expect("builder")
+            .build(&spec, &RepoRoot::new(dir.path()), &Rev::worktree())
+            .expect("payload");
+        let value: serde_json::Value = serde_json::from_slice(built.bundle.bytes()).expect("json");
+        assert_eq!(
+            value["questions"][0]["prompt"],
+            "A=f\"{b}\" literal B=BEE {unknown}"
+        );
+    }
+
+    #[test]
     fn payload_merges_questions_state_and_file_text() {
         let dir = copy_fixture();
         let repo = RepoRoot::new(dir.path());
@@ -194,7 +241,7 @@ mod tests {
             .expect("builder")
             .build(&spec, &repo, &rev)
             .expect("payload");
-        let text = std::str::from_utf8(&built.bundle.bytes).expect("utf-8");
+        let text = std::str::from_utf8(built.bundle.bytes()).expect("utf-8");
         assert!(text.contains("alpha note"));
         assert!(text.contains("\"choice\":\"yes\"") || text.contains("\"choice\": \"yes\""));
         assert!(
@@ -204,11 +251,10 @@ mod tests {
                 .any(|subject| subject.text == "ship | hold")
         );
         assert!(!text.contains("PROMPT-TOKEN-a3-check"));
-        assert!(!text.contains("PACKAGED-PROMPT-TOKEN-a3"));
-        assert_eq!(built.prompt.path, "prompt.md");
+        assert!(!text.contains(crate::config::PACKAGED_SYSTEM_PROMPT.trim()));
         assert_eq!(
-            built.bundle.sha256,
-            sc_agent_types::Sha256Digest::of(&built.bundle.bytes)
+            built.bundle.sha256(),
+            &sc_agent_types::Sha256Digest::of(built.bundle.bytes())
         );
     }
 
@@ -222,8 +268,14 @@ mod tests {
         let first = builder.build(&spec, &repo, &rev).expect("first");
         spec.system_prompt_file = Some("other-prompt.md".into());
         let second = builder.build(&spec, &repo, &rev).expect("second");
-        assert_eq!(first.bundle.sha256, second.bundle.sha256);
-        assert_ne!(first.prompt.path, second.prompt.path);
+        assert_eq!(first.bundle.sha256(), second.bundle.sha256());
+        assert_ne!(
+            spec.resolve_prompt_path().path,
+            load_check_at(&repo, &rev, "check.toml")
+                .expect("check")
+                .resolve_prompt_path()
+                .path
+        );
     }
 
     #[test]
@@ -294,13 +346,13 @@ mod tests {
         let head_again = builder
             .build(&spec, &repo, &Rev::new(sha))
             .expect("head again");
-        let worktree_text = std::str::from_utf8(&worktree.bundle.bytes).expect("utf-8");
-        let head_text = std::str::from_utf8(&head.bundle.bytes).expect("utf-8");
+        let worktree_text = std::str::from_utf8(worktree.bundle.bytes()).expect("utf-8");
+        let head_text = std::str::from_utf8(head.bundle.bytes()).expect("utf-8");
         assert!(worktree_text.contains("worktree edit"));
         assert!(head_text.contains("alpha note"));
         assert!(!head_text.contains("worktree edit"));
-        assert_eq!(head.bundle.sha256, head_again.bundle.sha256);
-        assert_ne!(head.bundle.sha256, worktree.bundle.sha256);
+        assert_eq!(head.bundle.sha256(), head_again.bundle.sha256());
+        assert_ne!(head.bundle.sha256(), worktree.bundle.sha256());
     }
 
     #[test]
@@ -316,9 +368,9 @@ mod tests {
             .expect("builder")
             .build(&spec, &repo, &Rev::worktree())
             .expect("dev questions");
-        let value: serde_json::Value = serde_json::from_slice(&built.bundle.bytes).expect("json");
+        let value: serde_json::Value = serde_json::from_slice(built.bundle.bytes()).expect("json");
         let questions = value["questions"].as_array().expect("questions");
         assert!(questions.len() >= 4);
-        assert_eq!(built.prompt.path, "llm-evaluator-system.md");
+        assert_eq!(spec.resolve_prompt_path().path, "llm-evaluator-system.md");
     }
 }

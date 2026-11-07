@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeRequest, LlmWireContext, PayloadBundle, ResolvedApiKey,
-    canonical_json_bytes,
+    BackendId, BackendKeyId, JevError, JudgeBackend, JudgeRequest, LlmWireContext, PayloadBundle,
+    ResolvedApiKey, canonical_json_bytes,
 };
 use sc_jev::{
     HttpsTransport, JevClient, JevClientConfig, JevTransport, RetryDelay, WireRequest, WireResponse,
@@ -15,10 +15,28 @@ use serde_json::json;
 
 const EXPECTED_BODY: &[u8] = b"{\"model\":\"jev-test\",\"questions\":{\"q\":{\"criteria\":{\"no\":\"n\",\"yes\":\"y\"},\"instructions\":\"Is it?\",\"type\":\"choice\"}},\"state\":{\"code\":\"x = 1\"}}";
 
+/// Largest jitter the busy-retry policy adds to a wait, in seconds.
+const JITTER_MAX_SECS: f64 = 0.25;
+
+/// Asserts each recorded wait is `expected` plus at most the policy jitter.
+fn assert_waits(actual: &[f64], expected: &[f64]) {
+    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
+    for (got, want) in actual.iter().zip(expected) {
+        assert!(
+            *got >= *want && *got <= *want + JITTER_MAX_SECS,
+            "{actual:?} vs {expected:?}"
+        );
+    }
+}
+
+fn secret_key() -> ResolvedApiKey {
+    ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "super-secret".to_owned()).expect("key")
+}
+
 struct FakeTransport {
     responses: Mutex<Vec<WireResponse>>,
     sent: Mutex<Vec<Vec<u8>>>,
-    authorizations: Mutex<Vec<String>>,
+    keys: Mutex<Vec<ResolvedApiKey>>,
     fail_with_key: bool,
 }
 
@@ -27,7 +45,7 @@ impl FakeTransport {
         Self {
             responses: Mutex::new(responses),
             sent: Mutex::new(Vec::new()),
-            authorizations: Mutex::new(Vec::new()),
+            keys: Mutex::new(Vec::new()),
             fail_with_key: false,
         }
     }
@@ -42,22 +60,22 @@ impl FakeTransport {
         self.sent.lock().expect("sent").clone()
     }
 
-    fn authorizations(&self) -> Vec<String> {
-        self.authorizations.lock().expect("auth").clone()
+    fn keys(&self) -> Vec<ResolvedApiKey> {
+        self.keys.lock().expect("keys").clone()
     }
 }
 
 impl JevTransport for FakeTransport {
     fn send(&self, request: &WireRequest<'_>) -> Result<WireResponse, JevError> {
         self.sent.lock().expect("sent").push(request.body.to_vec());
-        let authorization = format!("Bearer {}", request.api_key.as_str());
-        self.authorizations
+        self.keys
             .lock()
-            .expect("auth")
-            .push(authorization.clone());
+            .expect("keys")
+            .push(request.api_key.clone());
         if self.fail_with_key {
+            // A transport whose error echoes the key; the client must redact it.
             return Err(JevError::NetworkError {
-                detail: format!("boom {authorization}"),
+                detail: "boom Bearer super-secret".to_owned(),
             });
         }
         self.responses
@@ -111,7 +129,7 @@ fn scripted(responses: Vec<WireResponse>) -> Harness {
     });
     let client = JevClient::with_config(
         config(),
-        ResolvedApiKey::new("super-secret".to_owned()),
+        secret_key(),
         Arc::clone(&transport) as Arc<dyn JevTransport>,
     )
     .expect("client")
@@ -209,10 +227,7 @@ fn one_check_is_one_request_byte_exact() {
         .map(String::as_str)
         .collect();
     assert_eq!(names, judge_outcome_field_names());
-    assert_eq!(
-        harness.transport.authorizations(),
-        vec!["Bearer super-secret".to_owned()]
-    );
+    assert_eq!(harness.transport.keys(), vec![secret_key()]);
     assert!(!format!("{:?}", harness.client).contains("super-secret"));
     let backend: &dyn JudgeBackend = &harness.client;
     assert_eq!(backend.id(), BackendId::Jev);
@@ -227,7 +242,7 @@ fn busy_is_retried_with_the_same_body() {
     let sent = harness.transport.sent();
     assert_eq!(sent.len(), 2);
     assert_eq!(sent[0], sent[1]);
-    assert_eq!(harness.delay.slept(), vec![2.0]);
+    assert_waits(&harness.delay.slept(), &[2.0]);
 }
 
 #[test]
@@ -302,7 +317,7 @@ mod jev_api {
             let sent = harness.transport.sent();
             assert_eq!(sent.len(), 2, "status {status}");
             assert_eq!(sent[0], sent[1]);
-            assert_eq!(harness.delay.slept(), vec![1.0]);
+            assert_waits(&harness.delay.slept(), &[1.0]);
         }
     }
 
@@ -326,8 +341,12 @@ mod jev_api {
             .judge(&request(payload(json!({"code": "x"})), None))
             .expect_err("exhausted");
         assert_eq!(error.code(), "NETWORK_ERROR");
+        assert_eq!(
+            error.to_string(),
+            "network error: Jev busy: HTTP 429 after 3 sends; retry attempts exhausted"
+        );
         assert_eq!(harness.transport.sent().len(), 3);
-        assert_eq!(harness.delay.slept().len(), 2);
+        assert_waits(&harness.delay.slept(), &[1.0, 1.0]);
     }
 
     #[test]
@@ -497,16 +516,14 @@ mod jev_api {
     }
 
     #[test]
-    fn empty_key_sends_nothing() {
-        let transport = Arc::new(FakeTransport::new(vec![ok("jev-test")]));
-        let error = JevClient::with_config(
-            config(),
-            ResolvedApiKey::new("  ".to_owned()),
-            Arc::clone(&transport) as Arc<dyn JevTransport>,
-        )
-        .expect_err("key");
-        assert_eq!(error.code(), "KEY_MISSING");
-        assert!(transport.sent().is_empty());
+    fn blank_or_malformed_key_never_reaches_a_client() {
+        let blank = ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "  ".to_owned())
+            .expect_err("blank key");
+        assert_eq!(blank.code(), "KEY_MISSING");
+        let spaced = ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "super secret".to_owned())
+            .expect_err("interior space");
+        assert_eq!(spaced.code(), "CONFIG_INVALID");
+        assert!(!spaced.fix_hint().contains("super secret"));
     }
 
     #[test]
@@ -517,7 +534,7 @@ mod jev_api {
         });
         let client = JevClient::with_config(
             config(),
-            ResolvedApiKey::new("super-secret".to_owned()),
+            secret_key(),
             Arc::clone(&transport) as Arc<dyn JevTransport>,
         )
         .expect("client")
@@ -533,7 +550,7 @@ mod jev_api {
     #[test]
     fn https_transport_refuses_cleartext_without_sending() {
         let transport = HttpsTransport::new();
-        let api_key = ResolvedApiKey::new("super-secret".to_owned());
+        let api_key = secret_key();
         let error = transport
             .send(&WireRequest {
                 url: "http://api.typesafe.ai/v1/systemone",

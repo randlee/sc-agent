@@ -1,0 +1,10 @@
+# Line endings (FTQ-005 / REQ-QA-A10-005). Every tracked file is LF
+# (`git ls-files --eol`), so text checks out LF on every platform, including
+# Windows with core.autocrlf=true.
+* text=auto eol=lf
+
+# Byte-compared fixtures are never converted: tests compare their exact bytes
+# (sc-treesitter golden stdout, canonical payload references).
+tests/fixtures/** -text
+*.scm -text
+*.bytes binary

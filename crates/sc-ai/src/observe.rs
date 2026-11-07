@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use sc_agent_types::observability::v2::{EventError, LogEvent as SessionEvent, SessionLog};
+use sc_agent_types::observability::v2::{
+    EventError, LogEvent as SessionEvent, LogOperation, SessionLog,
+};
 use sc_agent_types::{JevError, RepoRoot};
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
@@ -151,7 +153,7 @@ fn obs_event(event: SessionEvent) -> LogEvent {
     );
     fields.insert(
         "operation".to_owned(),
-        Value::String(event.operation.clone()),
+        Value::String(event.operation.as_str().to_owned()),
     );
     fields.insert(
         "session_id".to_owned(),
@@ -163,7 +165,7 @@ fn obs_event(event: SessionEvent) -> LogEvent {
         level: Level::Info,
         service: service_name(),
         target: TargetCategory::new("jev.session").expect("jev.session is a valid target"),
-        action: action_name(&event.operation),
+        action: action_name(event.operation),
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -176,7 +178,59 @@ fn obs_event(event: SessionEvent) -> LogEvent {
     }
 }
 
-fn action_name(operation: &str) -> ActionName {
-    ActionName::new(operation)
-        .unwrap_or_else(|_| ActionName::new("session").expect("session is a valid action name"))
+/// Every [`LogOperation`] spelling is a valid action name; the unit test
+/// `every_log_operation_is_an_action_name` proves it.
+fn action_name(operation: LogOperation) -> ActionName {
+    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_log_operation_is_an_action_name() {
+        for operation in LogOperation::ALL {
+            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        }
+    }
+
+    /// Stable projection of an adapted event: every key except the
+    /// per-process `timestamp`, `service` and `identity`.
+    fn projection(event: &LogEvent) -> serde_json::Value {
+        let mut value = serde_json::to_value(event).expect("serialize");
+        let object = value.as_object_mut().expect("object");
+        for volatile in ["timestamp", "service", "identity"] {
+            object.remove(volatile);
+        }
+        value
+    }
+
+    fn golden_event(operation: LogOperation) -> SessionEvent {
+        SessionEvent {
+            session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
+                .expect("nil session id"),
+            backend: sc_agent_types::BackendId::AnthropicHaiku,
+            prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
+            operation,
+        }
+    }
+
+    /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
+    /// (where a shared one lives is decision D2). Both compare against this
+    /// one golden (every `LogOperation`), so they cannot drift apart.
+    #[test]
+    fn adapter_matches_the_shared_session_event_golden() {
+        let golden: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/observability/session-event.json"
+        ))
+        .expect("golden json");
+        for operation in LogOperation::ALL {
+            assert_eq!(
+                projection(&obs_event(golden_event(operation))),
+                golden[operation.as_str()],
+                "{operation}"
+            );
+        }
+    }
 }

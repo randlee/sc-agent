@@ -10,7 +10,6 @@
 //! (ADR-SAG-0022). Production builds leave that feature off. It does not add
 //! a `run_check` parameter (ADR-SAG-0009).
 
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 use std::sync::Arc;
@@ -25,7 +24,7 @@ use sc_jev_backends::{AnthropicHaikuBackend, OpenAiLunaBackend, UreqTransport};
 
 #[cfg(any(test, feature = "test-util"))]
 #[doc(inline)]
-pub use scripted::register_scripted_backends;
+pub use scripted::{RequestLog, ScriptedJudge, register_scripted_backends};
 
 /// Selected judge backends for one run.
 ///
@@ -101,12 +100,8 @@ impl std::fmt::Debug for BackendRegistry {
 
 /// Credential id used to construct `id`.
 #[must_use]
-pub fn backend_key_id(id: BackendId) -> BackendKeyId {
-    match id {
-        BackendId::Jev => BackendKeyId::TypeSafe,
-        BackendId::AnthropicHaiku => BackendKeyId::Anthropic,
-        BackendId::OpenAiLuna => BackendKeyId::OpenAi,
-    }
+pub(crate) fn backend_key_id(id: BackendId) -> BackendKeyId {
+    id.key_id()
 }
 
 /// Resolves keys at `repo` and constructs one backend per `ids` entry.
@@ -159,40 +154,16 @@ fn construct_backend(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sc_agent_types::{JudgeOutcome, JudgeRequest, test_util::MockJudgeBackend};
-    use std::sync::Mutex;
-
-    struct LocalJudge {
-        seen: Mutex<u32>,
-    }
-
-    impl JudgeBackend for LocalJudge {
-        fn id(&self) -> BackendId {
-            BackendId::Jev
-        }
-
-        fn validate_for_send(&self, _req: &JudgeRequest) -> Result<(), JevError> {
-            Ok(())
-        }
-
-        fn judge(&self, _req: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-            *self.seen.lock().unwrap_or_else(|error| error.into_inner()) += 1;
-            Ok(JudgeOutcome {
-                answers: serde_json::json!({"relevant": {"choice": "yes"}}),
-                backend: BackendId::Jev,
-                probabilities: None,
-                provider_meta: None,
-            })
-        }
-    }
+    use sc_agent_types::{JudgeOutcome, test_util::MockJudgeBackend};
 
     #[test]
     fn registry_accepts_a_new_judge_backend_without_an_api_change() {
         let mut registry = BackendRegistry::new();
         registry
-            .register(Arc::new(LocalJudge {
-                seen: Mutex::new(0),
-            }))
+            .register(Arc::new(ScriptedJudge::new(
+                BackendId::Jev,
+                serde_json::json!({"relevant": {"choice": "yes"}}),
+            )))
             .expect("register");
         let error = registry
             .register(Arc::new(MockJudgeBackend::new(

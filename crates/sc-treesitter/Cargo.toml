@@ -15,6 +15,9 @@ categories = ["command-line-utilities", "parsing"]
 # warning); tests that read repo-root fixtures run from the workspace only.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**", "assets/queries/**"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["python", "rust"]
 python = ["dep:tree-sitter-python"]
@@ -32,3 +35,6 @@ serde_json.workspace = true
 tree-sitter = { version = "=0.27.1" }
 tree-sitter-python = { version = "=0.25.0", optional = true }
 tree-sitter-rust = { version = "=0.24.2", optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true

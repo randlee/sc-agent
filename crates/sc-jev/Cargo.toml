@@ -15,8 +15,12 @@ categories.workspace = true
 # warning); tests that read repo-root fixtures run from the workspace only.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
+[lints]
+workspace = true
+
 [dependencies]
 sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 ureq.workspace = true

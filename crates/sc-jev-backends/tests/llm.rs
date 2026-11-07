@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle,
-    ResolvedApiKey, Sha256Digest,
+    BackendId, BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, LlmWireContext,
+    PayloadBundle, ResolvedApiKey, Sha256Digest,
 };
 use sc_jev_backends::{
     AnthropicHaikuBackend, BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT,
@@ -167,7 +167,21 @@ fn standard_request(prompt: &str) -> JudgeRequest {
 }
 
 fn credential() -> ResolvedApiKey {
-    ResolvedApiKey::new(KEY.to_owned())
+    ResolvedApiKey::try_new(BackendKeyId::Anthropic, KEY.to_owned()).expect("key")
+}
+
+/// Largest jitter the busy-retry policy adds to a wait.
+const JITTER_MAX: Duration = Duration::from_millis(250);
+
+/// Asserts each recorded wait is `expected` plus at most the policy jitter.
+fn assert_waits(actual: &[Duration], expected: &[Duration]) {
+    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
+    for (got, want) in actual.iter().zip(expected) {
+        assert!(
+            *got >= *want && *got <= *want + JITTER_MAX,
+            "{actual:?} vs {expected:?}"
+        );
+    }
 }
 
 fn haiku(replies: Vec<HttpResponse>) -> (AnthropicHaikuBackend, Arc<Recorded>) {
@@ -190,6 +204,17 @@ fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend, Arc<Recorded>) {
         .expect("key")
         .with_retry_sleeper(sleeper);
     (backend, recorded)
+}
+
+/// The constructors return `Result` for API stability only (RBP-007
+/// observation, a-10). If a construction check is added, update this test
+/// and the `# Errors` docs together.
+#[test]
+fn llm_backend_constructors_always_succeed_today() {
+    let (transport, _) = ScriptedTransport::new(Vec::new());
+    assert!(AnthropicHaikuBackend::new(credential(), transport).is_ok());
+    let (transport, _) = ScriptedTransport::new(Vec::new());
+    assert!(OpenAiLunaBackend::new(credential(), transport).is_ok());
 }
 
 fn posts(recorded: &Recorded) -> Vec<HttpRequest> {
@@ -234,7 +259,7 @@ fn assert_outcome_fields(outcome: &JudgeOutcome, backend: BackendId) {
 #[test]
 fn test_haiku_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(&request.payload.bytes).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 100),
         count_reply(100),
@@ -295,7 +320,7 @@ fn test_haiku_request_embeds_canonical_payload() {
 #[test]
 fn test_luna_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(&request.payload.bytes).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
     let (backend, recorded) = luna(vec![
         luna_message(&answer_text(), "completed", 50),
         count_reply(50),
@@ -372,8 +397,11 @@ fn test_llm_system_prompt_is_injected_not_hardcoded() {
 fn test_prompt_change_does_not_alter_prompt_sha256() {
     let first = standard_request("prompt-alpha");
     let second = standard_request("prompt-beta");
-    assert_eq!(first.payload.sha256, second.payload.sha256);
-    assert_eq!(first.payload.sha256, Sha256Digest::of(&first.payload.bytes));
+    assert_eq!(first.payload.sha256(), second.payload.sha256());
+    assert_eq!(
+        first.payload.sha256(),
+        &Sha256Digest::of(first.payload.bytes())
+    );
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 4),
         count_reply(4),
@@ -382,7 +410,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     ]);
     backend.judge(&first).expect("first");
     backend.judge(&second).expect("second");
-    assert_eq!(first.payload.sha256, second.payload.sha256);
+    assert_eq!(first.payload.sha256(), second.payload.sha256());
     let seen = posts(&recorded);
     let alpha = body_json(&seen[1]);
     let beta = body_json(&seen[3]);
@@ -390,7 +418,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     assert_ne!(alpha["system"], beta["system"]);
     assert_eq!(alpha["system"], "prompt-alpha");
     assert_eq!(beta["system"], "prompt-beta");
-    assert_ne!(first.payload.sha256, Sha256Digest::of(&seen[1].body));
+    assert_ne!(first.payload.sha256(), &Sha256Digest::of(&seen[1].body));
 }
 
 #[test]
@@ -499,14 +527,55 @@ fn test_llm_busy_retry_same_body() {
     assert_eq!(seen[3].body, seen[4].body);
     assert_ne!(seen[0].body, seen[2].body);
     let delays = recorded.delays.lock().expect("delays").clone();
-    assert_eq!(
-        delays,
-        vec![
+    assert_waits(
+        &delays,
+        &[
             Duration::from_secs(30),
             Duration::from_secs(1),
             Duration::from_secs(30),
-        ]
+        ],
     );
+}
+
+#[test]
+fn test_llm_busy_exhausted_wording_and_decimal_retry_after() {
+    let busy = || {
+        response(
+            429,
+            vec![("retry-after", "1.5")],
+            json!({"error": "slow down"}),
+        )
+    };
+    let (backend, recorded) = luna(vec![busy(), busy(), busy(), busy()]);
+    let error = backend
+        .judge(&standard_request(PROMPT))
+        .expect_err("exhausted");
+    assert_eq!(error.code(), "NETWORK_ERROR");
+    assert_eq!(
+        error.to_string(),
+        "network error: luna busy: HTTP 429 after 4 sends; retry attempts exhausted"
+    );
+    assert_eq!(posts(&recorded).len(), 4);
+    let delays = recorded.delays.lock().expect("delays").clone();
+    assert_waits(&delays, &[Duration::from_millis(1_500); 3]);
+}
+
+#[test]
+fn test_with_timeouts_reaches_every_request() {
+    let (transport, recorded) = ScriptedTransport::new(vec![
+        luna_message(&answer_text(), "completed", 5),
+        count_reply(5),
+    ]);
+    let backend = OpenAiLunaBackend::new(credential(), transport)
+        .expect("key")
+        .with_timeouts(Duration::from_millis(250), Duration::from_secs(3));
+    backend.judge(&standard_request(PROMPT)).expect("judge");
+    let seen = posts(&recorded);
+    assert_eq!(seen.len(), 2);
+    for request in &seen {
+        assert_eq!(request.connect_timeout, Duration::from_millis(250));
+        assert_eq!(request.request_timeout, Duration::from_secs(3));
+    }
 }
 
 #[test]
@@ -534,11 +603,13 @@ fn test_llm_bad_token_count_does_not_send_judge() {
 
 #[test]
 fn test_llm_missing_key_does_not_build() {
-    let (transport, recorded) = ScriptedTransport::new(vec![count_reply(1)]);
-    let error = AnthropicHaikuBackend::new(ResolvedApiKey::new(String::new()), transport)
-        .expect_err("missing");
+    let error =
+        ResolvedApiKey::try_new(BackendKeyId::Anthropic, String::new()).expect_err("missing");
     assert_eq!(error.code(), "KEY_MISSING");
-    assert!(posts(&recorded).is_empty());
+    let control = ResolvedApiKey::try_new(BackendKeyId::OpenAi, format!("{KEY}\u{7}"))
+        .expect_err("control character");
+    assert_eq!(control.code(), "CONFIG_INVALID");
+    assert!(!control.fix_hint().contains(KEY));
     let rendered = format!(
         "{:?}",
         OpenAiLunaBackend::new(credential(), {

@@ -3,13 +3,20 @@
 //! Construction uses [`sc_observability::v2::LoggerBuilder`] (ADR-SAG-0013).
 //! Path precedence is ADR-SAG-0021. The JSONL file uses the crate's built-in
 //! file sink. This module does not write JSONL itself.
+//!
+//! One logger (one file writer) exists per canonical log root in this
+//! process. [`open_session_log`] reuses a live one from a process-wide
+//! registry of weak handles, so repeated `run_check` calls in one interpreter
+//! share the writer. The last handle to drop flushes and shuts it down.
 
+use std::collections::HashMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 
 use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::{
-    EventError, LogEvent as SessionEvent, SessionLog, SharedSessionLog,
+    EventError, LogEvent as SessionEvent, LogOperation, SessionLog, SharedSessionLog,
 };
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
@@ -29,29 +36,50 @@ pub(crate) const SESSION_DIR_ENV: &str = "SC_AGENT_SESSION_DIR";
 /// Service name recorded on every Python session-log line.
 pub(crate) const SERVICE_NAME: &str = "sc-jev-py";
 
-/// Shared logger handle. The last clone flushes and shuts the writer down.
+/// Target category recorded on every Python session-log line.
+const TARGET: &str = "jev.session";
+
+/// Owns one running logger. Dropping it flushes and shuts the writer down.
+///
+/// Shutdown runs exactly once, when the last [`Arc`] goes away, so there is
+/// no reference-count race between concurrent drops.
+struct LoggerInner(Logger);
+
+impl Drop for LoggerInner {
+    fn drop(&mut self) {
+        let _ = self.0.flush();
+        let _ = self.0.shutdown();
+    }
+}
+
+/// Shared logger handle; clones share one writer.
 #[derive(Clone)]
 pub(crate) struct LoggerGuard {
-    logger: Arc<Logger>,
+    inner: Arc<LoggerInner>,
 }
 
 impl LoggerGuard {
     fn log(&self, event: LogEvent) -> Result<(), EventError> {
-        self.logger.log(event)
+        self.inner.0.log(event)
     }
 
     pub(crate) fn flush(&self) {
-        let _ = self.logger.flush();
+        let _ = self.inner.0.flush();
+    }
+
+    /// Whether `self` and `other` write through the same logger.
+    #[cfg(test)]
+    pub(crate) fn shares_writer_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
-impl Drop for LoggerGuard {
-    fn drop(&mut self) {
-        if Arc::strong_count(&self.logger) == 1 {
-            let _ = self.logger.flush();
-            let _ = self.logger.shutdown();
-        }
-    }
+/// Live loggers keyed by canonical log root (composition-root state).
+type Registry = Mutex<HashMap<PathBuf, Weak<LoggerInner>>>;
+
+fn registry() -> &'static Registry {
+    static LOGGERS: OnceLock<Registry> = OnceLock::new();
+    LOGGERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 struct ObservabilitySessionLog {
@@ -72,43 +100,63 @@ impl std::fmt::Debug for ObservabilitySessionLog {
     }
 }
 
-/// Starts a file logger at `log_root` and the [`SharedSessionLog`] adapter.
+/// Returns the file logger for `log_root` and its [`SharedSessionLog`] adapter.
 ///
-/// Console logging stays off so JSONL is the retained record. Bearer tokens
-/// in event text are redacted by the logger. This adapter never puts an API
-/// key in the event.
+/// A logger already running for the same canonical root is reused; otherwise
+/// one is started. Console logging stays off so JSONL is the retained record.
+/// Bearer tokens in event text are redacted by the logger. This adapter never
+/// puts an API key in the event.
 ///
 /// # Errors
 ///
 /// Returns [`JevError::session_store_io`] (`CONFIG_INVALID`) when `log_root`
-/// cannot be created or the logger cannot start. The fix hint names `log_root`.
+/// cannot be created or resolved, or the logger cannot start. The fix hint
+/// names `log_root`.
 pub(crate) fn open_session_log(
     log_root: &Path,
 ) -> Result<(LoggerGuard, SharedSessionLog), JevError> {
+    let guard = shared_logger(log_root)?;
+    let shared: SharedSessionLog = Arc::new(ObservabilitySessionLog {
+        logger: guard.clone(),
+    });
+    Ok((guard, shared))
+}
+
+fn shared_logger(log_root: &Path) -> Result<LoggerGuard, JevError> {
     std::fs::create_dir_all(log_root).map_err(|error| {
         JevError::session_store_io(&format!(
             "Create log directory {} or set {LOG_DIR_ENV} to a writable directory ({error}).",
             log_root.display()
         ))
     })?;
+    let key = std::fs::canonicalize(log_root).map_err(|error| {
+        JevError::session_store_io(&format!(
+            "Resolve log directory {} ({error}). Choose a readable log directory and retry.",
+            log_root.display()
+        ))
+    })?;
+    let mut live = registry().lock().unwrap_or_else(PoisonError::into_inner);
+    live.retain(|_, weak| weak.strong_count() > 0);
+    if let Some(inner) = live.get(&key).and_then(Weak::upgrade) {
+        return Ok(LoggerGuard { inner });
+    }
+    let inner = Arc::new(LoggerInner(start_logger(&key)?));
+    live.insert(key, Arc::downgrade(&inner));
+    Ok(LoggerGuard { inner })
+}
+
+fn start_logger(log_root: &Path) -> Result<Logger, JevError> {
     let mut config = LoggerConfig::default_for(service_name(), log_root.to_path_buf());
     config.enable_console_sink = false;
     config.enable_file_sink = true;
-    let logger = LoggerBuilder::new(config)
+    LoggerBuilder::new(config)
         .and_then(LoggerBuilder::build)
         .map_err(|error| {
             JevError::session_store_io(&format!(
                 "Start the session logger at {} ({error}). Choose a writable log directory and retry.",
                 log_root.display()
             ))
-        })?;
-    let guard = LoggerGuard {
-        logger: Arc::new(logger),
-    };
-    let shared: SharedSessionLog = Arc::new(ObservabilitySessionLog {
-        logger: guard.clone(),
-    });
-    Ok((guard, shared))
+        })
 }
 
 /// Default log root when no argument or environment variable is set.
@@ -119,9 +167,17 @@ pub(crate) fn open_session_log(
 #[must_use]
 pub(crate) fn default_log_root() -> PathBuf {
     let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
-    match home {
+    default_log_root_from(home, &std::env::temp_dir())
+}
+
+/// Pure form of [`default_log_root`] over an injected home and temp dir.
+///
+/// An empty `home` counts as unset.
+#[must_use]
+pub(crate) fn default_log_root_from(home: Option<OsString>, tmp: &Path) -> PathBuf {
+    match home.filter(|home| !home.is_empty()) {
         Some(home) => PathBuf::from(home).join(".sc-agent").join("log"),
-        None => std::env::temp_dir().join("sc-agent").join("log"),
+        None => tmp.join("sc-agent").join("log"),
     }
 }
 
@@ -179,17 +235,24 @@ fn env_path(key: &str) -> Option<PathBuf> {
     }
 }
 
+// The `expect`s below run on compile-time constants. The unit test
+// `observability_constants_are_valid` proves each one holds.
+
 fn service_name() -> ServiceName {
-    ServiceName::new(SERVICE_NAME).expect("sc-jev-py is a valid service name")
+    ServiceName::new(SERVICE_NAME).expect("SERVICE_NAME is a valid service name")
 }
 
 fn target() -> TargetCategory {
-    TargetCategory::new("jev.session").expect("jev.session is a valid target")
+    TargetCategory::new(TARGET).expect("TARGET is a valid target category")
 }
 
-fn action_name(operation: &str) -> ActionName {
-    ActionName::new(operation)
-        .unwrap_or_else(|_| ActionName::new("event").expect("event is a valid action name"))
+fn action_name(operation: LogOperation) -> ActionName {
+    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
+}
+
+fn schema_version() -> SchemaVersion {
+    SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION)
+        .expect("OBSERVATION_ENVELOPE_VERSION is a valid schema version")
 }
 
 fn to_obs_event(event: &SessionEvent) -> LogEvent {
@@ -208,15 +271,15 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
     );
     fields.insert(
         "operation".to_owned(),
-        serde_json::Value::String(event.operation.clone()),
+        serde_json::Value::String(event.operation.as_str().to_owned()),
     );
     LogEvent {
-        version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).expect("v1 is a valid schema"),
+        version: schema_version(),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
         service: service_name(),
         target: target(),
-        action: action_name(&event.operation),
+        action: action_name(event.operation),
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -233,26 +296,92 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
 mod tests {
     use super::*;
     use sc_agent_types::{BackendId, SessionId, Sha256Digest};
+    use tempfile::TempDir;
+
+    fn event(
+        session_id: SessionId,
+        digest: &Sha256Digest,
+        operation: LogOperation,
+    ) -> SessionEvent {
+        SessionEvent {
+            session_id,
+            backend: BackendId::AnthropicHaiku,
+            prompt_sha256: digest.clone(),
+            operation,
+        }
+    }
+
+    /// Stable projection of an adapted event: every key except the
+    /// per-process `timestamp`, `service` and `identity`.
+    fn projection(event: &LogEvent) -> serde_json::Value {
+        let mut value = serde_json::to_value(event).expect("serialize");
+        let object = value.as_object_mut().expect("object");
+        for volatile in ["timestamp", "service", "identity"] {
+            object.remove(volatile);
+        }
+        value
+    }
+
+    fn golden_event(operation: LogOperation) -> SessionEvent {
+        SessionEvent {
+            session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
+                .expect("nil session id"),
+            backend: sc_agent_types::BackendId::AnthropicHaiku,
+            prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
+            operation,
+        }
+    }
+
+    /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
+    /// (where a shared one lives is decision D2). Both compare against this
+    /// one golden (every `LogOperation`), so they cannot drift apart.
+    #[test]
+    fn adapter_matches_the_shared_session_event_golden() {
+        let golden: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/observability/session-event.json"
+        ))
+        .expect("golden json");
+        for operation in LogOperation::ALL {
+            assert_eq!(
+                projection(&to_obs_event(&golden_event(operation))),
+                golden[operation.as_str()],
+                "{operation}"
+            );
+        }
+    }
 
     #[test]
-    fn default_log_root_is_under_sc_agent() {
-        let path = default_log_root();
-        let parts: Vec<_> = path.components().collect();
-        assert!(parts.len() >= 2);
-        let end: Vec<String> = parts
-            .iter()
-            .rev()
-            .take(2)
-            .map(|component| component.as_os_str().to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(end, ["log", ".sc-agent"]);
+    fn observability_constants_are_valid() {
+        assert!(ServiceName::new(SERVICE_NAME).is_ok());
+        assert!(TargetCategory::new(TARGET).is_ok());
+        assert!(SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).is_ok());
+        for operation in LogOperation::ALL {
+            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        }
+    }
+
+    #[test]
+    fn default_log_root_uses_home_when_set() {
+        let tmp = Path::new("tmp-root");
+        assert_eq!(
+            default_log_root_from(Some(OsString::from("home-root")), tmp),
+            Path::new("home-root").join(".sc-agent").join("log")
+        );
+    }
+
+    #[test]
+    fn default_log_root_falls_back_to_temp_when_home_is_unset_or_empty() {
+        let tmp = Path::new("tmp-root");
+        let expected = tmp.join("sc-agent").join("log");
+        assert_eq!(default_log_root_from(None, tmp), expected);
+        assert_eq!(default_log_root_from(Some(OsString::new()), tmp), expected);
     }
 
     #[test]
     fn explicit_log_root_wins() {
-        let temp_dir = std::env::temp_dir();
-        let explicit = temp_dir.join("sc-jev-py-explicit");
-        let sessions = temp_dir.join("sessions");
+        let temp_dir = TempDir::new().expect("temp");
+        let explicit = temp_dir.path().join("sc-jev-py-explicit");
+        let sessions = temp_dir.path().join("sessions");
         assert_eq!(resolve_log_root(Some(&explicit)), explicit);
         assert_eq!(resolve_session_dir(Some(&sessions), &explicit), sessions);
         assert_eq!(
@@ -267,26 +396,14 @@ mod tests {
 
     #[test]
     fn adapter_writes_one_line_without_secret_fields() {
-        let root = std::env::temp_dir().join(format!(
-            "sc-jev-py-log-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("clock")
-                .as_nanos()
-        ));
-        let (guard, log) = open_session_log(&root).expect("logger");
+        let root = TempDir::new().expect("temp");
+        let (guard, log) = open_session_log(root.path()).expect("logger");
         let digest = Sha256Digest::of(b"payload");
         let session_id = SessionId::new();
-        log.try_log(SessionEvent {
-            session_id,
-            backend: BackendId::AnthropicHaiku,
-            prompt_sha256: digest.clone(),
-            operation: "judge".to_owned(),
-        })
-        .expect("log");
+        log.try_log(event(session_id, &digest, LogOperation::Judge))
+            .expect("log");
         guard.flush();
-        let text = std::fs::read_to_string(log_file(&root)).expect("jsonl");
+        let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");
         let lines: Vec<_> = text.lines().filter(|line| !line.is_empty()).collect();
         assert_eq!(lines.len(), 1, "{text}");
         assert!(lines[0].contains(digest.as_str()));
@@ -297,8 +414,35 @@ mod tests {
         for forbidden in ["api_key", "authorization", "bearer ", "password"] {
             assert!(!lower.contains(forbidden), "{forbidden} in {text}");
         }
-        drop(log);
-        drop(guard);
-        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn one_writer_per_log_root_while_any_handle_lives() {
+        let root = TempDir::new().expect("temp");
+        let (first, first_log) = open_session_log(root.path()).expect("first");
+        // A different spelling of the same directory maps to the same key.
+        let (second, second_log) = open_session_log(&root.path().join(".")).expect("second");
+        assert!(first.shares_writer_with(&second));
+        let digest = Sha256Digest::of(b"payload");
+        first_log
+            .try_log(event(SessionId::new(), &digest, LogOperation::Judge))
+            .expect("first line");
+        second_log
+            .try_log(event(SessionId::new(), &digest, LogOperation::Ask))
+            .expect("second line");
+        second.flush();
+        let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");
+        assert_eq!(text.lines().filter(|line| !line.is_empty()).count(), 2);
+
+        let other = TempDir::new().expect("other");
+        let (third, _third_log) = open_session_log(other.path()).expect("third");
+        assert!(!third.shares_writer_with(&first));
+
+        drop((first, first_log, second, second_log));
+        let (fresh, _fresh_log) = open_session_log(root.path()).expect("fresh");
+        assert!(
+            fresh.inner.0.flush().is_ok(),
+            "a fresh logger starts after the last drop"
+        );
     }
 }

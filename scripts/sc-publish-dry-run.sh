@@ -20,6 +20,11 @@
 #                             cleared first. Unset: a mktemp dir removed on exit.
 #   SC_PUBLISH_NET_TIMEOUT    seconds for each git / bootstrap network step (300)
 #   SC_PUBLISH_BUILD_TIMEOUT  seconds for cargo publish and maturin (1800)
+# The publish phase builds in target/sc-publish-dry-run/<content key> (see
+# phase_publish). One directory accumulates per distinct source state and
+# this script does not prune them. CI keeps them out of its target/ cache
+# (sc-publish-dry-run.yml); locally `cargo clean` or removing
+# target/sc-publish-dry-run/ reclaims the space.
 # Network settings default to CARGO_HTTP_TIMEOUT=60, CARGO_NET_RETRY=2 and
 # PIP_DEFAULT_TIMEOUT=60. A timed-out step fails and names itself; this script
 # never retries.
@@ -147,6 +152,30 @@ phase_publish() {
   if [[ "${SC_PUBLISH_ALLOW_DIRTY:-0}" == "1" ]]; then
     publish_args+=(--allow-dirty)
   fi
+  # A multi-package dry-run serves the packaged workspace crates from a
+  # local registry at <target-dir>/package/tmp-registry and unpacks each one
+  # under $CARGO_HOME/registry/src/-<hash of that path>/. Cargo does not
+  # unpack again while that directory exists, so with a fixed target dir a
+  # copy from an earlier run of the same version (locally, or restored from
+  # the CI cache of ~/.cargo/registry) is compiled instead of the current
+  # source, and a new public item in sc-agent-types fails to resolve when
+  # sc-jev-check is verified. Keying the target dir on the source content
+  # means a reused unpack always holds identical sources. The key covers the
+  # HEAD tree, the working diff, and untracked non-ignored files (paths and
+  # contents), which `--allow-dirty` packages too.
+  local content_key
+  content_key="$(python3 -c '
+import hashlib, subprocess
+def git(*args):
+    return subprocess.run(["git", *args], check=True, capture_output=True).stdout
+digest = hashlib.sha256(git("rev-parse", "HEAD^{tree}") + git("diff", "HEAD", "--binary"))
+for name in sorted(git("ls-files", "-z", "--others", "--exclude-standard").split(b"\0")):
+    if name:
+        with open(name, "rb") as handle:
+            digest.update(name + b"\0" + handle.read())
+print(digest.hexdigest()[:16])
+')"
+  publish_args+=(--target-dir "target/sc-publish-dry-run/$content_key")
   printf 'cargo publish --dry-run --locked %s\n' "${publish_args[*]}"
   bounded "$build_timeout" "cargo publish --dry-run" \
     cargo publish --dry-run --locked "${publish_args[@]}"

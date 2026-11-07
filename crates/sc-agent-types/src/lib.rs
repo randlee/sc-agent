@@ -9,11 +9,12 @@
 //! # Canonical judge payload
 //!
 //! ADR-SAG-0002: payload bytes are sorted-key compact JSON, encoded as UTF-8.
-//! Object keys are stored in a [`std::collections::BTreeMap`] (`serde_json::Map`
-//! without `preserve_order`). [`canonical_json_bytes`] re-sorts keys and emits
-//! `serde_json`'s compact encoding. Non-ASCII characters stay UTF-8. SHA-256
-//! of those bytes is `prompt_sha256`. LLM system-prompt
-//! text is not part of the digest (ADR-SAG-0019).
+//! [`canonical_json_bytes`] recursively re-sorts every object's keys and
+//! emits `serde_json`'s compact encoding; that re-sort is the canonical-order
+//! guarantee, independent of whether `serde_json` was built with
+//! `preserve_order`. Non-ASCII characters stay UTF-8. SHA-256 of those bytes
+//! is `prompt_sha256`. LLM system-prompt text is not part of the digest
+//! (ADR-SAG-0019).
 //!
 //! # Tests and fixtures
 //!

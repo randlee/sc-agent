@@ -126,7 +126,11 @@ pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(String, String)> {
 pub(crate) struct VendorReply {
     pub(crate) text: String,
     pub(crate) input_tokens: u64,
-    pub(crate) commands: u64,
+    /// Content blocks that are not text (tool calls and other items).
+    ///
+    /// Reported as `provider_meta.commands` for compatibility; not related to
+    /// `EqualInputRecord.commands`.
+    pub(crate) non_text_blocks: u64,
     pub(crate) stop_reason: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) truncation: Option<String>,
@@ -157,7 +161,7 @@ pub(crate) fn parse_vendor(
         detail: format!("{provider} reply is not JSON"),
     })?;
     let usage = object.get("usage").and_then(Value::as_object);
-    let (text, commands, input_tokens) = match kind {
+    let (text, non_text_blocks, input_tokens) = match kind {
         ProviderKind::Anthropic => parse_anthropic(object, usage)?,
         ProviderKind::OpenAi => parse_openai(object, usage)?,
     };
@@ -178,7 +182,7 @@ pub(crate) fn parse_vendor(
     Ok(VendorReply {
         text: text.unwrap_or_default(),
         input_tokens,
-        commands,
+        non_text_blocks,
         stop_reason,
         status,
         truncation,
@@ -258,7 +262,7 @@ pub(crate) fn provider_meta(reply: &VendorReply, model: &str, prompt_tokens: u64
         "status": reply.status,
         "input_tokens": reply.input_tokens,
         "prompt_tokens": prompt_tokens,
-        "commands": reply.commands,
+        "commands": reply.non_text_blocks,
     })
 }
 
@@ -267,7 +271,7 @@ fn parse_anthropic(
     usage: Option<&Map<String, Value>>,
 ) -> Result<(Option<String>, u64, u64), JevError> {
     let mut text = String::new();
-    let mut commands = 0_u64;
+    let mut non_text_blocks = 0_u64;
     let mut saw_text = false;
     for block in object
         .get("content")
@@ -285,14 +289,20 @@ fn parse_anthropic(
                     saw_text = true;
                 }
             }
-            Some(kind) if kind.ends_with("tool_use") => commands = commands.saturating_add(1),
+            Some(kind) if kind.ends_with("tool_use") => {
+                non_text_blocks = non_text_blocks.saturating_add(1)
+            }
             _ => {}
         }
     }
     let input_tokens = usage_i64(usage, "input_tokens")
         .saturating_add(usage_i64(usage, "cache_creation_input_tokens"))
         .saturating_add(usage_i64(usage, "cache_read_input_tokens"));
-    Ok((saw_text.then_some(text), commands, nonneg(input_tokens)?))
+    Ok((
+        saw_text.then_some(text),
+        non_text_blocks,
+        nonneg(input_tokens)?,
+    ))
 }
 
 fn parse_openai(
@@ -300,7 +310,7 @@ fn parse_openai(
     usage: Option<&Map<String, Value>>,
 ) -> Result<(Option<String>, u64, u64), JevError> {
     let mut text = String::new();
-    let mut commands = 0_u64;
+    let mut non_text_blocks = 0_u64;
     let mut saw_text = false;
     for item in object
         .get("output")
@@ -309,7 +319,7 @@ fn parse_openai(
         .flatten()
     {
         let Some(item) = item.as_object() else {
-            commands = commands.saturating_add(1);
+            non_text_blocks = non_text_blocks.saturating_add(1);
             continue;
         };
         match item.get("type").and_then(Value::as_str) {
@@ -330,12 +340,12 @@ fn parse_openai(
                 }
             }
             Some("reasoning") => {}
-            _ => commands = commands.saturating_add(1),
+            _ => non_text_blocks = non_text_blocks.saturating_add(1),
         }
     }
     Ok((
         saw_text.then_some(text),
-        commands,
+        non_text_blocks,
         nonneg(usage_i64(usage, "input_tokens"))?,
     ))
 }

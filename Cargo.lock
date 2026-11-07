@@ -1275,6 +1275,7 @@ dependencies = [
  "sc-observability",
  "serde",
  "serde_json",
+ "tempfile",
  "uuid",
 ]
 
@@ -1283,6 +1284,7 @@ name = "sc-jev"
 version = "0.1.0"
 dependencies = [
  "sc-agent-types",
+ "serde",
  "serde_json",
  "toml",
  "ureq",
@@ -1307,6 +1309,7 @@ dependencies = [
  "sc-jev-backends",
  "serde",
  "serde_json",
+ "tempfile",
  "toml",
 ]
 
@@ -1319,6 +1322,7 @@ dependencies = [
  "sc-jev-check",
  "sc-observability",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1375,6 +1379,7 @@ dependencies = [
  "mimalloc",
  "sc-agent-types",
  "serde_json",
+ "tempfile",
  "tree-sitter",
  "tree-sitter-python",
  "tree-sitter-rust",

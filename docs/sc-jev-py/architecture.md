@@ -23,10 +23,14 @@ extension; it is not the primary deliverable.
 
 PyO3 only — no duplicate Jev HTTP or canonicalization. `build_request` calls
 `sc_jev_check::run::build_request` and does not run extractors (ADR-SAG-0005).
-Production `run_check` does not take `scripted_answers` and does not implement
-`JudgeBackend` (ADR-SAG-0009). The `test-util` feature forwards scripted
-answers to `sc_jev_check::registry::register_scripted_backends`
-(ADR-SAG-0022). Default features leave that off. Exceptions expose the same
+`run_check` has one signature in every build and never takes
+`scripted_answers`; this crate does not implement `JudgeBackend`
+(ADR-SAG-0009). The test-util entry point is the separate function
+`sc_jev_py._testing.run_check_scripted(check_path, *, scripted_answers, ...)`.
+The `_testing` submodule is registered only under the `test-util` feature,
+and the function forwards the answers to
+`sc_jev_check::registry::register_scripted_backends` (ADR-SAG-0022,
+ADR-SAG-0029). Default features and the publish wheel leave that off. Exceptions expose the same
 error codes as `JevError`.
 
 Log and session paths follow ADR-SAG-0021. Log root, first match:

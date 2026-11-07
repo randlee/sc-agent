@@ -1,13 +1,11 @@
 //! `sc-ai` binary. JSON on stdout, typed errors on stderr, exit 2 on failure.
 
-#![forbid(unsafe_code)]
-
 use std::io::{self, Read, Write};
 use std::process::ExitCode;
 
 use mimalloc::MiMalloc;
 use sc_agent_types::{JevError, ScAgentErrorResponse};
-use sc_ai::{ExecuteOverrides, execute, reads_stdin};
+use sc_ai::{execute, reads_stdin};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -17,21 +15,17 @@ fn main() -> ExitCode {
     let stdin = if reads_stdin(&args) {
         let mut buf = Vec::new();
         if let Err(error) = io::stdin().read_to_end(&mut buf) {
-            emit(&JevError::operational_io(&format!(
-                "stdin could not be read ({error}). Retry or pass --request-json as a file path."
-            )));
+            emit(&JevError::io_failed("stdin", &error));
             return ExitCode::from(2);
         }
         buf
     } else {
         Vec::new()
     };
-    match execute(&args, &stdin, ExecuteOverrides::default()) {
+    match execute(&args, &stdin) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
-                emit(&JevError::operational_io(&format!(
-                    "stdout write failed ({error}). Check that stdout is writable and retry."
-                )));
+                emit(&JevError::io_failed("stdout", &error));
                 return ExitCode::from(2);
             }
             ExitCode::SUCCESS

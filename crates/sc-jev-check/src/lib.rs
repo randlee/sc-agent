@@ -1,7 +1,6 @@
 //! Check facade module tree.
 //!
-//! Sprint a-1 freezes this `mod` list. Later sprints fill module bodies and
-//! must not restructure this file.
+//! Module roles and boundaries are described in `docs/architecture.md`.
 
 pub mod config;
 pub mod equal_input;
@@ -10,3 +9,8 @@ pub mod payload;
 pub mod registry;
 pub mod run;
 pub mod session;
+
+/// Shared bounded subprocess runner for unit tests (FTQ-008).
+#[cfg(test)]
+#[path = "../../../tests/support/deadline.rs"]
+mod deadline;
