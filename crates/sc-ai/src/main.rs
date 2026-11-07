@@ -5,7 +5,7 @@ use std::process::ExitCode;
 
 use mimalloc::MiMalloc;
 use sc_agent_types::{JevError, ScAgentErrorResponse};
-use sc_ai::{ExecuteOverrides, execute, reads_stdin};
+use sc_ai::{execute, reads_stdin};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -22,7 +22,7 @@ fn main() -> ExitCode {
     } else {
         Vec::new()
     };
-    match execute(&args, &stdin, ExecuteOverrides::default()) {
+    match execute(&args, &stdin) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
                 emit(&JevError::io_failed("stdout", &error));

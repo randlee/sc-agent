@@ -29,8 +29,17 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 
+[features]
+default = []
+# Test-only entry point `execute_with_overrides` and the log helpers its
+# tests read. Only sc-ai's own tests enable it (EXT-003 CLI half).
+test-support = []
+
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
+sc-ai = { path = ".", features = ["test-support"] }
+sc-jev-check = { path = "../sc-jev-check", version = "0.1.0", features = ["test-util"] }
+tempfile.workspace = true
 
 [[bin]]
 name = "sc-ai"

@@ -19,22 +19,8 @@ use crate::extract::Extracted;
 /// every participating backend was given the same canonical bytes. `producer`
 /// is the subjects document producer when the check used a `subjects` or
 /// `command` input.
-///
-/// # Examples
-///
-/// ```
-/// use sc_agent_types::PayloadBundle;
-/// use sc_jev_check::equal_input::record;
-///
-/// let bundle = PayloadBundle::from_canonical_bytes(b"{}".to_vec());
-/// let record = record(&bundle, &["jev".to_owned()], false, true, None);
-/// assert_eq!(&record.prompt_sha256, bundle.sha256());
-/// assert!(record.equal);
-/// assert!(!record.leak);
-/// assert!(record.producer.is_none());
-/// ```
 #[must_use]
-pub fn record(
+pub(crate) fn record(
     bundle: &PayloadBundle,
     commands: &[String],
     leak: bool,
@@ -52,7 +38,7 @@ pub fn record(
 
 /// Backend id strings in `backends` order.
 #[must_use]
-pub fn commands_for(backends: &[BackendId]) -> Vec<String> {
+pub(crate) fn commands_for(backends: &[BackendId]) -> Vec<String> {
     backends.iter().map(ToString::to_string).collect()
 }
 
@@ -94,7 +80,7 @@ pub fn producer_from_extractions(
 /// An empty slice is not equal: a run with no payloads did not compare
 /// backends.
 #[must_use]
-pub fn same_bytes(payloads: &[impl AsRef<[u8]>]) -> bool {
+pub(crate) fn same_bytes(payloads: &[impl AsRef<[u8]>]) -> bool {
     let Some(first) = payloads.first() else {
         return false;
     };

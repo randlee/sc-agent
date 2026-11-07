@@ -1,7 +1,6 @@
 //! Check facade module tree.
 //!
-//! Sprint a-1 freezes this `mod` list. Later sprints fill module bodies and
-//! must not restructure this file.
+//! Module roles and boundaries are described in `docs/architecture.md`.
 
 pub mod config;
 pub mod equal_input;

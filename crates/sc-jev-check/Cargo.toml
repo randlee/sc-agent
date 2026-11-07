@@ -36,7 +36,5 @@ toml.workspace = true
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
 tempfile.workspace = true
-
-[[test]]
-name = "a6_exact"
-path = "src/run/exact.rs"
+# Integration tests use the in-process `ScriptedJudge` (ADR-SAG-0022).
+sc-jev-check = { path = ".", features = ["test-util"] }

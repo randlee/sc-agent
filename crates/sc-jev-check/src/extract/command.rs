@@ -45,7 +45,7 @@ const CLEANUP_BUDGET: Duration = Duration::from_secs(2);
 
 /// Runs an argv array and parses stdout as `sc/subjects/1`.
 #[derive(Debug, Clone, Copy)]
-pub struct CommandExtractor;
+pub(crate) struct CommandExtractor;
 
 impl Sealed for CommandExtractor {}
 
@@ -77,7 +77,7 @@ impl CommandExtractor {
     /// [`JevError::ExtractionTimeout`] when `timeout_seconds` elapses,
     /// [`JevError::ExtractionInvalid`] when stdout is not `sc/subjects/1`,
     /// and [`JevError::ExtractionEmpty`] when the document has no subjects.
-    pub fn extract_with_source(
+    pub(crate) fn extract_with_source(
         &self,
         repo: &RepoRoot,
         rev: &Rev,

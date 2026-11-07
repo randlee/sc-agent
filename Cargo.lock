@@ -1271,10 +1271,12 @@ version = "0.1.0"
 dependencies = [
  "mimalloc",
  "sc-agent-types",
+ "sc-ai",
  "sc-jev-check",
  "sc-observability",
  "serde",
  "serde_json",
+ "tempfile",
  "uuid",
 ]
 
@@ -1306,6 +1308,7 @@ dependencies = [
  "sc-agent-types",
  "sc-jev",
  "sc-jev-backends",
+ "sc-jev-check",
  "serde",
  "serde_json",
  "tempfile",

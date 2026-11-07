@@ -22,11 +22,12 @@ use crate::observe::{
 /// Clock injected into the session store.
 pub type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 
-/// Test and embedding overrides for [`execute`].
+/// Test overrides for [`execute_with_overrides`].
 ///
-/// Production passes [`Self::default`]. A registry skips key resolution and
-/// HTTP construction inside `sc-jev-check`. A session log replaces the v2
-/// file logger.
+/// Production calls [`execute`], which uses [`Self::default`]. A registry
+/// skips key resolution and HTTP construction inside `sc-jev-check`. A
+/// session log replaces the v2 file logger. Public only with the
+/// `test-support` feature.
 #[derive(Default)]
 pub struct ExecuteOverrides {
     /// Backends used instead of `registry_for_repo`.
@@ -58,7 +59,16 @@ pub fn reads_stdin(args: &[String]) -> bool {
 ///
 /// Returns [`JevError`] for unknown argv, unreadable paths, config, input,
 /// key, session, prompt, or judge failures. A dry-run does not resolve keys.
-pub fn execute(
+pub fn execute(args: &[String], stdin: &[u8]) -> Result<Vec<u8>, JevError> {
+    execute_with_overrides(args, stdin, ExecuteOverrides::default())
+}
+
+/// [`execute`] with test overrides (`test-support` feature).
+///
+/// # Errors
+///
+/// Same as [`execute`].
+pub fn execute_with_overrides(
     args: &[String],
     stdin: &[u8],
     overrides: ExecuteOverrides,
@@ -943,13 +953,12 @@ mod tests {
             args(&["jev", "--help"]),
             args(&["jev", "ask", "-h"]),
         ] {
-            let bytes = execute(&help, &[], ExecuteOverrides::default()).expect("help");
+            let bytes = execute(&help, &[]).expect("help");
             assert!(String::from_utf8_lossy(&bytes).contains("sc-ai jev"));
         }
         let error = execute(
             &args(&["jev", "ask", "--session-id", "x", "--text=--help"]),
             &[],
-            ExecuteOverrides::default(),
         )
         .expect_err("--help as a value is not help");
         assert!(error.fix_hint().contains("UUID"), "{}", error.fix_hint());

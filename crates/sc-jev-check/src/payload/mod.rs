@@ -11,7 +11,8 @@ use std::collections::BTreeMap;
 mod caller;
 mod questions;
 
-pub(crate) use caller::parse_caller_request;
+#[doc(inline)]
+pub use caller::{PreparedCallerRequest, prepare_caller_request};
 
 use sc_agent_types::{
     CanonicalJudgePayload, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot, Rev,
@@ -21,8 +22,9 @@ use sc_agent_types::{
 use crate::config::{CheckSpec, load_packaged_config};
 use crate::extract::{Extracted, extract_input, read_repo_text};
 
+pub(crate) use questions::parse_state;
 #[doc(inline)]
-pub use questions::{QUESTION_SET_SCHEMA, STATE_SCHEMA, parse_question_set, parse_state};
+pub use questions::{QUESTION_SET_SCHEMA, parse_question_set};
 
 /// Byte cap applied while building one canonical payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,7 +112,7 @@ impl PayloadBuilder {
 ///
 /// Returns [`JevError::InputTooLarge`] and nothing else. Callers must not send
 /// after this error.
-pub fn refuse_over_cap(bytes: &[u8], limit_bytes: u64) -> Result<(), JevError> {
+pub(crate) fn refuse_over_cap(bytes: &[u8], limit_bytes: u64) -> Result<(), JevError> {
     let actual_bytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if actual_bytes > limit_bytes {
         Err(JevError::InputTooLarge {

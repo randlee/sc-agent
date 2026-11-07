@@ -13,7 +13,7 @@ use super::read::read_repo_text;
 
 /// Reads one markdown table column.
 #[derive(Debug, Clone, Copy)]
-pub struct TableColumnExtractor;
+pub(crate) struct TableColumnExtractor;
 
 impl Sealed for TableColumnExtractor {}
 

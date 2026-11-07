@@ -9,7 +9,7 @@ use serde::Deserialize;
 pub const QUESTION_SET_SCHEMA: &str = "plan-anchoring/questions/1";
 
 /// Schema id required on state files.
-pub const STATE_SCHEMA: &str = "plan-anchoring/state/1";
+pub(crate) const STATE_SCHEMA: &str = "plan-anchoring/state/1";
 
 /// Parses a `plan-anchoring/questions/1` document into judge questions.
 ///
@@ -165,7 +165,10 @@ pub(crate) fn validate_state(
 ///
 /// Returns [`JevError::InputInvalid`] when the schema is wrong, a question id
 /// is unknown, or a choice is not one of that question's choices.
-pub fn parse_state(text: &str, questions: &[Question]) -> Result<Vec<ChoiceAnswer>, JevError> {
+pub(crate) fn parse_state(
+    text: &str,
+    questions: &[Question],
+) -> Result<Vec<ChoiceAnswer>, JevError> {
     let raw: RawState = serde_json::from_str(text).map_err(|error| JevError::InputInvalid {
         detail: format!("state: {error}"),
     })?;

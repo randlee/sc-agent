@@ -43,7 +43,7 @@ pub trait Extractor: private::Sealed {
     /// # Errors
     ///
     /// Returns [`JevError`] when the path, document, or command result is
-    /// unusable. Command `{path}` substitution uses [`CommandExtractor::extract_with_source`].
+    /// unusable. A command input's `{path}` placeholder has no value here.
     fn extract(
         &self,
         repo: &RepoRoot,
@@ -52,23 +52,18 @@ pub trait Extractor: private::Sealed {
     ) -> Result<Vec<Subject>, JevError>;
 }
 
-#[doc(inline)]
-pub use command::CommandExtractor;
-#[doc(inline)]
-pub use file::FileExtractor;
-#[doc(inline)]
-pub use read::{read_repo_bytes, read_repo_text};
-#[doc(inline)]
-pub use subjects::{SubjectsExtractor, parse_subjects_bytes, validate_subjects_document};
-#[doc(inline)]
-pub use table::TableColumnExtractor;
+pub(crate) use command::CommandExtractor;
+pub(crate) use file::FileExtractor;
+pub(crate) use read::{read_repo_bytes, read_repo_text};
+pub(crate) use subjects::SubjectsExtractor;
+pub(crate) use table::TableColumnExtractor;
 
 /// Runs the extractor selected by `input.kind`.
 ///
 /// # Errors
 ///
 /// Returns the extractor's [`JevError`]. Command inputs do not receive a
-/// `{path}` value here; pass that through [`CommandExtractor::extract_with_source`].
+/// `{path}` value here, so `{path}` in their argv is `CONFIG_INVALID`.
 pub fn extract_input(repo: &RepoRoot, rev: &Rev, input: &InputSpec) -> Result<Extracted, JevError> {
     match input {
         InputSpec::File { .. } => file::extract_file(repo, rev, input),
@@ -93,30 +88,14 @@ pub fn extractor_for(input: &InputSpec) -> &'static dyn Extractor {
 pub(crate) mod test_support {
     use std::path::{Path, PathBuf};
     use std::process::Command;
-    use std::sync::atomic::{AtomicU64, Ordering};
 
-    static SEQ: AtomicU64 = AtomicU64::new(0);
-
-    pub struct TempDir(PathBuf);
-
-    impl TempDir {
-        pub fn path(&self) -> &Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
+    pub use tempfile::TempDir;
 
     pub fn temp_dir(label: &str) -> TempDir {
-        let n = SEQ.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("sc-jev-check-{label}-{}-{n}", std::process::id()));
-        std::fs::create_dir_all(&path).expect("temp dir");
-        TempDir(path)
+        tempfile::Builder::new()
+            .prefix(&format!("sc-jev-check-{label}-"))
+            .tempdir()
+            .expect("temp dir")
     }
 
     pub fn fixture_root() -> PathBuf {

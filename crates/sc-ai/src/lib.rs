@@ -26,11 +26,13 @@ mod envelope;
 mod observe;
 
 #[doc(inline)]
-pub use command::{Clock, ExecuteOverrides, execute, reads_stdin};
+pub use command::{execute, reads_stdin};
 #[doc(inline)]
 pub use envelope::{ENVELOPE_VERSION, OP_ASK, OP_DRY_RUN, OP_RUN};
-#[doc(inline)]
-pub use observe::{
-    DEFAULT_LOG_ROOT_DIR, LOG_ROOT_ENV, ObservabilitySessionLog, default_log_root,
-    default_sessions_dir, session_log_file,
-};
+
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub use command::{Clock, ExecuteOverrides, execute_with_overrides};
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub use observe::{ObservabilitySessionLog, session_log_file};

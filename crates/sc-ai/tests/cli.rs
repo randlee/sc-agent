@@ -1,98 +1,113 @@
 //! CLI parity for `jev run`, `dry-run`, and `ask`.
+//!
+//! Every subprocess goes through [`spawn_with_deadline`], so a hung child
+//! fails the test after 60 seconds instead of stalling CI.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::process::{Command, Output, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, UNIX_EPOCH};
+use std::thread;
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
+use sc_agent_types::BackendId;
+use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::NoopSessionLog;
-use sc_agent_types::{BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
 use sc_ai::{
     ExecuteOverrides, OP_ASK, OP_DRY_RUN, OP_RUN, ObservabilitySessionLog, session_log_file,
 };
 use sc_jev_check::config::PACKAGED_SYSTEM_PROMPT;
-use sc_jev_check::registry::BackendRegistry;
+use sc_jev_check::registry::{BackendRegistry, RequestLog, ScriptedJudge};
 use serde_json::Value;
+use tempfile::TempDir;
 
-static SEQ: AtomicU64 = AtomicU64::new(0);
+/// Longest a subprocess may run before the test kills it.
+const SUBPROCESS_DEADLINE: Duration = Duration::from_secs(60);
 
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(label: &str) -> Self {
-        let n = SEQ.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("sc-ai-{label}-{}-{n}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&path);
-        std::fs::create_dir_all(&path).expect("temp");
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
-
-struct Capture {
-    id: BackendId,
-    requests: Arc<Mutex<Vec<JudgeRequest>>>,
-    answers: Value,
-    provider_meta: Option<Value>,
-}
-
-impl JudgeBackend for Capture {
-    fn id(&self) -> BackendId {
-        self.id
-    }
-
-    fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-        if matches!(self.id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
-            && request.llm.is_none()
-        {
-            return Err(JevError::InputInvalid {
-                detail: "LLM system prompt is required".into(),
-            });
-        }
-        Ok(())
-    }
-
-    fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-        self.validate_for_send(request)?;
-        self.requests
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(request.clone());
-        Ok(JudgeOutcome {
-            answers: self.answers.clone(),
-            backend: self.id,
-            probabilities: None,
-            provider_meta: self.provider_meta.clone(),
+/// Runs `command` to completion within [`SUBPROCESS_DEADLINE`].
+///
+/// stdout and stderr drain on threads so a full pipe cannot block the child.
+/// `try_wait` polls the deadline; on expiry the child is killed and reaped
+/// and the test panics with the captured stderr.
+fn spawn_with_deadline(command: &mut Command, stdin: Option<&[u8]>) -> Output {
+    command
+        .stdin(if stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
         })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().expect("spawn subprocess");
+    if let Some(bytes) = stdin {
+        child
+            .stdin
+            .take()
+            .expect("piped stdin")
+            .write_all(bytes)
+            .expect("write stdin");
+    }
+    let stdout = drain(child.stdout.take().expect("piped stdout"));
+    let stderr = drain(child.stderr.take().expect("piped stderr"));
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait().expect("poll subprocess") {
+            Some(status) => break status,
+            None if started.elapsed() >= SUBPROCESS_DEADLINE => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let stderr = stderr.join().unwrap_or_default();
+                panic!(
+                    "subprocess exceeded {SUBPROCESS_DEADLINE:?}; stderr: {}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+            None => thread::sleep(Duration::from_millis(20)),
+        }
+    };
+    Output {
+        status,
+        stdout: stdout.join().expect("stdout reader"),
+        stderr: stderr.join().expect("stderr reader"),
     }
 }
 
-fn registry(captures: Vec<Capture>) -> BackendRegistry {
+/// `Command::output` with [`SUBPROCESS_DEADLINE`] and no stdin.
+trait RunWithDeadline {
+    fn run_with_deadline(&mut self) -> Output;
+}
+
+impl RunWithDeadline for Command {
+    fn run_with_deadline(&mut self) -> Output {
+        spawn_with_deadline(self, None)
+    }
+}
+
+fn drain(mut pipe: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
+    thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = pipe.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn temp_dir(label: &str) -> TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("sc-ai-{label}-"))
+        .tempdir()
+        .expect("temp")
+}
+
+fn judge(id: BackendId, choice: &str) -> ScriptedJudge {
+    ScriptedJudge::new(id, serde_json::json!({"relevant": {"choice": choice}}))
+}
+
+fn registry(judges: Vec<ScriptedJudge>) -> BackendRegistry {
     let mut registry = BackendRegistry::new();
-    for capture in captures {
-        registry.register(Arc::new(capture)).expect("register");
+    for judge in judges {
+        registry.register(Arc::new(judge)).expect("register");
     }
     registry
-}
-
-fn capture(id: BackendId, requests: &Arc<Mutex<Vec<JudgeRequest>>>, choice: &str) -> Capture {
-    Capture {
-        id,
-        requests: Arc::clone(requests),
-        answers: serde_json::json!({"relevant": {"choice": choice}}),
-        provider_meta: None,
-    }
 }
 
 fn write_repo(dir: &Path) {
@@ -128,7 +143,7 @@ fn noop_overrides(registry: BackendRegistry) -> ExecuteOverrides {
 
 fn execute(args: &[&str], overrides: ExecuteOverrides) -> Result<Value, JevError> {
     let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
-    let bytes = sc_ai::execute(&args, &[], overrides)?;
+    let bytes = sc_ai::execute_with_overrides(&args, &[], overrides)?;
     serde_json::from_slice(&bytes).map_err(|_| JevError::InputInvalid {
         detail: format!("stdout was not JSON: {}", String::from_utf8_lossy(&bytes)),
     })
@@ -163,11 +178,11 @@ fn binary() -> &'static str {
 
 #[test]
 fn test_multi_backend_cli_equal_input() {
-    let repo = TempDir::new("multi");
+    let repo = temp_dir("multi");
     write_repo(repo.path());
-    let sessions = TempDir::new("multi-sessions");
-    let jev_seen = Arc::new(Mutex::new(Vec::new()));
-    let haiku_seen = Arc::new(Mutex::new(Vec::new()));
+    let sessions = temp_dir("multi-sessions");
+    let jev_seen = RequestLog::new();
+    let haiku_seen = RequestLog::new();
     let value = execute(
         &[
             "jev",
@@ -184,8 +199,8 @@ fn test_multi_backend_cli_equal_input() {
             "anthropic_haiku",
         ],
         noop_overrides(registry(vec![
-            capture(BackendId::Jev, &jev_seen, "yes"),
-            capture(BackendId::AnthropicHaiku, &haiku_seen, "no"),
+            judge(BackendId::Jev, "yes").with_request_log(&jev_seen),
+            judge(BackendId::AnthropicHaiku, "no").with_request_log(&haiku_seen),
         ])),
     )
     .expect("run");
@@ -206,8 +221,8 @@ fn test_multi_backend_cli_equal_input() {
         data["equal_input"]["commands"],
         serde_json::json!(["jev", "anthropic_haiku"])
     );
-    let jev = jev_seen.lock().expect("jev");
-    let haiku = haiku_seen.lock().expect("haiku");
+    let jev = jev_seen.snapshot();
+    let haiku = haiku_seen.snapshot();
     assert_eq!(jev.len(), 1);
     assert_eq!(haiku.len(), 1);
     assert_eq!(jev[0].payload.bytes(), haiku[0].payload.bytes());
@@ -224,11 +239,11 @@ fn test_multi_backend_cli_equal_input() {
 
 #[test]
 fn test_cli_prompt_override() {
-    let repo = TempDir::new("prompt");
+    let repo = temp_dir("prompt");
     write_repo(repo.path());
     let override_path = repo.path().join("override.md");
     std::fs::write(&override_path, "OVERRIDE-PROMPT-TOKEN-a7\n").expect("override");
-    let first_seen = Arc::new(Mutex::new(Vec::new()));
+    let first_seen = RequestLog::new();
     let first = execute(
         &[
             "jev",
@@ -236,22 +251,17 @@ fn test_cli_prompt_override() {
             "--repo-root",
             repo.path().to_str().expect("utf8"),
             "--sessions-dir",
-            TempDir::new("prompt-sessions-a")
-                .path()
-                .to_str()
-                .expect("utf8"),
+            temp_dir("prompt-sessions-a").path().to_str().expect("utf8"),
             "--backend",
             "anthropic_haiku",
         ],
-        noop_overrides(registry(vec![capture(
-            BackendId::AnthropicHaiku,
-            &first_seen,
-            "yes",
-        )])),
+        noop_overrides(registry(vec![
+            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&first_seen),
+        ])),
     )
     .expect("packaged");
-    let second_seen = Arc::new(Mutex::new(Vec::new()));
-    let sessions = TempDir::new("prompt-sessions-b");
+    let second_seen = RequestLog::new();
+    let sessions = temp_dir("prompt-sessions-b");
     let second = execute(
         &[
             "jev",
@@ -265,24 +275,22 @@ fn test_cli_prompt_override() {
             "--llm-system-prompt-file",
             override_path.to_str().expect("utf8"),
         ],
-        noop_overrides(registry(vec![capture(
-            BackendId::AnthropicHaiku,
-            &second_seen,
-            "no",
-        )])),
+        noop_overrides(registry(vec![
+            judge(BackendId::AnthropicHaiku, "no").with_request_log(&second_seen),
+        ])),
     )
     .expect("override");
     assert_eq!(
         first["data"]["prompt_sha256"],
         second["data"]["prompt_sha256"]
     );
-    let packaged = first_seen.lock().expect("first")[0]
+    let packaged = first_seen.snapshot()[0]
         .llm
         .as_ref()
         .expect("prompt")
         .system_prompt
         .clone();
-    let overridden = second_seen.lock().expect("second")[0]
+    let overridden = second_seen.snapshot()[0]
         .llm
         .as_ref()
         .expect("prompt")
@@ -306,20 +314,18 @@ fn test_cli_prompt_override() {
 
 #[test]
 fn cli_dry_run_readback_and_ask_session_ttl() {
-    let repo = TempDir::new("ask");
+    let repo = temp_dir("ask");
     write_repo(repo.path());
-    let sessions = TempDir::new("ask-sessions");
+    let sessions = temp_dir("ask-sessions");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7\n").expect("prompt");
-    let seen = Arc::new(Mutex::new(Vec::new()));
+    let seen = RequestLog::new();
     let now = Arc::new(Mutex::new(UNIX_EPOCH + Duration::from_secs(1_700_000_000)));
     let clock_now = Arc::clone(&now);
     let overrides = ExecuteOverrides {
-        registry: Some(registry(vec![capture(
-            BackendId::AnthropicHaiku,
-            &seen,
-            "yes",
-        )])),
+        registry: Some(registry(vec![
+            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+        ])),
         clock: Some(Arc::new(move || {
             *clock_now
                 .lock()
@@ -368,7 +374,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         canon(&prompt)
     );
     assert!(dry["data"]["readback"]["request_json"].is_null());
-    assert!(seen.lock().expect("dry seen").is_empty());
+    assert!(seen.snapshot().is_empty());
     assert_no_prompt_leak(&dry.to_string());
 
     let ran = execute(
@@ -398,7 +404,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         .expect("session")
         .to_owned();
     assert_eq!(ran["data"]["prompt_sha256"], dry["data"]["prompt_sha256"]);
-    let wire = seen.lock().expect("run seen")[0]
+    let wire = seen.snapshot()[0]
         .llm
         .as_ref()
         .expect("wire")
@@ -406,7 +412,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         .clone();
     assert!(wire.contains("EVALUATOR-PROMPT-a7"));
     assert!(
-        !String::from_utf8_lossy(seen.lock().expect("bytes")[0].payload.bytes())
+        !String::from_utf8_lossy(seen.snapshot()[0].payload.bytes())
             .contains("EVALUATOR-PROMPT-a7")
     );
     #[cfg(unix)]
@@ -452,7 +458,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         canon(sessions.path())
     );
     assert_eq!(asked["data"]["prompt_sha256"], ran["data"]["prompt_sha256"]);
-    let follow = seen.lock().expect("ask seen")[1]
+    let follow = seen.snapshot()[1]
         .llm
         .as_ref()
         .expect("follow")
@@ -462,7 +468,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     assert_no_prompt_leak(&asked.to_string());
 
     *now.lock().expect("clock") += Duration::from_secs(120);
-    let expired = sc_ai::execute(
+    let expired = sc_ai::execute_with_overrides(
         &[
             "jev".into(),
             "ask".into(),
@@ -491,13 +497,13 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
 
 #[test]
 fn cli_logger_adapter_records_session_without_secrets() {
-    let repo = TempDir::new("log");
+    let repo = temp_dir("log");
     write_repo(repo.path());
-    let sessions = TempDir::new("log-sessions");
-    let logs = TempDir::new("log-root");
+    let sessions = temp_dir("log-sessions");
+    let logs = temp_dir("log-root");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7 sk-ant-test-secret\n").expect("prompt");
-    let seen = Arc::new(Mutex::new(Vec::new()));
+    let seen = RequestLog::new();
     let value = execute(
         &[
             "jev",
@@ -514,11 +520,9 @@ fn cli_logger_adapter_records_session_without_secrets() {
             prompt.to_str().expect("utf8"),
         ],
         ExecuteOverrides {
-            registry: Some(registry(vec![capture(
-                BackendId::AnthropicHaiku,
-                &seen,
-                "yes",
-            )])),
+            registry: Some(registry(vec![
+                judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+            ])),
             ..ExecuteOverrides::default()
         },
     )
@@ -535,7 +539,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
     assert_no_prompt_leak(&log);
     assert_no_prompt_leak(&value.to_string());
     assert!(
-        seen.lock().expect("wire")[0]
+        seen.snapshot()[0]
             .llm
             .as_ref()
             .expect("prompt")
@@ -546,7 +550,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
 
 #[test]
 fn cli_invalid_request_json_is_input_invalid() {
-    let error = sc_ai::execute(
+    let error = sc_ai::execute_with_overrides(
         &[
             "jev".into(),
             "run".into(),
@@ -563,7 +567,7 @@ fn cli_invalid_request_json_is_input_invalid() {
 
 #[test]
 fn cli_request_json_rejects_inline_system_prompt() {
-    let error = sc_ai::execute(
+    let error = sc_ai::execute_with_overrides(
         &[
             "jev".into(),
             "run".into(),
@@ -583,18 +587,19 @@ fn cli_request_json_rejects_inline_system_prompt() {
 
 #[test]
 fn cli_keeps_typesafe_response_fields() {
-    let repo = TempDir::new("verbatim");
+    let repo = temp_dir("verbatim");
     write_repo(repo.path());
-    let sessions = TempDir::new("verbatim-sessions");
-    let seen = Arc::new(Mutex::new(Vec::new()));
+    let sessions = temp_dir("verbatim-sessions");
+    let seen = RequestLog::new();
     let usage = serde_json::json!({"input_tokens": 318, "output_tokens": 31});
-    let mut backend = capture(BackendId::Jev, &seen, "yes");
-    backend.provider_meta = Some(serde_json::json!({
-        "model": "jev-test",
-        "usage": usage,
-        "stop_reason": "end_turn",
-        "id": "resp-1"
-    }));
+    let backend = judge(BackendId::Jev, "yes")
+        .with_request_log(&seen)
+        .with_provider_meta(serde_json::json!({
+            "model": "jev-test",
+            "usage": usage,
+            "stop_reason": "end_turn",
+            "id": "resp-1"
+        }));
     let value = execute(
         &[
             "jev",
@@ -622,7 +627,7 @@ fn cli_keeps_typesafe_response_fields() {
 
 #[test]
 fn cli_log_and_git_errors_do_not_blame_check_toml() {
-    let root = TempDir::new("logblock");
+    let root = temp_dir("logblock");
     let file = root.path().join("not-a-directory");
     std::fs::write(&file, b"x").expect("file");
     let error = match ObservabilitySessionLog::open(&file.join("nested")) {
@@ -634,13 +639,14 @@ fn cli_log_and_git_errors_do_not_blame_check_toml() {
     assert!(!hint.contains("check.toml"), "{hint}");
     assert!(hint.contains("--log-dir"), "{hint}");
 
-    let outside = TempDir::new("nogit");
+    let outside = temp_dir("nogit");
     let output = Command::new(binary())
         .args(["jev", "dry-run"])
         .current_dir(outside.path())
         .env("GIT_DIR", outside.path().join("missing-git"))
-        .output()
-        .expect("git");
+        .env("GIT_CONFIG_GLOBAL", null_device())
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .run_with_deadline();
     assert_eq!(output.status.code(), Some(2));
     let err: Value = serde_json::from_slice(&output.stderr).expect("stderr json");
     assert_eq!(err["error"], "CONFIG_INVALID");
@@ -652,10 +658,7 @@ fn cli_log_and_git_errors_do_not_blame_check_toml() {
 
 #[test]
 fn cli_process_version_help_and_typed_stderr() {
-    let version = Command::new(binary())
-        .arg("--version")
-        .output()
-        .expect("version");
+    let version = Command::new(binary()).arg("--version").run_with_deadline();
     assert!(version.status.success());
     assert!(version.stderr.is_empty());
     let stdout = String::from_utf8(version.stdout).expect("utf8");
@@ -663,8 +666,7 @@ fn cli_process_version_help_and_typed_stderr() {
 
     let help = Command::new(binary())
         .args(["jev", "dry-run", "--help"])
-        .output()
-        .expect("help");
+        .run_with_deadline();
     assert!(help.status.success(), "help status {:?}", help.status);
     assert!(help.stderr.is_empty());
     let help_text = String::from_utf8(help.stdout).expect("utf8");
@@ -673,20 +675,10 @@ fn cli_process_version_help_and_typed_stderr() {
     assert!(help_text.contains("SC_LOG_ROOT"));
     assert!(help_text.contains(".sc-ai"));
 
-    let mut child = Command::new(binary())
-        .args(["jev", "run", "--request-json", "-"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn");
-    child
-        .stdin
-        .take()
-        .expect("stdin")
-        .write_all(br#"{"invalid":true}"#)
-        .expect("write");
-    let output = child.wait_with_output().expect("wait");
+    let output = spawn_with_deadline(
+        Command::new(binary()).args(["jev", "run", "--request-json", "-"]),
+        Some(br#"{"invalid":true}"#),
+    );
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let err: Value = serde_json::from_slice(&output.stderr).expect("stderr json");
@@ -708,15 +700,15 @@ fn cli_process_version_help_and_typed_stderr() {
 
 #[test]
 fn cli_run_resolves_dotenv_key_and_dry_run_does_not() {
-    let repo = TempDir::new("dotenv");
+    let repo = temp_dir("dotenv");
     write_repo(repo.path());
     std::fs::write(
         repo.path().join(".env"),
         "TYPESAFE_API_KEY=sk-test-whitespace key\n",
     )
     .expect("env");
-    let sessions = TempDir::new("dotenv-sessions");
-    let logs = TempDir::new("dotenv-logs");
+    let sessions = temp_dir("dotenv-sessions");
+    let logs = temp_dir("dotenv-logs");
     let dry = Command::new(binary())
         .args([
             "jev",
@@ -734,8 +726,7 @@ fn cli_run_resolves_dotenv_key_and_dry_run_does_not() {
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("OPENAI_API_KEY")
         .env_remove("SC_LOG_ROOT")
-        .output()
-        .expect("dry-run");
+        .run_with_deadline();
     assert!(
         dry.status.success(),
         "dry-run stderr {}",
@@ -764,8 +755,7 @@ fn cli_run_resolves_dotenv_key_and_dry_run_does_not() {
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("OPENAI_API_KEY")
         .env_remove("SC_LOG_ROOT")
-        .output()
-        .expect("run");
+        .run_with_deadline();
     assert_eq!(run.status.code(), Some(2), "run should refuse the bad key");
     assert!(run.stdout.is_empty());
     let err: Value = serde_json::from_slice(&run.stderr).expect("run stderr");
@@ -780,9 +770,9 @@ fn cli_run_resolves_dotenv_key_and_dry_run_does_not() {
 
 #[test]
 fn cli_dry_run_writes_nothing_and_ask_uses_default_log_root() {
-    let repo = TempDir::new("logroot");
+    let repo = temp_dir("logroot");
     write_repo(repo.path());
-    let sessions_parent = TempDir::new("logroot-sessions");
+    let sessions_parent = temp_dir("logroot-sessions");
     let sessions = sessions_parent.path().join("sessions");
     let dry = Command::new(binary())
         .args([
@@ -794,8 +784,7 @@ fn cli_dry_run_writes_nothing_and_ask_uses_default_log_root() {
             sessions.to_str().expect("utf8"),
         ])
         .env_remove("SC_LOG_ROOT")
-        .output()
-        .expect("dry-run");
+        .run_with_deadline();
     assert!(
         dry.status.success(),
         "{}",
@@ -826,7 +815,7 @@ fn cli_dry_run_writes_nothing_and_ask_uses_default_log_root() {
             Some(root) => command.env("SC_LOG_ROOT", root),
             None => command.env_remove("SC_LOG_ROOT"),
         };
-        command.output().expect("ask")
+        command.run_with_deadline()
     };
     let default_root = ask(None);
     assert_eq!(default_root.status.code(), Some(2));
@@ -834,7 +823,7 @@ fn cli_dry_run_writes_nothing_and_ask_uses_default_log_root() {
     assert_eq!(err["error"], "SESSION_NOT_FOUND");
     assert!(repo.path().join(".sc-ai").is_dir());
 
-    let custom = TempDir::new("logroot-env");
+    let custom = temp_dir("logroot-env");
     let env_root = custom.path().join("root");
     let env_run = ask(Some(&env_root));
     assert_eq!(env_run.status.code(), Some(2));
@@ -861,8 +850,7 @@ fn git(cwd: &Path, args: &[&str]) {
             "user.name=sc-ai",
         ])
         .args(args)
-        .output()
-        .expect("git");
+        .run_with_deadline();
     assert!(
         output.status.success(),
         "git {args:?}: {}",
@@ -872,7 +860,7 @@ fn git(cwd: &Path, args: &[&str]) {
 
 #[test]
 fn cli_check_that_exists_only_at_rev_loads_with_rev() {
-    let repo = TempDir::new("rev-only");
+    let repo = temp_dir("rev-only");
     write_repo(repo.path());
     git(repo.path(), &["init", "-q"]);
     git(repo.path(), &["add", "-A"]);

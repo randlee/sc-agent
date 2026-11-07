@@ -5,7 +5,9 @@
 //! resolved by the run facade from the CLI file, `check.toml`, or the
 //! packaged asset (ADR-SAG-0019).
 
-use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question};
+use std::path::Path;
+
+use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -50,6 +52,61 @@ pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, 
         backends.push(name.parse::<BackendId>()?);
     }
     Ok(ParsedCallerRequest { bundle, backends })
+}
+
+/// Caller questions document prepared for [`crate::run::run_request`].
+///
+/// [`prepare_caller_request`] validates the document and builds the payload.
+/// `sc-ai` passes the result to [`crate::run::run_request`] and does not assemble bytes
+/// itself (ADR-SAG-0005, ADR-SAG-0010).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedCallerRequest {
+    /// Canonical payload shared by every backend.
+    pub bundle: PayloadBundle,
+    /// Backends to judge. CLI flags win over ids in the document.
+    pub backends: Vec<BackendId>,
+    /// LLM system prompt from the CLI file or the packaged default.
+    ///
+    /// `None` when no LLM backend is selected. The text is not part of
+    /// [`PayloadBundle::sha256`].
+    pub system_prompt: Option<String>,
+}
+
+/// Validates request JSON, builds one payload, and resolves the system prompt.
+///
+/// `flag_backends` are the `--backend` values. A non-empty slice replaces
+/// backends named in the document. When both are empty the backend is
+/// [`BackendId::Jev`]. Prompt precedence for this path is `prompt_file`, then
+/// the packaged default. [`crate::run::run_check`] applies `check.toml` on the check path.
+/// A `system_prompt` field in `bytes` is refused (ADR-SAG-0019).
+///
+/// # Errors
+///
+/// Returns [`JevError`] when the document, backend id, prompt file, or
+/// packaged asset is unusable. A Jev-only selection does not read
+/// `prompt_file`.
+pub fn prepare_caller_request(
+    bytes: &[u8],
+    flag_backends: &[BackendId],
+    repo: &RepoRoot,
+    prompt_file: Option<&Path>,
+) -> Result<PreparedCallerRequest, JevError> {
+    let parsed = parse_caller_request(bytes)?;
+    let backends = if !flag_backends.is_empty() {
+        flag_backends.to_vec()
+    } else if !parsed.backends.is_empty() {
+        parsed.backends
+    } else {
+        vec![BackendId::Jev]
+    };
+    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
+    let system_prompt =
+        crate::run::prompt::load_request_system_prompt(repo, prompt_file, needs_llm)?;
+    Ok(PreparedCallerRequest {
+        bundle: parsed.bundle,
+        backends,
+        system_prompt,
+    })
 }
 
 #[derive(Debug, Deserialize)]

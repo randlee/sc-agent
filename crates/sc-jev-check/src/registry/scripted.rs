@@ -1,25 +1,127 @@
 //! In-process judges for tests (ADR-SAG-0022).
 //!
-//! [`register_scripted_backends`] builds a [`BackendRegistry`] whose judges
-//! return a fixed answer object and never open a socket. Production builds
-//! leave the `test-util` feature off, so [`crate::run::run_check`] stays the
-//! caller API (ADR-SAG-0009).
+//! [`ScriptedJudge`] returns a fixed answer object, records every request it
+//! judges, counts pre-send validations, and never opens a socket.
+//! [`register_scripted_backends`] builds a [`BackendRegistry`] of them.
+//! Production builds leave the `test-util` feature off, so
+//! [`crate::run::run_check`] stays the caller API (ADR-SAG-0009).
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use sc_agent_types::{BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest};
+use serde_json::Value;
 
 use super::BackendRegistry;
 
-/// Returns `answers` for every accepted request.
-struct ScriptedJudge {
+/// Requests judged by one or more [`ScriptedJudge`] values, in call order.
+///
+/// Clones share one log, so several judges can record into it.
+#[derive(Debug, Clone, Default)]
+pub struct RequestLog(Arc<Mutex<Vec<JudgeRequest>>>);
+
+impl RequestLog {
+    /// Creates an empty log.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Copies the recorded requests.
+    #[must_use]
+    pub fn snapshot(&self) -> Vec<JudgeRequest> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    fn push(&self, request: &JudgeRequest) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(request.clone());
+    }
+}
+
+/// A [`JudgeBackend`] that answers from a script and records its requests.
+///
+/// LLM ids ([`BackendId::is_llm`]) refuse a request without a system prompt,
+/// like the real Haiku and Luna backends. Clones share the request log and
+/// the validation counter.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::BackendId;
+/// use sc_jev_check::registry::{BackendRegistry, ScriptedJudge};
+///
+/// let judge = ScriptedJudge::new(BackendId::Jev, serde_json::json!({"q": {"choice": "yes"}}));
+/// let mut registry = BackendRegistry::new();
+/// registry.register(std::sync::Arc::new(judge.clone())).unwrap();
+/// assert!(judge.requests().is_empty());
+/// ```
+#[derive(Clone)]
+pub struct ScriptedJudge {
     id: BackendId,
-    answers: Arc<serde_json::Value>,
+    answers: Arc<Value>,
+    provider_meta: Option<Value>,
+    requests: RequestLog,
+    validations: Arc<AtomicUsize>,
 }
 
 impl ScriptedJudge {
-    fn new(id: BackendId, answers: Arc<serde_json::Value>) -> Self {
-        Self { id, answers }
+    /// Judge for `id` that returns `answers` for every accepted request.
+    #[must_use]
+    pub fn new(id: BackendId, answers: Value) -> Self {
+        Self::shared(id, Arc::new(answers))
+    }
+
+    fn shared(id: BackendId, answers: Arc<Value>) -> Self {
+        Self {
+            id,
+            answers,
+            provider_meta: None,
+            requests: RequestLog::new(),
+            validations: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    /// Returns `meta` as [`JudgeOutcome::provider_meta`].
+    #[must_use]
+    pub fn with_provider_meta(mut self, meta: Value) -> Self {
+        self.provider_meta = Some(meta);
+        self
+    }
+
+    /// Records requests into `log` instead of a private log.
+    #[must_use]
+    pub fn with_request_log(mut self, log: &RequestLog) -> Self {
+        self.requests = log.clone();
+        self
+    }
+
+    /// Requests judged so far, in call order.
+    #[must_use]
+    pub fn requests(&self) -> Vec<JudgeRequest> {
+        self.requests.snapshot()
+    }
+
+    /// Number of [`JudgeBackend::validate_for_send`] calls from callers.
+    ///
+    /// The check `judge` repeats internally is not counted.
+    #[must_use]
+    pub fn validations(&self) -> usize {
+        self.validations.load(Ordering::Relaxed)
+    }
+
+    fn check(&self, request: &JudgeRequest) -> Result<(), JevError> {
+        if self.id.is_llm() && request.llm.is_none() {
+            return Err(JevError::InputInvalid {
+                detail: "LLM system prompt is required".into(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -38,21 +140,18 @@ impl JudgeBackend for ScriptedJudge {
     }
 
     fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-        if self.id.is_llm() && request.llm.is_none() {
-            return Err(JevError::InputInvalid {
-                detail: "LLM system prompt is required".into(),
-            });
-        }
-        Ok(())
+        self.validations.fetch_add(1, Ordering::Relaxed);
+        self.check(request)
     }
 
     fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-        self.validate_for_send(request)?;
+        self.check(request)?;
+        self.requests.push(request);
         Ok(JudgeOutcome {
             answers: self.answers.as_ref().clone(),
             backend: self.id,
             probabilities: None,
-            provider_meta: None,
+            provider_meta: self.provider_meta.clone(),
         })
     }
 }
@@ -68,7 +167,7 @@ impl JudgeBackend for ScriptedJudge {
 /// Returns [`JevError::registry_invalid`] when `ids` repeats a backend.
 pub fn register_scripted_backends(
     ids: &[BackendId],
-    answers: serde_json::Value,
+    answers: Value,
 ) -> Result<BackendRegistry, JevError> {
     let mut registry = BackendRegistry::new();
     for judge in shared_judges(ids, answers) {
@@ -77,17 +176,18 @@ pub fn register_scripted_backends(
     Ok(registry)
 }
 
-fn shared_judges(ids: &[BackendId], answers: serde_json::Value) -> Vec<ScriptedJudge> {
+fn shared_judges(ids: &[BackendId], answers: Value) -> Vec<ScriptedJudge> {
     let shared = Arc::new(answers);
     ids.iter()
         .copied()
-        .map(|id| ScriptedJudge::new(id, Arc::clone(&shared)))
+        .map(|id| ScriptedJudge::shared(id, Arc::clone(&shared)))
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sc_agent_types::PayloadBundle;
 
     #[test]
     fn scripted_answers_share_one_allocation() {
@@ -97,5 +197,23 @@ mod tests {
         );
         assert_eq!(judges.len(), 2);
         assert!(Arc::ptr_eq(&judges[0].answers, &judges[1].answers));
+    }
+
+    #[test]
+    fn scripted_judge_records_requests_and_counts_validations() {
+        let log = RequestLog::new();
+        let judge = ScriptedJudge::new(BackendId::AnthropicHaiku, serde_json::json!({}))
+            .with_request_log(&log);
+        let bare = JudgeRequest {
+            payload: PayloadBundle::from_canonical_bytes(b"{}".to_vec()),
+            llm: None,
+        };
+        assert_eq!(
+            judge.validate_for_send(&bare).expect_err("llm").code(),
+            "INPUT_INVALID"
+        );
+        assert!(judge.judge(&bare).is_err());
+        assert_eq!(judge.validations(), 1);
+        assert!(log.snapshot().is_empty());
     }
 }

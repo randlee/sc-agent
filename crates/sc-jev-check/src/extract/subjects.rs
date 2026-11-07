@@ -15,7 +15,7 @@ use super::read::read_repo_bytes;
 
 /// Validates `sc/subjects/1` and returns its subjects.
 #[derive(Debug, Clone, Copy)]
-pub struct SubjectsExtractor;
+pub(crate) struct SubjectsExtractor;
 
 impl Sealed for SubjectsExtractor {}
 
@@ -60,7 +60,7 @@ pub(crate) fn extract_subjects(
 /// Returns [`JevError::ExtractionInvalid`] when the bytes are not JSON or
 /// the document is not the schema, and [`JevError::ExtractionEmpty`] when
 /// `subjects` is empty.
-pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
+pub(crate) fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
     let document: SubjectsDocument =
         serde_json::from_slice(bytes).map_err(|error| JevError::ExtractionInvalid {
             detail: format!("subjects JSON: {error}"),
@@ -80,7 +80,7 @@ pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
 /// # Errors
 ///
 /// Returns [`JevError::ExtractionEmpty`] or [`JevError::ExtractionInvalid`].
-pub fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), JevError> {
+pub(crate) fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), JevError> {
     if document.schema != SUBJECTS_SCHEMA_V1 {
         return Err(JevError::ExtractionInvalid {
             detail: format!(

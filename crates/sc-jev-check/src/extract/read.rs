@@ -33,7 +33,11 @@ pub(crate) const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 /// that leaves the repo root, a non-file target, or an invalid revision.
 /// Returns [`JevError::InputMissing`] when the path is absent and
 /// [`JevError::InputTooLarge`] above 8 MiB.
-pub fn read_repo_bytes(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, JevError> {
+pub(crate) fn read_repo_bytes(
+    repo: &RepoRoot,
+    rev: &Rev,
+    relative: &str,
+) -> Result<Vec<u8>, JevError> {
     validate_relative(relative)?;
     if rev.as_str() == Rev::WORKTREE {
         return read_worktree(repo, relative);
@@ -47,7 +51,11 @@ pub fn read_repo_bytes(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec
 ///
 /// Returns [`JevError::InputInvalid`] when the bytes are not UTF-8, plus the
 /// errors of [`read_repo_bytes`].
-pub fn read_repo_text(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<String, JevError> {
+pub(crate) fn read_repo_text(
+    repo: &RepoRoot,
+    rev: &Rev,
+    relative: &str,
+) -> Result<String, JevError> {
     let bytes = read_repo_bytes(repo, rev, relative)?;
     String::from_utf8(bytes).map_err(|_| JevError::InputInvalid {
         detail: format!("{relative} is not UTF-8"),

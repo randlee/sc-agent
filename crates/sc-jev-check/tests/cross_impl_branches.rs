@@ -49,16 +49,11 @@ fn cross_impl_branches() {
     )
     .expect("expected bundle");
 
-    let dir = std::env::temp_dir().join(format!(
-        "sc-jev-check-branches-{}-{}",
-        std::process::id(),
-        expected.sha256().as_str()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("temp");
+    let temp = tempfile::tempdir().expect("temp");
+    let dir = temp.path();
     std::fs::write(dir.join("subjects.json"), &bytes).expect("copy subjects");
     std::fs::write(dir.join("questions.json"), QUESTIONS).expect("questions file");
-    let repo = RepoRoot::new(&dir);
+    let repo = RepoRoot::new(dir);
     let spec = CheckSpec {
         questions_path: "questions.json".into(),
         state_path: None,
@@ -93,6 +88,4 @@ fn cross_impl_branches() {
     assert_eq!(dry.bundle.sha256(), expected.sha256());
     assert!(dry.session_id.is_none());
     assert!(dry.outcomes.is_empty());
-
-    let _ = std::fs::remove_dir_all(&dir);
 }
