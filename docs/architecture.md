@@ -81,9 +81,10 @@ order.
 | ADR-SAG-0017 | First release surfaces | Active | — |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
 | ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | — |
-| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003 |
+| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029 |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
-| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009 |
+| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029 |
+| ADR-SAG-0029 | Phase A hardening amendments | Active | Amends ADR-SAG-0020 and ADR-SAG-0022 |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 
@@ -134,7 +135,7 @@ Amended by ADR-SAG-0022.
 
 **Status:** Active
 
-Amends ADR-SAG-0009.
+Amends ADR-SAG-0009. Amended by ADR-SAG-0029.
 
 Registration without a caller-signature change stays ADR-SAG-0009. This
 decision records the test-only scripted judge. It is not a production backend
@@ -161,10 +162,16 @@ and not a second `run_check` policy.
   the argument to use the HTTP backends inside `sc-jev-check`. `cargo test`
   of this crate enables `sc-jev-check/test-util` through its dev-dependency
   and compiles the Python signature with `cfg(test)`.
+  *Superseded by ADR-SAG-0029 (b):* `run_check` has one signature with no
+  `scripted_answers` parameter in any build. Scripted injection is the
+  separate function `sc_jev_py._testing.run_check_scripted`, registered only
+  under feature `test-util`.
 - Default features of both crates leave `test-util` off. The publish wheel
   does not pass `--features test-util`. Sprint a-8 pytest may enable it so
   session `ask` runs without a network send. Enabling it does not change
   production registration.
+  *Superseded in part by ADR-SAG-0029 (b):* the a-8 pytest calls
+  `sc_jev_py._testing.run_check_scripted`, not a `run_check` argument.
 
 ## ADR-SAG-0019 — LLM wire envelope vs canonical payload
 
@@ -216,7 +223,7 @@ Amended by ADR-SAG-0020.
 
 **Status:** Active
 
-Amends ADR-SAG-0003.
+Amends ADR-SAG-0003. Amended by ADR-SAG-0029.
 
 Resolution order stays ADR-SAG-0003. This decision records the extension
 points and the secret-bearing return type.
@@ -226,9 +233,15 @@ points and the secret-bearing return type.
 - Cargo feature `test-util` exposes the in-memory doubles `MapEnv` and
   `MapKeyring`. Production builds leave the feature off. The doubles are not
   a second resolution policy.
+  *Superseded by ADR-SAG-0029 (a):* `sc-agent-secrets` has no `test-util`
+  feature. `MapEnv` and `MapKeyring` are `#[cfg(test)]` crate-private code
+  and are not exported.
 - `resolve_key` and `resolve_key_with` return `ResolvedApiKey`. `Debug` and
   `Display` redact the secret. `as_str` is the only read, and only the
   transport that sends the key may call it.
+  *Amended by ADR-SAG-0029 (a):* `ResolvedApiKey::try_new` is the one
+  construction rule set, and `clippy.toml` `disallowed-methods` enforces the
+  `as_str` rule.
 - An unreadable repo-root `.env` or keyring is `CONFIG_INVALID`
   (`JevError::credential_store_invalid`). The cause is an I/O kind or a
   keyring variant label. It never includes secret bytes, passwords, or the
@@ -381,6 +394,53 @@ Every TypeSafe Jev HTTP operation is implemented in `sc-jev`. Other crates
 must not send Jev API requests. Phase A ships the check/judge slice; remaining
 endpoints extend `sc-jev` in place.
 
+## ADR-SAG-0029 — Phase A hardening amendments
+
+**Status:** Active
+
+Amends ADR-SAG-0020 and ADR-SAG-0022. Recorded by the Phase A phase-end
+hardening sprint (a-10, PR 20). The earlier ADR text stays in place; the
+sentences this decision replaces carry a *Superseded by ADR-SAG-0029*
+pointer.
+
+**(a) Secrets (amends ADR-SAG-0020).**
+
+- `sc-agent-secrets` has no Cargo features. The in-memory doubles `MapEnv`
+  and `MapKeyring` are `#[cfg(test)]` code inside the crate
+  (`crates/sc-agent-secrets/src/resolve.rs`) and are not exported. Other
+  crates inject their own `EnvSource` / `KeyringSource` implementations
+  through `resolve_key_with`.
+- `ResolvedApiKey::try_new(BackendKeyId, String)` is the single construction
+  rule set: it trims the value, maps an empty value to `KEY_MISSING`, and
+  maps interior whitespace or control characters to
+  `JevError::credential_store_invalid` (`CONFIG_INVALID`). Every resolution
+  path in `sc-agent-secrets` goes through it. The unchecked
+  `ResolvedApiKey::new` exists only under `cfg(test)` or the
+  `sc-agent-types/test-util` feature, for test doubles.
+- `clippy.toml` `disallowed-methods` lists `ResolvedApiKey::as_str`. The two
+  sending transports (`crates/sc-jev/src/client/https.rs` and
+  `crates/sc-jev-backends/src/transport.rs`) are the only production readers
+  and carry `#[allow(clippy::disallowed_methods, reason = ...)]`.
+
+**(b) Scripted backends in `sc-jev-py` (amends ADR-SAG-0022).**
+
+- `sc_jev_py.run_check` has one signature in every build. It never takes
+  `scripted_answers`.
+- Scripted injection is `sc_jev_py._testing.run_check_scripted(check_path, *,
+  scripted_answers, ...)`. The `_testing` submodule is registered only when
+  the `sc-jev-py` feature `test-util` is on. The publish wheel leaves it off,
+  so the wheel has no `_testing` submodule.
+- `sc-jev-check` feature `test-util` makes `registry::ScriptedJudge`,
+  `registry::RequestLog`, and `registry::register_scripted_backends` public.
+  The string shorthand (`"yes"` for `{"choice": "yes"}`) is normalised inside
+  `register_scripted_backends`, so every caller gets the same rule.
+- Everything else in ADR-SAG-0022 stands: no production registration, no
+  socket, no API key, default features off.
+
+**Deferred.** ADR-SAG-0016 still names `"1.5.0"` while the workspace pins
+`"=1.5.0"` (arch-qa ARCH-004). The version-form text is left to the D8
+amendment (`PHASE-A-REVIEW.md` section 4).
+
 ## Rust API patterns (Phase A)
 
 **Status:** Active
@@ -394,6 +454,8 @@ endpoints extend `sc-jev` in place.
 - **Resolved secrets:** `ResolvedApiKey` in `sc-agent-types`, returned by
   `sc-agent-secrets::resolve_key` (ADR-SAG-0020). `Debug` and `Display` redact.
   `as_str` is the only read of the secret, and only the sending transport calls it.
+  `try_new` is the only production constructor; `clippy.toml` enforces the
+  `as_str` rule (ADR-SAG-0029).
 - **Extractor sealing:** `Extractor` is `pub trait Extractor: private::Sealed` —
   only the four Phase A kinds implement it; external crates cannot add kinds
   without a new ADR (RBP-F004).

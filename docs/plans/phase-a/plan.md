@@ -403,9 +403,9 @@ evidence-only docs commit; the docs commit changes no CI input.
 | `just lint` | `sc-agent-ci.yml` job `test`, ubuntu-24.04 only (the managed sc-lint bootstrap fails on Windows; [`ci.md`](../../development/ci.md#known-limits)) | Green: [test (ubuntu-24.04)](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467345) |
 | `cargo test -p …`, `cross_impl_branches`, and the `workspace` layer of `just test` (`cargo test --workspace`) | `sc-agent-ci.yml` job `test` (ubuntu-24.04, macos-15, windows-2022) | 194 passed, 0 failed on each OS: [ubuntu-24.04](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467345), [macos-15](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467493), [windows-2022](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467473) |
 | `clippy --workspace --all-targets --all-features -- -D warnings` | `sc-agent-ci.yml` job `test` (three OSes) | Green in the same three jobs |
-| `cargo doc` with `RUSTDOCFLAGS=-D warnings` | `sc-agent-ci.yml` job `doc` | **Fails** underneath `continue-on-error` ([rustdoc](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467366): could not document `sc-agent-types`, `sc-treesitter`); the job shows green until QA-005 lands |
+| `cargo doc` with `RUSTDOCFLAGS=-D warnings` | `sc-agent-ci.yml` job `doc` (a hard gate; no `continue-on-error` since a-10) | Historical: run [42345904358](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467366) failed underneath the former `continue-on-error` (could not document `sc-agent-types`, `sc-treesitter`). QA-005 (a-10) fixed the warnings and removed `continue-on-error`; the job now fails the run on any rustdoc warning |
 | Test-util wheel + `tests/fixtures/jev-python` pytest (the `jev-python` layer of `just test`) | `sc-agent-ci.yml` job `python` (`just test-python`, three OSes) | 7 passed on each OS: [ubuntu-24.04](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467398), [macos-15](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467414), [windows-2022](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467289) |
-| sc-treesitter feature matrix | `sc-agent-ci.yml` job `features` (`cargo hack --each-feature check`) | Green: [features](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467072); check only until the per-language tests are feature-gated |
+| sc-treesitter feature matrix | `sc-agent-ci.yml` job `features` (`cargo hack --each-feature test -p sc-treesitter` since a-10) | Historical: [features](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467072) ran `check` only. a-10 feature-gated the per-language tests (QA-006) and the job now runs `test` for every feature combination |
 | Coverage | `sc-agent-ci.yml` job `coverage` (cargo-llvm-cov) | 82.52% line (TOTAL row): [coverage job](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467256), artifact `coverage-summary` of run [42345904358](https://github.com/randlee/sc-agent/actions/runs/42345904358) |
 | Preflight, `cargo publish --dry-run`, publish-surface `maturin build` | `.github/workflows/sc-publish-dry-run.yml` | Runs [42339767937](https://github.com/randlee/sc-agent/actions/runs/42339767937), [42341299125](https://github.com/randlee/sc-agent/actions/runs/42341299125), [42341873748](https://github.com/randlee/sc-agent/actions/runs/42341873748) on PR #17 (sprint a-9), all green |
 
@@ -420,9 +420,10 @@ Phase A is not closed. Open at phase end:
   exists and the a-5 probe runs once with its output attached.
 - Phase-end review decisions D1–D13 (`PHASE-A-REVIEW.md` section 4) are
   awaiting Rand; nothing architectural has started.
-- `sc-agent-ci` `doc` job runs with `continue-on-error` until the rustdoc
-  warnings are fixed; the sc-treesitter feature matrix is `check` only until
-  its per-language tests are feature-gated.
+- Closed in a-10: the `sc-agent-ci` `doc` job is a hard gate (no
+  `continue-on-error`), and the sc-treesitter feature matrix runs
+  `cargo hack --each-feature test`. The run ids in the table above are
+  historical evidence from before those changes.
 - Bead `agt-obs-v2-shim-removal` (sprint a-1) stays open until upstream v2 is
   released.
 

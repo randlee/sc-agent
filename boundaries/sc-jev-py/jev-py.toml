@@ -21,8 +21,14 @@ owner_crate_path = "sc_jev_py"
 name = "jev-py"
 
 [public]
-facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session, sc_jev_py::CheckResult, sc_jev_py::canonical_bytes, sc_jev_py::canonical_sha256, sc_jev_py::default_log_root, sc_jev_py::resolve_log_root, sc_jev_py::resolve_session_dir, sc_jev_py::log_file"
-notes = "PyO3 over sc-jev-check; facade items are also the Python module surface. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). Feature test-util only forwards scripted answers to sc-jev-check (ADR-SAG-0022)."
+# The facade is the Python module surface of the `sc_jev_py` extension
+# module, written in path syntax because sc-boundary requires Rust paths:
+# `sc_jev_py::X` names the Python attribute `sc_jev_py.X`. The Rust items
+# behind it are pub(crate) pyfunctions and pyclasses (ADR-SAG-0011).
+# `_testing::run_check_scripted` (`sc_jev_py._testing.run_check_scripted`)
+# exists only in `test-util` builds.
+facade = "sc_jev_py::build_request, sc_jev_py::run_check, sc_jev_py::Session, sc_jev_py::CheckResult, sc_jev_py::canonical_bytes, sc_jev_py::canonical_sha256, sc_jev_py::default_log_root, sc_jev_py::resolve_log_root, sc_jev_py::resolve_session_dir, sc_jev_py::log_file, sc_jev_py::JevError, sc_jev_py::_testing::run_check_scripted"
+notes = "PyO3 over sc-jev-check; facade items are the Python module surface. Payload bytes and Jev HTTP stay in Rust. Session JSONL is sc-observability v2. Production run_check does not register a judge (ADR-SAG-0009). run_check has one signature and never takes scripted_answers. Feature test-util registers the _testing submodule whose run_check_scripted forwards scripted answers to sc-jev-check register_scripted_backends (ADR-SAG-0022, ADR-SAG-0029)."
 
 [implementation]
 type = "marker"

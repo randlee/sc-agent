@@ -26,6 +26,27 @@ emitted as subjects ([`subjects-schema.md`](../sc-agent-types/subjects-schema.md
 
 Errors on stderr as **`JevError`** codes (ADR-SAG-0001): `LANGUAGE_UNAVAILABLE`, `QUERY_INVALID`, `QUERY_NOT_FOUND`, `INPUT_MISSING`, plus shared `EXTRACTION_*` ids.
 
+## Library API notes (a-10)
+
+Recorded by the Phase A phase-end hardening (a-10):
+
+- `sc_treesitter::languages()` returns
+  `impl ExactSizeIterator<Item = &'static LanguageInfo>` (was
+  `&'static [LanguageInfo]`). Both come from the one cfg-gated grammar table.
+- `sc_treesitter::queries(language)` returns
+  `Result<Vec<&'static QueryInfo>, JevError>` (was `Vec<QueryInfo>` by
+  value); an uncompiled `language` is `LANGUAGE_UNAVAILABLE`.
+- `Rev::parse` rejects a revision that starts with `-` as `INPUT_INVALID`,
+  so `--rev=--output=<file>` never reaches git. Git reads use
+  `rev-parse --verify --end-of-options` and the resolved object id.
+- `--rev WORKTREE` hashes the bytes it returns with
+  `git hash-object -t blob --stdin --no-filters`, so `blob_sha` is the blob id
+  of exactly those bytes on every platform.
+- Reads are capped at 8 MiB (`INPUT_TOO_LARGE`), matching `sc-jev-check`.
+- Failure codes from git reads and argument parsing use the existing
+  `INPUT_INVALID`, `INPUT_MISSING` and `EXTRACTION_FAILED` ids (ADR-SAG-0029,
+  error-code dispositions). No new ids.
+
 ## Library + tests
 
 Library target; binary is thin wrapper. Named tests listed in sprint **a-11** (six schema-rule tests + `test_matches_mode_duplicate_captures` + `test_subjects_schema_roundtrip`).
