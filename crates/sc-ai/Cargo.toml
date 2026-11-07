@@ -18,12 +18,18 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 [lints]
 workspace = true
 
+[features]
+default = ["cli"]
+# Binary-only dependencies (ADR-SAG-0023): the `sc-ai` bin and the `cli` test
+# target need them; `--no-default-features` builds the library without them.
+cli = ["dep:mimalloc", "dep:clap"]
+
 [dependencies]
-# Deliberate `=` pin: the binary ships the allocator it was tested with; revisited at Phase A review.
-mimalloc.workspace = true
+clap = { workspace = true, optional = true }
+mimalloc = { workspace = true, optional = true }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-jev-check = { path = "../sc-jev-check", version = "0.1.0" }
-# Deliberate `=` lockstep with the sc-observability release train; revisited at Phase A review.
+# Deliberate `=` lockstep (ADR-SAG-0023 list; ADR-SAG-0016).
 sc-observability.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -37,3 +43,10 @@ tempfile.workspace = true
 [[bin]]
 name = "sc-ai"
 path = "src/main.rs"
+required-features = ["cli"]
+
+# Runs the binary through CARGO_BIN_EXE_sc-ai, so it needs the bin's features.
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+required-features = ["cli"]

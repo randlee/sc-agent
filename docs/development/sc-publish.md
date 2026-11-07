@@ -38,7 +38,8 @@ pin and re-run install. `install.py` overwrites kit paths without warning.
 - **PyPI**: `sc-jev-py`, a maturin wheel plus sdist on Linux, macOS and Windows.
   `sc-jev-py` is a workspace member with `publish = false`. It is not in the
   `crates` list, so it never reaches crates.io.
-- **Release binaries** `sc-ai` and `sc-treesitter`. Each target gets one archive
+- **Release binaries** `sc-ai` and `sc-treesitter` (ADR-SAG-0023; per-channel
+  coverage in ADR-SAG-0017's r-4 amendment). Each target gets one archive
   with `bin/sc-ai` and `bin/sc-treesitter`. Targets: `x86_64-unknown-linux-gnu`,
   `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`
   (`tar.gz`), `x86_64-pc-windows-msvc` (`zip`).
@@ -53,7 +54,8 @@ pin and re-run install. `install.py` overwrites kit paths without warning.
 ### Upstream kit issues to file
 
 These are sc-publish kit limitations. Fix them in the kit and bump the pin;
-do not hand-edit kit or rendered files (ADR-SAG-0018). Neither is filed yet.
+do not hand-edit kit or rendered files (ADR-SAG-0018). Neither is filed yet;
+record the URL here and in ADR-SAG-0017's r-4 amendment when issue 1 is.
 sc-lint kit issues (Windows bootstrap) are listed separately in
 [`ci.md`](ci.md#upstream-issues-to-file-sc-lint).
 
@@ -61,8 +63,9 @@ sc-lint kit issues (Windows bootstrap) are listed separately in
    entry, so only `sc-ai.exe` gets a shim; `sc-treesitter.exe` is in the
    archive but not on `PATH`. Homebrew installs both binaries; WinGet names
    only `randlee.sc-ai`. Ask: accept a list of release binaries per channel.
-   (Phase-end ARCH-002. Whether ADR-SAG-0017 should name both binaries and the
-   per-channel coverage is phase-end decision D8, not this doc.)
+   Bead `agt-scoop-multi-shim`; ADR-SAG-0017 r-4 amendment (phase-end
+   ARCH-002, decision D8). The kit has no consumer-input field for a second
+   shim at the current pin (`[channels.scoop].binary` must be one string).
 2. **`list-publish-plan` ignores `publish: false`.** `release_artifacts.py
    list-publish-plan` prints every entry in the consumer `crates` list without
    checking its `publish` flag, and `cargo publish` and the dry-run consume
@@ -140,21 +143,23 @@ consumer-preflight steps, plus credential liveness, registry state and
 
 ## Dependency pinning policy
 
-- Exact `=` pins on `sc-observability` and `sc-observability-types`
-  (`sc-agent-types`, `sc-ai`, `sc-jev-py`) are deliberate: they move in
-  lockstep with the sc-observability release train.
-- `sc-treesitter` pins `tree-sitter`, its grammars, and `mimalloc` exactly,
-  because the queries and the shipped binary are tested against those
-  releases. `sc-ai` pins `mimalloc` the same way.
-- `mimalloc` is an unconditional dependency of the `sc-treesitter` library,
-  not only its binary, so library users also build its C code. That cost is
-  accepted for now.
-- Shared requirements (`toml`, `ureq`, `sc-observability*`, `mimalloc`) live in
-  root `[workspace.dependencies]`; crates reference them with
-  `.workspace = true`.
-- Under review at the Phase A architectural review: caret ranges for library
-  crates (exact pins only for leaf binaries), and gating `mimalloc` behind a
-  bin-only feature.
+ADR-SAG-0023 (`docs/architecture.md`) is the policy; NFR-SAG-0004 is its
+requirement.
+
+- Every dependency uses a caret range except deliberate lockstep. The
+  lockstep crates, with their reasons, are the list between the
+  `lockstep-pins` markers in ADR-SAG-0023; that list is the only copy, so it
+  is not repeated here. `.github/scripts/check-exact-pins.sh` reads it and fails on
+  any other `=` requirement in any `Cargo.toml`; `--self-test` proves it
+  fails on an unlisted pin. CI runs both (`sc-agent-ci.yml`, job `deps`).
+- `mimalloc` and `clap` are optional dependencies of the two binary crates,
+  enabled by their default `cli` feature. The `[[bin]]` targets and the
+  `cli` test targets use `required-features = ["cli"]`, so
+  `cargo build -p sc-ai --lib --no-default-features` (and the same for
+  `sc-treesitter`) builds the library without the allocator
+  (REQ-SAG-0134; `.github/scripts/cargo-tree-gates.sh`).
+- Shared requirements live in root `[workspace.dependencies]`; crates
+  reference them with `.workspace = true`.
 
 ## Installing the binaries from crates.io
 
@@ -164,7 +169,21 @@ cargo install sc-treesitter --locked
 ```
 
 `--locked` builds with the `Cargo.lock` shipped in the package, so transitive
-dependency versions match the tested release.
+dependency versions match the tested release. Both binaries need the default
+`cli` feature; do not pass `--no-default-features` to `cargo install`.
+
+## Running the binaries on Windows
+
+| Channel | `sc-ai` | `sc-treesitter` |
+| --- | --- | --- |
+| Scoop (`scoop install sc-ai` from `randlee/scoop-bucket`) | on `PATH` (shim) | `& "$(scoop prefix sc-ai)\bin\sc-treesitter.exe"` |
+| WinGet (`winget install randlee.sc-ai`) | on `PATH` (alias) | run `bin\sc-treesitter.exe` from the package directory under `%LOCALAPPDATA%\Microsoft\WinGet\Packages\` (`randlee.sc-ai_*`) |
+| GitHub Release zip (`x86_64-pc-windows-msvc`) | `bin\sc-ai.exe` | `bin\sc-treesitter.exe` |
+| crates.io | `cargo install sc-ai --locked` | `cargo install sc-treesitter --locked` |
+
+Scoop and WinGet put only `sc-ai` on `PATH` (sc-publish kit limitation,
+bead `agt-scoop-multi-shim`). To get `sc-treesitter` on `PATH`, add the
+package's `bin` directory to `PATH` or install it with `cargo install`.
 
 ## Pin bump
 

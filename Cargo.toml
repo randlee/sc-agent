@@ -32,12 +32,13 @@ thiserror = "2"
 uuid = { version = "1", features = ["serde", "v4"] }
 toml = "1.1.8"
 ureq = "3.5.1"
-# Dependency pinning policy (docs/development/sc-publish.md): the `=` pins
-# below are deliberate lockstep with the sc-observability release train and
-# with the sc-ai / sc-treesitter binaries' tested allocator. Caret relaxation
-# for library crates is revisited at the Phase A architectural review.
+# Pinning policy: ADR-SAG-0023 (docs/architecture.md). Caret ranges, except
+# the deliberate-lockstep crates listed there; .github/scripts/check-exact-pins.sh
+# fails on any other `=` requirement (NFR-SAG-0004).
 sc-observability = "=1.5.0"
-mimalloc = "=0.1.52"
+# Binary-only: optional behind the `cli` feature of sc-ai and sc-treesitter.
+mimalloc = "0.1.52"
+clap = { version = "4", features = ["derive"] }
 # Dev-only. Tests use tempfile::TempDir instead of hand-rolled temp dirs.
 tempfile = "3"
 

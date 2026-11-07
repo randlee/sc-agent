@@ -159,10 +159,10 @@ verbatim. Plan: [`plans/phase-a-refine/plan.md`](plans/phase-a-refine/plan.md).
 | REQ-SAG-0107 | `sc-agent-types` has no `sc-observability*` dependency; session log port uses local `LogRejected`; module seams are cargo features (`judge`, `secret`, `obs` default; `git`, `test-util` non-default; `cancel` core), every combination builds — (Active, r-1) |
 | REQ-SAG-0108 | `SubjectsDocument` is the one validated subjects type (private fields; validated on deserialize and by `SubjectsBuilder::build`); it and the id-assigning `SubjectsBuilder` live in `sc-agent-types`; producer and consumer share them — (Active, r-1) |
 | REQ-SAG-0109 | `crates/workspace-tests` (`publish = false`, no pyo3/tree-sitter in its graph) hosts cross-crate proofs incl. `jev_cross_impl`, a real `sc-treesitter` → `check.toml` e2e test, CLI/Python parity and git-read parity — (Proposed, r-3b) |
-| REQ-SAG-0133 | Both released binaries (`sc-ai`, `sc-treesitter`) documented with per-channel coverage — (Proposed, r-4) |
-| REQ-SAG-0134 | CI proves `mimalloc` is absent from `--no-default-features` library builds of `sc-ai` and `sc-treesitter` — (Proposed, r-4) |
+| REQ-SAG-0133 | Both released binaries (`sc-ai`, `sc-treesitter`) documented with per-channel coverage — (Active, r-4; upstream sc-publish issue URL pending — owner deferral recorded in sprint-r-4 Implementation notes, bead `agt-scoop-multi-shim`) |
+| REQ-SAG-0134 | CI proves `mimalloc` is absent from `--no-default-features` library builds of `sc-ai` and `sc-treesitter` — (Active, r-4) |
 | REQ-SAG-0135 | CI proves `clap` is absent from `--no-default-features` library builds of `sc-ai` and `sc-treesitter` (`cargo tree` gates) — (Proposed, r-3b) |
-| NFR-SAG-0004 | Library deps use caret ranges; `=` pins only for lockstep listed in ADR-SAG-0023, checked by `check-exact-pins.sh` — (Proposed, r-4) |
+| NFR-SAG-0004 | Library deps use caret ranges; `=` pins only for lockstep listed in ADR-SAG-0023, checked by `check-exact-pins.sh` — (Active, r-4) |
 | REQ-SAG-0312 | `command` input `path` field (`RepoRelativePath`) settable in `check.toml`, substituted for `{path}` — (Proposed, r-2) |
 | REQ-SAG-0313 | Command producer stderr `ScAgentErrorResponse` re-raised with its code (`ProducerError`) — (Proposed, r-2) |
 | REQ-SAG-0314 | Request byte cap has one owner per backend (descriptor limit), enforced in `validate_for_send` before any send; dry-run reports `payload_bytes` and per-backend `over_limit` without failing — (Proposed, r-2) |

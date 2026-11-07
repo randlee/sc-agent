@@ -254,7 +254,7 @@ roots onto them.
 | `pyo3` | `crates/sc-jev-py` (a-10 record, unchanged) | a-10 |
 | `tree-sitter`, `tree-sitter-python`, `tree-sitter-rust` | `crates/sc-treesitter` (a-10 records, unchanged) | a-10 |
 | `sc-observability` | `crates/sc-agent-compose` only | r-3b |
-| `sc-observability-types` | record deleted (no user after r-1) | r-4 |
+| `sc-observability-types` | record deleted (no user after r-1); deleted by r-1 with the dependency (coordinated in r-4 QA-1) | r-1 |
 | `mimalloc` | `crates/sc-ai/Cargo.toml`, `crates/sc-treesitter/Cargo.toml` (optional, `cli`) | r-4 |
 | `clap` | `crates/sc-ai/Cargo.toml`, `crates/sc-treesitter/Cargo.toml` (optional, `cli`) | r-4 |
 

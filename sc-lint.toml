@@ -87,5 +87,12 @@ source_message = "Only the composition roots sc-ai and sc-jev-py may depend on f
 dependency = "mimalloc"
 allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-treesitter/Cargo.toml"]
 allowed_source_roots = ["crates/sc-ai", "crates/sc-treesitter"]
-manifest_message = "Only sc-ai and sc-treesitter may depend on mimalloc. Interim policy recording today's edges, pending the Phase A allocator/pin ADR (decision D8 in PHASE-A-REVIEW.md)."
-source_message = "Only sc-ai and sc-treesitter may depend on mimalloc. Interim policy recording today's edges, pending the Phase A allocator/pin ADR (decision D8 in PHASE-A-REVIEW.md)."
+manifest_message = "Only the binary crates sc-ai and sc-treesitter may depend on mimalloc, as an optional dependency behind their default `cli` feature (ADR-SAG-0023, REQ-SAG-0134)."
+source_message = "Only the binary crates sc-ai and sc-treesitter may depend on mimalloc, as an optional dependency behind their default `cli` feature (ADR-SAG-0023, REQ-SAG-0134)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "clap"
+allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-treesitter/Cargo.toml"]
+allowed_source_roots = ["crates/sc-ai", "crates/sc-treesitter"]
+manifest_message = "Only the binary crates sc-ai and sc-treesitter may depend on clap, as an optional dependency behind their default `cli` feature (ADR-SAG-0023, REQ-SAG-0135)."
+source_message = "Only the binary crates sc-ai and sc-treesitter may depend on clap, as an optional dependency behind their default `cli` feature (ADR-SAG-0023, REQ-SAG-0135)."
