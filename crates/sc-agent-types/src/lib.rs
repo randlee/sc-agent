@@ -68,7 +68,7 @@ pub use cancel::CancelToken;
 #[doc(inline)]
 pub use catalog::{BACKENDS, BackendDescriptor, BackendFamily};
 #[doc(inline)]
-pub use envelope::{ERROR_RESPONSE_SCHEMA_VERSION, ScAgentErrorResponse};
+pub use envelope::ScAgentErrorResponse;
 #[doc(inline)]
 pub use error::{ErrorCode, JevError, NetworkErrorKind, OperationalArea};
 #[doc(inline)]

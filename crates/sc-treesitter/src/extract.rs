@@ -26,7 +26,6 @@ use crate::{PRODUCER_MODE, PRODUCER_NAME};
 /// assert!(input.captures.is_none());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct ExtractInput<'a> {
     /// Grammar id, such as `python` or `rust`.
     pub language: &'a str,

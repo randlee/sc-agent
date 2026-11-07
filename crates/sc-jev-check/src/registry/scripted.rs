@@ -35,7 +35,11 @@ use super::BackendRegistry;
 ///
 /// # Examples
 ///
-/// ```
+/// Needs the `test-util` feature (a doctest links the library without
+/// `cfg(test)`), so plain `cargo test -p sc-jev-check` does not build it.
+///
+#[cfg_attr(feature = "test-util", doc = "```")]
+#[cfg_attr(not(feature = "test-util"), doc = "```ignore")]
 /// use sc_agent_types::BackendId;
 /// use sc_jev_check::registry::register_scripted_backends;
 ///

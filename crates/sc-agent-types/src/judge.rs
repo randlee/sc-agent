@@ -205,8 +205,11 @@ fn check_unit(what: &str, choice: &ChoiceId, value: f64) -> Result<(), JevError>
 
 /// Normalized answer both backend families emit.
 ///
-/// Built with [`Self::new`] against the request it answers, so every outcome
-/// has exactly the request's question ids and only offered choices.
+/// [`Self::new`] checks the answers against the request's payload
+/// ([`Self::check_against`]): exactly its question ids and only offered
+/// choices. `Deserialize` validates each [`QuestionAnswer`] but cannot know
+/// the payload, so a reader that loads stored outcomes calls
+/// [`Self::check_against`] with the stored payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JudgeOutcome {
@@ -231,34 +234,23 @@ impl JudgeOutcome {
         request: &JudgeRequest,
         answers: BTreeMap<QuestionId, QuestionAnswer>,
     ) -> Result<Self, JevError> {
-        let asked = request.payload().question_choices();
-        if !answers.keys().eq(asked.keys()) {
-            return Err(JevError::response_invalid(
-                "answer ids differ from the question ids",
-            ));
-        }
-        for (id, answer) in &answers {
-            let offered = &asked[id];
-            if !offered.contains(answer.choice()) {
-                return Err(JevError::response_invalid(format!(
-                    "answer {id} choice {} is not one of its choices",
-                    answer.choice()
-                )));
-            }
-            if let Some(probabilities) = answer.probabilities()
-                && let Some(extra) = probabilities.keys().find(|key| !offered.contains(*key))
-            {
-                return Err(JevError::response_invalid(format!(
-                    "answer {id} has a probability for {extra}, which is not one of its choices"
-                )));
-            }
-        }
+        check_answers(&answers, request.payload())?;
         Ok(Self {
             answers,
             backend,
             provider_meta: None,
             input_sha256: None,
         })
+    }
+
+    /// Checks that the answers match `payload`'s questions and choices.
+    ///
+    /// # Errors
+    ///
+    /// `RESPONSE_INVALID` when the answer ids differ from the question ids
+    /// or an answer's choice or probability key was not offered.
+    pub fn check_against(&self, payload: &PayloadBundle) -> Result<(), JevError> {
+        check_answers(&self.answers, payload)
     }
 
     /// Sets provider metadata (debugging only; not part of equal-input).
@@ -298,6 +290,35 @@ impl JudgeOutcome {
     pub fn input_sha256(&self) -> Option<&Sha256Digest> {
         self.input_sha256.as_ref()
     }
+}
+
+fn check_answers(
+    answers: &BTreeMap<QuestionId, QuestionAnswer>,
+    payload: &PayloadBundle,
+) -> Result<(), JevError> {
+    let asked = payload.question_choices();
+    if !answers.keys().eq(asked.keys()) {
+        return Err(JevError::response_invalid(
+            "answer ids differ from the question ids",
+        ));
+    }
+    for (id, answer) in answers {
+        let offered = &asked[id];
+        if !offered.contains(answer.choice()) {
+            return Err(JevError::response_invalid(format!(
+                "answer {id} choice {} is not one of its choices",
+                answer.choice()
+            )));
+        }
+        if let Some(probabilities) = answer.probabilities()
+            && let Some(extra) = probabilities.keys().find(|key| !offered.contains(*key))
+        {
+            return Err(JevError::response_invalid(format!(
+                "answer {id} has a probability for {extra}, which is not one of its choices"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Backend facts a caller may read before or after a backend exists.
@@ -512,7 +533,7 @@ impl TryFrom<EqualInputWire> for EqualInputRecord {
             wire.backends,
             wire.leak,
             wire.producer,
-        );
+        )?;
         if record.equal() == wire.equal {
             Ok(record)
         } else {
@@ -529,21 +550,36 @@ impl EqualInputRecord {
     /// `leak` is true when a requested backend was withheld from the
     /// comparison. `producer` is the subjects producer when the check used a
     /// `subjects` or `command` input.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// `INPUT_INVALID` when `backends` is empty or names a backend twice.
     pub fn new(
         prompt_sha256: Sha256Digest,
         mode: MultiBackendMode,
         backends: Vec<BackendAttestation>,
         leak: bool,
         producer: Option<SubjectsProducer>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, JevError> {
+        if backends.is_empty() {
+            return Err(JevError::input_invalid(
+                "an equal-input record needs at least one backend",
+            ));
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if let Some(repeated) = backends.iter().find(|entry| !seen.insert(entry.backend)) {
+            return Err(JevError::input_invalid(format!(
+                "equal-input record lists backend {} twice",
+                repeated.backend
+            )));
+        }
+        Ok(Self {
             prompt_sha256,
             mode,
             backends,
             leak,
             producer,
-        }
+        })
     }
 
     /// SHA-256 of the canonical payload bytes.
@@ -576,13 +612,11 @@ impl EqualInputRecord {
         self.producer.as_ref()
     }
 
-    /// True iff there is at least one backend and every one is `Matched`.
+    /// True iff every backend is `Matched` (there is always at least one).
     #[must_use]
     pub fn equal(&self) -> bool {
-        !self.backends.is_empty()
-            && self
-                .backends
-                .iter()
-                .all(|entry| matches!(entry.attestation, Attestation::Matched))
+        self.backends
+            .iter()
+            .all(|entry| matches!(entry.attestation, Attestation::Matched))
     }
 }

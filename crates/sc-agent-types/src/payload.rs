@@ -128,7 +128,8 @@ impl CanonicalJudgePayload {
 /// attestation and `JudgeOutcome::new` rely on that invariant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadBundle {
-    bytes: Vec<u8>,
+    /// Canonical JSON text; `serde_json` output, so UTF-8 by construction.
+    text: String,
     sha256: Sha256Digest,
     question_choices: BTreeMap<QuestionId, BTreeSet<ChoiceId>>,
 }
@@ -174,10 +175,11 @@ impl PayloadBundle {
         }
         let value = serde_json::to_value(payload)
             .map_err(|error| JevError::encode_failed("canonical payload", &error))?;
-        let bytes = canonical_json_bytes(&value)?;
-        let sha256 = Sha256Digest::of(&bytes);
+        let text = serde_json::to_string(&sorted(&value))
+            .map_err(|error| JevError::encode_failed("canonical JSON", &error))?;
+        let sha256 = Sha256Digest::of(text.as_bytes());
         Ok(Self {
-            bytes,
+            text,
             sha256,
             question_choices,
         })
@@ -195,7 +197,7 @@ impl PayloadBundle {
         let payload: CanonicalJudgePayload = serde_json::from_slice(bytes)
             .map_err(|error| JevError::encode_failed("canonical payload", &error))?;
         let bundle = Self::encode(&payload)?;
-        if bundle.bytes != bytes {
+        if bundle.text.as_bytes() != bytes {
             return Err(JevError::input_invalid(
                 "payload bytes are not canonical sorted-key compact JSON",
             ));
@@ -206,7 +208,20 @@ impl PayloadBundle {
     /// Sorted-key compact JSON, UTF-8.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+        self.text.as_bytes()
+    }
+
+    /// The canonical JSON as text. The bytes are always UTF-8, so no caller
+    /// needs to re-check them.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the text and its digest, consuming the bundle.
+    #[must_use]
+    pub fn into_text(self) -> (String, Sha256Digest) {
+        (self.text, self.sha256)
     }
 
     /// SHA-256 of [`Self::bytes`].
@@ -229,7 +244,7 @@ impl PayloadBundle {
     /// Returns the bytes and their digest, consuming the bundle.
     #[must_use]
     pub fn into_parts(self) -> (Vec<u8>, Sha256Digest) {
-        (self.bytes, self.sha256)
+        (self.text.into_bytes(), self.sha256)
     }
 }
 

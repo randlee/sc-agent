@@ -19,7 +19,7 @@ use sc_agent_types::{
 };
 
 use crate::config::{CheckSpec, load_packaged_config};
-use crate::extract::{Extracted, extract_input, read_repo_text};
+use crate::extract::{Extracted, extract_input, read_repo_text, repo_path};
 
 pub(crate) use questions::parse_state;
 #[doc(inline)]
@@ -86,9 +86,13 @@ impl PayloadBuilder {
         repo: &RepoRoot,
         rev: &Rev,
     ) -> Result<BuiltPayload, JevError> {
-        let questions = parse_question_set(&read_repo_text(repo, rev, &spec.questions_path)?)?;
+        let questions = parse_question_set(&read_repo_text(
+            repo,
+            rev,
+            &repo_path(&spec.questions_path)?,
+        )?)?;
         let state = match &spec.state_path {
-            Some(path) => parse_state(&read_repo_text(repo, rev, path)?, &questions)?,
+            Some(path) => parse_state(&read_repo_text(repo, rev, &repo_path(path)?)?, &questions)?,
             None => Vec::new(),
         };
         let mut extractions = BTreeMap::new();

@@ -14,6 +14,17 @@ use crate::error::JevError;
 use crate::ids::{BackendId, QuestionId, Sha256Digest};
 use crate::judge::{JudgeBackend, JudgeOutcome, JudgeRequest, QuestionAnswer};
 
+/// How a [`MockJudgeBackend`] ends a call.
+#[derive(Debug, Clone)]
+enum Behaviour {
+    /// Answer from the script.
+    Answer,
+    /// `validate_for_send` passes, then `judge` returns the error (sent and failed).
+    FailAfterSend(JevError),
+    /// `validate_for_send` (and `judge`) returns the error; nothing is sent.
+    Refuse(JevError),
+}
+
 /// In-process judge that answers from a script and records its requests.
 ///
 /// Contract:
@@ -38,8 +49,7 @@ pub struct MockJudgeBackend {
     answers: BTreeMap<QuestionId, QuestionAnswer>,
     provider_meta: Option<Value>,
     reported_digest: Option<Sha256Digest>,
-    failure: Option<JevError>,
-    refusal: Option<JevError>,
+    behaviour: Behaviour,
     requests: Mutex<Vec<JudgeRequest>>,
     validations: AtomicUsize,
 }
@@ -53,8 +63,7 @@ impl MockJudgeBackend {
             answers,
             provider_meta: None,
             reported_digest: None,
-            failure: None,
-            refusal: None,
+            behaviour: Behaviour::Answer,
             requests: Mutex::new(Vec::new()),
             validations: AtomicUsize::new(0),
         }
@@ -64,7 +73,7 @@ impl MockJudgeBackend {
     #[must_use]
     pub fn refusing(id: BackendId, error: JevError) -> Self {
         let mut mock = Self::new(id, BTreeMap::new());
-        mock.refusal = Some(error);
+        mock.behaviour = Behaviour::Refuse(error);
         mock
     }
 
@@ -85,7 +94,7 @@ impl MockJudgeBackend {
     /// Makes `judge` return `error` after `validate_for_send` passed.
     #[must_use]
     pub fn with_failure(mut self, error: JevError) -> Self {
-        self.failure = Some(error);
+        self.behaviour = Behaviour::FailAfterSend(error);
         self
     }
 
@@ -111,9 +120,9 @@ impl MockJudgeBackend {
                 self.id
             )));
         }
-        match &self.refusal {
-            Some(error) => Err(error.clone()),
-            None => Ok(()),
+        match &self.behaviour {
+            Behaviour::Refuse(error) => Err(error.clone()),
+            Behaviour::Answer | Behaviour::FailAfterSend(_) => Ok(()),
         }
     }
 }
@@ -134,7 +143,7 @@ impl JudgeBackend for MockJudgeBackend {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(request.clone());
-        if let Some(error) = &self.failure {
+        if let Behaviour::FailAfterSend(error) = &self.behaviour {
             return Err(error.clone());
         }
         let digest = self

@@ -90,7 +90,7 @@ struct ObservabilitySessionLog {
 impl SessionLog for ObservabilitySessionLog {
     fn emit(&self, event: SessionEvent) -> Result<(), LogRejected> {
         self.logger
-            .log(to_obs_event(&event))
+            .log(to_obs_event(&event)?)
             .map_err(|error| LogRejected::new(error.to_string()))
     }
 }
@@ -249,8 +249,14 @@ fn target() -> TargetCategory {
     TargetCategory::new(TARGET).expect("TARGET is a valid target category")
 }
 
-fn action_name(operation: Operation) -> ActionName {
-    ActionName::new(operation.as_str()).expect("Operation spellings are valid action names")
+/// A spelling that is not a valid action name is a rejected event, never a
+/// panic.
+fn action_name(operation: Operation) -> Result<ActionName, LogRejected> {
+    ActionName::new(operation.as_str()).map_err(|_| {
+        LogRejected::new(format!(
+            "operation {operation} is not a valid sc-observability action name"
+        ))
+    })
 }
 
 fn schema_version() -> SchemaVersion {
@@ -258,7 +264,7 @@ fn schema_version() -> SchemaVersion {
         .expect("OBSERVATION_ENVELOPE_VERSION is a valid schema version")
 }
 
-fn to_obs_event(event: &SessionEvent) -> LogEvent {
+fn to_obs_event(event: &SessionEvent) -> Result<LogEvent, LogRejected> {
     let mut fields = serde_json::Map::new();
     fields.insert(
         "session_id".to_owned(),
@@ -276,13 +282,13 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
         "operation".to_owned(),
         serde_json::Value::String(event.operation().as_str().to_owned()),
     );
-    LogEvent {
+    Ok(LogEvent {
         version: schema_version(),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
         service: service_name(),
         target: target(),
-        action: action_name(event.operation()),
+        action: action_name(event.operation())?,
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -292,7 +298,7 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
         diagnostic: None,
         state_transition: None,
         fields,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -342,7 +348,7 @@ mod tests {
         .expect("golden json");
         for operation in Operation::ALL.iter().copied() {
             assert_eq!(
-                projection(&to_obs_event(&golden_event(operation))),
+                projection(&to_obs_event(&golden_event(operation)).expect("event")),
                 golden[operation.as_str()],
                 "{operation}"
             );
@@ -355,7 +361,10 @@ mod tests {
         assert!(TargetCategory::new(TARGET).is_ok());
         assert!(SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).is_ok());
         for operation in Operation::ALL.iter().copied() {
-            assert_eq!(action_name(operation).as_str(), operation.as_str());
+            assert_eq!(
+                action_name(operation).expect("valid").as_str(),
+                operation.as_str()
+            );
         }
     }
 

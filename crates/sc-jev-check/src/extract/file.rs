@@ -40,7 +40,7 @@ pub(crate) fn extract_file(
             "file extractor received a different input kind",
         ));
     };
-    let text = read_repo_text(repo, rev, path)?;
+    let text = read_repo_text(repo, rev, &super::read::repo_path(path)?)?;
     if text.is_empty() {
         return Err(JevError::InputEmpty);
     }

@@ -44,7 +44,7 @@ pub(crate) fn extract_table(
             "table-column extractor received a different input kind",
         ));
     };
-    let text = read_repo_text(repo, rev, path)?;
+    let text = read_repo_text(repo, rev, &super::read::repo_path(path)?)?;
     let subjects = column_subjects(&text, path, column)?;
     if subjects.is_empty() {
         return Err(JevError::ExtractionEmpty);

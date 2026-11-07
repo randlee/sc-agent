@@ -279,10 +279,20 @@ fn read_response(mut response: ureq::http::Response<ureq::Body>) -> Result<HttpR
 }
 
 /// Classifies a ureq failure for [`JevError::retryable`].
+///
+/// TLS and certificate failures are `Tls` (not retryable); an oversize body
+/// is `BodyTooLarge`; everything else that fails before a response is
+/// `Connect`.
 fn ureq_error_kind(error: &ureq::Error) -> NetworkErrorKind {
     match error {
         ureq::Error::Timeout(_) => NetworkErrorKind::Timeout,
         ureq::Error::Io(io) => io_error_kind(io),
+        ureq::Error::Tls(_)
+        | ureq::Error::TlsRequired
+        | ureq::Error::RequireHttpsOnly(_)
+        | ureq::Error::Pem(_)
+        | ureq::Error::Rustls(_) => NetworkErrorKind::Tls,
+        ureq::Error::BodyExceedsLimit(_) => NetworkErrorKind::BodyTooLarge,
         _ => NetworkErrorKind::Connect,
     }
 }
@@ -475,5 +485,35 @@ mod tests {
         assert_eq!(invalid.code(), "NETWORK_ERROR");
         assert!(invalid.to_string().contains("provider request is invalid"));
         assert_no_key(&invalid);
+    }
+
+    #[test]
+    fn ureq_errors_map_to_network_kinds() {
+        let cases = [
+            (
+                ureq::Error::Timeout(ureq::Timeout::Global),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::TimedOut)),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset)),
+                NetworkErrorKind::Connect,
+            ),
+            (ureq::Error::Tls("handshake"), NetworkErrorKind::Tls),
+            (ureq::Error::TlsRequired, NetworkErrorKind::Tls),
+            (
+                ureq::Error::BodyExceedsLimit(1),
+                NetworkErrorKind::BodyTooLarge,
+            ),
+            (ureq::Error::ConnectionFailed, NetworkErrorKind::Connect),
+            (ureq::Error::HostNotFound, NetworkErrorKind::Connect),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(ureq_error_kind(&error), kind, "{error}");
+        }
+        assert!(!NetworkErrorKind::Tls.retryable());
     }
 }

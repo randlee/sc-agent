@@ -11,8 +11,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyBytes};
 use sc_agent_types::schema::subjects::SubjectsProducer;
 use sc_agent_types::{
-    BackendId, EqualInputRecord, JevError, JudgeOutcome, PayloadBundle, RepoRoot, Rev, SessionId,
-    Sha256Digest, canonical_json_bytes,
+    BackendId, EqualInputRecord, JevError, JudgeOutcome, RepoRoot, Rev, SessionId, Sha256Digest,
+    canonical_json_bytes,
 };
 use sc_jev_check::config::load_check_at;
 use sc_jev_check::run::{
@@ -78,20 +78,6 @@ pub(crate) fn canonical_of(json_text: &str) -> Result<Vec<u8>, JevError> {
     canonical_json_bytes(&value)
 }
 
-/// Splits a bundle into payload text and digest.
-///
-/// # Panics
-///
-/// When the canonical bytes are not UTF-8. They are serde JSON output, so
-/// that would be a broken `PayloadBundle` invariant; a lossy fallback would
-/// hide it (RBP-007 observation).
-fn payload_text(bundle: PayloadBundle) -> (String, Sha256Digest) {
-    let (bytes, digest) = bundle.into_parts();
-    let text = String::from_utf8(bytes)
-        .expect("PayloadBundle bytes are canonical serde JSON and therefore UTF-8");
-    (text, digest)
-}
-
 fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     let backends = parse_backends(&spec.backends)?;
     let repo = resolve_repo(spec.repo_root.as_deref())?;
@@ -121,7 +107,7 @@ fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     if let Some(live) = &live {
         live.logger.flush();
     }
-    let (payload, prompt_sha256) = payload_text(result.bundle);
+    let (payload, prompt_sha256) = result.bundle.into_text();
     Ok(FinishedRun {
         session_id: result.session_id,
         prompt_sha256,
@@ -141,7 +127,7 @@ fn build(
     let repo = resolve_repo(repo_root)?;
     let rev = Rev::parse(rev_text)?;
     let built = build_request_facade(&repo, &rev, check_path)?;
-    let (payload, prompt_sha256) = payload_text(built.bundle);
+    let (payload, prompt_sha256) = built.bundle.into_text();
     Ok(PreparedRequest {
         payload,
         prompt_sha256,

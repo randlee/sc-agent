@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::JevError;
 
 /// The only `schema_version` this crate writes or accepts.
-pub const ERROR_RESPONSE_SCHEMA_VERSION: u32 = 1;
+pub(crate) const ERROR_RESPONSE_SCHEMA_VERSION: u32 = 1;
 
 /// stderr body for a failed CLI command.
 ///

@@ -115,7 +115,7 @@ impl Drop for ObservabilitySessionLog {
 impl SessionLog for ObservabilitySessionLog {
     fn emit(&self, event: SessionEvent) -> Result<(), LogRejected> {
         self.logger
-            .try_log(obs_event(event))
+            .try_log(obs_event(event)?)
             .map_err(|error| LogRejected::new(error.to_string()))
     }
 }
@@ -141,7 +141,7 @@ impl DiagnosticMessage for sc_observability::v2::InitError {
     }
 }
 
-fn obs_event(event: SessionEvent) -> LogEvent {
+fn obs_event(event: SessionEvent) -> Result<LogEvent, LogRejected> {
     let mut fields = Map::new();
     fields.insert(
         "backend".to_owned(),
@@ -159,13 +159,13 @@ fn obs_event(event: SessionEvent) -> LogEvent {
         "session_id".to_owned(),
         Value::String(event.session_id().to_string()),
     );
-    LogEvent {
+    Ok(LogEvent {
         version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).expect("v1 schema"),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
         service: service_name(),
         target: TargetCategory::new("jev.session").expect("jev.session is a valid target"),
-        action: action_name(event.operation()),
+        action: action_name(event.operation())?,
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -175,13 +175,20 @@ fn obs_event(event: SessionEvent) -> LogEvent {
         diagnostic: None,
         state_transition: None,
         fields,
-    }
+    })
 }
 
 /// Every [`Operation`] spelling is a valid action name; the unit test
 /// `every_log_operation_is_an_action_name` proves it.
-fn action_name(operation: Operation) -> ActionName {
-    ActionName::new(operation.as_str()).expect("Operation spellings are valid action names")
+///
+/// A spelling that is not a valid action name is a rejected event, never a
+/// panic.
+fn action_name(operation: Operation) -> Result<ActionName, LogRejected> {
+    ActionName::new(operation.as_str()).map_err(|_| {
+        LogRejected::new(format!(
+            "operation {operation} is not a valid sc-observability action name"
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -191,7 +198,10 @@ mod tests {
     #[test]
     fn every_log_operation_is_an_action_name() {
         for operation in Operation::ALL.iter().copied() {
-            assert_eq!(action_name(operation).as_str(), operation.as_str());
+            assert_eq!(
+                action_name(operation).expect("valid").as_str(),
+                operation.as_str()
+            );
         }
     }
 
@@ -227,7 +237,7 @@ mod tests {
         .expect("golden json");
         for operation in Operation::ALL.iter().copied() {
             assert_eq!(
-                projection(&obs_event(golden_event(operation))),
+                projection(&obs_event(golden_event(operation)).expect("event")),
                 golden[operation.as_str()],
                 "{operation}"
             );

@@ -46,9 +46,26 @@ impl AsRef<Path> for RepoRoot {
 }
 
 /// Git revision, or the literal `WORKTREE`, for `git show` inputs.
+///
+/// `Deserialize` goes through [`Rev::parse`], so a document cannot carry a
+/// revision git would read as an option.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
+#[serde(try_from = "String", into = "String")]
 pub struct Rev(String);
+
+impl TryFrom<String> for Rev {
+    type Error = JevError;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        Self::parse(&text)
+    }
+}
+
+impl From<Rev> for String {
+    fn from(rev: Rev) -> Self {
+        rev.0
+    }
+}
 
 impl Rev {
     /// Revision string meaning the working tree rather than a commit.
@@ -151,6 +168,27 @@ impl SessionId {
     }
 }
 
+impl FromStr for SessionId {
+    type Err = JevError;
+
+    /// Parses a hyphenated UUID.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::SessionId;
+    ///
+    /// let id: SessionId = "00000000-0000-0000-0000-000000000000".parse().unwrap();
+    /// assert_eq!(id.to_string(), "00000000-0000-0000-0000-000000000000");
+    /// assert_eq!("nope".parse::<SessionId>().unwrap_err().code(), "INPUT_INVALID");
+    /// ```
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Uuid::parse_str(text)
+            .map(Self)
+            .map_err(|_| JevError::input_invalid(format!("session id {text:?} is not a UUID")))
+    }
+}
+
 impl fmt::Display for SessionId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, formatter)
@@ -174,11 +212,11 @@ pub enum BackendKeyId {
     OpenAi,
 }
 
-/// `(id, documented name, read aliases)` for every credential id.
-const KEY_NAMES: &[(BackendKeyId, &str, &[&str])] = &[
-    (BackendKeyId::TypeSafe, "typesafe", &[]),
-    (BackendKeyId::Anthropic, "anthropic", &[]),
-    (BackendKeyId::OpenAi, "openai", &["open_ai"]),
+/// Read aliases for each credential id, beside its documented name.
+const KEY_ALIASES: &[(BackendKeyId, &[&str])] = &[
+    (BackendKeyId::TypeSafe, &[]),
+    (BackendKeyId::Anthropic, &[]),
+    (BackendKeyId::OpenAi, &["open_ai"]),
 ];
 
 impl BackendKeyId {
@@ -187,11 +225,12 @@ impl BackendKeyId {
 
     /// The documented spelling.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
-        KEY_NAMES
-            .iter()
-            .find(|(id, _, _)| *id == self)
-            .map_or("unknown", |(_, name, _)| name)
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TypeSafe => "typesafe",
+            Self::Anthropic => "anthropic",
+            Self::OpenAi => "openai",
+        }
     }
 }
 
@@ -208,10 +247,10 @@ impl FromStr for BackendKeyId {
     ///
     /// Kebab-case and other spellings are rejected.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        KEY_NAMES
+        KEY_ALIASES
             .iter()
-            .find(|(_, name, aliases)| *name == text || aliases.contains(&text))
-            .map(|(id, _, _)| *id)
+            .find(|(id, aliases)| id.as_str() == text || aliases.contains(&text))
+            .map(|(id, _)| *id)
             .ok_or_else(|| {
                 JevError::input_invalid(format!(
                     "backend key {text} is not typesafe, anthropic, or openai"
@@ -572,8 +611,11 @@ impl fmt::Display for BlobSha {
 
 /// A path relative to the repository root, with `/` separators.
 ///
-/// The one validator for repo-relative paths: non-empty, not absolute, no
-/// `..` component, and no `\`, NUL, or `:`. The text is kept as written.
+/// Validated repo-relative path: non-empty, not absolute, at least one
+/// normal component, no `..`, and no `\`, NUL, or `:`. The text is kept as
+/// written. In r-1 it guards `sc-jev-check`'s file reads, subjects documents
+/// and the `git` helpers; the `check.toml` path fields (r-2) and
+/// `sc-treesitter`'s CLI path handling (r-3c) adopt it later.
 ///
 /// # Examples
 ///

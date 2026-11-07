@@ -51,7 +51,7 @@ pub(crate) fn load_system_prompt(
                 .map(Some)
         }
         PromptOrigin::CheckToml => {
-            let text = match read_repo_text(repo, rev, &resolved.path) {
+            let text = match read_repo_path_text(repo, rev, &resolved.path) {
                 Ok(text) => text,
                 Err(JevError::InputMissing { path, .. }) => {
                     return Err(JevError::prompt_file_missing(path));
@@ -128,6 +128,11 @@ fn read_override(repo: &Path, path: &Path) -> Result<String, JevError> {
     let text = String::from_utf8(bytes)
         .map_err(|_| JevError::config_invalid(format!("system prompt {display} is not UTF-8")))?;
     non_empty(&text, &display).map(str::to_owned)
+}
+
+/// [`read_repo_text`] for a `check.toml` path string.
+fn read_repo_path_text(repo: &RepoRoot, rev: &Rev, path: &str) -> Result<String, JevError> {
+    read_repo_text(repo, rev, &crate::extract::repo_path(path)?)
 }
 
 #[cfg(test)]

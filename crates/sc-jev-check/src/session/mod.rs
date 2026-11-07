@@ -192,8 +192,9 @@ impl FileSessionStore {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::InputInvalid`] when the payload is not UTF-8, and
-    /// [`JevError::session_store_io`] when the session file cannot be written.
+    /// Returns [`JevError::SessionStoreIo`] when the session file cannot be
+    /// written. Canonical payload text is UTF-8 by construction
+    /// ([`PayloadBundle::as_str`]), so there is no encoding failure.
     /// The write failure code is `CONFIG_INVALID` and names the session file.
     pub fn open(
         &self,
@@ -208,7 +209,7 @@ impl FileSessionStore {
             session_id,
             backend,
             created_at,
-            payload_utf8: utf8_payload(bundle.bytes())?,
+            payload_utf8: bundle.as_str().to_owned(),
             prompt_sha256: bundle.sha256().clone(),
             system_prompt,
             outcomes: Vec::new(),
@@ -338,8 +339,9 @@ impl FileSessionStore {
         if document.session_id != *id {
             return Err(session_parse(&path, "does not match this session id"));
         }
-        let payload = utf8_payload(document.payload_utf8.as_bytes())?;
-        if sc_agent_types::Sha256Digest::of(payload.as_bytes()) != document.prompt_sha256 {
+        if sc_agent_types::Sha256Digest::of(document.payload_utf8.as_bytes())
+            != document.prompt_sha256
+        {
             return Err(session_parse(&path, "payload digest does not match"));
         }
         Ok(document)
@@ -511,25 +513,6 @@ fn check_version(path: &Path, value: &Value) -> Result<(), JevError> {
     }
 }
 
-/// Canonical payload bytes as UTF-8 text.
-///
-/// The one definition in this crate; session files store the payload as text.
-///
-/// # Errors
-///
-/// Returns [`JevError::InputInvalid`] built by
-/// [`JevError::operational_io`] when the bytes are not UTF-8. Canonical
-/// payload bytes are always UTF-8, so this is an internal invariant failure,
-/// not a schema problem; the fix hint says so (RBP-F015).
-pub(crate) fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
-    String::from_utf8(bytes.to_vec()).map_err(|error| {
-        JevError::operational_io(format!(
-            "the canonical payload was not UTF-8 (first invalid byte at offset {}); this is an internal error, report it with the check that produced it",
-            error.utf8_error().valid_up_to()
-        ))
-    })
-}
-
 /// `INPUT_INVALID` for a refused `ask` whose fix hint is `recovery` verbatim.
 fn follow_up_invalid(recovery: &str) -> JevError {
     JevError::operational_io(recovery)
@@ -665,6 +648,11 @@ impl StoredSession {
     fn from_document(document: SessionDocument, path: &Path) -> Result<Self, JevError> {
         let payload = PayloadBundle::decode(document.payload_utf8.as_bytes())
             .map_err(|_| session_parse(path, "holds a payload that is not canonical"))?;
+        for outcome in &document.outcomes {
+            outcome.check_against(&payload).map_err(|_| {
+                session_parse(path, "holds an outcome that does not match its payload")
+            })?;
+        }
         Ok(Self {
             session_id: document.session_id,
             backend: document.backend,

@@ -51,7 +51,7 @@ pub(crate) fn extract_subjects(
             "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path",
         ));
     }
-    let bytes = read_repo_bytes(repo, rev, path)?;
+    let bytes = read_repo_bytes(repo, rev, &super::read::repo_path(path)?)?;
     parse_subjects_bytes(&bytes)
 }
 

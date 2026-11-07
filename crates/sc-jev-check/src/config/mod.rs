@@ -184,7 +184,7 @@ pub fn load_check_at(
     rev: &sc_agent_types::Rev,
     relative: &str,
 ) -> Result<CheckSpec, JevError> {
-    let bytes = crate::extract::read_repo_bytes(repo, rev, relative)?;
+    let bytes = crate::extract::read_repo_bytes(repo, rev, &crate::extract::repo_path(relative)?)?;
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| JevError::config_invalid(format!("{relative} is not UTF-8")))?;
     load_check_str(text)

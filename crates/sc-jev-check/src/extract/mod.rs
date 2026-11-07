@@ -56,7 +56,7 @@ pub trait Extractor: private::Sealed {
 
 pub(crate) use command::CommandExtractor;
 pub(crate) use file::FileExtractor;
-pub(crate) use read::{read_repo_bytes, read_repo_text};
+pub(crate) use read::{read_repo_bytes, read_repo_text, repo_path};
 pub(crate) use subjects::SubjectsExtractor;
 pub(crate) use table::TableColumnExtractor;
 

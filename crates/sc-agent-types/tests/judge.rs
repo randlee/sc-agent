@@ -162,7 +162,8 @@ fn test_equal_input_equal_is_derived() {
         ],
         false,
         None,
-    );
+    )
+    .expect("record");
     assert!(matched.equal());
     let value = serde_json::to_value(&matched).expect("json");
     assert_eq!(value["equal"], true);
@@ -193,15 +194,33 @@ fn test_equal_input_equal_is_derived() {
             ],
             false,
             None,
-        );
+        )
+        .expect("record");
         assert!(!record.equal(), "{other:?}");
         let value = serde_json::to_value(&record).expect("json");
         assert_eq!(value["equal"], false);
         let back: EqualInputRecord = serde_json::from_value(value).expect("read");
         assert_eq!(back, record);
     }
-    let empty = EqualInputRecord::new(digest, MultiBackendMode::default(), Vec::new(), false, None);
-    assert!(!empty.equal());
+    let empty = EqualInputRecord::new(
+        digest.clone(),
+        MultiBackendMode::default(),
+        Vec::new(),
+        false,
+        None,
+    );
+    assert_eq!(empty.expect_err("empty").code(), "INPUT_INVALID");
+    let twice = EqualInputRecord::new(
+        digest,
+        MultiBackendMode::default(),
+        vec![
+            BackendAttestation::new(BackendId::Jev, Attestation::Matched),
+            BackendAttestation::new(BackendId::Jev, Attestation::Matched),
+        ],
+        false,
+        None,
+    );
+    assert_eq!(twice.expect_err("duplicate").code(), "INPUT_INVALID");
     assert_eq!(MultiBackendMode::default(), MultiBackendMode::Independent);
 }
 

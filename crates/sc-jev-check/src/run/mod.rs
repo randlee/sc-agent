@@ -349,7 +349,7 @@ pub fn run_request(
             outcomes.len() != backends.len(),
         ),
         request.producer.clone(),
-    );
+    )?;
     Ok(CheckResult {
         session_id: Some(session_id),
         bundle: request.bundle.clone(),

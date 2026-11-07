@@ -168,10 +168,38 @@ fn clock_and_payload_faults_name_their_own_recovery() {
     let hint = clock.fix_hint();
     assert!(hint.contains("system clock"), "{hint}");
     assert!(!hint.contains("check.toml"), "{hint}");
+}
 
-    let payload = utf8_payload(b"ok\xff").expect_err("not utf-8");
-    assert_eq!(payload.code(), "INPUT_INVALID");
-    let hint = payload.fix_hint();
-    assert!(hint.contains("offset 2"), "{hint}");
-    assert!(!hint.contains("schema"), "{hint}");
+/// RBP-F201: a stored outcome is checked against its stored payload on load.
+#[test]
+fn tampered_stored_outcome_is_session_document_invalid() {
+    let (store, _dir) = store(Duration::from_secs(60));
+    let payload = PayloadBundle::encode(&sc_agent_types::CanonicalJudgePayload::new(
+        vec![sc_agent_types::Question::new(
+            "relevant".parse().expect("id"),
+            "Does it apply?",
+            vec!["no".parse().expect("no"), "yes".parse().expect("yes")],
+        )],
+        Vec::new(),
+    ))
+    .expect("bundle");
+    let id = store.create(BackendId::Jev, &payload).expect("create");
+    let request = JudgeRequest::new(Arc::new(payload), None);
+    let answers = serde_json::from_value(serde_json::json!({"relevant": {"choice": "yes"}}))
+        .expect("answers");
+    let outcome = JudgeOutcome::new(BackendId::Jev, &request, answers).expect("outcome");
+    store.record_outcome(&id, &outcome).expect("record");
+    store.load(&id).expect("valid outcome loads");
+
+    let path = store.path(&id);
+    let mut document: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).expect("read")).expect("json");
+    document["outcomes"][0]["answers"]["relevant"]["choice"] = serde_json::json!("maybe");
+    fs::write(&path, serde_json::to_vec(&document).expect("bytes")).expect("tamper");
+    let error = store.load(&id).expect_err("tampered");
+    assert!(
+        matches!(error, JevError::SessionDocumentInvalid { .. }),
+        "{error:?}"
+    );
+    assert!(error.fix_hint().contains("does not match its payload"));
 }

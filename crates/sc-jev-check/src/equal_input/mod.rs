@@ -53,12 +53,17 @@ impl RunAttestation {
 ///
 /// `producer` is the subjects document producer when the check used a
 /// `subjects` or `command` input.
-#[must_use]
+///
+/// # Errors
+///
+/// `INPUT_INVALID` when the run names no backend or one backend twice
+/// (callers validate the backend list before any send, so this is an
+/// internal invariant).
 pub(crate) fn record(
     bundle: &PayloadBundle,
     run: RunAttestation,
     producer: Option<SubjectsProducer>,
-) -> EqualInputRecord {
+) -> Result<EqualInputRecord, JevError> {
     EqualInputRecord::new(
         bundle.sha256().clone(),
         run.mode,
@@ -122,7 +127,8 @@ mod tests {
                 true,
             ),
             Some(producer.clone()),
-        );
+        )
+        .expect("record");
         assert_eq!(built.prompt_sha256(), &Sha256Digest::of(bundle.bytes()));
         assert!(built.leak());
         assert!(!built.equal());
