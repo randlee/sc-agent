@@ -394,13 +394,19 @@ against TypeSafe with Rand-provided key, artifact attached to phase PR.
 
 ### Acceptance evidence
 
+Recorded `sc-agent-ci` run: [42345904358](https://github.com/randlee/sc-agent/actions/runs/42345904358) on PR #18 at `5283307`,
+all nine jobs green. It is the run on the commit **before** this
+evidence-only docs commit; the docs commit changes no CI input.
+
 | Command (above) | Where it runs | Recorded result |
 | --- | --- | --- |
-| `just lint`, `cargo test -p …`, `cross_impl_branches`, and the `workspace` layer of `just test` (`cargo test --workspace`) | `.github/workflows/sc-agent-ci.yml` job `test` (ubuntu-24.04, macos-15, windows-2022) | The phase-end hardening PR run; local run at `d4a0111`: 194 tests passed, 0 failed |
-| `clippy --all-features`, `cargo doc` | `sc-agent-ci.yml` jobs `test` and `doc` | `doc` is `continue-on-error` until the rustdoc warnings are fixed |
-| Test-util wheel + `tests/fixtures/jev-python` pytest (the `jev-python` layer of `just test`) | `sc-agent-ci.yml` job `python` (`just test-python`, three OSes) | The phase-end hardening PR run |
-| sc-treesitter feature matrix | `sc-agent-ci.yml` job `features` (`cargo hack --each-feature check`) | Check only until the per-language tests are feature-gated |
-| Coverage | `sc-agent-ci.yml` job `coverage` (cargo-llvm-cov summary uploaded as an artifact) | Phase-end baseline 82.5% line |
+| `just lint` | `sc-agent-ci.yml` job `test`, ubuntu-24.04 only (the managed sc-lint bootstrap fails on Windows; [`ci.md`](../../development/ci.md#known-limits)) | Green: [test (ubuntu-24.04)](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467345) |
+| `cargo test -p …`, `cross_impl_branches`, and the `workspace` layer of `just test` (`cargo test --workspace`) | `sc-agent-ci.yml` job `test` (ubuntu-24.04, macos-15, windows-2022) | 194 passed, 0 failed on each OS: [ubuntu-24.04](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467345), [macos-15](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467493), [windows-2022](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467473) |
+| `clippy --workspace --all-targets --all-features -- -D warnings` | `sc-agent-ci.yml` job `test` (three OSes) | Green in the same three jobs |
+| `cargo doc` with `RUSTDOCFLAGS=-D warnings` | `sc-agent-ci.yml` job `doc` | **Fails** underneath `continue-on-error` ([rustdoc](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467366): could not document `sc-agent-types`, `sc-treesitter`); the job shows green until QA-005 lands |
+| Test-util wheel + `tests/fixtures/jev-python` pytest (the `jev-python` layer of `just test`) | `sc-agent-ci.yml` job `python` (`just test-python`, three OSes) | 7 passed on each OS: [ubuntu-24.04](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467398), [macos-15](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467414), [windows-2022](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467289) |
+| sc-treesitter feature matrix | `sc-agent-ci.yml` job `features` (`cargo hack --each-feature check`) | Green: [features](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467072); check only until the per-language tests are feature-gated |
+| Coverage | `sc-agent-ci.yml` job `coverage` (cargo-llvm-cov) | 82.52% line (TOTAL row): [coverage job](https://github.com/randlee/sc-agent/actions/runs/42345904358/job/128323467256), artifact `coverage-summary` of run [42345904358](https://github.com/randlee/sc-agent/actions/runs/42345904358) |
 | Preflight, `cargo publish --dry-run`, publish-surface `maturin build` | `.github/workflows/sc-publish-dry-run.yml` | Runs [42339767937](https://github.com/randlee/sc-agent/actions/runs/42339767937), [42341299125](https://github.com/randlee/sc-agent/actions/runs/42341299125), [42341873748](https://github.com/randlee/sc-agent/actions/runs/42341873748) on PR #17 (sprint a-9), all green |
 
 Local equivalents of every CI job: [`docs/development/ci.md`](../../development/ci.md).
