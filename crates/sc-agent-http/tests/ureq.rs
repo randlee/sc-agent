@@ -230,8 +230,11 @@ fn test_timeout_is_network_error_without_the_key() {
     assert_eq!(server.finish().len(), 1, "a timeout is not retried");
 }
 
+/// A connect-phase failure returns at once, retryable, sent once. Unix
+/// reports the closed loopback port as refused (`Connect`); Windows retries
+/// the SYN until the 2 s connect timeout (`Timeout`).
 #[test]
-fn test_refused_connection_is_connect_and_retryable() {
+fn test_connect_phase_failure_is_retryable_and_not_retried() {
     let endpoint = Endpoint::loopback_http(refused_port(), "/closed");
     let recording = RecordingTransport::new(loopback());
     let error = send_with_busy_retry(
@@ -245,7 +248,7 @@ fn test_refused_connection_is_connect_and_retryable() {
         matches!(
             error,
             JevError::NetworkError {
-                kind: NetworkErrorKind::Connect,
+                kind: NetworkErrorKind::Connect | NetworkErrorKind::Timeout,
                 ..
             }
         ),
