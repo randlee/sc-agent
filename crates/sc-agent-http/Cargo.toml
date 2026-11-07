@@ -1,0 +1,41 @@
+[package]
+name = "sc-agent-http"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared blocking HTTP layer for sc-agent backends: transport, busy retry, caps, redaction."
+readme = "README.md"
+keywords = ["llm", "http", "retry", "sc-agent"]
+categories.workspace = true
+# Allowlist. `tests/**` ships so cargo keeps every test target (no publish
+# warning); the targets need `--features test-util`.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Test hooks (plan "Test seams"): `BusyPolicy::with_test_hooks`,
+# `Endpoint::loopback_http`, `UreqTransport::loopback_for_tests` and
+# `test_util`. Enabled only by dev-dependencies and `--features test-util`.
+test-util = []
+
+[dependencies]
+# `CancelToken` is in the always-on core; `secret` brings `ResolvedApiKey`.
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types", default-features = false, features = ["secret"] }
+ureq.workspace = true
+
+# D0 spike outcome (boundaries/README.md "Dev-dependency and self edges"): no
+# self dev-dependency; both integration targets need the `test-util` hooks.
+[[test]]
+name = "retry"
+required-features = ["test-util"]
+
+[[test]]
+name = "ureq"
+required-features = ["test-util"]
