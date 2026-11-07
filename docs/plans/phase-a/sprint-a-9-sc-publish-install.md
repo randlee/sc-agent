@@ -1,7 +1,7 @@
 ---
 id: a-9
 phase: a
-status: planned
+status: complete
 closure_type: integration
 target_boundary: release
 track: publish

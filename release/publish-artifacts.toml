@@ -1,14 +1,157 @@
-# Minimal manifest until Rust crates and channels are declared.
-# Publisher and release_artifacts.py require this file to exist.
-
 schema_version = 1
 
 [project]
 name = "sc-agent"
 archive_prefix = "sc-agent"
-description = "Synaptic Canvas agent teams and orchestration assets"
+description = "Jev check client, judge backends, and the sc-ai CLI for Synaptic Canvas agents"
 homepage = "https://github.com/randlee/sc-agent"
 license = "MIT"
+renderer_archive_path = "bin/sc-ai"
+workspace_toml = "Cargo.toml"
+rust_toolchain = "1.94.1"
 
-# Rendered by sc-publish install (sprint a-9). Consumer input targets:
-# crates.io, pypi (sc-jev-py), homebrew, scoop, winget (sc-ai), GitHub release assets.
+
+[[release_targets]]
+target = "x86_64-unknown-linux-gnu"
+os = "ubuntu-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "aarch64-unknown-linux-gnu"
+os = "ubuntu-24.04-arm"
+archive = "tar.gz"
+[[release_targets]]
+target = "x86_64-apple-darwin"
+os = "macos-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "aarch64-apple-darwin"
+os = "macos-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "x86_64-pc-windows-msvc"
+os = "windows-latest"
+archive = "zip"
+
+[[crates]]
+artifact = "sc-agent-types"
+package = "sc-agent-types"
+cargo_toml = "crates/sc-agent-types/Cargo.toml"
+publish = true
+publish_order = 1
+wait_after_publish_seconds = 30
+verify_registry_visibility = true
+[[crates]]
+artifact = "sc-agent-secrets"
+package = "sc-agent-secrets"
+cargo_toml = "crates/sc-agent-secrets/Cargo.toml"
+publish = true
+publish_order = 2
+wait_after_publish_seconds = 30
+verify_registry_visibility = true
+[[crates]]
+artifact = "sc-jev"
+package = "sc-jev"
+cargo_toml = "crates/sc-jev/Cargo.toml"
+publish = true
+publish_order = 3
+wait_after_publish_seconds = 30
+verify_registry_visibility = true
+[[crates]]
+artifact = "sc-jev-backends"
+package = "sc-jev-backends"
+cargo_toml = "crates/sc-jev-backends/Cargo.toml"
+publish = true
+publish_order = 4
+wait_after_publish_seconds = 30
+verify_registry_visibility = true
+[[crates]]
+artifact = "sc-jev-check"
+package = "sc-jev-check"
+cargo_toml = "crates/sc-jev-check/Cargo.toml"
+publish = true
+publish_order = 5
+wait_after_publish_seconds = 30
+verify_registry_visibility = true
+[[crates]]
+artifact = "sc-treesitter"
+package = "sc-treesitter"
+cargo_toml = "crates/sc-treesitter/Cargo.toml"
+publish = true
+publish_order = 6
+wait_after_publish_seconds = 0
+[[crates]]
+artifact = "sc-ai"
+package = "sc-ai"
+cargo_toml = "crates/sc-ai/Cargo.toml"
+publish = true
+publish_order = 7
+wait_after_publish_seconds = 0
+
+[[release_binaries]]
+name = "sc-ai"
+[[release_binaries]]
+name = "sc-treesitter"
+
+[[python_packages]]
+artifact = "sc-jev-py-wheel"
+package = "sc-jev-py"
+manifest = "crates/sc-jev-py/pyproject.toml"
+module = "sc_jev_py"
+publish = "pypi"
+
+[[python_distributions]]
+name = "sc-jev-py"
+source = "crates/sc-jev-py"
+cargo_manifest = "crates/sc-jev-py/Cargo.toml"
+module_path = "crates/sc-jev-py"
+sdist = true
+wheels = ["ubuntu-latest", "macos-latest", "windows-latest"]
+
+[channels.pypi]
+workflow = "pypi-publish.yml"
+dispatch_inputs = { target = "production" }
+credential_rehearsal_inputs = { target = "testpypi" }
+test_repository = "testpypi"
+production_repository = "pypi"
+
+[channels.homebrew]
+workflow = "homebrew-publish.yml"
+dispatch_inputs = {  }
+tap_repository = "randlee/homebrew-tap"
+renderer_target = "x86_64-unknown-linux-gnu"
+
+[[channels.homebrew.formulas]]
+path = "Formula/sc-ai.rb"
+template = "release/homebrew/formula.rb.j2"
+class = "ScAi"
+binaries = ["sc-ai", "sc-treesitter"]
+test_binary = "sc-ai"
+test_command = "--version"
+test_output = "sc-ai"
+release_track = "stable"
+
+[[channels.homebrew.assets]]
+key = "macos_arm"
+target = "aarch64-apple-darwin"
+[[channels.homebrew.assets]]
+key = "macos_intel"
+target = "x86_64-apple-darwin"
+[[channels.homebrew.assets]]
+key = "linux"
+target = "x86_64-unknown-linux-gnu"
+
+[channels.winget]
+workflow = "winget-publish.yml"
+dispatch_inputs = {  }
+identifier = "randlee.sc-ai"
+installer_target = "x86_64-pc-windows-msvc"
+
+[channels.scoop]
+workflow = "scoop-publish.yml"
+dispatch_inputs = {  }
+bucket_repository = "randlee/scoop-bucket"
+manifest_path = "bucket/sc-ai.json"
+manifest_template = "release/scoop/manifest.json.j2"
+installer_target = "x86_64-pc-windows-msvc"
+binary = "bin/sc-ai.exe"
+renderer_target = "x86_64-unknown-linux-gnu"

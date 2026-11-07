@@ -8,6 +8,8 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "PyO3 bindings over sc-jev-check."
+# Ships to PyPI as a maturin wheel only (sprint a-9); never to crates.io.
+publish = false
 
 [lib]
 name = "sc_jev_py"

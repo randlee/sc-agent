@@ -1,0 +1,54 @@
+# Consumer-owned PR gate for the sc-publish release surface (REQ-SAG-0132,
+# REQ-SAG-0803). Not a kit file: install.py never writes this path.
+#
+# The kit's release-preflight.yml is workflow_dispatch-only and needs release
+# secrets, environments, and immutable releases, so it cannot run on a PR.
+# This job runs the same local recipe on every PR: kit drift check, manifest
+# validation, version lockstep, consumer preflight, cargo publish --dry-run,
+# and a maturin wheel build. It never tags or publishes.
+name: sc-publish dry-run
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sc-publish-dry-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.1"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install maturin
+        run: python3 -m pip install "maturin>=1.8,<2"
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: sc-publish-dry-run-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Release dry-run
+        env:
+          SC_AGENT_WHEEL_DIR: ${{ runner.temp }}/sc-agent-wheels
+        run: bash scripts/sc-publish-dry-run.sh

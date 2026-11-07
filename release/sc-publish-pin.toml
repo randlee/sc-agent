@@ -1,0 +1,11 @@
+# sc-publish pin (REQ-SAG-0130, ADR-SAG-0018).
+#
+# Records the exact upstream kit revision this repository is qualified
+# against. Pin one full 40-character commit SHA; never track a moving branch.
+# Clone the kit at this SHA into .sc-publish-kit/ (gitignored) and re-run
+# install.py whenever the pin or release/sc-publish-consumer-input.json
+# changes. Bump recipe: docs/development/sc-publish.md.
+
+[sc-publish]
+repository = "https://github.com/randlee/sc-publish"
+revision = "11b5b04907aade73599ad2fdabf4562f11f41ea8"
