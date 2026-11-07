@@ -79,7 +79,7 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | ADR-SAG-0002 | Canonical judge payload bytes | Active | — |
 | ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020; ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0004 | One check, one request | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2); A.1 subsections (Proposed, r-4), (Proposed, r-5) |
+| ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2); A.1 subsections (Active, r-4), (Proposed, r-5) |
 | ADR-SAG-0006 | Transport injection | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0007 | API-direct LLM backends | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
@@ -133,9 +133,9 @@ errors happens before any backend call (ADR-SAG-0004).
 
 ### Amendment (Phase A.1, r-4)
 
-**Status:** Proposed (Phase A.1) — lands in r-4.
+**Status:** Active (Phase A.1) — landed in r-4.
 
-- (Proposed, r-4) `sc-jev-check` runs the four consumer extractor kinds
+- (Active, r-4) `sc-jev-check` runs the four consumer extractor kinds
   (`file`, `table-column`, `subjects`, `command`); it is not the only
   producer of subjects (ADR-SAG-0015).
 
