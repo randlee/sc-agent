@@ -1,10 +1,11 @@
 # Hash-pinned lock for the jev-python harness tools (FTQ-002). Used by
-# `just test-python` as `pip install --require-hashes -c <this file> ...`.
+# `just test-python` as `pip install --require-hashes -r <this file>`; the
+# versions pinned here are the harness tool versions.
 # Universal (all platforms), Python 3.11. Regenerate with:
 #   printf 'maturin==1.16.0\npytest==8.4.2\n' > /tmp/in.txt
 #   uv pip compile /tmp/in.txt --universal --python-version 3.11 \
 #     --generate-hashes --no-header -o constraints.txt
-# Bump MATURIN_VERSION / PYTEST_VERSION in the justfile and workflow together.
+# Bump maturin here and in sc-publish-dry-run.yml's MATURIN_VERSION together.
 colorama==0.4.6 ; sys_platform == 'win32' \
     --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44 \
     --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6

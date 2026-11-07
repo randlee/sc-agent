@@ -36,8 +36,6 @@ env:
   # Exact patch: the newest 3.11 that actions/python-versions ships for
   # ubuntu-24.04, macos-15 (arm64) and windows-2022.
   PYTHON_VERSION: "3.11.9"
-  MATURIN_VERSION: "1.16.0"
-  PYTEST_VERSION: "8.4.2"
   JUST_VERSION: "1.58.0"
   CARGO_HACK_VERSION: "0.6.46"
   CARGO_LLVM_COV_VERSION: "0.9.1"
@@ -57,6 +55,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
+      # Committed fixtures are compared byte for byte; keep LF on Windows
+      # (runner default core.autocrlf=true rewrites them to CRLF).
+      - name: Keep LF line endings
+        timeout-minutes: 1
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -123,6 +127,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
+      # Committed fixtures are compared byte for byte; keep LF on Windows
+      # (runner default core.autocrlf=true rewrites them to CRLF).
+      - name: Keep LF line endings
+        timeout-minutes: 1
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -156,11 +166,11 @@ jobs:
           restore-keys: |
             sc-agent-ci-python-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
-      # Python 3.11 venv, maturin ${MATURIN_VERSION}, `maturin develop
-      # --features extension-module,test-util -m crates/sc-jev-py/Cargo.toml`,
-      # then `pytest tests/fixtures/jev-python -q`. The recipe reads
-      # MATURIN_VERSION and PYTEST_VERSION from the environment. The venv lives
-      # in RUNNER_TEMP (outside the cached target/) and is recreated each run.
+      # Python 3.11.9 venv; maturin 1.16.0 and pytest 8.4.2 from the hash-pinned
+      # tests/fixtures/jev-python/constraints.txt; `maturin develop --features
+      # extension-module,test-util -m crates/sc-jev-py/Cargo.toml`; then
+      # `pytest tests/fixtures/jev-python -q`. The venv lives in RUNNER_TEMP
+      # (outside the cached target/) and is recreated each run.
       - name: maturin develop + pytest (just test-python)
         timeout-minutes: 30
         env:
@@ -172,6 +182,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      # Committed fixtures are compared byte for byte; keep LF on Windows
+      # (runner default core.autocrlf=true rewrites them to CRLF).
+      - name: Keep LF line endings
+        timeout-minutes: 1
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -212,6 +228,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      # Committed fixtures are compared byte for byte; keep LF on Windows
+      # (runner default core.autocrlf=true rewrites them to CRLF).
+      - name: Keep LF line endings
+        timeout-minutes: 1
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 
@@ -255,6 +277,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
+      # Committed fixtures are compared byte for byte; keep LF on Windows
+      # (runner default core.autocrlf=true rewrites them to CRLF).
+      - name: Keep LF line endings
+        timeout-minutes: 1
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         timeout-minutes: 5
 

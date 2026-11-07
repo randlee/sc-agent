@@ -13,7 +13,9 @@ Two consumer-owned workflows run on pull requests. Neither is a kit file;
 Every job pins its actions to commit SHAs. Toolchain `1.94.1`, Python `3.11.9`,
 maturin `1.16.0`, pytest `8.4.2` and just `1.58.0` are exact; maturin, pytest
 and their transitive dependencies install from the hash-pinned
-`tests/fixtures/jev-python/constraints.txt`. Every step has a timeout. No step
+`tests/fixtures/jev-python/constraints.txt`. Every job sets
+`core.autocrlf false` before checkout so Windows keeps LF in the committed
+fixtures that tests compare byte for byte. Every step has a timeout. No step
 retries; bounded cargo network-fetch retries only (`CARGO_NET_RETRY=2`).
 
 | Job | Runners | Local equivalent |
@@ -42,10 +44,11 @@ The recipe:
    `target/jev-python-venv` (CI uses `$RUNNER_TEMP/jev-python-venv`, outside
    the cached `target/`), with the `python3` on `PATH` (`python` on Windows;
    3.11 or newer). On Windows the venv path must not contain spaces;
-2. installs `maturin==1.16.0` and `pytest==8.4.2` with
-   `pip install --require-hashes -c tests/fixtures/jev-python/constraints.txt`
-   (override the versions with `MATURIN_VERSION` / `PYTEST_VERSION` and
-   regenerate the constraints file as its header describes);
+2. installs `maturin==1.16.0`, `pytest==8.4.2` and their dependencies with
+   `pip install --require-hashes -r tests/fixtures/jev-python/constraints.txt`.
+   The lock is passed as `-r` because pip 24.0 (bundled with Python 3.11.9)
+   ignores constraint-file hashes for top-level requirements. To change a
+   version, regenerate the file as its header describes;
 3. runs `maturin develop --features extension-module,test-util -m crates/sc-jev-py/Cargo.toml`
    with `VIRTUAL_ENV` set to that venv;
 4. runs `pytest tests/fixtures/jev-python -q`.
