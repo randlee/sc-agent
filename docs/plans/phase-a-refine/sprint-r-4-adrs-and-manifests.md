@@ -241,8 +241,8 @@ for the Scoop multi-shim limit.
 - **`tree-sitter` pin form** (RBP minor), declined. The inline-table form
   `tree-sitter = { version = "=0.27.1" }` stays: the unit test
   `extract::tests::pinned_grammar_versions_match_cargo_toml`
-  (`crates/sc-treesitter/src/extract.rs`, not r-4's) matches that exact text,
-  and the string form fails it. The three tree-sitter pins also stay in
+  (`crates/sc-treesitter/src/extract.rs`, r-1's owned path) matches that
+  exact text, and the string form fails it; r-3c can revisit. The three tree-sitter pins also stay in
   `crates/sc-treesitter/Cargo.toml` (their only user) rather than being
   hoisted to the workspace.
 - **`check-exact-pins.sh` interpreter** (QA-003). The script needs bash and
