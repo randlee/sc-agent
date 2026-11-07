@@ -1,11 +1,28 @@
+# Boundary manifest for sc-ai. Checked by `sc-lint lint sc-boundary` (`just lint`).
+#
+# Conventions (Phase A phase-end, RBQA-F001 option B):
+# - `allowed_dependencies` lists EVERY direct normal (non-dev) dependency in
+#   crates/sc-ai/Cargo.toml, workspace and third-party, including optional and
+#   target-specific ones. Dev-dependencies are not listed.
+# - `forbidden_edges` are direct edges only; transitive reachability is not
+#   checked.
+# - What sc-lint 0.8.0 enforces from this file: workspace-to-workspace edges
+#   (SCB-DEPENDENCY-001 unlisted edge, -002 unlisted dependent, -003 forbidden
+#   edge present, -004 stale dependent permission). Third-party names here are
+#   accepted but not enforced by sc-boundary; the third-party edges that matter
+#   are enforced by the `global_dependency_ownership` records in sc-lint.toml
+#   (SCB-MANIFEST-004). Enforcement is Cargo-edge only: sc-lint 0.8.0 accepts
+#   `references.forbidden` entries but does not report on them, so this file
+#   declares none.
+
 boundary_id = "BOUNDARY-sc-ai-cli"
 owner_package = "sc-ai"
 owner_crate_path = "sc_ai"
 name = "sc-ai-cli"
 
 [public]
-facade = "sc_ai::execute"
-notes = "argv to sc-jev-check. No HTTP client in this crate."
+facade = "sc_ai::execute, sc_ai::reads_stdin, sc_ai::ExecuteOverrides, sc_ai::Clock, sc_ai::ENVELOPE_VERSION, sc_ai::OP_RUN, sc_ai::OP_DRY_RUN, sc_ai::OP_ASK, sc_ai::ObservabilitySessionLog, sc_ai::default_log_root, sc_ai::default_sessions_dir, sc_ai::session_log_file, sc_ai::DEFAULT_LOG_ROOT_DIR, sc_ai::LOG_ROOT_ENV"
+notes = "argv to sc-jev-check; library plus the sc-ai binary (src/main.rs). No HTTP client in this crate (ADR-SAG-0010)."
 
 [implementation]
 type = "marker"
@@ -18,19 +35,29 @@ roots = ["execute"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-agent-types", "sc-jev-check", "sc-observability"]
-forbidden_edges = []
+allowed_dependencies = ["mimalloc", "sc-agent-types", "sc-jev-check", "sc-observability", "serde", "serde_json", "uuid"]
+forbidden_edges = [
+    { from = "sc-ai", to = "ureq" },
+    { from = "sc-ai", to = "sc-jev" },
+    { from = "sc-ai", to = "sc-jev-backends" },
+]
 
+# Required by the sc-lint 0.8.0 inventory schema. Not enforced: the
+# validator accepts entries here but reports nothing for them.
 [references]
 scope = "outside_owner_crate"
 forbidden = []
 
+# Required by the schema. Declarative: sc-lint 0.8.0 reports nothing for
+# these fields. Paths name the feature-gated (`test-util`) test doubles.
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 
+# The sc-lint rules that check this boundary on every `just lint`. Listing
+# them here is documentation; sc-lint 0.8.0 does not read this field.
 [enforcement]
-lint_rules = []
+lint_rules = ["SCB-DEPENDENCY-001", "SCB-DEPENDENCY-002", "SCB-DEPENDENCY-003", "SCB-DEPENDENCY-004", "SCB-MANIFEST-004"]
 review_gates = []
 
 [status]

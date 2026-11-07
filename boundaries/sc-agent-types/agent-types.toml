@@ -1,11 +1,28 @@
+# Boundary manifest for sc-agent-types. Checked by `sc-lint lint sc-boundary` (`just lint`).
+#
+# Conventions (Phase A phase-end, RBQA-F001 option B):
+# - `allowed_dependencies` lists EVERY direct normal (non-dev) dependency in
+#   crates/sc-agent-types/Cargo.toml, workspace and third-party, including optional and
+#   target-specific ones. Dev-dependencies are not listed.
+# - `forbidden_edges` are direct edges only; transitive reachability is not
+#   checked.
+# - What sc-lint 0.8.0 enforces from this file: workspace-to-workspace edges
+#   (SCB-DEPENDENCY-001 unlisted edge, -002 unlisted dependent, -003 forbidden
+#   edge present, -004 stale dependent permission). Third-party names here are
+#   accepted but not enforced by sc-boundary; the third-party edges that matter
+#   are enforced by the `global_dependency_ownership` records in sc-lint.toml
+#   (SCB-MANIFEST-004). Enforcement is Cargo-edge only: sc-lint 0.8.0 accepts
+#   `references.forbidden` entries but does not report on them, so this file
+#   declares none.
+
 boundary_id = "BOUNDARY-agent-types"
 owner_package = "sc-agent-types"
 owner_crate_path = "sc_agent_types"
 name = "agent-types"
 
 [public]
-facade = "sc_agent_types::JevError, sc_agent_types::JudgeBackend, sc_agent_types::JudgeRequest, sc_agent_types::ScAgentErrorResponse"
-notes = "Errors, judge contract, subjects schema, and the temporary v2 log port."
+facade = "sc_agent_types::JevError, sc_agent_types::ScAgentErrorResponse, sc_agent_types::JudgeBackend, sc_agent_types::JudgeRequest, sc_agent_types::JudgeOutcome, sc_agent_types::PayloadBundle, sc_agent_types::LlmWireContext, sc_agent_types::CanonicalJudgePayload, sc_agent_types::Question, sc_agent_types::ChoiceAnswer, sc_agent_types::EqualInputRecord, sc_agent_types::BackendId, sc_agent_types::BackendKeyId, sc_agent_types::RepoRoot, sc_agent_types::Rev, sc_agent_types::SessionId, sc_agent_types::Sha256Digest, sc_agent_types::ResolvedApiKey, sc_agent_types::canonical_json_bytes, sc_agent_types::payload_bundle_from_value, sc_agent_types::InputSpec, sc_agent_types::SubjectsDocument, sc_agent_types::Subject, sc_agent_types::SubjectsProducer, sc_agent_types::SubjectsSource, sc_agent_types::Span, sc_agent_types::SUBJECTS_SCHEMA_V1, sc_agent_types::observability, sc_agent_types::test_util"
+notes = "Errors, judge contract, ids, secret wrapper, subjects schema, and the temporary v2 log port (observability::v2). test_util is behind the test-util feature. ResolvedApiKey::as_str is not restricted here: sc-lint 0.8.0 does not enforce references.forbidden, so the caller restriction is not encoded in this manifest."
 
 [implementation]
 type = "marker"
@@ -18,19 +35,29 @@ roots = ["JevError", "JudgeBackend", "JudgeRequest"]
 
 [dependencies]
 allowed_dependents = ["sc-agent-secrets", "sc-jev-check", "sc-jev", "sc-jev-backends", "sc-treesitter", "sc-ai", "sc-jev-py"]
-allowed_dependencies = []
-forbidden_edges = []
+allowed_dependencies = ["sc-observability-types", "serde", "serde_json", "sha2", "thiserror", "uuid"]
+forbidden_edges = [
+    { from = "sc-agent-types", to = "sc-observability" },
+    { from = "sc-agent-types", to = "ureq" },
+    { from = "sc-agent-types", to = "pyo3" },
+]
 
+# Required by the sc-lint 0.8.0 inventory schema. Not enforced: the
+# validator accepts entries here but reports nothing for them.
 [references]
 scope = "outside_owner_crate"
 forbidden = []
 
+# Required by the schema. Declarative: sc-lint 0.8.0 reports nothing for
+# these fields. Paths name the feature-gated (`test-util`) test doubles.
 [testing]
-allowed_test_double_paths = []
+allowed_test_double_paths = ["crates/sc-agent-types/src/test_util.rs"]
 forbidden_test_bypasses = []
 
+# The sc-lint rules that check this boundary on every `just lint`. Listing
+# them here is documentation; sc-lint 0.8.0 does not read this field.
 [enforcement]
-lint_rules = []
+lint_rules = ["SCB-DEPENDENCY-001", "SCB-DEPENDENCY-002", "SCB-DEPENDENCY-003", "SCB-DEPENDENCY-004", "SCB-MANIFEST-004"]
 review_gates = []
 
 [status]
