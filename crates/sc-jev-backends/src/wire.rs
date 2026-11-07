@@ -6,7 +6,8 @@
 
 use std::collections::BTreeSet;
 
-use sc_agent_types::JevError;
+use sc_agent_http::{HeaderName, SecretHeader};
+use sc_agent_types::{JevError, ResolvedApiKey};
 use serde_json::{Map, Value};
 
 use crate::validate::ParsedQuestion;
@@ -109,18 +110,28 @@ fn provider_document(
 
 /// Provider headers that do not carry the API key.
 ///
-/// The sending transport adds `x-api-key` or `Authorization` when it reads
-/// the sealed credential (ADR-SAG-0020).
-pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(String, String)> {
+/// The credential goes separately, as [`secret_header`]; only the sending
+/// transport writes its value (ADR-SAG-0020).
+pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(HeaderName, &'static str)> {
     let mut headers = match kind {
-        ProviderKind::Anthropic => {
-            vec![("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned())]
-        }
+        ProviderKind::Anthropic => vec![(ANTHROPIC_VERSION_HEADER, ANTHROPIC_VERSION)],
         ProviderKind::OpenAi => Vec::new(),
     };
-    headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
+    headers.push((CONTENT_TYPE, "application/json"));
     headers
 }
+
+/// The credential header each provider expects (ADR-SAG-0020).
+pub(crate) fn secret_header(kind: ProviderKind, key: ResolvedApiKey) -> SecretHeader {
+    match kind {
+        ProviderKind::Anthropic => SecretHeader::new(X_API_KEY, key),
+        ProviderKind::OpenAi => SecretHeader::bearer(key),
+    }
+}
+
+const ANTHROPIC_VERSION_HEADER: HeaderName = HeaderName::new("anthropic-version");
+const CONTENT_TYPE: HeaderName = HeaderName::new("Content-Type");
+const X_API_KEY: HeaderName = HeaderName::new("x-api-key");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VendorReply {

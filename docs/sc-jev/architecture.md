@@ -1,7 +1,7 @@
 # sc-jev — architecture
 
 **Boundary:** `jev`  
-**Depends on:** `sc-agent-types` only (API key resolved by **`sc-jev-check`** and passed at `JevClient` construction)
+**Depends on:** `sc-agent-types`, `sc-agent-http` (r-3), `serde`, `serde_json`, `toml` (API key resolved by **`sc-jev-check`** and passed at `JevClient` construction)
 
 ## North star
 
@@ -15,8 +15,18 @@ as modules without new top-level client crates.
 
 | Module | Purpose |
 | --- | --- |
-| `api` / `client` | TypeSafe transport, auth, retries |
-| `check` | Check/judge request encoding (HTTP only) |
+| `client` | `JevClient<T: Transport = UreqTransport>`: builds the `HttpRequest` (endpoint, `Content-Type`, `Authorization: Bearer` as a `SecretHeader`) and maps the reply |
+| `check` | Check/judge wire body (byte-exact payload, pinned model) and response parser |
+| `config` | `JevClientConfig`, packaged `jev.toml` (model, host, path, attempts, timeout) |
+
+From r-3, HTTP transport, busy retry, the 8 MiB response cap and redaction
+are `sc-agent-http` (ADR-SAG-0026, ADR-SAG-0006 r-3 amendment). This crate is
+a wire-format crate: it still owns every TypeSafe Jev API operation
+(ADR-SAG-0012). `JevClient::with_default_transport(key)` keeps the r-1
+signature and builds `UreqTransport` with a 10 s connect timeout and the
+`jev.toml` request timeout. `with_busy_policy` and `with_cancel` replace the
+policy and the cancel token; tests use the `sc-agent-http` `test-util`
+doubles through the dev-dependency.
 
 ## Non-responsibilities
 

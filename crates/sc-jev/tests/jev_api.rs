@@ -1,114 +1,49 @@
 //! Check/judge contract tests. Names match the jev-check README parity rows.
+//!
+//! Transports and retry hooks come from `sc-agent-http` (`test-util`, via
+//! the dev-dependency): `ScriptedTransport` answers in order and records
+//! every request; `BusyPolicy::with_test_hooks` records waits instead of
+//! sleeping.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use sc_agent_http::test_util::{FakeClock, RecordingSleeper, ScriptedTransport};
+use sc_agent_http::{BusyPolicy, Endpoint, HttpResponse};
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
     BackendId, BackendKeyId, CanonicalJudgePayload, JevError, JudgeBackend, JudgeRequest,
     LlmWireContext, NetworkErrorKind, PayloadBundle, ResolvedApiKey,
 };
-use sc_jev::{
-    HttpsTransport, JevClient, JevClientConfig, JevTransport, RetryDelay, WireRequest, WireResponse,
-};
+use sc_jev::{JevClient, JevClientConfig};
 use serde_json::json;
 
 const EXPECTED_BODY: &[u8] = b"{\"model\":\"jev-test\",\"questions\":[{\"choices\":[\"no\",\"yes\"],\"id\":\"q\",\"prompt\":\"x = 1\"}],\"state\":[]}";
 
-/// Largest jitter the busy-retry policy adds to a wait, in seconds.
-const JITTER_MAX_SECS: f64 = 0.25;
-
-/// Asserts each recorded wait is `expected` plus at most the policy jitter.
-fn assert_waits(actual: &[f64], expected: &[f64]) {
-    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
-    for (got, want) in actual.iter().zip(expected) {
-        assert!(
-            *got >= *want && *got <= *want + JITTER_MAX_SECS,
-            "{actual:?} vs {expected:?}"
-        );
-    }
-}
+const KEY: &str = "super-secret";
 
 fn secret_key() -> ResolvedApiKey {
-    ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "super-secret".to_owned()).expect("key")
-}
-
-struct FakeTransport {
-    responses: Mutex<Vec<WireResponse>>,
-    sent: Mutex<Vec<Vec<u8>>>,
-    keys: Mutex<Vec<ResolvedApiKey>>,
-    fail_with_key: bool,
-}
-
-impl FakeTransport {
-    fn new(responses: Vec<WireResponse>) -> Self {
-        Self {
-            responses: Mutex::new(responses),
-            sent: Mutex::new(Vec::new()),
-            keys: Mutex::new(Vec::new()),
-            fail_with_key: false,
-        }
-    }
-
-    fn failing(detail_includes_key: bool) -> Self {
-        let mut transport = Self::new(Vec::new());
-        transport.fail_with_key = detail_includes_key;
-        transport
-    }
-
-    fn sent(&self) -> Vec<Vec<u8>> {
-        self.sent.lock().expect("sent").clone()
-    }
-
-    fn keys(&self) -> Vec<ResolvedApiKey> {
-        self.keys.lock().expect("keys").clone()
-    }
-}
-
-impl JevTransport for FakeTransport {
-    fn send(&self, request: &WireRequest<'_>) -> Result<WireResponse, JevError> {
-        self.sent.lock().expect("sent").push(request.body.to_vec());
-        self.keys
-            .lock()
-            .expect("keys")
-            .push(request.api_key.clone());
-        if self.fail_with_key {
-            // A transport whose error echoes the key; the client must redact it.
-            return Err(JevError::network(
-                NetworkErrorKind::Connect,
-                "boom Bearer super-secret",
-            ));
-        }
-        self.responses
-            .lock()
-            .expect("responses")
-            .pop()
-            .ok_or_else(|| {
-                JevError::network(NetworkErrorKind::Connect, "fake transport has no response")
-            })
-    }
-}
-
-struct RecordingDelay {
-    slept: Mutex<Vec<f64>>,
-}
-
-impl RecordingDelay {
-    fn slept(&self) -> Vec<f64> {
-        self.slept.lock().expect("slept").clone()
-    }
-}
-
-impl RetryDelay for RecordingDelay {
-    fn wait(&self, delay: Duration) {
-        self.slept.lock().expect("slept").push(delay.as_secs_f64());
-    }
+    ResolvedApiKey::try_new(BackendKeyId::TypeSafe, KEY.to_owned()).expect("key")
 }
 
 struct Harness {
-    transport: Arc<FakeTransport>,
-    delay: Arc<RecordingDelay>,
-    client: JevClient,
+    transport: ScriptedTransport,
+    sleeper: RecordingSleeper,
+    client: JevClient<ScriptedTransport>,
+}
+
+impl Harness {
+    fn sent(&self) -> Vec<Vec<u8>> {
+        self.transport
+            .requests()
+            .iter()
+            .map(|request| request.body().to_vec())
+            .collect()
+    }
+
+    fn waits(&self) -> Vec<Duration> {
+        self.sleeper.waits()
+    }
 }
 
 fn config() -> JevClientConfig {
@@ -122,22 +57,24 @@ fn config() -> JevClientConfig {
     .expect("config")
 }
 
-fn scripted(responses: Vec<WireResponse>) -> Harness {
-    let transport = Arc::new(FakeTransport::new(responses));
-    let delay = Arc::new(RecordingDelay {
-        slept: Mutex::new(Vec::new()),
-    });
-    let client = JevClient::with_config(
-        config(),
-        secret_key(),
-        Arc::clone(&transport) as Arc<dyn JevTransport>,
-    )
-    .with_retry_delay(Arc::clone(&delay) as Arc<dyn RetryDelay>);
+/// A client over `replies` (answered first to last) with zero jitter.
+fn scripted_with(replies: Vec<Result<HttpResponse, JevError>>) -> Harness {
+    let transport = ScriptedTransport::new(replies);
+    let clock = FakeClock::new();
+    let sleeper = RecordingSleeper::new(clock.clone());
+    let policy = BusyPolicy::with_test_hooks(clock, sleeper.clone(), Duration::ZERO)
+        .with_max_sends(config().attempts());
+    let client =
+        JevClient::with_config(config(), secret_key(), transport.clone()).with_busy_policy(policy);
     Harness {
         transport,
-        delay,
+        sleeper,
         client,
     }
+}
+
+fn scripted(responses: Vec<HttpResponse>) -> Harness {
+    scripted_with(responses.into_iter().map(Ok).collect())
 }
 
 /// Canonical payload with one `q` question whose instructions are `prompt`.
@@ -157,31 +94,29 @@ fn request(bundle: PayloadBundle, llm: Option<&str>) -> JudgeRequest {
     JudgeRequest::new(Arc::new(bundle), llm.map(LlmWireContext::new))
 }
 
-fn ok(model: &str) -> WireResponse {
-    WireResponse {
-        status: 200,
-        body: serde_json::to_vec(&json!({
-            "model": model,
-            "answers": {
-                "q": {
-                    "choice": "no",
-                    "confidence": 0.9,
-                    "probabilities": {"yes": 0.1, "no": 0.9}
-                }
-            },
-            "usage": {"input_tokens": 318, "output_tokens": 31}
-        }))
-        .expect("json"),
-        retry_after: None,
-    }
+fn reply(body: serde_json::Value) -> HttpResponse {
+    HttpResponse::new(200, Vec::new(), serde_json::to_vec(&body).expect("json"))
 }
 
-fn busy(status: u16, retry_after: Option<&str>) -> WireResponse {
-    WireResponse {
-        status,
-        body: Vec::new(),
-        retry_after: retry_after.map(str::to_owned),
-    }
+fn ok(model: &str) -> HttpResponse {
+    reply(json!({
+        "model": model,
+        "answers": {
+            "q": {
+                "choice": "no",
+                "confidence": 0.9,
+                "probabilities": {"yes": 0.1, "no": 0.9}
+            }
+        },
+        "usage": {"input_tokens": 318, "output_tokens": 31}
+    }))
+}
+
+fn busy(status: u16, retry_after: Option<&str>) -> HttpResponse {
+    let headers = retry_after
+        .map(|value| vec![("Retry-After".to_owned(), value.to_owned())])
+        .unwrap_or_default();
+    HttpResponse::new(status, headers, Vec::new())
 }
 
 fn one_check_is_one_request_byte_exact() {
@@ -190,8 +125,8 @@ fn one_check_is_one_request_byte_exact() {
         .client
         .judge(&request(payload("x = 1"), None))
         .expect("judge");
-    assert_eq!(harness.transport.sent(), vec![EXPECTED_BODY.to_vec()]);
-    let sent = &harness.transport.sent()[0];
+    assert_eq!(harness.sent(), vec![EXPECTED_BODY.to_vec()]);
+    let sent = &harness.sent()[0];
     let payload_bytes = payload("x = 1");
     assert_eq!(
         sent,
@@ -214,22 +149,26 @@ fn one_check_is_one_request_byte_exact() {
         .map(String::as_str)
         .collect();
     assert_eq!(names, judge_outcome_field_names());
-    assert_eq!(harness.transport.keys(), vec![secret_key()]);
-    assert!(!format!("{:?}", harness.client).contains("super-secret"));
+    let requests = harness.transport.requests();
+    let secret = requests[0].secret().expect("bearer");
+    assert!(secret.matches(KEY));
+    assert_eq!(secret.redacted(), "Authorization: Bearer [redacted]");
+    assert_eq!(requests[0].endpoint().as_str(), "https://jev.invalid/v1/x");
+    assert!(!format!("{:?}", harness.client).contains(KEY));
     let backend: &dyn JudgeBackend = &harness.client;
     assert_eq!(backend.id(), BackendId::Jev);
 }
 
 fn busy_is_retried_with_the_same_body() {
-    let harness = scripted(vec![ok("jev-test"), busy(529, Some("2"))]);
+    let harness = scripted(vec![busy(529, Some("2")), ok("jev-test")]);
     harness
         .client
         .judge(&request(payload("x"), None))
         .expect("judge");
-    let sent = harness.transport.sent();
+    let sent = harness.sent();
     assert_eq!(sent.len(), 2);
     assert_eq!(sent[0], sent[1]);
-    assert_waits(&harness.delay.slept(), &[2.0]);
+    assert_eq!(harness.waits(), [Duration::from_secs(2)]);
 }
 
 #[test]
@@ -262,7 +201,7 @@ mod jev_api {
             .client
             .judge(&request(payload("x = 1"), Some("DO NOT SEND THIS PROMPT")))
             .expect("judge");
-        let sent = harness.transport.sent();
+        let sent = harness.sent();
         assert_eq!(sent.len(), 1);
         assert!(
             !sent[0]
@@ -287,34 +226,34 @@ mod jev_api {
         assert_eq!(error.code(), "INPUT_TOO_LARGE");
         let error = harness.client.judge(&req).expect_err("judge");
         assert_eq!(error.code(), "INPUT_TOO_LARGE");
-        assert!(harness.transport.sent().is_empty());
+        assert!(harness.sent().is_empty());
     }
 
     #[test]
     fn busy_statuses_retry_with_the_same_body() {
         for status in [429_u16, 502, 529] {
-            let harness = scripted(vec![ok("jev-test"), busy(status, None)]);
+            let harness = scripted(vec![busy(status, None), ok("jev-test")]);
             harness
                 .client
                 .judge(&request(payload("x"), None))
                 .expect("judge");
-            let sent = harness.transport.sent();
+            let sent = harness.sent();
             assert_eq!(sent.len(), 2, "status {status}");
             assert_eq!(sent[0], sent[1]);
-            assert_waits(&harness.delay.slept(), &[1.0]);
+            assert_eq!(harness.waits(), [Duration::from_secs(1)], "status {status}");
         }
     }
 
     #[test]
     fn non_busy_error_is_not_retried() {
-        let harness = scripted(vec![ok("jev-test"), busy(500, Some("1"))]);
+        let harness = scripted(vec![busy(500, Some("1")), ok("jev-test")]);
         let error = harness
             .client
             .judge(&request(payload("x"), None))
             .expect_err("status");
         assert_eq!(error.code(), "NETWORK_ERROR");
-        assert_eq!(harness.transport.sent().len(), 1);
-        assert!(harness.delay.slept().is_empty());
+        assert_eq!(harness.sent().len(), 1);
+        assert!(harness.waits().is_empty());
     }
 
     #[test]
@@ -327,19 +266,20 @@ mod jev_api {
         assert_eq!(error.code(), "NETWORK_ERROR");
         assert_eq!(
             error.to_string(),
-            "network error: Jev busy: HTTP 429 after 3 sends; retry attempts exhausted"
+            "network error: Jev HTTP 429 busy; 3 sends exhausted"
         );
-        assert_eq!(harness.transport.sent().len(), 3);
-        assert_waits(&harness.delay.slept(), &[1.0, 1.0]);
+        assert!(error.retryable());
+        assert_eq!(harness.sent().len(), 3);
+        // Absent Retry-After: exponential backoff (owner decision (b)).
+        assert_eq!(
+            harness.waits(),
+            [Duration::from_secs(1), Duration::from_secs(2)]
+        );
     }
 
     #[test]
     fn answer_ids_must_match_questions() {
-        let harness = scripted(vec![WireResponse {
-            status: 200,
-            body: serde_json::to_vec(&json!({"model": "jev-test", "answers": {}})).expect("json"),
-            retry_after: None,
-        }]);
+        let harness = scripted(vec![reply(json!({"model": "jev-test", "answers": {}}))]);
         let error = harness
             .client
             .judge(&request(payload("x"), None))
@@ -359,11 +299,7 @@ mod jev_api {
                 }
             }
         });
-        let harness = scripted(vec![WireResponse {
-            status: 200,
-            body: serde_json::to_vec(&extra).expect("json"),
-            retry_after: None,
-        }]);
+        let harness = scripted(vec![reply(extra)]);
         let error = harness
             .client
             .judge(&request(payload("x"), None))
@@ -380,11 +316,7 @@ mod jev_api {
                 }
             }
         });
-        let missing_case = scripted(vec![WireResponse {
-            status: 200,
-            body: serde_json::to_vec(&missing).expect("json"),
-            retry_after: None,
-        }]);
+        let missing_case = scripted(vec![reply(missing)]);
         let error = missing_case
             .client
             .judge(&request(payload("x"), None))
@@ -401,11 +333,11 @@ mod jev_api {
             .expect_err("model");
         assert_eq!(error.code(), "RESPONSE_INVALID");
 
-        let not_json = scripted(vec![WireResponse {
-            status: 200,
-            body: b"not-json".to_vec(),
-            retry_after: None,
-        }]);
+        let not_json = scripted(vec![HttpResponse::new(
+            200,
+            Vec::new(),
+            b"not-json".to_vec(),
+        )]);
         let error = not_json
             .client
             .judge(&request(payload("x"), None))
@@ -443,7 +375,7 @@ mod jev_api {
             .judge(&request(one_choice, None))
             .expect_err("question");
         assert_eq!(error.code(), "INPUT_INVALID");
-        assert!(harness.transport.sent().is_empty());
+        assert!(harness.sent().is_empty());
     }
 
     #[test]
@@ -467,14 +399,10 @@ mod jev_api {
             }
         }))
         .expect("json");
-        let harness = scripted(vec![WireResponse {
-            status: 200,
-            body,
-            retry_after: None,
-        }]);
+        let harness = scripted(vec![HttpResponse::new(200, Vec::new(), body)]);
         let outcome = harness.client.judge(&request(bytes, None)).expect("judge");
         assert_eq!(outcome.answers()["relevant"].choice().as_str(), "yes");
-        let sent = harness.transport.sent();
+        let sent = harness.sent();
         assert_eq!(sent.len(), 1);
         assert!(sent[0].starts_with(br#"{"model":"jev-test","#));
     }
@@ -492,38 +420,50 @@ mod jev_api {
 
     #[test]
     fn transport_errors_are_not_retried_and_drop_the_key() {
-        let transport = Arc::new(FakeTransport::failing(true));
-        let delay = Arc::new(RecordingDelay {
-            slept: Mutex::new(Vec::new()),
-        });
-        let client = JevClient::with_config(
-            config(),
-            secret_key(),
-            Arc::clone(&transport) as Arc<dyn JevTransport>,
-        )
-        .with_retry_delay(delay);
-        let error = client
+        let harness = scripted_with(vec![
+            Err(JevError::network(
+                NetworkErrorKind::Connect,
+                "boom Bearer super-secret",
+            )),
+            Ok(ok("jev-test")),
+        ]);
+        let error = harness
+            .client
             .judge(&request(payload("x"), None))
             .expect_err("network");
         assert_eq!(error.code(), "NETWORK_ERROR");
-        assert!(!error.fix_hint().contains("super-secret"));
-        assert_eq!(transport.sent().len(), 1);
+        assert!(
+            error.retryable(),
+            "connect failures are retryable by the caller"
+        );
+        assert_eq!(
+            error.to_string(),
+            "network error: Jev boom Bearer [redacted]"
+        );
+        assert!(!error.fix_hint().contains(KEY));
+        assert_eq!(harness.sent().len(), 1);
+        assert!(harness.waits().is_empty());
     }
 
     #[test]
     fn https_transport_refuses_cleartext_without_sending() {
-        let transport = HttpsTransport::new();
-        let api_key = secret_key();
-        let error = transport
-            .send(&WireRequest {
-                url: "http://api.typesafe.ai/v1/systemone",
-                body: b"{}",
-                api_key: &api_key,
-                timeout: Duration::from_secs(1),
-            })
-            .expect_err("cleartext");
-        assert_eq!(error.code(), "NETWORK_ERROR");
-        assert!(!error.fix_hint().contains("super-secret"));
+        // The client only ever builds an https endpoint, and the shared
+        // layer refuses plain HTTP in every build.
+        let error = Endpoint::parse("http://api.typesafe.ai/v1/systemone").expect_err("cleartext");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        let packaged = JevClientConfig::packaged();
+        assert!(packaged.endpoint().is_https());
+        let client = JevClient::with_default_transport(secret_key());
+        assert_eq!(client.config(), &packaged);
+        assert!(!format!("{client:?}").contains(KEY));
+    }
+
+    #[test]
+    fn packaged_attempts_match_the_shared_busy_policy() {
+        assert_eq!(
+            JevClientConfig::packaged().attempts(),
+            BusyPolicy::default().max_sends()
+        );
     }
 
     #[test]
@@ -547,6 +487,9 @@ mod jev_api {
                 Duration::from_secs(60)
             )
         );
-        assert_eq!(packaged.endpoint(), "https://api.typesafe.ai/v1/systemone");
+        assert_eq!(
+            packaged.endpoint().as_str(),
+            "https://api.typesafe.ai/v1/systemone"
+        );
     }
 }

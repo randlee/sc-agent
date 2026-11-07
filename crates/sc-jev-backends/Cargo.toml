@@ -19,9 +19,11 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 workspace = true
 
 [dependencies]
+sc-agent-http.workspace = true
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json.workspace = true
-ureq.workspace = true
 
 [dev-dependencies]
+# Test transports and retry hooks (plan "Test seams").
+sc-agent-http = { workspace = true, features = ["test-util"] }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }

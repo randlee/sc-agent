@@ -5,29 +5,19 @@
 //! body. It does not read `check.toml`, resolve secrets, or embed evaluator prose.
 //! `prompt_sha256` stays the digest of the canonical payload alone (ADR-SAG-0019).
 //!
-//! HTTP transport and the resolved API key are construction state (ADR-SAG-0006).
-//! Connect timeout is 10s and each provider call's read/write timeout is 120s
-//! (ADR-SAG-0007); `with_timeouts` on either backend overrides both. Busy
-//! statuses 429, 502, and 529 are retried with the same body, honoring
-//! `Retry-After` (0 to 30 s plus jitter) within a 90 s budget per call.
+//! The `sc_agent_http::Transport` and the resolved API key are construction
+//! state (ADR-SAG-0006). HTTP, busy retry, the response cap and redaction
+//! live in `sc-agent-http` (ADR-SAG-0026); this crate owns the provider wire
+//! bodies and reply parsers (ADR-SAG-0019). `with_default_transport` uses
+//! `sc_agent_http::UreqTransport` with connect 10 s and request 120 s
+//! (ADR-SAG-0007). Busy statuses 429, 502 and 529 are retried with the same
+//! body under `sc_agent_http::BusyPolicy` (REQ-SAG-0505).
 
 #![warn(missing_docs)]
 
 mod backend;
-mod retry;
-mod retry_policy;
-#[cfg(test)]
-mod test_server;
-mod transport;
 mod validate;
 mod wire;
 
 #[doc(inline)]
 pub use backend::{AnthropicHaikuBackend, OpenAiLunaBackend};
-#[doc(inline)]
-pub use retry::RetrySleeper;
-#[doc(inline)]
-pub use transport::{
-    BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, HttpRequest, HttpResponse,
-    UreqTransport,
-};

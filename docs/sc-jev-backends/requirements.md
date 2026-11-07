@@ -16,3 +16,10 @@ acceptance root, when it differs, is shown as "root a-N"; the closure table in
 REQ-SAG-0400/0401 (Jev HTTP) belong to **`sc-jev`**, not this crate.
 
 Each backend implements `JudgeBackend`.
+
+## Phase A.1 (r-3)
+
+The transport, busy retry (REQ-SAG-0505 as amended: absent or malformed
+`Retry-After` backs off 1, 2, 4 s), caps and redaction are
+[`sc-agent-http`](../sc-agent-http/requirements.md) (REQ-SAG-0402). This crate
+keeps the wire builders and reply parsers (ADR-SAG-0019).

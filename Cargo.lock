@@ -1400,20 +1400,20 @@ dependencies = [
 name = "sc-jev"
 version = "0.1.0"
 dependencies = [
+ "sc-agent-http",
  "sc-agent-types",
  "serde",
  "serde_json",
  "toml",
- "ureq",
 ]
 
 [[package]]
 name = "sc-jev-backends"
 version = "0.1.0"
 dependencies = [
+ "sc-agent-http",
  "sc-agent-types",
  "serde_json",
- "ureq",
 ]
 
 [[package]]
