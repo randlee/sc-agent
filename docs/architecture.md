@@ -91,13 +91,13 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | ADR-SAG-0014 | CLI success body | Active | Amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
 | ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0027 (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3b) |
-| ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
+| ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
 | ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | Amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3) |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
 | ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Proposed, r-1); ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0023 | Dependency pins, allocator, released binaries | Proposed (r-4; compose pin r-3b) | Amends ADR-SAG-0016, ADR-SAG-0017 |
+| ADR-SAG-0023 | Dependency pins, allocator, released binaries | Active (r-4; compose pin r-3b) | Amends ADR-SAG-0016, ADR-SAG-0017 |
 | ADR-SAG-0024 | Engine entry point and response contract | Proposed (r-2) | Amends ADR-SAG-0003, ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0025 | Multi-backend semantics and equal-input attestation | Proposed (r-2b) | Amends ADR-SAG-0004, ADR-SAG-0008, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0026 | Shared HTTP crate and composition crate | Proposed (HTTP half r-3; compose half r-3b) | Amends ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0020, ADR-SAG-0017 (HTTP half); ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013, ADR-SAG-0016, ADR-SAG-0017 (compose half) |
@@ -588,9 +588,9 @@ preflight CI, and publish dry-run).
 
 ### Amendment (Phase A.1, r-4)
 
-**Status:** Proposed (Phase A.1) — lands in r-4.
+**Status:** Active (Phase A.1) — landed in r-4.
 
-- (Proposed, r-4) Two released binaries: `sc-ai` and `sc-treesitter`
+- (Active, r-4) Two released binaries: `sc-ai` and `sc-treesitter`
   (ADR-SAG-0023). Per-channel coverage, matching
   `release/sc-publish-consumer-input.json` and the rendered
   `release/publish-artifacts.toml`:
@@ -903,10 +903,10 @@ comparison flows.
 
 ## ADR-SAG-0023 — Dependency pins, allocator, released binaries
 
-**Status:** Proposed (Phase A.1) — lands in r-4. Its r-3b subsection lands
-in r-3b.
+**Status:** Active (Phase A.1) — landed in r-4. Its r-3b subsection stays
+Proposed and lands in r-3b.
 
-- (Proposed, r-4) Library crates declare caret ranges. Exact `=` pins are
+- (Active, r-4) Library crates declare caret ranges. Exact `=` pins are
   allowed only for deliberate lockstep. The list below, between the markers,
   is the **only** copy: `.github/scripts/check-exact-pins.sh` reads it and
   fails on any `=` requirement in any `Cargo.toml` whose crate is not on it.
@@ -925,13 +925,13 @@ in r-3b.
   sc-agent-compose
   <!-- lockstep-pins:end -->
 
-- (Proposed, r-4) Global allocators and argv parsers are linked only by
+- (Active, r-4) Global allocators and argv parsers are linked only by
   binaries: `mimalloc` and `clap` are optional behind each binary crate's
   default `cli` feature, and the `[[bin]]` targets use
   `required-features = ["cli"]`. Libraries build with
   `--no-default-features` without mimalloc (REQ-SAG-0134) or clap
   (REQ-SAG-0135).
-- (Proposed, r-4) Released binaries are `sc-ai` and `sc-treesitter`.
+- (Active, r-4) Released binaries are `sc-ai` and `sc-treesitter`.
   Per-channel coverage is ADR-SAG-0017's r-4 amendment.
 
 ### Amendment (Phase A.1, r-3b)

@@ -1,7 +1,7 @@
 ---
 id: r-4
 phase: r
-status: planned
+status: complete
 closure_type: contract
 target_boundary: release
 track: release
