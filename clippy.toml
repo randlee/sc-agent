@@ -3,6 +3,10 @@
 # ADR-SAG-0020: only the transport that sends a credential may read it.
 # The two production readers (sc-jev client/https.rs and sc-jev-backends
 # transport.rs) carry `#[expect(clippy::disallowed_methods)]` with a reason.
+# `allow-invalid`: a package built without sc-agent-types' `secret` feature
+# (sc-treesitter, `default-features = false`) cannot reach the path, and
+# clippy would warn that the entry is invalid; the `--all-features` workspace
+# clippy still enforces it (r-3c QA-001).
 disallowed-methods = [
-    { path = "sc_agent_types::ResolvedApiKey::as_str", reason = "ADR-SAG-0020: only the sending transport may read the secret; compare keys by value in tests" },
+    { path = "sc_agent_types::ResolvedApiKey::as_str", allow-invalid = true, reason = "ADR-SAG-0020: only the sending transport may read the secret; compare keys by value in tests" },
 ]
