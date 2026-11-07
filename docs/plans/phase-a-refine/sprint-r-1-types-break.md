@@ -466,7 +466,7 @@ recorded outcome decides every later self edge:
    constructors and accessors so a D9 Branch B field is additive.
 9. Newtypes: `QuestionId`, `BlobSha` (40/64-hex, reusing the a-10
    validator), `RepoRelativePath` (`TryFrom<&str>`, `FromStr`,
-   `Deserialize`; the one validator for repo-relative paths: no `..`, no
+   `Deserialize`; the validator for repo-relative paths (adopted by sc-agent-types, the shared git helper and sc-treesitter in r-1; `InputSpec`/`CheckSpec` paths follow in r-2): no `..`, no
    absolute, no `\`, NUL or `:`), `Operation` enum (`Judge`, `Ask`) for
    `LogEvent.operation`. `SubjectsBuilder::push_subject`, `Subject.path`
    and `Question.id` use them; the two-bool argument of
@@ -740,6 +740,10 @@ cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev
 ```
 
 ## Implementation notes
+
+QA-2 runtime evidence at `64c0e85`: sc-agent CI run 42382157921 (test ×3 OSes incl. the
+`--features git,test-util` step, python ×3, rustdoc, feature matrix, coverage) and sc-publish
+dry-run run 42382157967 — all green.
 
 Added in the QA-1 fix round (PR 22). Validation logs: the developer run
 (`scratchpad/validate.log`, 56/57 lines pass; the one failure was the

@@ -31,7 +31,13 @@ fn git(dir: &Path, args: &[&str]) {
         .args(args)
         .env("GIT_CONFIG_GLOBAL", null_device())
         .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_TERMINAL_PROMPT", "0");
+        .env("GIT_TERMINAL_PROMPT", "0")
+        // Same hook-inherited variables the production helper removes (FTQ-001).
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_OBJECT_DIRECTORY")
+        .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
     let output = deadline::spawn_with_deadline(&mut command, None);
     assert!(
         output.status.success(),
