@@ -590,11 +590,25 @@ preflight CI, and publish dry-run).
 
 **Status:** Proposed (Phase A.1) — lands in r-4.
 
-- (Proposed, r-4) Two released binaries: `sc-ai` and `sc-treesitter`. Coverage: GitHub Release,
-  crates.io and Homebrew ship both. Scoop and WinGet expose only `sc-ai` as a
-  shim/alias; `sc-treesitter` ships in the archive without a shim (sc-publish
-  kit limitation; bead `agt-scoop-multi-shim`; upstream issue URL recorded by
-  r-4). REQ-SAG-0133.
+- (Proposed, r-4) Two released binaries: `sc-ai` and `sc-treesitter`
+  (ADR-SAG-0023). Per-channel coverage, matching
+  `release/sc-publish-consumer-input.json` and the rendered
+  `release/publish-artifacts.toml`:
+
+  | Channel | sc-ai | sc-treesitter |
+  | --- | --- | --- |
+  | GitHub Release archive | yes | yes |
+  | crates.io (`cargo install`) | yes | yes |
+  | Homebrew | yes | yes (same formula) |
+  | Scoop | shim | in archive, no shim |
+  | WinGet | alias | in package, no alias |
+
+  The Scoop/WinGet single-binary limit is an sc-publish kit limitation
+  (`[channels.scoop].binary` is one string; WinGet has no per-binary alias
+  field), so no consumer-input field can add the second shim. Bead
+  `agt-scoop-multi-shim`; upstream sc-publish issue: not yet filed — its URL
+  is recorded here when it is. The Windows invocation path for
+  `sc-treesitter` is in `docs/development/sc-publish.md`. REQ-SAG-0133.
 
 ### Amendment (Phase A.1, r-3)
 
