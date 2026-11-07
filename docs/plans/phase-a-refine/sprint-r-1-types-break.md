@@ -1,7 +1,7 @@
 ---
 id: r-1
 phase: r
-status: complete
+status: in-review
 closure_type: contract
 target_boundary: agent-types
 track: foundation
@@ -43,6 +43,20 @@ requirements:
   - REQ-SAG-0800
   - NFR-SAG-0001
   - NFR-SAG-0002
+  - REQ-SAG-0710
+  - NFR-SAG-0003
+# Ids of owned crates that r-1 touches only through call sites or does not
+# change; regression coverage is the crate's existing test target.
+constrained_by:
+  - "REQ-SAG-0100: crate layout unchanged; cargo build --workspace"
+  - "REQ-SAG-0201, REQ-SAG-0202: key resolution order and sources unchanged (only the constructor path); cargo test -p sc-agent-secrets"
+  - "REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0309: extractor behaviour unchanged (reads take RepoRelativePath; subjects validation moved to sc-agent-types unchanged); cargo test -p sc-jev-check --lib -- extract::"
+  - "REQ-SAG-0401: Jev wire body byte-exact; cargo test -p sc-jev --test jev_api"
+  - "REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0505: LLM wire, prompt asset and limits unchanged (limit now read from the descriptor, same 96 000); cargo test -p sc-jev-backends --test llm"
+  - "REQ-SAG-0601, REQ-SAG-0603: build_request/run_check entry points and signatures unchanged; cargo test -p sc-jev-check --lib -- run::"
+  - "REQ-SAG-0611: log line fields unchanged (operation now typed Operation, same spelling); cargo test -p sc-jev-check --test sessions_exact -- test_log_event_has_no_secrets --exact"
+  - "REQ-SAG-0702, REQ-SAG-0703: sc-ai argv and install unchanged; cargo test -p sc-ai --test cli"
+  - "REQ-SAG-0801, REQ-SAG-0802: Python API and harness unchanged in signature; just test-python"
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
@@ -57,13 +71,14 @@ adrs:
   - ADR-SAG-0011
   - ADR-SAG-0012
   - ADR-SAG-0013
+  - ADR-SAG-0014
   - ADR-SAG-0015
   - ADR-SAG-0016
   - ADR-SAG-0019
   - ADR-SAG-0020
+  - ADR-SAG-0021
   - ADR-SAG-0022
   - ADR-SAG-0023
-  - ADR-SAG-0025
   - ADR-SAG-0027
   - ADR-SAG-0029
 owned_paths:
@@ -96,6 +111,15 @@ owned_paths:
   - "docs/architecture.md#ADR index row ADR-SAG-0027"
   - "docs/architecture.md#ADR index Amended-by marker (r-1) in ADR-SAG-0001, 0009, 0016, 0020, 0022, 0029"
   - "docs/requirements.md#REQ-SAG-0101, REQ-SAG-0103, REQ-SAG-0120, REQ-SAG-0121, REQ-SAG-0701, NFR-SAG-0001 amendments; REQ-SAG-0105..0108 rows"
+  # Added in the QA-1 fix round; one line each on why r-1 owns it.
+  - "docs/architecture.md#Amendment (Phase A.1, r-1 — interim shapes) of ADR-SAG-0008, 0014, 0019 and their index A.1 markers (arch-qa ARCH-R1-001/002)"
+  - "docs/architecture.md#Phase A crate graph sc-observability-types edge and sentence; ADR-SAG-0016 body pointer (ARCH-R1-005)"
+  - "docs/plans/phase-a-refine/plan.md#Test seams D0 sentence (REQ-QA-R1-005)"
+  - "sc-lint.toml#sc-observability-types ownership record (delete; r-1 removes the only user; r-4 drops its deletion step)"
+  - "crates/sc-agent-secrets/Cargo.toml#[dev-dependencies] sc-agent-types line (delete; redundant after the parent's 22ef273 edit)"
+  - "clippy.toml#comment on the two transport readers (#[allow] -> #[expect])"
+  - ".github/workflows/sc-agent-ci.yml#test job step cargo test -p sc-agent-types --features git,test-util (owned by r-4 this wave; minimal edit, r-4 rebases)"
+  - "boundaries/sc-jev-check/jev-check.toml#facade and notes: drop ScriptedJudge/RequestLog (r-2 owns the rest of the manifest)"
 ---
 
 # Sprint r-1 — sc-agent-types break (D1, D6, D7 types, D10-break, D11 types)
@@ -503,10 +527,10 @@ recorded outcome decides every later self edge:
     `crates/sc-jev-check/Cargo.toml` to
     `test-util = ["sc-agent-types/test-util"]`, so the pytest wheel's
     `sc-jev-py/test-util` → `sc-jev-check/test-util` build compiles (r-2 owns
-    the rest of that file). `sc-agent-types`' own integration tests enable
-    the feature through a self dev-dependency
-    (`sc-agent-types = { path = ".", features = ["test-util", "git"] }`, no
-    `version` key; D0 decides its manifest treatment); nothing in `tests/`
+    the rest of that file). `sc-agent-types`' own integration targets that
+    need a non-default feature declare it with `[[test]] required-features`
+    (`mock`: `test-util`; `git`: `git`) and their validation lines pass
+    `--features` (D0 outcome 4: no self dev-dependency); nothing in `tests/`
     relies on `cfg(test)`.
 
 ### `#[non_exhaustive]` triage (RBP-F104)
@@ -652,6 +676,8 @@ read may be `#[non_exhaustive]`.
 | adr:ADR-SAG-0016 | r-1 amendment subsection Active |
 | adr:ADR-SAG-0020 | r-1 amendment subsection Active (names the superseded ADR-SAG-0029 (a) sentences); no `ResolvedApiKey::new` in any build (compile; `! rg -n 'ResolvedApiKey::new\b' crates/`) |
 | adr:ADR-SAG-0022 | r-1 amendment subsection Active; `ScriptedJudge` and `RequestLog` gone (`rg` finds neither name under `crates/`); `cargo build -p sc-jev-check --features test-util` green |
+| req:REQ-SAG-0710 (r-1 interim shapes, ADR-SAG-0014 r-1) | `cargo test -p sc-ai --test cli`: `cli_keeps_typesafe_response_fields` (Jev response fields verbatim, `answers` once from typed answers) and `test_multi_backend_cli_equal_input` (`outcomes[].backend`, no `probabilities`, `equal_input` = `{mode: chain_context, backends: [{backend, attestation: {status: unattested}}], equal: false}` on a live run); pytest `test_run_check_and_ask_append_jsonl_without_secrets` asserts the same `equal_input` |
+| req:NFR-SAG-0003 | Session JSONL retention unchanged (log path precedence ADR-SAG-0021 untouched): `cargo test -p sc-jev-check --test sessions_exact -- test_log_event_has_no_secrets --exact`; session documents are version 2 and Phase A / newer files are refused: `cargo test -p sc-jev-check --test session`; stored outcomes are checked on load: `cargo test -p sc-jev-check --lib -- session::tests::tampered_stored_outcome_is_session_document_invalid --exact` |
 | boundary:spike | D0 result recorded in `boundaries/README.md` ("Dev-dependency and self edges") with the rule ids observed for the three cases and the empty-facade load; the branch r-1 applied to `boundaries/sc-agent-types/agent-types.toml` matches it |
 | boundary:agent-types | Cross-impl digests unchanged (`jev_cross_impl`, `cross_impl_branches`); `test_answers_serde_golden` (Jev answer with `confidence`); `test_question_answer_rejects_non_finite` (incl. `confidence`); `test_outcome_rejects_mismatched_answer_keys`; `test_outcome_rejects_choice_not_offered`; `test_mock_judge_backend_contract`; `test_equal_input_equal_is_derived`; `test_backend_serde_documented_spelling`, `test_backend_serde_reads_old_alias`; git helper tests; `test_phase_a_session_is_invalid`, `test_newer_session_version_is_invalid`; no `#[allow(` under `crates/`. Regression for ids this sprint touches only through call sites: REQ-SAG-0200 `cargo test -p sc-agent-secrets`; REQ-SAG-0300/0311 `cargo test -p sc-jev-check --lib -- extract::`; REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0400 `cargo test -p sc-jev --test jev_api`; REQ-SAG-0500/0501/0502 `cargo test -p sc-jev-backends --test llm`; REQ-SAG-0600 (session document v2) `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0610 (`LogEvent.operation` is `Operation`) `cargo test -p sc-agent-types --test obs`; REQ-SAG-0700 and REQ-SAG-0711 `cargo test -p sc-ai --test cli`; REQ-SAG-0800 pytest below |
 
@@ -678,12 +704,13 @@ cargo test -p sc-agent-types --test judge -- test_outcome_rejects_mismatched_ans
 cargo test -p sc-agent-types --test judge -- test_outcome_rejects_choice_not_offered --exact
 cargo test -p sc-agent-types --test judge -- test_equal_input_equal_is_derived --exact
 cargo test -p sc-agent-types --test judge
-cargo test -p sc-agent-types --test mock -- test_mock_judge_backend_contract --exact
+cargo test -p sc-agent-types --features test-util --test mock -- test_mock_judge_backend_contract --exact
 cargo test -p sc-agent-types --test obs
 cargo test -p sc-agent-types --test subjects -- test_subjects_builder_ids_match_golden --exact
 cargo test -p sc-agent-types --test subjects -- test_unvalidated_subjects_rejected_on_deserialize --exact
 cargo test -p sc-agent-types --test features -- test_no_default_features_dep_set --exact
-cargo test -p sc-agent-types --test git
+cargo test -p sc-agent-types --features git --test git
+cargo test -p sc-agent-types --features git,test-util
 cargo test -p sc-jev-check --lib -- registry::tests::test_every_backend_has_factory --exact
 cargo test -p sc-jev-check --test session -- test_phase_a_session_is_invalid --exact
 cargo test -p sc-jev-check --test session -- test_newer_session_version_is_invalid --exact
@@ -712,6 +739,77 @@ test -z "$(cargo tree -p sc-agent-types -e normal --no-default-features | grep -
 ! rg -n -e 'ScriptedJudge' -e 'RequestLog' crates/
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```
+
+## Implementation notes
+
+Added in the QA-1 fix round (PR 22). Validation logs: the developer run
+(`scratchpad/validate.log`, 56/57 lines pass; the one failure was the
+`ResolvedApiKey::new` comment gate, fixed by the parent in 22ef273) and
+PR 22 CI at 22ef273: run 42379559440 (sc-agent CI) and run 42379559439
+(sc-publish dry-run), both green. The fix-round head is re-validated with
+the same list plus `cargo test -p sc-agent-types --features git,test-util`.
+
+**D0 outcome: 4 — dev edges counted, self edge flagged and self entry
+rejected** (`boundaries/README.md` "Dev-dependency and self edges"). A
+path-only self dev-dependency is flagged by `SCB-MANIFEST-002`, which no
+boundary manifest entry clears; a versioned one passes sc-lint but `cargo
+package` then cannot resolve it from crates.io. So no crate gets a self
+dev-dependency: integration targets that need a hook declare `[[test]]
+required-features` and their validation lines pass `--features`. An
+`exclude_paths_by_rule` record for `SCB-MANIFEST-002` in `sc-lint.toml`
+would make outcome 2 possible; that is an r-4 / owner decision. Later lines
+this changes: r-2 (`sc-jev-check`), r-3 (`sc-agent-http`), r-2b (`sc-jev`,
+`sc-jev-backends`) and r-3b (`sc-ai`) use required-features instead of the
+self dev-dependency their docs name (plan.md:132/444, sprint r-2:230,
+r-3:172, r-3b:232/289); r-2 rewords the ADR-SAG-0022 r-2 "Correction"
+sentence (`docs/architecture.md`) to "through `[[test]] required-features
+= ["test-util"]` and `--features test-util`", and r-3b the ADR-SAG-0028
+text; `workspace-tests` takes the "counted" branch and, because the schema
+rejects `facade = ""`, uses `facade = "workspace_tests"`.
+
+**ADR coverage.** D10-break items 3-5 ship shapes whose governing
+amendments (ADR-SAG-0024 of 0014, ADR-SAG-0025 of 0008/0019) are Proposed
+for r-2/r-2b. They are covered by Active "Amendment (Phase A.1, r-1 —
+interim shapes)" subsections of ADR-SAG-0008, 0014 and 0019, each
+superseded by 0024/0025 when those land. Their index A.1 markers were
+added by this sprint at QA's request, an exception to the plan's "adds no
+entry" rule; the ADR-SAG-0024/0025 "Amends" cells are left for r-2/r-2b to
+reconcile. ADR-SAG-0025 is removed from `adrs` (Proposed); ADR-SAG-0014 and
+0021 are added; ADR-SAG-0017 is not (r-1 changes no release channel) and
+ADR-SAG-0018's kit files are untouched.
+
+**Deviations from the text above**, with the requirement or ADR each touches:
+
+| Deviation | Touches | Why |
+| --- | --- | --- |
+| Jev `max_request_bytes` removed from `jev.toml` and `JevClientConfig::try_new` (no longer an argument); `validate_for_send` reads `BackendId::Jev.descriptor().request_limit_bytes()` (96 000, unchanged) | REQ-SAG-0400, ADR-SAG-0009 r-1 | D1.7 "one constant per backend"; a second config copy would be a second fact table |
+| `PayloadBundle::decode(&[u8])` is public | REQ-SAG-0103, ADR-SAG-0027 | session reload in `sc-jev-check` rebuilds stored bundles; it re-encodes and refuses non-canonical bytes, so `encode` stays the only way to make new bytes |
+| `JudgeOutcome` serializes `answers`, `backend`, `input_sha256` (null), `provider_meta`; `probabilities` removed; `data.answers` written once from typed answers | REQ-SAG-0710, frozen a-1 contract, ADR-SAG-0014 r-1 interim | D10.1; per-answer keys outside `choice`/`confidence`/`probabilities` survive only in `provider_meta` (CPR-203 option a) |
+| Live runs record `MultiBackendMode::ChainContext` and `Attestation::Unattested` per backend, so `equal = false` | ADR-SAG-0019 / 0008 r-1 interim, REQ-SAG-0710 | the engine passes prior answers to later LLM backends today, and no backend hashes until r-2b |
+| Several fix-hint texts changed shape: `RegistryInvalid` and `SessionDocumentInvalid` render "{detail}. {recovery}", `SessionStoreIo` renders "{op} failed (cause: {kind}). {recovery}"; clock and `sc-jev-py` log-directory failures use `Operational { Config }` | REQ-SAG-0106 | `fix_hint` is the one renderer and the recovery fields are data; ids unchanged (golden `error-codes.json`) |
+| `PartialEq<&str>` on `ErrorCode` and on the label newtypes; `retryable` stored as a bool that reads back `false`; `tempfile` dev-dependency on `sc-agent-types` | REQ-SAG-0106, NFR-SAG-0001 | test ergonomics; the reader is lenient on `false`, the writer never emits it; the `git` tests need temp repos |
+| `git cat-file` gets no `--no-textconv` | D7.5 | git rejects the flag for `cat-file`; `cat-file blob` never applies textconv or filters. The helper honours user config (for example `safe.directory`), removes `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` and `GIT_ALTERNATE_OBJECT_DIRECTORIES`, and has no wall-clock deadline (output is bounded; r-2/r-3c callers own timeouts) |
+| `BackendDescriptor`, `BACKENDS`, `BackendFamily` live in a private `catalog` module and `ErrorCode`, `NetworkErrorKind`, `OperationalArea` in a private `code` module, reached only through crate-root re-exports | D7.2 type homes, ADR-SAG-0027 | sc-boundary 0.8 reports a type cycle inside one module (`SCB-CYCLE-001`); the public paths are the crate root |
+| `MockJudgeBackend` is not `Clone`; tests share it through `Arc`. `EqualInputRecord` serializes by hand | D10.11, D10.5 | `SCB-CYCLE-003` / `SCB-CYCLE-001` |
+| "Subject.path" (D10.9) is read as `SubjectsSource.path: RepoRelativePath`; `SubjectsSource.blob_sha` is `BlobSha`; the id copy was in `sc-treesitter/src/extract.rs`, not `render.rs` | REQ-SAG-0108 | `Subject` has no path field |
+| `RepoRelativePath` is adopted for `sc-jev-check` reads (its second validator is deleted), subjects documents and the `git` helpers; `InputSpec` and `CheckSpec` path fields stay `String` this sprint (r-2 owns `config`), and `sc-treesitter`'s CLI path handling moves in r-3c. Its rustdoc no longer says "the one validator" | RBP-F003 | half applied by design; finished by r-2 / r-3c |
+| `JudgeOutcome::new(backend, &JudgeRequest, answers)` keeps the sprint-doc signature; `check_against(&PayloadBundle)` is the shared check and runs on session load | D10.2, RBP-F201 | QA suggested `&PayloadBundle`; deferred to r-2 with the engine API |
+| `EqualInputRecord::new` returns `Result` (refuses an empty or duplicate backend list) | D10.5 | invariant of the derived `equal` |
+| `ExtractInput` (sc-treesitter) is no longer `#[non_exhaustive]` | non_exhaustive triage | it has public fields and a builder; the rule forbids both |
+
+**`#[non_exhaustive]` triage additions:** `SubjectsSource`, `SubjectsProducer`
+and `ChoiceAnswer` keep public fields: they are frozen wire types whose
+fields are fixed by `sc/subjects/1` and the canonical payload, and a field
+change is a schema version. `LlmWireContext` keeps its public
+`system_prompt` beside `new` (one field, set by the facade). `ExtractInput`
+keeps public fields and drops `#[non_exhaustive]`.
+
+**Deferred to r-2, with reason:** `BackendSet` adoption in `sc-ai` and
+`sc-jev-py` (their argv/API is r-2/r-3b's); `sc-jev` `check.rs` re-deriving
+criteria from the payload instead of `question_choices()` (engine-side
+validation is r-2's); `BackendCapabilities` copying descriptor facts
+(kept as the D1.3 shape); `merge_jev_response`'s `unwrap_or(Value::Null)`
+(the `RunResponse` serialization replaces it in r-2).
 
 ## This sprint does not close
 

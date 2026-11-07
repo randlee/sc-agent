@@ -136,7 +136,14 @@ other design points are applied unless they contradict an accepted D decision.
   through their dev-dependencies. How `sc-boundary` treats these edges is
   settled in wave 1 by r-1's D0 spike and recorded in `boundaries/README.md`
   before wave 2; its four written outcomes say what each later self edge
-  does (RBQA-F101). `test-util` never appears in a normal-dependency edge:
+  does (RBQA-F101).
+  **Result (r-1 D0, outcome 4):** a path-only
+  self dev-dependency is flagged (`SCB-MANIFEST-002`), so no crate has one;
+  a crate's own integration targets declare `[[test]] required-features =
+  ["test-util"]` and their validation lines pass `--features test-util`
+  (`boundaries/README.md` "Dev-dependency and self edges"). The
+  self-dev-dependency wording above and in the Proposed ADR-SAG-0022 r-2 and
+  ADR-SAG-0028 text is reworded by r-2 and r-3b. `test-util` never appears in a normal-dependency edge:
   the `cargo tree` gate row `test-util` (below), `workspace-tests --test
   test_util_off` (graph query plus a release-built `sc-ai` that rejects
   `--scripted-answers`) and the release-wheel check prove it.
