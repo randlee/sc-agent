@@ -8,12 +8,18 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "TypeSafe Jev HTTP client."
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+# Allowlist. `tests/**` ships so cargo keeps every test target (no publish
+# warning); tests that read repo-root fixtures run from the workspace only.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
 [dependencies]
 sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
 serde_json.workspace = true
-toml = "1.1.8"
-ureq = "3.5.1"
+toml.workspace = true
+ureq.workspace = true
 
 [dev-dependencies]
 sc-agent-types = { version = "0.1.0", path = "../sc-agent-types", features = ["test-util"] }

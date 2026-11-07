@@ -17,7 +17,8 @@
 //!
 //! # Tests and fixtures
 //!
-//! The workspace integration test `jev_cross_impl` and unit tests that read
+//! The workspace integration test `jev_cross_impl` (hosted by the unpublished
+//! `sc-jev-py` crate) and unit tests that read
 //! `tests/fixtures/jev/**` run at the repo root only; they are not part of the
 //! published `sc-agent-types` crate package.
 //!

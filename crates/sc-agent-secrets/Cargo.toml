@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "API key resolution for sc-agent (process env, repo-root .env, keyring)."
+readme = "README.md"
+keywords = ["llm", "api-key", "keyring", "secrets", "sc-agent"]
+categories.workspace = true
+# Allowlist of packaged files.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
 [features]
 default = []

@@ -8,11 +8,17 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "API-direct Haiku and Luna judge backends."
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+# Allowlist. `tests/**` ships so cargo keeps every test target (no publish
+# warning); tests that read repo-root fixtures run from the workspace only.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
 [dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json.workspace = true
-ureq = "3.5.1"
+ureq.workspace = true
 
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }

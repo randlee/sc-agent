@@ -8,6 +8,12 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "Tree-sitter producer for sc/subjects/1 documents."
+readme = "README.md"
+keywords = ["tree-sitter", "parsing", "subjects", "sc-agent"]
+categories = ["command-line-utilities", "parsing"]
+# Allowlist. `tests/**` ships so cargo keeps every test target (no publish
+# warning); tests that read repo-root fixtures run from the workspace only.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**", "assets/queries/**"]
 
 [features]
 default = ["python", "rust"]
@@ -15,13 +21,14 @@ python = ["dep:tree-sitter-python"]
 rust = ["dep:tree-sitter-rust"]
 
 [dependencies]
-mimalloc = { version = "=0.1.52" }
+# Unconditional for the library target by current choice: library users also
+# build mimalloc's C code. Cost accepted; feature-gating it behind a bin-only
+# feature is under Phase A review. Deliberate `=` pin (tested allocator).
+mimalloc.workspace = true
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json.workspace = true
+# Deliberate `=` pins: grammar ABI and query captures are tested against these
+# exact tree-sitter releases; revisited at Phase A review.
 tree-sitter = { version = "=0.27.1" }
 tree-sitter-python = { version = "=0.25.0", optional = true }
 tree-sitter-rust = { version = "=0.24.2", optional = true }
-
-[[bin]]
-name = "sc-treesitter"
-path = "src/main.rs"

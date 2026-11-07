@@ -8,12 +8,20 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "sc-ai CLI for Jev check parity: run, dry-run, and ask."
+readme = "README.md"
+keywords = ["llm", "evaluation", "jev", "cli", "sc-agent"]
+categories = ["command-line-utilities"]
+# Allowlist. `tests/**` ships so cargo keeps every test target (no publish
+# warning); tests that read repo-root fixtures run from the workspace only.
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
 [dependencies]
-mimalloc = "=0.1.52"
+# Deliberate `=` pin: the binary ships the allocator it was tested with; revisited at Phase A review.
+mimalloc.workspace = true
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-jev-check = { path = "../sc-jev-check", version = "0.1.0" }
-sc-observability = "=1.5.0"
+# Deliberate `=` lockstep with the sc-observability release train; revisited at Phase A review.
+sc-observability.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
