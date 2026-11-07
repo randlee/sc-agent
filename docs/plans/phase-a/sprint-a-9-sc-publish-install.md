@@ -78,6 +78,16 @@ then prove the release dry-run (drift check, preflight, publish dry-run) in PR C
 5. **ADR-SAG-0018** — Do not hand-edit rendered `publish-artifacts.toml` /
    channel contracts; change consumer input + re-install.
 6. **ADR-SAG-0017** — Phase A close satisfies **first release surfaces** via sc-publish — not ad-hoc workflow edits.
+7. **Wheel + pytest CI (REQ-SAG-0802 proof for a-8)** — the `python` job of the
+   consumer-owned `.github/workflows/sc-agent-ci.yml`, step
+   `maturin develop + pytest (just test-python)`. It installs maturin 1.16.0
+   into a Python 3.11 venv, runs `maturin develop --features
+   extension-module,test-util -m crates/sc-jev-py/Cargo.toml`, then
+   `pytest tests/fixtures/jev-python -q` on ubuntu-24.04, macos-15 and
+   windows-2022. The `sc-publish dry-run` wheel step above is the
+   publish-surface build (`extension-module` only, no pytest). This item was
+   missing when a-9 merged; it landed in the Phase A phase-end hardening
+   (PR #18, REQ-QA-003). `install.py` never writes the workflow.
 
 **Decisions recorded in this sprint.** The PR gate is consumer-owned
 (`scripts/sc-publish-dry-run.sh` plus `.github/workflows/sc-publish-dry-run.yml`)
@@ -98,7 +108,8 @@ carries a `[[test]]` path outside its own directory.
 | req:REQ-SAG-0130 | Consumer JSON lists facade + all publish crates/channels |
 | req:REQ-SAG-0131 | Install doc + pin bump recipe |
 | req:REQ-SAG-0132 | `sc-publish dry-run` workflow green on PR (run 42339767937 on PR #17); kit Release Preflight is dispatch-only, run by the publisher at release |
-| req:REQ-SAG-0803 | Dry-run publish order documented and exercised |
+| req:REQ-SAG-0803 | Dry-run publish order documented and exercised (runs 42339767937, 42341299125, 42341873748 on PR #17) |
+| evidence:REQ-SAG-0802 | Boundary evidence only; the `req:` root is owned by **a-8**. `sc-agent-ci` job `python` builds the `test-util` extension and runs `tests/fixtures/jev-python` pytest on three OSes |
 | boundary:release | Kit dry-run renders five channels |
 
 ## Required validation
