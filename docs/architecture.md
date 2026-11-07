@@ -914,8 +914,11 @@ Proposed and lands in r-3b.
   `tree-sitter`, `tree-sitter-python`, `tree-sitter-rust` — output
   determinism; `sc-agent-compose` — lockstep internal support (owner
   decision 2026-11-06), in force from r-3b (subsection below; before the
-  crate exists no `Cargo.toml` names it). `sc-observability-types` is not on
-  the list: r-1 removes its only user and its root entry.
+  crate exists no `Cargo.toml` names it). `sc-observability-types` is on
+  the list only transitionally: r-1 removes its only user and its root
+  entry, and the entry below is removed when r-4 rebases onto r-1. The
+  script reads the first word of each line as the crate name; the rest of
+  the line is a note.
 
   <!-- lockstep-pins:start -->
   sc-observability
@@ -923,6 +926,7 @@ Proposed and lands in r-3b.
   tree-sitter-python
   tree-sitter-rust
   sc-agent-compose
+  sc-observability-types (transitional; r-1 deletes the dependency and this entry is removed when r-4 rebases onto r-1)
   <!-- lockstep-pins:end -->
 
 - (Active, r-4) Global allocators and argv parsers are linked only by

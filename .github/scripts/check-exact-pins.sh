@@ -6,7 +6,8 @@
 # ADR-SAG-0023 lockstep list. The list has exactly one copy: the lines
 # between `<!-- lockstep-pins:start -->` and `<!-- lockstep-pins:end -->` in
 # docs/architecture.md. This script reads it from there and keeps no list of
-# its own.
+# its own. Each non-empty line names one crate: its first word is the crate
+# name, and anything after it is a note (e.g. a transitional entry).
 #
 # Usage:
 #   bash .github/scripts/check-exact-pins.sh              check the repository
@@ -54,7 +55,7 @@ begin = lines.index(start_marker)
 end = lines.index(end_marker)
 if end < begin:
     sys.exit(f"check-exact-pins: {end_marker} precedes {start_marker}")
-allowed = {line for line in lines[begin + 1 : end] if line}
+allowed = {line.split()[0] for line in lines[begin + 1 : end] if line}
 if not allowed:
     sys.exit("check-exact-pins: the ADR-SAG-0023 lockstep list is empty")
 

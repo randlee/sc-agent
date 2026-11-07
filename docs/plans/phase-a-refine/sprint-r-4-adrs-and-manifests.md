@@ -208,3 +208,14 @@ Busy-retry policy (r-3, ADR-SAG-0007, owner decision (b)); the
 ADR-SAG-0005 `prepare` sentence (r-2); new-crate release entries (r-3, r-3b);
 clap parsers (r-3c, r-3b) and the clap `cargo tree` rows (r-3b); upstream fix
 for the Scoop multi-shim limit.
+
+## Implementation notes (QA-1 fix round, PR 21)
+
+- **Transitional lockstep entry** (REQ-QA-R4-001, RSH-001, RBP-F001,
+  QA-002). Until r-1 merges, the root `sc-observability-types = "=1.5.0"`
+  entry is still present, so the ADR-SAG-0023 list carries
+  `sc-observability-types (transitional; ...)` and `check-exact-pins.sh`
+  and CI job `deps` are green on this branch. When r-4 rebases onto r-1, the
+  entry is removed in the same commit that re-runs the gates, which restores
+  the end state this doc's acceptance row names (`sc-observability-types`
+  absent).
