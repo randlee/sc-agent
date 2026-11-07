@@ -5,6 +5,7 @@
 
 use std::time::Duration;
 
+use sc_agent_http::Endpoint;
 use sc_agent_types::JevError;
 use serde::Deserialize;
 
@@ -17,6 +18,7 @@ pub struct JevClientConfig {
     model: String,
     host: String,
     path: String,
+    endpoint: Endpoint,
     attempts: u32,
     timeout: Duration,
 }
@@ -69,7 +71,8 @@ impl JevClientConfig {
     /// # Errors
     ///
     /// Returns [`JevError::ConfigInvalid`] when the model, host, path,
-    /// attempt count, or timeout cannot be used for a check request.
+    /// attempt count, or timeout cannot be used for a check request, or
+    /// `https://{host}{path}` is not a valid https URL.
     pub fn try_new(
         model: impl Into<String>,
         host: impl Into<String>,
@@ -105,10 +108,12 @@ impl JevClientConfig {
         if timeout.is_zero() || timeout > Duration::from_secs(3_600) {
             return Err(invalid("timeout must be from 1 second to 3600 seconds"));
         }
+        let endpoint = Endpoint::parse(&format!("https://{host}{path}"))?;
         Ok(Self {
             model,
             host,
             path,
+            endpoint,
             attempts,
             timeout,
         })
@@ -133,12 +138,15 @@ impl JevClientConfig {
     }
 
     /// Total sends on a busy reply, including the first.
+    ///
+    /// The packaged value is 4, the `sc_agent_http::BusyPolicy::default`
+    /// count (REQ-SAG-0505).
     #[must_use]
     pub fn attempts(&self) -> u32 {
         self.attempts
     }
 
-    /// Per-request timeout applied by the transport.
+    /// Request timeout of the default transport, body read included.
     #[must_use]
     pub fn timeout(&self) -> Duration {
         self.timeout
@@ -146,8 +154,8 @@ impl JevClientConfig {
 
     /// `https://{host}{path}` for this config.
     #[must_use]
-    pub fn endpoint(&self) -> String {
-        format!("https://{}{}", self.host, self.path)
+    pub fn endpoint(&self) -> &Endpoint {
+        &self.endpoint
     }
 }
 
@@ -165,7 +173,7 @@ mod tests {
     fn from_toml_reads_every_field() {
         let config = JevClientConfig::from_toml(VALID).expect("valid");
         assert_eq!(config.model(), "m");
-        assert_eq!(config.endpoint(), "https://h.example/v1/x");
+        assert_eq!(config.endpoint().as_str(), "https://h.example/v1/x");
         assert_eq!(config.attempts(), 2);
         assert_eq!(config.timeout(), Duration::from_secs(5));
     }

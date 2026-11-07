@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/sc-agent-types",
     "crates/sc-agent-secrets",
+    "crates/sc-agent-http",
     "crates/sc-jev",
     "crates/sc-jev-backends",
     "crates/sc-jev-check",
@@ -32,6 +33,8 @@ thiserror = "2"
 uuid = { version = "1", features = ["serde", "v4"] }
 toml = "1.1.8"
 ureq = "3.5.1"
+# The shared HTTP layer (ADR-SAG-0026). Caret, like every workspace library.
+sc-agent-http = { version = "0.1.0", path = "crates/sc-agent-http" }
 # Pinning policy: ADR-SAG-0023 (docs/architecture.md). Caret ranges, except
 # the deliberate-lockstep crates listed there; .github/scripts/check-exact-pins.sh
 # fails on any other `=` requirement (NFR-SAG-0004).
@@ -45,3 +48,10 @@ tempfile = "3"
 # Every crate, sc-jev-py included, opts in with `[lints] workspace = true`.
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# ADR-SAG-0020 r-3 amendment: a lint suppression must be a visible
+# `#[expect(.., reason = "..")]`, so a second `ResolvedApiKey::as_str` call
+# site (clippy.toml `disallowed-methods`) cannot hide behind `#[allow]`.
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"

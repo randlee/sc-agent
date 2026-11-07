@@ -166,7 +166,7 @@ verbatim. Plan: [`plans/phase-a-refine/plan.md`](plans/phase-a-refine/plan.md).
 | REQ-SAG-0312 | `command` input `path` field (`RepoRelativePath`) settable in `check.toml`, substituted for `{path}` — (Proposed, r-2) |
 | REQ-SAG-0313 | Command producer stderr `ScAgentErrorResponse` re-raised with its code (`ProducerError`) — (Proposed, r-2) |
 | REQ-SAG-0314 | Request byte cap has one owner per backend (descriptor limit), enforced in `validate_for_send` before any send; dry-run reports `payload_bytes` and per-backend `over_limit` without failing — (Proposed, r-2) |
-| REQ-SAG-0402 | One shared HTTP layer (`sc-agent-http`) for all backend families — (Proposed, r-3) |
+| REQ-SAG-0402 | One shared HTTP layer (`sc-agent-http`) for all backend families — (Active, r-3) |
 | REQ-SAG-0403 | Both backends validate `CanonicalJudgePayload` by deserializing; Jev body is a JSON envelope (no byte-splice) — (Proposed, r-5, blocked) |
 | REQ-SAG-0604 | Per-backend results; a failure keeps other answers; `leak` = any failed; consumers print the envelope on stdout and the first failure on stderr and exit 2 / raise with `.response` — (Proposed, r-3b) |
 | REQ-SAG-0605 | Multi-backend runs independent by default; `chain_context` explicit (CLI flag, Python kwarg) and recorded — (Proposed, r-3b) |
@@ -187,7 +187,7 @@ verbatim. Plan: [`plans/phase-a-refine/plan.md`](plans/phase-a-refine/plan.md).
 | REQ-SAG-0701 | stderr is one `ScAgentErrorResponse` line per NFR-SAG-0001 (amended): `{error, message, schema_version, ...}`, exit 2 — (Active, r-1) |
 | REQ-SAG-0601 | `run_check` / dry-run library API becomes `prepare`/`run` with `RunConfig::dry_run` — (Proposed, r-2) |
 | REQ-SAG-0710 | `data` is the `RunResponse` serialization (ADR-SAG-0014 r-2 amendment): the primary backend is the first `Ok` backend in `BackendSet` order and its answers are at the top level (the verbatim Jev response when Jev is primary); plus `session_id`, `results`, `equal_input`, `warnings` — (Proposed, r-2) |
-| REQ-SAG-0505 | Busy retry (owner decision 2026-11-06): 429/502/529 only; 4 sends; valid Retry-After honoured, clamped 0–30 s; Retry-After grammar ASCII digits with optional fraction, ≤ 32 bytes, else malformed; absent or malformed Retry-After → exponential backoff 1, 2, 4, 8 … s capped at 30 s (the default 4 sends give at most three waits: 1, 2, 4 s); ≤ 250 ms jitter; 90 s budget for starting attempts (in-flight attempt keeps its 120 s timeout); connect/DNS failures are not retried — `NETWORK_ERROR`, `retryable() == true`, caller decides — (Proposed, r-3) |
-| REQ-SAG-0130 | Consumer input publishes `sc-agent-http` (publish order 3) — (Proposed, r-3) |
+| REQ-SAG-0505 | Busy retry (owner decision 2026-11-06): 429/502/529 only; 4 sends; valid Retry-After honoured, clamped 0–30 s; Retry-After grammar ASCII digits with optional fraction, ≤ 32 bytes, else malformed; absent or malformed Retry-After → exponential backoff 1, 2, 4, 8 … s capped at 30 s (the default 4 sends give at most three waits: 1, 2, 4 s); ≤ 250 ms jitter; 90 s budget for starting attempts (in-flight attempt keeps its 120 s timeout); connect/DNS failures are not retried — `NETWORK_ERROR`, `retryable() == true`, caller decides — (Active, r-3) |
+| REQ-SAG-0130 | Consumer input publishes `sc-agent-http` (publish order 3) — (Active, r-3) |
 | REQ-SAG-0130 | Consumer input publishes `sc-agent-compose` (internal support, directly after `sc-jev-check`; owner decision 2026-11-06); no crates.io publish until D9 resolves — (Proposed, r-3b) |
 | REQ-SAG-0711 | `sc-ai` wires the logger through `sc_agent_compose::obs` — (Proposed, r-3b) |

@@ -1,0 +1,60 @@
+# Boundary manifest for sc-agent-http. Checked by `sc-lint lint sc-boundary` (`just lint`).
+#
+# Text from docs/plans/phase-a-refine/plan.md "New boundary manifests" (r-3).
+# Conventions as in the other manifests (Phase A phase-end, RBQA-F001
+# option B): `allowed_dependencies` lists every direct normal dependency;
+# `forbidden_edges` are direct edges only. sc-lint 0.8.0 enforces the
+# workspace-to-workspace edges (SCB-DEPENDENCY-001..004); the ureq edge is
+# owned through the `global_dependency_ownership` record in sc-lint.toml
+# (SCB-MANIFEST-004). Dev-only edges are counted (D0 spike); this crate has
+# no self dev-dependency: its `retry` and `ureq` targets declare
+# `[[test]] required-features = ["test-util"]`.
+# The plan text's `sc-agent-compose` forbidden edge is added by r-3b with that
+# crate: sc-lint 0.8.0 rejects an edge to a package that is not a workspace
+# member yet (CLI.CONFIG_ERROR).
+
+boundary_id = "BOUNDARY-agent-http"
+owner_package = "sc-agent-http"
+owner_crate_path = "sc_agent_http"
+name = "agent-http"
+
+[public]
+facade = "sc_agent_http::HttpRequest, sc_agent_http::HttpResponse, sc_agent_http::Method, sc_agent_http::Endpoint, sc_agent_http::HeaderName, sc_agent_http::SecretHeader, sc_agent_http::Transport, sc_agent_http::Timeouts, sc_agent_http::UreqTransport, sc_agent_http::BusyPolicy, sc_agent_http::HttpClient, sc_agent_http::send_and_parse, sc_agent_http::send_with_busy_retry, sc_agent_http::redact, sc_agent_http::test_util"
+notes = "Single HTTP layer and the single ResolvedApiKey::as_str call site (src/ureq_transport.rs, private module, #[expect(clippy::disallowed_methods, reason = ...)]). No ureq type in any pub signature (cargo doc check). Carries bytes only: Jev API semantics stay in sc-jev (ADR-SAG-0012). Depends on sc-agent-types with default-features = false, features = [secret]; jitter from std, URL parsing via ureq's re-exported http::Uri inside the private module (no rand, no url crate). Non-default feature test-util (BusyPolicy::with_test_hooks, Endpoint::loopback_http, UreqTransport::loopback_for_tests, test_util::{FakeClock, RecordingSleeper, ScriptedTransport, RecordingTransport}) is enabled only by dev-dependencies and --features test-util."
+
+[implementation]
+type = "marker"
+module = "sc_agent_http"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["request", "transport", "ureq_transport", "retry", "redact"]
+
+[dependencies]
+allowed_dependents = ["sc-jev", "sc-jev-backends"]
+allowed_dependencies = ["sc-agent-types", "ureq"]
+forbidden_edges = [
+    { from = "sc-agent-http", to = "sc-agent-secrets" },
+    { from = "sc-agent-http", to = "sc-jev" },
+    { from = "sc-agent-http", to = "sc-jev-backends" },
+    { from = "sc-agent-http", to = "sc-jev-check" },
+    { from = "sc-agent-http", to = "sc-observability" },
+    { from = "sc-agent-http", to = "pyo3" },
+    { from = "sc-agent-http", to = "tree-sitter" },
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = ["crates/sc-agent-http/src/test_util.rs", "crates/sc-agent-http/tests/support/mod.rs"]
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["SCB-DEPENDENCY-001", "SCB-DEPENDENCY-002", "SCB-DEPENDENCY-003", "SCB-DEPENDENCY-004", "SCB-MANIFEST-004"]
+review_gates = []
+
+[status]
+state = "concrete_landed"

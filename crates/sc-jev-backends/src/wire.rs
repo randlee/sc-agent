@@ -6,7 +6,8 @@
 
 use std::collections::BTreeSet;
 
-use sc_agent_types::JevError;
+use sc_agent_http::{HeaderName, SecretHeader};
+use sc_agent_types::{JevError, ResolvedApiKey};
 use serde_json::{Map, Value};
 
 use crate::validate::ParsedQuestion;
@@ -109,18 +110,28 @@ fn provider_document(
 
 /// Provider headers that do not carry the API key.
 ///
-/// The sending transport adds `x-api-key` or `Authorization` when it reads
-/// the sealed credential (ADR-SAG-0020).
-pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(String, String)> {
+/// The credential goes separately, as [`secret_header`]; only the sending
+/// transport writes its value (ADR-SAG-0020).
+pub(crate) fn unsigned_headers(kind: ProviderKind) -> Vec<(HeaderName, &'static str)> {
     let mut headers = match kind {
-        ProviderKind::Anthropic => {
-            vec![("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned())]
-        }
+        ProviderKind::Anthropic => vec![(ANTHROPIC_VERSION_HEADER, ANTHROPIC_VERSION)],
         ProviderKind::OpenAi => Vec::new(),
     };
-    headers.push(("Content-Type".to_owned(), "application/json".to_owned()));
+    headers.push((CONTENT_TYPE, "application/json"));
     headers
 }
+
+/// The credential header each provider expects (ADR-SAG-0020).
+pub(crate) fn secret_header(kind: ProviderKind, key: ResolvedApiKey) -> SecretHeader {
+    match kind {
+        ProviderKind::Anthropic => SecretHeader::new(X_API_KEY, key),
+        ProviderKind::OpenAi => SecretHeader::bearer(key),
+    }
+}
+
+const ANTHROPIC_VERSION_HEADER: HeaderName = HeaderName::new("anthropic-version");
+const CONTENT_TYPE: HeaderName = HeaderName::new("Content-Type");
+const X_API_KEY: HeaderName = HeaderName::new("x-api-key");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VendorReply {
@@ -136,28 +147,26 @@ pub(crate) struct VendorReply {
     pub(crate) truncation: Option<String>,
 }
 
-pub(crate) fn parse_count(provider: &str, body: &[u8]) -> Result<u64, JevError> {
+pub(crate) fn parse_count(body: &[u8]) -> Result<u64, JevError> {
     let value: Value = serde_json::from_slice(body)
-        .map_err(|_| JevError::response_invalid(format!("{provider} token count is not JSON")))?;
+        .map_err(|_| JevError::response_invalid("token count is not JSON"))?;
     let tokens = value.get("input_tokens");
     match tokens.and_then(Value::as_i64) {
         Some(tokens) if tokens >= 0 => Ok(u64::try_from(tokens).unwrap_or(0)),
-        _ => Err(JevError::response_invalid(format!(
-            "{provider} token count has no input_tokens"
-        ))),
+        _ => Err(JevError::response_invalid(
+            "token count has no input_tokens",
+        )),
     }
 }
 
-pub(crate) fn parse_vendor(
-    kind: ProviderKind,
-    provider: &str,
-    body: &[u8],
-) -> Result<VendorReply, JevError> {
+/// Parses a vendor reply. Error details carry no provider name; the caller
+/// labels them.
+pub(crate) fn parse_vendor(kind: ProviderKind, body: &[u8]) -> Result<VendorReply, JevError> {
     let value: Value = serde_json::from_slice(body)
-        .map_err(|_| JevError::response_invalid(format!("{provider} reply is not JSON")))?;
+        .map_err(|_| JevError::response_invalid("reply is not JSON"))?;
     let object = value
         .as_object()
-        .ok_or_else(|| JevError::response_invalid(format!("{provider} reply is not JSON")))?;
+        .ok_or_else(|| JevError::response_invalid("reply is not JSON"))?;
     let usage = object.get("usage").and_then(Value::as_object);
     let (text, non_text_blocks, input_tokens) = match kind {
         ProviderKind::Anthropic => parse_anthropic(object, usage)?,
@@ -171,11 +180,9 @@ pub(crate) fn parse_vendor(
         .get("status")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    let truncation = truncation_reason(provider, object, stop_reason.as_deref(), status.as_deref());
+    let truncation = truncation_reason(object, stop_reason.as_deref(), status.as_deref());
     if text.is_none() && truncation.is_none() {
-        return Err(JevError::response_invalid(format!(
-            "{provider} reply has no text"
-        )));
+        return Err(JevError::response_invalid("reply has no text"));
     }
     Ok(VendorReply {
         text: text.unwrap_or_default(),
@@ -346,31 +353,27 @@ fn parse_openai(
 }
 
 fn truncation_reason(
-    provider: &str,
     object: &Map<String, Value>,
     stop_reason: Option<&str>,
     status: Option<&str>,
 ) -> Option<String> {
     if stop_reason == Some("max_tokens") {
-        return Some(format!(
-            "{provider} reply truncated at max_tokens (stop_reason=max_tokens)"
-        ));
+        return Some("reply truncated at max_tokens (stop_reason=max_tokens)".to_owned());
     }
     if let Some(status) =
         status.filter(|status| matches!(*status, "incomplete" | "max_tokens" | "max_output_tokens"))
     {
-        return Some(format!(
-            "{provider} reply truncated at max_tokens (status={status})"
-        ));
+        return Some(format!("reply truncated at max_tokens (status={status})"));
     }
     let incomplete = object
         .get("incomplete_details")
         .and_then(|value| value.get("reason"))
         .and_then(Value::as_str);
     if incomplete == Some("max_output_tokens") {
-        return Some(format!(
-            "{provider} reply truncated at max_tokens (incomplete_details.reason=max_output_tokens)"
-        ));
+        return Some(
+            "reply truncated at max_tokens (incomplete_details.reason=max_output_tokens)"
+                .to_owned(),
+        );
     }
     None
 }

@@ -1,93 +1,67 @@
-//! Fake-transport coverage for Haiku and Luna (sprint a-5).
+//! Scripted-transport coverage for Haiku and Luna (sprint a-5; r-3 moved the
+//! transport and retry doubles to `sc-agent-http` `test-util`).
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use sc_agent_http::test_util::{FakeClock, RecordingSleeper, ScriptedTransport};
+use sc_agent_http::{BusyPolicy, HttpRequest, HttpResponse, Timeouts, UreqTransport};
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, BackendKeyId, CanonicalJudgePayload, JevError, JudgeBackend, JudgeOutcome,
-    JudgeRequest, LlmWireContext, NetworkErrorKind, PayloadBundle, ResolvedApiKey, Sha256Digest,
+    BackendId, BackendKeyId, CanonicalJudgePayload, JudgeBackend, JudgeOutcome, JudgeRequest,
+    LlmWireContext, PayloadBundle, ResolvedApiKey, Sha256Digest,
 };
-use sc_jev_backends::{
-    AnthropicHaikuBackend, BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT,
-    HttpRequest, HttpResponse, OpenAiLunaBackend, RetrySleeper,
-};
+use sc_jev_backends::{AnthropicHaikuBackend, OpenAiLunaBackend};
 use serde_json::{Value, json};
 
 const PROMPT: &str = "INJECTED-EVALUATOR-PROMPT";
 const KEY: &str = "test-api-key";
 
+/// The transport and sleeper a test inspects after `judge`.
 struct Recorded {
-    posts: Mutex<Vec<HttpRequest>>,
-    replies: Mutex<Vec<HttpResponse>>,
-    delays: Mutex<Vec<Duration>>,
+    transport: ScriptedTransport,
+    sleeper: RecordingSleeper,
 }
 
-struct ScriptedTransport {
-    recorded: Arc<Recorded>,
-}
-
-struct ScriptedSleeper {
-    recorded: Arc<Recorded>,
-}
-
-impl ScriptedTransport {
-    fn new(replies: Vec<HttpResponse>) -> (Self, Arc<Recorded>) {
-        let recorded = Arc::new(Recorded {
-            posts: Mutex::new(Vec::new()),
-            replies: Mutex::new(replies),
-            delays: Mutex::new(Vec::new()),
-        });
-        (
-            Self {
-                recorded: Arc::clone(&recorded),
-            },
-            recorded,
-        )
+impl Recorded {
+    fn delays(&self) -> Vec<Duration> {
+        self.sleeper.waits()
     }
 }
 
-impl BackendTransport for ScriptedTransport {
-    fn send(&self, mut request: HttpRequest) -> Result<HttpResponse, JevError> {
-        // The sending transport is the only reader of the sealed key.
-        request.install_auth();
-        // The last queued reply is the next response.
-        self.recorded.posts.lock().expect("posts").push(request);
-        self.recorded
-            .replies
-            .lock()
-            .expect("replies")
-            .pop()
-            .ok_or_else(|| JevError::network(NetworkErrorKind::Connect, "script exhausted"))
-    }
+/// Replies are listed last-first: the last entry answers the first send.
+fn script(mut replies: Vec<HttpResponse>) -> ScriptedTransport {
+    replies.reverse();
+    ScriptedTransport::responses(replies)
 }
 
-impl RetrySleeper for ScriptedSleeper {
-    fn wait(&self, delay: Duration) {
-        self.recorded.delays.lock().expect("delays").push(delay);
-    }
+/// Zero-jitter test hooks, so waits are exact.
+fn policy() -> (BusyPolicy, RecordingSleeper) {
+    let clock = FakeClock::new();
+    let sleeper = RecordingSleeper::new(clock.clone());
+    (
+        BusyPolicy::with_test_hooks(clock, sleeper.clone(), Duration::ZERO),
+        sleeper,
+    )
 }
 
 fn response(status: u16, headers: Vec<(&str, &str)>, body: Value) -> HttpResponse {
-    HttpResponse {
+    text_response(
         status,
-        headers: headers
-            .into_iter()
-            .map(|(name, value)| (name.to_owned(), value.to_owned()))
-            .collect(),
-        body: serde_json::to_vec(&body).expect("json"),
-    }
+        headers,
+        &serde_json::to_string(&body).expect("json"),
+    )
 }
 
 fn text_response(status: u16, headers: Vec<(&str, &str)>, body: &str) -> HttpResponse {
-    HttpResponse {
+    HttpResponse::new(
         status,
-        headers: headers
+        headers
             .into_iter()
             .map(|(name, value)| (name.to_owned(), value.to_owned()))
             .collect(),
-        body: body.as_bytes().to_vec(),
-    }
+        body.as_bytes().to_vec(),
+    )
 }
 
 fn count_reply(tokens: i64) -> HttpResponse {
@@ -166,81 +140,76 @@ fn credential() -> ResolvedApiKey {
     ResolvedApiKey::try_new(BackendKeyId::Anthropic, KEY.to_owned()).expect("key")
 }
 
-/// Largest jitter the busy-retry policy adds to a wait.
-const JITTER_MAX: Duration = Duration::from_millis(250);
-
-/// Asserts each recorded wait is `expected` plus at most the policy jitter.
-fn assert_waits(actual: &[Duration], expected: &[Duration]) {
-    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
-    for (got, want) in actual.iter().zip(expected) {
-        assert!(
-            *got >= *want && *got <= *want + JITTER_MAX,
-            "{actual:?} vs {expected:?}"
-        );
-    }
+fn haiku(replies: Vec<HttpResponse>) -> (AnthropicHaikuBackend<ScriptedTransport>, Recorded) {
+    let transport = script(replies);
+    let (policy, sleeper) = policy();
+    let backend =
+        AnthropicHaikuBackend::new(credential(), transport.clone()).with_busy_policy(policy);
+    (backend, Recorded { transport, sleeper })
 }
 
-fn haiku(replies: Vec<HttpResponse>) -> (AnthropicHaikuBackend, Arc<Recorded>) {
-    let (transport, recorded) = ScriptedTransport::new(replies);
-    let sleeper = ScriptedSleeper {
-        recorded: Arc::clone(&recorded),
-    };
-    let backend = AnthropicHaikuBackend::new(credential(), transport).with_retry_sleeper(sleeper);
-    (backend, recorded)
-}
-
-fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend, Arc<Recorded>) {
-    let (transport, recorded) = ScriptedTransport::new(replies);
-    let sleeper = ScriptedSleeper {
-        recorded: Arc::clone(&recorded),
-    };
-    let backend = OpenAiLunaBackend::new(credential(), transport).with_retry_sleeper(sleeper);
-    (backend, recorded)
+fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend<ScriptedTransport>, Recorded) {
+    let transport = script(replies);
+    let (policy, sleeper) = policy();
+    let backend = OpenAiLunaBackend::new(credential(), transport.clone()).with_busy_policy(policy);
+    (backend, Recorded { transport, sleeper })
 }
 
 /// The constructors are infallible (ADR-SAG-0020 r-1 amendment); the ids
 /// come from the provider and the default transports exist.
 #[test]
 fn llm_backend_constructors_are_infallible() {
-    let (transport, _) = ScriptedTransport::new(Vec::new());
     assert_eq!(
-        AnthropicHaikuBackend::new(credential(), transport).id(),
+        AnthropicHaikuBackend::new(credential(), script(Vec::new())).id(),
         BackendId::AnthropicHaiku
     );
-    let (transport, _) = ScriptedTransport::new(Vec::new());
     assert_eq!(
-        OpenAiLunaBackend::new(credential(), transport).id(),
+        OpenAiLunaBackend::new(credential(), script(Vec::new())).id(),
         BackendId::OpenAiLuna
     );
     assert_eq!(
         OpenAiLunaBackend::with_default_transport(credential()).id(),
         BackendId::OpenAiLuna
     );
+    assert_eq!(
+        AnthropicHaikuBackend::with_default_transport(credential()).id(),
+        BackendId::AnthropicHaiku
+    );
 }
 
 fn posts(recorded: &Recorded) -> Vec<HttpRequest> {
-    recorded.posts.lock().expect("posts").clone()
+    recorded.transport.requests()
 }
 
 fn body_json(request: &HttpRequest) -> Value {
-    serde_json::from_slice(&request.body).expect("request json")
+    serde_json::from_slice(request.body()).expect("request json")
+}
+
+fn url(request: &HttpRequest) -> &str {
+    request.endpoint().as_str()
 }
 
 fn header<'a>(request: &'a HttpRequest, name: &str) -> &'a str {
     request
-        .headers
+        .headers()
         .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .find(|(key, _)| key.as_str().eq_ignore_ascii_case(name))
         .map(|(_, value)| value.as_str())
         .unwrap_or("")
 }
 
-fn assert_default_timeouts(request: &HttpRequest) {
-    assert_eq!(request.method, "POST");
-    assert_eq!(request.connect_timeout, DEFAULT_CONNECT_TIMEOUT);
-    assert_eq!(request.request_timeout, DEFAULT_REQUEST_TIMEOUT);
-    assert_eq!(DEFAULT_CONNECT_TIMEOUT, Duration::from_secs(10));
-    assert_eq!(DEFAULT_REQUEST_TIMEOUT, Duration::from_secs(120));
+/// The credential header: its name, its redacted form, and the key it holds.
+fn assert_secret(request: &HttpRequest, name: &str, redacted: &str) {
+    let secret = request.secret().expect("secret header");
+    assert!(secret.name().as_str().eq_ignore_ascii_case(name));
+    assert_eq!(secret.redacted(), redacted);
+    assert!(secret.matches(KEY));
+    assert_eq!(header(request, name), "", "the key is not a plain header");
+}
+
+fn assert_post(request: &HttpRequest) {
+    assert_eq!(request.method().as_str(), "POST");
+    assert!(request.endpoint().is_https());
 }
 
 fn assert_outcome_fields(outcome: &JudgeOutcome, backend: BackendId) {
@@ -271,14 +240,14 @@ fn test_haiku_request_embeds_canonical_payload() {
     let outcome = backend.judge(&request).expect("judge");
     let seen = posts(&recorded);
     assert_eq!(seen.len(), 2);
-    assert_default_timeouts(&seen[0]);
-    assert_default_timeouts(&seen[1]);
+    assert_post(&seen[0]);
+    assert_post(&seen[1]);
     assert_eq!(
-        seen[0].url,
+        url(&seen[0]),
         "https://api.anthropic.com/v1/messages/count_tokens"
     );
-    assert_eq!(seen[1].url, "https://api.anthropic.com/v1/messages");
-    assert_eq!(header(&seen[1], "x-api-key"), KEY);
+    assert_eq!(url(&seen[1]), "https://api.anthropic.com/v1/messages");
+    assert_secret(&seen[1], "x-api-key", "x-api-key: [redacted]");
     assert_eq!(header(&seen[1], "anthropic-version"), "2026-10-21");
     assert_eq!(header(&seen[1], "content-type"), "application/json");
 
@@ -349,15 +318,16 @@ fn test_luna_token_count_wire_before_judge() {
     let seen = posts(&recorded);
     assert_eq!(seen.len(), 2);
     assert_eq!(
-        seen[0].url,
+        url(&seen[0]),
         "https://api.openai.com/v1/responses/input_tokens"
     );
-    assert_eq!(seen[1].url, "https://api.openai.com/v1/responses");
-    assert_eq!(header(&seen[0], "authorization"), format!("Bearer {KEY}"));
-    assert_eq!(header(&seen[1], "authorization"), format!("Bearer {KEY}"));
-    assert_eq!(seen[0].body, seen[1].body);
-    assert_default_timeouts(&seen[0]);
-    assert_default_timeouts(&seen[1]);
+    assert_eq!(url(&seen[1]), "https://api.openai.com/v1/responses");
+    for request in &seen {
+        assert_secret(request, "authorization", "Authorization: Bearer [redacted]");
+    }
+    assert_eq!(seen[0].body(), seen[1].body());
+    assert_post(&seen[0]);
+    assert_post(&seen[1]);
     let body = body_json(&seen[1]);
     assert_eq!(
         body.as_object().expect("object").keys().collect::<Vec<_>>(),
@@ -416,7 +386,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     assert_ne!(alpha["system"], beta["system"]);
     assert_eq!(alpha["system"], "prompt-alpha");
     assert_eq!(beta["system"], "prompt-beta");
-    assert_ne!(first.payload().sha256(), &Sha256Digest::of(&seen[1].body));
+    assert_ne!(first.payload().sha256(), &Sha256Digest::of(seen[1].body()));
 }
 
 #[test]
@@ -520,21 +490,23 @@ fn test_llm_busy_retry_same_body() {
     backend.judge(&standard_request(PROMPT)).expect("retried");
     let seen = posts(&recorded);
     assert_eq!(seen.len(), 5);
-    assert!(seen[0].url.ends_with("/count_tokens"));
-    assert!(seen[1].url.ends_with("/count_tokens"));
-    assert_eq!(seen[0].body, seen[1].body);
-    assert!(seen[2].url.ends_with("/v1/messages"));
-    assert_eq!(seen[2].body, seen[3].body);
-    assert_eq!(seen[3].body, seen[4].body);
-    assert_ne!(seen[0].body, seen[2].body);
-    let delays = recorded.delays.lock().expect("delays").clone();
-    assert_waits(
-        &delays,
-        &[
+    assert!(url(&seen[0]).ends_with("/count_tokens"));
+    assert!(url(&seen[1]).ends_with("/count_tokens"));
+    assert_eq!(seen[0].body(), seen[1].body());
+    assert!(url(&seen[2]).ends_with("/v1/messages"));
+    assert_eq!(seen[2].body(), seen[3].body());
+    assert_eq!(seen[3].body(), seen[4].body());
+    assert_ne!(seen[0].body(), seen[2].body());
+    // Count call: Retry-After 45 clamps to 30 s. Judge call: 529 without
+    // Retry-After is the first backoff (1 s); the malformed "soon" on the
+    // 502 is treated as absent, so it is the second backoff (2 s).
+    assert_eq!(
+        recorded.delays(),
+        [
             Duration::from_secs(30),
             Duration::from_secs(1),
-            Duration::from_secs(30),
-        ],
+            Duration::from_secs(2),
+        ]
     );
 }
 
@@ -554,28 +526,42 @@ fn test_llm_busy_exhausted_wording_and_decimal_retry_after() {
     assert_eq!(error.code(), "NETWORK_ERROR");
     assert_eq!(
         error.to_string(),
-        "network error: luna busy: HTTP 429 after 4 sends; retry attempts exhausted"
+        "network error: luna HTTP 429 busy; 4 sends exhausted"
     );
+    assert!(error.retryable());
     assert_eq!(posts(&recorded).len(), 4);
-    let delays = recorded.delays.lock().expect("delays").clone();
-    assert_waits(&delays, &[Duration::from_millis(1_500); 3]);
+    assert_eq!(recorded.delays(), [Duration::from_millis(1_500); 3]);
+}
+
+/// Timeouts are transport construction state (ADR-SAG-0007): the default
+/// transport uses 10 s / 120 s, and a caller passes its own `UreqTransport`.
+#[test]
+fn test_timeouts_are_transport_construction_state() {
+    assert_eq!(Timeouts::default().connect(), Duration::from_secs(10));
+    assert_eq!(Timeouts::default().request(), Duration::from_secs(120));
+    let transport = UreqTransport::new(Timeouts::new(
+        Duration::from_millis(250),
+        Duration::from_secs(3),
+    ));
+    let backend = OpenAiLunaBackend::new(credential(), transport);
+    assert_eq!(backend.id(), BackendId::OpenAiLuna);
+    assert!(!format!("{backend:?}").contains(KEY));
 }
 
 #[test]
-fn test_with_timeouts_reaches_every_request() {
-    let (transport, recorded) = ScriptedTransport::new(vec![
-        luna_message(&answer_text(), "completed", 5),
-        count_reply(5),
-    ]);
-    let backend = OpenAiLunaBackend::new(credential(), transport)
-        .with_timeouts(Duration::from_millis(250), Duration::from_secs(3));
-    backend.judge(&standard_request(PROMPT)).expect("judge");
-    let seen = posts(&recorded);
-    assert_eq!(seen.len(), 2);
-    for request in &seen {
-        assert_eq!(request.connect_timeout, Duration::from_millis(250));
-        assert_eq!(request.request_timeout, Duration::from_secs(3));
-    }
+fn test_llm_non_2xx_detail_is_redacted() {
+    let (backend, recorded) = haiku(vec![text_response(
+        401,
+        Vec::new(),
+        &format!("invalid x-api-key {KEY}"),
+    )]);
+    let error = backend.judge(&standard_request(PROMPT)).expect_err("401");
+    assert_eq!(error.code(), "NETWORK_ERROR");
+    assert_eq!(
+        error.to_string(),
+        "network error: haiku HTTP 401: invalid x-api-key [redacted]"
+    );
+    assert_eq!(posts(&recorded).len(), 1);
 }
 
 #[test]
@@ -588,7 +574,7 @@ fn test_llm_non_busy_is_not_retried() {
     let error = backend.judge(&standard_request(PROMPT)).expect_err("400");
     assert_eq!(error.code(), "NETWORK_ERROR");
     assert_eq!(posts(&recorded).len(), 1);
-    assert!(recorded.delays.lock().expect("delays").is_empty());
+    assert!(recorded.delays().is_empty());
 }
 
 #[test]
@@ -598,7 +584,7 @@ fn test_llm_bad_token_count_does_not_send_judge() {
     assert_eq!(error.code(), "RESPONSE_INVALID");
     let seen = posts(&recorded);
     assert_eq!(seen.len(), 1);
-    assert!(seen[0].url.ends_with("/count_tokens"));
+    assert!(url(&seen[0]).ends_with("/count_tokens"));
 }
 
 #[test]
@@ -612,10 +598,7 @@ fn test_llm_missing_key_does_not_build() {
     assert!(!control.fix_hint().contains(KEY));
     let rendered = format!(
         "{:?}",
-        OpenAiLunaBackend::new(credential(), {
-            let (transport, _) = ScriptedTransport::new(Vec::new());
-            transport
-        })
+        OpenAiLunaBackend::new(credential(), script(Vec::new()))
     );
     assert!(!rendered.contains(KEY));
 }
@@ -625,6 +608,7 @@ fn backends_are_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<AnthropicHaikuBackend>();
     assert_send_sync::<OpenAiLunaBackend>();
+    assert_send_sync::<OpenAiLunaBackend<ScriptedTransport>>();
 }
 
 #[test]
@@ -651,7 +635,7 @@ fn test_provider_token_count_over_limit_does_not_send_judge() {
     assert!(error.to_string().contains("32001"));
     let seen = posts(&recorded);
     assert_eq!(seen.len(), 1);
-    assert!(seen[0].url.ends_with("/count_tokens"));
+    assert!(url(&seen[0]).ends_with("/count_tokens"));
 }
 
 #[test]

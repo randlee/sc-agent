@@ -57,11 +57,20 @@
       "verify_registry_visibility": true
     },
     {
+      "artifact": "sc-agent-http",
+      "package": "sc-agent-http",
+      "cargo_toml": "crates/sc-agent-http/Cargo.toml",
+      "publish": true,
+      "publish_order": 3,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
       "artifact": "sc-jev",
       "package": "sc-jev",
       "cargo_toml": "crates/sc-jev/Cargo.toml",
       "publish": true,
-      "publish_order": 3,
+      "publish_order": 4,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -70,7 +79,7 @@
       "package": "sc-jev-backends",
       "cargo_toml": "crates/sc-jev-backends/Cargo.toml",
       "publish": true,
-      "publish_order": 4,
+      "publish_order": 5,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -79,7 +88,7 @@
       "package": "sc-jev-check",
       "cargo_toml": "crates/sc-jev-check/Cargo.toml",
       "publish": true,
-      "publish_order": 5,
+      "publish_order": 6,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -88,7 +97,7 @@
       "package": "sc-treesitter",
       "cargo_toml": "crates/sc-treesitter/Cargo.toml",
       "publish": true,
-      "publish_order": 6,
+      "publish_order": 7,
       "wait_after_publish_seconds": 0
     },
     {
@@ -96,7 +105,7 @@
       "package": "sc-ai",
       "cargo_toml": "crates/sc-ai/Cargo.toml",
       "publish": true,
-      "publish_order": 7,
+      "publish_order": 8,
       "wait_after_publish_seconds": 0
     }
   ],

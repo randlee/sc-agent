@@ -36,10 +36,10 @@ command = ["just", "test-python"]
 
 [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
 dependency = "ureq"
-allowed_manifest_paths = ["crates/sc-jev/Cargo.toml", "crates/sc-jev-backends/Cargo.toml"]
-allowed_source_roots = ["crates/sc-jev", "crates/sc-jev-backends"]
-manifest_message = "Only the two HTTP backends (sc-jev, sc-jev-backends) may depend on ureq; sc-ai, sc-jev-check, sc-treesitter, sc-agent-types and sc-agent-secrets stay HTTP-free (ADR-SAG-0010, RBQA-F002)."
-source_message = "Only the two HTTP backends (sc-jev, sc-jev-backends) may depend on ureq; sc-ai, sc-jev-check, sc-treesitter, sc-agent-types and sc-agent-secrets stay HTTP-free (ADR-SAG-0010, RBQA-F002)."
+allowed_manifest_paths = ["crates/sc-agent-http/Cargo.toml"]
+allowed_source_roots = ["crates/sc-agent-http"]
+manifest_message = "Only sc-agent-http may depend on ureq (ADR-SAG-0026 HTTP half, r-3); sc-jev and sc-jev-backends are wire-format crates on sc-agent-http, and every other crate stays HTTP-free (ADR-SAG-0010, RBQA-F002)."
+source_message = "Only sc-agent-http may depend on ureq (ADR-SAG-0026 HTTP half, r-3); sc-jev and sc-jev-backends are wire-format crates on sc-agent-http, and every other crate stays HTTP-free (ADR-SAG-0010, RBQA-F002)."
 
 [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
 dependency = "pyo3"
