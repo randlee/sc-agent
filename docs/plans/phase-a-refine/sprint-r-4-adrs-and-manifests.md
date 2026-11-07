@@ -1,7 +1,7 @@
 ---
 id: r-4
 phase: r
-status: in-review
+status: in-review # open row: req:REQ-SAG-0133 upstream issue URL (owner deferral, see Implementation notes)
 closure_type: contract
 target_boundary: release
 track: release
@@ -267,3 +267,15 @@ for the Scoop multi-shim limit.
   ADR-SAG-0017 r-4 amendment and `docs/development/sc-publish.md` keep the
   "not yet filed" placeholder, and this doc stays `status: in-review` until
   the URL is recorded or the owner waives the row.
+
+### Deferral — upstream sc-publish issue URL (REQ-SAG-0133, QA-2 REQ-QA-R4-002)
+
+Filing the issue in `randlee/sc-publish` is an external write the orchestration
+agents are not permitted to perform (denied twice by the permission classifier,
+developer and parent). Recorded as an explicit orchestrator deferral so the sprint
+can merge: the owner files the issue from
+`.cursor/phase-a-orchestration/wave7-dev/sc-publish-multi-shim-issue-draft.md`
+and records its URL in the ADR-SAG-0017 r-4 amendment and
+`docs/development/sc-publish.md` in a one-line docs commit, then flips this doc to
+`status: complete`. Tracking bead: `agt-scoop-multi-shim`. Everything else in the
+sprint is delivered and QA-2 PASS (arch-qa, rust-qa, flaky-test-qa).
