@@ -104,8 +104,9 @@ ARCH-001 (phase-end), RBP-F001 (a-9), ARCH-002 (phase-end), ARCH-006
    script), lists every `=` requirement in any `Cargo.toml`, and fails on any
    name not on the list (consumer: CI; prevents the a-9 drift ARCH-001
    observed; retired never — it is the NFR's test). `--self-test` injects an
-   unlisted `=` and expects failure. r-4 deletes the `sc-lint.toml`
-   `sc-observability-types` ownership record (no user remains after r-1).
+   unlisted `=` and expects failure. The `sc-lint.toml`
+   `sc-observability-types` ownership record was deleted by r-1, together
+   with the dependency (coordinated in the QA-1 fix round, QA-001).
 2. **Allocator and `cli` feature.** `sc-treesitter`:
    `default = ["cli", "python", "rust"]`; `sc-ai`: `default = ["cli"]`; in
    both `cli = ["dep:mimalloc", "dep:clap"]`,
@@ -217,17 +218,16 @@ for the Scoop multi-shim limit.
 ## Implementation notes (QA-1 fix round, PR 21)
 
 - **Transitional lockstep entry** (REQ-QA-R4-001, RSH-001, RBP-F001,
-  QA-002). Until r-1 merges, the root `sc-observability-types = "=1.5.0"`
-  entry is still present, so the ADR-SAG-0023 list carries
-  `sc-observability-types (transitional; ...)` and `check-exact-pins.sh`
-  and CI job `deps` are green on this branch. When r-4 rebases onto r-1, the
-  entry is removed in the same commit that re-runs the gates, which restores
-  the end state this doc's acceptance row names (`sc-observability-types`
-  absent).
-- **`sc-observability-types` ownership record kept** (QA-001). D1's
-  deletion of the `sc-lint.toml` record is reverted until the dependency is
-  gone: r-1 deletes the record in the same change that deletes the
-  dependency, so no window exists where a user is unguarded.
+  QA-002), resolved. Until r-1 merged, the ADR-SAG-0023 list carried a
+  transitional `sc-observability-types` entry so the branch was green. After
+  merging `integrate/phase-a` (r-1, PR 22), the entry and its bullet text
+  were removed in the commit that re-ran the gates; `check-exact-pins.sh`
+  passes with 4 pins and `sc-observability-types` is absent, as the
+  acceptance row requires.
+- **`sc-observability-types` ownership record** (QA-001), resolved. r-4
+  kept the record until the dependency was gone; r-1 deleted the record
+  with the dependency, and the merge keeps that deletion. r-4 no longer
+  deletes it.
 - **CLI tests cannot be skipped silently** (FTQ-002). CI job `features` runs
   `cargo test -p sc-treesitter --test cli --features cli` and the same for
   `sc-ai`; cargo fails if the target or the feature is renamed or dropped.
