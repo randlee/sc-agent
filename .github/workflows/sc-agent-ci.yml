@@ -7,6 +7,7 @@
 #             and cargo test (all three OSes)
 #   python    just test-python (maturin develop + jev-python pytest)
 #   features  cargo hack --each-feature test -p sc-treesitter;
+#             cargo test --test cli --features cli for sc-treesitter and sc-ai;
 #             cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps
 #   deps      cargo build --lib --no-default-features for sc-treesitter and
 #             sc-ai; .github/scripts/cargo-tree-gates.sh (REQ-SAG-0134);
@@ -205,6 +206,18 @@ jobs:
       - name: cargo hack --each-feature test -p sc-treesitter
         timeout-minutes: 20
         run: cargo hack --each-feature test -p sc-treesitter
+
+      # The `cli` test targets are gated on `required-features = ["cli"]`, so
+      # the hack cells without `cli` skip them on purpose. Naming the feature
+      # here makes cargo fail if the target or the feature is renamed or
+      # dropped, instead of silently skipping the CLI tests.
+      - name: cargo test -p sc-treesitter --test cli --features cli
+        timeout-minutes: 15
+        run: cargo test --locked -p sc-treesitter --test cli --features cli
+
+      - name: cargo test -p sc-ai --test cli --features cli
+        timeout-minutes: 15
+        run: cargo test --locked -p sc-ai --test cli --features cli
 
       - name: cargo hack check -p sc-agent-types --feature-powerset
         timeout-minutes: 20

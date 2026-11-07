@@ -223,3 +223,10 @@ for the Scoop multi-shim limit.
   deletion of the `sc-lint.toml` record is reverted until the dependency is
   gone: r-1 deletes the record in the same change that deletes the
   dependency, so no window exists where a user is unguarded.
+- **CLI tests cannot be skipped silently** (FTQ-002). CI job `features` runs
+  `cargo test -p sc-treesitter --test cli --features cli` and the same for
+  `sc-ai`; cargo fails if the target or the feature is renamed or dropped.
+  The skip of `tests/cli.rs` in the `cargo hack --each-feature` cells
+  without `cli` is deliberate (`required-features = ["cli"]`). That sentence
+  belongs in `docs/development/ci.md`, which is outside r-4's
+  `owned_paths`, so it is recorded here and in the PR body instead.
