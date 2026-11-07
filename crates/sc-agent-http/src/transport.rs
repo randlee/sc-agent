@@ -12,7 +12,8 @@ use crate::request::{HttpRequest, HttpResponse};
 /// construction, and tests supply their own. Object-safe and `Send + Sync`.
 ///
 /// Calling `send` directly bypasses busy retry **and** redaction. Production
-/// code calls only [`send_with_busy_retry`](crate::send_with_busy_retry),
+/// code calls only [`send_and_parse`](crate::send_and_parse) (built on
+/// [`send_with_busy_retry`](crate::send_with_busy_retry)),
 /// which adds both. A transport other than
 /// [`UreqTransport`](crate::UreqTransport) cannot read the key in
 /// [`HttpRequest::secret`]; it sees only the header name,

@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use sc_agent_http::test_util::{FakeClock, RecordingSleeper, ScriptedTransport};
 use sc_agent_http::{
-    BusyPolicy, Endpoint, HttpRequest, HttpResponse, Method, SecretHeader, send_with_busy_retry,
+    BusyPolicy, Endpoint, HttpClient, HttpRequest, HttpResponse, Method, SecretHeader,
+    send_and_parse, send_with_busy_retry,
 };
 use sc_agent_types::{BackendKeyId, CancelToken, JevError, NetworkErrorKind, ResolvedApiKey};
 
@@ -340,4 +341,38 @@ fn test_transport_error_with_secret_is_redacted() {
     let secret = sent[0].secret().expect("secret");
     assert!(secret.matches(KEY));
     assert_eq!(secret.redacted(), "Authorization: Bearer [redacted]");
+}
+
+/// `send_and_parse` redacts the parse closure's error as well, and retries
+/// busy replies before the closure runs (RBP-F007).
+#[test]
+fn test_send_and_parse_redacts_parse_errors() {
+    let hooks = fake(Duration::ZERO);
+    let transport = ScriptedTransport::responses(vec![
+        busy(429, None),
+        HttpResponse::new(200, Vec::new(), format!("echo {KEY}").into_bytes()),
+    ]);
+    let error = send_and_parse(
+        &transport,
+        &request(),
+        &hooks.policy,
+        &CancelToken::new(),
+        |response| -> Result<(), JevError> {
+            Err(JevError::response_invalid(
+                String::from_utf8_lossy(response.body()).into_owned(),
+            ))
+        },
+    )
+    .expect_err("parse error");
+    assert_eq!(error.to_string(), "response is invalid: echo [redacted]");
+    assert_eq!(transport.sends(), 2);
+    assert_eq!(hooks.sleeper.waits(), [secs(1.0)]);
+
+    let client = HttpClient::new(ScriptedTransport::responses(vec![ok()]))
+        .with_busy_policy(fake(Duration::ZERO).policy);
+    let status = client
+        .send_and_parse(&request(), |response| Ok(response.status()))
+        .expect("ok");
+    assert_eq!(status, 200);
+    assert_eq!(client.transport().sends(), 1);
 }

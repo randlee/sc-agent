@@ -19,7 +19,7 @@ owner_crate_path = "sc_agent_http"
 name = "agent-http"
 
 [public]
-facade = "sc_agent_http::HttpRequest, sc_agent_http::HttpResponse, sc_agent_http::Method, sc_agent_http::Endpoint, sc_agent_http::HeaderName, sc_agent_http::SecretHeader, sc_agent_http::Transport, sc_agent_http::Timeouts, sc_agent_http::UreqTransport, sc_agent_http::BusyPolicy, sc_agent_http::send_with_busy_retry, sc_agent_http::redact, sc_agent_http::test_util"
+facade = "sc_agent_http::HttpRequest, sc_agent_http::HttpResponse, sc_agent_http::Method, sc_agent_http::Endpoint, sc_agent_http::HeaderName, sc_agent_http::SecretHeader, sc_agent_http::Transport, sc_agent_http::Timeouts, sc_agent_http::UreqTransport, sc_agent_http::BusyPolicy, sc_agent_http::HttpClient, sc_agent_http::send_and_parse, sc_agent_http::send_with_busy_retry, sc_agent_http::redact, sc_agent_http::test_util"
 notes = "Single HTTP layer and the single ResolvedApiKey::as_str call site (src/ureq_transport.rs, private module, #[expect(clippy::disallowed_methods, reason = ...)]). No ureq type in any pub signature (cargo doc check). Carries bytes only: Jev API semantics stay in sc-jev (ADR-SAG-0012). Depends on sc-agent-types with default-features = false, features = [secret]; jitter from std, URL parsing via ureq's re-exported http::Uri inside the private module (no rand, no url crate). Non-default feature test-util (BusyPolicy::with_test_hooks, Endpoint::loopback_http, UreqTransport::loopback_for_tests, test_util::{FakeClock, RecordingSleeper, ScriptedTransport, RecordingTransport}) is enabled only by dev-dependencies and --features test-util."
 
 [implementation]

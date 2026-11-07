@@ -18,7 +18,7 @@ All modules are private; the crate root re-exports the public items, plus the
 | `request` | `HttpRequest`, `HttpResponse`, `Method`, `HeaderName`, `SecretHeader`, `Endpoint` | Values with private fields, constructors and accessors. `HttpRequest::new(method, endpoint, body: Arc<[u8]>)`, `with_header`, `with_secret`; `HttpResponse::new(status, headers, body)`, `status`, `header` (case-insensitive), `body`, `into_body`. `HeaderName` is a `&'static str` RFC 9110 token (`const fn new`). `Endpoint::parse` accepts only `https://` URLs |
 | `transport` | `Transport`, `Timeouts` | The open transport trait; connect and request deadlines (10 s / 120 s default) |
 | `ureq_transport` | `UreqTransport` | The production transport and the single secret read site |
-| `retry` | `BusyPolicy`, `send_with_busy_retry` | Busy retry with the decided numbers and the cancel hook |
+| `retry` | `BusyPolicy`, `send_with_busy_retry`, `send_and_parse`, `HttpClient` | Busy retry with the decided numbers and the cancel hook; the one exchange (send, retry, parse, redact) and the transport + policy + token state every backend holds |
 | `redact` | `redact` | Removes the request's secret from every text field of an error |
 | `test_util` (`test-util`) | `FakeClock`, `RecordingSleeper`, `ScriptedTransport`, `RecordingTransport` | Doubles for this crate's and the backend crates' tests |
 
@@ -29,7 +29,7 @@ once. Every HTTP status is `Ok`; connection, send, read and timeout failures
 are `NETWORK_ERROR` with a `NetworkErrorKind`; a body over the cap is
 `RESPONSE_INVALID`. The trait is open (ADR-SAG-0006) and object-safe, with
 blanket impls for `&T` and `Arc<T>`. A direct `send` caller bypasses busy
-retry **and** redaction; production code calls only `send_with_busy_retry`.
+retry **and** redaction; production code calls only `send_and_parse` (which wraps `send_with_busy_retry`).
 A transport other than `UreqTransport` cannot read the key: it sees
 `SecretHeader::name`, `redacted` and `matches` only.
 
@@ -55,13 +55,19 @@ constrained.
 
 ## Redaction rule
 
+Backends call `send_and_parse(transport, &request, &policy, &cancel, parse)`
+(or `HttpClient::send_and_parse(&request, parse)`), which runs
+`send_with_busy_retry` and then `parse(response)`, and redacts `parse`'s
+error against the same request (RBP-F007). The backend's non-200 mapping and
+reply parser live inside `parse`, so no call site redacts by hand; the
+backend adds only its provider label (`Jev …`, `haiku …`) afterwards.
+
 `send_with_busy_retry` passes every `Err` it returns — the busy and cancel
 errors it builds and every error a transport returns, third-party transports
 included, whatever the variant — through `redact` exactly once.
 `redact(error, &request)` uses `ResolvedApiKey::redact_error`, which maps
 every text field, so a header echo or body excerpt containing the key becomes
-`[redacted]`. Backends use the same `redact` for errors they build from a
-response (non-2xx snippets, reply-parse errors).
+`[redacted]`.
 
 ## Busy retry and cancel latency
 

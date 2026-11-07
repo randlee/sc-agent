@@ -246,6 +246,141 @@ pub fn send_with_busy_retry(
     retry_loop(transport, request, policy, cancel).map_err(|error| redact(error, request))
 }
 
+/// Sends `request` like [`send_with_busy_retry`], then runs `parse` on the
+/// response, redacting `parse`'s error too.
+///
+/// This is the one exchange every backend uses: transport, retry and
+/// response-mapping errors all leave through [`redact`](crate::redact())
+/// against `request`, so a call site cannot forget to redact a reply-parse
+/// error that echoes the key. `parse` sees every non-busy response, whatever
+/// its status, and maps non-2xx statuses itself.
+///
+/// # Errors
+///
+/// Every error of [`send_with_busy_retry`], and every error `parse`
+/// returns, with the request's secret removed.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Arc;
+///
+/// use sc_agent_http::{
+///     BusyPolicy, Endpoint, HttpRequest, HttpResponse, Method, Transport, send_and_parse,
+/// };
+/// use sc_agent_types::{CancelToken, JevError};
+///
+/// struct Teapot;
+///
+/// impl Transport for Teapot {
+///     fn send(&self, _request: &HttpRequest) -> Result<HttpResponse, JevError> {
+///         Ok(HttpResponse::new(418, Vec::new(), Vec::new()))
+///     }
+/// }
+///
+/// let request = HttpRequest::new(
+///     Method::Post,
+///     Endpoint::parse("https://api.example.test/v1/x")?,
+///     Arc::from(&b"{}"[..]),
+/// );
+/// let status = send_and_parse(
+///     &Teapot,
+///     &request,
+///     &BusyPolicy::default(),
+///     &CancelToken::new(),
+///     |response| Ok(response.status()),
+/// )?;
+/// assert_eq!(status, 418);
+/// # Ok::<(), JevError>(())
+/// ```
+pub fn send_and_parse<R>(
+    transport: &dyn Transport,
+    request: &HttpRequest,
+    policy: &BusyPolicy,
+    cancel: &CancelToken,
+    parse: impl FnOnce(HttpResponse) -> Result<R, JevError>,
+) -> Result<R, JevError> {
+    let response = send_with_busy_retry(transport, request, policy, cancel)?;
+    parse(response).map_err(|error| redact(error, request))
+}
+
+/// A transport with its busy policy and cancel token: the HTTP state every
+/// backend holds.
+///
+/// Backends keep one `HttpClient` and forward their `with_busy_policy` /
+/// `with_cancel` builders to it, so the state and the exchange
+/// ([`HttpClient::send_and_parse`]) are written once.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_http::{BusyPolicy, HttpClient, Timeouts, UreqTransport};
+/// use sc_agent_types::CancelToken;
+///
+/// let client = HttpClient::new(UreqTransport::new(Timeouts::default()))
+///     .with_busy_policy(BusyPolicy::new(2))
+///     .with_cancel(CancelToken::new());
+/// assert_eq!(client.busy_policy().max_sends(), 2);
+/// ```
+#[derive(Debug, Clone)]
+pub struct HttpClient<T> {
+    transport: T,
+    policy: BusyPolicy,
+    cancel: CancelToken,
+}
+
+impl<T: Transport> HttpClient<T> {
+    /// `transport` with [`BusyPolicy::default`] and a token that is never
+    /// cancelled.
+    #[must_use]
+    pub fn new(transport: T) -> Self {
+        Self {
+            transport,
+            policy: BusyPolicy::default(),
+            cancel: CancelToken::new(),
+        }
+    }
+
+    /// Replaces the busy policy.
+    #[must_use]
+    pub fn with_busy_policy(mut self, policy: BusyPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// Replaces the cancel token.
+    #[must_use]
+    pub fn with_cancel(mut self, cancel: CancelToken) -> Self {
+        self.cancel = cancel;
+        self
+    }
+
+    /// The busy policy.
+    #[must_use]
+    pub fn busy_policy(&self) -> &BusyPolicy {
+        &self.policy
+    }
+
+    /// The transport.
+    #[must_use]
+    pub fn transport(&self) -> &T {
+        &self.transport
+    }
+
+    /// [`send_and_parse`] with this client's transport, policy and token.
+    ///
+    /// # Errors
+    ///
+    /// As [`send_and_parse`].
+    pub fn send_and_parse<R>(
+        &self,
+        request: &HttpRequest,
+        parse: impl FnOnce(HttpResponse) -> Result<R, JevError>,
+    ) -> Result<R, JevError> {
+        send_and_parse(&self.transport, request, &self.policy, &self.cancel, parse)
+    }
+}
+
 fn retry_loop(
     transport: &dyn Transport,
     request: &HttpRequest,

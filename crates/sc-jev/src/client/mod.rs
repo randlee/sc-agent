@@ -9,8 +9,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use sc_agent_http::{
-    BusyPolicy, HeaderName, HttpRequest, Method, SecretHeader, Timeouts, Transport, UreqTransport,
-    redact, send_with_busy_retry,
+    BusyPolicy, HeaderName, HttpClient, HttpRequest, Method, SecretHeader, Timeouts, Transport,
+    UreqTransport,
 };
 use sc_agent_types::{
     BackendId, CancelToken, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, NetworkErrorKind,
@@ -74,9 +74,7 @@ const CONTENT_TYPE: HeaderName = HeaderName::new("Content-Type");
 pub struct JevClient<T = UreqTransport> {
     config: JevClientConfig,
     api_key: ResolvedApiKey,
-    transport: T,
-    policy: BusyPolicy,
-    cancel: CancelToken,
+    http: HttpClient<T>,
 }
 
 impl JevClient<UreqTransport> {
@@ -114,13 +112,11 @@ impl<T: Transport> JevClient<T> {
     /// [`JevClientConfig::attempts`] sends.
     #[must_use]
     pub fn with_config(config: JevClientConfig, api_key: ResolvedApiKey, transport: T) -> Self {
-        let policy = BusyPolicy::new(config.attempts());
+        let http = HttpClient::new(transport).with_busy_policy(BusyPolicy::new(config.attempts()));
         Self {
             config,
             api_key,
-            transport,
-            policy,
-            cancel: CancelToken::new(),
+            http,
         }
     }
 
@@ -130,7 +126,7 @@ impl<T: Transport> JevClient<T> {
     /// `sc-agent-http/test-util`) so nothing sleeps.
     #[must_use]
     pub fn with_busy_policy(mut self, policy: BusyPolicy) -> Self {
-        self.policy = policy;
+        self.http = self.http.with_busy_policy(policy);
         self
     }
 
@@ -141,7 +137,7 @@ impl<T: Transport> JevClient<T> {
     /// worst case is the transport's request timeout.
     #[must_use]
     pub fn with_cancel(mut self, cancel: CancelToken) -> Self {
-        self.cancel = cancel;
+        self.http = self.http.with_cancel(cancel);
         self
     }
 
@@ -169,16 +165,19 @@ impl<T: Transport> JevClient<T> {
         )
         .with_header(CONTENT_TYPE, "application/json")
         .with_secret(SecretHeader::bearer(self.api_key.clone()));
-        let response = send_with_busy_retry(&self.transport, &request, &self.policy, &self.cancel)
-            .map_err(|error| error.map_detail(|detail| format!("Jev {detail}")))?;
-        if response.status() != 200 {
-            return Err(JevError::network(
-                NetworkErrorKind::Status,
-                format!("Jev HTTP {}", response.status()),
-            ));
-        }
-        check::parse_outcome(response.body(), self.config.model(), &criteria, judged)
-            .map_err(|error| redact(error, &request))
+        // Every error, transport or reply, is redacted inside
+        // `send_and_parse` and then labelled with the backend name.
+        self.http
+            .send_and_parse(&request, |response| {
+                if response.status() != 200 {
+                    return Err(JevError::network(
+                        NetworkErrorKind::Status,
+                        format!("HTTP {}", response.status()),
+                    ));
+                }
+                check::parse_outcome(response.body(), self.config.model(), &criteria, judged)
+            })
+            .map_err(|error| error.map_detail(|detail| format!("Jev {detail}")))
     }
 }
 
@@ -197,13 +196,13 @@ impl<T: Transport> JudgeBackend for JevClient<T> {
     }
 }
 
-impl<T> fmt::Debug for JevClient<T> {
+impl<T: Transport> fmt::Debug for JevClient<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("JevClient")
             .field("config", &self.config)
             .field("api_key", &self.api_key)
-            .field("policy", &self.policy)
+            .field("policy", self.http.busy_policy())
             .finish_non_exhaustive()
     }
 }

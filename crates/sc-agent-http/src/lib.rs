@@ -19,9 +19,11 @@
 //!
 //! # Retry and redaction
 //!
-//! Production code sends through [`send_with_busy_retry`], which retries busy
-//! statuses under [`BusyPolicy`] and passes every error it returns through
-//! [`redact()`]. Calling [`Transport::send`] directly bypasses both.
+//! Production code sends through [`send_and_parse`] (or
+//! [`HttpClient::send_and_parse`]), which retries busy statuses under
+//! [`BusyPolicy`] via [`send_with_busy_retry`] and passes every error it
+//! returns, reply-parse errors included, through [`redact()`]. Calling
+//! [`Transport::send`] directly bypasses both.
 //!
 //! # Cargo features
 //!
@@ -85,7 +87,7 @@ pub use redact::redact;
 #[doc(inline)]
 pub use request::{Endpoint, HeaderName, HttpRequest, HttpResponse, Method, SecretHeader};
 #[doc(inline)]
-pub use retry::{BusyPolicy, send_with_busy_retry};
+pub use retry::{BusyPolicy, HttpClient, send_and_parse, send_with_busy_retry};
 #[doc(inline)]
 pub use transport::{Timeouts, Transport};
 #[doc(inline)]

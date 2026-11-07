@@ -16,8 +16,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use sc_agent_http::{
-    BusyPolicy, Endpoint, HttpRequest, HttpResponse, Method, Timeouts, Transport, UreqTransport,
-    redact, send_with_busy_retry,
+    BusyPolicy, Endpoint, HttpClient, HttpRequest, HttpResponse, Method, Timeouts, Transport,
+    UreqTransport,
 };
 use sc_agent_types::{
     BackendId, CancelToken, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, NetworkErrorKind,
@@ -33,9 +33,20 @@ struct Provider {
     name: &'static str,
     model: &'static str,
     host: &'static str,
-    message_path: &'static str,
-    count_path: &'static str,
+    message_endpoint: Endpoint,
+    count_endpoint: Endpoint,
     kind: ProviderKind,
+}
+
+/// `https://{host}{path}` for a compile-time provider constant.
+///
+/// # Panics
+///
+/// Panics when the constant is not an https URL: a programming bug in
+/// `wire`, caught by every backend test.
+fn constant_endpoint(host: &str, path: &str) -> Endpoint {
+    Endpoint::parse(&format!("https://{host}{path}"))
+        .expect("provider endpoint constants are https URLs")
 }
 
 impl Provider {
@@ -45,8 +56,8 @@ impl Provider {
             name: "haiku",
             model: wire::HAIKU_MODEL,
             host: wire::ANTHROPIC_HOST,
-            message_path: wire::HAIKU_MESSAGE_PATH,
-            count_path: wire::HAIKU_COUNT_PATH,
+            message_endpoint: constant_endpoint(wire::ANTHROPIC_HOST, wire::HAIKU_MESSAGE_PATH),
+            count_endpoint: constant_endpoint(wire::ANTHROPIC_HOST, wire::HAIKU_COUNT_PATH),
             kind: ProviderKind::Anthropic,
         }
     }
@@ -57,8 +68,8 @@ impl Provider {
             name: "luna",
             model: wire::LUNA_MODEL,
             host: wire::OPENAI_HOST,
-            message_path: wire::LUNA_MESSAGE_PATH,
-            count_path: wire::LUNA_COUNT_PATH,
+            message_endpoint: constant_endpoint(wire::OPENAI_HOST, wire::LUNA_MESSAGE_PATH),
+            count_endpoint: constant_endpoint(wire::OPENAI_HOST, wire::LUNA_COUNT_PATH),
             kind: ProviderKind::OpenAi,
         }
     }
@@ -96,9 +107,7 @@ fn typed_answers(
 struct Client<T> {
     provider: Provider,
     api_key: ResolvedApiKey,
-    transport: T,
-    policy: BusyPolicy,
-    cancel: CancelToken,
+    http: HttpClient<T>,
 }
 
 impl<T: Transport> Client<T> {
@@ -106,9 +115,7 @@ impl<T: Transport> Client<T> {
         Self {
             provider,
             api_key,
-            transport,
-            policy: BusyPolicy::default(),
-            cancel: CancelToken::new(),
+            http: HttpClient::new(transport),
         }
     }
 
@@ -129,20 +136,25 @@ impl<T: Transport> Client<T> {
 
     fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
         let prepared = self.prepare_checked(request)?;
-        let (counted, count_request) = self.send(self.provider.count_path, &prepared.count_body)?;
-        let prompt_tokens = wire::parse_count(self.provider.name, counted.body())
-            .map_err(|error| redact(error, &count_request))?;
+        let prompt_tokens = self.exchange(
+            &self.provider.count_endpoint,
+            &prepared.count_body,
+            |response| wire::parse_count(response.body()),
+        )?;
         validate::enforce_input_token_limit(prompt_tokens)?;
-        let (judged, judge_request) =
-            self.send(self.provider.message_path, &prepared.message_body)?;
-        let reply = wire::parse_vendor(self.provider.kind, self.provider.name, judged.body())
-            .map_err(|error| redact(error, &judge_request))?;
-        if let Some(reason) = &reply.truncation {
-            return Err(JevError::response_invalid(reason.clone()));
-        }
-        let answers = wire::parse_answers(&reply.text, &prepared.questions)
-            .and_then(typed_answers)
-            .map_err(|error| redact(error, &judge_request))?;
+        let (reply, answers) = self.exchange(
+            &self.provider.message_endpoint,
+            &prepared.message_body,
+            |response| {
+                let reply = wire::parse_vendor(self.provider.kind, response.body())?;
+                if let Some(reason) = &reply.truncation {
+                    return Err(JevError::response_invalid(reason.clone()));
+                }
+                let answers = wire::parse_answers(&reply.text, &prepared.questions)
+                    .and_then(typed_answers)?;
+                Ok((reply, answers))
+            },
+        )?;
         Ok(
             JudgeOutcome::new(self.provider.id, request, answers)?.with_provider_meta(
                 wire::provider_meta(&reply, self.provider.model, prompt_tokens),
@@ -175,45 +187,48 @@ impl<T: Transport> Client<T> {
         })
     }
 
-    /// Sends `body` to `path` with busy retry; any status but 200 is an error.
-    ///
-    /// Returns the request too, so reply-parse errors are redacted against it.
-    fn send(&self, path: &str, body: &Arc<[u8]>) -> Result<(HttpResponse, HttpRequest), JevError> {
-        let request = self.http_request(path, body)?;
-        let response = send_with_busy_retry(&self.transport, &request, &self.policy, &self.cancel)
-            .map_err(|error| {
-                error.map_detail(|detail| format!("{} {detail}", self.provider.name))
-            })?;
-        if response.status() != 200 {
-            return Err(redact(
-                http_failure(self.provider.name, &response),
-                &request,
-            ));
-        }
-        Ok((response, request))
+    /// One provider call: busy retry, any status but 200 is an error, then
+    /// `parse`. Every error is redacted inside `send_and_parse` and then
+    /// labelled with the provider name.
+    fn exchange<R>(
+        &self,
+        endpoint: &Endpoint,
+        body: &Arc<[u8]>,
+        parse: impl FnOnce(HttpResponse) -> Result<R, JevError>,
+    ) -> Result<R, JevError> {
+        let request = self.http_request(endpoint, body);
+        self.http
+            .send_and_parse(&request, |response| {
+                if response.status() != 200 {
+                    return Err(http_failure(&response));
+                }
+                parse(response)
+            })
+            .map_err(|error| error.map_detail(|detail| format!("{} {detail}", self.provider.name)))
     }
 
-    fn http_request(&self, path: &str, body: &Arc<[u8]>) -> Result<HttpRequest, JevError> {
-        let endpoint = Endpoint::parse(&format!("https://{}{path}", self.provider.host))?;
-        let request = wire::unsigned_headers(self.provider.kind).into_iter().fold(
-            HttpRequest::new(Method::Post, endpoint, Arc::clone(body)),
-            |request, (name, value)| request.with_header(name, value),
-        );
-        Ok(request.with_secret(wire::secret_header(
-            self.provider.kind,
-            self.api_key.clone(),
-        )))
+    fn http_request(&self, endpoint: &Endpoint, body: &Arc<[u8]>) -> HttpRequest {
+        wire::unsigned_headers(self.provider.kind)
+            .into_iter()
+            .fold(
+                HttpRequest::new(Method::Post, endpoint.clone(), Arc::clone(body)),
+                |request, (name, value)| request.with_header(name, value),
+            )
+            .with_secret(wire::secret_header(
+                self.provider.kind,
+                self.api_key.clone(),
+            ))
     }
 }
 
 /// `NETWORK_ERROR` kind `Status` with the first 300 bytes of the body.
-fn http_failure(provider: &str, response: &HttpResponse) -> JevError {
+fn http_failure(response: &HttpResponse) -> JevError {
     let body = response.body();
     let end = body.len().min(300);
     let snippet = String::from_utf8_lossy(&body[..end]).replace(['\n', '\r'], " ");
     JevError::network(
         NetworkErrorKind::Status,
-        format!("{provider} HTTP {}: {snippet}", response.status()),
+        format!("HTTP {}: {snippet}", response.status()),
     )
 }
 
@@ -269,7 +284,7 @@ macro_rules! llm_backend {
             /// `sc-agent-http/test-util`) so nothing sleeps.
             #[must_use]
             pub fn with_busy_policy(mut self, policy: BusyPolicy) -> Self {
-                self.client.policy = policy;
+                self.client.http = self.client.http.with_busy_policy(policy);
                 self
             }
 
@@ -278,7 +293,7 @@ macro_rules! llm_backend {
             /// seen when it returns (worst case: the request timeout).
             #[must_use]
             pub fn with_cancel(mut self, cancel: CancelToken) -> Self {
-                self.client.cancel = cancel;
+                self.client.http = self.client.http.with_cancel(cancel);
                 self
             }
         }
