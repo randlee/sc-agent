@@ -1,7 +1,7 @@
 ---
 id: r-4
 phase: r
-status: complete
+status: in-review
 closure_type: contract
 target_boundary: release
 track: release
@@ -253,3 +253,8 @@ for the Scoop multi-shim limit.
   `present` row per binary crate asserting `mimalloc` is in the default
   tree, so the absence rows cannot pass because the pattern stopped
   matching.
+- **Upstream sc-publish issue** (REQ-QA-R4-002). Filing it is an owner
+  action (the sprint agent is permission-blocked on `gh issue create`); the
+  ADR-SAG-0017 r-4 amendment and `docs/development/sc-publish.md` keep the
+  "not yet filed" placeholder, and this doc stays `status: in-review` until
+  the URL is recorded or the owner waives the row.
