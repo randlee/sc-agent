@@ -1,36 +1,28 @@
 //! Thin CLI over [`sc_treesitter`].
 //!
-//! Success writes JSON to stdout. Failure writes one `JevError` object to
-//! stderr and exits 2.
+//! Argv is parsed by [`cli::parse`] (clap). Success writes JSON (or the
+//! `--help` / `--version` text) to stdout and exits 0. Failure writes one
+//! `ScAgentErrorResponse` line to stderr and exits 2.
 
 use std::io::{self, Write};
 use std::process::ExitCode;
 
 use mimalloc::MiMalloc;
-use sc_agent_types::{JevError, Rev, ScAgentErrorResponse};
+use sc_agent_types::{JevError, ScAgentErrorResponse};
 use sc_treesitter::{
-    ExtractInput, PRODUCER_NAME, extract, languages, queries, query_source, subjects_to_json_bytes,
+    ExtractInput, extract, languages, queries, query_source, subjects_to_json_bytes,
 };
 
+use crate::cli::{Command, ExtractArgs, Parsed};
+
+mod cli;
 mod git_io;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-const HELP: &str = "\
-sc-treesitter extract --language L --query Q [--captures name,name] [--rev HEAD] <path>
-sc-treesitter languages
-sc-treesitter queries [--language L]
-sc-treesitter --version
-
-<path> is repo-relative, or absolute inside the repository. --rev HEAD reads the
-blob with `git cat-file`. --rev WORKTREE reads the working tree. A revision may
-not start with `-`. --captures is an allow-list. Execution always uses matches
-mode.
-";
-
 fn main() -> ExitCode {
-    match dispatch(std::env::args().skip(1)) {
+    match cli::parse(std::env::args_os()).and_then(run) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
                 emit(&JevError::io_failed("stdout", &error));
@@ -56,16 +48,18 @@ fn emit(error: &JevError) {
     let _ = writeln!(io::stderr(), "{line}");
 }
 
-fn dispatch(args: impl Iterator<Item = String>) -> Result<Vec<u8>, JevError> {
-    match parse(args)? {
-        Cli::Help => Ok(HELP.as_bytes().to_vec()),
-        Cli::Version => Ok(format!("{PRODUCER_NAME} {}\n", env!("CARGO_PKG_VERSION")).into_bytes()),
-        Cli::Languages => {
+fn run(parsed: Parsed) -> Result<Vec<u8>, JevError> {
+    let cli = match parsed {
+        Parsed::Print(text) => return Ok(text.into_bytes()),
+        Parsed::Run(cli) => cli,
+    };
+    match cli.command {
+        Command::Languages => {
             let ids: Vec<&str> = languages().map(|info| info.id).collect();
             json_line(&serde_json::json!(ids))
         }
-        Cli::Queries { language } => {
-            let listed = queries(language.as_deref())?;
+        Command::Queries(args) => {
+            let listed = queries(args.language.as_deref())?;
             let value: Vec<serde_json::Value> = listed
                 .iter()
                 .map(|info| {
@@ -77,31 +71,25 @@ fn dispatch(args: impl Iterator<Item = String>) -> Result<Vec<u8>, JevError> {
                 .collect();
             json_line(&serde_json::Value::Array(value))
         }
-        Cli::Extract {
-            language,
-            query,
-            captures,
-            rev,
-            path,
-        } => {
-            let query_text = query_source(&language, &query)?;
-            let blob = git_io::read_blob(&rev, &path)?;
-            let capture_refs: Vec<&str> = captures.iter().map(String::as_str).collect();
-            let allow = if captures.is_empty() {
-                None
-            } else {
-                Some(capture_refs.as_slice())
-            };
-            let document = extract(
-                &ExtractInput::new(&language, query_text, &blob.bytes)
-                    .with_captures(allow)
-                    .with_path(&blob.path)
-                    .with_rev(rev.as_str())
-                    .with_blob_sha(&blob.sha),
-            )?;
-            subjects_to_json_bytes(&document)
-        }
+        Command::Extract(args) => run_extract(&args),
     }
+}
+
+fn run_extract(args: &ExtractArgs) -> Result<Vec<u8>, JevError> {
+    let query_text = query_source(&args.language, &args.query)?;
+    let blob = git_io::read_blob(&args.rev, &args.path)?;
+    let capture_refs: Option<Vec<&str>> = args
+        .captures
+        .as_ref()
+        .map(|captures| captures.names().collect());
+    let document = extract(
+        &ExtractInput::new(&args.language, query_text, &blob.bytes)
+            .with_captures(capture_refs.as_deref())
+            .with_path(blob.path.as_str())
+            .with_rev(args.rev.as_str())
+            .with_blob_sha(blob.sha.as_str()),
+    )?;
+    subjects_to_json_bytes(&document)
 }
 
 fn json_line(value: &serde_json::Value) -> Result<Vec<u8>, JevError> {
@@ -109,168 +97,4 @@ fn json_line(value: &serde_json::Value) -> Result<Vec<u8>, JevError> {
         .map_err(|error| JevError::encode_failed("listing JSON", &error))?;
     bytes.push(b'\n');
     Ok(bytes)
-}
-
-enum Cli {
-    Help,
-    Version,
-    Languages,
-    Queries {
-        language: Option<String>,
-    },
-    Extract {
-        language: String,
-        query: String,
-        captures: Vec<String>,
-        rev: Rev,
-        path: String,
-    },
-}
-
-fn parse(args: impl Iterator<Item = String>) -> Result<Cli, JevError> {
-    let args: Vec<String> = args.collect();
-    // `--help` counts only as the command or the first argument after it, so
-    // a value such as a path named `-h` later on is not swallowed.
-    let is_help = |arg: &String| arg == "--help" || arg == "-h";
-    if args.is_empty() || args.iter().take(2).any(is_help) {
-        return Ok(Cli::Help);
-    }
-    match args[0].as_str() {
-        "help" => Ok(Cli::Help),
-        "--version" | "-V" => {
-            if args.len() != 1 {
-                return Err(JevError::input_invalid("--version does not take arguments"));
-            }
-            Ok(Cli::Version)
-        }
-        "languages" => {
-            if args.len() != 1 {
-                return Err(JevError::input_invalid("languages does not take arguments"));
-            }
-            Ok(Cli::Languages)
-        }
-        "queries" => parse_queries(&args[1..]),
-        "extract" => parse_extract(&args[1..]),
-        other => Err(JevError::input_invalid(format!("unknown command {other}"))),
-    }
-}
-
-fn parse_queries(args: &[String]) -> Result<Cli, JevError> {
-    let mut language = None;
-    let mut index = 0;
-    while index < args.len() {
-        if let Some(value) = flag_value("--language", args, &mut index)? {
-            if language.is_some() {
-                return Err(JevError::input_invalid("--language was given twice"));
-            }
-            language = Some(value);
-            continue;
-        }
-        return Err(JevError::input_invalid(format!(
-            "unexpected argument {}",
-            args[index]
-        )));
-    }
-    Ok(Cli::Queries { language })
-}
-
-fn parse_extract(args: &[String]) -> Result<Cli, JevError> {
-    let mut language = None;
-    let mut query = None;
-    let mut captures = None;
-    let mut rev = None;
-    let mut path = None;
-    let mut index = 0;
-    while index < args.len() {
-        if let Some(value) = flag_value("--language", args, &mut index)? {
-            assign_once("language", &mut language, value)?;
-            continue;
-        }
-        if let Some(value) = flag_value("--query", args, &mut index)? {
-            assign_once("query", &mut query, value)?;
-            continue;
-        }
-        if let Some(value) = flag_value("--captures", args, &mut index)? {
-            assign_once("captures", &mut captures, split_captures(&value)?)?;
-            continue;
-        }
-        if let Some(value) = flag_value("--rev", args, &mut index)? {
-            assign_once("rev", &mut rev, Rev::parse(&value)?)?;
-            continue;
-        }
-        if args[index].starts_with('-') {
-            return Err(JevError::input_invalid(format!(
-                "unknown flag {}",
-                args[index]
-            )));
-        }
-        if path.is_some() {
-            return Err(JevError::input_invalid("extract takes one source path"));
-        }
-        path = Some(args[index].clone());
-        index += 1;
-    }
-    let language =
-        language.ok_or_else(|| JevError::input_invalid("extract requires --language"))?;
-    let query = query.ok_or_else(|| JevError::input_invalid("extract requires --query"))?;
-    let path = path.ok_or_else(|| JevError::input_invalid("extract requires a source path"))?;
-    Ok(Cli::Extract {
-        language,
-        query,
-        captures: captures.unwrap_or_default(),
-        rev: rev.unwrap_or_else(|| Rev::new("HEAD")),
-        path,
-    })
-}
-
-fn assign_once<T>(name: &str, slot: &mut Option<T>, value: T) -> Result<(), JevError> {
-    if slot.is_some() {
-        return Err(JevError::input_invalid(format!("--{name} was given twice")));
-    }
-    *slot = Some(value);
-    Ok(())
-}
-
-fn split_captures(value: &str) -> Result<Vec<String>, JevError> {
-    if value.is_empty() {
-        return Err(JevError::input_invalid(
-            "--captures requires a comma-separated allow-list",
-        ));
-    }
-    let mut names = Vec::new();
-    for part in value.split(',') {
-        let name = part.trim();
-        if name.is_empty() {
-            return Err(JevError::input_invalid("--captures contains an empty name"));
-        }
-        names.push(name.to_owned());
-    }
-    Ok(names)
-}
-
-/// Reads `--name value` or `--name=value` and advances `index` past it.
-///
-/// Returns `Ok(None)` when `args[*index]` is a different argument and leaves
-/// `index` unchanged.
-fn flag_value(name: &str, args: &[String], index: &mut usize) -> Result<Option<String>, JevError> {
-    let arg = &args[*index];
-    let with_equals = format!("{name}=");
-    if let Some(value) = arg.strip_prefix(&with_equals) {
-        if value.is_empty() {
-            return Err(JevError::input_invalid(format!("{name} requires a value")));
-        }
-        *index += 1;
-        return Ok(Some(value.to_owned()));
-    }
-    if arg == name {
-        let value = args
-            .get(*index + 1)
-            .ok_or_else(|| JevError::input_invalid(format!("{name} requires a value")))?;
-        if value.starts_with('-') {
-            return Err(JevError::input_invalid(format!("{name} requires a value")));
-        }
-        *index += 2;
-        return Ok(Some(value.clone()));
-    }
-    Ok(None)
 }

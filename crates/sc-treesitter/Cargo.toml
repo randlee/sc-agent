@@ -21,16 +21,20 @@ workspace = true
 [features]
 default = ["cli", "python", "rust"]
 # Binary-only dependencies (ADR-SAG-0023): the `sc-treesitter` bin and the
-# `cli` test target need them; `--no-default-features` builds the library
-# without them.
-cli = ["dep:mimalloc", "dep:clap"]
+# `cli` / `argv` test targets need them; `--no-default-features` builds the
+# library without them. `sc-agent-types/git` (the shared argv-only git reads,
+# RBQA-F006) is non-default there and only this feature turns it on.
+cli = ["dep:mimalloc", "dep:clap", "sc-agent-types/git"]
 python = ["dep:tree-sitter-python"]
 rust = ["dep:tree-sitter-rust"]
 
 [dependencies]
 clap = { workspace = true, optional = true }
 mimalloc = { workspace = true, optional = true }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+# The library uses only the always-on `error`, `ids`, `envelope` and `schema`
+# modules; `default-features = false` keeps `judge`, `secret` and `obs` out
+# (ADR-SAG-0015, ADR-SAG-0027, RBQA-F009).
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", default-features = false }
 serde_json.workspace = true
 # Deliberate `=` lockstep (ADR-SAG-0023 list): grammar ABI and query captures
 # are tested against these exact tree-sitter releases (output determinism).
@@ -51,4 +55,10 @@ required-features = ["cli"]
 [[test]]
 name = "cli"
 path = "tests/cli.rs"
+required-features = ["cli"]
+
+# argv edge cases of the clap parser; also runs the binary (CPR-207).
+[[test]]
+name = "argv"
+path = "tests/argv.rs"
 required-features = ["cli"]
