@@ -23,8 +23,10 @@ requirements:
   - REQ-SAG-0606
 adrs:
   - ADR-SAG-0002
+  - ADR-SAG-0004
   - ADR-SAG-0005
   - ADR-SAG-0006
+  - ADR-SAG-0007
   - ADR-SAG-0012
   - ADR-SAG-0019
   - ADR-SAG-0025
@@ -36,6 +38,7 @@ owned_paths:
   - "crates/sc-agent-types/src/judge.rs"
   - "docs/sc-jev/**"
   - "docs/architecture.md#ADR-SAG-0005 amendment (r-5)"
+  - "docs/architecture.md#ADR index Amended-by marker (r-5) in ADR-SAG-0005"
   - "docs/requirements.md#REQ-SAG-0403 row"
 ---
 
@@ -120,6 +123,7 @@ cargo test -p sc-jev-backends --test llm
 cargo test -p sc-agent-http --test retry
 cargo test -p workspace-tests --test jev_cross_impl
 cargo test -p sc-jev-check --test cross_impl_branches
+cargo test -p workspace-tests --test source_scans
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-agent-http -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-agent-compose -p sc-treesitter -p sc-ai
 ```
 

@@ -24,7 +24,11 @@ requirements:
   - REQ-SAG-0103
   - REQ-SAG-0104
   - REQ-SAG-0305
+  - REQ-SAG-0600
   - REQ-SAG-0602
+  - REQ-SAG-0610
+  - REQ-SAG-0700
+  - REQ-SAG-0701
   - REQ-SAG-0711
   - REQ-SAG-0120
   - REQ-SAG-0121
@@ -43,6 +47,7 @@ adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
   - ADR-SAG-0003
+  - ADR-SAG-0004
   - ADR-SAG-0005
   - ADR-SAG-0006
   - ADR-SAG-0007
@@ -57,8 +62,10 @@ adrs:
   - ADR-SAG-0019
   - ADR-SAG-0020
   - ADR-SAG-0022
+  - ADR-SAG-0023
   - ADR-SAG-0025
   - ADR-SAG-0027
+  - ADR-SAG-0029
 owned_paths:
   - "crates/sc-agent-types/**"
   - "crates/sc-agent-secrets/src/**"
@@ -69,6 +76,7 @@ owned_paths:
   - "crates/sc-jev-backends/tests/**"
   - "crates/sc-jev-check/src/**"
   - "crates/sc-jev-check/tests/**"
+  - "crates/sc-jev-check/Cargo.toml#[features] test-util line (only)"
   - "crates/sc-jev-py/src/**"
   - "crates/sc-ai/src/**"
   - "crates/sc-ai/tests/**"
@@ -78,14 +86,16 @@ owned_paths:
   - "tests/jev_cross_impl/**"
   - "tests/fixtures/jev-python/**"
   - "boundaries/sc-agent-types/**"
+  - "boundaries/README.md#Dev-dependency and self edges (D0 spike result)"
   - "docs/sc-agent-types/**"
   - "docs/architecture.md#ADR-SAG-0009 amendment (r-1)"
   - "docs/architecture.md#ADR-SAG-0016 amendment (r-1)"
   - "docs/architecture.md#ADR-SAG-0020 amendment (r-1)"
+  - "docs/architecture.md#ADR-SAG-0022 amendment (r-1)"
   - "docs/architecture.md#ADR-SAG-0027"
   - "docs/architecture.md#ADR index row ADR-SAG-0027"
-  - "docs/architecture.md#ADR index Amended-by marker (r-1) in ADR-SAG-0001"
-  - "docs/requirements.md#REQ-SAG-0101, REQ-SAG-0103, REQ-SAG-0120, REQ-SAG-0121, NFR-SAG-0001 amendments; REQ-SAG-0105..0108 rows"
+  - "docs/architecture.md#ADR index Amended-by marker (r-1) in ADR-SAG-0001, 0009, 0016, 0020, 0022, 0029"
+  - "docs/requirements.md#REQ-SAG-0101, REQ-SAG-0103, REQ-SAG-0120, REQ-SAG-0121, REQ-SAG-0701, NFR-SAG-0001 amendments; REQ-SAG-0105..0108 rows"
 ---
 
 # Sprint r-1 — sc-agent-types break (D1, D6, D7 types, D10-break, D11 types)
@@ -121,6 +131,44 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
 
 ## Deliverables
 
+### D0 — first step: `sc-boundary` dev-edge and self-edge spike (RBQA-F101)
+
+r-1 writes the first self-referencing dev-dependency of the phase
+(`sc-agent-types`, D10.11), so it settles how `sc-boundary` treats dev edges
+before it writes one. On a throwaway branch, run `sc-lint lint sc-boundary`
+on three cases and record the rule ids that fire:
+
+1. a dev-only edge between two different workspace crates (no normal edge);
+2. a self edge, `<crate> = { path = ".", features = ["test-util"] }`;
+3. an `allowed_dependencies` / `allowed_dependents` entry with no normal edge
+   behind it (does `SCB-DEPENDENCY-004` call it stale?).
+
+The same run loads a scratch manifest with `facade = ""` and the full
+`[references]`, `[testing]`, `[enforcement]`, `[status]` blocks, to confirm
+the sc-lint 0.8 schema accepts an empty facade (RBQA-F104). The result is
+recorded in a "Dev-dependency and self edges" paragraph of
+`boundaries/README.md` in r-1's PR, so it exists before wave 2 starts. The
+recorded outcome decides every later self edge:
+
+- **Dev edges ignored** (expected; the README says dev-dependencies are
+  excluded): self dev-dependencies need no manifest entry. r-3b's
+  `workspace-tests` manifests take the "ignored" branch (plan.md "New
+  boundary manifests").
+- **Dev edges counted, self entries accepted:** every manifest of a crate
+  with a self dev-dependency lists the crate in its own
+  `allowed_dependencies` and `allowed_dependents`, in the sprint that adds
+  the self edge (r-1 `sc-agent-types`; r-2 `sc-jev-check`; r-3
+  `sc-agent-http`; r-2b `sc-jev`, `sc-jev-backends`; r-3b `sc-ai`).
+  `workspace-tests` takes the "counted" branch.
+- **Dev edges counted, self entries rejected:** no crate gets a self
+  dev-dependency. Each integration target that needs a hook is declared
+  `[[test]] name = "<t>" required-features = ["test-util"]`, and every
+  validation line for it passes `--features test-util` (a plain
+  `cargo test` then skips it instead of failing to compile). The
+  `test_util_off` gate is unchanged, because a command-line feature is not a
+  dependency edge. The PR states this branch and every later sprint doc
+  line it changes.
+
 ### D1 — open backend set, static facts (REQ-SAG-0105, ADR-SAG-0009 r-1 amendment)
 
 1. `ids.rs`: `BackendDescriptor` with **private** fields and `const fn`
@@ -152,10 +200,14 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    factory in `sc-jev-check::registry` is data, not a `match`:
    `static FACTORIES: &[(BackendId, fn(ResolvedApiKey) -> Arc<dyn JudgeBackend>)]`,
    one row per built-in backend, each row calling that backend's
-   `with_default_transport`. `BackendRegistry::from_env` looks the id up in
-   the table; an id with no row is `RegistryInvalid` (`CONFIG_INVALID`).
-   `test_every_backend_has_factory` (target `registry`) iterates `BACKENDS`
-   and fails for a descriptor with no row or a row with no descriptor.
+   `with_default_transport`. The a-10 production entry
+   `registry::registry_for_repo` (renamed `BackendRegistry::from_env` by r-2)
+   looks the id up in the table; an id with no row is `RegistryInvalid`
+   (`CONFIG_INVALID`). `FACTORIES` stays private:
+   `test_every_backend_has_factory` is a `--lib` unit test
+   (`registry::tests::test_every_backend_has_factory`) that iterates
+   `BACKENDS` and fails for a descriptor with no row, a row with no
+   descriptor, or a `BackendId` that appears in two rows.
    Outside `ids.rs` (descriptor lookup) and this table, code branches on
    **descriptor facts** (`family()`, `requires_llm_context()`,
    `supports_session_ask()`, `request_limit_bytes()`), never on id equality
@@ -204,7 +256,8 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    `input_invalid(..)`, `input_missing(path)`,
    `language_unavailable(producer, language)`,
    `query_not_found(producer, query)`, `query_invalid(producer, detail)`,
-   `producer_error(producer, code, message)`, `network(kind, detail)`, and
+   `producer_error(producer: impl Into<String>, code: ErrorCode, message: impl Into<String>)`,
+   `network(kind, detail)`, and
    the existing `operational_io` / `operational_config` / `io_failed` thin
    constructors), so every cross-crate literal in `sc-treesitter`
    (`grammar.rs`, `query.rs`, `git_io.rs`, `main.rs`), `sc-ai/src/main.rs`
@@ -224,11 +277,14 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    | `IoFailed { what, kind }` | `io_failed` | `INPUT_INVALID` |
    | `LanguageUnavailable { producer, language }` | sc-treesitter-named variant | `LANGUAGE_UNAVAILABLE` |
    | `QueryInvalid { producer, detail }`, `QueryNotFound { producer, query }` | sc-treesitter-named variants | `QUERY_INVALID`, `QUERY_NOT_FOUND` |
-   | `ProducerError { producer, code: &'static str, message }` | (new; producer stderr) | the carried `code` |
+   | `ProducerError { producer: String, code: ErrorCode, message: String }` | (new; producer stderr) | the carried `code` |
    | `NetworkError { kind: NetworkErrorKind, detail }` | `NetworkError { detail }` | `NETWORK_ERROR` |
 
    `OperationalArea` is `#[non_exhaustive] { Config, Io }`; its `code()`
-   depends on the area, as the table states. REQ-SAG-0101 is amended from
+   depends on the area, as the table states. Every `producer` field
+   (`ProducerError`, `LanguageUnavailable`, `QueryInvalid`, `QueryNotFound`)
+   is a `String`: it carries a runtime command name from `check.toml` (r-2
+   D11.3) and is serialized as `details.producer`. REQ-SAG-0101 is amended from
    "one variant per id" to "every variant maps to exactly one id; an id may
    have several variants".
 2. `ErrorCode`: `#[non_exhaustive]` enum with one variant per id in
@@ -237,7 +293,12 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    `build.rs`). `JevError::code()` returns `ErrorCode`.
    `test_error_codes_match_errors_json` (target `errors`) asserts the set of
    `ErrorCode::ALL.as_str()` values equals the ids in
-   `tests/fixtures/jev/README-contract/errors.json`.
+   `tests/fixtures/jev/README-contract/errors.json`. Completeness of `ALL`
+   is a compile-time check: the unit test
+   `error::tests::test_error_code_all_is_complete` holds an exhaustive
+   in-crate `match` over `ErrorCode` with no wildcard arm (inside the crate
+   `#[non_exhaustive]` does not force one), whose every arm asserts that
+   variant is in `ALL`; a new variant fails to compile until it is matched.
    `test_every_variant_code_golden` (target `errors`) constructs each variant
    in the table **through its public constructor** (an integration target
    cannot use literals of a `#[non_exhaustive]` variant, so the test also
@@ -273,13 +334,20 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    - `retryable`: present (`true`) only when `JevError::retryable()` is true;
      absent otherwise (never `false`).
    - `details`: present only for `ProducerError`, as `{"producer": <name>}`;
-     absent for every other variant.
-   `Deserialize` (producer stderr): `deny_unknown_fields`; `schema_version`
-   absent (a Phase A producer) or `1` is accepted; any other value, or an
-   unknown key, fails to parse, so the `command` extractor falls back to
-   `ExtractionFailed` (r-2 D11.3). This changes the stderr bytes of every
-   error (one added `"schema_version":1` key): NFR-SAG-0001 is amended in
-   this sprint and the bytes are pinned by
+     absent for every other variant. `details` is a closed object.
+   `Deserialize` (producer stderr): `deny_unknown_fields` on the response and
+   on `details`; `schema_version` absent (a Phase A producer) or `1` is
+   accepted; any other value, or an unknown key, fails to parse, so the
+   `command` extractor falls back to `ExtractionFailed` (r-2 D11.3). Because
+   readers deny unknown fields, adding any key, top-level or inside
+   `details`, is a breaking change of this shape and bumps `schema_version`.
+   **Consumer rule** (EXT-030, ADR-SAG-0027): an agent or CLI/MCP client may
+   read `schema_version` from every stderr line; a value other than `1`
+   means "unknown error shape", and the client falls back to the exit code
+   and the raw line. A bump is announced in the changelog. This changes the
+   stderr bytes of every error (one added `"schema_version":1` key):
+   NFR-SAG-0001 and REQ-SAG-0701 are amended in this sprint and the bytes are
+   pinned by
    `test_error_response_stderr_golden` (target `errors`), which serializes
    `INPUT_EMPTY`, `NETWORK_ERROR` (`Busy`) and a `ProducerError` and compares
    with `crates/sc-agent-types/tests/fixtures/error-stderr.jsonl`:
@@ -291,17 +359,25 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
 
 1. Remove `JudgeOutcome.probabilities`. `answers` becomes
    `BTreeMap<QuestionId, QuestionAnswer>`. `QuestionAnswer` has private
-   fields `choice: ChoiceId` and optional
+   fields `choice: ChoiceId`, optional `confidence: f64` and optional
    `probabilities: BTreeMap<ChoiceId, f64>`, a constructor
-   `QuestionAnswer::new(choice, probabilities) -> Result<Self, JevError>` and
-   accessors. `ChoiceId` is a validated string newtype (non-empty, no
-   control characters) in `ids`. **Finite-probability rule:** every
-   probability is finite and in `[0, 1]` (NaN, infinity, negative or > 1 is
-   `RESPONSE_INVALID`); `Deserialize` goes through the same constructor
-   (`#[serde(try_from)]`), so an invalid backend response never becomes a
-   `QuestionAnswer`. `QuestionAnswer` derives `PartialEq` only (not `Eq`,
-   because of `f64`). Its serde form is byte-identical to today's `answers`
-   JSON (golden test `test_answers_serde_golden`, target `judge`).
+   `QuestionAnswer::new(choice, confidence: Option<f64>, probabilities) -> Result<Self, JevError>`
+   and accessors. Every Jev answer carries `confidence` today (a-10
+   `crates/sc-jev/src/check.rs` requires it); LLM backends leave it `None`.
+   Serialized keys are `choice`, `confidence`, `probabilities` in that order,
+   each optional key omitted when `None`. `ChoiceId` is a validated string
+   newtype (non-empty, no control characters) in `ids`.
+   **Finite-number rule:** `confidence` and every probability are finite and
+   in `[0, 1]` (NaN, infinity, negative or > 1 is `RESPONSE_INVALID`);
+   `Deserialize` goes through the same constructor (`#[serde(try_from)]`), so
+   an invalid backend response never becomes a `QuestionAnswer`.
+   `QuestionAnswer` derives `PartialEq` only (not `Eq`, because of `f64`).
+   Its serde form is byte-identical to today's `answers` JSON for the three
+   keys `choice`, `confidence`, `probabilities`: golden test
+   `test_answers_serde_golden` (target `judge`) round-trips a real a-10 Jev
+   answer object with `confidence` and an LLM answer without it. A
+   per-answer key outside those three is not modelled; it survives only in
+   `provider_meta` (CPR-203 option (a)).
    **Relation to `ChoiceAnswer`:** `QuestionAnswer` is a backend's *output*
    for one question; `ChoiceAnswer { question_id, choice }` is an *input*
    (prior state inside the canonical payload, part of `prompt_sha256`
@@ -312,11 +388,18 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    `provider_meta` stays `Option<Value>` (D10 defers typed `JudgeMeta`).
 2. `JudgeOutcome` gets private fields,
    `JudgeOutcome::new(backend, request: &JudgeRequest, answers) -> Result<Self, JevError>`,
-   `with_provider_meta`, `with_input_sha256`, accessors. `new` checks that
-   the answer key set equals the request's `QuestionId` set (a missing or
-   extra key is `RESPONSE_INVALID`), so no outcome exists whose answers do
-   not match the questions asked. It is not `#[non_exhaustive]`: backend
-   crates construct it.
+   `with_provider_meta`, `with_input_sha256`, accessors. The question set
+   comes from `PayloadBundle::question_choices() -> &BTreeMap<QuestionId, BTreeSet<ChoiceId>>`,
+   computed once by `PayloadBundle::encode` from the canonical payload's
+   questions; every bundle is built through `encode` (the crate-private byte
+   path, if kept, parses its bytes into `CanonicalJudgePayload` first and is
+   `INPUT_INVALID` otherwise), so no bundle lacks the map.
+   `PayloadBundle::question_ids()` returns its keys. `new` checks that the
+   answer key set equals `question_ids()`, that each answer's `choice`, and
+   each key of its `probabilities`, is one of that question's choices
+   (RBP minor 1); any failure is `RESPONSE_INVALID`. So no outcome exists
+   whose answers do not match the questions and choices asked. It is not
+   `#[non_exhaustive]`: backend crates construct it.
 3. `JudgeOutcome.input_sha256: Option<Sha256Digest>` — `None` means "this
    backend does not attest". r-1 adds the field only; every backend returns
    `None` until r-2b, the single sprint that implements backend-side hashing.
@@ -351,22 +434,57 @@ a-10 follow-ups "serde spelling of `openai_luna`" and "`encode_failed`/
    `LogEvent.operation`. `SubjectsBuilder::push_subject`, `Subject.path`
    and `Question.id` use them; the two-bool argument of
    `equal_input::record` becomes a struct.
-10. `ResolvedApiKey` stores `Arc<str>`; the hidden `ResolvedApiKey::new` is
-    deleted; `try_new` is the only constructor (ADR-SAG-0020 r-1 amendment).
+10. `ResolvedApiKey` stores `Arc<str>`; the unchecked `ResolvedApiKey::new`
+    is deleted in every build, including under `cfg(test)` and the
+    `sc-agent-types/test-util` feature; `try_new` is the only constructor and
+    test keys use it (ADR-SAG-0020 r-1 amendment, which supersedes the
+    ADR-SAG-0029 (a) sentence "The unchecked `ResolvedApiKey::new` exists only
+    under `cfg(test)` or the `sc-agent-types/test-util` feature, for test
+    doubles").
 11. One `JudgeBackend` test double home (ARCHC-010), behind the existing
     non-default `test-util` feature (plan "Test seams"):
-    `test_util::MockJudgeBackend`. **Contract:** `new(id, answers)`;
-    records every `JudgeRequest` it receives (`requests() -> Vec<JudgeRequest>`);
-    returns a `JudgeOutcome` whose `input_sha256` is
-    `Some(request.payload().sha256())`, the digest of the bundle it received;
-    `with_reported_digest(Sha256Digest)` makes it report that digest instead
-    (r-2b's mismatch tests); `with_failure(JevError)` makes `judge` return the
-    error. The engine ignores `input_sha256` until r-2b (records
-    `Unattested`). The second copy in `sc-jev-check` tests is deleted and
-    `register_scripted_backends` builds over it. `sc-agent-types`' own
-    integration tests enable the feature through a self dev-dependency
-    (`sc-agent-types = { path = ".", features = ["test-util", "git"] }`);
-    nothing in `tests/` relies on `cfg(test)`.
+    `test_util::MockJudgeBackend`. **Contract:**
+    - `new(id, answers: BTreeMap<QuestionId, QuestionAnswer>)`; the outcome
+      is built at `judge` time with `JudgeOutcome::new` against the request
+      it received;
+    - records every `JudgeRequest` it receives (`requests() -> Vec<JudgeRequest>`,
+      interior `Mutex`, so a test that keeps an `Arc<MockJudgeBackend>` and
+      registers a clone reads its own log) and counts `validate_for_send`
+      calls (`validations() -> usize`);
+    - `with_provider_meta(Value)` sets the outcome's `provider_meta` (Jev
+      response samples);
+    - reports `input_sha256 = Some(request.payload().sha256())`, the digest
+      of the bundle it received; `with_reported_digest(Sha256Digest)` reports
+      that digest instead (r-2b's mismatch tests);
+    - `with_failure(JevError)` makes `judge` return the error after
+      `validate_for_send` passed (a sent-and-failed backend);
+      `refusing(JevError)` makes `validate_for_send` return it, so nothing is
+      sent (ADR-SAG-0004 refusal; r-2b's `NotSent` / `Failed` attestation
+      tests need both).
+
+    `test_mock_judge_backend_contract` (target `mock`) covers each item.
+    The engine ignores `input_sha256` until r-2b (records `Unattested`).
+    **`ScriptedJudge` and `RequestLog` are deleted** (CPR-205):
+    `sc-jev-check`'s `registry::ScriptedJudge` and `registry::RequestLog`
+    (public under `test-util` since a-10) duplicate the mock, so their
+    callers (`crates/sc-ai/tests/cli.rs`, the local copy in
+    `crates/sc-jev-check/tests/sessions_exact.rs`) move to
+    `MockJudgeBackend`, and `register_scripted_backends(ids, answers)` keeps
+    its signature and its string-shorthand normalisation but builds
+    `MockJudgeBackend`s. This is the ADR-SAG-0022 r-1 amendment, which
+    supersedes the ADR-SAG-0029 (b) sentence "`sc-jev-check` feature
+    `test-util` makes `registry::ScriptedJudge`, `registry::RequestLog`, and
+    `registry::register_scripted_backends` public" (only the last stays).
+    Because the library code of `register_scripted_backends` now names
+    `sc_agent_types::test_util`, r-1 changes the one `[features]` line of
+    `crates/sc-jev-check/Cargo.toml` to
+    `test-util = ["sc-agent-types/test-util"]`, so the pytest wheel's
+    `sc-jev-py/test-util` → `sc-jev-check/test-util` build compiles (r-2 owns
+    the rest of that file). `sc-agent-types`' own integration tests enable
+    the feature through a self dev-dependency
+    (`sc-agent-types = { path = ".", features = ["test-util", "git"] }`, no
+    `version` key; D0 decides its manifest treatment); nothing in `tests/`
+    relies on `cfg(test)`.
 
 ### `#[non_exhaustive]` triage (RBP-F104)
 
@@ -380,7 +498,7 @@ read may be `#[non_exhaustive]`.
 | `BackendDescriptor`, `BackendCapabilities`, `BackendAttestation`, `EqualInputRecord`, `JudgeOutcome`, `QuestionAnswer`, `CanonicalJudgePayload`, `Question`, `PayloadBundle`, `Span`, `Subject`, `SubjectsDocument`, `GitBlob` | private fields + constructor/builder + accessors |
 | `ChoiceId`, `QuestionId`, `BlobSha`, `RepoRelativePath` | validated newtype (private inner value, `TryFrom`/`FromStr`, `Deserialize` through the validator) |
 | `ErrorCode` | `#[non_exhaustive]` enum with `as_str()` |
-| `ScAgentErrorResponse` | private fields (a-10) + `from_error` + `Deserialize` |
+| `ScAgentErrorResponse` | private fields (a-10) + `from_jev_error` (name kept) + `Deserialize` |
 | `LogEvent`, `JudgeRequest` | private fields + constructor |
 
 ### D7 — types scope and module seams (REQ-SAG-0107, REQ-SAG-0108, ADR-SAG-0016 r-1 amendment, ADR-SAG-0027)
@@ -409,21 +527,24 @@ read may be `#[non_exhaustive]`.
    | --- | --- | --- |
    | `error` (core) | `JevError`, `ErrorCode`, `NetworkErrorKind`, `OperationalArea` | `thiserror` |
    | `envelope` (core) | `ScAgentErrorResponse` | `serde`, `serde_json` |
-   | `ids` (core) | `BackendId`, `BackendKeyId`, `BackendFamily`, `BackendDescriptor`, `BACKENDS`, `BackendSet`, `SessionId`, `Rev`, `RepoRoot`, `RepoRelativePath`, `BlobSha`, `Sha256Digest`, `QuestionId`, `ChoiceId`, `Operation` | `uuid` (`SessionId`) |
+   | `ids` (core) | `BackendId`, `BackendKeyId`, `BackendFamily`, `BackendDescriptor`, `BACKENDS`, `BackendSet`, `SessionId`, `Rev`, `RepoRoot`, `RepoRelativePath`, `BlobSha`, `Sha256Digest` (incl. `Sha256Digest::of`), `QuestionId`, `ChoiceId`, `Operation` | `uuid` (`SessionId`), `sha2` (`Sha256Digest::of`) |
    | `schema` (core) | `schema::subjects::*`, `SubjectsBuilder` | — |
    | `cancel` (core) | `CancelToken` | — (std) |
-   | `judge` / `payload` (`judge`) | `JudgeBackend`, `JudgeRequest`, `JudgeOutcome`, `QuestionAnswer`, `BackendCapabilities`, `MultiBackendMode`, `Attestation`, `BackendAttestation`, `EqualInputRecord`; `PayloadBundle`, `CanonicalJudgePayload`, `Question`, `ChoiceAnswer` | `sha2` |
+   | `judge` / `payload` (`judge`) | `JudgeBackend`, `JudgeRequest`, `JudgeOutcome`, `QuestionAnswer`, `BackendCapabilities`, `MultiBackendMode`, `Attestation`, `BackendAttestation`, `EqualInputRecord`; `PayloadBundle`, `CanonicalJudgePayload`, `Question`, `ChoiceAnswer` | — (uses core `Sha256Digest::of`) |
    | `secret` (`secret`) | `ResolvedApiKey` | — |
    | `observability::v2` (`obs`) | `SessionLog`, `SharedSessionLog`, `LogEvent`, `LogRejected` | — |
    | `git` (`git`) | `discover_toplevel`, `read_at_rev`, `GitBlob` | — (std) |
    | `test_util` (`test-util`) | `MockJudgeBackend` | — |
 
-   `secret` and `judge` are independent (neither enables the other); `git`
-   needs only core. `cargo hack check -p sc-agent-types --feature-powerset
+   `sha2` is a core dependency (CPR-M202): `Sha256Digest::of` is in core
+   `ids`, and the `sc-treesitter` library (`default-features = false`) calls
+   it for `producer.query_sha256` (a-10 `extract.rs`), so it cannot sit
+   behind `judge`. `secret` and `judge` are independent (neither enables the
+   other); `git` needs only core. `cargo hack check -p sc-agent-types --feature-powerset
    --no-dev-deps` proves every combination builds (r-1 validation; r-4 adds
    it to CI). `cargo tree -p sc-agent-types --no-default-features -e normal`
    is pinned by `test_no_default_features_dep_set` (target `features`, runs
-   the command and compares to a committed list). `sc-treesitter` switches to
+   the command and compares to a committed list, which includes `sha2`). `sc-treesitter` switches to
    `default-features = false` in r-3c; `sc-jev-check` enables `git` in r-2.
 3. `schema::subjects` (moved from `subjects.rs`): `SubjectsDocument`,
    `Subject`, `Span`, `SubjectsProducer`, `SubjectsSource`, `SUBJECTS_SCHEMA_V1`.
@@ -481,7 +602,11 @@ read may be `#[non_exhaustive]`.
    `crates/sc-jev-backends/src/transport.rs` (`clippy::disallowed_methods`,
    the two secret reads r-3 replaces). Gate in validation:
    `! rg -n '#!?\[allow\(' crates/`. This makes r-3's workspace
-   `allow_attributes = "deny"` a no-op on arrival.
+   `allow_attributes = "deny"` a no-op on arrival. It supersedes the
+   ADR-SAG-0029 (a) sentence that the two sending transports "carry
+   `#[allow(clippy::disallowed_methods, reason = ...)]`": from r-1 they carry
+   `#[expect(..)]`, and r-3 deletes both files (ADR-SAG-0020 r-1 and r-3
+   amendments).
 2. Every existing crate keeps `[lints] workspace = true` (all eight have it
    at a-10) and has no per-crate `[lints]` table; r-1 adds none.
    `workspace-tests --test source_scans` (r-3b) asserts it for every crate.
@@ -490,8 +615,11 @@ read may be `#[non_exhaustive]`.
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0105 | `BACKENDS` is the only fact table; `capabilities()` provided from the descriptor; `test_backend_catalog_roundtrip` (serde, `Display`, `FromStr`, aliases agree), `test_every_backend_has_factory` over the `FACTORIES` table; no `== BackendId::` outside `ids.rs` (tripwire `rg`); no `wildcard_enum_match_arm` deny or expect anywhere |
-| req:REQ-SAG-0106 | No `*_DETAIL_PREFIX`; `test_every_variant_code_golden` (constructors only); `test_error_codes_match_errors_json`; `test_retryable_only_network_transient`; `test_from_error_response_round_trip` |
+| req:REQ-SAG-0105 | `BACKENDS` is the only fact table; `capabilities()` provided from the descriptor; `test_backend_catalog_roundtrip` (serde, `Display`, `FromStr`, aliases agree), `--lib` `registry::tests::test_every_backend_has_factory` over the private `FACTORIES` table (no missing row, no orphan row, no duplicate id); no `== BackendId::` outside `ids.rs` (tripwire `rg`); no `wildcard_enum_match_arm` deny or expect anywhere |
+| req:REQ-SAG-0106 | No `*_DETAIL_PREFIX`; `test_every_variant_code_golden` (constructors only); `test_error_codes_match_errors_json`; `error::tests::test_error_code_all_is_complete`; `test_retryable_only_network_transient`; `test_from_error_response_round_trip` |
+| req:REQ-SAG-0101 (amended) | `cargo test -p sc-agent-types --test errors -- test_every_variant_code_golden --exact` prints `1 passed`: every variant maps to one `errors.json` id, and several variants share an id (`Operational` with area `Config` and `RegistryInvalid` both give `CONFIG_INVALID`) |
+| req:REQ-SAG-0103 (amended) | `docs/sc-agent-types/architecture.md` and the root and crate REQ-SAG-0103 rows say "re-frozen at r-1 merge" (`grep -q 're-frozen at r-1 merge' docs/sc-agent-types/architecture.md`); contract tests `cargo test -p sc-agent-types --test judge` green |
+| req:REQ-SAG-0701 (amended) | `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact` prints `1 passed` (field rule bytes); `cargo test -p sc-ai --test cli` green: every stderr line the binary writes parses as one `ScAgentErrorResponse` with `schema_version: 1`, exit 2 |
 | req:REQ-SAG-0107 | `cargo tree -p sc-agent-types -e normal` (default and `--no-default-features`) has no `sc-observability`, `sc-observability-types`, `ureq`, `pyo3`, `tree-sitter`; `test_log_rejected_display`; `test_no_default_features_dep_set`; `cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps` |
 | req:REQ-SAG-0108 | `test_subjects_builder_ids_match_golden` (golden unchanged); `test_unvalidated_subjects_rejected_on_deserialize`; `SubjectsDocument` has no public field and no `ValidatedSubjects` exists (compile); the two deleted copies are gone (compile) |
 | req:NFR-SAG-0001 (amended) | `test_error_response_stderr_golden` pins the field rule bytes |
@@ -499,8 +627,10 @@ read may be `#[non_exhaustive]`.
 | adr:ADR-SAG-0027 | Status Active; text matches code (code table, field rule, source rule, features and type homes, factory checklist) |
 | adr:ADR-SAG-0009 | r-1 amendment bullets `(Active, r-1)` |
 | adr:ADR-SAG-0016 | r-1 amendment subsection Active |
-| adr:ADR-SAG-0020 | r-1 amendment subsection Active; no `ResolvedApiKey::new` (compile) |
-| boundary:agent-types | Cross-impl digests unchanged (`jev_cross_impl`, `cross_impl_branches`); `test_answers_serde_golden`; `test_question_answer_rejects_non_finite`; `test_outcome_rejects_mismatched_answer_keys`; `test_equal_input_equal_is_derived`; `test_backend_serde_documented_spelling`, `test_backend_serde_reads_old_alias`; git helper tests; `test_phase_a_session_is_invalid`, `test_newer_session_version_is_invalid`; no `#[allow(` under `crates/`; REQ-SAG-0103 amendment + `docs/sc-agent-types/architecture.md` "re-frozen at r-1 merge". Regression for ids this sprint touches only through call sites: REQ-SAG-0200 `cargo test -p sc-agent-secrets`; REQ-SAG-0300/0311 `cargo test -p sc-jev-check --lib -- extract::`; REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0400 `cargo test -p sc-jev --test jev_api`; REQ-SAG-0500/0501/0502 `cargo test -p sc-jev-backends --test llm`; REQ-SAG-0800 pytest below; REQ-SAG-0711 `cargo test -p sc-ai --test cli` |
+| adr:ADR-SAG-0020 | r-1 amendment subsection Active (names the superseded ADR-SAG-0029 (a) sentences); no `ResolvedApiKey::new` in any build (compile; `! rg -n 'ResolvedApiKey::new\b' crates/`) |
+| adr:ADR-SAG-0022 | r-1 amendment subsection Active; `ScriptedJudge` and `RequestLog` gone (`rg` finds neither name under `crates/`); `cargo build -p sc-jev-check --features test-util` green |
+| boundary:spike | D0 result recorded in `boundaries/README.md` ("Dev-dependency and self edges") with the rule ids observed for the three cases and the empty-facade load; the branch r-1 applied to `boundaries/sc-agent-types/agent-types.toml` matches it |
+| boundary:agent-types | Cross-impl digests unchanged (`jev_cross_impl`, `cross_impl_branches`); `test_answers_serde_golden` (Jev answer with `confidence`); `test_question_answer_rejects_non_finite` (incl. `confidence`); `test_outcome_rejects_mismatched_answer_keys`; `test_outcome_rejects_choice_not_offered`; `test_mock_judge_backend_contract`; `test_equal_input_equal_is_derived`; `test_backend_serde_documented_spelling`, `test_backend_serde_reads_old_alias`; git helper tests; `test_phase_a_session_is_invalid`, `test_newer_session_version_is_invalid`; no `#[allow(` under `crates/`. Regression for ids this sprint touches only through call sites: REQ-SAG-0200 `cargo test -p sc-agent-secrets`; REQ-SAG-0300/0311 `cargo test -p sc-jev-check --lib -- extract::`; REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0400 `cargo test -p sc-jev --test jev_api`; REQ-SAG-0500/0501/0502 `cargo test -p sc-jev-backends --test llm`; REQ-SAG-0600 (session document v2) `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0610 (`LogEvent.operation` is `Operation`) `cargo test -p sc-agent-types --test obs`; REQ-SAG-0700 and REQ-SAG-0711 `cargo test -p sc-ai --test cli`; REQ-SAG-0800 pytest below |
 
 ## Required validation
 
@@ -513,6 +643,7 @@ cargo test -p sc-agent-types --test errors -- test_error_codes_match_errors_json
 cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact
 cargo test -p sc-agent-types --test errors -- test_retryable_only_network_transient --exact
 cargo test -p sc-agent-types --test errors -- test_from_error_response_round_trip --exact
+cargo test -p sc-agent-types --lib -- error::tests::test_error_code_all_is_complete --exact
 cargo test -p sc-agent-types --test obs -- test_log_rejected_display --exact
 cargo test -p sc-agent-types --test ids -- test_backend_catalog_roundtrip --exact
 cargo test -p sc-agent-types --test ids -- test_backend_serde_documented_spelling --exact
@@ -520,16 +651,23 @@ cargo test -p sc-agent-types --test ids -- test_backend_serde_reads_old_alias --
 cargo test -p sc-agent-types --test judge -- test_answers_serde_golden --exact
 cargo test -p sc-agent-types --test judge -- test_question_answer_rejects_non_finite --exact
 cargo test -p sc-agent-types --test judge -- test_outcome_rejects_mismatched_answer_keys --exact
+cargo test -p sc-agent-types --test judge -- test_outcome_rejects_choice_not_offered --exact
 cargo test -p sc-agent-types --test judge -- test_equal_input_equal_is_derived --exact
+cargo test -p sc-agent-types --test judge
+cargo test -p sc-agent-types --test mock -- test_mock_judge_backend_contract --exact
 cargo test -p sc-agent-types --test obs
 cargo test -p sc-agent-types --test subjects -- test_subjects_builder_ids_match_golden --exact
 cargo test -p sc-agent-types --test subjects -- test_unvalidated_subjects_rejected_on_deserialize --exact
 cargo test -p sc-agent-types --test features -- test_no_default_features_dep_set --exact
 cargo test -p sc-agent-types --test git
-cargo test -p sc-jev-check --test registry -- test_every_backend_has_factory --exact
+cargo test -p sc-jev-check --lib -- registry::tests::test_every_backend_has_factory --exact
 cargo test -p sc-jev-check --test session -- test_phase_a_session_is_invalid --exact
 cargo test -p sc-jev-check --test session -- test_newer_session_version_is_invalid --exact
+cargo test -p sc-jev-check --test sessions_exact
 cargo test -p sc-jev-check --test cross_impl_branches
+cargo build -p sc-jev-check --features test-util
+sc-lint lint sc-boundary
+grep -q 'Dev-dependency and self edges' boundaries/README.md
 cargo test -p sc-jev-py --test jev_cross_impl
 cargo test -p sc-agent-secrets
 cargo test -p sc-jev-check --lib -- extract::
@@ -546,6 +684,8 @@ test -z "$(cargo tree -p sc-agent-types -e normal --no-default-features | grep -
 ! rg -n 'BackendId::[A-Za-z]+ *==|== *BackendId::' crates/ --glob '!crates/sc-agent-types/src/ids.rs' --glob '!**/tests/**'
 ! rg -n 'wildcard_enum_match_arm' crates/
 ! rg -n 'sc-observability-types' Cargo.toml crates/*/Cargo.toml boundaries/*/*.toml
+! rg -n 'ResolvedApiKey::new\b' crates/
+! rg -n -e 'ScriptedJudge' -e 'RequestLog' crates/
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```
 

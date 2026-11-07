@@ -55,6 +55,7 @@ adrs:
   - ADR-SAG-0022
   - ADR-SAG-0024
   - ADR-SAG-0027
+  - ADR-SAG-0029
 owned_paths:
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/**"
@@ -69,7 +70,7 @@ owned_paths:
   - "tests/fixtures/jev-python/**"
   - "boundaries/sc-jev-check/**"
   - "docs/sc-jev-check/**"
-  - "docs/sc-jev-py/architecture.md"
+  - "docs/sc-jev-py/architecture.md#Contract (the `build_request` sentence)"
   - "docs/architecture.md#ADR-SAG-0003 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0005 amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0014 amendment (r-2)"
@@ -79,7 +80,7 @@ owned_paths:
   - "docs/architecture.md#Rust API patterns amendment (r-2)"
   - "docs/architecture.md#ADR-SAG-0024"
   - "docs/architecture.md#ADR index row ADR-SAG-0024"
-  - "docs/architecture.md#ADR index Amended-by marker (r-2) in ADR-SAG-0005, 0009, 0014, 0019, 0022"
+  - "docs/architecture.md#ADR index Amended-by marker (r-2) in ADR-SAG-0003, 0005, 0009, 0014, 0019, 0022, 0029"
   - "docs/requirements.md#REQ-SAG-0312, 0313, 0314, 0607, 0620 rows; REQ-SAG-0601, REQ-SAG-0710 amendments"
 ---
 
@@ -182,15 +183,21 @@ ARCH-006 (phase-end, `prepare` sentence).
 6. **One serialization.** `RunResponse` has one hand-written `Serialize`,
    which **is** the ADR-SAG-0014 `data` body (ADR-SAG-0014 r-2 amendment,
    REQ-SAG-0710 amendment). The primary backend is the first `Ok` result in
-   `BackendSet` order: if it is Jev, its `provider_meta` fields then
-   `answers` are copied to the top level verbatim; if it is an LLM backend,
-   `answers`, `model`, `usage`. `primary_backend` names it. Then
+   `BackendSet` order. If it is Jev, every `provider_meta` field **except
+   `answers`** is copied to the top level verbatim, then `answers` is written
+   once, from the typed `answers` (r-1 D10.1: `choice`, `confidence`,
+   `probabilities`, byte-identical to the Jev answer objects for those
+   keys). There are no duplicate keys: the `provider_meta` `answers` key is
+   skipped, never written a second time, and `results[].outcome` keeps the
+   full `provider_meta`. If the primary is an LLM backend, `answers`,
+   `model`, `usage`. `primary_backend` names it. Then
    `session_id`, `session_saved`, `prompt_sha256`, `payload_bytes`,
    `results`, `equal_input` (dry-run: `payload`, `limits`), and last
    `warnings` (omitted when empty, so the first four samples are unaffected).
    The `{version, operation, data}` wrapper moves beside it as
    `sc_jev_check::run::Envelope { version, operation, data }` with
-   `Envelope::run(&RunResponse)`, `Envelope::ask(..)` and
+   `Envelope::run(&RunResponse) -> Envelope`,
+   `Envelope::ask(outcome: &JudgeOutcome, session_id: &SessionId) -> Envelope` and
    `with_readback(impl Serialize)` (the only consumer-added envelope key;
    warnings go through `RunResponse::with_warning`). It replaces
    `merge_jev_response`/`run_data` in `sc-ai` and the shaping in
@@ -198,6 +205,9 @@ ARCH-006 (phase-end, `prepare` sentence).
    (target `run_response`, built with `RunResponse::test_builder`, fixtures
    under `crates/sc-jev-check/tests/fixtures/run-response/`):
    - `single_jev.json` — `primary_backend: "jev"`, Jev fields at top level,
+     built from a real a-10 Jev response body (answers carry `confidence`);
+     the top-level `answers` equals that body's `answers` byte for byte and
+     the key appears once;
      `results: [{backend: "jev", status: "ok", outcome: {...}}]`.
    - `jev_haiku.json` — Jev primary; two `ok` results.
    - `jev_failed_haiku_ok.json` — `primary_backend: "haiku"`, Haiku
@@ -212,11 +222,12 @@ ARCH-006 (phase-end, `prepare` sentence).
 
    The integration target enables `test-util` through the self
    dev-dependency `sc-jev-check = { path = ".", features = ["test-util"] }`
-   (r-2 owns `crates/sc-jev-check/Cargo.toml`, which also switches
-   `sc-agent-types` to `features = ["git"]` for D2.4). ADR-SAG-0022's
-   sentence that this crate's own tests see the scripted registry through
-   `cfg(test)` is corrected by the same self dev-dependency (ADR-SAG-0022
-   r-2 amendment).
+   (r-2 owns `crates/sc-jev-check/Cargo.toml` except r-1's `test-util`
+   feature line, `test-util = ["sc-agent-types/test-util"]`, which it keeps;
+   it switches `sc-agent-types` to `features = ["git"]` for D2.4; the self
+   dev-dependency has no `version` key). ADR-SAG-0022's sentence that this
+   crate's own tests see the scripted registry through `cfg(test)` is
+   corrected by the same self dev-dependency (ADR-SAG-0022 r-2 amendment).
 7. **The four old entry points are deleted with no shims:** `build_request`,
    `run_check`, `run_request`, `prepare_caller_request`, and `CheckResult`,
    `BuiltRequest`, `RunRequest`, `PreparedCallerRequest`, `RunOptions`.
@@ -233,7 +244,11 @@ ARCH-006 (phase-end, `prepare` sentence).
    no-secrets path for embedders (EXT-009).
 9. `boundaries/sc-jev-check/jev-check.toml` facade lists exactly the items
    above plus `config::{load_check_at, CheckSpec, InputSpec}`,
-   `session::FileSessionStore`, `registry::{BackendRegistry, register_scripted_backends}`.
+   `session::FileSessionStore`, `registry::{BackendRegistry, register_scripted_backends}`
+   (`register_scripted_backends` and `RunResponse::test_builder` under
+   `test-util`). `registry::ScriptedJudge` and `registry::RequestLog` are not
+   in it: r-1 deleted them (r-1 D10.11). `FACTORIES` stays private (its
+   coverage test is a `--lib` test).
 
 ### D4 — stateless session store (REQ-SAG-0607)
 
@@ -288,8 +303,8 @@ ARCH-006 (phase-end, `prepare` sentence).
 
 ### ADR text
 
-Land: ADR-SAG-0024 → Active (header "Amends ADR-SAG-0005, ADR-SAG-0009,
-ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022"); ADR-SAG-0014 r-2 amendment
+Land: ADR-SAG-0024 → Active (header "Amends ADR-SAG-0003, ADR-SAG-0005,
+ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022"); ADR-SAG-0014 r-2 amendment
 (`data` is the `RunResponse` serialization; primary backend = first `Ok` in
 `BackendSet` order, which may be an LLM backend; `warnings` replaces the
 Phase A `data.warning`; "verbatim Jev response" holds only when Jev is
@@ -298,30 +313,37 @@ primary); ADR-SAG-0005 r-2 amendment (entry point
 amendment (callers use `prepare`/`run` with `RunConfig::backends`; the
 `run_check(..., backends)` sentence is superseded); ADR-SAG-0022 r-2
 amendment (`RunConfig::registry`; "`run_check`'s parameters stay unchanged"
-superseded); ADR-SAG-0019 r-2 amendment (`RunConfig`); ADR-SAG-0003 r-2
+superseded; the `cfg(test)` correction supersedes, for that one sentence,
+ADR-SAG-0029 (b)'s "Everything else in ADR-SAG-0022 stands"; 0029 (b)'s
+`_testing.run_check_scripted` seam and string-shorthand rule are unchanged);
+ADR-SAG-0019 r-2 amendment (`RunConfig`); ADR-SAG-0003 r-2
 amendment (toplevel repo root); Rust API patterns Extractor note withdrawn.
 REQ-SAG-0601 amended: "`prepare`/`run` library API; dry-run via
 `RunConfig::dry_run`". REQ-SAG-0710 amended: "`data` is the `RunResponse`
 serialization (ADR-SAG-0014 r-2 amendment); the primary backend is the first
 `Ok` backend in `BackendSet` order; its answers are at the top level".
 The ADR index row ADR-SAG-0024 and the r-2 "Amended by" markers in rows
-0005, 0009, 0014, 0019, 0022 flip to Active. `docs/sc-jev-py/architecture.md` line 25: the
-`build_request` sentence now names `prepare` (ADR-SAG-0024).
+0003, 0005, 0009, 0014, 0019, 0022, 0029 flip to Active.
+`docs/sc-jev-py/architecture.md`, section "Contract": the sentence that says
+`build_request` calls `sc_jev_check::run::build_request` now names `prepare`
+(ADR-SAG-0024). The sentence is anchored by section, not line, because a-10
+rewrites the lines around it.
 
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0620 | Facade lists only `prepare`/`run`/`discover_repo_root` as run entry points (sc-lint facade check); `test_run_response_contract` pins the five samples (incl. the Haiku-primary `jev_failed_haiku_ok.json` and `session_save_failed.json`); `test_backend_failure_response_derived_from_error`; `test_backend_precedence`; `test_prepared_run_owns_config` |
-| req:REQ-SAG-0710 (amended) | `jev_failed_haiku_ok.json`: Haiku primary, `primary_backend: "haiku"`, no Jev fields at top level; `single_jev.json`: Jev response verbatim at top level |
+| req:REQ-SAG-0710 (amended) | `jev_failed_haiku_ok.json`: Haiku primary, `primary_backend: "haiku"`, no Jev fields at top level; `single_jev.json`: Jev response verbatim at top level, answers with `confidence`, `answers` key once (`test_run_response_contract`) |
+| req:REQ-SAG-0601 (amended) | `cargo test -p sc-jev-check --test run_response -- test_run_response_contract --exact` and `-- test_dry_run_reports_over_limit --exact` each print `1 passed`: `prepare`/`run` is the library API and `RunConfig::dry_run` produces `dry_run.json` |
 | req:REQ-SAG-0607 | `SessionStore` trait and `install_registry` gone (compile); `test_session_written_once_only_with_llm`; `test_ask_takes_registry`; concurrency tests above |
 | req:REQ-SAG-0312 | `test_command_path_placeholder_from_check_toml`; `test_command_placeholder_without_path_is_config_invalid`; `test_command_path_symlink_outside_root_refused` |
 | req:REQ-SAG-0313 | `test_command_stderr_error_response_reraised`; `test_command_stderr_unknown_code_is_extraction_failed` |
 | req:REQ-SAG-0314 | No `refuse_over_cap` on the request path; no `max_input_bytes`; `test_payload_between_old_caps_refused_by_backend_before_send`; `test_dry_run_reports_over_limit` |
-| adr:ADR-SAG-0024 | Status Active; text matches signatures; header lists the amended ADRs incl. 0014; index row Active |
+| adr:ADR-SAG-0024 | Status Active; text matches signatures; header lists the amended ADRs incl. 0003 and 0014; index row Active |
 | adr:ADR-SAG-0005, 0009, 0014, 0019, 0022, 0003 | r-2 subsections Active |
 | adr:ADR-SAG-0021 | Path precedence tests in `sc-ai` and `sc-jev-py` unchanged and green |
-| boundary:jev-check | Regression: README parity rows, cross-impl digests, session 0600/expiry tests; `cargo tree -p sc-jev-check --depth 1` has no `ureq`; no `#[allow(` under `crates/`. Per added id: REQ-SAG-0300/0301/0302 `cargo test -p sc-jev-check --lib -- extract::` and `test_repo_root_from_subdirectory`; REQ-SAG-0502 `test_payload_between_old_caps_refused_by_backend_before_send`; REQ-SAG-0503 `cargo test -p sc-jev-check --lib -- run::prompt::`; REQ-SAG-0600 `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0603 `test_run_response_contract` (`jev_haiku.json`); REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0800 pytest below |
+| boundary:jev-check | Regression: README parity rows, cross-impl digests, session 0600/expiry tests; `cargo tree -p sc-jev-check --depth 1` has no `ureq`; no `#[allow(` under `crates/`. Per added id: REQ-SAG-0300/0301/0302 `cargo test -p sc-jev-check --lib -- extract::` and `test_repo_root_from_subdirectory`; REQ-SAG-0502 `test_payload_between_old_caps_refused_by_backend_before_send`; REQ-SAG-0503 `cargo test -p sc-jev-check --lib -- run::prompt::`; REQ-SAG-0600 `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0603 `test_run_response_contract` (`jev_haiku.json`); REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0305 `cargo test -p sc-jev-check --test command`; REQ-SAG-0602 `test_run_response_contract` (`equal_input` in every sample); REQ-SAG-0700/0701 `cargo test -p sc-ai --test cli`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`; NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-ai --test cli`; NFR-SAG-0003 `cargo test -p sc-jev-check --test sessions_exact`; REQ-SAG-0800 pytest below |
 | boundary:test-util | `cargo tree -p sc-jev-check -e normal,features` shows no `test-util` feature (dev-only) |
 
 ## Required validation
@@ -347,8 +369,11 @@ cargo test -p sc-jev-check --test command -- test_command_stderr_error_response_
 cargo test -p sc-jev-check --test command -- test_command_stderr_unknown_code_is_extraction_failed --exact
 cargo test -p sc-jev-check --test caps -- test_payload_between_old_caps_refused_by_backend_before_send --exact
 cargo test -p sc-jev-check --test sessions_exact
+cargo test -p sc-jev-check --test command
 cargo test -p sc-jev-check --lib -- extract::
 cargo test -p sc-jev-check --lib -- run::
+cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact
+cargo test -p sc-jev-backends --test llm
 cargo test -p sc-ai --test cli
 maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels
 uv run --directory tests/fixtures/jev-python pytest -q

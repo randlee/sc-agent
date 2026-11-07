@@ -73,7 +73,11 @@ RBQA-F006 (producer caller), RBQA-F009 (`default-features = false`).
    other error prints one `ScAgentErrorResponse` line on stderr with the code
    current tests expect and exits 2. Delete the hand-rolled parser and its
    flag tables. The a-10 argv edge cases are ported to
-   `crates/sc-treesitter/tests/argv.rs`.
+   `crates/sc-treesitter/tests/argv.rs`, declared in
+   `crates/sc-treesitter/Cargo.toml` as
+   `[[test]] name = "argv" required-features = ["cli"]` beside r-4's
+   `[[test]] name = "cli"` entry, so `cargo hack --each-feature test` skips
+   it when `cli` is off (CPR-207).
 3. **git read.** `git_io.rs` `repo_root`, `hash_object` and the `git show`
    path are replaced by `sc_agent_types::git::{discover_toplevel, read_at_rev}`
    (compiled only with `cli`); producer error variants are the
@@ -87,7 +91,7 @@ RBQA-F006 (producer caller), RBQA-F009 (`default-features = false`).
 | Root | Criterion |
 | --- | --- |
 | boundary:treesitter | No hand-rolled argv tables (deleted); `tests/argv.rs` edge cases green; `test_version_flag_exits_zero`; `test_rev_option_injection_rejected` (`--rev=--output=FILE` creates no file); `cargo build -p sc-treesitter --lib --no-default-features` green and its tree has no `clap`, `mimalloc`, `sc-observability`; `cargo hack` feature powerset green. Regression: REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0134 the mimalloc `cargo tree` assertion below; NFR-SAG-0004 `bash .github/scripts/check-exact-pins.sh` (tree-sitter pins unchanged) |
-| adr:ADR-SAG-0015 | Library still links no judge module: the asserted row below finds no `judge`, `secret`, `obs` or `git` feature of `sc-agent-types` in `cargo tree -p sc-treesitter --no-default-features -e features -i sc-agent-types` (r-3b adds the same row to `cargo-tree-gates.sh`) |
+| adr:ADR-SAG-0015 | Library still links no judge module: the asserted row below finds no `judge`, `secret`, `obs` or `git` feature of `sc-agent-types` in `cargo tree -p sc-treesitter --no-default-features -e normal,features -i sc-agent-types` (`-e normal,features` so a future dev-dependency cannot trip it, CPR-M208; r-3b adds the same row to `cargo-tree-gates.sh`) |
 
 ## Required validation
 
@@ -100,8 +104,9 @@ cargo test -p sc-treesitter --test argv -- test_rev_option_injection_rejected --
 cargo test -p sc-treesitter --test cli
 cargo build -p sc-treesitter --lib --no-default-features
 test -z "$(cargo tree -p sc-treesitter --no-default-features -e normal | grep -E '(^|[^[:alnum:]_-])(clap|mimalloc|sc-observability) v[0-9]')"
-test -z "$(cargo tree -p sc-treesitter --no-default-features -e features -i sc-agent-types | grep -E 'sc-agent-types feature "(judge|secret|obs|git|default)"')"
+test -z "$(cargo tree -p sc-treesitter --no-default-features -e normal,features -i sc-agent-types | grep -E 'sc-agent-types feature "(judge|secret|obs|git|default)"')"
 cargo hack check -p sc-treesitter --feature-powerset --no-dev-deps
+cargo hack --each-feature test -p sc-treesitter
 bash .github/scripts/check-exact-pins.sh
 ! rg -n '#!?\[allow\(' crates/
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai

@@ -95,7 +95,7 @@ DECIDED; only (c) D9 stays pending.
 | REQ-QA-R2-004 | applied — `test-util` convention (CPR-107); https-only stays (`Endpoint::parse` never accepts http; `loopback_http` builds only 127.0.0.1); deterministic public-API check (CPR-109); feature named in manifests and gated out of normal graphs | plan conventions, gate table; r-3 D1 |
 | REQ-QA-R2-005 | applied — see ARCH-009; Haiku-primary sample in r-2 acceptance (`req:REQ-SAG-0710 (amended)` row) | r-2 D2.6, acceptance; req REQ-SAG-0710 |
 | REQ-QA-R2-006 | applied — plan resolution 11 and the ARCHC-021 closure note now say "r-1 moves `InputSpec`; r-2 adds `Command.path`" | plan |
-| REQ-QA-R2-007 | applied — `QA-003 | r-3` in the closure table and r-3 "Closes findings" | plan findings closure; r-3 |
+| REQ-QA-R2-007 | applied — `QA-003 \| r-3` in the closure table and r-3 "Closes findings" | plan findings closure; r-3 |
 | REQ-QA-R2-008 | applied — exception recorded now in `.claude/project/quality-policy.md` "Repository exceptions" (paths, branch, `r-N` ids, naming `req-qa` and `arch-qa`), as a deliverable of this plan PR | qp; plan header |
 | REQ-QA-R2-009 | applied — `docs/sc-agent-http/{requirements,architecture}.md` (r-3 D6); `docs/sc-agent-compose/…` (r-3b D2.4); `docs/workspace-tests/…` (r-3b ADR text), with `docs/workspace-tests/**` in r-3b owned_paths | r-3, r-3b |
 | REQ-QA-R2-010 | applied — see CPR-111 | arch index; plan conventions |
@@ -139,7 +139,7 @@ DECIDED; only (c) D9 stays pending.
 | RBQA-F009 | applied — `CancelToken` always-on core; `sc-agent-http` `features = ["secret"]` (asserted by a `cargo tree -e features` row); r-1 removes `sc-observability-types` from `agent-types.toml`; jitter from std and URL parsing via ureq's re-exported `http::Uri`, so `allowed_dependencies` stays `[sc-agent-types, ureq]` | r-1 D7.1, D10.7; r-3 D1, validation; plan agent-http manifest |
 | obs (compose re-export) | declined — re-exporting `CheckSource`/`Envelope`/`RunResponse` from compose would give each item a second public path, against the r-1 rule "one path each"; the direct `sc-ai`/`sc-jev-py` → `sc-jev-check` edge is already in both manifests and costs nothing | r-3b D2.3 (stated) |
 | obs (env-reading owner) | applied — ADR-0026: key/`.env` reading in `sc-jev-check` (`from_env`), path env vars in compose `PathPolicy`, nobody else | arch ADR-0026; r-3b D2.2 |
-| obs (unanchored patterns) | applied — word-bounded `grep -E '(^|[^[:alnum:]_-])<name> v[0-9]'` in the gate table and every sprint validation line | plan gate table; r-1, r-2, r-2b, r-3, r-3c |
+| obs (unanchored patterns) | applied — word-bounded `grep -E '(^\|[^[:alnum:]_-])<name> v[0-9]'` in the gate table and every sprint validation line | plan gate table; r-1, r-2, r-2b, r-3, r-3c |
 
 ## extensibility-qa
 

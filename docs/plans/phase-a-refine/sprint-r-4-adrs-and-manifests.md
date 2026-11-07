@@ -48,7 +48,8 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0016 amendment (r-4)"
   - "docs/architecture.md#ADR-SAG-0017 amendment (r-4)"
   - "docs/architecture.md#ADR-SAG-0023 (Status line and r-4 bullets)"
-  - "docs/architecture.md#ADR index row ADR-SAG-0023"
+  - "docs/architecture.md#ADR index row ADR-SAG-0023 (Status cell: r-4)"
+  - "docs/architecture.md#ADR index Amended-by marker (r-4) in ADR-SAG-0005, 0016, 0017"
   - "docs/requirements.md#REQ-SAG-0133, REQ-SAG-0134, NFR-SAG-0004 rows"
 ---
 
@@ -109,18 +110,34 @@ ARCH-001 (phase-end), RBP-F001 (a-9), ARCH-002 (phase-end), ARCH-006
    gated on `cli`, the existing unconditional `#[global_allocator]` and
    `use mimalloc::MiMalloc` compile only when `dep:mimalloc` is present, and
    `cargo hack --feature-powerset` skips the bin for feature sets without
-   `cli`. Delete the "cost accepted" comment in `sc-treesitter/Cargo.toml`. Boundary
-   manifests are updated by the crates' own sprints (r-3c, r-3b); r-4 adds the
-   two `sc-lint.toml` ownership records `mimalloc` and `clap` →
-   `crates/sc-ai/Cargo.toml`, `crates/sc-treesitter/Cargo.toml`.
+   `cli`. The integration targets that run the binary through
+   `env!("CARGO_BIN_EXE_<name>")` are gated the same way, or a no-`cli` test
+   run fails to compile (CPR-207): both crates get
+   `[[test]] name = "cli" required-features = ["cli"]` (`tests/cli.rs`; r-3c
+   and r-3b add the same for `argv`). Delete the "cost accepted" comment in
+   `sc-treesitter/Cargo.toml`. Boundary manifests are updated by the crates'
+   own sprints (r-3c for `sc-treesitter`, r-3b for `sc-ai`); r-4 adds the two
+   `sc-lint.toml` ownership records `mimalloc` and `clap` →
+   `crates/sc-ai/Cargo.toml`, `crates/sc-treesitter/Cargo.toml`. **Recorded
+   deferral** (CPR-M212): `boundaries/README.md` says to update a manifest in
+   the same change as a new dependency; r-4 adds optional `clap` without
+   touching `boundaries/sc-ai/*.toml` or `boundaries/sc-treesitter/*.toml`
+   because those files belong to r-3b and r-3c, which add `clap` and
+   `mimalloc` there with the parsers. `sc-boundary` 0.8 does not check
+   third-party names, so `just lint` stays green in between; the PR states
+   the deferral.
 3. **REQ-SAG-0134 (mimalloc) CI.** In `.github/workflows/sc-agent-ci.yml`:
    `cargo build -p sc-treesitter --lib --no-default-features`, the same for
    `sc-ai`, and `.github/scripts/cargo-tree-gates.sh` with the two mimalloc
    rows (`sc-ai`, `sc-treesitter`; word-bounded pattern, plan "`cargo tree`
    gates"). Keep a-10's `cargo hack` matrix and add
    `cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps`
-   (r-1's feature seams; valid on the a-10 feature set too). The clap rows
-   (REQ-SAG-0135) and the remaining rows are added by r-3b.
+   (r-1's feature seams; valid on the a-10 feature set too). The kept step
+   is `cargo hack --each-feature test -p sc-treesitter`
+   (`.github/workflows/sc-agent-ci.yml`); with the `[[test]]` gates above
+   its no-`cli` runs skip `tests/cli.rs` instead of failing to compile, and
+   r-4's validation runs that exact command. The clap rows (REQ-SAG-0135)
+   and the remaining rows are added by r-3b.
 4. **REQ-SAG-0133 / ADR-SAG-0017 r-4 amendment.** Both `sc-ai` and
    `sc-treesitter` are released binaries:
 
@@ -146,8 +163,10 @@ ARCH-001 (phase-end), RBP-F001 (a-9), ARCH-002 (phase-end), ARCH-006
    `prepare` or ADR-SAG-0024 (r-2 lands that sentence).
 7. Flip ADR-SAG-0023's Status line and r-4 bullets → Active (its r-3b
    subsection stays Proposed) and the r-4 amendment subsections → Active.
-   The ADR index rows for ADR-SAG-0023..0028 already exist (written by the
-   plan PR); r-4 edits only the ADR-SAG-0023 row's Status cell.
+   The ADR index rows for ADR-SAG-0023..0028 already exist, with their
+   Amends cells filled (written by the plan PR); r-4 flips only the
+   ADR-SAG-0023 row's Status cell to "Active (r-4; compose pin r-3b)" and its
+   own `(Proposed, r-4)` marker text in rows 0005, 0016 and 0017.
 
 ## Acceptance criteria (authoritative)
 
@@ -160,7 +179,7 @@ ARCH-001 (phase-end), RBP-F001 (a-9), ARCH-002 (phase-end), ARCH-006
 | adr:ADR-SAG-0017 | r-4 subsection Active |
 | adr:ADR-SAG-0016 | r-4 subsection Active |
 | adr:ADR-SAG-0005 | r-4 subsection Active; contains no ADR-SAG-0024/`prepare` reference |
-| boundary:release | Consumer preflight + publish dry-run green; `sc-lint` boundary output attached. Regression: REQ-SAG-0310 `cargo test -p sc-treesitter --test cli` (the `cli`-gated binary still builds and runs); REQ-SAG-0703 install path in `docs/development/sc-publish.md` names both binaries; ADR-SAG-0010 `cargo test -p sc-ai --test cli` |
+| boundary:release | Consumer preflight + publish dry-run green; `sc-lint` boundary output attached; `cargo hack --each-feature test -p sc-treesitter` green (the a-10 CI step, with the `[[test]] required-features` gates); r-4 changes neither `main.rs` (diff against the merge-base after rebasing onto `integrate/phase-a`, which holds r-1 by the wave-1 merge order); the clap manifest deferral is stated in the PR. Regression: REQ-SAG-0310 `cargo test -p sc-treesitter --test cli` (the `cli`-gated binary still builds and runs); REQ-SAG-0703 install path in `docs/development/sc-publish.md` names both binaries; ADR-SAG-0010 `cargo test -p sc-ai --test cli` |
 
 ## Required validation
 
@@ -174,9 +193,11 @@ bash .github/scripts/check-exact-pins.sh
 bash .github/scripts/check-exact-pins.sh --self-test
 cargo hack check -p sc-treesitter --feature-powerset --no-dev-deps
 cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps
+cargo hack --each-feature test -p sc-treesitter
 cargo test -p sc-treesitter --test cli
 cargo test -p sc-ai --test cli
-git diff --quiet origin/integrate/phase-a -- crates/sc-ai/src/main.rs crates/sc-treesitter/src/main.rs
+git fetch origin integrate/phase-a && git rebase origin/integrate/phase-a
+git diff --quiet "$(git merge-base HEAD origin/integrate/phase-a)" HEAD -- crates/sc-ai/src/main.rs crates/sc-treesitter/src/main.rs
 bash .github/scripts/run-consumer-preflight.sh
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```

@@ -42,6 +42,7 @@ adrs:
   - ADR-SAG-0023
   - ADR-SAG-0026
   - ADR-SAG-0027
+  - ADR-SAG-0029
 owned_paths:
   - "crates/sc-agent-http/**"
   - "boundaries/sc-agent-http/**"
@@ -67,6 +68,7 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0020 amendment (r-3)"
   - "docs/architecture.md#ADR-SAG-0026 Status line and HTTP half"
   - "docs/architecture.md#ADR index row ADR-SAG-0026 (Status cell: HTTP half)"
+  - "docs/architecture.md#ADR index Amended-by marker (r-3) in ADR-SAG-0006, 0007, 0017, 0020, 0029"
   - "docs/requirements.md#REQ-SAG-0402 row; REQ-SAG-0505, REQ-SAG-0130 (r-3 bullet) amendments"
 ---
 
@@ -84,7 +86,13 @@ Active here. ADR-SAG-0012 still holds: `sc-jev` owns every Jev API operation;
 ## Closes findings
 
 EXT-005, QA-003, RBQA-F003, RBP-F006, RBP-F007 (body), ARCHC-001, RSH-005;
-a-10 follow-up "hidden `ResolvedApiKey::new`" is closed by r-1. (The
+a-10 follow-up "hidden `ResolvedApiKey::new`" is closed by r-1. Deleting
+`sc-jev/src/client/https.rs` and `sc-jev-backends/src/transport.rs`
+supersedes the ADR-SAG-0029 (a) sentence naming them as "the only production
+readers" of `ResolvedApiKey::as_str`: from r-3 the one reader is
+`crates/sc-agent-http/src/ureq_transport.rs` (ADR-SAG-0020 r-3 amendment).
+ADR-SAG-0029 (a) already states that `sc-agent-secrets` has no Cargo
+features; A.1 relies on it and does not restate it. (The
 workspace-wide secret-read-site scan of RBQA-F003 lands in r-3b's
 `workspace-tests --test source_scans`; r-3 lands the lint mechanism and a
 local `rg` check.)
@@ -133,10 +141,17 @@ local `rg` check.)
      constructor has no such switch. Response body cap **8 MiB**,
      enforced while streaming, for error bodies too. No `ureq` type is in
      any public signature: the module is private and the public-API check
-     greps the generated docs (validation:
-     `cargo doc -p sc-agent-http --no-deps` then
-     `! grep -rl 'ureq::' target/doc/sc_agent_http/`; rustdoc prose names
-     the crate as "ureq" without a path). r-3b adds the same check to CI.
+     greps the generated docs. The check runs `cargo doc -p sc-agent-http`
+     **without** `--no-deps`, so ureq's own docs exist and a leaked type
+     renders as a link `../ureq/<kind>.<Name>.html` with
+     `title="<kind> ureq::<Name>"`; it then fails on either form:
+     `! grep -rlE 'ureq/(struct|enum|trait|type|fn|union)\.|title="(struct|enum|trait|type|fn|union) ureq::' target/doc/sc_agent_http/`
+     (with `--no-deps` rustdoc may print a bare `Agent` and the gate could
+     never fail, CPR-209). **Canary:** before the final commit, r-3 adds a
+     throwaway `pub fn _canary() -> ureq::Agent` to `lib.rs`, runs the check,
+     records in the PR that it fails and on which pattern, then deletes the
+     canary. Rustdoc prose names the crate as "ureq" without a path. r-3b
+     puts the same proven command into CI.
    - `retry`: `BusyPolicy` (private fields, constructor, `default()` per
      owner decision (b)), `send_with_busy_retry(&dyn Transport, &HttpRequest, &BusyPolicy, &CancelToken) -> Result<HttpResponse, JevError>`.
      Sleeping, the monotonic clock and jitter are part of `BusyPolicy`. The
@@ -155,10 +170,11 @@ local `rg` check.)
      secret value; the returned error does not contain it.
    - **Tests and the seam.** The crate's integration targets enable
      `test-util` through the self dev-dependency
-     `sc-agent-http = { path = ".", features = ["test-util"] }` (plan "Test
+     `sc-agent-http = { path = ".", features = ["test-util"] }` (no
+     `version` key; manifest treatment per r-1's D0 spike result; plan "Test
      seams"); loopback tests in `--test ureq` use `Endpoint::loopback_http`
      and run against a std `TcpListener` on 127.0.0.1.
-2. **Retry rules** (owner decision (b), DECIDED 2026-11-07; REQ-SAG-0505
+2. **Retry rules** (owner decision (b), DECIDED 2026-11-06; REQ-SAG-0505
    amendment; ADR-SAG-0007 r-3 amendment). `BusyPolicy::default()`:
    statuses 429/502/529 only; at most 4 sends; a valid Retry-After honoured,
    clamped 0–30 s. **Retry-After grammar:** valid is 1–32 bytes matching
@@ -187,8 +203,15 @@ local `rg` check.)
    request; documented in the amendment. Tests (target `retry`):
    `test_busy_policy_numbers` (default: three waits 1, 2, 4 s + jitter),
    `test_missing_and_malformed_retry_after_back_off_exponentially`,
-   `test_retry_after_grammar` (table: `"3"`, `"2.5"` valid; `"-1"`, `"1e9"`,
-   `"inf"`, `"NaN"`, `""`, an HTTP-date, 33 digits malformed),
+   `test_retry_after_grammar` (table: `"3"`, `"2.5"` valid; `"0"` valid with
+   a zero wait, bounded by the 4-send cap; 32 nines valid and saturating to
+   the 30 s clamp without overflow; `"-1"`, `"1e9"`, `"inf"`, `"NaN"`, `""`,
+   an HTTP-date, 33 digits malformed),
+   `test_exhaustion_reason_distinguishable` (the error after the fourth
+   send's busy status says "4 sends exhausted"; the error when the 90 s
+   budget forbids the next attempt says "retry budget exhausted"; both are
+   `NetworkError { kind: Busy }` with `retryable() == true`, distinguished by
+   detail text),
    `test_retry_sleep_capped_by_budget`, `test_cancel_interrupts_sleep`,
    `test_no_retry_after_body_sent`, `test_connect_failure_returns_immediately_retryable`,
    `test_transport_error_with_secret_is_redacted`; all drive
@@ -255,7 +278,9 @@ local `rg` check.)
 | adr:ADR-SAG-0026 | HTTP half Active; ADR-level Status line and index row updated |
 | adr:ADR-SAG-0020 | r-3 subsection Active; local `rg` read-site check; existing leak tests moved into `sc-agent-http`; `test_transport_error_with_secret_is_redacted` |
 | adr:ADR-SAG-0006, 0017 | r-3 subsections Active |
-| boundary:agent-http | Manifest enforced by `just lint` (output attached); public-API `cargo doc` grep finds no `ureq::`; `test_release_build_refuses_http`; retry tests; `test-util` absent from `cargo tree -p sc-agent-http -e normal,features`; `sc-agent-types` reached with feature `secret` only |
+| boundary:agent-http | Manifest enforced by `just lint` (output attached); public-API `cargo doc` (with deps) grep finds no `ureq/<kind>.` href or `ureq::` title, and the PR records the canary run in which it failed; `test_release_build_refuses_http`; retry tests; `test-util` absent from `cargo tree -p sc-agent-http -e normal,features`; `sc-agent-types` reached with feature `secret` only |
+| req:REQ-SAG-0505 (amended) | `cargo test -p sc-agent-http --test retry -- <name> --exact` prints `1 passed` for `test_busy_policy_numbers`, `test_missing_and_malformed_retry_after_back_off_exponentially`, `test_retry_after_grammar`, `test_retry_sleep_capped_by_budget`, `test_connect_failure_returns_immediately_retryable`, `test_exhaustion_reason_distinguishable` (the decided numbers) |
+| req:REQ-SAG-0130 (amended, r-3 bullet) | `release/sc-publish-consumer-input.json` lists `sc-agent-http` with `publish_order: 3`; the `cargo publish --dry-run` below packages `sc-agent-http` third and exits 0 |
 | boundary:jev | Regression: REQ-SAG-0110 / REQ-SAG-0400 / REQ-SAG-0401 `cargo test -p sc-jev --test jev_api` green (every Jev operation still in `sc-jev`, ADR-SAG-0012) |
 | boundary:jev-backends | Regression: REQ-SAG-0500/0501/0502/0504/0505 `cargo test -p sc-jev-backends --test llm` green against the decided numbers |
 | boundary:errors | Regression: NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact` (network errors keep the r-1 field rule) |
@@ -275,10 +300,11 @@ cargo test -p sc-agent-http --test retry -- test_cancel_interrupts_sleep --exact
 cargo test -p sc-agent-http --test retry -- test_no_retry_after_body_sent --exact
 cargo test -p sc-agent-http --test retry -- test_retry_after_grammar --exact
 cargo test -p sc-agent-http --test retry -- test_transport_error_with_secret_is_redacted --exact
+cargo test -p sc-agent-http --test retry -- test_exhaustion_reason_distinguishable --exact
 cargo test -p sc-agent-http --test ureq
 cargo test -p sc-agent-http --test ureq -- test_release_build_refuses_http --exact
 cargo test -p sc-agent-http --lib -- ureq_transport::tests::test_ureq_agent_config_values --exact
-cargo doc -p sc-agent-http --no-deps && ! grep -rl 'ureq::' target/doc/sc_agent_http/
+cargo doc -p sc-agent-http && ! grep -rlE 'ureq/(struct|enum|trait|type|fn|union)\.|title="(struct|enum|trait|type|fn|union) ureq::' target/doc/sc_agent_http/
 test -z "$(rg -l 'disallowed_methods' crates/ | grep -v '^crates/sc-agent-http/src/ureq_transport.rs$')"
 ! rg -n '#!?\[allow\(' crates/
 grep -q '^\[lints\]' crates/sc-agent-http/Cargo.toml && grep -A1 '^\[lints\]' crates/sc-agent-http/Cargo.toml | grep -q 'workspace = true'
@@ -292,7 +318,7 @@ test -z "$(cargo tree -p sc-jev -e normal --depth 1 | grep -E '(^|[^[:alnum:]_-]
 test -z "$(cargo tree -p sc-jev-backends -e normal --depth 1 | grep -E '(^|[^[:alnum:]_-])ureq v[0-9]')"
 test -z "$(cargo tree -p sc-agent-http -e normal | grep -E '(^|[^[:alnum:]_-])(sc-observability|pyo3|tree-sitter|sc-agent-secrets|sc-jev|sc-jev-backends|sc-jev-check) v[0-9]')"
 test -z "$(cargo tree -p sc-agent-http -e normal,features | grep -F '"test-util"')"
-test -z "$(cargo tree -p sc-agent-http -e features -i sc-agent-types | grep -E 'sc-agent-types feature "(judge|obs|git|default)"')"
+test -z "$(cargo tree -p sc-agent-http -e normal,features -i sc-agent-types | grep -E 'sc-agent-types feature "(judge|obs|git|default)"')"
 bash .github/scripts/check-exact-pins.sh
 bash .github/scripts/run-consumer-preflight.sh
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-agent-http -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
