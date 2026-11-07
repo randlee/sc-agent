@@ -135,7 +135,7 @@ other design points are applied unless they contradict an accepted D decision.
   dependency would be uploaded, CPR-M210); other crates' tests enable it
   through their dev-dependencies. How `sc-boundary` treats these edges is
   settled in wave 1 by r-1's D0 spike and recorded in `boundaries/README.md`
-  before wave 2; its three written outcomes say what each later self edge
+  before wave 2; its four written outcomes say what each later self edge
   does (RBQA-F101). `test-util` never appears in a normal-dependency edge:
   the `cargo tree` gate row `test-util` (below), `workspace-tests --test
   test_util_off` (graph query plus a release-built `sc-ai` that rejects
