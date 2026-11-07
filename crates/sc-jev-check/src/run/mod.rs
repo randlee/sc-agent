@@ -593,7 +593,7 @@ mod tests {
         assert!(prompt.system_prompt.contains("\"choice\":\"yes\""));
         assert!(!String::from_utf8_lossy(result.bundle.bytes()).contains(SESSION_CONTEXT_HEADER));
         assert!(
-            !String::from_utf8_lossy(result.bundle.bytes()).contains("PACKAGED-PROMPT-TOKEN-a3")
+            !String::from_utf8_lossy(result.bundle.bytes()).contains(PACKAGED_SYSTEM_PROMPT.trim())
         );
         let equal = result.equal_input.expect("equal");
         assert!(equal.equal);
@@ -680,7 +680,7 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let prompt = &seen[0].llm.as_ref().expect("prompt").system_prompt;
         assert!(prompt.contains("PROMPT-TOKEN-a3-check"));
-        assert!(!prompt.contains("PACKAGED-PROMPT-TOKEN-a3"));
+        assert!(!prompt.contains(PACKAGED_SYSTEM_PROMPT.trim()));
     }
 
     #[test]

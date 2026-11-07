@@ -35,6 +35,7 @@ toml.workspace = true
 
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
+tempfile.workspace = true
 
 [[test]]
 name = "a6_exact"

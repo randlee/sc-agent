@@ -394,7 +394,6 @@ fn test_log_event_has_no_secrets() {
 
 #[test]
 fn test_packaged_default_prompt_available() {
-    assert!(PACKAGED_SYSTEM_PROMPT.contains("PACKAGED-PROMPT-TOKEN-a3"));
     assert!(PACKAGED_SYSTEM_PROMPT.contains("canonical judge payload"));
     let repo = bare_repo();
     let root = RepoRoot::new(repo.path());
@@ -420,7 +419,9 @@ fn test_packaged_default_prompt_available() {
         result.system_prompt.as_deref(),
         Some(PACKAGED_SYSTEM_PROMPT)
     );
-    assert!(!String::from_utf8_lossy(result.bundle.bytes()).contains("PACKAGED-PROMPT-TOKEN-a3"));
+    assert!(
+        !String::from_utf8_lossy(result.bundle.bytes()).contains(PACKAGED_SYSTEM_PROMPT.trim())
+    );
     assert_eq!(
         &result.equal_input.expect("equal").prompt_sha256,
         result.bundle.sha256()

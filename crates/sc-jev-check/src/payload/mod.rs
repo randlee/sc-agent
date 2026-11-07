@@ -140,27 +140,47 @@ fn substitute_inputs(
     mut questions: Vec<Question>,
     extractions: &BTreeMap<String, Extracted>,
 ) -> Vec<Question> {
-    let mut names: Vec<&str> = extractions.keys().map(String::as_str).collect();
-    names.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    for question in &mut questions {
-        for name in &names {
-            let Some(extracted) = extractions.get(*name) else {
-                continue;
-            };
-            let needle = format!("{{{name}}}");
-            if !question.prompt.contains(&needle) {
-                continue;
-            }
-            let replacement = extracted
+    let replacements: BTreeMap<&str, String> = extractions
+        .iter()
+        .map(|(name, extracted)| {
+            let joined = extracted
                 .subjects
                 .iter()
                 .map(|subject| subject.text.as_str())
                 .collect::<Vec<_>>()
                 .join("\n");
-            question.prompt = question.prompt.replace(&needle, &replacement);
-        }
+            (name.as_str(), joined)
+        })
+        .collect();
+    for question in &mut questions {
+        question.prompt = expand_placeholders(&question.prompt, &replacements);
     }
     questions
+}
+
+/// Replaces each `{name}` token in one left-to-right pass.
+///
+/// Replacement text is emitted verbatim and never scanned again, so an
+/// extracted subject that itself contains `{other}` stays literal. Braces
+/// that do not form a known `{name}` are kept.
+fn expand_placeholders(text: &str, replacements: &BTreeMap<&str, String>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        if let Some(close) = after.find('}')
+            && let Some(replacement) = replacements.get(&after[..close])
+        {
+            out.push_str(replacement);
+            rest = &after[close + 1..];
+            continue;
+        }
+        out.push('{');
+        rest = after;
+    }
+    out.push_str(rest);
+    out
 }
 
 pub(crate) fn encode_payload(
@@ -185,6 +205,46 @@ mod tests {
     use sc_agent_types::Rev;
 
     #[test]
+    fn placeholder_text_inside_a_subject_is_not_re_expanded() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("questions.json"),
+            r#"{"schema":"plan-anchoring/questions/1","questions":{"q":{"type":"choice","instructions":"A={a} B={b} {unknown}","criteria":{"no":"No.","yes":"Yes."}}}}"#,
+        )
+        .expect("questions");
+        std::fs::write(dir.path().join("a.txt"), "f\"{b}\" literal").expect("a");
+        std::fs::write(dir.path().join("b.txt"), "BEE").expect("b");
+        let spec = CheckSpec {
+            questions_path: "questions.json".into(),
+            state_path: None,
+            system_prompt_file: None,
+            inputs: BTreeMap::from([
+                (
+                    "a".into(),
+                    sc_agent_types::InputSpec::File {
+                        path: "a.txt".into(),
+                    },
+                ),
+                (
+                    "b".into(),
+                    sc_agent_types::InputSpec::File {
+                        path: "b.txt".into(),
+                    },
+                ),
+            ]),
+        };
+        let built = PayloadBuilder::packaged()
+            .expect("builder")
+            .build(&spec, &RepoRoot::new(dir.path()), &Rev::worktree())
+            .expect("payload");
+        let value: serde_json::Value = serde_json::from_slice(built.bundle.bytes()).expect("json");
+        assert_eq!(
+            value["questions"][0]["prompt"],
+            "A=f\"{b}\" literal B=BEE {unknown}"
+        );
+    }
+
+    #[test]
     fn payload_merges_questions_state_and_file_text() {
         let dir = copy_fixture();
         let repo = RepoRoot::new(dir.path());
@@ -204,7 +264,7 @@ mod tests {
                 .any(|subject| subject.text == "ship | hold")
         );
         assert!(!text.contains("PROMPT-TOKEN-a3-check"));
-        assert!(!text.contains("PACKAGED-PROMPT-TOKEN-a3"));
+        assert!(!text.contains(crate::config::PACKAGED_SYSTEM_PROMPT.trim()));
         assert_eq!(built.prompt.path, "prompt.md");
         assert_eq!(
             built.bundle.sha256(),

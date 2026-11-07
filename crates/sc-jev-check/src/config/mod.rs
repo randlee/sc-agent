@@ -260,7 +260,14 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/llm-evaluator-system.md");
         let disk = std::fs::read_to_string(path).expect("asset");
         assert_eq!(disk, PACKAGED_SYSTEM_PROMPT);
-        assert!(PACKAGED_SYSTEM_PROMPT.contains("PACKAGED-PROMPT-TOKEN-a3"));
+        assert_eq!(
+            PACKAGED_SYSTEM_PROMPT,
+            include_str!("../../assets/llm-evaluator-system.md")
+        );
+        assert!(
+            !PACKAGED_SYSTEM_PROMPT.contains("TOKEN"),
+            "the shipped prompt carries no test sentinel"
+        );
         assert!(PACKAGED_SYSTEM_PROMPT.contains("canonical judge payload"));
     }
 

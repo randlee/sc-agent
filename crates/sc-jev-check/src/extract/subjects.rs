@@ -1,9 +1,8 @@
 //! `subjects` extractor.
 //!
-//! Reads a `sc/subjects/1` document from a repo-relative path, or from stdin
-//! when the path is `-`.
-
-use std::io::Read;
+//! Reads a `sc/subjects/1` document from a repo-relative path. The engine
+//! never reads process stdin: `-` is refused with a pointer to
+//! `--request-json -` or a committed file.
 
 use sc_agent_types::{
     InputSpec, JevError, RepoRoot, Rev, SUBJECTS_SCHEMA_V1, Subject, SubjectsDocument,
@@ -45,17 +44,12 @@ pub(crate) fn extract_subjects(
             detail: "subjects extractor received a different input kind".into(),
         });
     };
-    let bytes = if path == "-" {
-        let mut bytes = Vec::new();
-        std::io::stdin()
-            .read_to_end(&mut bytes)
-            .map_err(|error| JevError::ExtractionFailed {
-                detail: format!("stdin read failed: {error}"),
-            })?;
-        bytes
-    } else {
-        read_repo_bytes(repo, rev, path)?
-    };
+    if path == "-" {
+        return Err(JevError::ConfigInvalid {
+            detail: "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path".into(),
+        });
+    }
+    let bytes = read_repo_bytes(repo, rev, path)?;
     parse_subjects_bytes(&bytes)
 }
 
@@ -206,6 +200,19 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn subjects_stdin_path_is_config_invalid() {
+        let repo = RepoRoot::new(workspace_root());
+        let error = extract_subjects(
+            &repo,
+            &Rev::worktree(),
+            &InputSpec::Subjects { path: "-".into() },
+        )
+        .expect_err("stdin");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        assert!(error.fix_hint().contains("--request-json -"));
     }
 
     #[test]

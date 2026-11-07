@@ -8,6 +8,7 @@
 mod command;
 mod file;
 mod read;
+mod sanitize;
 mod subjects;
 mod table;
 
@@ -134,35 +135,8 @@ pub(crate) mod test_support {
 
     pub fn git_fixture() -> (TempDir, String) {
         let dir = copy_fixture();
-        git(
-            dir.path(),
-            &[
-                "-c",
-                "commit.gpgsign=false",
-                "-c",
-                "user.email=jev-check@example.com",
-                "-c",
-                "user.name=jev-check",
-                "init",
-            ],
-        );
-        git(dir.path(), &["add", "."]);
-        git(
-            dir.path(),
-            &[
-                "-c",
-                "commit.gpgsign=false",
-                "-c",
-                "core.hooksPath=/dev/null",
-                "-c",
-                "user.email=jev-check@example.com",
-                "-c",
-                "user.name=jev-check",
-                "commit",
-                "-m",
-                "init",
-            ],
-        );
+        git(dir.path(), &["init", "-q"]);
+        commit_all(dir.path(), "init");
         let sha = git_stdout(dir.path(), &["rev-parse", "HEAD"]);
         (dir, sha.trim().to_owned())
     }
@@ -171,13 +145,39 @@ pub(crate) mod test_support {
         if cfg!(windows) { "python" } else { "python3" }
     }
 
-    fn git(cwd: &Path, args: &[&str]) {
-        let output = Command::new("git")
+    /// Git with no global config, no terminal prompt, and a fixed identity.
+    pub fn git_command(cwd: &Path) -> Command {
+        let mut command = Command::new("git");
+        command
             .arg("-C")
             .arg(cwd)
-            .args(args)
-            .output()
-            .expect("git");
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_CONFIG_GLOBAL", null_device())
+            .args([
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "user.email=jev-check@example.com",
+                "-c",
+                "user.name=jev-check",
+            ]);
+        command
+    }
+
+    fn null_device() -> &'static str {
+        if cfg!(windows) { "NUL" } else { "/dev/null" }
+    }
+
+    /// Stages everything under `cwd` and commits it.
+    pub fn commit_all(cwd: &Path, message: &str) {
+        git(cwd, &["add", "-A"]);
+        git(cwd, &["commit", "-q", "-m", message]);
+    }
+
+    pub fn git(cwd: &Path, args: &[&str]) {
+        let output = git_command(cwd).args(args).output().expect("git");
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",
@@ -186,12 +186,7 @@ pub(crate) mod test_support {
     }
 
     fn git_stdout(cwd: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(cwd)
-            .args(args)
-            .output()
-            .expect("git output");
+        let output = git_command(cwd).args(args).output().expect("git output");
         assert!(output.status.success(), "git {args:?} failed");
         String::from_utf8(output.stdout).expect("utf-8")
     }

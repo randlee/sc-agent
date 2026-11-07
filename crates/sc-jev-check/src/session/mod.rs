@@ -7,12 +7,27 @@
 //!
 //! [`SessionStore`] is an open extension point. [`FileSessionStore`] is the
 //! Phase A implementation.
+//!
+//! # Durability and concurrency
+//!
+//! A session file is replaced atomically: the new document goes to a unique
+//! `.{id}.{pid}.{nonce}.tmp` file created with `create_new`, is synced, then
+//! renamed over the session file, and the directory is synced on Unix. A
+//! failed write removes its temporary file. Session directories this store
+//! creates are mode `0700` on Unix and session files are mode `0600`.
+//!
+//! The store assumes **one writer per session**. Clones of one store in one
+//! process serialize read-modify-write through a shared lock. Two processes
+//! that update the same session at the same time (two concurrent `ask`
+//! calls) can lose one update; neither corrupts the file. There is no
+//! cross-process lock.
 
 #![warn(missing_docs)]
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -104,8 +119,9 @@ pub struct FileSessionStore {
 impl FileSessionStore {
     /// Creates a store rooted at `dir`, creating the directory when needed.
     ///
-    /// The directory's existing mode is left unchanged. Session files created
-    /// later are mode `0600`.
+    /// Directories created here are mode `0700` on Unix. An existing
+    /// directory's mode is left unchanged. Session files created later are
+    /// mode `0600`.
     ///
     /// # Errors
     ///
@@ -113,7 +129,7 @@ impl FileSessionStore {
     /// The code is `CONFIG_INVALID`. The fix hint names `dir`.
     pub fn new(dir: impl Into<PathBuf>, session_log: SharedSessionLog) -> Result<Self, JevError> {
         let dir = dir.into();
-        fs::create_dir_all(&dir).map_err(|error| {
+        create_private_dir(&dir).map_err(|error| {
             JevError::session_store_io(&format!(
                 "Create session directory {} or choose a writable directory ({error}).",
                 dir.display()
@@ -473,25 +489,75 @@ fn system_time_from_unix_ms(millis: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_millis(millis)
 }
 
+fn create_private_dir(dir: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir)
+}
+
+/// Unique temporary sibling of `path`: `.{name}.{pid}.{nonce}.tmp`.
+fn tmp_path(path: &Path) -> PathBuf {
+    static NONCE: AtomicU64 = AtomicU64::new(0);
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("session");
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.subsec_nanos());
+    let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+    path.with_file_name(format!(
+        ".{name}.{}.{nanos:08x}{nonce:04x}.tmp",
+        std::process::id()
+    ))
+}
+
 fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp_name = match path.file_name().and_then(|name| name.to_str()) {
-        Some(name) => format!(".{name}.tmp"),
-        None => ".session.tmp".to_owned(),
-    };
-    let tmp = path.with_file_name(tmp_name);
     let mut options = OpenOptions::new();
-    options.write(true).create(true).truncate(true);
+    options.write(true).create_new(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(&tmp)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    tighten_0600(&tmp)?;
-    fs::rename(&tmp, path)?;
+    let (tmp, mut file) = loop {
+        let tmp = tmp_path(path);
+        match options.open(&tmp) {
+            Ok(file) => break (tmp, file),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+    };
+    let written = file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .and_then(|()| tighten_0600(&tmp));
+    drop(file);
+    if let Err(error) = written.and_then(|()| fs::rename(&tmp, path)) {
+        let _ = fs::remove_file(&tmp);
+        return Err(error);
+    }
     tighten_0600(path)?;
+    sync_parent(path)
+}
+
+/// Syncs the directory entry after a rename so the new file survives a crash.
+fn sync_parent(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        if let Some(parent) = path.parent() {
+            File::open(parent)?.sync_all()?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
     Ok(())
 }
 
@@ -549,7 +615,6 @@ mod tests {
     use super::*;
     use sc_agent_types::observability::v2::NoopSessionLog;
     use sc_agent_types::{JudgeBackend, JudgeRequest};
-    use std::sync::atomic::{AtomicU64, Ordering};
 
     struct SharedBackend {
         prompts: Arc<Mutex<Vec<String>>>,
@@ -728,6 +793,81 @@ mod tests {
             !hint.contains("check.toml"),
             "directory hint is not a check.toml hint: {hint}"
         );
+    }
+
+    #[test]
+    fn session_writes_leave_no_temporary_files() {
+        let (store, dir) = store(Duration::from_secs(60));
+        let id = store.create(BackendId::Jev, &bundle()).expect("create");
+        store
+            .record_outcome(
+                &id,
+                &JudgeOutcome {
+                    answers: serde_json::json!({}),
+                    backend: BackendId::Jev,
+                    probabilities: None,
+                    provider_meta: None,
+                },
+            )
+            .expect("record");
+        let names: Vec<String> = fs::read_dir(dir.path())
+            .expect("dir")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(names, [id.to_string()]);
+    }
+
+    #[test]
+    fn temporary_names_are_unique_per_write() {
+        let path = Path::new("/sessions/abc");
+        let first = tmp_path(path);
+        let second = tmp_path(path);
+        assert_ne!(first, second);
+        let name = first
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("name");
+        assert!(name.starts_with(".abc."), "{name}");
+        assert!(name.contains(&std::process::id().to_string()), "{name}");
+        assert!(name.ends_with(".tmp"), "{name}");
+    }
+
+    #[test]
+    fn failed_write_removes_its_temporary_file() {
+        let dir = crate::extract::test_support::temp_dir("session-tmp");
+        let target = dir.path().join("occupied");
+        fs::create_dir(&target).expect("directory blocks the rename");
+        fs::write(target.join("keep"), b"x").expect("non-empty");
+        write_private(&target, b"{}").expect_err("rename onto a directory fails");
+        let leftovers: Vec<String> = fs::read_dir(dir.path())
+            .expect("dir")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter(|name| name.ends_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn created_session_directory_is_mode_0700() {
+        use std::os::unix::fs::PermissionsExt;
+        let parent = crate::extract::test_support::temp_dir("session-mode");
+        let nested = parent.path().join("a").join("sessions");
+        FileSessionStore::new(&nested, Arc::new(NoopSessionLog)).expect("store");
+        let mode = fs::metadata(&nested).expect("meta").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
     }
 
     fn file_set_modified(path: &Path, time: SystemTime) {

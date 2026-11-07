@@ -191,6 +191,11 @@ fn parse(args: &[String], stdin: &[u8]) -> Result<Parsed, JevError> {
                     detail: "pass either --request-json or --check, not both".into(),
                 });
             }
+            if flags.request_json.is_some() && flags.rev.is_some() {
+                return Err(JevError::InputInvalid {
+                    detail: "--rev selects check inputs and does not apply to --request-json; drop --rev or use --check".into(),
+                });
+            }
             let command = RunCommand {
                 repo_root: flags.repo_root,
                 check: flags.check,
@@ -379,11 +384,28 @@ fn prepare_log(log_root: &Path, overrides: &ExecuteOverrides) -> Result<Prepared
     })
 }
 
-fn finish_log(prepared: &PreparedLog) -> Result<(), JevError> {
-    if let Some(adapter) = &prepared.adapter {
-        adapter.flush()?;
+/// Flushes the session log after a successful command.
+///
+/// The log is best effort: a flush failure becomes a `warning` string in the
+/// envelope `data` and does not change the exit code (CR-014).
+fn finish_log(prepared: &PreparedLog) -> Option<String> {
+    let flushed = match &prepared.adapter {
+        Some(adapter) => adapter.flush(),
+        None => Ok(()),
+    };
+    flush_warning(flushed)
+}
+
+fn flush_warning(flushed: Result<(), JevError>) -> Option<String> {
+    flushed
+        .err()
+        .map(|error| format!("session log was not flushed: {}", error.fix_hint()))
+}
+
+fn attach_warning(data: &mut Value, warning: Option<String>) {
+    if let (Some(warning), Some(object)) = (warning, data.as_object_mut()) {
+        object.insert("warning".to_owned(), Value::String(warning));
     }
-    Ok(())
 }
 
 fn open_sessions(
@@ -413,10 +435,10 @@ fn dispatch_run(
         .clone()
         .unwrap_or_else(|| sessions_dir_for(&repo));
     let log_root = default_log_root(&repo, command.log_dir.as_deref());
-    let prompt_path = command
+    let prompt_readback = command
         .prompt_file
         .as_ref()
-        .map(|path| joined_path(repo.as_path().to_path_buf(), path));
+        .map(|path| absolute_text(&repo, path));
     let plan = if let Some(request_path) = &command.request_json {
         let bytes = request_bytes(&repo, request_path, &command.stdin)?;
         let prepared = prepare_caller_request(
@@ -459,7 +481,7 @@ fn dispatch_run(
                 }
             }),
         repo_root: path_text(repo.as_path()),
-        llm_system_prompt_file: prompt_path.as_ref().map(|path| path_text(path)),
+        llm_system_prompt_file: prompt_readback,
         request_json: command.request_json.as_ref().map(|path| {
             if path == "-" {
                 "-".to_owned()
@@ -490,15 +512,17 @@ fn dispatch_run(
             opts,
         ),
         PreparedRun::Check { spec, backends } => {
-            if let Some(path) = prompt_path {
-                opts = opts.system_prompt_override(path);
+            if let Some(path) = &command.prompt_file {
+                opts = opts.system_prompt_override(path.clone());
             }
             run_check(&spec, &backends, opts)
         }
     }?;
-    finish_log(&prepared)?;
+    let warning = finish_log(&prepared);
     let operation = if dry_run { OP_DRY_RUN } else { OP_RUN };
-    envelope::envelope(operation, run_data(&result, &readback, dry_run)?)
+    let mut data = run_data(&result, &readback, dry_run)?;
+    attach_warning(&mut data, warning);
+    envelope::envelope(operation, data)
 }
 
 enum PreparedRun {
@@ -538,7 +562,7 @@ fn dispatch_ask(command: AskCommand, overrides: &ExecuteOverrides) -> Result<Vec
         sessions.install_registry(registry_for_repo(&repo, &[stored.backend])?);
     }
     let outcome = sessions.ask(&session_id, &command.text)?;
-    finish_log(&prepared)?;
+    let warning = finish_log(&prepared);
     let readback = AskReadback {
         repo_root: path_text(repo.as_path()),
         sessions_dir: path_text(&sessions_dir),
@@ -560,7 +584,9 @@ fn dispatch_ask(command: AskCommand, overrides: &ExecuteOverrides) -> Result<Vec
             detail: "response JSON could not be encoded".into(),
         })?,
     );
-    envelope::envelope(OP_ASK, Value::Object(body))
+    let mut data = Value::Object(body);
+    attach_warning(&mut data, warning);
+    envelope::envelope(OP_ASK, data)
 }
 
 fn run_data(
@@ -704,7 +730,14 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
                 path: path.display().to_string(),
             });
         }
-        return Ok(RepoRoot::new(path));
+        let absolute = std::path::absolute(path).map_err(|error| {
+            JevError::operational_config(&format!(
+                "--repo-root {} could not be made absolute (cause: {}). Pass an absolute --repo-root.",
+                path.display(),
+                error.kind()
+            ))
+        })?;
+        return Ok(RepoRoot::new(absolute));
     }
     let cwd = std::env::current_dir().map_err(|error| {
         JevError::operational_config(&format!(
@@ -714,6 +747,7 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .current_dir(&cwd)
+        .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|error| {
             JevError::operational_config(&format!(
@@ -729,38 +763,69 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
         JevError::operational_config("git rev-parse returned non-UTF-8. Pass --repo-root.")
     })?;
     let path = PathBuf::from(text.trim());
-    if !path.is_dir() {
+    let canonical = std::fs::canonicalize(&path).map_err(|_| JevError::InputMissing {
+        path: path.display().to_string(),
+    })?;
+    if !canonical.is_dir() {
         return Err(JevError::InputMissing {
-            path: path.display().to_string(),
+            path: canonical.display().to_string(),
         });
     }
-    Ok(RepoRoot::new(path))
+    Ok(RepoRoot::new(canonical))
 }
 
+/// Turns `--check` into a repo-relative path without touching the filesystem.
+///
+/// An absolute argument must sit under the repo root (as given or
+/// canonicalized); that prefix is stripped. `\\` becomes `/`, `.` segments
+/// are dropped, and `..` is refused. Existence is decided by the engine, so
+/// a check file that exists only at `--rev` still loads (CR-004).
 fn relative_to_repo(repo: &RepoRoot, path: &Path) -> Result<String, JevError> {
-    let full = joined_path(repo.as_path().to_path_buf(), path);
-    let root = std::fs::canonicalize(repo.as_path()).map_err(|_| JevError::InputMissing {
-        path: repo.as_path().display().to_string(),
-    })?;
-    let full = std::fs::canonicalize(&full).map_err(|_| JevError::InputMissing {
-        path: full.display().to_string(),
-    })?;
-    let rel = full
-        .strip_prefix(&root)
-        .map_err(|_| JevError::InputInvalid {
-            detail: format!(
-                "{} is outside the repo root {}. Pass a path inside --repo-root.",
-                full.display(),
-                root.display()
-            ),
-        })?;
-    let text = rel.to_string_lossy().replace('\\', "/");
-    if text.is_empty() {
+    let relative = if path.is_absolute() {
+        strip_repo_prefix(repo, path)?
+    } else {
+        path.to_path_buf()
+    };
+    let text = relative.to_string_lossy().replace('\\', "/");
+    let mut parts = Vec::new();
+    for part in text.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                return Err(JevError::InputInvalid {
+                    detail: format!(
+                        "--check {} must not contain '..'. Pass a path inside --repo-root.",
+                        path.display()
+                    ),
+                });
+            }
+            other => parts.push(other),
+        }
+    }
+    if parts.is_empty() {
         return Err(JevError::InputInvalid {
             detail: "check path must be a file inside the repo, not the repo root itself".into(),
         });
     }
-    Ok(text)
+    Ok(parts.join("/"))
+}
+
+fn strip_repo_prefix(repo: &RepoRoot, path: &Path) -> Result<PathBuf, JevError> {
+    if let Ok(rest) = path.strip_prefix(repo.as_path()) {
+        return Ok(rest.to_path_buf());
+    }
+    if let Ok(root) = std::fs::canonicalize(repo.as_path())
+        && let Ok(rest) = path.strip_prefix(&root)
+    {
+        return Ok(rest.to_path_buf());
+    }
+    Err(JevError::InputInvalid {
+        detail: format!(
+            "{} is outside the repo root {}. Pass a path inside --repo-root.",
+            path.display(),
+            repo.as_path().display()
+        ),
+    })
 }
 
 fn absolute_text(repo: &RepoRoot, path: &Path) -> String {
@@ -777,6 +842,71 @@ fn path_text(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn check_path_is_normalised_lexically() {
+        let root = std::env::temp_dir().join("sc-ai-normalise-root");
+        let repo = RepoRoot::new(&root);
+        let inside = root.join("sub").join("check.toml");
+        let outside = std::env::temp_dir().join("elsewhere").join("check.toml");
+        let cases = [
+            (PathBuf::from("check.toml"), "check.toml"),
+            (PathBuf::from("./sub/check.toml"), "sub/check.toml"),
+            (PathBuf::from("sub\\check.toml"), "sub/check.toml"),
+            (inside, "sub/check.toml"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                relative_to_repo(&repo, &input).expect("normalised"),
+                expected,
+                "{}",
+                input.display()
+            );
+        }
+        let bad = [
+            PathBuf::from("../check.toml"),
+            PathBuf::from("sub/../../x"),
+            outside,
+            PathBuf::from("."),
+        ];
+        for path in bad {
+            let error = relative_to_repo(&repo, &path).expect_err("refused");
+            assert_eq!(error.code(), "INPUT_INVALID", "{}", path.display());
+        }
+    }
+
+    #[test]
+    fn flush_failure_is_a_warning_not_an_error() {
+        let warning = flush_warning(Err(JevError::operational_config(
+            "session log flush failed (disk full). Check that the log root is writable.",
+        )))
+        .expect("warning");
+        assert!(warning.contains("disk full"), "{warning}");
+        let mut data = serde_json::json!({"session_id": "x"});
+        attach_warning(&mut data, Some(warning));
+        assert!(data["warning"].as_str().is_some());
+        assert_eq!(data["session_id"], "x");
+        assert!(flush_warning(Ok(())).is_none());
+    }
+
+    #[test]
+    fn rev_with_request_json_is_rejected() {
+        let args = ["jev", "run", "--request-json", "req.json", "--rev", "HEAD"]
+            .map(str::to_owned)
+            .to_vec();
+        let error = match parse(&args, &[]) {
+            Ok(_) => panic!("--rev with --request-json must fail"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), "INPUT_INVALID");
+        assert!(error.fix_hint().contains("--rev"));
+    }
+
+    #[test]
+    fn relative_repo_root_is_absolutized() {
+        let repo = resolve_repo(Some(Path::new("."))).expect("cwd is a directory");
+        assert!(repo.as_path().is_absolute());
+    }
 
     #[test]
     fn reads_stdin_only_for_request_json_dash() {

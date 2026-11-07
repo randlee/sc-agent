@@ -3,6 +3,7 @@
 //! Precedence is the run override, then `check.toml`, then the packaged asset
 //! compiled in with `include_str`. The text is not part of `prompt_sha256`.
 
+use std::io::Read;
 use std::path::Path;
 
 use sc_agent_types::{JevError, RepoRoot, Rev};
@@ -75,6 +76,12 @@ fn non_empty<'a>(text: &'a str, path: &str) -> Result<&'a str, JevError> {
     }
 }
 
+/// Largest system-prompt override file this crate reads.
+///
+/// Prompts are instructions, not inputs. 1 MiB is far above any useful
+/// prompt and keeps a mistaken path (a log, `/dev/zero`) from exhausting memory.
+pub(crate) const MAX_PROMPT_BYTES: u64 = 1024 * 1024;
+
 fn read_override(repo: &Path, path: &Path) -> Result<String, JevError> {
     let full = if path.is_absolute() {
         path.to_path_buf()
@@ -82,13 +89,77 @@ fn read_override(repo: &Path, path: &Path) -> Result<String, JevError> {
         repo.join(path)
     };
     let display = full.display().to_string();
-    match std::fs::read_to_string(&full) {
-        Ok(text) => non_empty(&text, &display).map(str::to_owned),
+    let metadata = match std::fs::metadata(&full) {
+        Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            Err(JevError::PromptFileMissing { path: display })
+            return Err(JevError::PromptFileMissing { path: display });
         }
-        Err(error) => Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {display}: {error}"),
-        }),
+        Err(error) => {
+            return Err(JevError::ConfigInvalid {
+                detail: format!(
+                    "system prompt {display} could not be read ({})",
+                    error.kind()
+                ),
+            });
+        }
+    };
+    if !metadata.is_file() {
+        return Err(JevError::ConfigInvalid {
+            detail: format!("system prompt {display} is not a regular file"),
+        });
+    }
+    let file = std::fs::File::open(&full).map_err(|error| JevError::ConfigInvalid {
+        detail: format!(
+            "system prompt {display} could not be opened ({})",
+            error.kind()
+        ),
+    })?;
+    let mut bytes = Vec::new();
+    file.take(MAX_PROMPT_BYTES.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| JevError::ConfigInvalid {
+            detail: format!(
+                "system prompt {display} could not be read ({})",
+                error.kind()
+            ),
+        })?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_PROMPT_BYTES {
+        return Err(JevError::ConfigInvalid {
+            detail: format!("system prompt {display} exceeds {MAX_PROMPT_BYTES} bytes"),
+        });
+    }
+    let text = String::from_utf8(bytes).map_err(|_| JevError::ConfigInvalid {
+        detail: format!("system prompt {display} is not UTF-8"),
+    })?;
+    non_empty(&text, &display).map(str::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversize_override_is_config_invalid() {
+        let dir = tempfile::tempdir().expect("temp");
+        let path = dir.path().join("huge.md");
+        let size = usize::try_from(MAX_PROMPT_BYTES).expect("cap") + 1;
+        std::fs::write(&path, vec![b'p'; size]).expect("write");
+        let error = read_override(dir.path(), &path).expect_err("too large");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+        assert!(error.to_string().contains("exceeds"), "{error}");
+    }
+
+    #[test]
+    fn directory_override_is_config_invalid() {
+        let dir = tempfile::tempdir().expect("temp");
+        let error = read_override(dir.path(), dir.path()).expect_err("dir");
+        assert_eq!(error.code(), "CONFIG_INVALID");
+    }
+
+    #[test]
+    fn missing_override_is_prompt_file_missing() {
+        let dir = tempfile::tempdir().expect("temp");
+        let error = read_override(dir.path(), Path::new("absent.md")).expect_err("missing");
+        assert_eq!(error.code(), "PROMPT_FILE_MISSING");
     }
 }

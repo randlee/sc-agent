@@ -1,7 +1,14 @@
 //! `command` extractor.
 //!
 //! Argv only: no shell. Placeholders `{path}`, `{rev}`, and `{repo_root}` are
-//! replaced before spawn. The working directory is the repo root.
+//! replaced before spawn. `{repo_root}` is always absolute. The working
+//! directory is the repo root.
+//!
+//! The child starts with a cleared environment plus an allowlist (`PATH`,
+//! `HOME`, `USERPROFILE`, `SYSTEMROOT`, `TEMP`, `TMP`, `TMPDIR`, `LANG`,
+//! `LC_*`, `TERM`), so provider API keys and `SC_*` settings in this process
+//! never reach a repo-configured command. A failed command's error carries
+//! the last 4 KiB of its stderr with credential-looking values redacted.
 
 use std::io::Read;
 use std::mem::ManuallyDrop;
@@ -15,6 +22,7 @@ use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev};
 use super::Extracted;
 use super::Extractor;
 use super::private::Sealed;
+use super::sanitize::{STDERR_TAIL_BYTES, apply_env_allowlist, redact_error, stderr_tail};
 use super::subjects::parse_subjects_bytes;
 
 /// Largest stdout capture for one command.
@@ -107,7 +115,10 @@ pub(crate) fn substitute_placeholders(
             detail: "command argv must start with a program".into(),
         });
     }
-    let repo_root = repo.as_path().display().to_string();
+    let repo_root = std::path::absolute(repo.as_path())
+        .unwrap_or_else(|_| repo.as_path().to_path_buf())
+        .display()
+        .to_string();
     let mut out = Vec::with_capacity(argv.len());
     for arg in argv {
         if arg.contains("{path}") && source_path.is_none() {
@@ -128,6 +139,7 @@ pub(crate) fn substitute_placeholders(
 
 fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u8>, JevError> {
     let mut command = Command::new(&argv[0]);
+    apply_env_allowlist(&mut command);
     command
         .args(&argv[1..])
         .current_dir(repo.as_path())
@@ -139,30 +151,16 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         .map_err(|error| JevError::ExtractionFailed {
             detail: format!("failed to spawn {}: {error}", argv[0]),
         })?;
-    let stdout = match child.stdout.take() {
-        Some(stdout) => stdout,
-        None => {
-            kill_and_reap(child, Instant::now() + CLEANUP_BUDGET);
-            return Err(JevError::ExtractionFailed {
-                detail: "command stdout was not captured".into(),
-            });
-        }
-    };
-    let stderr = match child.stderr.take() {
-        Some(stderr) => stderr,
-        None => {
-            kill_and_reap(child, Instant::now() + CLEANUP_BUDGET);
-            return Err(JevError::ExtractionFailed {
-                detail: "command stderr was not captured".into(),
-            });
-        }
-    };
+    let stdout = child
+        .stdout
+        .take()
+        .expect("stdout is piped, so the child has a stdout handle");
+    let stderr = child
+        .stderr
+        .take()
+        .expect("stderr is piped, so the child has a stderr handle");
     let stdout_reader = PipeReader::spawn(move || read_capped(stdout, MAX_COMMAND_STDOUT_BYTES));
-    let stderr_reader = PipeReader::spawn(move || {
-        let mut sink = Vec::new();
-        let mut pipe = stderr;
-        let _ = read_capped_discard(&mut pipe, &mut sink);
-    });
+    let stderr_reader = PipeReader::spawn(move || read_tail(stderr, STDERR_TAIL_BYTES));
 
     let started = Instant::now();
     let status = loop {
@@ -206,12 +204,16 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
             });
         }
     };
-    let _ = stderr_reader.finish_by(deadline);
+    let stderr = stderr_reader.finish_by(deadline).unwrap_or_default();
     if !status.success() {
         let code = status.code().unwrap_or(-1);
-        return Err(JevError::ExtractionFailed {
-            detail: format!("exit {code}"),
-        });
+        let tail = stderr_tail(&stderr);
+        let detail = if tail.is_empty() {
+            format!("exit {code}")
+        } else {
+            format!("exit {code}; stderr: {tail}")
+        };
+        return Err(redact_error(JevError::ExtractionFailed { detail }));
     }
     match stdout {
         Ok(bytes) => Ok(bytes),
@@ -313,16 +315,19 @@ fn read_capped(mut pipe: impl Read, cap: usize) -> Result<Vec<u8>, CapError> {
     }
 }
 
-fn read_capped_discard(pipe: &mut impl Read, sink: &mut Vec<u8>) -> std::io::Result<()> {
+/// Drains `pipe` and keeps only its last `keep` bytes.
+fn read_tail(mut pipe: impl Read, keep: usize) -> Vec<u8> {
+    let mut tail = Vec::with_capacity(keep);
     let mut chunk = [0_u8; 8192];
     loop {
-        let read = pipe.read(&mut chunk)?;
-        if read == 0 {
-            return Ok(());
-        }
-        if sink.len() < 4096 {
-            let keep = 4096usize.saturating_sub(sink.len()).min(read);
-            sink.extend_from_slice(&chunk[..keep]);
+        let read = match pipe.read(&mut chunk) {
+            Ok(0) | Err(_) => return tail,
+            Ok(read) => read,
+        };
+        tail.extend_from_slice(&chunk[..read]);
+        if tail.len() > keep {
+            let excess = tail.len() - keep;
+            tail.drain(..excess);
         }
     }
 }
@@ -477,5 +482,136 @@ sys.stdout.write(json.dumps(doc))
             .extract(&repo, &Rev::worktree(), &input)
             .expect_err("empty");
         assert_eq!(error.code(), "EXTRACTION_EMPTY");
+    }
+
+    #[test]
+    fn command_extractor_failure_carries_stderr_tail() {
+        let dir = temp_dir("stderr");
+        let repo = RepoRoot::new(dir.path());
+        let input = command(
+            vec![
+                test_support::python().into(),
+                "-c".into(),
+                "import sys; sys.stderr.write('x' * 9000 + 'boom-diagnostic'); sys.exit(3)".into(),
+            ],
+            30,
+        );
+        let error = CommandExtractor
+            .extract(&repo, &Rev::worktree(), &input)
+            .expect_err("exit");
+        assert_eq!(error.code(), "EXTRACTION_FAILED");
+        let text = error.to_string();
+        assert!(text.contains("exit 3"), "{text}");
+        assert!(text.contains("boom-diagnostic"), "{text}");
+        assert!(text.len() < 5000, "stderr tail is bounded");
+    }
+
+    #[test]
+    fn repo_root_placeholder_is_absolute() {
+        let argv = substitute_placeholders(
+            &["prog".to_owned(), "{repo_root}".to_owned()],
+            &RepoRoot::new("relative-sub"),
+            &Rev::worktree(),
+            None,
+        )
+        .expect("argv");
+        let root = std::path::Path::new(&argv[1]);
+        assert!(root.is_absolute(), "{}", argv[1]);
+        assert!(root.ends_with("relative-sub"));
+    }
+
+    const PROBE_ENV: &str = "SC_JEV_CHECK_ENV_PROBE_API_KEY";
+    const PROBE_SECRET_ENV: &str = "SC_JEV_CHECK_PROBE_SECRET";
+    const PROBE_VALUE: &str = "sentinel-do-not-leak-7f2c";
+    const PROBE_DONE: &str = "env-probe-ran";
+
+    const PRINT_ENV: &str = r#"
+import json, os, sys
+text = "\n".join(f"{k}={v}" for k, v in sorted(os.environ.items()))
+n = len(text.encode())
+doc = {
+    "schema": "sc/subjects/1",
+    "source": {"path": "env.txt", "rev": "WORKTREE", "blob_sha": "b" * 40},
+    "producer": {
+        "name": "fixture", "version": "0", "language": "text", "grammar": "fixture",
+        "grammar_version": "0", "query_sha256": "a" * 64, "mode": "matches",
+    },
+    "subjects": [{
+        "id": "env.txt:1", "capture": "env", "text": text,
+        "span": {"start_line": 1, "end_line": 1, "start_byte": 0, "end_byte": n},
+    }],
+}
+sys.stdout.write(json.dumps(doc))
+"#;
+
+    /// Re-runs this test binary with a sentinel credential in its
+    /// environment. `unsafe_code` is forbidden, so the test cannot set the
+    /// variable in its own process.
+    #[test]
+    fn command_extractor_child_env_excludes_secrets() {
+        let exe = std::env::current_exe().expect("test binary");
+        let output = Command::new(exe)
+            .args([
+                "--exact",
+                "extract::command::tests::env_probe_child",
+                "--include-ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(PROBE_ENV, PROBE_VALUE)
+            .env(PROBE_SECRET_ENV, PROBE_VALUE)
+            .stdin(Stdio::null())
+            .output()
+            .expect("re-run test binary");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "probe failed: {stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains(PROBE_DONE), "probe did not run: {stdout}");
+    }
+
+    #[test]
+    #[ignore = "child half of command_extractor_child_env_excludes_secrets"]
+    fn env_probe_child() {
+        if std::env::var_os(PROBE_ENV).is_none() {
+            return;
+        }
+        let dir = temp_dir("env-probe");
+        let repo = RepoRoot::new(dir.path());
+        let input = command(
+            vec![test_support::python().into(), "-c".into(), PRINT_ENV.into()],
+            30,
+        );
+        let extracted = CommandExtractor
+            .extract(&repo, &Rev::worktree(), &input)
+            .expect("env probe");
+        let text = &extracted[0].text;
+        assert!(!text.contains(PROBE_VALUE), "sentinel leaked: {text}");
+        assert!(!text.contains(PROBE_ENV), "key name leaked: {text}");
+        assert!(!text.contains(PROBE_SECRET_ENV), "SC_ name leaked: {text}");
+        assert!(
+            text.lines()
+                .any(|line| line.to_ascii_uppercase().starts_with("PATH=")),
+            "PATH is kept: {text}"
+        );
+
+        let echo = command(
+            vec![
+                test_support::python().into(),
+                "-c".into(),
+                "import sys; sys.stderr.write(sys.argv[1]); sys.exit(1)".into(),
+                PROBE_VALUE.into(),
+            ],
+            30,
+        );
+        let error = CommandExtractor
+            .extract(&repo, &Rev::worktree(), &echo)
+            .expect_err("echo");
+        let rendered = format!("{error} {}", error.fix_hint());
+        assert!(!rendered.contains(PROBE_VALUE), "{rendered}");
+        assert!(rendered.contains("[redacted]"), "{rendered}");
+        println!("{PROBE_DONE}");
     }
 }

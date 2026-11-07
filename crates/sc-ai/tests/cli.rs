@@ -142,8 +142,12 @@ fn canon(path: &Path) -> String {
 }
 
 fn assert_no_prompt_leak(text: &str) {
+    let packaged_first_line = PACKAGED_SYSTEM_PROMPT.lines().next().expect("prompt line");
+    assert!(
+        !text.contains(packaged_first_line),
+        "packaged prompt leaked into {text}"
+    );
     for token in [
-        "PACKAGED-PROMPT-TOKEN-a3",
         "OVERRIDE-PROMPT-TOKEN-a7",
         "EVALUATOR-PROMPT-a7",
         "sk-ant-test-secret",
@@ -214,7 +218,7 @@ fn test_multi_backend_cli_equal_input() {
     assert!(prompt.contains("Session context:"));
     let payload = String::from_utf8_lossy(jev[0].payload.bytes());
     assert!(!payload.contains("Session context:"));
-    assert!(!payload.contains("PACKAGED-PROMPT-TOKEN-a3"));
+    assert!(!payload.contains(PACKAGED_SYSTEM_PROMPT.trim()));
     assert_no_prompt_leak(&value.to_string());
 }
 
@@ -286,7 +290,7 @@ fn test_cli_prompt_override() {
         .clone();
     assert_eq!(packaged, PACKAGED_SYSTEM_PROMPT);
     assert!(overridden.contains("OVERRIDE-PROMPT-TOKEN-a7"));
-    assert!(!overridden.contains("PACKAGED-PROMPT-TOKEN-a3"));
+    assert!(!overridden.contains(PACKAGED_SYSTEM_PROMPT.trim()));
     assert_eq!(
         second["data"]["readback"]["llm_system_prompt_file"],
         canon(&override_path)
@@ -813,4 +817,59 @@ fn cli_default_log_root_and_env_override() {
         String::from_utf8_lossy(&env_run.stderr)
     );
     assert!(custom.path().is_dir());
+}
+
+fn null_device() -> &'static str {
+    if cfg!(windows) { "NUL" } else { "/dev/null" }
+}
+
+/// Git for test fixtures: no global config, no prompt, fixed identity.
+fn git(cwd: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(cwd)
+        .env("GIT_CONFIG_GLOBAL", null_device())
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .args([
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "user.email=sc-ai@example.com",
+            "-c",
+            "user.name=sc-ai",
+        ])
+        .args(args)
+        .output()
+        .expect("git");
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn cli_check_that_exists_only_at_rev_loads_with_rev() {
+    let repo = TempDir::new("rev-only");
+    write_repo(repo.path());
+    git(repo.path(), &["init", "-q"]);
+    git(repo.path(), &["add", "-A"]);
+    git(repo.path(), &["commit", "-q", "-m", "init"]);
+    std::fs::remove_file(repo.path().join("check.toml")).expect("remove worktree copy");
+    let value = execute(
+        &[
+            "jev",
+            "dry-run",
+            "--repo-root",
+            repo.path().to_str().expect("utf8"),
+            "--check",
+            "check.toml",
+            "--rev",
+            "HEAD",
+        ],
+        noop_overrides(BackendRegistry::new()),
+    )
+    .expect("check.toml at HEAD");
+    assert_eq!(value["operation"], OP_DRY_RUN);
+    assert!(value["data"]["payload"]["questions"].is_array());
 }
