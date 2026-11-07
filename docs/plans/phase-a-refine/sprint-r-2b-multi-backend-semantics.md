@@ -30,13 +30,18 @@ adrs:
   - ADR-SAG-0002
   - ADR-SAG-0004
   - ADR-SAG-0005
+  - ADR-SAG-0006
   - ADR-SAG-0007
   - ADR-SAG-0008
+  - ADR-SAG-0009
   - ADR-SAG-0012
+  - ADR-SAG-0014
   - ADR-SAG-0019
   - ADR-SAG-0022
   - ADR-SAG-0024
   - ADR-SAG-0025
+  - ADR-SAG-0026  # HTTP half only (Active after r-3); r-2b relies on no compose-half bullet
+  - ADR-SAG-0027
   - ADR-SAG-0029
 owned_paths:
   - "crates/sc-jev-check/Cargo.toml"
@@ -86,8 +91,10 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
 
 ## Deliverables
 
-1. **Mode (ADR-SAG-0008, REQ-SAG-0605 engine part).** `RunConfig::mode`
-   honoured. `Independent`: no backend receives another's answers; the LLM
+1. **Mode (ADR-SAG-0008, REQ-SAG-0605 engine part).**
+   `RunConfig::mode(self, mode: MultiBackendMode) -> Self` is **added here**
+   (r-2 ships no `mode` setter, because its only governing text is
+   ADR-SAG-0025) and honoured. `Independent`: no backend receives another's answers; the LLM
    system prompt is the ADR-SAG-0019 resolved text only. `ChainContext`: later
    LLM backends receive `render_session_context(prior Ok outcomes)` appended to
    the system prompt, in `BackendSet` order; Jev never receives context. The
@@ -150,8 +157,9 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
      `ids` with no entry, or a shared-form map whose only question id is
      `backends` is `INPUT_INVALID` with a fix hint naming the two forms.
    Example: `{"backends": {"jev": {"failure": {"error": "NETWORK_ERROR", "kind": "busy"}}, "haiku": {"relevant": "yes"}}}`.
-   Tests (target `scripted`, through the crate's `test-util` self
-   dev-dependency): `test_scripted_shared_form_unchanged`,
+   Tests (target `scripted`, declared
+   `[[test]] required-features = ["test-util"]`; validation lines pass
+   `--features test-util`): `test_scripted_shared_form_unchanged`,
    `test_scripted_per_backend_failure` (one backend `Failed` with
    `NETWORK_ERROR`/`Busy`, the other `Ok`), `test_scripted_validate_stage_not_sent`
    (`NotSent`, nothing recorded by the mock), `test_scripted_invalid_form_rejected`.
@@ -161,9 +169,10 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
    `WireFault::DropEmbeddedByte` and a `with_wire_fault(WireFault)` builder
    method on `JevClient` / `AnthropicHaikuBackend` / `OpenAiLunaBackend`; the
    fault is applied inside the real wire builder after canonical bytes are
-   embedded. Each crate's own integration tests enable it through a self
-   dev-dependency (no `version` key; manifest treatment per r-1's D0 spike
-   result); transports come from `sc-agent-http`'s `test-util` test
+   embedded. Each crate's `wire` target is declared
+   `[[test]] required-features = ["test-util"]` and its validation lines pass
+   `--features test-util`; there is no self dev-dependency (r-1's D0 spike
+   result, `boundaries/README.md` "Dev-dependency and self edges"); transports come from `sc-agent-http`'s `test-util` test
    transport (dev-dependency). Both boundary manifests name the feature in
    `notes`. Tests live **in each backend crate** (no new dependency edge
    from `sc-jev-check` to `sc-agent-http`):
@@ -186,45 +195,65 @@ ARCHE-001, ARCHE-002 (engine), ARCHE-013, CR-009.
    for the shared form). ADR index row ADR-SAG-0025 and the r-2b "Amended by"
    markers in rows 0004, 0008, 0019, 0022 → Active.
 
+   **ADR-SAG-0025 bullet 2 split at flip time** (plan review 4, pre-screen
+   r-2b). Bullet 2's clause "REQ-SAG-0604 (consumer output in r-3b: stdout
+   envelope, stderr first failure, exit 2)" would go Active at r-2b merge
+   but is delivered by r-3b. r-2b ends bullet 2 at "…and one `warnings`
+   entry. REQ-SAG-0604 (engine part)." and inserts, directly after it, an
+   r-3b-owned bullet that it leaves Proposed:
+
+   > - (Proposed, r-3b) REQ-SAG-0604 consumer output: on a partial result
+   >   (`RunResponse::is_partial()`) `sc-ai` prints the envelope with the
+   >   successful answers on stdout, the first failure's
+   >   `ScAgentErrorResponse` on stderr, and exits 2; `sc-jev-py` raises
+   >   `JevError` with a `.response` attribute holding the envelope `data`.
+   >   All-failed stays a plain error.
+
+   The ADR-SAG-0025 Status line then reads "Active (Phase A.1, r-2b); the
+   REQ-SAG-0604 consumer-output bullet is Proposed (r-3b)", and the index
+   row Status cell "Active (r-2b); consumer-output bullet Proposed (r-3b)".
+   r-3b flips that bullet, the Status line and the cell to Active.
+
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0606 | `test_equal_false_when_backend_digest_differs` (mock reports another digest); `test_equal_true_when_all_digests_match`; `test_real_wire_builder_reports_prompt_digest` and `test_digest_detects_faulty_wire_builder` in `sc-jev` (Jev) and `sc-jev-backends` (Haiku, Luna) |
-| adr:ADR-SAG-0025 | Status Active; index row Active |
+| adr:ADR-SAG-0025 | Status line and index row read as above (Active, r-2b; consumer-output bullet Proposed, r-3b); bullet 2 ends at "REQ-SAG-0604 (engine part)" and no Active bullet names r-3b consumer behaviour; bullet 1 matches `RunConfig::mode` as added in deliverable 1 |
+| adr:ADR-SAG-0006, 0009, 0014, 0026, 0027 | Regression: backends still take their transport through the r-3 `Transport` generic (0006, 0026 HTTP half; `cargo test -p sc-jev --test jev_api` and `cargo test -p sc-jev-backends --test llm`); the scripted registry still installs over existing ids only and the second scripted-answers form goes through `register_scripted_backends` (0009); `RunResponse` serialization and the session-save `warnings` entry match the r-2 `data` body (0014, `test_run_response_contract`); `Attestation` and `input_sha256` keep the r-1 types and every new failure maps through `ErrorCode` (0027, `test_error_response_stderr_golden`) |
 | adr:ADR-SAG-0022 | r-2b subsection Active (scripted backend reports the received digest; per-backend scripted-answers form); `test_scripted_shared_form_unchanged`, `test_scripted_per_backend_failure`, `test_scripted_validate_stage_not_sent`, `test_scripted_invalid_form_rejected` |
 | adr:ADR-SAG-0005, 0007 | Regression: backends still do not re-canonicalize the wire body (digest re-encoding is attestation-only and never feeds the wire body; the byte-exact Jev body regression `cargo test -p sc-jev --test jev_api` and `cargo test -p sc-jev-backends --test llm` stay green); retries only via `BusyPolicy` (`test_no_resend_on_timeout`) |
 | adr:ADR-SAG-0004 | `test_chain_context_augmented_request_revalidated` (over-cap chained request refused before send; that backend `Failed`, `leak = true`) |
 | adr:ADR-SAG-0008 | `test_independent_default_no_prior_answers_in_prompt`; `test_chain_context_recorded_and_applied` |
-| boundary:jev-check | `test_partial_failure_keeps_answers`; `test_all_failed_returns_err`; `test_leak_true_iff_any_failed`; `test_no_resend_on_timeout`; `test_session_save_failure_keeps_answers`; cross-impl digests unchanged; `test-util` absent from `cargo tree -p sc-jev -e normal,features` and the same for `sc-jev-backends`. Regression per listed id: REQ-SAG-0602/0603 `cargo test -p sc-jev-check --test multi_backend`; REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0710 `test_run_response_contract`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact` (`results[].error`); NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm`; NFR-SAG-0003 `cargo test -p sc-jev-check --test sessions_exact` |
+| boundary:jev-check | `test_partial_failure_keeps_answers`; `test_all_failed_returns_err`; `test_leak_true_iff_any_failed`; `test_no_resend_on_timeout`; `test_session_save_failure_keeps_answers`; cross-impl digests unchanged; `test-util` absent from `cargo tree -p sc-jev -e normal,features` and the same for `sc-jev-backends`. Regression per listed id: REQ-SAG-0602/0603 `cargo test -p sc-jev-check --features test-util --test multi_backend`; REQ-SAG-0610 `cargo test -p sc-jev-check --lib -- run::tests::`; REQ-SAG-0710 `test_run_response_contract`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact` (`results[].error`); NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm`; NFR-SAG-0003 `cargo test -p sc-jev-check --features test-util --test sessions_exact` |
 
 ## Required validation
 
 ```bash
 just lint
 just test
-cargo test -p sc-jev-check --test multi_backend -- test_partial_failure_keeps_answers --exact
-cargo test -p sc-jev-check --test multi_backend -- test_all_failed_returns_err --exact
-cargo test -p sc-jev-check --test multi_backend -- test_leak_true_iff_any_failed --exact
-cargo test -p sc-jev-check --test multi_backend -- test_independent_default_no_prior_answers_in_prompt --exact
-cargo test -p sc-jev-check --test multi_backend -- test_chain_context_recorded_and_applied --exact
-cargo test -p sc-jev-check --test multi_backend -- test_chain_context_augmented_request_revalidated --exact
-cargo test -p sc-jev-check --test multi_backend -- test_no_resend_on_timeout --exact
-cargo test -p sc-jev-check --test multi_backend -- test_session_save_failure_keeps_answers --exact
-cargo test -p sc-jev-check --test multi_backend -- test_equal_false_when_backend_digest_differs --exact
-cargo test -p sc-jev-check --test multi_backend -- test_equal_true_when_all_digests_match --exact
-cargo test -p sc-jev --test wire -- test_real_wire_builder_reports_prompt_digest --exact
-cargo test -p sc-jev --test wire -- test_digest_detects_faulty_wire_builder --exact
-cargo test -p sc-jev-backends --test wire -- test_real_wire_builder_reports_prompt_digest --exact
-cargo test -p sc-jev-backends --test wire -- test_digest_detects_faulty_wire_builder --exact
-cargo test -p sc-jev-check --test scripted -- test_scripted_shared_form_unchanged --exact
-cargo test -p sc-jev-check --test scripted -- test_scripted_per_backend_failure --exact
-cargo test -p sc-jev-check --test scripted -- test_scripted_validate_stage_not_sent --exact
-cargo test -p sc-jev-check --test scripted -- test_scripted_invalid_form_rejected --exact
-cargo test -p sc-jev-check --test run_response -- test_run_response_contract --exact
-cargo test -p sc-jev-check --test multi_backend
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_partial_failure_keeps_answers --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_all_failed_returns_err --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_leak_true_iff_any_failed --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_independent_default_no_prior_answers_in_prompt --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_chain_context_recorded_and_applied --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_chain_context_augmented_request_revalidated --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_no_resend_on_timeout --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_session_save_failure_keeps_answers --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_equal_false_when_backend_digest_differs --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend -- test_equal_true_when_all_digests_match --exact
+cargo test -p sc-jev --features test-util --test wire -- test_real_wire_builder_reports_prompt_digest --exact
+cargo test -p sc-jev --features test-util --test wire -- test_digest_detects_faulty_wire_builder --exact
+cargo test -p sc-jev-backends --features test-util --test wire -- test_real_wire_builder_reports_prompt_digest --exact
+cargo test -p sc-jev-backends --features test-util --test wire -- test_digest_detects_faulty_wire_builder --exact
+cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_shared_form_unchanged --exact
+cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_per_backend_failure --exact
+cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_validate_stage_not_sent --exact
+cargo test -p sc-jev-check --features test-util --test scripted -- test_scripted_invalid_form_rejected --exact
+cargo test -p sc-jev-check --features test-util --test run_response -- test_run_response_contract --exact
+cargo test -p sc-jev-check --features test-util --test multi_backend
 cargo test -p sc-jev-check --lib -- run::tests::
-cargo test -p sc-jev-check --test sessions_exact
+cargo test -p sc-jev-check --features test-util --test sessions_exact
 cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact
 cargo test -p sc-jev --test jev_api
 cargo test -p sc-jev-backends --test llm

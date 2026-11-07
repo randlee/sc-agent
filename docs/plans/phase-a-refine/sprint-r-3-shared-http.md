@@ -35,12 +35,15 @@ adrs:
   - ADR-SAG-0003
   - ADR-SAG-0006
   - ADR-SAG-0007
+  - ADR-SAG-0009
   - ADR-SAG-0012
+  - ADR-SAG-0016
   - ADR-SAG-0017
   - ADR-SAG-0018
+  - ADR-SAG-0019
   - ADR-SAG-0020
-  - ADR-SAG-0023
-  - ADR-SAG-0026
+  - ADR-SAG-0023  # binding once r-4 has made its r-4 part Active; r-3 does not cite its r-3b subsection
+  - ADR-SAG-0026  # HTTP half only; the compose half stays Proposed (r-3b) and r-3 relies on none of it
   - ADR-SAG-0027
   - ADR-SAG-0029
 owned_paths:
@@ -66,9 +69,11 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0007 amendment (r-3)"
   - "docs/architecture.md#ADR-SAG-0017 amendment (r-3)"
   - "docs/architecture.md#ADR-SAG-0020 amendment (r-3)"
+  - "docs/architecture.md#ADR-SAG-0020 amendment (r-3b) — inserted as Proposed only (r-3b owns its text from then on and flips it)"
   - "docs/architecture.md#ADR-SAG-0026 Status line and HTTP half"
   - "docs/architecture.md#ADR index row ADR-SAG-0026 (Status cell: HTTP half)"
   - "docs/architecture.md#ADR index Amended-by marker (r-3) in ADR-SAG-0006, 0007, 0017, 0020, 0029"
+  - "docs/architecture.md#ADR index row ADR-SAG-0020 (adds the marker 'A.1 subsection (Proposed, r-3b)')"
   - "docs/requirements.md#REQ-SAG-0402 row; REQ-SAG-0505, REQ-SAG-0130 (r-3 bullet) amendments"
 ---
 
@@ -168,12 +173,13 @@ local `rg` check.)
      `test_transport_error_with_secret_is_redacted` (target `retry`): a
      scripted transport returns an error whose detail contains the request's
      secret value; the returned error does not contain it.
-   - **Tests and the seam.** The crate's integration targets enable
-     `test-util` through the self dev-dependency
-     `sc-agent-http = { path = ".", features = ["test-util"] }` (no
-     `version` key; manifest treatment per r-1's D0 spike result; plan "Test
-     seams"); loopback tests in `--test ureq` use `Endpoint::loopback_http`
-     and run against a std `TcpListener` on 127.0.0.1.
+   - **Tests and the seam.** The crate's integration targets `retry` and
+     `ureq` are declared `[[test]] required-features = ["test-util"]` and
+     their validation lines pass `--features test-util`; there is no self
+     dev-dependency (r-1's D0 spike result, `boundaries/README.md`
+     "Dev-dependency and self edges"; plan "Test seams"); loopback tests in
+     `--test ureq` use `Endpoint::loopback_http` and run against a std
+     `TcpListener` on 127.0.0.1.
 2. **Retry rules** (owner decision (b), DECIDED 2026-11-06; REQ-SAG-0505
    amendment; ADR-SAG-0007 r-3 amendment). `BusyPolicy::default()`:
    statuses 429/502/529 only; at most 4 sends; a valid Retry-After honoured,
@@ -234,7 +240,8 @@ local `rg` check.)
    crate has `[lints] workspace = true` (a-10; `sc-agent-http` adds it here).
    r-3's validation runs a local check (`rg`, below). The cross-crate proof
    is `workspace-tests --test source_scans` in r-3b (moved out of this
-   published crate, RBQA-F003): it scans **all** targets
+   published crate, RBQA-F003), governed by an r-3b-owned ADR-SAG-0020
+   bullet, not by r-3's (ADR text, item 7): it scans **all** targets
    (`crates/**/*.rs`, incl. `tests/`, `benches/`, `examples/`, `build.rs`)
    for `disallowed_methods` in any `allow`/`expect` (item- or crate-level)
    outside `crates/sc-agent-http/src/ureq_transport.rs` (the type-aware half
@@ -266,20 +273,60 @@ local `rg` check.)
 7. **ADR text.** ADR-SAG-0026 HTTP half → Active (states ADR-SAG-0012 still
    holds); ADR-level Status → "Active (HTTP half, r-3); compose half
    Proposed (r-3b)"; index row ADR-SAG-0026 Status cell likewise. ADR-SAG-0006 r-3 amendment → Active. ADR-SAG-0020 r-3 amendment →
-   Active. ADR-SAG-0017 r-3 amendment (published library set gains
+   Active, with its first bullet reworded at flip time so that it states
+   only what r-3 enforces (below). ADR-SAG-0017 r-3 amendment (published library set gains
    `sc-agent-http`, publish order) → Active. ADR-SAG-0007 r-3 amendment →
    Active. REQ-SAG-0505 and REQ-SAG-0130 r-3 bullets → Active.
+
+   **ADR-SAG-0020 r-3 bullet 1, replacement wording** (plan review 4,
+   pre-screen r-3 fix 1). The Active bullet must not name a mechanism that
+   does not exist until wave 4. Replace the whole first bullet of
+   "Amendment (Phase A.1, r-3)" with:
+
+   > - (Active, r-3) A secret travels only as a `SecretHeader` holding
+   >   `ResolvedApiKey` inside `sc_agent_http::HttpRequest`. The single read
+   >   site is a **lint-enforced workspace convention, not a type seal**:
+   >   `ResolvedApiKey::as_str` is listed in `clippy.toml`
+   >   `disallowed-methods`; its one call site,
+   >   `crates/sc-agent-http/src/ureq_transport.rs`, carries
+   >   `#[expect(clippy::disallowed_methods, reason = ...)]`; workspace lints
+   >   deny `allow_attributes` and `allow_attributes_without_reason`; every
+   >   crate has `[lints] workspace = true`, checked locally by r-3's
+   >   validation; and an `rg` check finds `disallowed_methods` in no file
+   >   under `crates/` other than that call site. Crates outside the
+   >   workspace are not constrained. Redaction is applied once, in
+   >   `send_with_busy_retry`, to every error it returns, including errors a
+   >   `Transport` impl returns; a caller of `Transport::send` directly
+   >   bypasses it.
+
+   The removed `source_scans` clause is not dropped: in the same edit r-3
+   inserts, after the r-3 subsection, a new subsection
+   "### Amendment (Phase A.1, r-3b)" with
+   "**Status:** Proposed (Phase A.1) — lands in r-3b." and the bullet whose
+   exact text is in sprint r-3b ("ADR text", ADR-SAG-0020 r-3b bullet), and
+   adds "A.1 subsection (Proposed, r-3b)" to the ADR-SAG-0020 index row.
+   r-3b owns that subsection and marker from then on.
+
+   **Markers r-3 flips and markers it must not touch.** r-3 flips the
+   "(Proposed, r-3)" markers in index rows 0006, 0007, 0017, 0020 and 0029,
+   the HTTP-half parts of the ADR-SAG-0026 Status and Amends cells, and the
+   ADR-SAG-0026 Status line. It must **not** flip: the r-3b markers in rows
+   0010, 0011, 0013, 0016 and 0017 ("ADR-SAG-0026 (Proposed, r-3b)"), the
+   compose-half part of the ADR-SAG-0026 row, the new ADR-SAG-0020 r-3b
+   marker, the r-4 marker in rows 0016 and 0017 ("ADR-SAG-0023 (Proposed,
+   r-4)", which r-4 flips), the ADR-SAG-0023 row, or ADR-SAG-0028.
 
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
 | req:REQ-SAG-0402 | No transport/retry/redaction code in `sc-jev` or `sc-jev-backends` (the deleted files are gone; both compile only against `sc-agent-http`); `cargo tree --depth 1` of both has no `ureq`; loopback tests for `UreqTransport` (https-only, no redirect, 8 MiB streaming cap, agent reused) via `Endpoint::loopback_http`; `test_ureq_agent_config_values` |
-| adr:ADR-SAG-0026 | HTTP half Active; ADR-level Status line and index row updated |
-| adr:ADR-SAG-0020 | r-3 subsection Active; local `rg` read-site check; existing leak tests moved into `sc-agent-http`; `test_transport_error_with_secret_is_redacted` |
-| adr:ADR-SAG-0006, 0017 | r-3 subsections Active |
+| adr:ADR-SAG-0026 | HTTP half Active; ADR-level Status line and index row Status cell read exactly "Active (HTTP half, r-3); compose half Proposed (r-3b)"; r-3 asserts nothing about the compose half (no r-3 deliverable or test relies on `sc-agent-compose` or on any compose-half bullet) |
+| adr:ADR-SAG-0020 | r-3 subsection Active with bullet 1 reading as the replacement wording above (no `source_scans` clause); the ADR-SAG-0020 r-3b subsection exists with Status Proposed and the index row carries "(Proposed, r-3b)"; local `rg` read-site check; existing leak tests moved into `sc-agent-http`; `test_transport_error_with_secret_is_redacted` |
+| adr:ADR-SAG-0006, 0017 | r-3 subsections Active; the r-3b and r-4 markers in rows 0016 and 0017 unchanged |
+| adr:ADR-SAG-0009, 0016, 0019 | Regression: `with_default_transport(key)` keeps the r-1 signature and the r-1 `FACTORIES` dispatch is unchanged (0009, `cargo test -p sc-jev-check --lib -- registry::tests::test_every_backend_has_factory --exact`); `sc-agent-http` reaches `sc-agent-types` with feature `secret` only and the `agent-types` manifest change is `allowed_dependents +sc-agent-http` only (0016); the wire builders and parsers stay in `sc-jev`/`sc-jev-backends` and `cargo test -p sc-jev-backends --test llm` is green (0019) |
 | boundary:agent-http | Manifest enforced by `just lint` (output attached); public-API `cargo doc` (with deps) grep finds no `ureq/<kind>.` href or `ureq::` title, and the PR records the canary run in which it failed; `test_release_build_refuses_http`; retry tests; `test-util` absent from `cargo tree -p sc-agent-http -e normal,features`; `sc-agent-types` reached with feature `secret` only |
-| req:REQ-SAG-0505 (amended) | `cargo test -p sc-agent-http --test retry -- <name> --exact` prints `1 passed` for `test_busy_policy_numbers`, `test_missing_and_malformed_retry_after_back_off_exponentially`, `test_retry_after_grammar`, `test_retry_sleep_capped_by_budget`, `test_connect_failure_returns_immediately_retryable`, `test_exhaustion_reason_distinguishable` (the decided numbers) |
+| req:REQ-SAG-0505 (amended) | `cargo test -p sc-agent-http --features test-util --test retry -- <name> --exact` prints `1 passed` for `test_busy_policy_numbers`, `test_missing_and_malformed_retry_after_back_off_exponentially`, `test_retry_after_grammar`, `test_retry_sleep_capped_by_budget`, `test_connect_failure_returns_immediately_retryable`, `test_exhaustion_reason_distinguishable` (the decided numbers) |
 | req:REQ-SAG-0130 (amended, r-3 bullet) | `release/sc-publish-consumer-input.json` lists `sc-agent-http` with `publish_order: 3`; the `cargo publish --dry-run` below packages `sc-agent-http` third and exits 0 |
 | boundary:jev | Regression: REQ-SAG-0110 / REQ-SAG-0400 / REQ-SAG-0401 `cargo test -p sc-jev --test jev_api` green (every Jev operation still in `sc-jev`, ADR-SAG-0012) |
 | boundary:jev-backends | Regression: REQ-SAG-0500/0501/0502/0504/0505 `cargo test -p sc-jev-backends --test llm` green against the decided numbers |
@@ -292,17 +339,17 @@ local `rg` check.)
 ```bash
 just lint
 just test
-cargo test -p sc-agent-http --test retry -- test_busy_policy_numbers --exact
-cargo test -p sc-agent-http --test retry -- test_missing_and_malformed_retry_after_back_off_exponentially --exact
-cargo test -p sc-agent-http --test retry -- test_retry_sleep_capped_by_budget --exact
-cargo test -p sc-agent-http --test retry -- test_connect_failure_returns_immediately_retryable --exact
-cargo test -p sc-agent-http --test retry -- test_cancel_interrupts_sleep --exact
-cargo test -p sc-agent-http --test retry -- test_no_retry_after_body_sent --exact
-cargo test -p sc-agent-http --test retry -- test_retry_after_grammar --exact
-cargo test -p sc-agent-http --test retry -- test_transport_error_with_secret_is_redacted --exact
-cargo test -p sc-agent-http --test retry -- test_exhaustion_reason_distinguishable --exact
-cargo test -p sc-agent-http --test ureq
-cargo test -p sc-agent-http --test ureq -- test_release_build_refuses_http --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_busy_policy_numbers --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_missing_and_malformed_retry_after_back_off_exponentially --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_retry_sleep_capped_by_budget --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_connect_failure_returns_immediately_retryable --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_cancel_interrupts_sleep --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_no_retry_after_body_sent --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_retry_after_grammar --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_transport_error_with_secret_is_redacted --exact
+cargo test -p sc-agent-http --features test-util --test retry -- test_exhaustion_reason_distinguishable --exact
+cargo test -p sc-agent-http --features test-util --test ureq
+cargo test -p sc-agent-http --features test-util --test ureq -- test_release_build_refuses_http --exact
 cargo test -p sc-agent-http --lib -- ureq_transport::tests::test_ureq_agent_config_values --exact
 cargo doc -p sc-agent-http && ! grep -rlE 'ureq/(struct|enum|trait|type|fn|union)\.|title="(struct|enum|trait|type|fn|union) ureq::' target/doc/sc_agent_http/
 test -z "$(rg -l 'disallowed_methods' crates/ | grep -v '^crates/sc-agent-http/src/ureq_transport.rs$')"
