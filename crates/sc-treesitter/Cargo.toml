@@ -19,22 +19,36 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**", "assets/q
 workspace = true
 
 [features]
-default = ["python", "rust"]
+default = ["cli", "python", "rust"]
+# Binary-only dependencies (ADR-SAG-0023): the `sc-treesitter` bin and the
+# `cli` test target need them; `--no-default-features` builds the library
+# without them.
+cli = ["dep:mimalloc", "dep:clap"]
 python = ["dep:tree-sitter-python"]
 rust = ["dep:tree-sitter-rust"]
 
 [dependencies]
-# Unconditional for the library target by current choice: library users also
-# build mimalloc's C code. Cost accepted; feature-gating it behind a bin-only
-# feature is under Phase A review. Deliberate `=` pin (tested allocator).
-mimalloc.workspace = true
+clap = { workspace = true, optional = true }
+mimalloc = { workspace = true, optional = true }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json.workspace = true
-# Deliberate `=` pins: grammar ABI and query captures are tested against these
-# exact tree-sitter releases; revisited at Phase A review.
+# Deliberate `=` lockstep (ADR-SAG-0023 list): grammar ABI and query captures
+# are tested against these exact tree-sitter releases (output determinism).
 tree-sitter = { version = "=0.27.1" }
 tree-sitter-python = { version = "=0.25.0", optional = true }
 tree-sitter-rust = { version = "=0.24.2", optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "sc-treesitter"
+path = "src/main.rs"
+required-features = ["cli"]
+
+# Runs the binary through CARGO_BIN_EXE_sc-treesitter, so it needs the bin's
+# features.
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+required-features = ["cli"]
