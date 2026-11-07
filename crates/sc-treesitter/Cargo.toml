@@ -34,7 +34,7 @@ sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json.workspace = true
 # Deliberate `=` lockstep (ADR-SAG-0023 list): grammar ABI and query captures
 # are tested against these exact tree-sitter releases (output determinism).
-tree-sitter = "=0.27.1"
+tree-sitter = { version = "=0.27.1" }
 tree-sitter-python = { version = "=0.25.0", optional = true }
 tree-sitter-rust = { version = "=0.24.2", optional = true }
 

@@ -238,9 +238,12 @@ for the Scoop multi-shim limit.
 - **Frontmatter** (REQ-QA-R4-003, REQ-QA-R4-004). REQ-SAG-0135 is listed
   under `constrained_by` (r-4 adds optional `clap` and its ownership record;
   r-3b closes the requirement), and `Cargo.lock` is an owned derived file.
-- **`tree-sitter` pin form** (RBP minor). `tree-sitter = "=0.27.1"` uses the
-  plain string form like the other entries; the three tree-sitter pins stay
-  in `crates/sc-treesitter/Cargo.toml` (their only user) rather than being
+- **`tree-sitter` pin form** (RBP minor), declined. The inline-table form
+  `tree-sitter = { version = "=0.27.1" }` stays: the unit test
+  `extract::tests::pinned_grammar_versions_match_cargo_toml`
+  (`crates/sc-treesitter/src/extract.rs`, not r-4's) matches that exact text,
+  and the string form fails it. The three tree-sitter pins also stay in
+  `crates/sc-treesitter/Cargo.toml` (their only user) rather than being
   hoisted to the workspace.
 - **`check-exact-pins.sh` interpreter** (QA-003). The script needs bash and
   `python3` 3.11+ (tomllib) and fails with a clear message otherwise. It is
