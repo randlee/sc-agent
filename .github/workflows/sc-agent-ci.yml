@@ -6,7 +6,7 @@
 #   test      just setup + just lint (ubuntu only); cargo clippy --all-features
 #             and cargo test (all three OSes)
 #   python    just test-python (maturin develop + jev-python pytest)
-#   features  cargo hack --each-feature check -p sc-treesitter
+#   features  cargo hack --each-feature test -p sc-treesitter
 #   doc       cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings
 #   coverage  cargo llvm-cov summary, uploaded as an artifact
 #
@@ -215,13 +215,9 @@ jobs:
           restore-keys: |
             sc-agent-ci-features-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
 
-      # `check` only: the per-language sc-treesitter tests are not yet
-      # feature-gated, so `--no-default-features` tests do not build. This
-      # step switches to `cargo hack --each-feature test -p sc-treesitter`
-      # once the phase-end code track (wave 3) gates them.
-      - name: cargo hack --each-feature check -p sc-treesitter
+      - name: cargo hack --each-feature test -p sc-treesitter
         timeout-minutes: 20
-        run: cargo hack --each-feature check -p sc-treesitter
+        run: cargo hack --each-feature test -p sc-treesitter
 
   doc:
     name: rustdoc (-D warnings)

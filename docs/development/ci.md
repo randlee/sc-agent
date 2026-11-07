@@ -22,7 +22,7 @@ retries; bounded cargo network-fetch retries only (`CARGO_NET_RETRY=2`).
 | --- | --- | --- |
 | `test` | ubuntu-24.04, macos-15, windows-2022 | `just setup` and `just lint` (ubuntu-24.04 only), then on every OS `cargo clippy --workspace --all-targets --all-features -- -D warnings` and `cargo test --workspace` |
 | `python` | ubuntu-24.04, macos-15, windows-2022 | `just test-python` |
-| `features` | ubuntu-24.04 | `cargo hack --each-feature check -p sc-treesitter` |
+| `features` | ubuntu-24.04 | `cargo hack --each-feature test -p sc-treesitter` |
 | `doc` | ubuntu-24.04 | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` |
 | `coverage` | ubuntu-24.04 | `cargo llvm-cov --workspace --no-report`, then `cargo llvm-cov report` |
 
@@ -83,10 +83,6 @@ features to maturin.
   managed file and is not patched here. Boundary, fmt and clippy results do
   not depend on the host; clippy `--all-features` and `cargo test` still run
   on all three OSes. Upstream issue 1 below.
-- **`features` runs `check`, not `test`.** The per-language sc-treesitter tests
-  are not feature-gated yet, so `--no-default-features` test builds fail. The
-  job switches to `cargo hack --each-feature test -p sc-treesitter` once they
-  are gated.
 - **Coverage is reported, not gated.** The job uploads `coverage/summary.txt`
   and `coverage/summary.json` as the `coverage-summary` artifact and writes the
   table to the job summary. Nothing is sent to a third-party service.

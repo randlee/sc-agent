@@ -1,29 +1,31 @@
 //! Tree-sitter producer for `sc/subjects/1` documents.
 //!
 //! `sc-treesitter` parses a source blob with a pinned grammar, runs a query in
-//! matches mode, and returns a [`SubjectsDocument`]. The CLI reads bytes with
-//! `git show` and writes that document to stdout. This library does not spawn
-//! git and does not depend on `sc-jev` or `sc-jev-check`.
+//! matches mode, and returns a [`SubjectsDocument`]. The CLI reads blob bytes
+//! with `git cat-file` and writes that document to stdout. This library does
+//! not spawn git and does not depend on `sc-jev` or `sc-jev-check`.
 //!
 //! Normative JSON rules live in `docs/sc-agent-types/subjects-schema.md`.
+//!
+//! [`SubjectsDocument`]: sc_agent_types::SubjectsDocument
 //!
 //! # Examples
 //!
 //! ```
-//! let source = b"value = left + right\n";
-//! let document = sc_treesitter::extract(&sc_treesitter::ExtractInput {
-//!     language: "python",
-//!     query: "(binary_operator left: (identifier) @name right: (identifier) @name)\n",
-//!     captures: None,
-//!     source,
-//!     path: "sample.py",
-//!     rev: "HEAD",
-//!     blob_sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-//! })
-//! .expect("extract");
+//! # #[cfg(feature = "python")] {
+//! let input = sc_treesitter::ExtractInput::new(
+//!     "python",
+//!     "(binary_operator left: (identifier) @name right: (identifier) @name)\n",
+//!     b"value = left + right\n",
+//! )
+//! .with_path("sample.py")
+//! .with_rev("HEAD")
+//! .with_blob_sha("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+//! let document = sc_treesitter::extract(&input).expect("extract");
 //! assert_eq!(document.schema, sc_agent_types::SUBJECTS_SCHEMA_V1);
 //! assert_eq!(document.producer.mode, "matches");
 //! assert_eq!(document.subjects.len(), 2);
+//! # }
 //! ```
 
 #![warn(missing_docs)]

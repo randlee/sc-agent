@@ -1378,6 +1378,7 @@ dependencies = [
  "mimalloc",
  "sc-agent-types",
  "serde_json",
+ "tempfile",
  "tree-sitter",
  "tree-sitter-python",
  "tree-sitter-rust",
