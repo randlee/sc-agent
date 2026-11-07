@@ -6,6 +6,14 @@
 //! messages. Blob bytes come from `git cat-file blob <sha>`, which writes the
 //! stored bytes without textconv or filters, through a reader bounded by
 //! the caller's byte limit.
+//!
+//! The user's git config is honoured (for example `safe.directory`); the
+//! commands are read-only plumbing that run no hooks and do not sign.
+//! Environment overrides that would redirect git to another repository
+//! (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+//! `GIT_ALTERNATE_OBJECT_DIRECTORIES`) are removed. There is no wall-clock
+//! deadline: output is bounded by `max_bytes`, prompts are off, and the
+//! callers that migrate here in r-2 / r-3c own any timeout policy.
 
 use std::io::Read;
 use std::path::Path;
@@ -49,6 +57,13 @@ fn git(dir: &Path) -> Command {
         .arg(dir)
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("LC_ALL", "C")
+        // `-C dir` must decide the repository; inherited overrides would
+        // point git at another one.
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_OBJECT_DIRECTORY")
+        .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES")
         .stdin(Stdio::null());
     command
 }

@@ -1,23 +1,43 @@
 //! Argv-only git helpers (feature `git`, RBQA-F006). One temp repo per test.
 //!
 //! Needs `--features git` (`[[test]] required-features`, D0 outcome).
+//!
+//! Fixture git runs ignore the host's global and system config (no gpg
+//! signing, hooks or templates) and go through the workspace's bounded
+//! runner, so a stuck git fails the test instead of hanging it.
 
 use std::path::Path;
 use std::process::Command;
+
+#[path = "../../../tests/support/deadline.rs"]
+mod deadline;
+
+/// The platform null device, used as an empty global git config.
+fn null_device() -> &'static str {
+    if cfg!(windows) { "NUL" } else { "/dev/null" }
+}
 
 use sc_agent_types::git::{discover_toplevel, read_at_rev};
 use sc_agent_types::{RepoRelativePath, RepoRoot, Rev};
 
 fn git(dir: &Path, args: &[&str]) {
-    let status = Command::new("git")
+    let hooks = format!("core.hooksPath={}", null_device());
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(dir)
         .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+        .args(["-c", "commit.gpgsign=false", "-c", &hooks])
         .args(args)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .status()
-        .expect("git runs");
-    assert!(status.success(), "git {args:?}");
+        .env("GIT_CONFIG_GLOBAL", null_device())
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_TERMINAL_PROMPT", "0");
+    let output = deadline::spawn_with_deadline(&mut command, None);
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn repo() -> (tempfile::TempDir, RepoRoot) {

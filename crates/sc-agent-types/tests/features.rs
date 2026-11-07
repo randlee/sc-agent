@@ -3,16 +3,22 @@
 //! `cargo tree -p sc-agent-types --no-default-features -e normal` is pinned
 //! against `tests/fixtures/no-default-features-deps.txt` (crate names only,
 //! so a patch bump does not churn it; `--target all`, so the list does not
-//! depend on the host platform). `sha2` is a core dependency because
+//! depend on the host platform). `cargo tree` runs `--offline` through the
+//! workspace's bounded runner, so it needs a warm registry cache (any prior
+//! `cargo build` or `cargo test` of the workspace provides one). `sha2` is a core dependency because
 //! `Sha256Digest::of` is in core `ids`.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::Command;
 
+#[path = "../../../tests/support/deadline.rs"]
+mod deadline;
+
 fn tree(args: &[&str]) -> BTreeSet<String> {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
-    let output = Command::new(cargo)
+    let mut command = Command::new(cargo);
+    command
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .args([
             "tree",
@@ -22,13 +28,10 @@ fn tree(args: &[&str]) -> BTreeSet<String> {
             "normal",
             "--prefix",
             "none",
-            "--locked",
-            "--target",
-            "all",
         ])
-        .args(args)
-        .output()
-        .expect("cargo tree runs");
+        .args(["--locked", "--offline", "--target", "all"])
+        .args(args);
+    let output = deadline::spawn_with_deadline(&mut command, None);
     assert!(
         output.status.success(),
         "cargo tree failed: {}",
