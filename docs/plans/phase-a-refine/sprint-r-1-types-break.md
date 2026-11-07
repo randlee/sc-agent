@@ -171,7 +171,11 @@ recorded outcome decides every later self edge:
   `cargo test` then skips it instead of failing to compile). The
   `test_util_off` gate is unchanged, because a command-line feature is not a
   dependency edge. The PR states this branch and every later sprint doc
-  line it changes.
+  line it changes, including the "Correction" sentence of the ADR-SAG-0022
+  r-2 amendment (`docs/architecture.md`), which says `sc-jev-check`'s
+  integration targets enable `test-util` through a self-referencing
+  dev-dependency; in this branch r-2 rewords it to "through
+  `[[test]] required-features = ["test-util"]` and `--features test-util`".
 
 ### D1 — open backend set, static facts (REQ-SAG-0105, ADR-SAG-0009 r-1 amendment)
 
@@ -311,7 +315,13 @@ recorded outcome decides every later self edge:
    `crates/sc-agent-types/tests/fixtures/error-codes.json`.
 3. `NetworkErrorKind` (`#[non_exhaustive]`: `Busy`, `Timeout`, `Connect`,
    `Tls`, `Status`, `BodyTooLarge`, `Cancelled`). `retryable()` is true only
-   for `NetworkError { kind: Busy | Timeout | Connect }`.
+   for `NetworkError { kind: Busy | Timeout | Connect }`. Its one spelling is
+   snake_case: `Serialize`/`Deserialize` (`#[serde(rename_all = "snake_case")]`),
+   `Display` and `FromStr` all use `busy`, `timeout`, `connect`, `tls`,
+   `status`, `body_too_large`, `cancelled`, so the r-2b D5 scripted-answers
+   `"kind"` value parses through `FromStr`; an unknown kind is
+   `INPUT_INVALID`. Pinned by `test_network_error_kind_spelling` (target
+   `errors`: serde, `Display` and `FromStr` agree for every kind).
 4. `fix_hint()` is the one renderer of recovery text: an exhaustive `match`
    inside the crate; `recovery` fields are data it formats. Delete the four
    `*_DETAIL_PREFIX` constants and the `strip_prefix` chain.
@@ -464,7 +474,16 @@ recorded outcome decides every later self edge:
       `validate_for_send` passed (a sent-and-failed backend);
       `refusing(JevError)` makes `validate_for_send` return it, so nothing is
       sent (ADR-SAG-0004 refusal; r-2b's `NotSent` / `Failed` attestation
-      tests need both).
+      tests need both);
+    - LLM context (ADR-SAG-0022, "An LLM backend id still requires
+      `JudgeRequest.llm` before it returns"; CPR-302): when
+      `self.id().descriptor().requires_llm_context()` is true and the request
+      carries no LLM context, `validate_for_send` (still counted by
+      `validations()`) and `judge` return `INPUT_INVALID` and record no
+      request. `test_mock_judge_backend_contract` covers it; it replaces the
+      a-10 unit test
+      `registry::scripted::tests::scripted_judge_records_requests_and_counts_validations`,
+      which pins this rule for `ScriptedJudge` today and goes with it.
 
     `test_mock_judge_backend_contract` (target `mock`) covers each item.
     The engine ignores `input_sha256` until r-2b (records `Unattested`).
@@ -648,6 +667,7 @@ cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden 
 cargo test -p sc-agent-types --test errors -- test_retryable_only_network_transient --exact
 cargo test -p sc-agent-types --test errors -- test_from_error_response_round_trip --exact
 cargo test -p sc-agent-types --lib -- error::tests::test_error_code_all_is_complete --exact
+cargo test -p sc-agent-types --test errors -- test_network_error_kind_spelling --exact
 cargo test -p sc-agent-types --test obs -- test_log_rejected_display --exact
 cargo test -p sc-agent-types --test ids -- test_backend_catalog_roundtrip --exact
 cargo test -p sc-agent-types --test ids -- test_backend_serde_documented_spelling --exact

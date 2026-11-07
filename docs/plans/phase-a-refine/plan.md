@@ -721,7 +721,13 @@ TypeSafe vendor answer). This is the only item still pending.** r-5 holds both b
     `workspace-tests --test source_scans`
     (`test_disallowed_methods_expect_sites`) allows production expect sites
     only in `sc-agent-types/src/git.rs` and the `command` extractor's
-    user-argv spawn in `sc-jev-check/src/extract/command.rs` (RBQA-F102).
+    user-argv spawn in `sc-jev-check/src/extract/command.rs`, plus the
+    `#[cfg(test)]` `test_support::git_command` fixture helper in
+    `sc-jev-check/src/extract/mod.rs` (RBQA-F102, CPR-301). All those expect
+    lines land in r-3b with the `clippy.toml` entry (an expect with nothing
+    to fulfil fails `-D warnings`), after a pre-merge
+    `cargo clippy --workspace --all-targets -- -D warnings` sweep whose
+    fixed sites the PR lists.
 
 Round-2 resolutions in the same standing: module seams are cargo features
 (`judge`, `secret`, `obs` default-on; `git` and `test-util` non-default;

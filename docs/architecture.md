@@ -275,6 +275,12 @@ and not a second `run_check` policy.
   `test-util` makes `registry::ScriptedJudge`, `registry::RequestLog`, and
   `registry::register_scripted_backends` public": only
   `register_scripted_backends` stays.
+- (Proposed, r-1) The sentence above "An LLM backend id still requires
+  `JudgeRequest.llm` before it returns" still holds and is not superseded:
+  `MockJudgeBackend` enforces it from the descriptor
+  (`requires_llm_context()`), so `validate_for_send` (counted) and `judge`
+  return `INPUT_INVALID` for an LLM id with no LLM context and record
+  nothing.
 
 ### Amendment (Phase A.1, r-2)
 

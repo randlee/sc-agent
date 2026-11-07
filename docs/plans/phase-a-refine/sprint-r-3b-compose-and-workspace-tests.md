@@ -79,6 +79,9 @@ owned_paths:
   - "Cargo.toml"
   - "sc-lint.toml"
   - "clippy.toml#disallowed-methods std::process::Command::new entry"
+  - "crates/sc-agent-types/src/git.rs#expect line only (item-level `#[expect(clippy::disallowed_methods, reason = ...)]` on the `git` spawn)"
+  - "crates/sc-jev-check/src/extract/command.rs#expect line only (item-level expect on the user-argv spawn and on its test-module re-exec)"
+  - "crates/sc-jev-check/src/extract/mod.rs#expect line only (item-level expect on `test_support::git_command`)"
   - "crates/*/tests/** and crates/*/src/**/tests.rs#item-level `#[expect(clippy::disallowed_methods, reason = ...)]` on the spawning helper only, where clippy flags `Command::new`"
   - ".github/workflows/sc-agent-ci.yml"
   - ".github/scripts/cargo-tree-gates.sh"
@@ -276,8 +279,12 @@ graph); contributes ARCHE-002 (consumer flag).
    dependencies). Helper in `crates/workspace-tests/tests/support/bin_path.rs`
    (a test-support module, so its `serde_json` use is a dev-dependency),
    included by each target with `mod support;`. `<isolated>` is always
-   `$CARGO_TARGET_DIR/workspace-tests-bin` (default
-   `target/workspace-tests-bin`), never the directory `cargo test` uplifts
+   `$CARGO_TARGET_DIR/workspace-tests-bin`, and when `CARGO_TARGET_DIR` is
+   unset, `<workspace root>/target/workspace-tests-bin`, where the workspace
+   root is `concat!(env!("CARGO_MANIFEST_DIR"), "/../..")` canonicalized
+   (`crates/workspace-tests` is two levels down; `cargo test` runs each
+   target with the package directory as cwd, so a relative `target/` would
+   land in `crates/workspace-tests/target`). It is never the directory `cargo test` uplifts
    `CARGO_BIN_EXE_sc-ai` into: that test binary has `test-util` on through
    `sc-ai`'s self dev-dependency, so sharing an uplift path would make the
    parity golden and `test_util_off` depend on test order (RBQA-F103 (b)).
@@ -327,7 +334,11 @@ graph); contributes ARCHE-002 (consumer flag).
        `crates/sc-agent-http/src/ureq_transport.rs` (the
        `ResolvedApiKey::as_str` read), `crates/sc-agent-types/src/git.rs` and
        `crates/sc-jev-check/src/extract/command.rs` (`Command::new`; the
-       extractor spawns the configured argv), and in test files
+       extractor spawns the configured argv), the `#[cfg(test)]`
+       `test_support` module of `crates/sc-jev-check/src/extract/mod.rs`
+       (a-10 :87-132; its `git_command` helper builds `git` fixture repos
+       with an isolated config, which `sc_agent_types::git` does not offer;
+       item-level expect on that helper; CPR-301 option 2), and in test files
        (`crates/*/tests/**`, `crates/*/src/**/tests.rs`) whose item-level
        expect has a reason naming a process spawn. A file of the last two
        kinds must not contain the token `ResolvedApiKey`, and a test file's
@@ -342,6 +353,14 @@ graph); contributes ARCHE-002 (consumer flag).
        `test_disallowed_methods_expect_only_in_ureq_transport` of round 3
        (RBQA-F102 (d), RBQA-F003, RBQA-F006). r-3b adds the item-level
        expect to the spawning helper in each test file clippy flags.
+       **Same-sprint rule (CPR-301):** every production and `test_support`
+       expect line (`git.rs`, `command.rs`, `extract/mod.rs`) lands in r-3b
+       together with the `clippy.toml` entry, never earlier: an `#[expect]`
+       with no lint to fulfil is `unfulfilled_lint_expectations`, which
+       `-D warnings` fails. Before merge r-3b runs
+       `cargo clippy --workspace --all-targets -- -D warnings` with the new
+       entry as a sweep, and the PR lists every site it fixed (file, item,
+       reason).
      - `test_lint_mechanism_present` (RBQA-F102 (b), (c); RBQA-F103 (c)):
        `clippy.toml` lists both disallowed paths; root `Cargo.toml`
        `[workspace.lints.clippy]` sets `allow_attributes = "deny"` and
