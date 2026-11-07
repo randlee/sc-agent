@@ -6,7 +6,12 @@
 #   test      just setup + just lint (ubuntu only); cargo clippy --all-features
 #             and cargo test (all three OSes)
 #   python    just test-python (maturin develop + jev-python pytest)
-#   features  cargo hack --each-feature test -p sc-treesitter
+#   features  cargo hack --each-feature test -p sc-treesitter;
+#             cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps
+#   deps      cargo build --lib --no-default-features for sc-treesitter and
+#             sc-ai; .github/scripts/cargo-tree-gates.sh (REQ-SAG-0134);
+#             .github/scripts/check-exact-pins.sh and its --self-test
+#             (NFR-SAG-0004, ADR-SAG-0023)
 #   doc       cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings
 #   coverage  cargo llvm-cov summary, uploaded as an artifact
 #
@@ -200,6 +205,65 @@ jobs:
       - name: cargo hack --each-feature test -p sc-treesitter
         timeout-minutes: 20
         run: cargo hack --each-feature test -p sc-treesitter
+
+      - name: cargo hack check -p sc-agent-types --feature-powerset
+        timeout-minutes: 20
+        run: cargo hack check -p sc-agent-types --feature-powerset --no-dev-deps
+
+  deps:
+    name: dependency gates (allocator, pins)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        timeout-minutes: 5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        timeout-minutes: 10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      # check-exact-pins.sh parses Cargo.toml with tomllib (Python 3.11+).
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        timeout-minutes: 5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        timeout-minutes: 10
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: sc-agent-ci-deps-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sc-agent-ci-deps-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
+
+      # REQ-SAG-0134: the libraries build without the binaries' `cli` feature.
+      - name: cargo build -p sc-treesitter --lib --no-default-features
+        timeout-minutes: 15
+        run: cargo build -p sc-treesitter --lib --no-default-features
+
+      - name: cargo build -p sc-ai --lib --no-default-features
+        timeout-minutes: 15
+        run: cargo build -p sc-ai --lib --no-default-features
+
+      - name: cargo tree gates
+        timeout-minutes: 10
+        run: bash .github/scripts/cargo-tree-gates.sh
+
+      # NFR-SAG-0004: every `=` pin is on the ADR-SAG-0023 lockstep list.
+      - name: check-exact-pins
+        timeout-minutes: 5
+        run: bash .github/scripts/check-exact-pins.sh
+
+      - name: check-exact-pins --self-test
+        timeout-minutes: 5
+        run: bash .github/scripts/check-exact-pins.sh --self-test
 
   doc:
     name: rustdoc (-D warnings)
