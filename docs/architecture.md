@@ -90,7 +90,7 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | ADR-SAG-0013 | Session JSONL via sc-observability v2 | Active | Amended by ADR-SAG-0021; ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0014 | CLI success body | Active | Amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
-| ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0027 (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3b) |
+| ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0027 (Proposed, r-1); ADR-SAG-0026 (Proposed, r-3b) |
 | ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
 | ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | Amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
@@ -706,10 +706,11 @@ the module** and drop the types dependency if possible (bead:
 
 ### Amendment (Phase A.1, r-4)
 
-**Status:** Proposed (Phase A.1) — lands in r-4.
+**Status:** Active (Phase A.1) — landed in r-4.
 
-- (Proposed, r-4) The pin is exact: `sc-observability = "=1.5.0"`, a
-  deliberate lockstep per ADR-SAG-0023.
+- (Active, r-4) The pin is exact: `sc-observability = "=1.5.0"`, a
+  deliberate lockstep per ADR-SAG-0023. The version text `"1.5.0"` above is
+  superseded by `=1.5.0` (exact).
 
 ### Amendment (Phase A.1, r-1)
 
