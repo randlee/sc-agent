@@ -1,7 +1,7 @@
 # sc-treesitter — architecture
 
 **Boundary:** `treesitter` (Phase A)  
-**Depends on:** `sc-agent-types`, pinned `tree-sitter-*` grammar crates (features)  
+**Depends on:** `sc-agent-types`, `mimalloc`, `serde_json`, `tree-sitter`, and the pinned grammar crates `tree-sitter-python` / `tree-sitter-rust` (optional, features `python` / `rust`); matches `boundaries/sc-treesitter/treesitter.toml`  
 **Does not depend on:** `sc-jev-check`, `sc-jev`, `sc-jev-backends`, `sc-agent-secrets`, any HTTP crate
 **Ships:** library plus the `sc-treesitter` binary (second released binary next to `sc-ai`)
 

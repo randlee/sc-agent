@@ -29,14 +29,16 @@ sc-ai (binary) ── sc-observability v2 Logger → SessionLog adapter
         └── sc-agent-types (temporary observability::v2 shim)
                 └── sc-observability-types (=1.5.0, v2 port types)
 
-sc-jev-py (PyO3) → sc-jev-check
+sc-jev-py (PyO3) ── sc-observability v2 Logger → SessionLog adapter
+  └── sc-jev-check
 
 sc-treesitter (library + binary) → sc-agent-types
 ```
 
 Every workspace crate depends on `sc-agent-types`; the graph shows the edge
 once. `sc-agent-types` is the only crate that depends on
-`sc-observability-types` (ADR-SAG-0016).
+`sc-observability-types` (ADR-SAG-0016). Only the composition roots `sc-ai`
+and `sc-jev-py` depend on full `sc-observability`.
 
 `sc-jev` and `sc-jev-backends` do not depend on each other.
 

@@ -83,11 +83,11 @@ then prove the release dry-run (drift check, preflight, publish dry-run) in PR C
    `maturin develop + pytest (just test-python)`. It installs maturin 1.16.0
    into a Python 3.11 venv, runs `maturin develop --features
    extension-module,test-util -m crates/sc-jev-py/Cargo.toml`, then
-   `pytest tests/fixtures/jev-python -q` on ubuntu-24.04, macos-14 and
+   `pytest tests/fixtures/jev-python -q` on ubuntu-24.04, macos-15 and
    windows-2022. The `sc-publish dry-run` wheel step above is the
    publish-surface build (`extension-module` only, no pytest). This item was
    missing when a-9 merged; it landed in the Phase A phase-end hardening
-   (sprint a-10, REQ-QA-003). `install.py` never writes the workflow.
+   (PR #18, REQ-QA-003). `install.py` never writes the workflow.
 
 **Decisions recorded in this sprint.** The PR gate is consumer-owned
 (`scripts/sc-publish-dry-run.sh` plus `.github/workflows/sc-publish-dry-run.yml`)

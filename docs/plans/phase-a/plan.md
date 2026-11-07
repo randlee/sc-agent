@@ -353,8 +353,8 @@ job).
 | --- | --- |
 | a-1 (contract) | 0005 (workspace layout matches `docs/architecture.md` and the per-crate requirement tables) |
 | a-7 | 0101, 0600, 0601, 0603, 0700–0703, 0710, 0711, 0503 (CLI override), NFR-0001–0003 |
-| a-8 | 0102, 0610, 0611, 0800, 0801, 0802 (evidence only: NFR-0002, NFR-0003) |
-| a-9 | 0130, 0131, 0132, 0803 (evidence only: 0802) |
+| a-8 | 0102, 0610, 0611, 0800, 0801, 0802; evidence only: NFR-0002, NFR-0003 |
+| a-9 | 0130, 0131, 0132, 0803; evidence only: 0802 |
 
 Remaining feature REQs (0100, 0103, 0104, 0120, 0121, 0200–0202, 0300–0303,
 0305, 0309, 0310, 0311, 0400–0401, 0500–0502, 0504–0505, 0602, 0110) close via
@@ -396,7 +396,7 @@ against TypeSafe with Rand-provided key, artifact attached to phase PR.
 
 | Command (above) | Where it runs | Recorded result |
 | --- | --- | --- |
-| `just lint`, `cargo test -p …`, `cross_impl_branches`, and the `workspace` layer of `just test` (`cargo test --workspace`) | `.github/workflows/sc-agent-ci.yml` job `test` (ubuntu-24.04, macos-14, windows-2022) | The phase-end hardening PR run; local run at `d4a0111`: 194 tests passed, 0 failed |
+| `just lint`, `cargo test -p …`, `cross_impl_branches`, and the `workspace` layer of `just test` (`cargo test --workspace`) | `.github/workflows/sc-agent-ci.yml` job `test` (ubuntu-24.04, macos-15, windows-2022) | The phase-end hardening PR run; local run at `d4a0111`: 194 tests passed, 0 failed |
 | `clippy --all-features`, `cargo doc` | `sc-agent-ci.yml` jobs `test` and `doc` | `doc` is `continue-on-error` until the rustdoc warnings are fixed |
 | Test-util wheel + `tests/fixtures/jev-python` pytest (the `jev-python` layer of `just test`) | `sc-agent-ci.yml` job `python` (`just test-python`, three OSes) | The phase-end hardening PR run |
 | sc-treesitter feature matrix | `sc-agent-ci.yml` job `features` (`cargo hack --each-feature check`) | Check only until the per-language tests are feature-gated |

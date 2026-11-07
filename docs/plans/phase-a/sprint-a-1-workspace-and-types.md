@@ -143,7 +143,7 @@ test -f tests/fixtures/jev/README-contract/errors.json
 test -f tests/fixtures/jev/subjects-schema/v1/minimal.json
 python3 -c "import json; d=json.load(open('tests/fixtures/jev/subjects-schema/v1/minimal.json')); assert d.get('schema')=='sc/subjects/1'"
 python3 -c "import json; json.load(open('tests/fixtures/jev/README-contract/errors.json'))"
-test -z "$(cargo tree -p sc-agent-types -e normal | grep -E 'reqwest|hyper|ureq')"
+out=$(cargo tree -p sc-agent-types -e normal) && ! grep -E 'reqwest|hyper|ureq' <<<"$out"
 ```
 
 Expected: all commands exit 0. The last command checks the lasting invariant:
