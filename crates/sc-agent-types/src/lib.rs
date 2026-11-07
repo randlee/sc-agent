@@ -42,6 +42,8 @@
 #![warn(missing_docs)]
 
 mod cancel;
+mod catalog;
+mod code;
 mod envelope;
 mod error;
 mod ids;
@@ -64,13 +66,15 @@ pub mod test_util;
 #[doc(inline)]
 pub use cancel::CancelToken;
 #[doc(inline)]
+pub use catalog::{BACKENDS, BackendDescriptor, BackendFamily};
+#[doc(inline)]
 pub use envelope::{ERROR_RESPONSE_SCHEMA_VERSION, ScAgentErrorResponse};
 #[doc(inline)]
 pub use error::{ErrorCode, JevError, NetworkErrorKind, OperationalArea};
 #[doc(inline)]
 pub use ids::{
-    BACKENDS, BackendDescriptor, BackendFamily, BackendId, BackendKeyId, BackendSet, BlobSha,
-    ChoiceId, Operation, QuestionId, RepoRelativePath, RepoRoot, Rev, SessionId, Sha256Digest,
+    BackendId, BackendKeyId, BackendSet, BlobSha, ChoiceId, Operation, QuestionId,
+    RepoRelativePath, RepoRoot, Rev, SessionId, Sha256Digest,
 };
 #[cfg(feature = "judge")]
 #[doc(inline)]

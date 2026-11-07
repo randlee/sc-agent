@@ -12,10 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::cancel::CancelToken;
+use crate::catalog::{BackendDescriptor, BackendFamily};
 use crate::error::JevError;
-use crate::ids::{
-    BackendDescriptor, BackendFamily, BackendId, BackendKeyId, ChoiceId, QuestionId, Sha256Digest,
-};
+use crate::ids::{BackendId, BackendKeyId, ChoiceId, QuestionId, Sha256Digest};
 use crate::payload::{ChoiceAnswer, PayloadBundle};
 use crate::schema::subjects::SubjectsProducer;
 
@@ -467,8 +466,8 @@ impl BackendAttestation {
 /// is [`Attestation::Matched`]. Serialization writes `equal` from that
 /// method, and deserialization rejects a document whose `equal` differs from
 /// the recomputed value.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "EqualInputWire", into = "EqualInputWire")]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "EqualInputWire")]
 pub struct EqualInputRecord {
     prompt_sha256: Sha256Digest,
     mode: MultiBackendMode,
@@ -477,7 +476,7 @@ pub struct EqualInputRecord {
     producer: Option<SubjectsProducer>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EqualInputWire {
     prompt_sha256: Sha256Digest,
@@ -488,17 +487,18 @@ struct EqualInputWire {
     producer: Option<SubjectsProducer>,
 }
 
-impl From<EqualInputRecord> for EqualInputWire {
-    fn from(record: EqualInputRecord) -> Self {
-        let equal = record.equal();
-        Self {
-            prompt_sha256: record.prompt_sha256,
-            mode: record.mode,
-            backends: record.backends,
-            leak: record.leak,
-            equal,
-            producer: record.producer,
-        }
+impl Serialize for EqualInputRecord {
+    /// Writes `equal` from [`EqualInputRecord::equal`]; it is never stored.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("EqualInputRecord", 6)?;
+        state.serialize_field("prompt_sha256", &self.prompt_sha256)?;
+        state.serialize_field("mode", &self.mode)?;
+        state.serialize_field("backends", &self.backends)?;
+        state.serialize_field("leak", &self.leak)?;
+        state.serialize_field("equal", &self.equal())?;
+        state.serialize_field("producer", &self.producer)?;
+        state.end()
     }
 }
 

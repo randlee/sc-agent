@@ -44,21 +44,6 @@ pub struct MockJudgeBackend {
     validations: AtomicUsize,
 }
 
-impl Clone for MockJudgeBackend {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            answers: self.answers.clone(),
-            provider_meta: self.provider_meta.clone(),
-            reported_digest: self.reported_digest.clone(),
-            failure: self.failure.clone(),
-            refusal: self.refusal.clone(),
-            requests: Mutex::new(self.requests()),
-            validations: AtomicUsize::new(self.validations()),
-        }
-    }
-}
-
 impl MockJudgeBackend {
     /// A judge for `id` that returns `answers` for every accepted request.
     #[must_use]
