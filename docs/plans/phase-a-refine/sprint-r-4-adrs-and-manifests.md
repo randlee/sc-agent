@@ -219,3 +219,7 @@ for the Scoop multi-shim limit.
   entry is removed in the same commit that re-runs the gates, which restores
   the end state this doc's acceptance row names (`sc-observability-types`
   absent).
+- **`sc-observability-types` ownership record kept** (QA-001). D1's
+  deletion of the `sc-lint.toml` record is reverted until the dependency is
+  gone: r-1 deletes the record in the same change that deletes the
+  dependency, so no window exists where a user is unguarded.
