@@ -79,8 +79,8 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020; ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0004 | One check, one request | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2); A.1 subsections (Active, r-4), (Proposed, r-5) |
-| ADR-SAG-0006 | Transport injection | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
-| ADR-SAG-0007 | API-direct LLM backends | Active | Amended by ADR-SAG-0026 (Proposed, r-3) |
+| ADR-SAG-0006 | Transport injection | Active | Amended by ADR-SAG-0026 (Active, r-3) |
+| ADR-SAG-0007 | API-direct LLM backends | Active | Amended by ADR-SAG-0026 (Active, r-3) |
 | ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0027 (Active, r-1); ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0010 | CLI thin adapter | Active | Amended by ADR-SAG-0026 (Proposed, r-3b) |
@@ -90,19 +90,19 @@ cell and its own marker text to `(Active, r-N)`; it adds or removes no entry.
 | ADR-SAG-0014 | CLI success body | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
 | ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0027 (Active, r-1); ADR-SAG-0026 (Proposed, r-3b) |
-| ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0026 (Proposed, r-3), (Proposed, r-3b) |
+| ADR-SAG-0017 | First release surfaces | Active | Amended by ADR-SAG-0023 (Active, r-4); ADR-SAG-0026 (Active, r-3), (Proposed, r-3b) |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
 | ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | A.1 subsection (Active, r-1); amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
-| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0026 (Proposed, r-3) |
+| ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0026 (Active, r-3); A.1 subsection (Proposed, r-3b) |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
 | ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0029; A.1 subsection (Active, r-1); ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0023 | Dependency pins, allocator, released binaries | Active (r-4; compose pin r-3b) | Amends ADR-SAG-0016, ADR-SAG-0017 |
 | ADR-SAG-0024 | Engine entry point and response contract | Proposed (r-2) | Amends ADR-SAG-0003, ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022 |
 | ADR-SAG-0025 | Multi-backend semantics and equal-input attestation | Proposed (r-2b) | Amends ADR-SAG-0004, ADR-SAG-0008, ADR-SAG-0019, ADR-SAG-0022 |
-| ADR-SAG-0026 | Shared HTTP crate and composition crate | Proposed (HTTP half r-3; compose half r-3b) | Amends ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0020, ADR-SAG-0017 (HTTP half); ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013, ADR-SAG-0016, ADR-SAG-0017 (compose half) |
+| ADR-SAG-0026 | Shared HTTP crate and composition crate | Active (HTTP half, r-3); compose half Proposed (r-3b) | Amends ADR-SAG-0006, ADR-SAG-0007, ADR-SAG-0020, ADR-SAG-0017 (HTTP half); ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013, ADR-SAG-0016, ADR-SAG-0017 (compose half) |
 | ADR-SAG-0027 | Error taxonomy and extensibility | Active (r-1) | Amends ADR-SAG-0001, ADR-SAG-0009, ADR-SAG-0016 |
 | ADR-SAG-0028 | workspace-tests crate | Proposed (r-3b) | — |
-| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Active, r-1), (Proposed, r-3) and of (b) (Active, r-1), (Proposed, r-2) |
+| ADR-SAG-0029 | Phase A hardening amendments | Active (a-10) | Amends ADR-SAG-0020 and ADR-SAG-0022; A.1 supersedes named sentences of (a) (Active, r-1), (Active, r-3) and of (b) (Active, r-1), (Proposed, r-2) |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 
@@ -470,31 +470,47 @@ points and the secret-bearing return type.
 
 ### Amendment (Phase A.1, r-3)
 
-**Status:** Proposed (Phase A.1) — lands in r-3.
+**Status:** Active (Phase A.1) — landed in r-3.
 
-- (Proposed, r-3) A secret travels only as a `SecretHeader` holding
-  `ResolvedApiKey` inside `sc_agent_http::HttpRequest`. The single read site
-  is a **lint-enforced workspace convention, not a type seal**:
-  `ResolvedApiKey::as_str` is listed in `clippy.toml` `disallowed-methods`;
-  its one call site, `crates/sc-agent-http/src/ureq_transport.rs`, carries
-  `#[expect(clippy::disallowed_methods, reason = ...)]`; workspace lints deny
-  `allow_attributes` and `allow_attributes_without_reason`; every crate has
-  `[lints] workspace = true` with no override; and
-  `workspace-tests --test source_scans` (r-3b) fails if a
-  `disallowed_methods` suppression appears in any other file of any target
-  (`src`, `tests`, `benches`, `examples`, `build.rs`) or a crate stops
-  inheriting the workspace lints. Crates outside the workspace are not
-  constrained. Redaction is applied once, in `send_with_busy_retry`, to every
-  error it returns, including errors a `Transport` impl returns; a caller of
-  `Transport::send` directly bypasses it.
-- (Proposed, r-3) The `Transport` trait is open; test transports see
+- (Active, r-3) A secret travels only as a `SecretHeader` holding
+  `ResolvedApiKey` inside `sc_agent_http::HttpRequest`. The single read
+  site is a **lint-enforced workspace convention, not a type seal**:
+  `ResolvedApiKey::as_str` is listed in `clippy.toml`
+  `disallowed-methods`; its one call site,
+  `crates/sc-agent-http/src/ureq_transport.rs`, carries
+  `#[expect(clippy::disallowed_methods, reason = ...)]`; workspace lints
+  deny `allow_attributes` and `allow_attributes_without_reason`; every
+  crate has `[lints] workspace = true`, checked locally by r-3's
+  validation; and an `rg` check finds `disallowed_methods` in no file
+  under `crates/` other than that call site. Crates outside the
+  workspace are not constrained. Redaction is applied once, in
+  `send_with_busy_retry`, to every error it returns, including errors a
+  `Transport` impl returns; a caller of `Transport::send` directly
+  bypasses it.
+- (Active, r-3) The `Transport` trait is open; test transports see
   `SecretHeader::redacted()` / `matches()` only.
-- (Proposed, r-3) Supersedes the ADR-SAG-0029 (a) sentence naming
+- (Active, r-3) Supersedes the ADR-SAG-0029 (a) sentence naming
   `crates/sc-jev/src/client/https.rs` and
   `crates/sc-jev-backends/src/transport.rs` as "the only production
   readers": r-3 deletes both, and the one reader is
   `crates/sc-agent-http/src/ureq_transport.rs`. That `sc-agent-secrets` has
   no Cargo features is ADR-SAG-0029 (a) and is not restated here.
+
+### Amendment (Phase A.1, r-3b)
+
+**Status:** Proposed (Phase A.1) — lands in r-3b.
+
+- (Proposed, r-3b) `workspace-tests --test source_scans` is the
+  cross-crate proof of the ADR-SAG-0020 r-3 read-site convention:
+  `test_disallowed_methods_expect_sites` fails if an `expect` naming
+  `clippy::disallowed_methods` (item- or crate-level, also inside
+  `cfg_attr`) appears in any file of any target (`src`, `tests`,
+  `benches`, `examples`, `build.rs`) other than
+  `crates/sc-agent-http/src/ureq_transport.rs` and the process-spawn sites
+  ADR-SAG-0028 lists, and a spawn-site file must not contain
+  `ResolvedApiKey`; `test_every_crate_inherits_workspace_lints` fails if a
+  crate stops inheriting the workspace lints or adds a per-crate
+  `[lints.*]` override. From r-3b this replaces r-3's local `rg` check.
 
 ## ADR-SAG-0004 — One check, one request
 
@@ -523,9 +539,9 @@ Both use test doubles for unit tests.
 
 ### Amendment (Phase A.1, r-3)
 
-**Status:** Proposed (Phase A.1) — lands in r-3.
+**Status:** Active (Phase A.1) — landed in r-3.
 
-- (Proposed, r-3) HTTP transport, retry, caps and redaction live in `sc-agent-http`
+- (Active, r-3) HTTP transport, retry, caps and redaction live in `sc-agent-http`
   (ADR-SAG-0026). `sc-jev` and `sc-jev-backends` are wire-format crates that
   take an injected `sc_agent_http::Transport` at construction. Injection at
   construction (not per `judge`) is unchanged.
@@ -542,10 +558,10 @@ REQ-SAG-0505.
 
 ### Amendment (Phase A.1, r-3)
 
-**Status:** Proposed (Phase A.1) — lands in r-3. Numbers decided by the
+**Status:** Active (Phase A.1) — landed in r-3. Numbers decided by the
 owner (2026-11-06).
 
-- (Proposed, r-3) One busy-retry policy for every backend, in
+- (Active, r-3) One busy-retry policy for every backend, in
   `sc_agent_http::BusyPolicy`: statuses 429/502/529 only; at most 4 sends;
   a valid Retry-After (integer or decimal seconds) is honoured, clamped to
   0–30 s. A valid Retry-After is 1–32 bytes of ASCII digits with an
@@ -563,7 +579,7 @@ owner (2026-11-06).
   120 s request timeout. A transport error or timeout after the body was
   sent is never retried. A 502 retry can double-charge a provider
   that processed the request.
-- (Proposed, r-3) No network-connectivity detection and no indefinite wait on
+- (Active, r-3) No network-connectivity detection and no indefinite wait on
   network loss: connect and DNS failures return `NETWORK_ERROR`
   (`NetworkErrorKind::Connect`, `retryable() == true`) at once, and the caller
   (CLI, Python, future MCP) decides whether to retry.
@@ -646,9 +662,9 @@ preflight CI, and publish dry-run).
 
 ### Amendment (Phase A.1, r-3)
 
-**Status:** Proposed (Phase A.1) — lands in r-3.
+**Status:** Active (Phase A.1) — landed in r-3.
 
-- (Proposed, r-3) Published library crates gain `sc-agent-http`. crates.io
+- (Active, r-3) Published library crates gain `sc-agent-http`. crates.io
   publish order: `sc-agent-types`, `sc-agent-secrets`, `sc-agent-http`,
   `sc-jev`, `sc-jev-backends`, `sc-jev-check`, `sc-treesitter`, `sc-ai`.
 
@@ -1070,16 +1086,16 @@ ADR-SAG-0008, ADR-SAG-0019, ADR-SAG-0022.
 
 ## ADR-SAG-0026 — Shared HTTP crate and composition crate
 
-**Status:** Proposed (Phase A.1) — HTTP half lands in r-3, compose half in
-r-3b. r-3 sets this line to "Active (HTTP half, r-3); compose half Proposed
-(r-3b)"; r-3b sets it to "Active". HTTP half amends ADR-SAG-0006, 0007, 0017
-and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
+**Status:** Active (HTTP half, r-3); compose half Proposed (r-3b)
+
+r-3b sets the line above to "Active". HTTP half amends ADR-SAG-0006, 0007,
+0017 and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
 
 ### HTTP half
 
-**Status:** Proposed (Phase A.1) — lands in r-3.
+**Status:** Active (Phase A.1) — landed in r-3.
 
-- (Proposed, r-3) `sc-agent-http` (published) owns `HttpRequest`
+- (Active, r-3) `sc-agent-http` (published) owns `HttpRequest`
   (`body: Arc<[u8]>`) / `HttpResponse`, `Endpoint`, `SecretHeader`,
   `Transport`, `UreqTransport` (one `Agent` built in `new`, 8 MiB streaming
   response cap; private module `ureq_transport`), `BusyPolicy` /
@@ -1090,7 +1106,7 @@ and 0020; compose half amends ADR-SAG-0010, 0011, 0013, 0016 and 0017.
   non-default `test-util` feature (test hooks for clock, sleeper and jitter;
   loopback-only `http` endpoint; test transports) is enabled only by
   dev-dependencies. Phase B provider agents reuse it. REQ-SAG-0402.
-- (Proposed, r-3) ADR-SAG-0012 still holds: `sc-jev` owns every TypeSafe
+- (Active, r-3) ADR-SAG-0012 still holds: `sc-jev` owns every TypeSafe
   Jev API operation (endpoints, wire body, response parsing);
   `sc-agent-http` only carries bytes.
 
