@@ -85,9 +85,9 @@ fn run_extract(args: &ExtractArgs) -> Result<Vec<u8>, JevError> {
     let document = extract(
         &ExtractInput::new(&args.language, query_text, &blob.bytes)
             .with_captures(capture_refs.as_deref())
-            .with_path(&blob.path)
+            .with_path(blob.path.as_str())
             .with_rev(args.rev.as_str())
-            .with_blob_sha(&blob.sha),
+            .with_blob_sha(blob.sha.as_str()),
     )?;
     subjects_to_json_bytes(&document)
 }
