@@ -17,8 +17,11 @@ requirements:
   - REQ-SAG-0712
   - REQ-SAG-0135
   - REQ-SAG-0104
+  - REQ-SAG-0134
   - REQ-SAG-0305
+  - REQ-SAG-0310
   - NFR-SAG-0001
+  - NFR-SAG-0004
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0015
@@ -37,6 +40,12 @@ owned_paths:
 
 # Sprint r-3c — sc-treesitter clap and shared git read (D12 producer, RBQA-F006 caller)
 
+Wave-2 ownership: r-1 (wave 1) migrated every `JevError` literal in
+`main.rs`, `git_io.rs`, `grammar.rs` and `query.rs` to constructors; r-3c
+starts from that tree and owns `main.rs`, `cli/**` and `git_io.rs` in wave 2.
+`grammar.rs` and `query.rs` are not touched here. r-4 left `main.rs`
+unchanged (`[[bin]] required-features = ["cli"]` in `Cargo.toml`).
+
 ## Outcome
 
 The `sc-treesitter` binary parses argv with clap derive behind the `cli`
@@ -54,8 +63,9 @@ RBQA-F006 (producer caller), RBQA-F009 (`default-features = false`).
 
 1. **Cargo.toml.** `sc-agent-types = { ..., default-features = false }`;
    `cli = ["dep:mimalloc", "dep:clap", "sc-agent-types/git"]` (extends r-4's
-   feature). The library target needs only `error`, `ids`, `envelope`,
-   `schema`.
+   feature; `git` is non-default in `sc-agent-types` since r-1, so only
+   `cli` turns it on here). The library target needs only `error`, `ids`,
+   `envelope`, `schema`. `[lints] workspace = true` stays.
 2. **clap.** `crates/sc-treesitter/src/cli/mod.rs`:
    `#[derive(Parser)] struct Cli` with the existing flag set, `--version`,
    values starting with `-` accepted via `allow_hyphen_values` on value flags.
@@ -76,8 +86,8 @@ RBQA-F006 (producer caller), RBQA-F009 (`default-features = false`).
 
 | Root | Criterion |
 | --- | --- |
-| boundary:treesitter | No hand-rolled argv tables (deleted); `tests/argv.rs` edge cases green; `test_version_flag_exits_zero`; `test_rev_option_injection_rejected` (`--rev=--output=FILE` creates no file); `cargo build -p sc-treesitter --lib --no-default-features` green and its tree has no `clap`, `mimalloc`, `sc-observability`; `cargo hack` feature powerset green |
-| adr:ADR-SAG-0015 | Library still links no judge module: `cargo tree -p sc-treesitter --no-default-features -e normal` shows `sc-agent-types` without `judge`/`secret`/`obs` features |
+| boundary:treesitter | No hand-rolled argv tables (deleted); `tests/argv.rs` edge cases green; `test_version_flag_exits_zero`; `test_rev_option_injection_rejected` (`--rev=--output=FILE` creates no file); `cargo build -p sc-treesitter --lib --no-default-features` green and its tree has no `clap`, `mimalloc`, `sc-observability`; `cargo hack` feature powerset green. Regression: REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0134 the mimalloc `cargo tree` assertion below; NFR-SAG-0004 `bash .github/scripts/check-exact-pins.sh` (tree-sitter pins unchanged) |
+| adr:ADR-SAG-0015 | Library still links no judge module: the asserted row below finds no `judge`, `secret`, `obs` or `git` feature of `sc-agent-types` in `cargo tree -p sc-treesitter --no-default-features -e features -i sc-agent-types` (r-3b adds the same row to `cargo-tree-gates.sh`) |
 
 ## Required validation
 
@@ -89,9 +99,11 @@ cargo test -p sc-treesitter --test argv -- test_version_flag_exits_zero --exact
 cargo test -p sc-treesitter --test argv -- test_rev_option_injection_rejected --exact
 cargo test -p sc-treesitter --test cli
 cargo build -p sc-treesitter --lib --no-default-features
-test -z "$(cargo tree -p sc-treesitter --no-default-features -e normal | grep -E 'clap|mimalloc|sc-observability')"
-cargo tree -p sc-treesitter --no-default-features -e features -i sc-agent-types
+test -z "$(cargo tree -p sc-treesitter --no-default-features -e normal | grep -E '(^|[^[:alnum:]_-])(clap|mimalloc|sc-observability) v[0-9]')"
+test -z "$(cargo tree -p sc-treesitter --no-default-features -e features -i sc-agent-types | grep -E 'sc-agent-types feature "(judge|secret|obs|git|default)"')"
 cargo hack check -p sc-treesitter --feature-powerset --no-dev-deps
+bash .github/scripts/check-exact-pins.sh
+! rg -n '#!?\[allow\(' crates/
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-treesitter -p sc-ai
 ```
 

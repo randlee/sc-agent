@@ -23,9 +23,19 @@ requirements:
   - REQ-SAG-0711
   - REQ-SAG-0130
   - REQ-SAG-0313
+  - REQ-SAG-0131
+  - REQ-SAG-0132
+  - REQ-SAG-0310
+  - REQ-SAG-0600
+  - REQ-SAG-0601
+  - REQ-SAG-0610
   - REQ-SAG-0700
   - REQ-SAG-0701
+  - REQ-SAG-0702
   - REQ-SAG-0710
+  - REQ-SAG-0800
+  - REQ-SAG-0801
+  - REQ-SAG-0802
   - NFR-SAG-0001
   - NFR-SAG-0002
   - NFR-SAG-0003
@@ -45,6 +55,7 @@ adrs:
   - ADR-SAG-0024
   - ADR-SAG-0025
   - ADR-SAG-0026
+  - ADR-SAG-0028
 owned_paths:
   - "crates/sc-agent-compose/**"
   - "crates/workspace-tests/**"
@@ -68,17 +79,23 @@ owned_paths:
   - ".github/workflows/release*.yml"
   - ".github/workflows/prerelease-archive.yml"
   - ".github/workflows/sc-publish-dry-run.yml"
+  - "boundaries/README.md"
   - "docs/sc-agent-compose/**"
+  - "docs/workspace-tests/**"
   - "docs/sc-ai/**"
   - "docs/sc-jev-py/**"
   - "docs/architecture.md#Phase A.1 crate graph"
   - "docs/architecture.md#ADR-SAG-0010 amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0011 amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0013 amendment (r-3b)"
-  - "docs/architecture.md#ADR-SAG-0016 amendment (r-3b)"
+  - "docs/architecture.md#ADR-SAG-0016 heading and amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0017 amendment (r-3b)"
-  - "docs/architecture.md#ADR-SAG-0023 compose-pin bullet"
-  - "docs/architecture.md#ADR-SAG-0026 compose half"
+  - "docs/architecture.md#ADR-SAG-0023 amendment (r-3b)"
+  - "docs/architecture.md#ADR-SAG-0026 Status line and compose half"
+  - "docs/architecture.md#ADR-SAG-0028"
+  - "docs/architecture.md#ADR index row ADR-SAG-0016 (Title cell)"
+  - "docs/architecture.md#ADR index row ADR-SAG-0026 (Status cell: compose half)"
+  - "docs/architecture.md#ADR index row ADR-SAG-0028"
   - "docs/requirements.md#REQ-SAG-0109, 0135, 0604, 0605, 0712 rows; REQ-SAG-0130 (r-3b bullet), REQ-SAG-0711 amendments"
 ---
 
@@ -108,8 +125,8 @@ graph); contributes ARCHE-002 (consumer flag).
    internal-support crate** (owner decision (a), DECIDED 2026-11-06):
    `=`-pinned from `sc-ai` and `sc-jev-py` under the ADR-SAG-0023 lockstep
    rule, no semver promise of its own (README and crate rustdoc say so).
-   Depends on `sc-jev-check`, `sc-agent-types`, `sc-observability =1.5.0`,
-   `serde_json`. Consumer input: add it with `publish_order` directly after
+   `[lints] workspace = true`. Depends on `sc-jev-check`, `sc-agent-types`,
+   `sc-observability =1.5.0`, `serde_json`. Consumer input: add it with `publish_order` directly after
    `sc-jev-check`, shift later crates, re-run `install.py` (r-3b owns the
    rendered files this wave). REQ-SAG-0130 r-3b bullet records the new
    published crate and order.
@@ -117,25 +134,54 @@ graph); contributes ARCHE-002 (consumer flag).
    - `obs::ObservabilityAdapter`, moved from `sc-ai/src/observe.rs` and
      `sc-jev-py/src/logging.rs`, implementing `SessionLog` and mapping
      `EventError → LogRejected`; keeps a-10's one-logger-per-root and flush
-     rules; one fallback action name and field order (QA-004).
+     rules; one fallback action name and field order (QA-004). The
+     adapter's tests (moved from both roots) are target `obs`
+     (`cargo test -p sc-agent-compose --test obs`; REQ-SAG-0610 emission and
+     REQ-SAG-0611 fields).
    - `paths::PathPolicy` — one data type
      `{ service: &'static str, log_root_flag, log_root_env: &'static [&'static str], log_root_default: DefaultRoot, session_dir_env: &'static [&'static str], session_dir_default: SessionDefault }`
      with `resolve_log_root`, `resolve_session_dir`, `jsonl_path`, and presets
      `PathPolicy::cli()` and `PathPolicy::python()` encoding ADR-SAG-0021
      **per root, unchanged**. A new consumer builds its own `PathPolicy`
      value; it does not edit this crate (EXT-012).
-   - `compose::ComposeInputs { cwd: PathBuf, policy: PathPolicy, log_dir: Option<PathBuf>, sessions_dir: Option<PathBuf>, backends: Option<BackendSet>, rev: Option<Rev>, dry_run: bool, system_prompt_override: Option<PathBuf>, mode: MultiBackendMode, cancel: CancelToken, registry: Option<Arc<BackendRegistry>> }`
-     (builder; private fields).
+   - `compose::ComposeInputs`: **private fields** (`cwd`, `policy`,
+     `log_dir`, `sessions_dir`, `backends`, `rev`, `dry_run`,
+     `system_prompt_override`, `mode`, `cancel`, `registry`), constructed only
+     by `ComposeInputs::new(cwd: PathBuf, policy: PathPolicy)` with
+     defaults (no overrides, `Independent`, never-cancelled token, production
+     registry) plus one by-value setter per optional field
+     (`log_dir(..)`, `sessions_dir(..)`, `backends(..)`, `rev(..)`,
+     `dry_run(..)`, `system_prompt_override(..)`, `mode(..)`, `cancel(..)`,
+     `registry(..)`). A new field is a new setter with a default, so adding
+     one does not break `sc-ai`, `sc-jev-py` or an external caller (EXT-021).
+     External consumers with their own composition needs call
+     `sc_jev_check::{prepare, run}` directly; compose has no semver promise.
    - `compose::run_from(source: CheckSource, inputs: ComposeInputs) -> Result<RunResponse, JevError>`
      (calls `discover_repo_root`, builds `RunConfig`, `prepare`, `run`) and
      `compose::ask_from(session_id, follow_up, inputs) -> Result<JudgeOutcome, JevError>`
      (builds `FileSessionStore` + `BackendRegistry::from_env` unless a registry
      is injected).
+   - **Warnings.** When the logger reports a flush failure (the Phase A
+     CR-014 log-flush warning), `run_from` appends it with
+     `RunResponse::with_warning` before returning, so both consumers emit it
+     identically in `data.warnings`; neither consumer adds keys of its own
+     besides `sc-ai`'s `with_readback`.
+   - **Environment ownership** (ADR-SAG-0026): API-key environment and
+     `.env` reading stays in `sc-jev-check` (`BackendRegistry::from_env` →
+     `sc-agent-secrets`); log/session path environment variables are read
+     only by `PathPolicy` in this crate. No other crate reads either set.
 3. `sc-ai` and `sc-jev-py` delete their local adapters, path defaults,
    backend parsing (they use `BackendSet::from_str`) and response shaping
    (they print `Envelope::run(&response)`, plus `with_readback` in `sc-ai`).
    Their direct `sc-observability` dependency is removed; `sc-lint.toml`
-   `sc-observability*` record → `crates/sc-agent-compose` only.
+   `sc-observability` record → `crates/sc-agent-compose` only (the
+   `sc-observability-types` record was deleted by r-4). They keep their
+   direct `sc-jev-check` edge for `CheckSource`, `Envelope`, `RunResponse`:
+   compose does not re-export them (one path per item).
+4. **Crate docs.** `docs/sc-agent-compose/requirements.md` (rows mapping to
+   REQ-SAG-0604, 0605, 0711, ADR-SAG-0021 precedence) and
+   `docs/sc-agent-compose/architecture.md` (adapter, `PathPolicy`,
+   `ComposeInputs`, warnings, environment ownership).
 
 ### D3 consumers (REQ-SAG-0604, REQ-SAG-0605)
 
@@ -149,21 +195,43 @@ graph); contributes ARCHE-002 (consumer flag).
    holding the envelope `data` as a dict. All-failed stays a plain error
    (exit 2 / `JevError` without `.response`). `.pyi` and docs updated.
 3. Tests: `test_cli_partial_failure_both_streams_exit_2`,
-   `test_cli_chain_context_flag` (`crates/sc-ai/tests/cli.rs`, scripted
-   backends via `sc-ai`'s `test-util` dev path); pytest
+   `test_cli_chain_context_flag`, `test_cli_log_flush_warning_in_data`
+   (`crates/sc-ai/tests/cli.rs`). Seam per the plan "Test seams"
+   convention: `sc-ai` gains `test-util = ["sc-jev-check/test-util"]`, enabled
+   by its self dev-dependency; only under that feature does the binary accept
+   a hidden `--scripted-answers <file>` flag that injects
+   `register_scripted_backends` through `ComposeInputs::registry`. The
+   published binary has no such flag (`test_util_off`); pytest
    `test_partial_failure_raises_with_response`, `test_chain_context_kwarg`.
 
 ### D7 workspace-tests (REQ-SAG-0109)
 
-1. `crates/workspace-tests` (`publish = false`; no normal dependencies;
-   dev-deps on `sc-agent-types`, `sc-agent-http`, `sc-jev-check`,
-   `sc-agent-compose`; no `pyo3` or `tree-sitter` in its graph). Manifest
-   text in plan.md.
+0. **First step — `sc-boundary` dev-edge spike** (RBQA-F005a). Before
+   writing the manifest, add a throwaway dev-only workspace edge and run
+   `sc-lint lint sc-boundary`; record in `boundaries/README.md` whether
+   dev-dependency edges are checked (and which rule ids fire). Then write
+   `boundaries/workspace-tests/workspace-tests.toml` and the dependents'
+   `allowed_dependents` per the branch in plan.md ("New boundary
+   manifests"): dev edges counted → `+workspace-tests` on `sc-agent-types`,
+   `sc-jev-check`, `sc-agent-compose`; ignored → no dependent change and the
+   `cargo tree -p workspace-tests -e dev --depth 1` row in
+   `cargo-tree-gates.sh` polices the exact dev set. The PR records which
+   branch applied. The same `boundaries/README.md` edit drops
+   `sc-observability-types` from the `SCB-MANIFEST-004` row (record deleted
+   by r-4).
+1. `crates/workspace-tests` (`publish = false`; `[lints] workspace = true`;
+   empty `src/lib.rs`; no normal dependencies; dev-deps exactly
+   `sc-agent-types` (`features = ["git"]`), `sc-jev-check`,
+   `sc-agent-compose`, `serde_json`, `tempfile` — **no `sc-agent-http`**,
+   which no target links; no `pyo3` or `tree-sitter` in its graph). Manifest
+   text in plan.md; ADR-SAG-0028.
 2. Binaries are built with
    `std::process::Command::new(env!("CARGO")).args(["build", "-p", <pkg>, "--features", "cli", "--message-format=json"])`
    and the executable path is read from the `compiler-artifact` message
    (stable Cargo, no `CARGO_BIN_EXE_*` across packages, no artifact
-   dependencies). Helper in `crates/workspace-tests/src/bin_path.rs`.
+   dependencies). Helper in `crates/workspace-tests/tests/support/bin_path.rs`
+   (a test-support module, so its `serde_json` use is a dev-dependency),
+   included by each target with `mod support;`.
 3. Targets:
    - `tests/jev_cross_impl.rs` (moved from `tests/jev_cross_impl/`; the
      `[[test]]` in `sc-jev-py/Cargo.toml` is deleted; uses only Rust crates
@@ -184,6 +252,21 @@ graph); contributes ARCHE-002 (consumer flag).
      repo matches `git cat-file blob` bytes for files `sc-jev-check` and the
      `sc-treesitter` binary read, and `--output=FILE` as `--rev` to the
      `sc-treesitter` binary creates no file.
+   - `tests/source_scans.rs` (reads files, links nothing):
+     `test_disallowed_methods_expect_only_in_ureq_transport` (all targets
+     under `crates/**/*.rs`, item- and crate-level `allow`/`expect`;
+     RBQA-F003, moved from r-3's draft); `test_every_crate_inherits_workspace_lints`
+     (every `crates/*/Cargo.toml` has `[lints] workspace = true` and no
+     `[lints.*]` table of its own); `test_no_allow_attributes` (no
+     `#[allow(` / `#![allow(` under `crates/`);
+     `test_git_spawn_only_in_types_git` (no `Command::new("git")` outside
+     `crates/sc-agent-types/src/git.rs`; allowlist: the `command` extractor's
+     user-argv spawn in `crates/sc-jev-check/src/extract/command.rs`, which
+     spawns the configured argv, not `git`; RBQA-F006).
+   - `tests/test_util_off.rs`: `test_test_util_absent_from_normal_graph` runs
+     `cargo tree --workspace -e normal,features` (no dev edges) and fails if
+     any workspace crate's `test-util` feature appears; this is the
+     release-build proof for the plan "Test seams" convention.
 
 ### D12 sc-ai clap (REQ-SAG-0712, REQ-SAG-0135, ADR-SAG-0010 r-3b amendment)
 
@@ -197,43 +280,66 @@ graph); contributes ARCHE-002 (consumer flag).
    tables.
 2. CI (`sc-agent-ci.yml` + `cargo-tree-gates.sh`): add every row of the
    plan.md `cargo tree` gate table not yet scripted (clap for both libraries,
-   ureq, pyo3, tree-sitter, sc-observability), a `workspace-tests` job, and a
-   re-run of `check-exact-pins.sh` now that the `=` compose pin exists
-   (NFR-SAG-0004 regression).
+   ureq, pyo3, tree-sitter, sc-observability, the `sc-treesitter` →
+   `sc-agent-types` feature row r-3c checks locally, the `test-util` row, the
+   `workspace-tests` dev-set row if the spike requires it), each run with
+   default features **and** `--no-default-features` except *(lib)* rows, with
+   word-bounded patterns; the public-API check
+   (`cargo doc -p sc-agent-http --no-deps` + `ureq::` grep); isolated
+   per-library builds (`cargo build -p <lib> --lib` for each library crate,
+   one invocation per crate so feature unification cannot hide a seam); a
+   `workspace-tests` job; and a re-run of `check-exact-pins.sh` now that the
+   `=` compose pin exists (NFR-SAG-0004 regression).
 
 ### Manifests
 
 Root `Cargo.toml` members `sc-agent-compose`, `workspace-tests`. Boundary
-manifests: `sc-agent-compose` and `workspace-tests` (full text in plan.md);
-`sc-ai`, `sc-jev-py` `allowed_dependencies -sc-observability +sc-agent-compose`
-with forbidden `sc-observability`, `ureq`; `sc-jev-check` and
-`sc-agent-types` `allowed_dependents +sc-agent-compose, +workspace-tests`.
+manifests: `sc-agent-compose` and `workspace-tests` (full text in plan.md,
+written after the D7.0 spike); `sc-ai`, `sc-jev-py` `allowed_dependencies
+-sc-observability +sc-agent-compose` with forbidden `sc-observability`,
+`ureq`, and `sc-ai` `+clap`, `+mimalloc` (optional); `sc-jev-check` and
+`sc-agent-types` `allowed_dependents +sc-agent-compose` (and
+`+workspace-tests` only if the spike shows dev edges are checked).
+`sc-agent-compose` and `workspace-tests` both have `[lints] workspace = true`.
 
 ### ADR text
 
-ADR-SAG-0026 compose half → Active; ADR-SAG-0016 r-3b amendment (adapter in
-published `sc-agent-compose`; supersedes "do not publish a separate
-observability crate" for that crate) → Active; ADR-SAG-0017 r-3b amendment
-(published library set + publish order gains `sc-agent-compose`) → Active;
-ADR-SAG-0023 compose-pin bullet → Active; ADR-SAG-0010, ADR-SAG-0011,
-ADR-SAG-0013 r-3b amendments → Active; A.1 crate graph section added.
-REQ-SAG-0711 amended: "`sc-ai` wires the logger through
-`sc_agent_compose::obs`".
+ADR-SAG-0026 compose half → Active and its ADR-level Status → Active;
+ADR-SAG-0016 r-3b amendment (adapter in published `sc-agent-compose`;
+supersedes "do not publish a separate observability crate" for that crate)
+→ Active, and ADR-SAG-0016 is retitled "v2 shim in sc-agent-types; adapter
+in sc-agent-compose" in its heading and index title cell; ADR-SAG-0017 r-3b
+amendment (published library set + publish order gains `sc-agent-compose`)
+→ Active; ADR-SAG-0023 r-3b amendment subsection (compose pin in force) →
+Active; ADR-SAG-0028 (`workspace-tests`: purpose, dev-only edges, the
+built-binary contract, forbidden edges, spike outcome) → Active, with its
+index row; ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013 r-3b amendments →
+Active; A.1 crate graph section added. REQ-SAG-0711 amended in
+`docs/requirements.md` **and** the crate-level row in
+`docs/sc-ai/requirements.md` (which still says
+`sc-observability = "1.5.0"` + adapter): "`sc-ai` wires the logger through
+`sc_agent_compose::obs`". `docs/workspace-tests/requirements.md` (rows
+mapping to REQ-SAG-0109 and each target) and
+`docs/workspace-tests/architecture.md` (ADR-SAG-0028 summary, how binaries
+are built, scan rules) are created.
 
 ## Acceptance criteria (authoritative)
 
 | Root | Criterion |
 | --- | --- |
-| req:REQ-SAG-0109 | `cargo test -p workspace-tests` runs the four targets above; `sc-jev-py/Cargo.toml` has no `[[test]]`; `cargo tree -p workspace-tests -e normal,dev` has no `pyo3`/`tree-sitter` |
+| req:REQ-SAG-0109 | `cargo test -p workspace-tests` runs the six targets above; `sc-jev-py/Cargo.toml` has no `[[test]]`; `cargo tree -p workspace-tests -e normal,dev` has no `pyo3`/`tree-sitter`; spike outcome recorded in `boundaries/README.md` |
 | req:REQ-SAG-0604 | `test_partial_failure_keeps_answers` (r-2b) still green; `test_cli_partial_failure_both_streams_exit_2`; pytest `test_partial_failure_raises_with_response` |
 | req:REQ-SAG-0605 | `test_cli_chain_context_flag`; pytest `test_chain_context_kwarg`; independent is the default in both |
 | req:REQ-SAG-0712 | No hand-rolled argv tables in either binary; `sc-ai` and `sc-treesitter` `tests/argv.rs` green |
 | req:REQ-SAG-0135 | `cargo-tree-gates.sh` clap rows pass in CI for both libraries |
-| adr:ADR-SAG-0026 | Compose half Active; `sc-ai`/`sc-jev-py` contain no adapter or path-default code (the moved files are deleted) |
-| adr:ADR-SAG-0016, 0017, 0010, 0011, 0013, 0023 | r-3b subsections / bullet Active |
+| adr:ADR-SAG-0026 | Compose half and ADR-level Status Active; `sc-ai`/`sc-jev-py` contain no adapter or path-default code (the moved files are deleted); `ComposeInputs` has no public field |
+| adr:ADR-SAG-0028 | Status Active; index row Active; text matches the manifest and the spike outcome |
+| adr:ADR-SAG-0016, 0017, 0010, 0011, 0013, 0023 | r-3b subsections Active; ADR-SAG-0016 retitled |
 | adr:ADR-SAG-0021 | `test_cli_path_policy_precedence`, `test_python_path_policy_precedence` in compose reproduce every existing precedence case |
 | boundary:agent-compose | Manifest enforced (`just lint` output attached); `cargo tree` gates for compose pass |
-| boundary:sc-ai-cli | Regression: REQ-SAG-0700–0711 tests green; `test_cli_and_python_data_match_golden` |
+| boundary:sc-ai-cli | Regression: REQ-SAG-0700–0711 tests green (REQ-SAG-0702 readback: `cargo test -p sc-ai --test cli`); `test_cli_and_python_data_match_golden`; `test_cli_log_flush_warning_in_data` |
+| boundary:workspace | `source_scans` and `test_util_off` targets green; isolated library builds green |
+| boundary:regressions | REQ-SAG-0310 `cargo test -p sc-treesitter --test cli` and `e2e_treesitter_producer`; REQ-SAG-0600/0601 `cargo test -p sc-jev-check --test sessions_exact` and `--test run_response`; REQ-SAG-0610 `cargo test -p sc-agent-compose --test obs`; REQ-SAG-0800/0801/0802 maturin build + pytest below; REQ-SAG-0131/0132 `bash .github/scripts/run-consumer-preflight.sh` and the publish dry-run with `sc-agent-compose` in order |
 
 ## Required validation
 
@@ -245,14 +351,25 @@ cargo test -p workspace-tests --test e2e_treesitter_producer -- test_e2e_produce
 cargo test -p workspace-tests --test e2e_treesitter_producer -- test_e2e_producer_error_reraised --exact
 cargo test -p workspace-tests --test consumer_parity -- test_cli_and_python_data_match_golden --exact
 cargo test -p workspace-tests --test git_read_parity
+cargo test -p workspace-tests --test source_scans -- test_disallowed_methods_expect_only_in_ureq_transport --exact
+cargo test -p workspace-tests --test source_scans -- test_every_crate_inherits_workspace_lints --exact
+cargo test -p workspace-tests --test source_scans -- test_no_allow_attributes --exact
+cargo test -p workspace-tests --test source_scans -- test_git_spawn_only_in_types_git --exact
+cargo test -p workspace-tests --test test_util_off -- test_test_util_absent_from_normal_graph --exact
+cargo test -p sc-agent-compose --test obs
+cargo test -p sc-jev-check --test sessions_exact
+cargo test -p sc-treesitter --test cli
 cargo test -p sc-agent-compose --test paths -- test_cli_path_policy_precedence --exact
 cargo test -p sc-agent-compose --test paths -- test_python_path_policy_precedence --exact
 cargo test -p sc-ai --test argv
 cargo test -p sc-ai --test cli -- test_cli_partial_failure_both_streams_exit_2 --exact
 cargo test -p sc-ai --test cli -- test_cli_chain_context_flag --exact
+cargo test -p sc-ai --test cli -- test_cli_log_flush_warning_in_data --exact
 cargo test -p sc-treesitter --test argv
 cargo build -p sc-ai --lib --no-default-features
 cargo build -p sc-treesitter --lib --no-default-features
+for p in sc-agent-types sc-agent-secrets sc-agent-http sc-jev sc-jev-backends sc-jev-check sc-agent-compose; do cargo build -p "$p" --lib || exit 1; done
+cargo doc -p sc-agent-http --no-deps && ! grep -rl 'ureq::' target/doc/sc_agent_http/
 bash .github/scripts/cargo-tree-gates.sh
 bash .github/scripts/check-exact-pins.sh
 maturin build -m crates/sc-jev-py/Cargo.toml -o /tmp/sc-agent-wheels

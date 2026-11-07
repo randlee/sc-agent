@@ -20,3 +20,14 @@ Domain types: `Question`, `ChoiceAnswer`, `PayloadBundle`, `BackendId`,
 `JudgeOutcome`, `EqualInputRecord`.
 
 Trait: `JudgeBackend` (see `architecture.md`).
+
+## Phase A.1 amendments (proposed)
+
+Each row carries a marker that sprint r-1 flips to `(Active, r-1)`; root rows
+are in [`../requirements.md`](../requirements.md#phase-a1--refinement-proposed).
+
+| ID | Amendment |
+| --- | --- |
+| REQ-SAG-0120 | The `observability::v2::SessionLog` port no longer depends on `sc-observability-types`; `emit` returns the local `LogRejected`; behind the default `obs` feature — (Proposed, r-1) |
+| REQ-SAG-0121 | Noop and test-util doubles stay; the `sc-observability-types` dependency is removed; module deletion still waits on upstream v2 — (Proposed, r-1) |
+| NFR-SAG-0001 | `ScAgentErrorResponse` field rule: `schema_version` always `1`, `retryable` only when `true`, `details` only for producer errors (ADR-SAG-0027) — (Proposed, r-1) |

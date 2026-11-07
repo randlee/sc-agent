@@ -66,32 +66,40 @@ without changing callers.
 ## ADR index
 
 ADR sections below keep their original order. This table lists them in id
-order.
+order. Phase A.1 entries carry a `(Proposed, r-N)` marker that the named
+sprint flips to `(Active, r-N)`; each landing sprint edits only its own row's
+Status and Amends cells and its own markers (plan.md conventions).
 
 | ADR | Title | Status | Amends / amended by |
 | --- | --- | --- | --- |
-| ADR-SAG-0001 | Error enum is CLI authority | Active | — |
+| ADR-SAG-0001 | Error enum is CLI authority | Active | Amended by ADR-SAG-0027 (Proposed, r-1) |
 | ADR-SAG-0002 | Canonical judge payload bytes | Active | — |
 | ADR-SAG-0003 | Secret resolution | Active | Amended by ADR-SAG-0020 |
-| ADR-SAG-0004 | One check, one request | Active | — |
-| ADR-SAG-0005 | Facade owns payload assembly | Active | — |
+| ADR-SAG-0004 | One check, one request | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0005 | Facade owns payload assembly | Active | Amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0006 | Transport injection | Active | — |
 | ADR-SAG-0007 | API-direct LLM backends | Active | — |
-| ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | — |
-| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022 |
+| ADR-SAG-0008 | Sessions carry prior answers to later backends | Active | Amended by ADR-SAG-0025 (Proposed, r-2b) |
+| ADR-SAG-0009 | Local backend registers without caller changes | Active | Amended by ADR-SAG-0022; ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0010 | CLI thin adapter | Active | — |
 | ADR-SAG-0011 | Python via sc-jev-py wheel | Active | — |
 | ADR-SAG-0012 | sc-jev owns Jev API | Active | — |
 | ADR-SAG-0013 | Session JSONL via sc-observability v2 | Active | Amended by ADR-SAG-0021 |
-| ADR-SAG-0014 | CLI success body | Active | — |
+| ADR-SAG-0014 | CLI success body | Active | Amended by ADR-SAG-0024 (Proposed, r-2) |
 | ADR-SAG-0015 | Subjects artifact outside the judge | Active | — |
 | ADR-SAG-0016 | v2 shim in sc-agent-types (no extra crate) | Active | — |
 | ADR-SAG-0017 | First release surfaces | Active | — |
 | ADR-SAG-0018 | sc-publish kit owns release surface | Active | — |
-| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | — |
+| ADR-SAG-0019 | LLM wire envelope vs canonical payload | Active | Amended by ADR-SAG-0024 (Proposed, r-2); ADR-SAG-0025 (Proposed, r-2b) |
 | ADR-SAG-0020 | Secret injection and redaction | Active | Amends ADR-SAG-0003 |
 | ADR-SAG-0021 | Log and session path precedence | Active | Amends ADR-SAG-0013 |
-| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009 |
+| ADR-SAG-0022 | Scripted backends are a test-util feature | Active | Amends ADR-SAG-0009; amended by ADR-SAG-0024 (Proposed, r-2) |
+| ADR-SAG-0023 | Dependency pins, allocator, released binaries | Proposed (r-4; compose pin r-3b) | — |
+| ADR-SAG-0024 | Engine entry point and response contract | Proposed (r-2) | Amends ADR-SAG-0005, ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022 |
+| ADR-SAG-0025 | Multi-backend semantics and equal-input attestation | Proposed (r-2b) | Amends ADR-SAG-0004, ADR-SAG-0008, ADR-SAG-0019 |
+| ADR-SAG-0026 | Shared HTTP crate and composition crate | Proposed (HTTP half r-3; compose half r-3b) | — |
+| ADR-SAG-0027 | Error taxonomy and extensibility | Proposed (r-1) | Amends ADR-SAG-0001 |
+| ADR-SAG-0028 | workspace-tests crate | Proposed (r-3b) | — |
 
 ## ADR-SAG-0001 — Error enum is CLI authority
 
@@ -181,11 +189,20 @@ Amended by ADR-SAG-0022.
   (`family`, `key_id`, `requires_llm_context`, `supports_session_ask`,
   `request_limit_bytes`) live on `BackendDescriptor` rows in `BACKENDS`;
   `JudgeBackend::capabilities()` is a provided method derived from the
-  descriptor. The engine reads descriptors, never matches on ids, except the
-  one allowlisted factory in `sc-jev-check::registry`.
-- (Proposed, r-1) "Open" means additive: adding a backend is a minor
-  `sc-agent-types` change (variant + `BACKENDS` row) plus one registry factory
-  arm, with no caller signature change. It is not a runtime-open registry.
+  descriptor.
+- (Proposed, r-1) Backend dispatch is a **test-and-review convention**, not a
+  lint: the production factory is a table
+  `&[(BackendId, fn(ResolvedApiKey) -> Arc<dyn JudgeBackend>)]` in
+  `sc-jev-check::registry`, checked against `BACKENDS` by
+  `test_every_backend_has_factory`. Everywhere else, code branches on
+  descriptor facts (`family`, `requires_llm_context`,
+  `supports_session_ask`, `request_limit_bytes`), never on `BackendId`
+  equality or a `match`; review enforces it (no clippy lint expresses it).
+- (Proposed, r-1) "Open" means additive: adding a built-in backend is a
+  minor `sc-agent-types` change (variant + `BACKENDS` row) plus one factory
+  table row, with no caller signature change (checklist in ADR-SAG-0027). It
+  is not a runtime-open registry: `BackendRegistry::register` installs a
+  double or scripted backend for an existing id and cannot add an id.
 - (Proposed, r-1) `JudgeBackend` is intentionally open (not sealed); every
   method added after A.1 has a default body.
 
@@ -242,9 +259,22 @@ and not a second `run_check` policy.
   (ADR-SAG-0024), not `RunOptions::registry`; the sentences "not a second
   `run_check` policy" and "`run_check`'s parameters stay unchanged" now read
   against `prepare`/`run`. `register_scripted_backends` and its `test-util`
-  gating are unchanged. The scripted backend builds over
-  `sc_agent_types::test_util::MockJudgeBackend` and reports the digest of the
-  bundle it received (r-2b).
+  gating are unchanged; the scripted backend builds over
+  `sc_agent_types::test_util::MockJudgeBackend` (r-1). Correction: an
+  integration test target does not compile the library with `cfg(test)`, so
+  "this crate's own `cargo test` … sees the function without enabling the
+  feature" holds only for unit tests; `sc-jev-check`'s integration targets
+  enable `test-util` through a self-referencing dev-dependency (plan.md
+  "Test seams").
+
+### Amendment (Phase A.1, r-2b)
+
+**Status:** Proposed (Phase A.1) — lands in r-2b.
+
+- (Proposed, r-2b) The scripted backend reports, as
+  `JudgeOutcome.input_sha256`, the digest of the bundle it received, so
+  equal-input attestation (ADR-SAG-0025) treats it like a real backend;
+  tests that need a mismatch use `MockJudgeBackend::with_reported_digest`.
 
 ## ADR-SAG-0019 — LLM wire envelope vs canonical payload
 
@@ -360,12 +390,17 @@ points and the secret-bearing return type.
   `ResolvedApiKey` inside `sc_agent_http::HttpRequest`. The single read site
   is a **lint-enforced workspace convention, not a type seal**:
   `ResolvedApiKey::as_str` is listed in `clippy.toml` `disallowed-methods`;
-  its one call site, `crates/sc-agent-http/src/ureq.rs`, carries
+  its one call site, `crates/sc-agent-http/src/ureq_transport.rs`, carries
   `#[expect(clippy::disallowed_methods, reason = ...)]`; workspace lints deny
-  `allow_attributes` and `allow_attributes_without_reason`; and
-  `sc-agent-http`'s `secret_read_site` test fails if that `#[expect]` appears
-  anywhere else in `crates/*/src`. Crates outside the workspace are not
-  constrained. Redaction is applied once, in `send_with_busy_retry`.
+  `allow_attributes` and `allow_attributes_without_reason`; every crate has
+  `[lints] workspace = true` with no override; and
+  `workspace-tests --test source_scans` (r-3b) fails if a
+  `disallowed_methods` suppression appears in any other file of any target
+  (`src`, `tests`, `benches`, `examples`, `build.rs`) or a crate stops
+  inheriting the workspace lints. Crates outside the workspace are not
+  constrained. Redaction is applied once, in `send_with_busy_retry`, to every
+  error it returns, including errors a `Transport` impl returns; a caller of
+  `Transport::send` directly bypasses it.
 - (Proposed, r-3) The `Transport` trait is open; test transports see
   `SecretHeader::redacted()` / `matches()` only.
 - (Proposed, r-3) Correction to the text above: `sc-agent-secrets` no longer has a
@@ -426,14 +461,20 @@ owner (2026-11-07).
 - (Proposed, r-3) One busy-retry policy for every backend, in
   `sc_agent_http::BusyPolicy`: statuses 429/502/529 only; at most 4 sends;
   a valid Retry-After (integer or decimal seconds) is honoured, clamped to
-  0–30 s; when Retry-After is absent **or malformed** (treated the same), the
-  wait backs off exponentially from 1 s (1, 2, 4, 8 … capped at 30 s); every
-  wait adds up to 250 ms jitter. A 90 s budget from the first send governs
+  0–30 s. A valid Retry-After is 1–32 bytes of ASCII digits with an
+  optional `.` and ASCII-digit fraction; anything else (HTTP-date, sign,
+  exponent, `inf`, `NaN`, empty) is malformed. When Retry-After is absent
+  **or malformed** (treated the same), the wait backs off exponentially from
+  1 s (1, 2, 4, 8 … capped at 30 s); with the default 4 sends at most three
+  waits occur (1, 2, 4 s), so 8 s and the cap apply only to a non-default
+  policy. Every wait adds up to 250 ms jitter. A 90 s budget from the first send governs
   starting new attempts: no attempt starts after it, and every wait is capped
   to the remaining budget; an in-flight attempt keeps its 120 s request
   timeout (covering the body read). A `CancelToken` is checked before each
-  attempt and during sliced waits. A transport error or timeout after the
-  body was sent is never retried. A 502 retry can double-charge a provider
+  attempt and during sliced waits (≤ 100 ms); a cancel during an in-flight
+  request is observed when it returns, so worst-case cancel latency is the
+  120 s request timeout. A transport error or timeout after the body was
+  sent is never retried. A 502 retry can double-charge a provider
   that processed the request.
 - (Proposed, r-3) No network-connectivity detection and no indefinite wait on
   network loss: connect and DNS failures return `NETWORK_ERROR`
@@ -608,9 +649,10 @@ the module** and drop the types dependency if possible (bead:
 **Status:** Proposed (Phase A.1) — lands in r-1.
 
 - (Proposed, r-1) `sc-agent-types` no longer depends on
-  `sc-observability-types`. `observability::v2::SessionLog::emit` returns the
-  local `LogRejected`. The `observability` module is behind the default-on
-  `obs` feature (ADR-SAG-0027).
+  `sc-observability-types`, and the root workspace entry is deleted (no
+  user remains). `observability::v2::SessionLog::emit` returns the local
+  `LogRejected`. The `observability` module is behind the default-on `obs`
+  feature (ADR-SAG-0027). REQ-SAG-0120/0121 are amended to match.
 
 ### Amendment (Phase A.1, r-3b)
 
@@ -622,6 +664,9 @@ the module** and drop the types dependency if possible (bead:
   internal support, `=`-pinned by `sc-ai` and `sc-jev-py`, with no semver
   promise of its own (owner decision 2026-11-06; ADR-SAG-0026). The port
   stays in `sc-agent-types`.
+- (Proposed, r-3b) This ADR is retitled "v2 shim in sc-agent-types; adapter
+  in sc-agent-compose" (heading and ADR index title cell), since "(no extra
+  crate)" no longer holds.
 
 ## ADR-SAG-0014 — CLI success body
 
@@ -631,6 +676,30 @@ On success, stdout is the versioned sc-ai-cli envelope
 `{ "version", "operation", "data" }` where **`data`** holds the **verbatim Jev
 response JSON** for the operation plus **`session_id`** (REQ-SAG-0710). LLM
 backends normalize to the same answer shape before printing.
+
+Amended by ADR-SAG-0024 (Proposed, r-2).
+
+### Amendment (Phase A.1, r-2)
+
+**Status:** Proposed (Phase A.1) — lands in r-2.
+
+- (Proposed, r-2) `data` is the single serialization of
+  `sc_jev_check::run::RunResponse` (ADR-SAG-0024), printed unchanged by every
+  consumer. The **primary backend** is the first backend in `BackendSet`
+  order whose status is `Ok`; `primary_backend` names it. If it is Jev, its
+  response fields and `answers` are at the top level verbatim (the sentence
+  above still holds for that case); if it is an LLM backend (Jev failed or
+  was not selected), its normalized `answers`, `model` and `usage` are at the
+  top level and no Jev answer is. Then `session_id` (null unless
+  `session_saved`), `session_saved`, `prompt_sha256`, `payload_bytes`,
+  `results` (per backend: `ok` + outcome, or `failed` + the
+  `ScAgentErrorResponse` derived from its error), `equal_input`, dry-run
+  `payload`/`limits`, and last `warnings` (array of strings, omitted when
+  empty). `warnings` replaces the Phase A `data.warning` key; the
+  composition crate adds the log-flush warning through
+  `RunResponse::with_warning` (r-3b). The `{version, operation, data}`
+  wrapper is `sc_jev_check::run::Envelope`; `readback` is the only key a
+  consumer adds (`sc-ai`). REQ-SAG-0710 is amended to match.
 
 ## ADR-SAG-0012 — sc-jev owns Jev API
 
@@ -690,17 +759,28 @@ comparison flows.
 
 ## ADR-SAG-0023 — Dependency pins, allocator, released binaries
 
-**Status:** Proposed (Phase A.1) — lands in r-4; the compose-pin bullet is
-effective when the crate lands (r-3b).
+**Status:** Proposed (Phase A.1) — lands in r-4. Its r-3b subsection lands
+in r-3b.
 
 - (Proposed, r-4) Library crates declare caret ranges. Exact `=` pins are
-  allowed only for deliberate lockstep, and every one is listed here:
-  `sc-observability` (v2 shim alignment); `tree-sitter` and grammar crates
-  (output determinism). `.github/scripts/check-exact-pins.sh` enforces the
-  list. NFR-SAG-0004.
-- (Proposed, r-3b) The intra-workspace `sc-agent-compose` dependency of
-  `sc-ai` and `sc-jev-py` is `=`-pinned (lockstep internal support; owner
-  decision 2026-11-06). Effective when the crate lands in r-3b.
+  allowed only for deliberate lockstep. The list below, between the markers,
+  is the **only** copy: `.github/scripts/check-exact-pins.sh` reads it and
+  fails on any `=` requirement in any `Cargo.toml` whose crate is not on it.
+  NFR-SAG-0004. Reasons: `sc-observability` — v2 shim alignment;
+  `tree-sitter`, `tree-sitter-python`, `tree-sitter-rust` — output
+  determinism; `sc-agent-compose` — lockstep internal support (owner
+  decision 2026-11-06), in force from r-3b (subsection below; before the
+  crate exists no `Cargo.toml` names it). `sc-observability-types` is not on
+  the list: r-1 removes its only user and its root entry.
+
+  <!-- lockstep-pins:start -->
+  sc-observability
+  tree-sitter
+  tree-sitter-python
+  tree-sitter-rust
+  sc-agent-compose
+  <!-- lockstep-pins:end -->
+
 - (Proposed, r-4) Global allocators and argv parsers are linked only by
   binaries: `mimalloc` and `clap` are optional behind each binary crate's
   default `cli` feature, and the `[[bin]]` targets use
@@ -710,10 +790,18 @@ effective when the crate lands (r-3b).
 - (Proposed, r-4) Released binaries are `sc-ai` and `sc-treesitter`.
   Per-channel coverage is ADR-SAG-0017's r-4 amendment.
 
+### Amendment (Phase A.1, r-3b)
+
+**Status:** Proposed (Phase A.1) — lands in r-3b.
+
+- (Proposed, r-3b) The intra-workspace `sc-agent-compose` dependency of
+  `sc-ai` and `sc-jev-py` is `=`-pinned (it is already on the list above);
+  `check-exact-pins.sh` re-runs green with the pin present.
+
 ## ADR-SAG-0024 — Engine entry point and response contract
 
 **Status:** Proposed (Phase A.1) — lands in r-2. Amends ADR-SAG-0005,
-ADR-SAG-0009, ADR-SAG-0019, ADR-SAG-0022.
+ADR-SAG-0009, ADR-SAG-0014, ADR-SAG-0019, ADR-SAG-0022.
 
 - (Proposed, r-2) `sc-jev-check`'s only run API is
   `prepare(CheckSource, RunConfig) -> PreparedRun` then
@@ -723,16 +811,20 @@ ADR-SAG-0009, ADR-SAG-0019, ADR-SAG-0022.
 - (Proposed, r-2) Backend selection: `RunConfig::backends` if set, else the
   source document's `backends`, else `[jev]`. `prepare` and dry-run read only
   static `BackendDescriptor` facts and construct no backend.
-- (Proposed, r-2) `RunResponse` (`#[non_exhaustive]`) is the one result type
+- (Proposed, r-2) `RunResponse` (private fields) is the one result type
   every consumer (CLI, PyO3, future MCP) prints, and its single `Serialize`
-  is the ADR-SAG-0014 `data` body: the primary backend (first `Ok` in
-  `BackendSet` order) contributes its answer fields at the top level, named by
+  is the ADR-SAG-0014 `data` body (ADR-SAG-0014 r-2 amendment): the primary
+  backend (first `Ok` in `BackendSet` order, possibly an LLM backend)
+  contributes its answer fields at the top level, named by
   `primary_backend`, followed by `session_id` (null unless `session_saved`),
-  `prompt_sha256`, `payload_bytes`, `results` (per backend `ok` + outcome or
-  `failed` + `ScAgentErrorResponse`) and `equal_input`. The
+  `session_saved`, `prompt_sha256`, `payload_bytes`, `results` (per backend
+  `ok` + outcome or `failed` + `ScAgentErrorResponse`), `equal_input` and
+  `warnings` (omitted when empty; `RunResponse::with_warning` is how a
+  composition root adds one). A `BackendFailure` stores only the `JevError`;
+  its serialized error object is derived from it at serialize time. The
   `{version, operation, data}` wrapper is `sc_jev_check::run::Envelope`.
   `RunResponse::first_failure()` / `is_partial()` decide exit codes and
-  exceptions for every consumer. REQ-SAG-0620.
+  exceptions for every consumer. REQ-SAG-0620, REQ-SAG-0710 (amended).
 - (Proposed, r-2) Dry-run reports `payload_bytes` and, per selected backend,
   `request_limit_bytes` and `over_limit`; it does not fail on an over-limit
   payload. Each backend owns its byte cap and enforces it in
@@ -741,8 +833,8 @@ ADR-SAG-0009, ADR-SAG-0019, ADR-SAG-0022.
   fn pointer). `ask` takes the `&BackendRegistry` and does not rewrite the
   file. No lock: `save` writes a `create_new` tmp named with pid + random,
   fsyncs, renames, fsyncs the parent, removes the tmp on error; last writer
-  wins; readers are protected by digest and id re-verification; stale tmp
-  files are swept. The session is written once at the end of `run`, only
+  wins; readers are protected by digest and id re-verification; tmp files
+  older than 1 h are swept by `FileSessionStore::new`. The session is written once at the end of `run`, only
   when a backend with `supports_session_ask` returned `Ok`. REQ-SAG-0607.
 - (Proposed, r-2) Repo-root discovery is the git toplevel for both consumers
   (ADR-SAG-0003 r-2 amendment).
@@ -757,11 +849,12 @@ ADR-SAG-0008, ADR-SAG-0019.
 - (Proposed, r-2b) The base request is validated on every backend before any
   send; each `ChainContext`-augmented request is re-validated before its own
   send, and a refusal marks that backend `Failed`. Each backend yields
-  `BackendStatus::Ok | Failed(ScAgentErrorResponse + JevError)`; a failure
+  `BackendStatus::Ok | Failed(BackendFailure)` (the `JevError`; its
+  `ScAgentErrorResponse` is derived when serialized); a failure
   does not discard other answers; `leak = any Failed`; if all fail, `run`
   returns `Err`. `judge` is called once per backend; only `BusyPolicy`
   retries; a session-save failure keeps the answers with
-  `session_saved = false`. REQ-SAG-0604 (consumer output in r-3b: stdout
+  `session_saved = false` and one `warnings` entry. REQ-SAG-0604 (consumer output in r-3b: stdout
   envelope, stderr first failure, exit 2).
 - (Proposed, r-2b) `equal` is derived from per-backend `Attestation`
   (`Matched`, `Mismatched`, `Unattested`, `Failed`, `NotSent`). Each backend
@@ -772,6 +865,10 @@ ADR-SAG-0008, ADR-SAG-0019.
 
 ## ADR-SAG-0026 — Shared HTTP crate and composition crate
 
+**Status:** Proposed (Phase A.1) — HTTP half lands in r-3, compose half in
+r-3b. r-3 sets this line to "Active (HTTP half, r-3); compose half Proposed
+(r-3b)"; r-3b sets it to "Active".
+
 ### HTTP half
 
 **Status:** Proposed (Phase A.1) — lands in r-3.
@@ -779,10 +876,14 @@ ADR-SAG-0008, ADR-SAG-0019.
 - (Proposed, r-3) `sc-agent-http` (published) owns `HttpRequest`
   (`body: Arc<[u8]>`) / `HttpResponse`, `Endpoint`, `SecretHeader`,
   `Transport`, `UreqTransport` (one `Agent` built in `new`, 8 MiB streaming
-  response cap), `BusyPolicy` / `send_with_busy_retry` (with `CancelToken`)
-  and redaction, and is the single secret-read site (ADR-SAG-0020 r-3
-  amendment). It depends only on `sc-agent-types` and `ureq`; no `ureq` type
-  is public. Phase B provider agents reuse it. REQ-SAG-0402.
+  response cap; private module `ureq_transport`), `BusyPolicy` /
+  `send_with_busy_retry` (with `CancelToken`) and redaction of every error it
+  returns, and is the single secret-read site (ADR-SAG-0020 r-3 amendment).
+  It depends only on `sc-agent-types` (`default-features = false`,
+  `features = ["secret"]`) and `ureq`; no `ureq` type is public. Its
+  non-default `test-util` feature (test hooks for clock, sleeper and jitter;
+  loopback-only `http` endpoint; test transports) is enabled only by
+  dev-dependencies. Phase B provider agents reuse it. REQ-SAG-0402.
 - (Proposed, r-3) ADR-SAG-0012 still holds: `sc-jev` owns every TypeSafe
   Jev API operation (endpoints, wire body, response parsing);
   `sc-agent-http` only carries bytes.
@@ -798,7 +899,12 @@ ADR-SAG-0008, ADR-SAG-0019.
   as an internal-support crate, `=`-pinned from `sc-ai` and `sc-jev-py`, with
   no semver promise of its own, because `sc-ai` is published and cannot
   depend on an unpublished crate. Publish order and the published-crate set
-  are ADR-SAG-0017's r-3b amendment.
+  are ADR-SAG-0017's r-3b amendment. `ComposeInputs` has private fields,
+  `new(cwd, policy)` and one setter per optional field.
+- (Proposed, r-3b) Environment ownership: API-key environment and `.env`
+  reading belongs to `sc-jev-check` (`BackendRegistry::from_env` via
+  `sc-agent-secrets`); log and session path environment variables belong to
+  `PathPolicy` in `sc-agent-compose`. No other crate reads either set.
 
 ## ADR-SAG-0027 — Error taxonomy and extensibility
 
@@ -806,21 +912,35 @@ ADR-SAG-0008, ADR-SAG-0019.
 
 - (Proposed, r-1) `JevError`, `BackendId` and `BackendKeyId` are
   `#[non_exhaustive]`, and struct-like `JevError` variants are
-  `#[non_exhaustive]` so downstream crates use constructors. Recovery
+  `#[non_exhaustive]` so downstream crates use constructors; every
+  struct-like variant has a public constructor. Recovery
   categories are explicit variants (`CredentialStoreInvalid`,
   `RegistryInvalid`, `SessionStoreIo`, `Operational { area }`,
   `SessionDocumentInvalid`, `EncodeFailed`, `IoFailed`). Producer variants are
   neutral (`LanguageUnavailable { producer, language }`); producer stderr is
   re-raised as `ProducerError { producer, code, message }`, whose `code()` is
   the carried id. No string-prefix parsing. REQ-SAG-0106.
-- (Proposed, r-1) `code()` ids are unchanged. Every variant maps to exactly
-  one existing id; an id may have several variants (REQ-SAG-0101 amended).
-  The variant → id table is in sprint r-1 and pinned by a golden test. A new
-  stable code requires changing the README `errors.json` contract shared with
-  Python. Revisit when Phase B needs an `INTERNAL` class.
+- (Proposed, r-1) `code()` returns `ErrorCode`, a `#[non_exhaustive]` enum
+  with `as_str()`; its ids are unchanged. `ErrorCode::ALL` is a hand-written
+  `const` table (no `build.rs`) that a test compares with
+  `errors.json`. Every variant maps to exactly one existing id; an id may
+  have several variants (REQ-SAG-0101 amended). The variant → id table is in
+  sprint r-1 and pinned by a golden test. A new stable code requires
+  changing the README `errors.json` contract shared with Python. Revisit
+  when Phase B needs an `INTERNAL` class.
 - (Proposed, r-1) `retryable()` is true only for `NetworkError` kinds Busy,
-  Timeout, Connect. `ScAgentErrorResponse` carries optional `schema_version`,
-  `retryable`, `details`.
+  Timeout, Connect.
+- (Proposed, r-1) `ScAgentErrorResponse::from_jev_error` (name unchanged)
+  fills fields by one rule, in the fixed key order `error`, `message`,
+  `schema_version`, `retryable`, `details`: `schema_version` is always `1`
+  (versions this error shape only, independent of the stdout envelope
+  `version`; bumped only by a breaking change of this shape); `retryable` is
+  present, as `true`, only when `retryable()` is true; `details` is present
+  only for `ProducerError`, as `{"producer": <name>}`. Deserialization (for
+  producer stderr) accepts `schema_version` absent or `1`, denies unknown
+  fields, and treats anything else as not an error response. Every stderr
+  line gains `"schema_version":1`; NFR-SAG-0001 is amended and a golden
+  stderr test pins the bytes.
 - (Proposed, r-1) `Error::source()` is `None` for every redacted-cause
   variant (`CredentialStoreInvalid`, `NetworkError`, `EncodeFailed`,
   `IoFailed`, `SessionStoreIo`); no A.1 variant carries a non-redacted source.
@@ -828,8 +948,56 @@ ADR-SAG-0008, ADR-SAG-0019.
   (`openai_luna`, `openai`), with a one-release read alias for
   `open_ai_luna` / `open_ai` in config and caller-request input.
 - (Proposed, r-1) Module seams are cargo features of `sc-agent-types`:
-  `judge`, `secret`, `obs`, `git` (all default-on); `error`, `envelope`,
-  `ids`, `schema` are always on. `sc-treesitter` uses
+  `judge`, `secret`, `obs` (default-on), `git` and `test-util`
+  (non-default); `error`, `envelope`, `ids`, `schema`, `cancel` are always
+  on. `secret` and `judge` are independent; `git` needs only the core.
+  `sc-jev-check` and `sc-treesitter`'s `cli` feature are the only enablers
+  of `git`. `cargo hack --feature-powerset` checks every combination. `sc-treesitter` uses
   `default-features = false`. Module paths are the stable surface for a later
-  re-export split. Adding a backend is a minor `sc-agent-types` change plus
-  one registry factory arm (ADR-SAG-0009 r-1 amendment).
+  re-export split.
+- (Proposed, r-1) **Adding a built-in backend** (checklist): (1) a minor
+  `sc-agent-types` release with the `BackendId` variant, its `BACKENDS` row
+  (facts, aliases, limit) and a `BackendKeyId` variant if needed; (2) the
+  backend type with `with_default_transport`; (3) one row in
+  `sc-jev-check::registry`'s factory table; (4) the catalog and
+  factory-coverage tests pass unchanged. Dispatch on ids is a
+  test-and-review convention (ADR-SAG-0009 r-1 amendment);
+  `BackendRegistry::register` is for doubles and scripted backends of
+  existing ids only. `BackendId` deserializes through `FromStr`, so the
+  descriptor's `aliases()` is the one alias source.
+- (Proposed, r-1) **Test seams** are non-default, additive `test-util` cargo
+  features of the crate that owns the hook, enabled only by
+  dev-dependencies (a crate's own integration targets use a
+  self-referencing dev-dependency), never by a normal dependency edge;
+  `workspace-tests --test test_util_off` and a `cargo tree` gate prove it.
+  No acceptance test in `tests/` relies on `cfg(test)`.
+
+## ADR-SAG-0028 — workspace-tests crate
+
+**Status:** Proposed (Phase A.1) — lands in r-3b.
+
+- (Proposed, r-3b) **Purpose.** `crates/workspace-tests` (`publish = false`)
+  holds proofs that span crates and must not live inside a published crate:
+  the Rust/Python cross-implementation digest (`jev_cross_impl`), the real
+  `sc-treesitter` → `check.toml` producer run, CLI/Python output parity,
+  git-read parity, source scans (secret read site, lints inheritance,
+  `#[allow]`, git spawn sites) and the `test-util`-off proof. Its `src/lib.rs`
+  is empty; everything is under `tests/`. REQ-SAG-0109.
+- (Proposed, r-3b) **Dev-only edges.** It has no normal dependencies. Its
+  dev-dependencies are exactly `sc-agent-types` (`features = ["git"]`),
+  `sc-jev-check`, `sc-agent-compose`, `serde_json`, `tempfile`. Whether
+  `sc-boundary` checks dev edges is settled by r-3b's spike and recorded in
+  `boundaries/README.md`; if it does not, `cargo-tree-gates.sh` polices the
+  dev set.
+- (Proposed, r-3b) **Built-binary contract.** `sc-ai` and `sc-treesitter`
+  are never linked: a test builds them with
+  `cargo build -p <pkg> --features cli --message-format=json` (via
+  `env!("CARGO")`) and runs the executable named in the `compiler-artifact`
+  message (helper `tests/support/bin_path.rs`). Stable Cargo only: no
+  `CARGO_BIN_EXE_*` across packages, no artifact dependencies.
+- (Proposed, r-3b) **Forbidden edges.** `pyo3`, `tree-sitter`,
+  `sc-treesitter`, `sc-jev-py`, `sc-ai`, `sc-agent-http`, `sc-jev`,
+  `sc-jev-backends` (manifest `forbidden_edges`; `cargo tree -p
+  workspace-tests -e normal,dev` gate for `pyo3`/`tree-sitter`). A proof
+  that needs one of them goes through a built binary or into that crate's own
+  tests.

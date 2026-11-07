@@ -125,4 +125,13 @@ Phase plans live only under `docs/plans/phase-<phase>/`.
 
 ## Repository exceptions
 
-None yet.
+- **Phase A.1 plan naming (`docs/plans/phase-a-refine/`).** Phase id `r`;
+  the plan directory is `docs/plans/phase-a-refine/` and the plan branch is
+  `plan/phase-a-refine` instead of `docs/plans/phase-r/` / `plan/phase-r`,
+  because A.1 refines Phase A rather than opening a new phase and lands on
+  `integrate/phase-a`. Sprint ids, sprint docs, sprint branches and beads
+  keep the standard form (`r-N`, `sprint-r-N-<slug>.md`,
+  `sprint/r-N-<slug>`). `req-qa` and `arch-qa` accept these paths as the
+  phase-`r` plan location; no other phase may use a descriptive directory
+  name without its own entry here. Recorded by the Phase A.1 plan PR
+  (REQ-QA-012, REQ-QA-R2-008).

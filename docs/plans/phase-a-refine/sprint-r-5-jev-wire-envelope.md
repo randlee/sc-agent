@@ -16,6 +16,9 @@ parallel_safe: []
 requirements:
   - REQ-SAG-0403
   - REQ-SAG-0400
+  - REQ-SAG-0401
+  - REQ-SAG-0500
+  - REQ-SAG-0501
   - REQ-SAG-0102
   - REQ-SAG-0606
 adrs:
@@ -102,7 +105,7 @@ ARCHC-002, ARCHC-003.
 | --- | --- |
 | req:REQ-SAG-0403 | Both backends deserialize `CanonicalJudgePayload`; no byte-splice; `test_envelope_robust_to_key_ordering` |
 | adr:ADR-SAG-0005 | r-5 subsection Active |
-| boundary:jev | `jev_cross_impl` and `cross_impl_branches` digests unchanged; `test_digest_detects_faulty_wire_builder` still green |
+| boundary:jev | `jev_cross_impl` and `cross_impl_branches` digests unchanged; `test_digest_detects_faulty_wire_builder` and `test_real_wire_builder_reports_prompt_digest` still green. Regression: REQ-SAG-0401 `cargo test -p sc-agent-http --test retry` (busy retry unchanged); REQ-SAG-0500/0501 `cargo test -p sc-jev-backends --test llm` and `--test wire` (Haiku/Luna embed the same canonical bytes) |
 
 ## Required validation
 
@@ -111,7 +114,10 @@ just lint
 just test
 cargo test -p sc-jev --test wire -- test_envelope_robust_to_key_ordering --exact
 cargo test -p sc-jev --test wire -- test_digest_detects_faulty_wire_builder --exact
+cargo test -p sc-jev --test wire -- test_real_wire_builder_reports_prompt_digest --exact
 cargo test -p sc-jev-backends
+cargo test -p sc-jev-backends --test llm
+cargo test -p sc-agent-http --test retry
 cargo test -p workspace-tests --test jev_cross_impl
 cargo test -p sc-jev-check --test cross_impl_branches
 cargo publish --dry-run --locked -p sc-agent-types -p sc-agent-secrets -p sc-agent-http -p sc-jev -p sc-jev-backends -p sc-jev-check -p sc-agent-compose -p sc-treesitter -p sc-ai
