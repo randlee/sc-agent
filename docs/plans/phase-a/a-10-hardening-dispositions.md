@@ -3,9 +3,10 @@
 Branch `sprint/a-10-phase-end-hardening` (PR 20). One row per finding id per
 assignment: the three code waves
 (`.cursor/phase-a-orchestration/wave6-dev/fix-a-10-code-wave{1,2,3}.xml`)
-and the QA-1 fix round (`fix-a-10-code-qa1.xml`). An id that appears in
+the QA-1 fix round (`fix-a-10-code-qa1.xml`), and the QA-2 follow-up
+(`wave6-qa/a-10-code-qa2/*.json`). An id that appears in
 more than one wave or group has one row each. Evidence is `file:line` at the
-QA-1 head; a deferred row names the owner.
+QA-2 head; a deferred row names the owner.
 
 Status values: **implemented** (code, test, or doc change landed) or
 **deferred** (not done here; reason and owner given). Architectural items
@@ -13,7 +14,7 @@ are never implemented here; they are D1–D13 in `PHASE-A-REVIEW.md`
 section 4 or the Phase A.1 plan (r-*).
 
 
-**Totals:** 152 rows; 143 implemented, 9 deferred.
+**Totals:** 162 rows; 152 implemented, 10 deferred.
 
 | Id | Wave / group | Status | Reason or note | Evidence |
 | --- | --- | --- | --- | --- |
@@ -52,7 +53,7 @@ section 4 or the Phase A.1 plan (r-*).
 | RSH-005 | wave 1 C | implemented | 90 s retry deadline + jitter (cancellation is Phase A.1) | `crates/sc-jev/src/retry_policy.rs:15`<br>`crates/sc-jev/src/retry_policy.rs:13` |
 | QA-002 | wave 1 C | implemented | loopback transport tests; rust-qa: sc-jev 89.9%, sc-jev-backends 93.4% line | `crates/sc-jev/src/client/https.rs:227`<br>`crates/sc-jev-backends/src/transport.rs:415` |
 | QA-005 | wave 1 C | implemented | sc-jev / sc-jev-backends rustdoc links fixed | `.github/workflows/sc-agent-ci.yml:239` |
-| RBQA-F012 | wave 1 D | implemented | workspace unsafe_code = forbid | `Cargo.toml:48` |
+| RBQA-F012 | wave 1 D | implemented | workspace unsafe_code = forbid | `Cargo.toml:47` |
 | RBQA-F008 | wave 1 D | implemented | clippy disallowed-methods on as_str; two allow sites | `clippy.toml:6`<br>`crates/sc-jev/src/client/https.rs:85`<br>`crates/sc-jev-backends/src/transport.rs:82` |
 | QA-007 | wave 1 D | implemented | tempfile workspace dev-dependency (TempDir part) | `Cargo.toml:42` |
 | ARCHP-021 | wave 1 D | implemented | tempfile workspace dev-dependency | `Cargo.toml:42` |
@@ -96,7 +97,7 @@ section 4 or the Phase A.1 plan (r-*).
 | RBQA-F011 | wave 2 C | implemented | same visibility pass | `boundaries/sc-ai/sc-ai-cli.toml:24` |
 | EXT-003 | wave 2 C | implemented | CLI half: ExecuteOverrides and observe seams are #[doc(hidden)] but NOT feature-gated: a self dev-dependency for a test-support feature is rejected by sc-boundary and crates.io publish (reason in code) | `crates/sc-ai/src/lib.rs:33` |
 | CR-013 | wave 2 C | implemented | cross-impl fixture extended; references regenerated | `tests/fixtures/jev/cross_impl/logical.json:11` |
-| FTQ-003 | wave 2 C | implemented | spawn_with_deadline (now the shared tests/support/deadline.rs) | `tests/support/deadline.rs:31` |
+| FTQ-003 | wave 2 C | implemented | spawn_with_deadline (now the shared tests/support/deadline.rs) | `tests/support/deadline.rs:47` |
 | QA-005 | wave 2 C | implemented | no rustdoc warnings in sc-jev-check / sc-ai | `.github/workflows/sc-agent-ci.yml:239` |
 | CR-005 | wave 3 A | implemented | rev-parse --verify --end-of-options, cat-file on the id; leading-dash rev rejected | `crates/sc-treesitter/src/git_io.rs:142`<br>`crates/sc-treesitter/tests/cli.rs:156` |
 | RBQA-F006 | wave 3 A | implemented | same git read rewrite | `crates/sc-treesitter/src/git_io.rs:134` |
@@ -124,7 +125,7 @@ section 4 or the Phase A.1 plan (r-*).
 | ARCHP-022 | wave 3 B | implemented | shorthand normalised in register_scripted_backends | `crates/sc-jev-check/src/registry/scripted.rs:242` |
 | FTQ-002 | wave 3 B | implemented | pure default_log_root_from | `crates/sc-jev-py/src/logging.rs:177` |
 | QA-005 | wave 3 B | implemented | sc-jev-py rustdoc warnings removed | `.github/workflows/sc-agent-ci.yml:239` |
-| QA-008 | wave 3 B | implemented | invariant expects carry messages and a proving test | `crates/sc-jev-py/src/logging.rs:348` |
+| QA-008 | wave 3 B | implemented | invariant expects carry messages and a proving test | `crates/sc-jev-py/src/logging.rs:354` |
 | QA-005 | wave 3 C | implemented | doc gate hard (no continue-on-error) | `.github/workflows/sc-agent-ci.yml:236` |
 | FTQ-005 | wave 3 C | implemented | .gitattributes pins LF; autocrlf steps removed | `.gitattributes:4` |
 | REQ-QA-A10-005 | wave 3 C | implemented | same .gitattributes change | `.gitattributes:4` |
@@ -133,7 +134,7 @@ section 4 or the Phase A.1 plan (r-*).
 | RSH observation (hash-object filters) | QA-1 A | implemented | id matches the returned bytes; no clean filters | `crates/sc-treesitter/src/git_io.rs:107` |
 | ARCH-001 | QA-1 B | implemented | ADR-SAG-0029 (b) amends ADR-SAG-0022 | `docs/architecture.md:425` |
 | ARCH-002 | QA-1 B | implemented | ADR-SAG-0029 (a) amends ADR-SAG-0020 | `docs/architecture.md:406` |
-| ARCH-003 | QA-1 B | implemented | secrets facade drops MapEnv/MapKeyring; notes fixed | `boundaries/sc-agent-secrets/agent-secrets.toml:25` |
+| ARCH-003 | QA-1 B | implemented | secrets facade drops MapEnv/MapKeyring; notes fixed. `just lint` green on 9482380 (QA-2 code head; the later commit is docs-only): local `compatibility.check: ok`, `lint.ci.consumer: pass (3 steps)`; `sc-lint lint sc-boundary --json` = sc-lint-boundary 0.8.0 status pass, 0 findings, 9 crates scanned; CI [test (ubuntu-24.04)](https://github.com/randlee/sc-agent/actions/runs/42361431082/job/128370466596) `just lint` step: `compatibility.check: ok`, `lint.ci.consumer: ok` | `boundaries/sc-agent-secrets/agent-secrets.toml:25` |
 | ARCH-004 | QA-1 B | deferred | ADR-SAG-0016 version-form text belongs to the D8 amendment; noted in ADR-SAG-0029 | `docs/architecture.md:461` |
 | REQ-QA-001 | QA-1 B | implemented | ADR-SAG-0022 bullet marked superseded with pointer | `docs/architecture.md:165` |
 | REQ-QA-002 | QA-1 B | implemented | sc-jev-py architecture and sprint a-8 name run_check_scripted | `docs/sc-jev-py/architecture.md:29`<br>`docs/plans/phase-a/sprint-a-8-pyo3-wrapper.md:70` |
@@ -142,7 +143,7 @@ section 4 or the Phase A.1 plan (r-*).
 | REQ-QA-005 | QA-1 C | implemented | error-code dispositions in ADR-SAG-0029 (c); all ids in errors.json | `docs/architecture.md:440`<br>`crates/sc-agent-types/src/error.rs:632` |
 | REQ-QA-006 | QA-1 B | implemented | sc-treesitter API notes | `docs/sc-treesitter/architecture.md:29` |
 | REQ-QA-007 | QA-1 C | implemented | this table | `docs/plans/phase-a/a-10-hardening-dispositions.md:1` |
-| REQ-QA-008 | QA-1 C | implemented | D1-D13 section below | `docs/plans/phase-a/a-10-hardening-dispositions.md:173` |
+| REQ-QA-008 | QA-1 C | implemented | D1-D13 section below | `docs/plans/phase-a/a-10-hardening-dispositions.md:184` |
 | REQ-QA-009 | QA-1 B | implemented | ADR-SAG-0020 test-util sentence superseded; sprint a-4 owned path fixed; jev.toml lists root re-exports only | `docs/architecture.md:236`<br>`docs/plans/phase-a/sprint-a-4-backend-jev.md:34`<br>`boundaries/sc-jev/jev.toml:25` |
 | FTQ-006 | QA-1 D | implemented | bounded accept loop, stream timeouts, finish recv_timeout + count panic; copies byte-compared | `crates/sc-jev/src/test_server.rs:142`<br>`crates/sc-jev/src/lib.rs:41` |
 | FTQ-007 | QA-1 D | implemented | sentinel handshake in Rust and Python; drop guard / try-finally | `crates/sc-jev-py/src/run.rs:1041`<br>`tests/fixtures/jev-python/tests/test_run_check_and_ask.py:209` |
@@ -166,9 +167,19 @@ section 4 or the Phase A.1 plan (r-*).
 | RBP obs: serde spelling open_ai_luna vs openai_luna | QA-1 E | deferred | D6 wire decision; divergence stays pinned by test | `crates/sc-agent-types/src/ids.rs:244` |
 | RBP obs: encode_failed INPUT_INVALID semantics | QA-1 E | deferred | RBP-F001 / r-1 (error type design, D6); wire id unchanged | `crates/sc-agent-types/src/error.rs:327` |
 | RBP obs: logging.rs raw {error} interpolation | QA-1 E | deferred | r-2; io/observability errors only, no payload text | — |
-| QA-004 | QA-1 F | implemented | adapters stay per root (location is D2; D7 drops the obs-types dep from sc-agent-types), so both compare to one golden | `tests/fixtures/observability/session-event.json:16`<br>`crates/sc-ai/src/observe.rs:223`<br>`crates/sc-jev-py/src/logging.rs:339` |
+| QA-004 | QA-1 F | implemented | adapters stay per root (location is D2; D7 drops the obs-types dep from sc-agent-types), so both compare to one golden | `tests/fixtures/observability/session-event.json:17`<br>`crates/sc-ai/src/observe.rs:223`<br>`crates/sc-jev-py/src/logging.rs:339` |
 | QA-007 | QA-1 F | implemented | show-toplevel lookups documented: different error mapping by design; sharing is D2 | `crates/sc-ai/src/command.rs:750`<br>`crates/sc-treesitter/src/git_io.rs:312` |
 | rust-qa note: symlink tests cfg(unix) | QA-1 F | implemented | documented Windows limitation | `docs/sc-jev-check/extraction.md:44` |
+| FTQ-011 | QA-2 | implemented | every wait bounded: stdin on its own thread, drains via recv_timeout with 5 s grace and a grandchild report, Unix process-group kill; unix tests with a pipe-holding `sleep 30 &` grandchild | `tests/support/deadline.rs:38`<br>`tests/support/deadline.rs:158`<br>`tests/support/deadline.rs:185`<br>`tests/support/deadline.rs:202` |
+| QA-009 | QA-2 | implemented | same runner fix; unread stdin test | `tests/support/deadline.rs:219` |
+| ARCH-005 | QA-2 | implemented | green `just lint` recorded in the ARCH-003 row and in plan.md | `docs/plans/phase-a/plan.md:403` |
+| ARCH-006 | QA-2 | implemented | [testing] comments reworded (no feature; cfg(test) doubles) | `boundaries/sc-agent-secrets/agent-secrets.toml:50`<br>`boundaries/sc-jev-py/jev-py.toml:56` |
+| REQ-QA-201 | QA-2 | implemented | sprint a-2 lines carry the ADR-SAG-0029 (a) pointer; stale root Cargo.toml lint comment fixed | `docs/plans/phase-a/sprint-a-2-agent-secrets.md:45`<br>`docs/plans/phase-a/sprint-a-2-agent-secrets.md:61`<br>`Cargo.toml:45` |
+| QA-010 | QA-2 | implemented | documented: tests do not run from a packaged .crate; no gating | `docs/development/ci.md:78` |
+| QA-011 | QA-2 | implemented | content key includes untracked non-ignored files; key dirs not pruned (documented) and excluded from the CI target cache | `scripts/sc-publish-dry-run.sh:172`<br>`scripts/sc-publish-dry-run.sh:25`<br>`.github/workflows/sc-publish-dry-run.yml:64` |
+| FTQ-012 | QA-2 | implemented | same content-key fix | `scripts/sc-publish-dry-run.sh:164` |
+| QA-004 residual | QA-2 | implemented | golden keyed by operation; both adapters checked for Ask and Judge | `tests/fixtures/observability/session-event.json:21`<br>`crates/sc-ai/src/observe.rs:193` |
+| ARCH-004 (carried) | QA-2 | deferred | unchanged: D8 owns the ADR-SAG-0016 version text | `docs/architecture.md:461` |
 
 ## D1–D13 (PHASE-A-REVIEW.md section 4): no implementation
 
