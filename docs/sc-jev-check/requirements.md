@@ -14,7 +14,7 @@
 | REQ-SAG-0601 | `run_check` / dry-run | a-6 |
 | REQ-SAG-0602 | Equal-input record | a-6 |
 | REQ-SAG-0603 | Multi-backend run | a-6 |
-| REQ-SAG-0610 | Session logging via `SharedSessionLog` | a-6 |
+| REQ-SAG-0610 | Session logging via `SharedSessionLog` (implemented a-6; `req:` root owned by a-8) | a-8 |
 | REQ-SAG-0611 | Log fields, no secrets | a-6 |
 
 Consumer boundary: [`extraction.md`](extraction.md). Subjects schema: [`subjects-schema.md`](../sc-agent-types/subjects-schema.md).

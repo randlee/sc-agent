@@ -1,7 +1,7 @@
 ---
 id: a-1
 phase: a
-status: in_progress
+status: complete
 closure_type: contract
 target_boundary: agent-types
 track: foundation
@@ -54,13 +54,13 @@ owned_paths:
   - "crates/sc-jev-backends/src/lib.rs"
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/lib.rs"
-  - "crates/sc-jev-check/src/config.rs"
-  - "crates/sc-jev-check/src/equal_input.rs"
-  - "crates/sc-jev-check/src/extract.rs"
-  - "crates/sc-jev-check/src/payload.rs"
-  - "crates/sc-jev-check/src/registry.rs"
-  - "crates/sc-jev-check/src/run.rs"
-  - "crates/sc-jev-check/src/session.rs"
+  - "crates/sc-jev-check/src/config/mod.rs"
+  - "crates/sc-jev-check/src/equal_input/mod.rs"
+  - "crates/sc-jev-check/src/extract/mod.rs"
+  - "crates/sc-jev-check/src/payload/mod.rs"
+  - "crates/sc-jev-check/src/registry/mod.rs"
+  - "crates/sc-jev-check/src/run/mod.rs"
+  - "crates/sc-jev-check/src/session/mod.rs"
   - "crates/sc-ai/Cargo.toml"
   - "crates/sc-ai/src/lib.rs"
   - "crates/sc-ai/src/main.rs"
@@ -88,9 +88,12 @@ verified against committed Python reference bytes. **No network code.**
    `sc-treesitter`, `sc-ai`, `sc-jev-py`. a-1 commits **minimal compiling stubs** (`Cargo.toml` + root
    module only) for each member except `sc-agent-types` (fully implemented here).
    Later sprints **replace stub bodies** without editing root `Cargo.toml` members list.
-   **`sc-jev-check/src/lib.rs`** — a-1 commits the **full `mod` tree** and empty
-   module files (`config`, `extract`, `payload`, `session`, `run`, `equal_input`,
-   `registry`); a-3 and a-6 fill bodies only, never restructure `lib.rs`.
+   **`sc-jev-check/src/lib.rs`** — a-1 commits the **full `mod` tree** as
+   directory modules (`config/mod.rs`, `extract/mod.rs`, `payload/mod.rs`,
+   `session/mod.rs`, `run/mod.rs`, `equal_input/mod.rs`, `registry/mod.rs`);
+   a-3 and a-6 fill those bodies and add child files inside the directories
+   (for example `extract/subjects.rs`, `run/prompt.rs`), and never restructure
+   `lib.rs`.
    `just lint` / `just test`, sc-lint manifests for Phase A boundaries.
    Stub crates satisfy **REQ-SAG-0100** only; crate REQ ids are owned by later sprints.
 2. **REQ-SAG-0101** — `JevError` enum covering every id in `tests/fixtures/jev/README-contract/errors.json`; each variant exposes stable `code()` and `fix_hint()`.
@@ -140,10 +143,13 @@ test -f tests/fixtures/jev/README-contract/errors.json
 test -f tests/fixtures/jev/subjects-schema/v1/minimal.json
 python3 -c "import json; d=json.load(open('tests/fixtures/jev/subjects-schema/v1/minimal.json')); assert d.get('schema')=='sc/subjects/1'"
 python3 -c "import json; json.load(open('tests/fixtures/jev/README-contract/errors.json'))"
-! rg -l 'reqwest|hyper|ureq' crates/ 2>/dev/null | rg -v sc-agent-types || test $(rg -l 'reqwest|hyper|ureq' crates/ 2>/dev/null | wc -l) -eq 0
+test -z "$(cargo tree -p sc-agent-types -e normal | grep -E 'reqwest|hyper|ureq')"
 ```
 
-Expected: all commands exit 0; last command confirms no HTTP client deps in workspace yet.
+Expected: all commands exit 0. The last command checks the lasting invariant:
+`sc-agent-types` has no HTTP client in its normal dependency tree. Later
+sprints add `ureq` to `sc-jev` and `sc-jev-backends` on purpose, so this check
+does not scan the whole `crates/` tree.
 
 Cross-impl and fixture-backed tests run in the **workspace** only (see `sc-agent-types` crate docs); they are omitted from the published crate package.
 

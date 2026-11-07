@@ -1,7 +1,7 @@
 ---
 id: a-7
 phase: a
-status: in_progress
+status: complete
 closure_type: integration
 target_boundary: sc-ai-cli
 track: cli
@@ -106,16 +106,16 @@ fn emit(error: &JevError) {
 | req:REQ-SAG-0600 | Session create/load + TTL via CLI `ask` path |
 | req:REQ-SAG-0601 | CLI `run`/`dry-run` resolve keys and inject LLM system prompt per ADR-SAG-0019 |
 | req:REQ-SAG-0603 | Two backends in one CLI run share payload + equal-input |
-| req:REQ-SAG-0610 | One JSONL `LogEvent` per judge send through the v2 `SharedSessionLog` adapter |
+| evidence:REQ-SAG-0610 | Boundary evidence only; the `req:` root is owned by **a-8**. The CLI logger adapter writes one JSONL `LogEvent` per judge send through the v2 `SharedSessionLog` adapter (`crates/sc-ai/tests/cli.rs::cli_logger_adapter_records_session_without_secrets`) |
 | req:REQ-SAG-0700 | `run`, `dry-run`, `ask` emit versioned envelope |
 | req:REQ-SAG-0701 | Failure exits 2; stderr JSON `{error, message}` only |
 | req:REQ-SAG-0702 | Readback tests for path-consuming flags |
 | req:REQ-SAG-0703 | README or `just` target documents install |
 | req:REQ-SAG-0710 | `data` includes Jev body + `session_id` inside envelope |
 | req:REQ-SAG-0711 | v2 logger adapter wired to `SharedSessionLog` |
-| NFR-SAG-0001 | Typed errors only; no ad hoc exit messages |
-| NFR-SAG-0002 | No secrets in stdout/stderr/logs |
-| NFR-SAG-0003 | Default log root documented |
+| req:NFR-SAG-0001 | Typed errors only; no ad hoc exit messages |
+| req:NFR-SAG-0002 | No secrets in stdout/stderr/logs. Owning sprint (CLI output is the primary surface). Tests in `crates/sc-ai/tests/cli.rs`: `cli_logger_adapter_records_session_without_secrets` writes `sk-ant-test-secret` into the system prompt and asserts it is absent from the JSONL session log and the stdout envelope; `cli_run_resolves_dotenv_key_and_dry_run_does_not` runs the built binary with `TYPESAFE_API_KEY=sk-test-whitespace key` in a repo `.env` and asserts the key is absent from dry-run stdout and from the run's stderr error JSON. Both use `assert_no_prompt_leak`. Recorded run: `sc-agent-ci` workflow, `test` job (`cargo test --workspace`) |
+| req:NFR-SAG-0003 | Default log root documented (`README.md`: `<repo-root>/.sc-ai`, `--log-dir`, `SC_LOG_ROOT`; test `cli_default_log_root_and_env_override`). Owning sprint; a-8 records the Python half of ADR-SAG-0021 as evidence |
 | boundary:sc-ai-cli | No HTTP crates in **direct** deps (`cargo tree -p sc-ai --depth 1`) |
 
 ## Required validation
