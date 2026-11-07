@@ -108,6 +108,8 @@ fn test_help_prints_usage_and_exits_zero() {
     ] {
         let text = stdout_text(&run(dir.path(), &args));
         assert!(text.contains("sc-treesitter extract"), "{args:?}: {text}");
+        assert!(text.contains("Usage: sc-treesitter "), "{args:?}: {text}");
+        assert!(!text.contains("sc-treesitter.exe"), "{args:?}: {text}");
     }
 }
 

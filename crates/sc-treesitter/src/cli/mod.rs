@@ -30,10 +30,13 @@ and exits 2.";
 /// "a source path".
 const PATH_VALUE_NAME: &str = "PATH";
 
-/// Parsed command line.
+// `name` and `bin_name` are fixed so usage and `--version` text never depend
+// on argv[0] (Windows runs `sc-treesitter.exe`, CI-R3C-001). A doc comment
+// here would replace `about` in `--help`.
 #[derive(Debug, Parser)]
 #[command(
     name = "sc-treesitter",
+    bin_name = "sc-treesitter",
     version,
     about = "Tree-sitter producer for sc/subjects/1 documents.",
     after_help = NOTES
@@ -213,6 +216,28 @@ mod tests {
     fn cli_definition_is_consistent() {
         use clap::CommandFactory;
         Cli::command().debug_assert();
+    }
+
+    /// Usage text names `sc-treesitter`, never argv\[0\] such as
+    /// `sc-treesitter.exe` or a full path.
+    #[test]
+    fn usage_ignores_argv0() {
+        for argv0 in ["sc-treesitter.exe", "/opt/bin/other-name"] {
+            let Ok(Parsed::Print(text)) = parse([argv0, "extract", "--help"]) else {
+                panic!("{argv0}: extract --help must print");
+            };
+            assert!(
+                text.contains("Usage: sc-treesitter extract "),
+                "{argv0}: {text}"
+            );
+            let Ok(Parsed::Print(text)) = parse([argv0, "--version"]) else {
+                panic!("{argv0}: --version must print");
+            };
+            assert_eq!(
+                text,
+                format!("sc-treesitter {}\n", env!("CARGO_PKG_VERSION"))
+            );
+        }
     }
 
     #[test]
