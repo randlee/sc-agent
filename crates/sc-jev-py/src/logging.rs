@@ -311,6 +311,39 @@ mod tests {
         }
     }
 
+    /// Stable projection of an adapted event: every key except the
+    /// per-process `timestamp`, `service` and `identity`.
+    fn projection(event: &LogEvent) -> serde_json::Value {
+        let mut value = serde_json::to_value(event).expect("serialize");
+        let object = value.as_object_mut().expect("object");
+        for volatile in ["timestamp", "service", "identity"] {
+            object.remove(volatile);
+        }
+        value
+    }
+
+    fn golden_event() -> SessionEvent {
+        SessionEvent {
+            session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
+                .expect("nil session id"),
+            backend: sc_agent_types::BackendId::AnthropicHaiku,
+            prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
+            operation: LogOperation::Ask,
+        }
+    }
+
+    /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
+    /// (where a shared one lives is decision D2). Both compare against this
+    /// one golden, so they cannot drift apart.
+    #[test]
+    fn adapter_matches_the_shared_session_event_golden() {
+        let golden: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/observability/session-event.json"
+        ))
+        .expect("golden json");
+        assert_eq!(projection(&to_obs_event(&golden_event())), golden);
+    }
+
     #[test]
     fn observability_constants_are_valid() {
         assert!(ServiceName::new(SERVICE_NAME).is_ok());

@@ -1,0 +1,19 @@
+{
+  "action": "ask",
+  "correlation_id": null,
+  "diagnostic": null,
+  "fields": {
+    "backend": "anthropic_haiku",
+    "operation": "ask",
+    "prompt_sha256": "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+    "session_id": "00000000-0000-0000-0000-000000000000"
+  },
+  "level": "Info",
+  "message": null,
+  "outcome": null,
+  "request_id": null,
+  "state_transition": null,
+  "target": "jev.session",
+  "trace": null,
+  "version": "v1"
+}

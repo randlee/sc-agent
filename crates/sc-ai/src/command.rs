@@ -745,6 +745,14 @@ fn parse_session_id(text: &str) -> Result<SessionId, JevError> {
     Ok(SessionId::from_uuid(id))
 }
 
+/// `--repo-root`, else the git toplevel of the current directory.
+///
+/// `sc-treesitter`'s `git_io::repo_root` runs the same
+/// `git rev-parse --show-toplevel` but is not shared (QA-007): this CLI has a
+/// `--repo-root` escape hatch, so a lookup failure is `CONFIG_INVALID` with
+/// "Pass --repo-root", while the producer has no such flag and reports
+/// `EXTRACTION_FAILED` ("run inside a repository"). The two crates share
+/// only `sc-agent-types`; one repo-discovery owner is decision D2.
 fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
     if let Some(path) = flag {
         if !path.is_dir() {

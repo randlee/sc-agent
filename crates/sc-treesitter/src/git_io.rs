@@ -308,6 +308,11 @@ fn canonicalize_lenient(path: &Path) -> io::Result<PathBuf> {
 }
 
 /// Canonical toplevel of the repository containing the current directory.
+///
+/// `sc-ai`'s `resolve_repo` runs the same lookup with a different error
+/// mapping (QA-007): it can tell the caller to pass `--repo-root`
+/// (`CONFIG_INVALID`); this producer has no such flag, so a failure is
+/// `EXTRACTION_FAILED`. Sharing one implementation is decision D2.
 fn repo_root() -> Result<PathBuf, JevError> {
     let output = git_command()
         .args(["rev-parse", "--show-toplevel"])
