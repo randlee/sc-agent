@@ -567,14 +567,17 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 
 | ADR | Change | Landing sprint |
 | --- | --- | --- |
+| ADR-SAG-0002 | Branch B or both of D9 only: optional `criteria` field (`CriteriaSpec`), exactly one of `questions`/`criteria`, array payloads byte-identical (r-5 inserts the subsection and its index marker) | r-5 (blocked) |
 | ADR-SAG-0003 | repo root = git toplevel for both consumers | r-2 |
 | ADR-SAG-0004 | each `ChainContext`-augmented request re-validated before its own send | r-2b |
 | ADR-SAG-0005 | runs the four consumer extractor kinds (no ADR-0024/`prepare` reference) | r-4 |
 | ADR-SAG-0005 | public assembly entry is `prepare`; `run::build_request` sentence superseded | r-2 |
+| ADR-SAG-0014 | r-1 interim: typed `answers` written once; `JudgeOutcome` entries; `equal_input` shape. Superseded by ADR-SAG-0024 (r-2) as a whole; the "null until r-2b" clause is made false by an r-2b-owned pointer in ADR-SAG-0025 | r-1 |
 | ADR-SAG-0014 | `data` is the `RunResponse` serialization; primary backend = first `Ok`; `warnings` | r-2 |
 | ADR-SAG-0005 | canonical-only schema + Jev JSON envelope (D9) | r-5 (blocked) |
 | ADR-SAG-0006 | transports live in `sc-agent-http` | r-3 |
 | ADR-SAG-0007 | busy-retry policy (owner decision (b), decided); Retry-After grammar; cancel latency ≤ 120 s | r-3 |
+| ADR-SAG-0008 | r-1 interim: engine behaviour recorded as `ChainContext`; session document v2. Bullet 1 (except its last sentence) superseded by ADR-SAG-0025 (r-2b); bullet 2 stays in force; r-2b rewrites the Status line (r-2b D7) | r-1 |
 | ADR-SAG-0008 | independent default; `chain_context` explicit | r-2b |
 | ADR-SAG-0009 | descriptor + catalog; open = additive; factory table + test-and-review dispatch convention; `register` for existing ids only; `JudgeBackend` intentionally open | r-1 |
 | ADR-SAG-0009 | entry point is `prepare`/`run`; `run_check` deleted | r-2 |
@@ -587,6 +590,7 @@ and REQ-SAG-0135, which r-3b closes). Existing rows not listed are regression
 | ADR-SAG-0017 | two released binaries + per-channel coverage | r-4 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-http` | r-3 |
 | ADR-SAG-0017 | published library set + publish order: `sc-agent-compose` | r-3b |
+| ADR-SAG-0019 | r-1 interim: per-backend `Attestation`, derived `equal`; `Arc<PayloadBundle>` + `CancelToken`. The "until r-2b … `equal = false`" and "r-1 records `ChainContext`" sentences superseded by ADR-SAG-0025 (r-2b); the rest stays in force; r-2b rewrites the Status line (r-2b D7) | r-1 |
 | ADR-SAG-0019 | `RunOptions` text → `RunConfig` | r-2 |
 | ADR-SAG-0019 | equal-input from backend-reported digest | r-2b |
 | ADR-SAG-0020 | unchecked `ResolvedApiKey::new` gone in every build; `Arc<str>`; constructors infallible; the two `#[allow]` sites become `#[expect]`. Supersedes the named ADR-SAG-0029 (a) sentences | r-1 |
@@ -615,7 +619,13 @@ ADR-SAG-0023..0028 are written by this plan PR (conventions). Plan review 4
 made two exceptions to "never adds or removes an entry": r-3 adds the
 ADR-SAG-0020 "A.1 subsection (Proposed, r-3b)" marker when it moves the
 `source_scans` clause out, and r-2b splits ADR-SAG-0025 bullet 2; both are
-written out verbatim in the sprint docs.
+written out verbatim in the sprint docs. Plan review 5 adds a third: in
+D9 Branch B or "both", r-5 adds the "A.1 subsection (Active, r-5)" marker
+to the ADR-SAG-0002 row with its new subsection (the branch is unknown until
+owner decision (c)). The r-1 interim rows above are already marked in the
+index ("A.1 subsection (Active, r-1)" in rows 0008, 0014, 0019); the
+sentence-level supersession is written by r-2b, which owns the interim
+Status lines of 0008 and 0019 for that purpose.
 
 **No shape on another sprint's Proposed text.** A sprint may not ship a
 code shape whose only governing text is another sprint's Proposed
