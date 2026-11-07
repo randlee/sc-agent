@@ -158,22 +158,71 @@ impl JudgeBackend for ScriptedJudge {
 
 /// Registers one scripted judge per `ids` entry.
 ///
-/// Each judge returns `answers` and does not open a socket or store an API
-/// key. Callers pass the registry to [`crate::run::RunOptions::registry`].
-/// This does not change [`crate::run::run_check`]'s parameters (ADR-SAG-0009).
+/// `answers` is a JSON object keyed by question id. Each value is either an
+/// answer object (`{"choice": "yes"}`) or the string shorthand `"yes"`, which
+/// is stored as `{"choice": "yes"}`. Every caller (CLI tests, the Python
+/// binding's `_testing` module) therefore accepts the same shape.
+///
+/// Each judge returns the normalised answers and does not open a socket or
+/// store an API key. Callers pass the registry to
+/// [`crate::run::RunOptions::registry`]. This does not change
+/// [`crate::run::run_check`]'s parameters (ADR-SAG-0009).
 ///
 /// # Errors
 ///
-/// Returns [`JevError::registry_invalid`] when `ids` repeats a backend.
+/// Returns [`JevError::InputInvalid`] when `answers` is not an object or a
+/// value is neither a string nor an object, and
+/// [`JevError::registry_invalid`] when `ids` repeats a backend.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::BackendId;
+/// use sc_jev_check::registry::register_scripted_backends;
+///
+/// let registry =
+///     register_scripted_backends(&[BackendId::Jev], serde_json::json!({"q": "yes"})).unwrap();
+/// assert!(registry.get(BackendId::Jev).is_ok());
+/// assert_eq!(
+///     register_scripted_backends(&[BackendId::Jev], serde_json::json!(["yes"]))
+///         .unwrap_err()
+///         .code(),
+///     "INPUT_INVALID"
+/// );
+/// ```
 pub fn register_scripted_backends(
     ids: &[BackendId],
     answers: Value,
 ) -> Result<BackendRegistry, JevError> {
+    let answers = normalize_answers(answers)?;
     let mut registry = BackendRegistry::new();
     for judge in shared_judges(ids, answers) {
         registry.register(Arc::new(judge))?;
     }
     Ok(registry)
+}
+
+/// Expands the `"choice"` string shorthand into answer objects.
+fn normalize_answers(answers: Value) -> Result<Value, JevError> {
+    let Value::Object(map) = answers else {
+        return Err(JevError::InputInvalid {
+            detail: "scripted answers must be a JSON object of question ids".into(),
+        });
+    };
+    let mut normalized = serde_json::Map::new();
+    for (id, answer) in map {
+        let wrapped = match answer {
+            Value::String(choice) => serde_json::json!({ "choice": choice }),
+            object @ Value::Object(_) => object,
+            _ => {
+                return Err(JevError::InputInvalid {
+                    detail: format!("scripted answer for {id} must be a string or object"),
+                });
+            }
+        };
+        normalized.insert(id, wrapped);
+    }
+    Ok(Value::Object(normalized))
 }
 
 fn shared_judges(ids: &[BackendId], answers: Value) -> Vec<ScriptedJudge> {
@@ -188,6 +237,18 @@ fn shared_judges(ids: &[BackendId], answers: Value) -> Vec<ScriptedJudge> {
 mod tests {
     use super::*;
     use sc_agent_types::PayloadBundle;
+
+    #[test]
+    fn string_shorthand_and_object_answers_normalise_alike() {
+        let shorthand = normalize_answers(serde_json::json!({"q": "yes"})).expect("shorthand");
+        let object = normalize_answers(serde_json::json!({"q": {"choice": "yes"}})).expect("obj");
+        assert_eq!(shorthand, object);
+        assert_eq!(shorthand, serde_json::json!({"q": {"choice": "yes"}}));
+        for bad in [serde_json::json!("yes"), serde_json::json!({"q": 1})] {
+            let error = normalize_answers(bad).expect_err("bad shape");
+            assert_eq!(error.code(), "INPUT_INVALID");
+        }
+    }
 
     #[test]
     fn scripted_answers_share_one_allocation() {

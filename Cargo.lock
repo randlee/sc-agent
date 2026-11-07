@@ -1322,6 +1322,7 @@ dependencies = [
  "sc-jev-check",
  "sc-observability",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
