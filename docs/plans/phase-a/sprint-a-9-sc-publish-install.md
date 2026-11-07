@@ -87,6 +87,9 @@ either path, so ADR-SAG-0018 still holds. `sc-jev-py` ships to PyPI only
 consumer `crates` list. Its `pyproject.toml` `[project].version` is static
 because the kit's `sync-python-version` rejects dynamic versions. The maturin
 feature list keeps `test-util` off in the published wheel (ADR-SAG-0022).
+The workspace `jev_cross_impl` test target (`tests/jev_cross_impl/`) is hosted
+by `sc-jev-py` because that crate is `publish = false`, so no crates.io package
+carries a `[[test]]` path outside its own directory.
 
 ## Acceptance criteria (authoritative)
 
