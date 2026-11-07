@@ -4,10 +4,12 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use sc_agent_types::schema::subjects::SubjectsDocument;
-use sc_agent_types::{BackendId, CanonicalJudgePayload, PayloadBundle, RepoRoot, Rev};
+use sc_agent_types::{
+    BackendId, CanonicalJudgePayload, PayloadBundle, RepoRelativePath, RepoRoot, Rev,
+};
 use sc_jev_check::config::{CheckSpec, InputSpec};
 use sc_jev_check::equal_input::producer_from_extractions;
-use sc_jev_check::payload::{PayloadBuilder, parse_question_set};
+use sc_jev_check::payload::{build_payload, parse_question_set};
 use sc_jev_check::run::{RunOptions, run_check};
 
 const QUESTIONS: &str = r#"{
@@ -52,21 +54,14 @@ fn cross_impl_branches() {
     std::fs::write(dir.join("subjects.json"), &bytes).expect("copy subjects");
     std::fs::write(dir.join("questions.json"), QUESTIONS).expect("questions file");
     let repo = RepoRoot::new(dir);
-    let spec = CheckSpec {
-        questions_path: "questions.json".into(),
-        state_path: None,
-        system_prompt_file: None,
-        inputs: BTreeMap::from([(
-            "branches".into(),
-            InputSpec::Subjects {
-                path: "subjects.json".into(),
-            },
-        )]),
-    };
-    let built = PayloadBuilder::packaged()
-        .expect("builder")
-        .build(&spec, &repo, &Rev::worktree())
-        .expect("payload");
+    let mut spec = CheckSpec::new(RepoRelativePath::try_from("questions.json").expect("path"));
+    spec.inputs = BTreeMap::from([(
+        "branches".into(),
+        InputSpec::Subjects {
+            path: RepoRelativePath::try_from("subjects.json").expect("path"),
+        },
+    )]);
+    let built = build_payload(&spec, &repo, &Rev::worktree()).expect("payload");
     let payload = std::str::from_utf8(built.bundle.bytes()).expect("utf-8");
     assert!(payload.contains("Transition.GIVE_BACK"));
     assert!(payload.contains("Transition.KEEP"));

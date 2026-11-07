@@ -4,54 +4,26 @@
 //! never reads process stdin: `-` is refused with a pointer to
 //! `--request-json -` or a committed file.
 
-use crate::config::InputSpec;
 #[cfg(test)]
 use sc_agent_types::schema::subjects::SUBJECTS_SCHEMA_V1;
-use sc_agent_types::schema::subjects::{Subject, SubjectsDocument};
-use sc_agent_types::{JevError, RepoRoot, Rev};
+use sc_agent_types::schema::subjects::SubjectsDocument;
+use sc_agent_types::{JevError, RepoRelativePath, RepoRoot, Rev};
 
 use super::Extracted;
-use super::Extractor;
-use super::private::Sealed;
 use super::read::read_repo_bytes;
 
-/// Validates `sc/subjects/1` and returns its subjects.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct SubjectsExtractor;
-
-impl Sealed for SubjectsExtractor {}
-
-impl Extractor for SubjectsExtractor {
-    fn kind(&self) -> &'static str {
-        "subjects"
-    }
-
-    fn extract(
-        &self,
-        repo: &RepoRoot,
-        rev: &Rev,
-        input: &InputSpec,
-    ) -> Result<Vec<Subject>, JevError> {
-        Ok(extract_subjects(repo, rev, input)?.subjects)
-    }
-}
-
+/// Validates the `sc/subjects/1` document at the input path.
 pub(crate) fn extract_subjects(
     repo: &RepoRoot,
     rev: &Rev,
-    input: &InputSpec,
+    path: &RepoRelativePath,
 ) -> Result<Extracted, JevError> {
-    let InputSpec::Subjects { path } = input else {
-        return Err(JevError::config_invalid(
-            "subjects extractor received a different input kind",
-        ));
-    };
-    if path == "-" {
+    if path.as_str() == "-" {
         return Err(JevError::config_invalid(
             "subjects input path - (stdin) is not supported; pass a caller-built document with sc-ai jev run --request-json -, or commit the subjects.json file and name its repo-relative path",
         ));
     }
-    let bytes = read_repo_bytes(repo, rev, &super::read::repo_path(path)?)?;
+    let bytes = read_repo_bytes(repo, rev, path)?;
     parse_subjects_bytes(&bytes)
 }
 
@@ -76,7 +48,7 @@ pub(crate) fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extract::test_support::workspace_root;
+    use crate::extract::test_support::{rel, workspace_root};
     use sc_agent_types::{RepoRoot, Rev};
 
     fn minimal_value() -> serde_json::Value {
@@ -88,14 +60,8 @@ mod tests {
     #[test]
     fn subjects_minimal_fixture_maps_ids_and_text() {
         let repo = RepoRoot::new(workspace_root());
-        let extracted = extract_subjects(
-            &repo,
-            &Rev::worktree(),
-            &InputSpec::Subjects {
-                path: "tests/fixtures/jev/subjects-schema/v1/minimal.json".into(),
-            },
-        )
-        .expect("subjects");
+        let path = rel("tests/fixtures/jev/subjects-schema/v1/minimal.json");
+        let extracted = extract_subjects(&repo, &Rev::worktree(), &path).expect("subjects");
         assert_eq!(extracted.subjects[0].id(), "src/example.py:42");
         assert_eq!(extracted.subjects[1].id(), "src/example.py:42:1");
         assert_eq!(extracted.subjects[0].text(), "alpha");
@@ -103,30 +69,13 @@ mod tests {
         let document = extracted.document.expect("document");
         assert_eq!(document.schema(), SUBJECTS_SCHEMA_V1);
         assert_eq!(document.producer().mode, "matches");
-        assert_eq!(
-            SubjectsExtractor
-                .extract(
-                    &repo,
-                    &Rev::worktree(),
-                    &InputSpec::Subjects {
-                        path: "tests/fixtures/jev/subjects-schema/v1/minimal.json".into(),
-                    },
-                )
-                .expect("trait")
-                .len(),
-            2
-        );
+        assert_eq!(extracted.subjects.len(), 2);
     }
 
     #[test]
     fn subjects_stdin_path_is_config_invalid() {
         let repo = RepoRoot::new(workspace_root());
-        let error = extract_subjects(
-            &repo,
-            &Rev::worktree(),
-            &InputSpec::Subjects { path: "-".into() },
-        )
-        .expect_err("stdin");
+        let error = extract_subjects(&repo, &Rev::worktree(), &rel("-")).expect_err("stdin");
         assert_eq!(error.code(), "CONFIG_INVALID");
         assert!(error.fix_hint().contains("--request-json -"));
     }

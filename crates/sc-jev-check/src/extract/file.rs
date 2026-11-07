@@ -1,46 +1,18 @@
 //! `file` extractor.
 
-use crate::config::InputSpec;
 use sc_agent_types::schema::subjects::{Span, Subject};
-use sc_agent_types::{JevError, RepoRoot, Rev};
+use sc_agent_types::{JevError, RepoRelativePath, RepoRoot, Rev};
 
 use super::Extracted;
-use super::Extractor;
-use super::private::Sealed;
 use super::read::read_repo_text;
 
 /// Reads one repo-relative file into a single subject.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct FileExtractor;
-
-impl Sealed for FileExtractor {}
-
-impl Extractor for FileExtractor {
-    fn kind(&self) -> &'static str {
-        "file"
-    }
-
-    fn extract(
-        &self,
-        repo: &RepoRoot,
-        rev: &Rev,
-        input: &InputSpec,
-    ) -> Result<Vec<Subject>, JevError> {
-        Ok(extract_file(repo, rev, input)?.subjects)
-    }
-}
-
 pub(crate) fn extract_file(
     repo: &RepoRoot,
     rev: &Rev,
-    input: &InputSpec,
+    path: &RepoRelativePath,
 ) -> Result<Extracted, JevError> {
-    let InputSpec::File { path } = input else {
-        return Err(JevError::config_invalid(
-            "file extractor received a different input kind",
-        ));
-    };
-    let text = read_repo_text(repo, rev, &super::read::repo_path(path)?)?;
+    let text = read_repo_text(repo, rev, path)?;
     if text.is_empty() {
         return Err(JevError::InputEmpty);
     }
@@ -62,25 +34,20 @@ pub(crate) fn extract_file(
 mod tests {
     use super::*;
     use crate::config::InputSpec;
-    use crate::extract::test_support::{git_fixture, temp_dir};
+    use crate::extract::extract_input;
+    use crate::extract::test_support::{git_fixture, rel, temp_dir};
 
     #[test]
     fn extractors_file_reads_git_rev_not_the_worktree() {
         let (dir, sha) = git_fixture();
         std::fs::write(dir.path().join("notes/readme.txt"), "worktree edit\n").expect("edit");
         let repo = RepoRoot::new(dir.path());
-        let input = InputSpec::File {
-            path: "notes/readme.txt".into(),
-        };
-        let head = FileExtractor
-            .extract(&repo, &Rev::new(&sha), &input)
-            .expect("head");
-        let worktree = FileExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect("worktree");
-        assert_eq!(head[0].text(), "alpha note\n");
-        assert_eq!(worktree[0].text(), "worktree edit\n");
-        assert_eq!(head[0].id(), "notes/readme.txt:1");
+        let path = rel("notes/readme.txt");
+        let head = extract_file(&repo, &Rev::new(&sha), &path).expect("head");
+        let worktree = extract_file(&repo, &Rev::worktree(), &path).expect("worktree");
+        assert_eq!(head.subjects[0].text(), "alpha note\n");
+        assert_eq!(worktree.subjects[0].text(), "worktree edit\n");
+        assert_eq!(head.subjects[0].id(), "notes/readme.txt:1");
     }
 
     #[test]
@@ -88,41 +55,18 @@ mod tests {
         let dir = temp_dir("root");
         std::fs::write(dir.path().join("note.txt"), "from-root\n").expect("write");
         let repo = RepoRoot::new(dir.path());
-        let input = InputSpec::File {
-            path: "Cargo.toml".into(),
-        };
-        let error = FileExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("missing");
+        let error = extract_file(&repo, &Rev::worktree(), &rel("Cargo.toml")).expect_err("missing");
         assert_eq!(error.code(), "INPUT_MISSING");
-        let found = FileExtractor
-            .extract(
-                &repo,
-                &Rev::worktree(),
-                &InputSpec::File {
-                    path: "note.txt".into(),
-                },
-            )
-            .expect("note");
-        assert_eq!(found[0].text(), "from-root\n");
-    }
-
-    #[test]
-    fn extractors_file_rejects_parent_and_absolute_paths() {
-        let dir = temp_dir("escape");
-        let absolute_dir = temp_dir("absolute");
-        let absolute = absolute_dir.path().join("note.txt");
-        let absolute = absolute.to_str().expect("temp path is utf-8");
-        let repo = RepoRoot::new(dir.path());
-        for path in ["../note.txt", absolute, ""] {
-            let error = FileExtractor
-                .extract(
-                    &repo,
-                    &Rev::worktree(),
-                    &InputSpec::File { path: path.into() },
-                )
-                .expect_err(path);
-            assert_eq!(error.code(), "INPUT_INVALID", "{path}");
-        }
+        let found = extract_file(&repo, &Rev::worktree(), &rel("note.txt")).expect("note");
+        assert_eq!(found.subjects[0].text(), "from-root\n");
+        let dispatched = extract_input(
+            &repo,
+            &Rev::worktree(),
+            &InputSpec::File {
+                path: rel("note.txt"),
+            },
+        )
+        .expect("extract_input dispatches file");
+        assert_eq!(dispatched, found);
     }
 }

@@ -1,45 +1,48 @@
-//! `check.toml`, packaged `jev.toml`, and LLM prompt paths.
+//! `check.toml` and LLM prompt paths.
 //!
 //! Prompt text is not sent from this module; the run facade injects it into
 //! `JudgeRequest`. Production prose lives in `assets/llm-evaluator-system.md`
 //! and is compiled in as [`PACKAGED_SYSTEM_PROMPT`]. That constant is the
-//! only source of the packaged prompt; packaged `jev.toml` carries limits
-//! only and is parsed once per process.
+//! only source of the packaged prompt. Packaged `assets/jev.toml` carries no
+//! settings: the request byte cap belongs to each backend's descriptor
+//! (REQ-SAG-0314), so this crate keeps no second copy.
+//!
+//! Every path in `check.toml` is a [`RepoRelativePath`], validated when the
+//! document is parsed.
 
 #![warn(missing_docs)]
 
 use std::collections::BTreeMap;
-use std::sync::OnceLock;
 
-use sc_agent_types::JevError;
+use sc_agent_types::{BackendId, BackendSet, JevError, RepoRelativePath};
 use serde::{Deserialize, Serialize};
 
 /// Check input stored under `[inputs.<name>]` in `check.toml`.
 ///
 /// `<name>` is the table key, not a field. Keys match
 /// `docs/sc-jev-check/extraction.md`: `kind`, `path`, `column`, and for
-/// `command` the argv array `command` plus optional `timeout_seconds`
-/// (default 30). Only these four Phase A kinds exist. `sc-jev-check` is the
-/// only crate that runs them.
+/// `command` the argv array `command`, an optional `path` substituted for
+/// `{path}`, and optional `timeout_seconds` (default 30). Only these four
+/// kinds exist; a new kind is a new variant plus an ADR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum InputSpec {
     /// Read a file at the caller-supplied revision.
     File {
         /// Repo-relative path.
-        path: String,
+        path: RepoRelativePath,
     },
     /// Read one markdown table column.
     TableColumn {
         /// Repo-relative path.
-        path: String,
+        path: RepoRelativePath,
         /// Column header to extract.
         column: String,
     },
     /// Read a `sc/subjects/1` document from `path`.
     Subjects {
         /// Repo-relative path of the artifact.
-        path: String,
+        path: RepoRelativePath,
     },
     /// Run an argv array. No shell.
     Command {
@@ -48,6 +51,12 @@ pub enum InputSpec {
         /// Process time limit in seconds. Omitted toml uses 30.
         #[serde(default = "default_command_timeout_seconds")]
         timeout_seconds: u64,
+        /// Repo-relative file substituted for `{path}` (REQ-SAG-0312).
+        ///
+        /// Validated like a `file` input path before the command runs.
+        /// `{path}` in `command` without this field is `CONFIG_INVALID`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<RepoRelativePath>,
     },
 }
 
@@ -61,14 +70,12 @@ pub const PACKAGED_SYSTEM_PROMPT: &str = include_str!("../../assets/llm-evaluato
 /// Display name of the packaged system prompt in [`ResolvedPromptPath::path`].
 pub const PACKAGED_SYSTEM_PROMPT_NAME: &str = "llm-evaluator-system.md";
 
-const PACKAGED_JEV_TOML: &str = include_str!("../../assets/jev.toml");
-
 /// Where a system-prompt path was selected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptOrigin {
     /// `[llm_judge] system_prompt_file` in `check.toml`.
     CheckToml,
-    /// `system_prompt_file` in packaged `jev.toml`.
+    /// The packaged asset compiled into this crate.
     PackagedAsset,
 }
 
@@ -81,13 +88,6 @@ pub struct ResolvedPromptPath {
     pub origin: PromptOrigin,
 }
 
-/// Defaults loaded from packaged `assets/jev.toml`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PackagedConfig {
-    /// Canonical payload byte cap (`INPUT_TOO_LARGE` above this).
-    pub max_input_bytes: u64,
-}
-
 /// A parsed `check.toml`.
 ///
 /// Input names are `[inputs.<name>]` table keys. `sc-jev-check` is the only
@@ -95,16 +95,32 @@ pub struct PackagedConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckSpec {
     /// Repo-relative `plan-anchoring/questions/1` document.
-    pub questions_path: String,
+    pub questions_path: RepoRelativePath,
     /// Repo-relative state document. Absent means an empty state.
-    pub state_path: Option<String>,
+    pub state_path: Option<RepoRelativePath>,
     /// Optional override of the packaged system-prompt path.
-    pub system_prompt_file: Option<String>,
+    pub system_prompt_file: Option<RepoRelativePath>,
     /// Named extractors, in table-key order.
     pub inputs: BTreeMap<String, InputSpec>,
+    /// Top-level `backends` list. `RunConfig::backends` wins over it, and
+    /// `[jev]` applies when both are absent (ADR-SAG-0024).
+    pub backends: Option<BackendSet>,
 }
 
 impl CheckSpec {
+    /// A check with only a questions document: no state, inputs, prompt
+    /// override, or backends.
+    #[must_use]
+    pub fn new(questions_path: RepoRelativePath) -> Self {
+        Self {
+            questions_path,
+            state_path: None,
+            system_prompt_file: None,
+            inputs: BTreeMap::new(),
+            backends: None,
+        }
+    }
+
     /// Selects the system-prompt path without reading the file.
     ///
     /// `check.toml` wins when `system_prompt_file` is set. Otherwise the
@@ -113,7 +129,7 @@ impl CheckSpec {
     pub fn resolve_prompt_path(&self) -> ResolvedPromptPath {
         match &self.system_prompt_file {
             Some(path) => ResolvedPromptPath {
-                path: path.clone(),
+                path: path.as_str().to_owned(),
                 origin: PromptOrigin::CheckToml,
             },
             None => ResolvedPromptPath {
@@ -124,41 +140,16 @@ impl CheckSpec {
     }
 }
 
-/// Returns the packaged byte cap from `assets/jev.toml`.
-///
-/// The compiled-in file is parsed once per process and cached.
-///
-/// # Errors
-///
-/// Returns [`JevError::ConfigInvalid`] when `assets/jev.toml` is malformed.
-pub fn load_packaged_config() -> Result<PackagedConfig, JevError> {
-    static PACKAGED: OnceLock<Result<PackagedConfig, JevError>> = OnceLock::new();
-    PACKAGED
-        .get_or_init(|| parse_packaged(PACKAGED_JEV_TOML))
-        .clone()
-}
-
 /// Parses `check.toml` text.
 ///
 /// # Errors
 ///
 /// Returns [`JevError::ConfigInvalid`] when the document does not match the
-/// Phase A check shape.
+/// check shape: unknown keys, a path that is not repo-relative, an unknown
+/// backend id, or an empty or repeated `backends` list.
 pub fn load_check_str(text: &str) -> Result<CheckSpec, JevError> {
     let raw: RawCheck = toml::from_str(text)
         .map_err(|error| JevError::config_invalid(format!("check.toml: {error}")))?;
-    if raw.questions.path.is_empty() {
-        return Err(JevError::config_invalid(
-            "check.toml questions.path is empty",
-        ));
-    }
-    if let Some(prompt) = &raw.llm_judge
-        && prompt.system_prompt_file.is_empty()
-    {
-        return Err(JevError::config_invalid(
-            "check.toml llm_judge.system_prompt_file is empty",
-        ));
-    }
     for name in raw.inputs.keys() {
         if !is_input_name(name) {
             return Err(JevError::config_invalid(format!(
@@ -166,15 +157,20 @@ pub fn load_check_str(text: &str) -> Result<CheckSpec, JevError> {
             )));
         }
     }
+    let backends = match raw.backends {
+        Some(ids) => Some(BackendSet::try_from(ids)?),
+        None => None,
+    };
     Ok(CheckSpec {
         questions_path: raw.questions.path,
         state_path: raw.state.map(|state| state.path),
         system_prompt_file: raw.llm_judge.map(|llm| llm.system_prompt_file),
         inputs: raw.inputs,
+        backends,
     })
 }
 
-/// Reads `check.toml` through the repo-root resolver.
+/// Reads `check.toml` at `relative` and `rev` through the repo-root resolver.
 ///
 /// # Errors
 ///
@@ -188,19 +184,6 @@ pub fn load_check_at(
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| JevError::config_invalid(format!("{relative} is not UTF-8")))?;
     load_check_str(text)
-}
-
-fn parse_packaged(text: &str) -> Result<PackagedConfig, JevError> {
-    let raw: RawPackaged = toml::from_str(text)
-        .map_err(|error| JevError::config_invalid(format!("jev.toml: {error}")))?;
-    if raw.limits.max_input_bytes == 0 {
-        return Err(JevError::config_invalid(
-            "jev.toml limits.max_input_bytes must be greater than zero",
-        ));
-    }
-    Ok(PackagedConfig {
-        max_input_bytes: raw.limits.max_input_bytes,
-    })
 }
 
 fn is_input_name(name: &str) -> bool {
@@ -220,30 +203,20 @@ struct RawCheck {
     llm_judge: Option<RawLlmJudge>,
     #[serde(default)]
     inputs: BTreeMap<String, InputSpec>,
+    #[serde(default)]
+    backends: Option<Vec<BackendId>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawPath {
-    path: String,
+    path: RepoRelativePath,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLlmJudge {
-    system_prompt_file: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawPackaged {
-    limits: RawLimits,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawLimits {
-    max_input_bytes: u64,
+    system_prompt_file: RepoRelativePath,
 }
 
 #[cfg(test)]
@@ -252,6 +225,7 @@ mod tests {
 
     use super::*;
     use crate::config::InputSpec;
+    use crate::extract::test_support::rel;
 
     #[test]
     fn payload_packaged_system_prompt_matches_asset() {
@@ -269,15 +243,39 @@ mod tests {
         assert!(PACKAGED_SYSTEM_PROMPT.contains("canonical judge payload"));
     }
 
+    /// REQ-SAG-0314: the engine keeps no request byte cap; packaged
+    /// `jev.toml` is an empty document and no code reads `max_input_bytes`.
     #[test]
-    fn payload_packaged_jev_toml_sets_the_byte_cap() {
-        let packaged = load_packaged_config().expect("jev.toml");
-        assert_eq!(packaged.max_input_bytes, 200_000);
-        assert_eq!(load_packaged_config().expect("cached"), packaged);
-        assert!(parse_packaged("[limits]\nmax_input_bytes = 0\n").is_err());
-        assert!(
-            parse_packaged("[limits]\nmax_input_bytes = 1\n[vendors.x]\nmodel = \"m\"\n").is_err(),
-            "vendor pins are no longer part of jev.toml"
+    fn packaged_jev_toml_has_no_byte_cap() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/jev.toml");
+        let text = std::fs::read_to_string(path).expect("jev.toml");
+        let table: toml::Table = toml::from_str(&text).expect("toml");
+        assert!(table.is_empty(), "{table:?}");
+        assert!(!text.contains("max_input_bytes ="), "{text}");
+    }
+
+    #[test]
+    fn check_paths_are_repo_relative_and_backends_are_a_set() {
+        for bad in [
+            "[questions]\npath = \"../q.json\"\n",
+            "[questions]\npath = \"/etc/q.json\"\n",
+            "[questions]\npath = \"\"\n",
+            "[questions]\npath = \"q.json\"\n[llm_judge]\nsystem_prompt_file = \"\"\n",
+            "[questions]\npath = \"q.json\"\n[inputs.a]\nkind = \"file\"\npath = \"../a\"\n",
+            "backends = []\n[questions]\npath = \"q.json\"\n",
+            "backends = [\"jev\", \"jev\"]\n[questions]\npath = \"q.json\"\n",
+            "backends = [\"nope\"]\n[questions]\npath = \"q.json\"\n",
+        ] {
+            let error = load_check_str(bad).expect_err(bad);
+            assert_eq!(error.code(), "CONFIG_INVALID", "{bad}");
+        }
+        let spec = load_check_str(
+            "backends = [\"anthropic_haiku\", \"jev\"]\n[questions]\npath = \"q.json\"\n",
+        )
+        .expect("backends");
+        assert_eq!(
+            spec.backends.expect("set").as_slice(),
+            [BackendId::AnthropicHaiku, BackendId::Jev]
         );
     }
 
@@ -291,13 +289,32 @@ mod tests {
             [inputs.live]
             kind = "command"
             command = ["python3", "-c", "pass"]
+
+            [inputs.with_path]
+            kind = "command"
+            command = ["sc-treesitter", "{path}"]
+            path = "src/hook.py"
             "#,
         )
         .expect("check");
         match &spec.inputs["live"] {
             InputSpec::Command {
-                timeout_seconds, ..
-            } => assert_eq!(*timeout_seconds, 30),
+                timeout_seconds,
+                path,
+                ..
+            } => {
+                assert_eq!(*timeout_seconds, 30);
+                assert!(path.is_none());
+            }
+            other => panic!("expected command, got {other:?}"),
+        }
+        match &spec.inputs["with_path"] {
+            InputSpec::Command { path, .. } => {
+                assert_eq!(
+                    path.as_ref().map(RepoRelativePath::as_str),
+                    Some("src/hook.py")
+                );
+            }
             other => panic!("expected command, got {other:?}"),
         }
     }
@@ -339,7 +356,7 @@ mod tests {
         assert_eq!(
             file,
             InputSpec::File {
-                path: "skills/atm-bd-lite/scripts/atm-bd-task-hook.py".into(),
+                path: rel("skills/atm-bd-lite/scripts/atm-bd-task-hook.py"),
             }
         );
 
@@ -356,7 +373,7 @@ mod tests {
         assert_eq!(
             column,
             InputSpec::TableColumn {
-                path: "docs/decisions.md".into(),
+                path: rel("docs/decisions.md"),
                 column: "Choice".into(),
             }
         );
@@ -378,6 +395,7 @@ mod tests {
                     "{path}".into(),
                 ],
                 timeout_seconds: 30,
+                path: None,
             }
         );
 

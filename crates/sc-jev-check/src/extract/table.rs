@@ -4,48 +4,21 @@
 //! A subject's span covers the trimmed cell in the source line, so it is the
 //! cell's own bytes rather than the whole row.
 
-use crate::config::InputSpec;
 use sc_agent_types::schema::subjects::{Span, Subject};
-use sc_agent_types::{JevError, RepoRoot, Rev};
+use sc_agent_types::{JevError, RepoRelativePath, RepoRoot, Rev};
 
 use super::Extracted;
-use super::Extractor;
-use super::private::Sealed;
 use super::read::read_repo_text;
 
 /// Reads one markdown table column.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct TableColumnExtractor;
-
-impl Sealed for TableColumnExtractor {}
-
-impl Extractor for TableColumnExtractor {
-    fn kind(&self) -> &'static str {
-        "table-column"
-    }
-
-    fn extract(
-        &self,
-        repo: &RepoRoot,
-        rev: &Rev,
-        input: &InputSpec,
-    ) -> Result<Vec<Subject>, JevError> {
-        Ok(extract_table(repo, rev, input)?.subjects)
-    }
-}
-
 pub(crate) fn extract_table(
     repo: &RepoRoot,
     rev: &Rev,
-    input: &InputSpec,
+    path: &RepoRelativePath,
+    column: &str,
 ) -> Result<Extracted, JevError> {
-    let InputSpec::TableColumn { path, column } = input else {
-        return Err(JevError::config_invalid(
-            "table-column extractor received a different input kind",
-        ));
-    };
-    let text = read_repo_text(repo, rev, &super::read::repo_path(path)?)?;
-    let subjects = column_subjects(&text, path, column)?;
+    let text = read_repo_text(repo, rev, path)?;
+    let subjects = column_subjects(&text, path.as_str(), column)?;
     if subjects.is_empty() {
         return Err(JevError::ExtractionEmpty);
     }
@@ -196,22 +169,14 @@ fn is_delimiter(cell: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::InputSpec;
-    use crate::extract::test_support::fixture_root;
+    use crate::extract::test_support::{fixture_root, rel};
 
     #[test]
     fn extractors_table_column_keeps_escaped_pipes() {
         let repo = RepoRoot::new(fixture_root());
-        let subjects = TableColumnExtractor
-            .extract(
-                &repo,
-                &Rev::worktree(),
-                &InputSpec::TableColumn {
-                    path: "docs/decisions.md".into(),
-                    column: "Choice".into(),
-                },
-            )
-            .expect("column");
+        let subjects = extract_table(&repo, &Rev::worktree(), &rel("docs/decisions.md"), "Choice")
+            .expect("column")
+            .subjects;
         let texts: Vec<&str> = subjects.iter().map(|subject| subject.text()).collect();
         assert_eq!(texts, ["ship | hold", "drop"]);
         assert_eq!(subjects[0].id(), "docs/decisions.md:3");
@@ -226,16 +191,14 @@ mod tests {
             "| Choice |\n| --- |\n| `a\\|b` |\n",
         )
         .expect("write");
-        let subjects = TableColumnExtractor
-            .extract(
-                &RepoRoot::new(dir.path()),
-                &Rev::worktree(),
-                &InputSpec::TableColumn {
-                    path: "decisions.md".into(),
-                    column: "Choice".into(),
-                },
-            )
-            .expect("column");
+        let subjects = extract_table(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("decisions.md"),
+            "Choice",
+        )
+        .expect("column")
+        .subjects;
         assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0].text(), "`a|b`");
     }
@@ -245,16 +208,14 @@ mod tests {
         let dir = crate::extract::test_support::temp_dir("table-span");
         let text = "| Id | Choice |\n| --- | --- |\n| 1 | ship it |\n";
         std::fs::write(dir.path().join("t.md"), text).expect("write");
-        let subjects = TableColumnExtractor
-            .extract(
-                &RepoRoot::new(dir.path()),
-                &Rev::worktree(),
-                &InputSpec::TableColumn {
-                    path: "t.md".into(),
-                    column: "Choice".into(),
-                },
-            )
-            .expect("column");
+        let subjects = extract_table(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("t.md"),
+            "Choice",
+        )
+        .expect("column")
+        .subjects;
         let span = &subjects[0].span();
         let start = usize::try_from(span.start_byte()).expect("start");
         let end = usize::try_from(span.end_byte()).expect("end");

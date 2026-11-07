@@ -22,7 +22,7 @@ use sc_agent_types::{
 
 use crate::config::CheckSpec;
 use crate::equal_input::{RunAttestation, producer_from_extractions, record};
-use crate::payload::PayloadBuilder;
+use crate::payload::build_payload;
 #[doc(inline)]
 pub use crate::payload::{PreparedCallerRequest, prepare_caller_request};
 use crate::registry::{BackendRegistry, registry_for_repo};
@@ -160,7 +160,7 @@ pub struct BuiltRequest {
 ///
 /// This is the public assembly entry (ADR-SAG-0005). Extractors and
 /// canonicalization run in this crate. Composition roots call this function
-/// and do not call [`PayloadBuilder`].
+/// and do not call [`build_payload`].
 ///
 /// # Errors
 ///
@@ -192,7 +192,7 @@ fn assemble_payload(
     repo: &RepoRoot,
     rev: &Rev,
 ) -> Result<BuiltRequest, JevError> {
-    let built = PayloadBuilder::packaged()?.build(spec, repo, rev)?;
+    let built = build_payload(spec, repo, rev)?;
     Ok(BuiltRequest {
         bundle: built.bundle,
         producer: producer_from_extractions(&built.extractions)?,

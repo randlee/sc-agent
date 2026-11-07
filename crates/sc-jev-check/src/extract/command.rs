@@ -1,29 +1,36 @@
-//! `command` extractor.
+//! `command` extractor (REQ-SAG-0305, REQ-SAG-0312, REQ-SAG-0313).
 //!
 //! Argv only: no shell. Placeholders `{path}`, `{rev}`, and `{repo_root}` are
-//! replaced before spawn. `{repo_root}` is always absolute. The working
-//! directory is the repo root.
+//! replaced before spawn in one left-to-right pass. `{path}` is the input's
+//! own `path` field from `check.toml`, validated like a `file` input path;
+//! `{path}` with no `path` field is `CONFIG_INVALID`. `{repo_root}` is always
+//! absolute. The working directory is the repo root.
 //!
 //! The child starts with a cleared environment plus an allowlist (`PATH`,
 //! `HOME`, `USERPROFILE`, `SYSTEMROOT`, `TEMP`, `TMP`, `TMPDIR`, `LANG`,
 //! `LC_*`, `TERM`), so provider API keys and `SC_*` settings in this process
-//! never reach a repo-configured command. A failed command's error carries
-//! the last 4 KiB of its stderr with credential-looking values redacted.
+//! never reach a repo-configured command.
+//!
+//! On a non-zero exit the last non-empty line of the child's stderr (bounded
+//! by the 4 KiB stderr tail) is tried as an `ScAgentErrorResponse`. A
+//! response with a known id becomes [`JevError::ProducerError`] carrying
+//! that id and the producer name (the file stem of `argv[0]`); anything else
+//! is `EXTRACTION_FAILED` with the stderr tail. Credential-looking values are
+//! redacted from either error.
 
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::mem::ManuallyDrop;
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::config::InputSpec;
-use sc_agent_types::{JevError, RepoRoot, Rev};
+use sc_agent_types::{JevError, RepoRelativePath, RepoRoot, Rev, ScAgentErrorResponse};
 
 use super::Extracted;
-use super::Extractor;
-use super::private::Sealed;
+use super::read::validate_input_path;
 use super::sanitize::{STDERR_TAIL_BYTES, apply_env_allowlist, redact_error, stderr_tail};
 use super::subjects::parse_subjects_bytes;
 use crate::payload::expand_placeholders;
@@ -31,7 +38,8 @@ use crate::payload::expand_placeholders;
 /// Largest stdout capture for one command.
 ///
 /// Subjects documents are small. Stopping at 8 MiB bounds memory if a command
-/// writes without exiting. Raising it does not change the payload byte cap.
+/// writes without exiting. Each backend still enforces its own request byte
+/// limit on the assembled payload (REQ-SAG-0314).
 const MAX_COMMAND_STDOUT_BYTES: usize = 8 * 1024 * 1024;
 
 /// How often a running command is polled.
@@ -46,65 +54,41 @@ const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// destructor and `JoinHandle::join` are not used: both wait without a limit.
 const CLEANUP_BUDGET: Duration = Duration::from_secs(2);
 
-/// Runs an argv array and parses stdout as `sc/subjects/1`.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct CommandExtractor;
-
-impl Sealed for CommandExtractor {}
-
-impl Extractor for CommandExtractor {
-    fn kind(&self) -> &'static str {
-        "command"
+/// Runs one `command` input and parses its stdout as `sc/subjects/1`.
+///
+/// `path` is the input's `path` field. It is validated with the `file`
+/// input rules (repo-relative, a regular file whose canonical path stays
+/// under the canonical repo root at `WORKTREE`, a blob at any other `rev`)
+/// and substituted for `{path}`.
+///
+/// # Errors
+///
+/// Returns [`JevError::ConfigInvalid`] for an empty argv, a zero timeout, or
+/// `{path}` without a `path` field; the `file` input errors for an invalid
+/// `path`; [`JevError::ProducerError`] when the child exits non-zero and its
+/// last stderr line is an error response with a known id;
+/// [`JevError::ExtractionFailed`] on any other non-zero exit;
+/// [`JevError::ExtractionTimeout`] when `timeout_seconds` elapses;
+/// [`JevError::ExtractionInvalid`] when stdout is not `sc/subjects/1`; and
+/// [`JevError::ExtractionEmpty`] when the document has no subjects.
+pub(crate) fn extract_command(
+    repo: &RepoRoot,
+    rev: &Rev,
+    command: &[String],
+    timeout_seconds: u64,
+    path: Option<&RepoRelativePath>,
+) -> Result<Extracted, JevError> {
+    if timeout_seconds == 0 {
+        return Err(JevError::config_invalid(
+            "command timeout_seconds must be greater than zero",
+        ));
     }
-
-    fn extract(
-        &self,
-        repo: &RepoRoot,
-        rev: &Rev,
-        input: &InputSpec,
-    ) -> Result<Vec<sc_agent_types::schema::subjects::Subject>, JevError> {
-        Ok(self.extract_with_source(repo, rev, input, None)?.subjects)
+    let argv = substitute_placeholders(command, repo, rev, path.map(RepoRelativePath::as_str))?;
+    if let Some(path) = path {
+        validate_input_path(repo, rev, path)?;
     }
-}
-
-impl CommandExtractor {
-    /// Runs `input`, substituting `source_path` for `{path}` when it is set.
-    ///
-    /// `{rev}` and `{repo_root}` always come from `rev` and `repo`. `{path}`
-    /// without `source_path` is [`JevError::ConfigInvalid`] because a command
-    /// input has no path field of its own.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`JevError::ExtractionFailed`] on a non-zero exit,
-    /// [`JevError::ExtractionTimeout`] when `timeout_seconds` elapses,
-    /// [`JevError::ExtractionInvalid`] when stdout is not `sc/subjects/1`,
-    /// and [`JevError::ExtractionEmpty`] when the document has no subjects.
-    pub(crate) fn extract_with_source(
-        &self,
-        repo: &RepoRoot,
-        rev: &Rev,
-        input: &InputSpec,
-        source_path: Option<&str>,
-    ) -> Result<Extracted, JevError> {
-        let InputSpec::Command {
-            command,
-            timeout_seconds,
-        } = input
-        else {
-            return Err(JevError::config_invalid(
-                "command extractor received a different input kind",
-            ));
-        };
-        if *timeout_seconds == 0 {
-            return Err(JevError::config_invalid(
-                "command timeout_seconds must be greater than zero",
-            ));
-        }
-        let argv = substitute_placeholders(command, repo, rev, source_path)?;
-        let stdout = run_argv(repo, &argv, Duration::from_secs(*timeout_seconds))?;
-        parse_subjects_bytes(&stdout)
-    }
+    let stdout = run_argv(repo, &argv, Duration::from_secs(timeout_seconds))?;
+    parse_subjects_bytes(&stdout)
 }
 
 pub(crate) fn substitute_placeholders(
@@ -131,7 +115,7 @@ pub(crate) fn substitute_placeholders(
     for arg in argv {
         if arg.contains("{path}") && source_path.is_none() {
             return Err(JevError::config_invalid(
-                "command argv contains {path} but no source path was provided",
+                "command argv contains {path}, but the input has no path field; set path = \"<repo-relative file>\" on the command input",
             ));
         }
         // One left-to-right pass: a path containing `{rev}`, or a rev
@@ -139,6 +123,42 @@ pub(crate) fn substitute_placeholders(
         out.push(expand_placeholders(arg, &replacements));
     }
     Ok(out)
+}
+
+/// Producer name for an error response: the file stem of `argv[0]`.
+fn producer_name(program: &str) -> String {
+    Path::new(program)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or(program)
+        .to_owned()
+}
+
+/// Error for a non-zero exit: the producer's own error response when its
+/// last non-empty stderr line is one, else `EXTRACTION_FAILED` with the tail.
+fn exit_error(program: &str, code: i32, stderr: &[u8]) -> JevError {
+    let last_line = String::from_utf8_lossy(stderr)
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_owned);
+    if let Some(line) = last_line
+        && let Ok(response) = serde_json::from_str::<ScAgentErrorResponse>(&line)
+    {
+        return redact_error(JevError::from_error_response(
+            &producer_name(program),
+            &response,
+        ));
+    }
+    let tail = stderr_tail(stderr);
+    let detail = if tail.is_empty() {
+        format!("exit {code}")
+    } else {
+        format!("exit {code}; stderr: {tail}")
+    };
+    redact_error(JevError::extraction_failed(detail))
 }
 
 fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u8>, JevError> {
@@ -209,14 +229,7 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
     };
     let stderr = stderr_reader.finish_by(deadline).unwrap_or_default();
     if !status.success() {
-        let code = status.code().unwrap_or(-1);
-        let tail = stderr_tail(&stderr);
-        let detail = if tail.is_empty() {
-            format!("exit {code}")
-        } else {
-            format!("exit {code}; stderr: {tail}")
-        };
-        return Err(redact_error(JevError::extraction_failed(detail)));
+        return Err(exit_error(&argv[0], status.code().unwrap_or(-1), &stderr));
     }
     match stdout {
         Ok(bytes) => Ok(bytes),
@@ -339,8 +352,7 @@ fn read_tail(mut pipe: impl Read, keep: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::InputSpec;
-    use crate::extract::test_support::{self, temp_dir};
+    use crate::extract::test_support::{self, rel, temp_dir};
 
     const EMIT: &str = r#"
 import json, sys
@@ -369,11 +381,9 @@ doc = {
 sys.stdout.write(json.dumps(doc))
 "#;
 
-    fn command(argv: Vec<String>, timeout_seconds: u64) -> InputSpec {
-        InputSpec::Command {
-            command: argv,
-            timeout_seconds,
-        }
+    /// Runs `argv` at `WORKTREE` with no `path` field.
+    fn run(repo: &RepoRoot, argv: &[String], timeout_seconds: u64) -> Result<Extracted, JevError> {
+        extract_command(repo, &Rev::worktree(), argv, timeout_seconds, None)
     }
 
     #[test]
@@ -381,24 +391,27 @@ sys.stdout.write(json.dumps(doc))
         let dir = temp_dir("emit");
         let script = dir.path().join("emit.py");
         std::fs::write(&script, EMIT).expect("script");
+        std::fs::create_dir(dir.path().join("src")).expect("src");
+        std::fs::write(dir.path().join("src/hook.py"), "x = 1\n").expect("hook");
         let repo = RepoRoot::new(dir.path());
-        let rev = Rev::new("abc123");
-        let input = command(
-            vec![
-                test_support::python().into(),
-                script.display().to_string(),
-                "{path}".into(),
-                "{rev}".into(),
-                "{repo_root}".into(),
-            ],
+        let argv: Vec<String> = vec![
+            test_support::python().into(),
+            script.display().to_string(),
+            "{path}".into(),
+            "{rev}".into(),
+            "{repo_root}".into(),
+        ];
+        let extracted = extract_command(
+            &repo,
+            &Rev::worktree(),
+            &argv,
             30,
-        );
-        let extracted = CommandExtractor
-            .extract_with_source(&repo, &rev, &input, Some("src/hook.py"))
-            .expect("command");
+            Some(&rel("src/hook.py")),
+        )
+        .expect("command");
         let document = extracted.document.expect("document");
         assert_eq!(document.source().path, "src/hook.py");
-        assert_eq!(document.source().rev.as_str(), "abc123");
+        assert_eq!(document.source().rev.as_str(), Rev::WORKTREE);
         assert_eq!(extracted.subjects[0].text(), "arm");
         assert_eq!(extracted.subjects[0].id(), "src/hook.py:1");
     }
@@ -407,28 +420,25 @@ sys.stdout.write(json.dumps(doc))
     fn command_extractor_path_placeholder_requires_source() {
         let dir = temp_dir("nopath");
         let repo = RepoRoot::new(dir.path());
-        let input = command(vec!["python3".into(), "{path}".into()], 30);
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("path");
+        let error = run(&repo, &["python3".into(), "{path}".into()], 30).expect_err("path");
         assert_eq!(error.code(), "CONFIG_INVALID");
+        assert!(
+            error.fix_hint().contains("path field"),
+            "{}",
+            error.fix_hint()
+        );
     }
 
     #[test]
     fn command_extractor_nonzero_exit_is_extraction_failed() {
         let dir = temp_dir("exit");
         let repo = RepoRoot::new(dir.path());
-        let input = command(
-            vec![
-                test_support::python().into(),
-                "-c".into(),
-                "import sys; sys.exit(2)".into(),
-            ],
-            30,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("exit");
+        let input: Vec<String> = vec![
+            test_support::python().into(),
+            "-c".into(),
+            "import sys; sys.exit(2)".into(),
+        ];
+        let error = run(&repo, &input, 30).expect_err("exit");
         assert_eq!(error.code(), "EXTRACTION_FAILED");
         assert!(error.to_string().contains("exit 2"));
     }
@@ -437,17 +447,12 @@ sys.stdout.write(json.dumps(doc))
     fn command_extractor_timeout() {
         let dir = temp_dir("sleep");
         let repo = RepoRoot::new(dir.path());
-        let input = command(
-            vec![
-                test_support::python().into(),
-                "-c".into(),
-                "import time; time.sleep(30)".into(),
-            ],
-            1,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("timeout");
+        let input: Vec<String> = vec![
+            test_support::python().into(),
+            "-c".into(),
+            "import time; time.sleep(30)".into(),
+        ];
+        let error = run(&repo, &input, 1).expect_err("timeout");
         assert_eq!(error.code(), "EXTRACTION_TIMEOUT");
         match error {
             JevError::ExtractionTimeout {
@@ -461,17 +466,12 @@ sys.stdout.write(json.dumps(doc))
     fn command_extractor_invalid_stdout() {
         let dir = temp_dir("bad");
         let repo = RepoRoot::new(dir.path());
-        let input = command(
-            vec![
-                test_support::python().into(),
-                "-c".into(),
-                "print('nope')".into(),
-            ],
-            30,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("stdout");
+        let input: Vec<String> = vec![
+            test_support::python().into(),
+            "-c".into(),
+            "print('nope')".into(),
+        ];
+        let error = run(&repo, &input, 30).expect_err("stdout");
         assert_eq!(error.code(), "EXTRACTION_INVALID");
     }
 
@@ -480,13 +480,8 @@ sys.stdout.write(json.dumps(doc))
         let dir = temp_dir("empty");
         let repo = RepoRoot::new(dir.path());
         let code = r#"import json,sys; sys.stdout.write(json.dumps({"schema":"sc/subjects/1","source":{"path":"a.py","rev":"HEAD","blob_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"producer":{"name":"fixture","version":"0","language":"python","grammar":"fixture","grammar_version":"0","query_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"matches"},"subjects":[]}))"#;
-        let input = command(
-            vec![test_support::python().into(), "-c".into(), code.into()],
-            30,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("empty");
+        let input: Vec<String> = vec![test_support::python().into(), "-c".into(), code.into()];
+        let error = run(&repo, &input, 30).expect_err("empty");
         assert_eq!(error.code(), "EXTRACTION_EMPTY");
     }
 
@@ -494,17 +489,12 @@ sys.stdout.write(json.dumps(doc))
     fn command_extractor_failure_carries_stderr_tail() {
         let dir = temp_dir("stderr");
         let repo = RepoRoot::new(dir.path());
-        let input = command(
-            vec![
-                test_support::python().into(),
-                "-c".into(),
-                "import sys; sys.stderr.write('x' * 9000 + 'boom-diagnostic'); sys.exit(3)".into(),
-            ],
-            30,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect_err("exit");
+        let input: Vec<String> = vec![
+            test_support::python().into(),
+            "-c".into(),
+            "import sys; sys.stderr.write('x' * 9000 + 'boom-diagnostic'); sys.exit(3)".into(),
+        ];
+        let error = run(&repo, &input, 30).expect_err("exit");
         assert_eq!(error.code(), "EXTRACTION_FAILED");
         let text = error.to_string();
         assert!(text.contains("exit 3"), "{text}");
@@ -606,14 +596,9 @@ sys.stdout.write(json.dumps(doc))
         }
         let dir = temp_dir("env-probe");
         let repo = RepoRoot::new(dir.path());
-        let input = command(
-            vec![test_support::python().into(), "-c".into(), PRINT_ENV.into()],
-            30,
-        );
-        let extracted = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &input)
-            .expect("env probe");
-        let text = &extracted[0].text();
+        let input: Vec<String> = vec![test_support::python().into(), "-c".into(), PRINT_ENV.into()];
+        let extracted = run(&repo, &input, 30).expect("env probe");
+        let text = &extracted.subjects[0].text();
         assert!(!text.contains(PROBE_VALUE), "sentinel leaked: {text}");
         assert!(!text.contains(PROBE_ENV), "key name leaked: {text}");
         assert!(!text.contains(PROBE_SECRET_ENV), "SC_ name leaked: {text}");
@@ -623,18 +608,13 @@ sys.stdout.write(json.dumps(doc))
             "PATH is kept: {text}"
         );
 
-        let echo = command(
-            vec![
-                test_support::python().into(),
-                "-c".into(),
-                "import sys; sys.stderr.write(sys.argv[1]); sys.exit(1)".into(),
-                PROBE_VALUE.into(),
-            ],
-            30,
-        );
-        let error = CommandExtractor
-            .extract(&repo, &Rev::worktree(), &echo)
-            .expect_err("echo");
+        let echo: Vec<String> = vec![
+            test_support::python().into(),
+            "-c".into(),
+            "import sys; sys.stderr.write(sys.argv[1]); sys.exit(1)".into(),
+            PROBE_VALUE.into(),
+        ];
+        let error = run(&repo, &echo, 30).expect_err("echo");
         let rendered = format!("{error} {}", error.fix_hint());
         assert!(!rendered.contains(PROBE_VALUE), "{rendered}");
         assert!(rendered.contains("[redacted]"), "{rendered}");

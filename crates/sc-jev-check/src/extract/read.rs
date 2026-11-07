@@ -17,9 +17,9 @@ use super::sanitize::{redact_error, stderr_tail};
 
 /// Largest single file an input may read.
 ///
-/// This bounds memory before the canonical payload cap applies. It matches
-/// the command extractor's stdout cap. The payload byte cap in packaged
-/// `jev.toml` still refuses an oversize request after extraction.
+/// A resource guard that bounds memory per read. It matches the command
+/// extractor's stdout cap. It is not a request cap: each backend refuses an
+/// oversize request in `validate_for_send` (REQ-SAG-0314).
 pub(crate) const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Reads `relative` from `repo` at `rev`.
@@ -67,7 +67,35 @@ pub(crate) fn read_repo_text(
     })
 }
 
-fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
+/// Checks that `relative` names a readable input file at `rev` without
+/// keeping its bytes.
+///
+/// At `WORKTREE` this is the `file` input rule: the path is canonicalized,
+/// must stay under the canonical repo root, and must be a regular file. At
+/// any other revision the path must be a blob at `rev` (read and dropped,
+/// bounded by [`MAX_INPUT_BYTES`]). A `command` input's `path` uses this
+/// before `{path}` is substituted (REQ-SAG-0312).
+///
+/// # Errors
+///
+/// The errors of [`read_repo_bytes`] for the same path.
+pub(crate) fn validate_input_path(
+    repo: &RepoRoot,
+    rev: &Rev,
+    relative: &RepoRelativePath,
+) -> Result<(), JevError> {
+    if rev.as_str() == Rev::WORKTREE {
+        resolve_worktree_file(repo, relative.as_str()).map(|_| ())
+    } else {
+        read_repo_bytes(repo, rev, relative).map(|_| ())
+    }
+}
+
+/// Canonical path and metadata of a worktree input file inside the repo root.
+fn resolve_worktree_file(
+    repo: &RepoRoot,
+    relative: &str,
+) -> Result<(std::path::PathBuf, std::fs::Metadata), JevError> {
     let root = std::fs::canonicalize(repo.as_path()).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             JevError::input_missing(repo.as_path().display().to_string())
@@ -94,6 +122,11 @@ fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
             "input path {relative} is not a regular file"
         )));
     }
+    Ok((full, metadata))
+}
+
+fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
+    let (full, metadata) = resolve_worktree_file(repo, relative)?;
     let file = File::open(&full).map_err(|error| JevError::io_failed(relative, &error))?;
     let mut bytes = Vec::new();
     file.take(MAX_INPUT_BYTES.saturating_add(1))

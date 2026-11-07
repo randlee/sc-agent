@@ -1,9 +1,7 @@
-# Packaged check limits. The packaged LLM system prompt is compiled in from
-# llm-evaluator-system.md (sc_jev_check::config::PACKAGED_SYSTEM_PROMPT) and
-# is not configured here. Model ids live with each backend crate.
-
-[limits]
-# One check is one request. The payload builder returns INPUT_TOO_LARGE
-# above this size and never splits the input. 200_000 bytes sits under a
-# single provider request so refusal happens before any backend send.
-max_input_bytes = 200000
+# Packaged check settings. This document is intentionally empty.
+#
+# The packaged LLM system prompt is compiled in from llm-evaluator-system.md
+# (sc_jev_check::config::PACKAGED_SYSTEM_PROMPT). Model ids live with each
+# backend crate. The request byte cap is each backend's own descriptor limit
+# (`BackendDescriptor::request_limit_bytes`), enforced by `validate_for_send`
+# before any send (REQ-SAG-0314); the engine keeps no second cap.

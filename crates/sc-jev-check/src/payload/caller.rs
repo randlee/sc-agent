@@ -11,9 +11,8 @@ use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question,
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::encode_payload;
 use super::questions::{validate_question_set, validate_state};
-use super::{encode_payload, refuse_over_cap};
-use crate::config::load_packaged_config;
 
 /// Canonical payload built from a caller questions document.
 #[derive(Debug)]
@@ -30,9 +29,8 @@ pub(crate) struct ParsedCallerRequest {
 ///
 /// Returns [`JevError::InputInvalid`] when the document is empty, not the
 /// questions shape, names an unknown backend, or includes `system_prompt`.
-/// Returns [`JevError::InputTooLarge`] when the canonical bytes exceed the
-/// packaged cap. Returns [`JevError::ConfigInvalid`] when packaged `jev.toml`
-/// cannot be loaded.
+/// No byte cap applies here: each backend refuses an oversize request
+/// before any send (REQ-SAG-0314).
 pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, JevError> {
     if bytes.iter().all(u8::is_ascii_whitespace) {
         return Err(JevError::input_invalid(
@@ -45,8 +43,6 @@ pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, 
     validate_question_set(&document.questions)?;
     validate_state(&document.state, &document.questions)?;
     let bundle = encode_payload(&document.questions, &document.state)?;
-    let packaged = load_packaged_config()?;
-    refuse_over_cap(bundle.bytes(), packaged.max_input_bytes)?;
     let mut backends = Vec::with_capacity(document.backends.len());
     for name in &document.backends {
         backends.push(name.parse::<BackendId>()?);
