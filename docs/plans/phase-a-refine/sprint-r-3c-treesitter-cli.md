@@ -129,7 +129,13 @@ D2 `6911372`, D3 `0f8ffa8`, D4 `1b1f1cf`), then one commit per QA-1 item
 (PR 25, reviewed at `39661a6`; listed below). Every "Required validation"
 line, the workspace gates and `cargo test -p sc-agent-types --features
 git,test-util` passed at the developer run on the fix-round head. PR 25 CI
-evidence: CI-RUN-PENDING. r-3c owns no ADR text and flips no `(Proposed,
+evidence at `92b3d05` (fix-round code head): sc-agent CI run 42386842485
+(test on ubuntu-24.04, macos-15 and windows-2022, python ×3, rustdoc,
+dependency gates, sc-treesitter feature matrix, coverage) and sc-publish
+dry-run run 42386842465, all green; the parent confirms the final head.
+A local `cargo publish --dry-run` in a reused `target/` can compile a stale
+cached `sc-agent-types 0.1.0` (cargo treats registry-sourced builds as
+immutable); a fresh `CARGO_TARGET_DIR` passes, as CI does. r-3c owns no ADR text and flips no `(Proposed,
 r-3c)` marker (none exists). Governing ADRs, all Active: ADR-SAG-0001, 0015,
 0017, 0023, 0027, 0029. The `argv` and `cli` validation lines carry
 `--features cli` (their `[[test]] required-features`; `cli` is also a
