@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use sc_agent_types::observability::v2::{EventError, LogEvent as SessionEvent, SessionLog};
+use sc_agent_types::observability::v2::{
+    EventError, LogEvent as SessionEvent, LogOperation, SessionLog,
+};
 use sc_agent_types::{JevError, RepoRoot};
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
@@ -151,7 +153,7 @@ fn obs_event(event: SessionEvent) -> LogEvent {
     );
     fields.insert(
         "operation".to_owned(),
-        Value::String(event.operation.clone()),
+        Value::String(event.operation.as_str().to_owned()),
     );
     fields.insert(
         "session_id".to_owned(),
@@ -163,7 +165,7 @@ fn obs_event(event: SessionEvent) -> LogEvent {
         level: Level::Info,
         service: service_name(),
         target: TargetCategory::new("jev.session").expect("jev.session is a valid target"),
-        action: action_name(&event.operation),
+        action: action_name(event.operation),
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -176,7 +178,20 @@ fn obs_event(event: SessionEvent) -> LogEvent {
     }
 }
 
-fn action_name(operation: &str) -> ActionName {
-    ActionName::new(operation)
-        .unwrap_or_else(|_| ActionName::new("session").expect("session is a valid action name"))
+/// Every [`LogOperation`] spelling is a valid action name; the unit test
+/// `every_log_operation_is_an_action_name` proves it.
+fn action_name(operation: LogOperation) -> ActionName {
+    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_log_operation_is_an_action_name() {
+        for operation in LogOperation::ALL {
+            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        }
+    }
 }

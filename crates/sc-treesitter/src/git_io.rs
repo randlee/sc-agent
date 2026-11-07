@@ -4,7 +4,9 @@
 //!
 //! A revision read resolves `<rev>:<path>` to a blob id with
 //! `git rev-parse --verify --end-of-options`, checks that the object is a
-//! blob, then reads `git cat-file blob <id>`. The bytes and the id therefore
+//! blob and that `git cat-file -s <id>` is within [`MAX_INPUT_BYTES`], then
+//! reads `git cat-file blob <id>`. A `WORKTREE` read checks the file length
+//! and reads at most [`MAX_INPUT_BYTES`] + 1 bytes. The bytes and the id therefore
 //! come from the same object even if a ref moves between calls. Failures are
 //! classified by exit status plus `git cat-file -e`, never by git's English
 //! stderr. Every git call runs with `LC_ALL=C` and `GIT_TERMINAL_PROMPT=0`.
@@ -19,11 +21,18 @@
 //! macOS `/tmp`) and must sit under the canonical repository toplevel.
 
 use std::ffi::OsStr;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 use sc_agent_types::{JevError, Rev};
+
+/// Largest blob the binary reads (RSH-007).
+///
+/// Same 8 MiB value as `sc-jev-check`'s `MAX_INPUT_BYTES`; this crate does
+/// not depend on `sc-jev-check`, so the value is repeated here. Larger
+/// inputs are [`JevError::InputTooLarge`] before they are buffered.
+pub(crate) const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 
 /// One blob read from the repository.
 pub(crate) struct Blob {
@@ -72,7 +81,13 @@ fn read_worktree(repo: &Path, path: String) -> Result<Blob, JevError> {
             detail: format!("{path} is not a regular file"),
         });
     }
-    let bytes = std::fs::read(&full).map_err(|error| JevError::io_failed(&path, &error))?;
+    too_large(metadata.len())?;
+    let file = std::fs::File::open(&full).map_err(|error| JevError::io_failed(&path, &error))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_INPUT_BYTES.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| JevError::io_failed(&path, &error))?;
+    too_large(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
     let sha = hash_bytes(repo, &bytes, &path)?;
     Ok(Blob { path, bytes, sha })
 }
@@ -143,17 +158,38 @@ fn read_at_rev(repo: &Path, rev: &Rev, path: String) -> Result<Blob, JevError> {
             detail: format!("{path} is not a file at {rev}"),
         });
     }
+    let size = run_git(repo, ["cat-file", "-s", sha.as_str()])?;
+    let size = std::str::from_utf8(size.stdout.trim_ascii())
+        .ok()
+        .filter(|_| size.status.success())
+        .and_then(|text| text.parse::<u64>().ok())
+        .ok_or_else(|| JevError::ExtractionFailed {
+            detail: format!("git cat-file -s failed for {path} at {rev}"),
+        })?;
+    too_large(size)?;
     let blob = run_git(repo, ["cat-file", "blob", sha.as_str()])?;
     if !blob.status.success() {
         return Err(JevError::ExtractionFailed {
             detail: format!("git cat-file blob failed for {path} at {rev}"),
         });
     }
+    too_large(u64::try_from(blob.stdout.len()).unwrap_or(u64::MAX))?;
     Ok(Blob {
         path,
         bytes: blob.stdout,
         sha,
     })
+}
+
+/// [`JevError::InputTooLarge`] when `actual_bytes` exceeds [`MAX_INPUT_BYTES`].
+fn too_large(actual_bytes: u64) -> Result<(), JevError> {
+    if actual_bytes > MAX_INPUT_BYTES {
+        return Err(JevError::InputTooLarge {
+            limit_bytes: MAX_INPUT_BYTES,
+            actual_bytes,
+        });
+    }
+    Ok(())
 }
 
 /// Classifies a failed `<rev>:<path>` lookup without reading stderr.

@@ -16,6 +16,9 @@ use crate::subjects::SubjectsProducer;
 #[serde(deny_unknown_fields)]
 pub struct Question {
     /// Caller-chosen question id.
+    ///
+    /// Plain `String` by decision (a-10, RBP-F011): a `QuestionId` newtype
+    /// touches the frozen judge contract and is deferred to Phase A.1 r-1.
     pub id: String,
     /// Instructions sent with the question.
     pub prompt: String,

@@ -243,6 +243,21 @@ fn cli_sha256_repository_is_accepted() {
     assert_eq!(worktree, sha);
 }
 
+/// Reads stop at 8 MiB (RSH-007): the worktree file by length, the blob by
+/// `git cat-file -s` before it is buffered.
+#[cfg(feature = "python")]
+#[test]
+fn cli_oversize_inputs_are_input_too_large() {
+    let dir = temp_repo(None);
+    let big = vec![b'#'; 8 * 1024 * 1024 + 1];
+    std::fs::write(dir.path().join("big.py"), &big).expect("write");
+    commit_all(dir.path(), "big");
+    for rev in ["HEAD", "WORKTREE"] {
+        let value = error_json(&run(dir.path(), &extract_args(rev, "big.py")));
+        assert_eq!(value["error"], "INPUT_TOO_LARGE", "{rev}");
+    }
+}
+
 /// A `WORKTREE` read hashes the returned bytes, not a filesystem path, so it
 /// works with Windows verbatim (`\\?\`) canonical paths and skips clean
 /// filters. The file is committed with CRLF bytes under `-text`; switching

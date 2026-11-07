@@ -153,3 +153,21 @@ fn created_session_directory_is_mode_0700() {
     let mode = fs::metadata(&nested).expect("meta").permissions().mode() & 0o777;
     assert_eq!(mode, 0o700);
 }
+
+/// RBP-F015: clock and payload-invariant failures carry their own recovery,
+/// not the generic `check.toml` / schema hints.
+#[test]
+fn clock_and_payload_faults_name_their_own_recovery() {
+    let before_epoch = UNIX_EPOCH - Duration::from_secs(1);
+    let clock = unix_ms(before_epoch).expect_err("before epoch");
+    assert_eq!(clock.code(), "CONFIG_INVALID");
+    let hint = clock.fix_hint();
+    assert!(hint.contains("system clock"), "{hint}");
+    assert!(!hint.contains("check.toml"), "{hint}");
+
+    let payload = utf8_payload(b"ok\xff").expect_err("not utf-8");
+    assert_eq!(payload.code(), "INPUT_INVALID");
+    let hint = payload.fix_hint();
+    assert!(hint.contains("offset 2"), "{hint}");
+    assert!(!hint.contains("schema"), "{hint}");
+}

@@ -150,8 +150,9 @@ fn substitute_inputs(
 ///
 /// Replacement text is emitted verbatim and never scanned again, so an
 /// extracted subject that itself contains `{other}` stays literal. Braces
-/// that do not form a known `{name}` are kept.
-fn expand_placeholders(text: &str, replacements: &BTreeMap<&str, String>) -> String {
+/// that do not form a known `{name}` are kept. The command extractor's argv
+/// substitution uses the same function.
+pub(crate) fn expand_placeholders(text: &str, replacements: &BTreeMap<&str, String>) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(open) = rest.find('{') {

@@ -206,6 +206,17 @@ fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend, Arc<Recorded>) {
     (backend, recorded)
 }
 
+/// The constructors return `Result` for API stability only (RBP-007
+/// observation, a-10). If a construction check is added, update this test
+/// and the `# Errors` docs together.
+#[test]
+fn llm_backend_constructors_always_succeed_today() {
+    let (transport, _) = ScriptedTransport::new(Vec::new());
+    assert!(AnthropicHaikuBackend::new(credential(), transport).is_ok());
+    let (transport, _) = ScriptedTransport::new(Vec::new());
+    assert!(OpenAiLunaBackend::new(credential(), transport).is_ok());
+}
+
 fn posts(recorded: &Recorded) -> Vec<HttpRequest> {
     recorded.posts.lock().expect("posts").clone()
 }

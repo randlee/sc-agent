@@ -84,9 +84,11 @@ impl ResolvedApiKey {
     /// Seals `secret` without any check. Test-only.
     ///
     /// Production code builds keys with [`Self::try_new`] (through
-    /// `sc-agent-secrets`). This constructor exists so tests can build a
-    /// fixed key; it is hidden from the docs and is not part of the supported
-    /// API.
+    /// `sc-agent-secrets`). This constructor exists only under `cfg(test)` or
+    /// the `test-util` feature so test doubles can build a fixed key; a
+    /// production build has no unchecked constructor (RBP-F010,
+    /// ADR-SAG-0029).
+    #[cfg(any(test, feature = "test-util"))]
     #[doc(hidden)]
     pub fn new(secret: String) -> Self {
         Self(secret)

@@ -31,7 +31,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, LogOperation, SharedSessionLog};
 use sc_agent_types::{
     BackendId, JevError, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle, SessionId,
 };
@@ -409,7 +409,7 @@ impl SessionStore for FileSessionStore {
                 session_id: *id,
                 backend: stored.backend,
                 prompt_sha256: stored.payload.sha256().clone(),
-                operation: "ask".to_owned(),
+                operation: LogOperation::Ask,
             },
         );
         let outcome = judged?;
@@ -495,10 +495,16 @@ fn session_parse(path: &Path, problem: &str) -> JevError {
 ///
 /// # Errors
 ///
-/// Returns [`JevError::InputInvalid`] when the bytes are not UTF-8.
+/// Returns [`JevError::InputInvalid`] built by
+/// [`JevError::operational_io`] when the bytes are not UTF-8. Canonical
+/// payload bytes are always UTF-8, so this is an internal invariant failure,
+/// not a schema problem; the fix hint says so (RBP-F015).
 pub(crate) fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
-    String::from_utf8(bytes.to_vec()).map_err(|_| JevError::InputInvalid {
-        detail: "canonical payload is not UTF-8".into(),
+    String::from_utf8(bytes.to_vec()).map_err(|error| {
+        JevError::operational_io(&format!(
+            "the canonical payload was not UTF-8 (first invalid byte at offset {}); this is an internal error, report it with the check that produced it",
+            error.utf8_error().valid_up_to()
+        ))
     })
 }
 
@@ -510,11 +516,15 @@ fn follow_up_invalid(recovery: &str) -> JevError {
 fn unix_ms(time: SystemTime) -> Result<u64, JevError> {
     let elapsed = time
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| JevError::ConfigInvalid {
-            detail: "session clock is before the unix epoch".into(),
+        .map_err(|_| {
+            JevError::session_store_io(
+                "the system clock is before the unix epoch, so the session timestamp cannot be written. Fix the system clock and retry.",
+            )
         })?;
-    u64::try_from(elapsed.as_millis()).map_err(|_| JevError::ConfigInvalid {
-        detail: "session clock is out of range".into(),
+    u64::try_from(elapsed.as_millis()).map_err(|_| {
+        JevError::session_store_io(
+            "the system clock is out of range for a session timestamp. Fix the system clock and retry.",
+        )
     })
 }
 

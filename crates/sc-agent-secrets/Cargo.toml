@@ -34,4 +34,6 @@ keyring = { version = "3.6", features = ["windows-native"] }
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
+# Unit tests build fixed keys with the test-only `ResolvedApiKey::new`.
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types", features = ["test-util"] }
 tempfile.workspace = true

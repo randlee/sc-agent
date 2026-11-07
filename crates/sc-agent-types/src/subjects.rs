@@ -18,6 +18,11 @@ pub struct SubjectsSource {
     /// Git revision, or `HEAD` when the producer recorded that name.
     pub rev: Rev,
     /// Git blob id of the source bytes.
+    ///
+    /// Plain `String` by decision (a-10, RBP-F011): a validating `BlobSha`
+    /// newtype would tighten what `sc/subjects/1` documents from command
+    /// extractors deserialize to, which is the same contract question as
+    /// `Rev` deserialize validation and is deferred to Phase A.1 r-1.
     pub blob_sha: String,
 }
 

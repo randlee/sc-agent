@@ -10,6 +10,7 @@
 //! never reach a repo-configured command. A failed command's error carries
 //! the last 4 KiB of its stderr with credential-looking values redacted.
 
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::mem::ManuallyDrop;
 use std::process::{Child, Command, Stdio};
@@ -24,6 +25,7 @@ use super::Extractor;
 use super::private::Sealed;
 use super::sanitize::{STDERR_TAIL_BYTES, apply_env_allowlist, redact_error, stderr_tail};
 use super::subjects::parse_subjects_bytes;
+use crate::payload::expand_placeholders;
 
 /// Largest stdout capture for one command.
 ///
@@ -119,6 +121,11 @@ pub(crate) fn substitute_placeholders(
         .unwrap_or_else(|_| repo.as_path().to_path_buf())
         .display()
         .to_string();
+    let mut replacements =
+        BTreeMap::from([("rev", rev.as_str().to_owned()), ("repo_root", repo_root)]);
+    if let Some(path) = source_path {
+        replacements.insert("path", path.to_owned());
+    }
     let mut out = Vec::with_capacity(argv.len());
     for arg in argv {
         if arg.contains("{path}") && source_path.is_none() {
@@ -126,13 +133,9 @@ pub(crate) fn substitute_placeholders(
                 detail: "command argv contains {path} but no source path was provided".into(),
             });
         }
-        let mut replaced = arg.clone();
-        if let Some(path) = source_path {
-            replaced = replaced.replace("{path}", path);
-        }
-        replaced = replaced.replace("{rev}", rev.as_str());
-        replaced = replaced.replace("{repo_root}", &repo_root);
-        out.push(replaced);
+        // One left-to-right pass: a path containing `{rev}`, or a rev
+        // containing `{repo_root}`, is emitted verbatim (RBP observation).
+        out.push(expand_placeholders(arg, &replacements));
     }
     Ok(out)
 }
@@ -518,6 +521,27 @@ sys.stdout.write(json.dumps(doc))
         let root = std::path::Path::new(&argv[1]);
         assert!(root.is_absolute(), "{}", argv[1]);
         assert!(root.ends_with("relative-sub"));
+    }
+
+    /// A source path containing `{rev}` and a rev containing `{repo_root}`
+    /// are substituted once and kept verbatim.
+    #[test]
+    fn placeholder_values_are_not_re_expanded() {
+        let argv = substitute_placeholders(
+            &[
+                "prog".to_owned(),
+                "{path}".to_owned(),
+                "{rev}".to_owned(),
+                "{unknown}".to_owned(),
+            ],
+            &RepoRoot::new("repo"),
+            &Rev::new("v{repo_root}"),
+            Some("dir/{rev}.py"),
+        )
+        .expect("argv");
+        assert_eq!(argv[1], "dir/{rev}.py");
+        assert_eq!(argv[2], "v{repo_root}");
+        assert_eq!(argv[3], "{unknown}");
     }
 
     const PROBE_ENV: &str = "SC_JEV_CHECK_ENV_PROBE_API_KEY";

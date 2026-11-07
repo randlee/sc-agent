@@ -12,7 +12,7 @@ pub(crate) mod prompt;
 
 use std::path::PathBuf;
 
-use sc_agent_types::observability::v2::{LogEvent, NoopSessionLog, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, LogOperation, NoopSessionLog, SharedSessionLog};
 use sc_agent_types::{
     BackendId, EqualInputRecord, JevError, JudgeOutcome, JudgeRequest, LlmWireContext,
     PayloadBundle, RepoRoot, Rev, SessionId, SubjectsProducer,
@@ -330,7 +330,7 @@ pub fn run_request(
                 session_id,
                 backend: *id,
                 prompt_sha256: request.bundle.sha256().clone(),
-                operation: "judge".to_owned(),
+                operation: LogOperation::Judge,
             },
         );
         let outcome = judged?;

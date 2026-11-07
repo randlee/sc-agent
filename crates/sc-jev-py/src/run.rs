@@ -79,14 +79,15 @@ pub(crate) fn canonical_of(json_text: &str) -> Result<Vec<u8>, JevError> {
 
 /// Splits a bundle into payload text and digest.
 ///
-/// Canonical bytes are serde JSON output and therefore always UTF-8, so the
-/// lossy conversion is exact.
+/// # Panics
+///
+/// When the canonical bytes are not UTF-8. They are serde JSON output, so
+/// that would be a broken `PayloadBundle` invariant; a lossy fallback would
+/// hide it (RBP-007 observation).
 fn payload_text(bundle: PayloadBundle) -> (String, Sha256Digest) {
     let (bytes, digest) = bundle.into_parts();
-    let text = match String::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(error) => String::from_utf8_lossy(error.as_bytes()).into_owned(),
-    };
+    let text = String::from_utf8(bytes)
+        .expect("PayloadBundle bytes are canonical serde JSON and therefore UTF-8");
     (text, digest)
 }
 

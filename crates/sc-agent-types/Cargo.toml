@@ -19,8 +19,9 @@ workspace = true
 
 [features]
 default = []
-# JudgeBackend test double and contract helpers. Unit tests compile this module
-# via cfg(test); downstream crates enable the feature explicitly.
+# JudgeBackend test double, contract helpers, and the unchecked
+# `ResolvedApiKey::new` for test keys. Unit tests compile these via cfg(test);
+# downstream crates enable the feature explicitly (dev-dependencies only).
 test-util = []
 
 [dependencies]

@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 
 use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::{
-    EventError, LogEvent as SessionEvent, SessionLog, SharedSessionLog,
+    EventError, LogEvent as SessionEvent, LogOperation, SessionLog, SharedSessionLog,
 };
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
@@ -38,9 +38,6 @@ pub(crate) const SERVICE_NAME: &str = "sc-jev-py";
 
 /// Target category recorded on every Python session-log line.
 const TARGET: &str = "jev.session";
-
-/// Action recorded when an operation name is not a valid action name.
-const FALLBACK_ACTION: &str = "event";
 
 /// Owns one running logger. Dropping it flushes and shuts the writer down.
 ///
@@ -249,10 +246,8 @@ fn target() -> TargetCategory {
     TargetCategory::new(TARGET).expect("TARGET is a valid target category")
 }
 
-fn action_name(operation: &str) -> ActionName {
-    ActionName::new(operation).unwrap_or_else(|_| {
-        ActionName::new(FALLBACK_ACTION).expect("FALLBACK_ACTION is a valid action name")
-    })
+fn action_name(operation: LogOperation) -> ActionName {
+    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
 }
 
 fn schema_version() -> SchemaVersion {
@@ -276,7 +271,7 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
     );
     fields.insert(
         "operation".to_owned(),
-        serde_json::Value::String(event.operation.clone()),
+        serde_json::Value::String(event.operation.as_str().to_owned()),
     );
     LogEvent {
         version: schema_version(),
@@ -284,7 +279,7 @@ fn to_obs_event(event: &SessionEvent) -> LogEvent {
         level: Level::Info,
         service: service_name(),
         target: target(),
-        action: action_name(&event.operation),
+        action: action_name(event.operation),
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -303,12 +298,16 @@ mod tests {
     use sc_agent_types::{BackendId, SessionId, Sha256Digest};
     use tempfile::TempDir;
 
-    fn event(session_id: SessionId, digest: &Sha256Digest, operation: &str) -> SessionEvent {
+    fn event(
+        session_id: SessionId,
+        digest: &Sha256Digest,
+        operation: LogOperation,
+    ) -> SessionEvent {
         SessionEvent {
             session_id,
             backend: BackendId::AnthropicHaiku,
             prompt_sha256: digest.clone(),
-            operation: operation.to_owned(),
+            operation,
         }
     }
 
@@ -316,10 +315,10 @@ mod tests {
     fn observability_constants_are_valid() {
         assert!(ServiceName::new(SERVICE_NAME).is_ok());
         assert!(TargetCategory::new(TARGET).is_ok());
-        assert!(ActionName::new(FALLBACK_ACTION).is_ok());
         assert!(SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).is_ok());
-        // An operation that is not an action name falls back instead of panicking.
-        let _ = action_name("not a valid action name!");
+        for operation in LogOperation::ALL {
+            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        }
     }
 
     #[test]
@@ -362,7 +361,7 @@ mod tests {
         let (guard, log) = open_session_log(root.path()).expect("logger");
         let digest = Sha256Digest::of(b"payload");
         let session_id = SessionId::new();
-        log.try_log(event(session_id, &digest, "judge"))
+        log.try_log(event(session_id, &digest, LogOperation::Judge))
             .expect("log");
         guard.flush();
         let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");
@@ -387,10 +386,10 @@ mod tests {
         assert!(first.shares_writer_with(&second));
         let digest = Sha256Digest::of(b"payload");
         first_log
-            .try_log(event(SessionId::new(), &digest, "judge"))
+            .try_log(event(SessionId::new(), &digest, LogOperation::Judge))
             .expect("first line");
         second_log
-            .try_log(event(SessionId::new(), &digest, "ask"))
+            .try_log(event(SessionId::new(), &digest, LogOperation::Ask))
             .expect("second line");
         second.flush();
         let text = std::fs::read_to_string(log_file(root.path())).expect("jsonl");

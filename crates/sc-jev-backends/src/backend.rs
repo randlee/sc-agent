@@ -244,8 +244,11 @@ macro_rules! llm_backend {
             /// # Errors
             ///
             /// Does not fail today: key validation happens once, in
-            /// [`ResolvedApiKey::try_new`]. The `Result` is kept so
-            /// construction checks can be added without an API break.
+            /// [`ResolvedApiKey::try_new`]. The `Result` is a deliberate
+            /// stability choice, matching `sc_jev::JevClient::new`, so
+            /// construction checks can be added without an API break. The
+            /// test `llm_backend_constructors_always_succeed_today` pins the
+            /// current behaviour.
             pub fn new(
                 api_key: ResolvedApiKey,
                 transport: impl BackendTransport + 'static,

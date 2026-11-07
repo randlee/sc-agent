@@ -26,7 +26,6 @@ mod retry_policy;
 #[cfg(test)]
 mod test_server;
 
-
 #[doc(inline)]
 pub use client::{
     HttpsTransport, JevClient, JevTransport, RetryDelay, ThreadRetryDelay, WireRequest,

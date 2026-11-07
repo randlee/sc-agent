@@ -149,7 +149,7 @@ impl SessionLog for JsonlSink {
             "session_id": event.session_id.to_string(),
             "backend": event.backend.to_string(),
             "prompt_sha256": event.prompt_sha256.as_str(),
-            "operation": event.operation,
+            "operation": event.operation.as_str(),
         });
         let mut file = fs::OpenOptions::new()
             .create(true)
