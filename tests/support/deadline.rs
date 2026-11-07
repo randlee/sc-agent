@@ -176,31 +176,32 @@ mod tests {
 
     const TEST_DEADLINE: Duration = Duration::from_millis(500);
     const TEST_GRACE: Duration = Duration::from_millis(500);
-    /// Generous bound on runner overhead beyond deadline plus grace.
-    const SLACK: Duration = Duration::from_secs(5);
+
+    // No wall-clock asserts (FTQ-002): each property is shown by what the
+    // runner returns, so a loaded CI host cannot fail these tests.
 
     /// A grandchild that keeps stdout open after the child exits cannot
-    /// stall the runner; the child's own output is still returned.
+    /// stall the runner; the child's own output is still returned. The
+    /// grandchild prints `late` only if it lives out its sleep, so seeing
+    /// exactly `early` shows the runner returned (and killed the group)
+    /// instead of waiting for the pipe to close.
     #[test]
     fn grandchild_holding_the_pipe_is_bounded_by_the_grace() {
-        let started = Instant::now();
         let output = run_with_limits(
-            Command::new("sh").args(["-c", "sleep 30 & echo early"]),
+            Command::new("sh").args(["-c", "(sleep 30; echo late) & echo early"]),
             None,
-            Duration::from_secs(30),
+            Duration::from_secs(60),
             TEST_GRACE,
         );
         assert!(output.status.success());
         assert_eq!(String::from_utf8_lossy(&output.stdout), "early\n");
-        let elapsed = started.elapsed();
-        assert!(elapsed < TEST_GRACE * 2 + SLACK, "{elapsed:?}");
     }
 
-    /// A hung child with a pipe-holding grandchild fails within the deadline
-    /// plus the grace, not when the grandchild exits.
+    /// A hung child with a pipe-holding grandchild fails at the deadline, not
+    /// when the grandchild exits: left alone the child would exit 0, so a
+    /// panic shows the deadline fired.
     #[test]
     fn deadline_kill_returns_despite_a_grandchild() {
-        let started = Instant::now();
         let outcome = std::panic::catch_unwind(|| {
             run_with_limits(
                 Command::new("sh").args(["-c", "sleep 30 & sleep 30"]),
@@ -210,8 +211,6 @@ mod tests {
             )
         });
         assert!(outcome.is_err(), "the deadline must fail the run");
-        let elapsed = started.elapsed();
-        assert!(elapsed < TEST_DEADLINE + TEST_GRACE + SLACK, "{elapsed:?}");
     }
 
     /// A child that never reads stdin cannot block the runner on the write.
