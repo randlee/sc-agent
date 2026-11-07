@@ -102,24 +102,6 @@ impl ResolvedApiKey {
         &self.0
     }
 
-    /// Checks a TypeSafe key. Superseded by [`Self::try_new`].
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::try_new`] with [`BackendKeyId::TypeSafe`].
-    pub fn normalized_typesafe(self) -> Result<Self, JevError> {
-        Self::try_new(BackendKeyId::TypeSafe, self.0)
-    }
-
-    /// Checks a provider key. Superseded by [`Self::try_new`].
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::try_new`].
-    pub fn normalized_provider(self, backend: BackendKeyId) -> Result<Self, JevError> {
-        Self::try_new(backend, self.0)
-    }
-
     /// Replaces the secret with `[redacted]` in every text field of `error`.
     ///
     /// Built on [`JevError::map_detail`], so a new variant with a text field

@@ -7,13 +7,18 @@
 //!
 //! HTTP transport and the resolved API key are construction state (ADR-SAG-0006).
 //! Connect timeout is 10s and each provider call's read/write timeout is 120s
-//! (ADR-SAG-0007). Busy statuses 429, 502, and 529 are retried with the same body.
+//! (ADR-SAG-0007); `with_timeouts` on either backend overrides both. Busy
+//! statuses 429, 502, and 529 are retried with the same body, honoring
+//! `Retry-After` (0 to 30 s plus jitter) within a 90 s budget per call.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod backend;
 mod retry;
+mod retry_policy;
+#[cfg(test)]
+mod test_server;
 mod transport;
 mod validate;
 mod wire;

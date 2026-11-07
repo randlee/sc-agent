@@ -17,6 +17,7 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "tests/**"]
 
 [dependencies]
 sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 ureq.workspace = true

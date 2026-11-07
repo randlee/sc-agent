@@ -101,7 +101,7 @@ impl std::fmt::Debug for BackendRegistry {
 
 /// Credential id used to construct `id`.
 #[must_use]
-pub fn backend_key_id(id: BackendId) -> BackendKeyId {
+pub(crate) fn backend_key_id(id: BackendId) -> BackendKeyId {
     match id {
         BackendId::Jev => BackendKeyId::TypeSafe,
         BackendId::AnthropicHaiku => BackendKeyId::Anthropic,
