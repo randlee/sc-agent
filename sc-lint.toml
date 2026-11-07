@@ -17,3 +17,72 @@ command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warni
 [[tool.sc-lint.test]]
 name = "workspace"
 command = ["cargo", "test", "--workspace"]
+
+# Third-party dependency ownership (SCB-MANIFEST-004). sc-boundary enforces
+# only workspace-to-workspace edges from boundaries/**; these records make the
+# third-party edges in each manifest's forbidden_edges mechanical. Each record
+# checks direct manifest declarations and `use` paths under the allowed crate
+# directories. Keep in sync with boundaries/*/*.toml allowed_dependencies.
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "ureq"
+allowed_manifest_paths = ["crates/sc-jev/Cargo.toml", "crates/sc-jev-backends/Cargo.toml"]
+allowed_source_roots = ["crates/sc-jev", "crates/sc-jev-backends"]
+manifest_message = "Only the two HTTP backends (sc-jev, sc-jev-backends) may depend on ureq; sc-ai, sc-jev-check, sc-treesitter, sc-agent-types and sc-agent-secrets stay HTTP-free (ADR-SAG-0010, RBQA-F002)."
+source_message = "Only the two HTTP backends (sc-jev, sc-jev-backends) may depend on ureq; sc-ai, sc-jev-check, sc-treesitter, sc-agent-types and sc-agent-secrets stay HTTP-free (ADR-SAG-0010, RBQA-F002)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "pyo3"
+allowed_manifest_paths = ["crates/sc-jev-py/Cargo.toml"]
+allowed_source_roots = ["crates/sc-jev-py"]
+manifest_message = "Only sc-jev-py may depend on pyo3 (ADR-SAG-0011)."
+source_message = "Only sc-jev-py may depend on pyo3 (ADR-SAG-0011)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "tree-sitter"
+allowed_manifest_paths = ["crates/sc-treesitter/Cargo.toml"]
+allowed_source_roots = ["crates/sc-treesitter"]
+manifest_message = "Only sc-treesitter may depend on tree-sitter; sc-jev-check links no grammar crate (ADR-SAG-0015)."
+source_message = "Only sc-treesitter may depend on tree-sitter; sc-jev-check links no grammar crate (ADR-SAG-0015)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "tree-sitter-python"
+allowed_manifest_paths = ["crates/sc-treesitter/Cargo.toml"]
+allowed_source_roots = ["crates/sc-treesitter"]
+manifest_message = "Only sc-treesitter may depend on tree-sitter-python (ADR-SAG-0015)."
+source_message = "Only sc-treesitter may depend on tree-sitter-python (ADR-SAG-0015)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "tree-sitter-rust"
+allowed_manifest_paths = ["crates/sc-treesitter/Cargo.toml"]
+allowed_source_roots = ["crates/sc-treesitter"]
+manifest_message = "Only sc-treesitter may depend on tree-sitter-rust (ADR-SAG-0015)."
+source_message = "Only sc-treesitter may depend on tree-sitter-rust (ADR-SAG-0015)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "keyring"
+allowed_manifest_paths = ["crates/sc-agent-secrets/Cargo.toml"]
+allowed_source_roots = ["crates/sc-agent-secrets"]
+manifest_message = "Only sc-agent-secrets may depend on keyring (key resolution lives there)."
+source_message = "Only sc-agent-secrets may depend on keyring (key resolution lives there)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "sc-observability"
+allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-jev-py/Cargo.toml"]
+allowed_source_roots = ["crates/sc-ai", "crates/sc-jev-py"]
+manifest_message = "Only the composition roots sc-ai and sc-jev-py may depend on full sc-observability (ADR-SAG-0016)."
+source_message = "Only the composition roots sc-ai and sc-jev-py may depend on full sc-observability (ADR-SAG-0016)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "sc-observability-types"
+allowed_manifest_paths = ["crates/sc-agent-types/Cargo.toml"]
+allowed_source_roots = ["crates/sc-agent-types"]
+manifest_message = "Only sc-agent-types may depend on sc-observability-types (v2 shim, ADR-SAG-0016)."
+source_message = "Only sc-agent-types may depend on sc-observability-types (v2 shim, ADR-SAG-0016)."
+
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "mimalloc"
+allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-treesitter/Cargo.toml"]
+allowed_source_roots = ["crates/sc-ai", "crates/sc-treesitter"]
+manifest_message = "Only the crates that ship a binary (sc-ai, sc-treesitter) may depend on mimalloc."
+source_message = "Only the crates that ship a binary (sc-ai, sc-treesitter) may depend on mimalloc."
