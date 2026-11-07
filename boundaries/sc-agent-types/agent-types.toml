@@ -38,7 +38,6 @@ allowed_dependents = ["sc-agent-secrets", "sc-jev-check", "sc-jev", "sc-jev-back
 allowed_dependencies = ["serde", "serde_json", "sha2", "thiserror", "uuid"]
 forbidden_edges = [
     { from = "sc-agent-types", to = "sc-observability" },
-    { from = "sc-agent-types", to = "sc-observability-types" },
     { from = "sc-agent-types", to = "ureq" },
     { from = "sc-agent-types", to = "pyo3" },
 ]

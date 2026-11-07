@@ -52,9 +52,9 @@ fn judge(id: BackendId, choice: &str) -> MockJudgeBackend {
 
 /// Requests recorded by the judges attached to this log, in judge order.
 #[derive(Clone, Default)]
-struct RequestLog(Arc<Mutex<Vec<Arc<MockJudgeBackend>>>>);
+struct SeenRequests(Arc<Mutex<Vec<Arc<MockJudgeBackend>>>>);
 
-impl RequestLog {
+impl SeenRequests {
     fn new() -> Self {
         Self::default()
     }
@@ -70,12 +70,12 @@ impl RequestLog {
 }
 
 /// Keeps a handle on a judge so the test can read what it received.
-trait WithRequestLog {
-    fn with_request_log(self, log: &RequestLog) -> Arc<MockJudgeBackend>;
+trait WithSeen {
+    fn with_seen(self, log: &SeenRequests) -> Arc<MockJudgeBackend>;
 }
 
-impl WithRequestLog for MockJudgeBackend {
-    fn with_request_log(self, log: &RequestLog) -> Arc<MockJudgeBackend> {
+impl WithSeen for MockJudgeBackend {
+    fn with_seen(self, log: &SeenRequests) -> Arc<MockJudgeBackend> {
         let judge = Arc::new(self);
         log.0.lock().expect("log").push(Arc::clone(&judge));
         judge
@@ -166,8 +166,8 @@ fn test_multi_backend_cli_equal_input() {
     let repo = temp_dir("multi");
     write_repo(repo.path());
     let sessions = temp_dir("multi-sessions");
-    let jev_seen = RequestLog::new();
-    let haiku_seen = RequestLog::new();
+    let jev_seen = SeenRequests::new();
+    let haiku_seen = SeenRequests::new();
     let value = execute(
         &[
             "jev",
@@ -184,8 +184,8 @@ fn test_multi_backend_cli_equal_input() {
             "anthropic_haiku",
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::Jev, "yes").with_request_log(&jev_seen),
-            judge(BackendId::AnthropicHaiku, "no").with_request_log(&haiku_seen),
+            judge(BackendId::Jev, "yes").with_seen(&jev_seen),
+            judge(BackendId::AnthropicHaiku, "no").with_seen(&haiku_seen),
         ])),
     )
     .expect("run");
@@ -234,7 +234,7 @@ fn test_cli_prompt_override() {
     write_repo(repo.path());
     let override_path = repo.path().join("override.md");
     std::fs::write(&override_path, "OVERRIDE-PROMPT-TOKEN-a7\n").expect("override");
-    let first_seen = RequestLog::new();
+    let first_seen = SeenRequests::new();
     let first = execute(
         &[
             "jev",
@@ -247,11 +247,11 @@ fn test_cli_prompt_override() {
             "anthropic_haiku",
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&first_seen),
+            judge(BackendId::AnthropicHaiku, "yes").with_seen(&first_seen),
         ])),
     )
     .expect("packaged");
-    let second_seen = RequestLog::new();
+    let second_seen = SeenRequests::new();
     let sessions = temp_dir("prompt-sessions-b");
     let second = execute(
         &[
@@ -267,7 +267,7 @@ fn test_cli_prompt_override() {
             override_path.to_str().expect("utf8"),
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::AnthropicHaiku, "no").with_request_log(&second_seen),
+            judge(BackendId::AnthropicHaiku, "no").with_seen(&second_seen),
         ])),
     )
     .expect("override");
@@ -310,12 +310,12 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     let sessions = temp_dir("ask-sessions");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7\n").expect("prompt");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let now = Arc::new(Mutex::new(UNIX_EPOCH + Duration::from_secs(1_700_000_000)));
     let clock_now = Arc::clone(&now);
     let overrides = ExecuteOverrides {
         registry: Some(registry(vec![
-            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+            judge(BackendId::AnthropicHaiku, "yes").with_seen(&seen),
         ])),
         clock: Some(Arc::new(move || {
             *clock_now
@@ -494,7 +494,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
     let logs = temp_dir("log-root");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7 sk-ant-test-secret\n").expect("prompt");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let value = execute(
         &[
             "jev",
@@ -512,7 +512,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
         ],
         ExecuteOverrides {
             registry: Some(registry(vec![
-                judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+                judge(BackendId::AnthropicHaiku, "yes").with_seen(&seen),
             ])),
             ..ExecuteOverrides::default()
         },
@@ -581,7 +581,7 @@ fn cli_keeps_typesafe_response_fields() {
     let repo = temp_dir("verbatim");
     write_repo(repo.path());
     let sessions = temp_dir("verbatim-sessions");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let usage = serde_json::json!({"input_tokens": 318, "output_tokens": 31});
     let backend = judge(BackendId::Jev, "yes")
         .with_provider_meta(serde_json::json!({
@@ -590,7 +590,7 @@ fn cli_keeps_typesafe_response_fields() {
             "stop_reason": "end_turn",
             "id": "resp-1"
         }))
-        .with_request_log(&seen);
+        .with_seen(&seen);
     let value = execute(
         &[
             "jev",
