@@ -130,11 +130,13 @@ self_test() {
   cat >"$work/docs/architecture.md" <<'MD'
   <!-- lockstep-pins:start -->
   listed-crate
+  noted-crate (transitional; the note after the name is ignored)
   <!-- lockstep-pins:end -->
 MD
   cat >"$work/Cargo.toml" <<'TOML'
 [workspace.dependencies]
 listed-crate = "=1.0.0"
+noted-crate = "=2.0.0"
 caret-crate = "1"
 range-crate = ">=1, <2"
 TOML
@@ -146,22 +148,31 @@ listed-crate = { workspace = true }
 renamed = { package = "listed-crate", version = "=1.0.0" }
 TOML
 
+  # expect pass LABEL | expect fail LABEL SUBSTRING. A failing case must exit
+  # exactly 1 and print SUBSTRING, so it fails for the reason under test and
+  # not for an unrelated error (a crash, a parse error).
   expect() {
-    local want="$1" label="$2" got=0
+    local want="$1" label="$2" needle="${3:-}" got=0
     check_tree "$work" >"$work/out.txt" 2>&1 || got=$?
-    if [[ "$want" == pass && "$got" -eq 0 ]] || [[ "$want" == fail && "$got" -ne 0 ]]; then
+    local ok=0
+    if [[ "$want" == pass ]]; then
+      [[ "$got" -eq 0 ]] && ok=1
+    elif [[ "$got" -eq 1 ]] && grep -qF -- "$needle" "$work/out.txt"; then
+      ok=1
+    fi
+    if [[ "$ok" -eq 1 ]]; then
       echo "self-test ok:   $label (exit $got)"
     else
-      echo "self-test FAIL: $label (expected $want, exit $got)"
+      echo "self-test FAIL: $label (expected $want${needle:+ with \"$needle\"}, exit $got)"
       sed 's/^/    /' "$work/out.txt"
       failures=$((failures + 1))
     fi
   }
 
-  expect pass "listed pins, caret and range requirements"
+  expect pass "listed and noted pins, caret and range requirements"
 
   printf '[dev-dependencies]\nunlisted-crate = "=0.1.0"\n' >>"$work/crates/lib/Cargo.toml"
-  expect fail "injected unlisted = in [dev-dependencies]"
+  expect fail "injected unlisted = in [dev-dependencies]" "NOT LISTED"
 
   cat >"$work/crates/lib/Cargo.toml" <<'TOML'
 [package]
@@ -169,11 +180,11 @@ name = "lib"
 [target.'cfg(unix)'.dependencies]
 alias = { package = "unlisted-crate", version = "= 0.1.0" }
 TOML
-  expect fail "injected unlisted = behind a rename in a [target] table"
+  expect fail "injected unlisted = behind a rename in a [target] table" "NOT LISTED"
 
   printf '[package]\nname = "lib"\n' >"$work/crates/lib/Cargo.toml"
   printf '# no markers\n' >"$work/docs/architecture.md"
-  expect fail "lockstep list markers missing"
+  expect fail "lockstep list markers missing" "exactly once each"
 
   if [[ "$failures" -ne 0 ]]; then
     echo "check-exact-pins self-test: $failures case(s) failed" >&2
