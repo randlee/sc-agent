@@ -5,18 +5,24 @@
 //! name and the account is the OS user. Anthropic keyring lookups use
 //! `ANTHROPIC_KEYCHAIN_SERVICE` when that variable is set.
 //!
-//! Callers pass the git toplevel as a [`RepoRoot`]. This crate does not run
-//! git, does not open network connections, and does not log credential values.
-//! Errors are [`JevError`] values and never include secret material
+//! Callers pass the git toplevel as a
+//! [`RepoRoot`](sc_agent_types::RepoRoot). This crate does not run git, does
+//! not open network connections, and does not log credential values. Errors
+//! are [`JevError`](sc_agent_types::JevError) values and never include secret
+//! material
 //! (ADR-SAG-0003). Log lines stay under NFR-SAG-0002 and ADR-SAG-0013; this
 //! crate emits none.
 //!
-//! [`resolve_key`] returns a [`ResolvedApiKey`]. Its `Debug` and `Display`
-//! implementations redact the secret (ADR-SAG-0020).
+//! [`resolve_key`] returns a [`ResolvedApiKey`] built by
+//! [`ResolvedApiKey::try_new`], so key normalization (trim, reject interior
+//! whitespace and control characters) happens once, here. Its `Debug` and
+//! `Display` implementations redact the secret (ADR-SAG-0020).
 //!
-//! [`EnvSource`] and [`KeyringSource`] are open injection traits. The
-//! `test-util` feature exposes `MapEnv` and `MapKeyring` for downstream tests.
-//! Production builds leave that feature off.
+//! [`EnvSource`] and [`KeyringSource`] are open injection traits. Callers
+//! that need fakes implement them directly, as the example below does.
+//!
+//! The repo-root `.env` dialect (comments, quoting, `export`) is documented
+//! in `docs/sc-agent-secrets/architecture.md`.
 //!
 //! # Examples
 //!
@@ -69,18 +75,15 @@ pub use resolve::{
 #[doc(inline)]
 pub use sc_agent_types::ResolvedApiKey;
 
-#[cfg(any(test, feature = "test-util"))]
-#[doc(inline)]
-pub use resolve::{MapEnv, MapKeyring};
-
 // Crate-root name so `cargo test -- test_env_dotenv_keychain_order --exact` selects it.
 #[cfg(test)]
 #[test]
 fn test_env_dotenv_keychain_order() {
     use sc_agent_types::BackendKeyId;
 
+    use crate::resolve::{MapEnv, MapKeyring};
+    use crate::resolve_key_with;
     use crate::test_support::TempRepo;
-    use crate::{MapEnv, MapKeyring, resolve_key_with};
 
     let repo = TempRepo::new(Some(
         "TYPESAFE_API_KEY=from-dotenv\nANTHROPIC_API_KEY=from-dotenv-anthropic\n",
@@ -103,7 +106,7 @@ fn test_env_dotenv_keychain_order() {
         "tester",
     )
     .unwrap();
-    assert_eq!(from_env.as_str(), "from-env");
+    assert_eq!(from_env, ResolvedApiKey::new("from-env".to_owned()));
 
     let from_dotenv = resolve_key_with(
         BackendKeyId::Anthropic,
@@ -113,11 +116,17 @@ fn test_env_dotenv_keychain_order() {
         "tester",
     )
     .unwrap();
-    assert_eq!(from_dotenv.as_str(), "from-dotenv-anthropic");
+    assert_eq!(
+        from_dotenv,
+        ResolvedApiKey::new("from-dotenv-anthropic".to_owned())
+    );
 
     let from_keyring =
         resolve_key_with(BackendKeyId::OpenAi, &repo.root(), &env, &keyring, "tester").unwrap();
-    assert_eq!(from_keyring.as_str(), "from-keyring-openai");
+    assert_eq!(
+        from_keyring,
+        ResolvedApiKey::new("from-keyring-openai".to_owned())
+    );
 
     let empty = TempRepo::new(None);
     let missing = resolve_key_with(

@@ -14,12 +14,6 @@ categories.workspace = true
 # Allowlist of packaged files.
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
-[features]
-default = []
-# In-memory env and keyring doubles for tests (ADR-SAG-0020).
-# Production builds omit them.
-test-util = []
-
 [dependencies]
 # No default features: platform keystores are enabled per target below.
 # Targets without a keystore fall back to keyring's empty mock (no network).
