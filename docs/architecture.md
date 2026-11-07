@@ -437,6 +437,27 @@ pointer.
 - Everything else in ADR-SAG-0022 stands: no production registration, no
   socket, no API key, default features off.
 
+**(c) Error-code dispositions (upholds ADR-SAG-0001, REQ-SAG-0101,
+REQ-SAG-0800).** Phase A hardening moved some failures to a different
+existing id. Every id below is in
+`tests/fixtures/jev/README-contract/errors.json` and is a `JevError`
+variant; no id was added or removed, and `JevError::code()` still matches
+the snapshot (test `codes_match_readme_contract_snapshot`).
+
+| Surface | Failure | Before | After |
+| --- | --- | --- | --- |
+| `sc_jev_py.run_check` / `_testing.run_check_scripted` | unknown backend name | `CONFIG_INVALID` | `INPUT_INVALID` (`BackendId::from_str`, same as `sc-ai` and `check.toml`) |
+| same | kebab-case alias (`anthropic-haiku`, `openai-luna`) | accepted | `INPUT_INVALID` (one documented spelling) |
+| any crate | `serde_json` encode / decode failure (`JevError::encode_failed`) | mixed (`INPUT_INVALID`, `EXTRACTION_FAILED`) or raw text | `INPUT_INVALID`, detail keeps only category and line/column |
+| any crate | file or process I/O failure (`JevError::io_failed`) | mixed (`INPUT_MISSING` for any read error, `EXTRACTION_FAILED` for git spawn) | `INPUT_INVALID` with the `io::ErrorKind`; a missing file stays `INPUT_MISSING` |
+| `sc-treesitter` CLI | missing positional source path | `INPUT_MISSING` | `INPUT_INVALID` (an argument error, not a missing file) |
+| `sc-treesitter` library | span or line number does not fit `u32` | `INPUT_TOO_LARGE` | `INPUT_INVALID` naming the field and value |
+| `sc-treesitter` CLI | revision starting with `-`, path outside the repo or with a forbidden component, unresolvable revision, non-blob object | mixed | `INPUT_INVALID` (absent path at a revision stays `INPUT_MISSING`) |
+| `sc-treesitter` CLI | blob or worktree file over 8 MiB | read unbounded | `INPUT_TOO_LARGE` |
+
+Python exceptions carry the same `code` as the Rust `JevError`
+(REQ-SAG-0800); the change is which existing id a failure maps to.
+
 **Deferred.** ADR-SAG-0016 still names `"1.5.0"` while the workspace pins
 `"=1.5.0"` (arch-qa ARCH-004). The version-form text is left to the D8
 amendment (`PHASE-A-REVIEW.md` section 4).
