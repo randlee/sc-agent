@@ -63,6 +63,14 @@ features to maturin.
 
 ### Known limits
 
+- **CRLF workaround, not a fix.** Every job sets `core.autocrlf false` before checkout because the
+  sc-treesitter golden-byte fixture test compares committed bytes exactly and Windows runners default to
+  CRLF. The repo-level fix is a `.gitattributes` pinning `tests/fixtures/**` (and other byte-compared
+  fixtures) to LF or `-text`; it is outside this branch's allowed paths and is tracked under
+  "Phase close notes / open items" in `docs/plans/phase-a/plan.md`. Once it lands the five
+  `Keep LF line endings` steps can be dropped. Local Windows checkouts with `autocrlf=true` see the same
+  failure until then.
+
 - **`doc` is `continue-on-error`.** The workspace has 11 rustdoc warnings at
   `d4a0111`, so the step shows green while it fails. Removal condition: QA-005
   (rustdoc warnings fixed) lands from the phase-end code track, and that
