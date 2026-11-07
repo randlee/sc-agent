@@ -1,34 +1,54 @@
-//! File-backed judge sessions (REQ-SAG-0600, ADR-SAG-0008).
+//! File-backed judge sessions (REQ-SAG-0600, REQ-SAG-0607, ADR-SAG-0008,
+//! ADR-SAG-0024).
 //!
-//! Each session is a UUID file with mode `0600`. Expiry is `created_at` plus
-//! the store TTL. Touching the file does not extend the session. Haiku and
-//! Luna `ask` calls reuse the stored payload, system prompt, and prior
-//! answers. Jev has no rationale field, so `ask` refuses a Jev session.
+//! Each session is one `<id>.json` file with mode `0600` in a directory with
+//! mode `0700` (when this store creates it). Expiry is `created_at` plus the
+//! store TTL; touching the file does not extend the session. Haiku and Luna
+//! `ask` calls reuse the stored payload, system prompt, and prior answers.
+//! Jev has no rationale field, so `ask` refuses a Jev session.
 //!
-//! [`SessionStore`] is an open extension point. [`FileSessionStore`] is the
-//! Phase A implementation.
+//! [`FileSessionStore`] is stateless: a directory, a TTL, and a clock `fn`
+//! pointer. It holds no registry, logger, or lock. [`FileSessionStore::ask`]
+//! takes the [`BackendRegistry`] and [`SharedSessionLog`] for that call.
+//! `crate::run::run` writes a session once, at the end of a run, and only
+//! when a backend whose descriptor has `supports_session_ask` returned
+//! `Ok`.
 //!
-//! # Durability and concurrency
+//! # Concurrency model (RSH-004)
 //!
-//! A session file is replaced atomically: the new document goes to a unique
-//! `.{id}.{pid}.{nonce}.tmp` file created with `create_new`, is synced, then
-//! renamed over the session file, and the directory is synced on Unix. A
-//! failed write removes its temporary file. Session directories this store
-//! creates are mode `0700` on Unix and session files are mode `0600`.
+//! There is no lock, in process or across processes.
 //!
-//! The store assumes **one writer per session**. Clones of one store in one
-//! process serialize read-modify-write through a shared lock. Two processes
-//! that update the same session at the same time (two concurrent `ask`
-//! calls) can lose one update; neither corrupts the file. There is no
-//! cross-process lock.
+//! - [`FileSessionStore::save`] writes the document to
+//!   `<id>.json.tmp.<pid>.<random>` opened with `create_new`, fsyncs it,
+//!   renames it over `<id>.json`, then fsyncs the parent directory. Any
+//!   failure removes the temporary file. A rename is atomic on one file
+//!   system, so a reader sees either the old document or the new one, never
+//!   a torn write.
+//! - Two writers of the same id: the last rename wins. Neither corrupts the
+//!   file. Session ids are random UUIDs and `run` saves each id once, so
+//!   this only happens when a caller saves the same [`StoredSession`] twice.
+//!   On Windows, replacing a file that another writer is replacing at the
+//!   same instant can fail with a sharing error; that save returns
+//!   `SessionStoreIo` and removes its temporary file, and the other write
+//!   stands.
+//! - Readers re-verify every document they load: the stored id must match
+//!   the file name's id and the payload must match its stored SHA-256, and
+//!   every stored outcome is checked against the payload. A file that fails
+//!   any check is `SessionDocumentInvalid`.
+//! - [`FileSessionStore::ask`] reads the session and never rewrites it, so
+//!   concurrent `ask` calls on one session cannot lose each other's data.
+//! - A crashed writer can leave a temporary file behind.
+//!   [`FileSessionStore::new`] removes `*.tmp.*` files older than one hour
+//!   ([`STALE_TMP_AGE`]); younger ones may belong to a live writer.
 
 #![warn(missing_docs)]
 
+use std::collections::BTreeMap;
+use std::collections::hash_map::RandomState;
 use std::fs::{self, File, OpenOptions};
+use std::hash::{BuildHasher, Hasher};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
@@ -38,12 +58,18 @@ use sc_agent_types::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
 
 use crate::registry::BackendRegistry;
 
 /// Default lifetime measured from `created_at`.
 pub const DEFAULT_SESSION_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Age after which [`FileSessionStore::new`] removes a leftover temporary file.
+///
+/// A save finishes in well under a second, so a temporary file this old
+/// belongs to a writer that crashed. One hour leaves a wide margin for a
+/// slow disk without letting leftovers pile up.
+pub const STALE_TMP_AGE: Duration = Duration::from_secs(60 * 60);
 
 /// Header inserted before prior answers in an LLM system prompt.
 pub const SESSION_CONTEXT_HEADER: &str = "Session context:";
@@ -57,30 +83,13 @@ const MAX_SESSION_BYTES: u64 = 8 * 1024 * 1024;
 /// `probabilities` field and untyped answers (r-1 D7.6).
 const SESSION_VERSION: u64 = 2;
 
-/// Creates a session and continues an LLM session with `ask`.
-///
-/// The trait is open so callers can supply their own store. Adding a store
-/// does not change [`crate::run::run_check`]'s signature.
-pub trait SessionStore: Send + Sync {
-    /// Persists `bundle` for `backend` and returns the new session id.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`JevError`] when the session cannot be stored.
-    fn create(&self, backend: BackendId, bundle: &PayloadBundle) -> Result<SessionId, JevError>;
+/// Session file extension.
+const SESSION_EXT: &str = "json";
 
-    /// Sends `follow_up` to the session's Haiku or Luna backend.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`JevError::SessionNotFound`] when `id` is absent,
-    /// [`JevError::SessionExpired`] when `created_at` plus the TTL is in the
-    /// past, and [`JevError::InputInvalid`] when the session is Jev or the
-    /// follow-up is empty.
-    fn ask(&self, id: &SessionId, follow_up: &str) -> Result<JudgeOutcome, JevError>;
-}
+/// Marker between a session file name and a temporary suffix.
+const TMP_MARKER: &str = ".tmp.";
 
-/// One session loaded from disk.
+/// One session document.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredSession {
     /// File id.
@@ -91,49 +100,42 @@ pub struct StoredSession {
     pub created_at: SystemTime,
     /// Canonical payload bytes and their digest.
     pub payload: PayloadBundle,
-    /// Base LLM system prompt. `None` for a Jev-only session.
+    /// Base LLM system prompt. `None` for a session with no LLM backend.
     pub system_prompt: Option<String>,
     /// Prior judge outcomes, in call order.
     pub outcomes: Vec<JudgeOutcome>,
-    /// Follow-up texts already sent with `ask`.
+    /// Follow-up texts included before a new one when the session is asked.
+    ///
+    /// `ask` does not append to this list or rewrite the file; a caller
+    /// that keeps a conversation saves a new document itself.
     pub follow_ups: Vec<String>,
 }
 
-/// Sessions stored as UUID files under a directory.
+/// Sessions stored as `<id>.json` files under one directory.
 ///
-/// Clone shares the registry, clock handle, log, and file lock. `with_ttl` and
-/// `with_clock` replace those settings on the returned value only. Call them
-/// before cloning the store into [`crate::run::RunOptions`].
-///
-/// The shared file lock serializes session-file read-modify-write. A run and a
-/// later `ask` can hold clones of one store, and the lock keeps those calls
-/// from interleaving writes to the same UUID file.
-#[derive(Clone)]
+/// Stateless and cheap to copy: `dir`, `ttl`, and a `clock` function
+/// pointer. See the module documentation for the concurrency model.
+#[derive(Debug, Clone)]
 pub struct FileSessionStore {
     dir: PathBuf,
     ttl: Duration,
-    clock: Arc<dyn Fn() -> SystemTime + Send + Sync>,
-    registry: Arc<RwLock<BackendRegistry>>,
-    session_log: SharedSessionLog,
-    /// Shared by every clone. Session create, record, and `ask` take this lock
-    /// for the whole read-modify-write so concurrent callers cannot corrupt a
-    /// session file. `RwLock` is the wrong shape: the critical section updates
-    /// the file, not an in-memory map.
-    io: Arc<Mutex<()>>,
+    clock: fn() -> SystemTime,
 }
 
 impl FileSessionStore {
-    /// Creates a store rooted at `dir`, creating the directory when needed.
+    /// Creates a store rooted at `dir`, creating the directory when needed,
+    /// and removes temporary files older than [`STALE_TMP_AGE`].
     ///
     /// Directories created here are mode `0700` on Unix. An existing
-    /// directory's mode is left unchanged. Session files created later are
-    /// mode `0600`.
+    /// directory's mode is left unchanged. Session files are mode `0600`.
+    /// The sweep is best effort: a file that cannot be inspected or removed
+    /// is left in place.
     ///
     /// # Errors
     ///
     /// Returns [`JevError::session_store_io`] when `dir` cannot be created.
     /// The code is `CONFIG_INVALID`. The fix hint names `dir`.
-    pub fn new(dir: impl Into<PathBuf>, session_log: SharedSessionLog) -> Result<Self, JevError> {
+    pub fn new(dir: impl Into<PathBuf>) -> Result<Self, JevError> {
         let dir = dir.into();
         create_private_dir(&dir).map_err(|error| {
             JevError::session_store_io(
@@ -142,13 +144,11 @@ impl FileSessionStore {
                 "Choose a writable directory, then retry.",
             )
         })?;
+        sweep_stale_tmp(&dir, SystemTime::now());
         Ok(Self {
             dir,
             ttl: DEFAULT_SESSION_TTL,
-            clock: Arc::new(SystemTime::now),
-            registry: Arc::new(RwLock::new(BackendRegistry::new())),
-            session_log,
-            io: Arc::new(Mutex::new(())),
+            clock: SystemTime::now,
         })
     }
 
@@ -159,21 +159,11 @@ impl FileSessionStore {
         self
     }
 
-    /// Replaces the clock used for `created_at` and expiry.
+    /// Replaces the clock used for expiry and by [`Self::now`].
     #[must_use]
-    pub fn with_clock(mut self, clock: impl Fn() -> SystemTime + Send + Sync + 'static) -> Self {
-        self.clock = Arc::new(clock);
+    pub fn with_clock(mut self, clock: fn() -> SystemTime) -> Self {
+        self.clock = clock;
         self
-    }
-
-    /// Installs `registry` for later `ask` calls.
-    ///
-    /// Clones of this store share the registry.
-    pub fn install_registry(&self, registry: BackendRegistry) {
-        *self
-            .registry
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = registry;
     }
 
     /// Directory that holds session files.
@@ -182,122 +172,129 @@ impl FileSessionStore {
         &self.dir
     }
 
-    /// Path of the UUID file for `id`.
+    /// Path of the `<id>.json` file for `id`.
     #[must_use]
     pub fn path(&self, id: &SessionId) -> PathBuf {
-        self.dir.join(id.to_string())
+        self.dir.join(format!("{id}.{SESSION_EXT}"))
     }
 
-    /// Stores `bundle` and an optional base system prompt.
+    /// The store clock's current time, used for a new session's `created_at`.
+    #[must_use]
+    pub fn now(&self) -> SystemTime {
+        (self.clock)()
+    }
+
+    /// Writes `session` to `<id>.json`, replacing any existing file.
+    ///
+    /// The write is atomic (temporary file, fsync, rename, parent fsync) and
+    /// removes its temporary file on any error. Last writer wins.
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::SessionStoreIo`] when the session file cannot be
-    /// written. Canonical payload text is UTF-8 by construction
-    /// ([`PayloadBundle::as_str`]), so there is no encoding failure.
-    /// The write failure code is `CONFIG_INVALID` and names the session file.
-    pub fn open(
-        &self,
-        backend: BackendId,
-        bundle: &PayloadBundle,
-        system_prompt: Option<String>,
-    ) -> Result<SessionId, JevError> {
-        let session_id = SessionId::new();
-        let created_at = unix_ms((self.clock)())?;
+    /// Returns [`JevError::SessionStoreIo`] (`CONFIG_INVALID`, naming the
+    /// session file) when the file cannot be written, and `CONFIG_INVALID`
+    /// when `created_at` is before the Unix epoch.
+    pub fn save(&self, session: &StoredSession) -> Result<(), JevError> {
         let document = SessionDocument {
             version: SESSION_VERSION,
-            session_id,
-            backend,
-            created_at,
-            payload_utf8: bundle.as_str().to_owned(),
-            prompt_sha256: bundle.sha256().clone(),
-            system_prompt,
-            outcomes: Vec::new(),
-            follow_ups: Vec::new(),
+            session_id: session.session_id,
+            backend: session.backend,
+            created_at: unix_ms(session.created_at)?,
+            payload_utf8: session.payload.as_str().to_owned(),
+            prompt_sha256: session.payload.sha256().clone(),
+            system_prompt: session.system_prompt.clone(),
+            outcomes: session.outcomes.clone(),
+            follow_ups: session.follow_ups.clone(),
         };
-        let _guard = self
-            .io
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        self.write_document(&document)?;
-        Ok(session_id)
-    }
-
-    /// Loads `id`, including expired sessions.
-    ///
-    /// Callers that must refuse expired sessions use [`Self::load`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`JevError::SessionNotFound`] when the file is absent,
-    /// [`JevError::session_store_io`] when the file cannot be read, and
-    /// [`JevError::session_document_invalid`] when the file is not a session
-    /// document. The fix hint names the session file.
-    pub(crate) fn load_raw(&self, id: &SessionId) -> Result<StoredSession, JevError> {
-        let _guard = self
-            .io
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        self.read_document(id)
-            .and_then(|document| StoredSession::from_document(document, &self.path(id)))
+        let path = self.path(&session.session_id);
+        let bytes = serde_json::to_vec(&document).map_err(|error| {
+            session_parse(
+                &path,
+                &format!("could not be encoded ({})", json_cause(&error)),
+            )
+        })?;
+        write_private(&path, &bytes)
+            .map_err(|error| session_io(&path, &self.dir, "write", error.kind()))
     }
 
     /// Loads `id` when `created_at` plus the TTL is still in the future.
+    ///
+    /// File modification time is not consulted.
     ///
     /// # Errors
     ///
     /// Returns [`JevError::SessionNotFound`] when the file is absent,
     /// [`JevError::SessionExpired`] when `created_at` is past the TTL,
     /// [`JevError::session_store_io`] when the file cannot be read, and
-    /// [`JevError::session_document_invalid`] when the file is not a session
-    /// document.
-    /// File modification time is not consulted.
+    /// [`JevError::session_document_invalid`] when the file is not a valid
+    /// session document for `id`.
     pub fn load(&self, id: &SessionId) -> Result<StoredSession, JevError> {
-        let stored = self.load_raw(id)?;
-        self.ensure_fresh(id, &stored)?;
-        Ok(stored)
+        let document = self.read_document(id)?;
+        if self.is_expired(document.created_at)? {
+            return Err(JevError::session_expired(*id));
+        }
+        StoredSession::from_document(document, &self.path(id))
     }
 
-    /// Appends `outcome` to the session file.
+    /// Sends `follow_up` to the session's Haiku or Luna backend.
+    ///
+    /// The backend comes from `registry`; one [`LogEvent`] with
+    /// [`sc_agent_types::Operation::Ask`] goes to `log`. The session file is
+    /// read and not rewritten.
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::SessionNotFound`] when `id` is absent and
-    /// [`JevError::SessionExpired`] when the session is past its TTL.
-    pub fn record_outcome(&self, id: &SessionId, outcome: &JudgeOutcome) -> Result<(), JevError> {
-        let _guard = self
-            .io
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut document = self.read_document(id)?;
-        self.ensure_fresh_document(id, &document)?;
-        document.outcomes.push(outcome.clone());
-        self.write_document(&document)
-    }
-
-    fn ensure_fresh(&self, id: &SessionId, stored: &StoredSession) -> Result<(), JevError> {
-        let created_at = unix_ms(stored.created_at)?;
-        if self.is_expired(created_at)? {
-            Err(JevError::session_expired(*id))
-        } else {
-            Ok(())
-        }
-    }
-
-    fn ensure_fresh_document(
+    /// Returns [`JevError::InputInvalid`] when `follow_up` is empty or the
+    /// session's backend has no `ask`; the [`Self::load`] errors; the
+    /// registry error when the backend is not registered; and the backend's
+    /// `validate_for_send` or `judge` error.
+    pub fn ask(
         &self,
         id: &SessionId,
-        document: &SessionDocument,
-    ) -> Result<(), JevError> {
-        if self.is_expired(document.created_at)? {
-            Err(JevError::session_expired(*id))
-        } else {
-            Ok(())
+        follow_up: &str,
+        registry: &BackendRegistry,
+        log: &SharedSessionLog,
+    ) -> Result<JudgeOutcome, JevError> {
+        if follow_up.trim().is_empty() {
+            return Err(follow_up_invalid(
+                "The follow-up text is empty. Pass non-empty text to ask.",
+            ));
         }
+        let stored = self.load(id)?;
+        if !stored.backend.descriptor().supports_session_ask() {
+            return Err(follow_up_invalid(
+                "Jev sessions have no rationale field. Ask a Haiku or Luna session instead.",
+            ));
+        }
+        let backend = registry.get(stored.backend)?;
+        let mut prompt = stored.system_prompt.clone().unwrap_or_default();
+        prompt.push_str(&render_session_context(&stored.outcomes)?);
+        for prior in &stored.follow_ups {
+            prompt.push_str("\n\nFollow-up:\n");
+            prompt.push_str(prior);
+        }
+        prompt.push_str("\n\nFollow-up:\n");
+        prompt.push_str(follow_up);
+        let request = JudgeRequest::new(
+            std::sync::Arc::new(stored.payload.clone()),
+            Some(LlmWireContext::new(prompt)),
+        );
+        backend.validate_for_send(&request)?;
+        let judged = backend.judge(&request);
+        emit_log(
+            log,
+            LogEvent::new(
+                *id,
+                stored.backend,
+                stored.payload.sha256().clone(),
+                sc_agent_types::Operation::Ask,
+            ),
+        );
+        judged
     }
 
     fn is_expired(&self, created_at: u64) -> Result<bool, JevError> {
-        let now = unix_ms((self.clock)())?;
+        let now = unix_ms(self.now())?;
         let ttl_ms = u64::try_from(self.ttl.as_millis()).unwrap_or(u64::MAX);
         Ok(now >= created_at.saturating_add(ttl_ms))
     }
@@ -345,90 +342,6 @@ impl FileSessionStore {
             return Err(session_parse(&path, "payload digest does not match"));
         }
         Ok(document)
-    }
-
-    fn write_document(&self, document: &SessionDocument) -> Result<(), JevError> {
-        let path = self.path(&document.session_id);
-        let bytes = serde_json::to_vec(document).map_err(|error| {
-            session_parse(
-                &path,
-                &format!("could not be encoded ({})", json_cause(&error)),
-            )
-        })?;
-        write_private(&path, &bytes)
-            .map_err(|error| session_io(&path, &self.dir, "write", error.kind()))
-    }
-
-    fn backend(&self, id: BackendId) -> Result<Arc<dyn sc_agent_types::JudgeBackend>, JevError> {
-        self.registry
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(id)
-    }
-}
-
-impl SessionStore for FileSessionStore {
-    fn create(&self, backend: BackendId, bundle: &PayloadBundle) -> Result<SessionId, JevError> {
-        self.open(backend, bundle, None)
-    }
-
-    fn ask(&self, id: &SessionId, follow_up: &str) -> Result<JudgeOutcome, JevError> {
-        if follow_up.trim().is_empty() {
-            return Err(follow_up_invalid(
-                "The follow-up text is empty. Pass non-empty text to ask.",
-            ));
-        }
-        let stored = self.load(id)?;
-        if !stored.backend.descriptor().supports_session_ask() {
-            return Err(follow_up_invalid(
-                "Jev sessions have no rationale field. Ask a Haiku or Luna session instead.",
-            ));
-        }
-        let backend = self.backend(stored.backend)?;
-        let mut prompt = stored.system_prompt.clone().unwrap_or_default();
-        prompt.push_str(&render_session_context(&stored.outcomes)?);
-        for prior in &stored.follow_ups {
-            prompt.push_str("\n\nFollow-up:\n");
-            prompt.push_str(prior);
-        }
-        prompt.push_str("\n\nFollow-up:\n");
-        prompt.push_str(follow_up);
-        let request = JudgeRequest::new(
-            std::sync::Arc::new(stored.payload.clone()),
-            Some(LlmWireContext::new(prompt)),
-        );
-        backend.validate_for_send(&request)?;
-        let judged = backend.judge(&request);
-        emit_log(
-            &self.session_log,
-            LogEvent::new(
-                *id,
-                stored.backend,
-                stored.payload.sha256().clone(),
-                sc_agent_types::Operation::Ask,
-            ),
-        );
-        let outcome = judged?;
-        let _guard = self
-            .io
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut document = self.read_document(id)?;
-        self.ensure_fresh_document(id, &document)?;
-        document.follow_ups.push(follow_up.to_owned());
-        document.outcomes.push(outcome.clone());
-        self.write_document(&document)?;
-        Ok(outcome)
-    }
-}
-
-impl std::fmt::Debug for FileSessionStore {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("FileSessionStore")
-            .field("dir", &self.dir)
-            .field("ttl", &self.ttl)
-            .finish_non_exhaustive()
     }
 }
 
@@ -548,23 +461,24 @@ fn create_private_dir(dir: &Path) -> std::io::Result<()> {
     builder.create(dir)
 }
 
-/// Unique temporary sibling of `path`: `.{name}.{pid}.{nonce}.tmp`.
+/// Unique temporary sibling of `path`: `<name>.tmp.<pid>.<random>`.
+///
+/// The random part is 64 bits from a fresh [`RandomState`] (seeded from the
+/// OS), so two writers in one process or two processes never pick the same
+/// name; `create_new` refuses the rare collision and the caller retries.
 fn tmp_path(path: &Path) -> PathBuf {
-    static NONCE: AtomicU64 = AtomicU64::new(0);
     let name = path
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("session");
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.subsec_nanos());
-    let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+    let random = RandomState::new().build_hasher().finish();
     path.with_file_name(format!(
-        ".{name}.{}.{nanos:08x}{nonce:04x}.tmp",
+        "{name}{TMP_MARKER}{}.{random:016x}",
         std::process::id()
     ))
 }
 
+/// Atomically replaces `path` with `bytes` (mode `0600`).
 fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -573,7 +487,7 @@ fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let (tmp, mut file) = loop {
+    let (tmp, file) = loop {
         let tmp = tmp_path(path);
         match options.open(&tmp) {
             Ok(file) => break (tmp, file),
@@ -581,17 +495,44 @@ fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
             Err(error) => return Err(error),
         }
     };
-    let written = file
-        .write_all(bytes)
-        .and_then(|()| file.sync_all())
-        .and_then(|()| tighten_0600(&tmp));
-    drop(file);
-    if let Err(error) = written.and_then(|()| fs::rename(&tmp, path)) {
+    let written = finish_tmp(file, &tmp, bytes)
+        .and_then(|()| fs::rename(&tmp, path))
+        .and_then(|()| sync_parent(path));
+    if written.is_err() {
         let _ = fs::remove_file(&tmp);
-        return Err(error);
     }
-    tighten_0600(path)?;
-    sync_parent(path)
+    written
+}
+
+/// Writes, fsyncs, and closes the temporary file.
+fn finish_tmp(mut file: File, tmp: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    tighten_0600(tmp)
+}
+
+/// Removes `<name>.tmp.*` files in `dir` last modified before `now - STALE_TMP_AGE`.
+fn sweep_stale_tmp(dir: &Path, now: SystemTime) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let Some(cutoff) = now.checked_sub(STALE_TMP_AGE) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if !name.to_str().is_some_and(|name| name.contains(TMP_MARKER)) {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .is_ok_and(|modified| modified < cutoff);
+        if stale && entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
 }
 
 /// Syncs the directory entry after a rename so the new file survives a crash.

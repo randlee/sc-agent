@@ -5,12 +5,12 @@ use std::path::PathBuf;
 
 use sc_agent_types::schema::subjects::SubjectsDocument;
 use sc_agent_types::{
-    BackendId, CanonicalJudgePayload, PayloadBundle, RepoRelativePath, RepoRoot, Rev,
+    BackendId, BackendSet, CanonicalJudgePayload, PayloadBundle, RepoRelativePath, RepoRoot, Rev,
 };
 use sc_jev_check::config::{CheckSpec, InputSpec};
 use sc_jev_check::equal_input::producer_from_extractions;
 use sc_jev_check::payload::{build_payload, parse_question_set};
-use sc_jev_check::run::{RunOptions, run_check};
+use sc_jev_check::run::{CheckSource, RunConfig, prepare, run};
 
 const QUESTIONS: &str = r#"{
   "schema": "plan-anchoring/questions/1",
@@ -77,8 +77,14 @@ fn cross_impl_branches() {
     assert_eq!(producer.query_sha256, document.producer().query_sha256);
     assert_eq!(producer.mode, "matches");
 
-    let dry = run_check(&spec, &[BackendId::Jev], RunOptions::dry_run_only(repo)).expect("dry-run");
-    assert_eq!(dry.bundle.sha256(), expected.sha256());
-    assert!(dry.session_id.is_none());
-    assert!(dry.outcomes.is_empty());
+    let config = RunConfig::new(
+        repo,
+        std::sync::Arc::new(sc_agent_types::observability::v2::NoopSessionLog),
+    )
+    .backends(BackendSet::try_from(vec![BackendId::Jev]).expect("set"))
+    .dry_run(true);
+    let dry = run(prepare(CheckSource::Spec(spec), config).expect("prepare")).expect("dry-run");
+    assert_eq!(dry.prompt_sha256(), expected.sha256());
+    assert!(dry.session_id().is_none());
+    assert!(dry.results().is_empty());
 }

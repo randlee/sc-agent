@@ -13,9 +13,6 @@ use std::collections::BTreeMap;
 pub(crate) mod caller;
 mod questions;
 
-#[doc(inline)]
-pub use caller::{PreparedCallerRequest, prepare_caller_request};
-
 use sc_agent_types::{
     CanonicalJudgePayload, ChoiceAnswer, JevError, PayloadBundle, Question, RepoRoot, Rev,
 };

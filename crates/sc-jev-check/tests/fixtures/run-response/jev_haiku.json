@@ -1,0 +1,101 @@
+{
+  "model": "jev-test",
+  "usage": {
+    "input_tokens": 318,
+    "output_tokens": 31
+  },
+  "answers": {
+    "q": {
+      "choice": "no",
+      "confidence": 0.9,
+      "probabilities": {
+        "no": 0.9,
+        "yes": 0.1
+      }
+    }
+  },
+  "primary_backend": "jev",
+  "session_id": "3f2b8c1e-5d4a-4e6f-9a7b-0c1d2e3f4a5b",
+  "session_saved": true,
+  "prompt_sha256": "4761e8e5cb3c8da165b4869c6a252459ca5adc4cb23cfb45ce6800583d982587",
+  "payload_bytes": 89,
+  "results": [
+    {
+      "backend": "jev",
+      "status": "ok",
+      "outcome": {
+        "answers": {
+          "q": {
+            "choice": "no",
+            "confidence": 0.9,
+            "probabilities": {
+              "no": 0.9,
+              "yes": 0.1
+            }
+          }
+        },
+        "backend": "jev",
+        "provider_meta": {
+          "answers": {
+            "q": {
+              "choice": "no",
+              "confidence": 0.9,
+              "probabilities": {
+                "no": 0.9,
+                "yes": 0.1
+              }
+            }
+          },
+          "model": "jev-test",
+          "usage": {
+            "input_tokens": 318,
+            "output_tokens": 31
+          }
+        },
+        "input_sha256": null
+      }
+    },
+    {
+      "backend": "anthropic_haiku",
+      "status": "ok",
+      "outcome": {
+        "answers": {
+          "q": {
+            "choice": "yes"
+          }
+        },
+        "backend": "anthropic_haiku",
+        "provider_meta": {
+          "commands": 0,
+          "input_tokens": 412,
+          "model": "claude-haiku-test",
+          "prompt_tokens": 377,
+          "status": "complete",
+          "stop_reason": "end_turn"
+        },
+        "input_sha256": null
+      }
+    }
+  ],
+  "equal_input": {
+    "prompt_sha256": "4761e8e5cb3c8da165b4869c6a252459ca5adc4cb23cfb45ce6800583d982587",
+    "mode": "chain_context",
+    "backends": [
+      {
+        "backend": "jev",
+        "attestation": {
+          "status": "unattested"
+        }
+      },
+      {
+        "backend": "anthropic_haiku",
+        "attestation": {
+          "status": "unattested"
+        }
+      }
+    ],
+    "leak": false,
+    "equal": false,
+    "producer": null
+  }
+}

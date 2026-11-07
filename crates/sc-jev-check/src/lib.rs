@@ -1,6 +1,10 @@
-//! Check facade module tree.
+//! Jev check engine: `check.toml`, extraction, the canonical payload,
+//! backends, sessions, and the one run API.
 //!
-//! Module roles and boundaries are described in `docs/architecture.md`.
+//! Run a check with [`run::prepare`] then [`run::run`]; the result is one
+//! [`run::RunResponse`] whose serialization every consumer prints
+//! (ADR-SAG-0024). Module roles and boundaries are described in
+//! `docs/sc-jev-check/architecture.md`.
 
 pub mod config;
 pub mod equal_input;

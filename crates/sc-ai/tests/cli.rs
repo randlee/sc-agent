@@ -9,8 +9,9 @@ mod deadline;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use deadline::spawn_with_deadline;
 use sc_agent_types::BackendId;
@@ -193,13 +194,23 @@ fn test_multi_backend_cli_equal_input() {
     assert_eq!(value["operation"], OP_RUN);
     let data = &value["data"];
     assert!(data["session_id"].as_str().is_some());
+    assert_eq!(data["session_saved"], true);
+    assert_eq!(data["primary_backend"], "jev");
     assert_eq!(data["answers"]["relevant"]["choice"], "yes");
-    assert_eq!(data["outcomes"][0]["backend"], "jev");
+    assert_eq!(data["results"][0]["backend"], "jev");
+    assert_eq!(data["results"][0]["status"], "ok");
+    assert_eq!(data["results"][1]["backend"], "anthropic_haiku");
+    assert_eq!(
+        data["results"][1]["outcome"]["answers"]["relevant"]["choice"],
+        "no"
+    );
     assert!(data.get("backend").is_none());
     assert!(data.get("provider_meta").is_none());
     assert!(data.get("probabilities").is_none());
-    assert_eq!(data["outcomes"].as_array().expect("outcomes").len(), 2);
-    // r-1: no backend reports an input digest yet, so each is `unattested`
+    assert!(data.get("outcomes").is_none(), "results replaces outcomes");
+    assert!(data.get("warnings").is_none());
+    assert_eq!(data["results"].as_array().expect("results").len(), 2);
+    // r-1 interim: no backend digest is trusted yet, so each is `unattested`
     // and the derived `equal` is false (backend-side hashing lands in r-2b).
     assert_eq!(data["equal_input"]["equal"], false);
     assert_eq!(data["equal_input"]["leak"], false);
@@ -311,17 +322,11 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7\n").expect("prompt");
     let seen = SeenRequests::new();
-    let now = Arc::new(Mutex::new(UNIX_EPOCH + Duration::from_secs(1_700_000_000)));
-    let clock_now = Arc::clone(&now);
     let overrides = ExecuteOverrides {
         registry: Some(registry(vec![
             judge(BackendId::AnthropicHaiku, "yes").with_seen(&seen),
         ])),
-        clock: Some(Arc::new(move || {
-            *clock_now
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-        })),
+        clock: Some(ask_clock),
         session_ttl: Some(Duration::from_secs(60)),
         session_log: Some(Arc::new(NoopSessionLog)),
     };
@@ -350,11 +355,19 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     assert_eq!(dry["version"], "1");
     assert_eq!(dry["operation"], OP_DRY_RUN);
     assert!(dry["data"]["session_id"].is_null());
+    assert_eq!(dry["data"]["session_saved"], false);
     assert_eq!(
         dry["data"]["prompt_sha256"].as_str().expect("sha").len(),
         64
     );
     assert!(dry["data"]["payload"]["questions"].is_array());
+    assert_eq!(dry["data"]["limits"][0]["backend"], "anthropic_haiku");
+    assert_eq!(dry["data"]["limits"][0]["over_limit"], false);
+    assert_eq!(dry["data"]["results"], serde_json::json!([]));
+    assert_eq!(
+        dry["data"]["equal_input"]["backends"][0]["attestation"]["status"],
+        "not_sent"
+    );
     assert_eq!(dry["data"]["readback"]["repo_root"], canon(repo.path()));
     assert_eq!(
         dry["data"]["readback"]["check_toml"],
@@ -383,7 +396,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         ],
         ExecuteOverrides {
             registry: overrides.registry.clone(),
-            clock: overrides.clock.clone(),
+            clock: overrides.clock,
             session_ttl: overrides.session_ttl,
             session_log: Some(Arc::new(NoopSessionLog)),
         },
@@ -409,7 +422,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(sessions.path().join(&session_id))
+        let mode = std::fs::metadata(sessions.path().join(format!("{session_id}.json")))
             .expect("session file")
             .permissions()
             .mode()
@@ -432,7 +445,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         ],
         ExecuteOverrides {
             registry: overrides.registry.clone(),
-            clock: overrides.clock.clone(),
+            clock: overrides.clock,
             session_ttl: overrides.session_ttl,
             session_log: Some(Arc::new(NoopSessionLog)),
         },
@@ -448,7 +461,10 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         asked["data"]["readback"]["sessions_dir"],
         canon(sessions.path())
     );
-    assert_eq!(asked["data"]["prompt_sha256"], ran["data"]["prompt_sha256"]);
+    assert!(
+        asked["data"].get("results").is_none(),
+        "ask data is the outcome"
+    );
     let follow = seen.snapshot()[1]
         .llm()
         .as_ref()
@@ -458,7 +474,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     assert!(follow.contains("why the choice?"));
     assert_no_prompt_leak(&asked.to_string());
 
-    *now.lock().expect("clock") += Duration::from_secs(120);
+    ASK_CLOCK_OFFSET_SECS.store(120, Ordering::SeqCst);
     let expired = sc_ai::execute_with_overrides(
         &[
             "jev".into(),
@@ -484,6 +500,16 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     assert_eq!(expired.code(), "SESSION_EXPIRED");
     assert!(expired.fix_hint().contains(&session_id));
     assert_no_prompt_leak(&expired.fix_hint());
+}
+
+/// Seconds added to the real clock by [`ask_clock`].
+static ASK_CLOCK_OFFSET_SECS: AtomicU64 = AtomicU64::new(0);
+
+/// `ask`'s session clock: real time plus [`ASK_CLOCK_OFFSET_SECS`]. The run
+/// stamps `created_at` with real time, so moving the offset past the TTL
+/// expires the session.
+fn ask_clock() -> SystemTime {
+    SystemTime::now() + Duration::from_secs(ASK_CLOCK_OFFSET_SECS.load(Ordering::SeqCst))
 }
 
 #[test]
@@ -610,7 +636,16 @@ fn cli_keeps_typesafe_response_fields() {
     assert_eq!(data["usage"], usage);
     assert_eq!(data["stop_reason"], "end_turn");
     assert_eq!(data["id"], "resp-1");
-    assert!(data["session_id"].as_str().is_some());
+    assert_eq!(data["primary_backend"], "jev");
+    // Jev has no `ask`, so a Jev-only run saves no session (REQ-SAG-0607).
+    assert!(data["session_id"].is_null());
+    assert_eq!(data["session_saved"], false);
+    assert!(
+        std::fs::read_dir(sessions.path())
+            .map(|entries| entries.count())
+            .unwrap_or(0)
+            == 0
+    );
     assert_eq!(data["answers"]["relevant"]["choice"], "yes");
     assert!(data.get("provider_meta").is_none());
     assert!(data.get("backend").is_none());
@@ -638,13 +673,15 @@ fn cli_log_and_git_errors_do_not_blame_check_toml() {
         .env("GIT_CONFIG_GLOBAL", null_device())
         .env("GIT_TERMINAL_PROMPT", "0")
         .run_with_deadline();
+    // Outside git the repo root is the current directory (ADR-SAG-0003 r-2
+    // amendment), so the failure names the missing check file, not git.
     assert_eq!(output.status.code(), Some(2));
     let err: Value = serde_json::from_slice(&output.stderr).expect("stderr json");
-    assert_eq!(err["error"], "CONFIG_INVALID");
+    assert_eq!(err["error"], "INPUT_MISSING");
     let message = err["message"].as_str().expect("message");
-    assert!(message.contains("--repo-root"), "{message}");
-    assert!(!message.contains("check.toml"), "{message}");
+    assert!(message.contains("check.toml"), "{message}");
     assert!(!message.contains("schema"), "{message}");
+    assert!(!message.to_ascii_lowercase().contains("git"), "{message}");
 }
 
 #[test]

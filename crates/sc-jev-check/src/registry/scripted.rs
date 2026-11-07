@@ -2,8 +2,8 @@
 //!
 //! [`register_scripted_backends`] builds a [`BackendRegistry`] of
 //! [`MockJudgeBackend`]s, the workspace's one judge double. Production builds
-//! leave the `test-util` feature off, so [`crate::run::run_check`] stays the
-//! caller API (ADR-SAG-0009).
+//! leave the `test-util` feature off; the scripted registry reaches a run
+//! through [`crate::run::RunConfig::registry`] (ADR-SAG-0022 r-2 amendment).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -24,8 +24,8 @@ use super::BackendRegistry;
 ///
 /// Each judge is a [`MockJudgeBackend`]: it answers at `judge` time against
 /// the request it receives, does not open a socket, and stores no API key.
-/// Callers pass the registry to [`crate::run::RunOptions::registry`]. This
-/// does not change [`crate::run::run_check`]'s parameters (ADR-SAG-0009).
+/// Callers pass the registry, in an `Arc`, to
+/// [`crate::run::RunConfig::registry`]. No run API changes (ADR-SAG-0009).
 ///
 /// # Errors
 ///

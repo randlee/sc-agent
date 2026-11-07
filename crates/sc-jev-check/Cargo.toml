@@ -7,7 +7,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Jev check facade: check.toml, extractors, sessions, and run_check."
+description = "Jev check engine: check.toml, extractors, sessions, and the prepare/run API."
 readme = "README.md"
 keywords.workspace = true
 categories.workspace = true
@@ -20,13 +20,15 @@ workspace = true
 
 [features]
 default = []
-# In-process scripted judges for tests (ADR-SAG-0022). Production builds
-# leave this off. `run_check`'s signature does not change (ADR-SAG-0009).
+# Test seams (ADR-SAG-0022, plan "Test seams"): `register_scripted_backends`
+# and `RunResponse::test_builder`. Production builds leave this off; it adds
+# no run API (ADR-SAG-0009).
 test-util = ["sc-agent-types/test-util"]
 
 [dependencies]
 sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+# `git`: `discover_toplevel` (repo root) and `read_at_rev` (revision reads).
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["git"] }
 sc-jev = { path = "../sc-jev", version = "0.1.0" }
 sc-jev-backends = { path = "../sc-jev-backends", version = "0.1.0" }
 serde.workspace = true
@@ -36,3 +38,10 @@ toml.workspace = true
 [dev-dependencies]
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0", features = ["test-util"] }
 tempfile.workspace = true
+
+# D0 outcome 4 (boundaries/README.md "Dev-dependency and self edges"): no
+# self dev-dependency. A target that needs this crate's `test-util` seam
+# declares it here, and its validation lines pass `--features test-util`.
+[[test]]
+name = "run_response"
+required-features = ["test-util"]

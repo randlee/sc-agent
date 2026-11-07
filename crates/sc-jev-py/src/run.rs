@@ -1,6 +1,9 @@
 //! `build_request`, `run_check`, and session `ask`.
 //!
-//! Every pyfunction here is `pub(crate)`: the Python module registered in
+//! Both Python entry points keep their Python names and call
+//! `sc_jev_check::run::prepare` (and, for `run_check`, `run`); this module
+//! only maps the [`RunResponse`] into Python (ADR-SAG-0024). Every
+//! pyfunction here is `pub(crate)`: the Python module registered in
 //! `lib.rs` is the only surface. Work that may block (git, extractors, judge
 //! sends) runs under `py.detach`, so other Python threads keep running.
 
@@ -9,28 +12,26 @@ use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyBytes};
+use sc_agent_types::observability::v2::{NoopSessionLog, SharedSessionLog};
 use sc_agent_types::schema::subjects::SubjectsProducer;
 use sc_agent_types::{
-    BackendId, EqualInputRecord, JevError, JudgeOutcome, RepoRoot, Rev, SessionId, Sha256Digest,
-    canonical_json_bytes,
+    BackendId, BackendSet, JevError, RepoRoot, Rev, SessionId, Sha256Digest, canonical_json_bytes,
 };
-use sc_jev_check::config::load_check_at;
+use sc_jev_check::registry::BackendRegistry;
 use sc_jev_check::run::{
-    RunOptions, build_request as build_request_facade, run_check as run_check_facade,
+    CheckSource, PreparedRun, RunConfig, RunResponse, discover_repo_root, prepare, run,
 };
-use sc_jev_check::session::{FileSessionStore, SessionStore};
+use sc_jev_check::session::FileSessionStore;
 use serde_json::Value;
 
 use crate::error::{self, map_err};
 use crate::logging::{self, LoggerGuard};
 
-/// Default `backends` when the caller passes none.
-const DEFAULT_BACKEND: &str = "jev";
-
 /// One Python `run_check` invocation, with owned arguments.
 struct CheckRun {
     check_path: String,
-    backends: Vec<String>,
+    /// `backends=`; `None` leaves the choice to `check.toml`, then `[jev]`.
+    backends: Option<Vec<String>>,
     dry_run: bool,
     repo_root: Option<PathBuf>,
     rev: String,
@@ -43,21 +44,45 @@ struct CheckRun {
     scripted_answers: Option<Value>,
 }
 
-/// Session store and logger kept alive so `ask` reuses them.
+/// Session store, logger, and backends kept alive so `ask` reuses them.
 struct LiveSession {
     store: FileSessionStore,
     logger: LoggerGuard,
+    session_log: SharedSessionLog,
+    repo: RepoRoot,
+    /// The run's injected registry (scripted runs). `None` builds the
+    /// production registry for the session's backend at `ask` time.
+    registry: Option<Arc<BackendRegistry>>,
 }
 
-/// Facade result for one run. `live` is `None` on dry-run.
+impl Clone for LiveSession {
+    fn clone(&self) -> Self {
+        Self {
+            store: self.store.clone(),
+            logger: self.logger.clone(),
+            session_log: Arc::clone(&self.session_log),
+            repo: self.repo.clone(),
+            registry: self.registry.clone(),
+        }
+    }
+}
+
+/// Engine result for one run. `live` is `None` on dry-run.
 struct FinishedRun {
-    session_id: Option<SessionId>,
+    response: RunResponse,
     payload: String,
-    prompt_sha256: Sha256Digest,
-    outcomes: Vec<JudgeOutcome>,
-    equal_input: Option<EqualInputRecord>,
     system_prompt: Option<String>,
     live: Option<LiveSession>,
+}
+
+impl FinishedRun {
+    fn session_id(&self) -> Option<SessionId> {
+        self.response.session_id()
+    }
+
+    fn prompt_sha256(&self) -> &Sha256Digest {
+        self.response.prompt_sha256()
+    }
 }
 
 struct PreparedRequest {
@@ -79,44 +104,74 @@ pub(crate) fn canonical_of(json_text: &str) -> Result<Vec<u8>, JevError> {
 }
 
 fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
-    let backends = parse_backends(&spec.backends)?;
+    let backends = parse_backends(spec.backends.as_deref())?;
     let repo = resolve_repo(spec.repo_root.as_deref())?;
     let rev = Rev::parse(&spec.rev)?;
-    let check = load_check_at(&repo, &rev, &spec.check_path)?;
-    let (mut options, live) = if spec.dry_run {
+    let mut live = None;
+    let mut config = if spec.dry_run {
         // Dry-run creates no session store, session directory, or logger.
-        (RunOptions::dry_run_only(repo).rev(rev), None)
+        RunConfig::new(repo.clone(), Arc::new(NoopSessionLog)).dry_run(true)
     } else {
         let log_root = logging::resolve_log_root(spec.log_dir.as_deref());
         let session_dir = logging::resolve_session_dir(spec.session_dir.as_deref(), &log_root);
         let (logger, session_log) = logging::open_session_log(&log_root)?;
-        let store = FileSessionStore::new(&session_dir, Arc::clone(&session_log))?;
-        let options = RunOptions::new(repo, store.clone(), session_log).rev(rev);
-        (options, Some(LiveSession { store, logger }))
-    };
+        let store = FileSessionStore::new(&session_dir)?;
+        live = Some(LiveSession {
+            store,
+            logger,
+            session_log: Arc::clone(&session_log),
+            repo: repo.clone(),
+            registry: None,
+        });
+        RunConfig::new(repo, session_log).sessions_dir(session_dir)
+    }
+    .rev(rev);
+    if let Some(backends) = backends {
+        config = config.backends(backends);
+    }
     if let Some(path) = spec.system_prompt_file {
-        options = options.system_prompt_override(path);
+        config = config.system_prompt_override(path);
     }
     #[cfg(any(test, feature = "test-util"))]
     if let Some(answers) = spec.scripted_answers {
-        options = options.registry(sc_jev_check::registry::register_scripted_backends(
-            &backends, answers,
+        // Every built-in id gets the scripted judge; the run uses the ones
+        // its backend selection names (config, then check.toml, then jev).
+        let ids: Vec<BackendId> = sc_agent_types::BACKENDS
+            .iter()
+            .map(sc_agent_types::BackendDescriptor::id)
+            .collect();
+        let registry = Arc::new(sc_jev_check::registry::register_scripted_backends(
+            &ids, answers,
         )?);
+        if let Some(live) = &mut live {
+            live.registry = Some(Arc::clone(&registry));
+        }
+        config = config.registry(registry);
     }
-    let result = run_check_facade(&check, &backends, options)?;
+    let prepared = prepare(
+        CheckSource::CheckFile(PathBuf::from(&spec.check_path)),
+        config,
+    )?;
+    let (payload, system_prompt) = prepared_text(&prepared);
+    let response = run(prepared)?;
     if let Some(live) = &live {
         live.logger.flush();
     }
-    let (payload, prompt_sha256) = result.bundle.into_text();
     Ok(FinishedRun {
-        session_id: result.session_id,
-        prompt_sha256,
+        response,
         payload,
-        outcomes: result.outcomes,
-        equal_input: result.equal_input,
-        system_prompt: result.system_prompt,
+        system_prompt,
         live,
     })
+}
+
+/// The canonical payload text and the resolved LLM system prompt.
+fn prepared_text(prepared: &PreparedRun) -> (String, Option<String>) {
+    let request = prepared.request();
+    (
+        request.payload().as_str().to_owned(),
+        request.llm().map(|llm| llm.system_prompt.clone()),
+    )
 }
 
 fn build(
@@ -126,29 +181,40 @@ fn build(
 ) -> Result<PreparedRequest, JevError> {
     let repo = resolve_repo(repo_root)?;
     let rev = Rev::parse(rev_text)?;
-    let built = build_request_facade(&repo, &rev, check_path)?;
-    let (payload, prompt_sha256) = built.bundle.into_text();
+    let prepared = prepare(
+        CheckSource::CheckFile(PathBuf::from(check_path)),
+        RunConfig::new(repo, Arc::new(NoopSessionLog)).rev(rev),
+    )?;
     Ok(PreparedRequest {
-        payload,
-        prompt_sha256,
-        producer: built.producer,
+        payload: prepared.request().payload().as_str().to_owned(),
+        prompt_sha256: prepared.prompt_sha256().clone(),
+        producer: prepared.producer().cloned(),
     })
 }
 
-/// Parses backend ids with [`BackendId`]'s `FromStr`.
+/// Parses `backends=` into a [`BackendSet`] with [`BackendId`]'s `FromStr`.
 ///
 /// Only `jev`, `anthropic_haiku`, and `openai_luna` are accepted, matching
 /// `sc-ai` and the engine. Kebab-case aliases (`anthropic-haiku`) are not
-/// accepted. An unknown id is `INPUT_INVALID`. An empty list is left to the
-/// engine, which reports `CONFIG_INVALID`.
-fn parse_backends(names: &[String]) -> Result<Vec<BackendId>, JevError> {
-    names.iter().map(|name| name.parse()).collect()
+/// accepted. An unknown id is `INPUT_INVALID`; an empty or repeated list is
+/// `CONFIG_INVALID`. `None` leaves the selection to the engine.
+fn parse_backends(names: Option<&[String]>) -> Result<Option<BackendSet>, JevError> {
+    let Some(names) = names else {
+        return Ok(None);
+    };
+    let ids = names
+        .iter()
+        .map(|name| name.parse())
+        .collect::<Result<Vec<BackendId>, JevError>>()?;
+    BackendSet::try_from(ids).map(Some)
 }
 
 /// Resolves `repo_root` like `sc-ai --repo-root`.
 ///
 /// An explicit root must be a directory and is made absolute. `None` (or an
-/// empty path) is the process current directory.
+/// empty path) is `discover_repo_root` of the process current directory: its
+/// git toplevel, or the directory itself outside git (ADR-SAG-0003 r-2
+/// amendment). From a subdirectory, keys come from the toplevel `.env`.
 fn resolve_repo(repo_root: Option<&Path>) -> Result<RepoRoot, JevError> {
     match repo_root.filter(|path| !path.as_os_str().is_empty()) {
         Some(path) => {
@@ -162,7 +228,7 @@ fn resolve_repo(repo_root: Option<&Path>) -> Result<RepoRoot, JevError> {
         None => {
             let current = std::env::current_dir()
                 .map_err(|error| JevError::io_failed("current directory", &error))?;
-            Ok(RepoRoot::new(current))
+            discover_repo_root(&current)
         }
     }
 }
@@ -215,11 +281,22 @@ fn ask_with(
     follow_up: &str,
 ) -> PyResult<Py<PyAny>> {
     let follow_up = follow_up.to_owned();
-    let store = live.store.clone();
-    let logger = live.logger.clone();
+    let live = live.clone();
     let outcome = py.detach(move || {
-        let outcome = store.ask(&id, &follow_up)?;
-        logger.flush();
+        let registry = match &live.registry {
+            Some(registry) => Arc::clone(registry),
+            None => {
+                let stored = live.store.load(&id)?;
+                Arc::new(BackendRegistry::from_env(
+                    &live.repo,
+                    &BackendSet::try_from(vec![stored.backend])?,
+                )?)
+            }
+        };
+        let outcome = live
+            .store
+            .ask(&id, &follow_up, &registry, &live.session_log)?;
+        live.logger.flush();
         Ok::<_, JevError>(outcome)
     });
     to_py(
@@ -229,12 +306,13 @@ fn ask_with(
     )
 }
 
-/// Result of `run_check`.
+/// Result of `run_check`, built from the engine's `RunResponse`.
 ///
-/// Immutable. `outcomes` and `equal_input` are converted to Python objects
-/// once, when the result is built. `ask` is kept beside `Session.ask`
-/// because the Python harness relies on it; both send through the same
-/// session. Dry-run leaves `session` empty.
+/// Immutable. `outcomes` (the `ok` results, in backend order) and
+/// `equal_input` are converted to Python objects once, when the result is
+/// built. `ask` is kept beside `Session.ask` because the Python harness
+/// relies on it; both send through the same session. `session` is empty on
+/// a dry run and when no backend that supports `ask` answered.
 #[pyclass(module = "sc_jev_py", name = "CheckResult", frozen)]
 pub(crate) struct CheckResult {
     inner: FinishedRun,
@@ -244,11 +322,13 @@ pub(crate) struct CheckResult {
 
 impl CheckResult {
     fn new(py: Python<'_>, inner: FinishedRun) -> PyResult<Self> {
-        let outcomes = to_py(py, "outcomes JSON", serde_json::to_value(&inner.outcomes))?;
-        let equal_input = match &inner.equal_input {
-            Some(record) => to_py(py, "equal-input JSON", serde_json::to_value(record))?,
-            None => py.None(),
-        };
+        let outcomes: Vec<_> = inner.response.outcomes().collect();
+        let outcomes = to_py(py, "outcomes JSON", serde_json::to_value(&outcomes))?;
+        let equal_input = to_py(
+            py,
+            "equal-input JSON",
+            serde_json::to_value(inner.response.equal_input()),
+        )?;
         Ok(Self {
             inner,
             outcomes,
@@ -259,16 +339,17 @@ impl CheckResult {
 
 #[pymethods]
 impl CheckResult {
-    /// Session id for a live run.
+    /// Saved session id. `None` on a dry run and when no backend that
+    /// supports `ask` answered (a Jev-only run saves no session).
     #[getter]
     fn session_id(&self) -> Option<String> {
-        self.inner.session_id.map(|id| id.to_string())
+        self.inner.session_id().map(|id| id.to_string())
     }
 
     /// SHA-256 of the canonical payload. This is `prompt_sha256`.
     #[getter]
     fn prompt_sha256(&self) -> &str {
-        self.inner.prompt_sha256.as_str()
+        self.inner.prompt_sha256().as_str()
     }
 
     /// Canonical payload JSON.
@@ -277,13 +358,14 @@ impl CheckResult {
         &self.inner.payload
     }
 
-    /// Judge outcomes in backend order. Empty on dry-run.
+    /// Outcomes of the backends that answered, in backend order. Empty on
+    /// dry-run.
     #[getter]
     fn outcomes(&self, py: Python<'_>) -> Py<PyAny> {
         self.outcomes.clone_ref(py)
     }
 
-    /// Equal-input record. `None` on dry-run.
+    /// Equal-input record. On a dry run every backend is `not_sent`.
     #[getter]
     fn equal_input(&self, py: Python<'_>) -> Py<PyAny> {
         self.equal_input.clone_ref(py)
@@ -299,12 +381,9 @@ impl CheckResult {
     #[getter]
     fn session(&self) -> Option<Session> {
         let live = self.inner.live.as_ref()?;
-        self.inner.session_id.map(|id| Session {
+        self.inner.session_id().map(|id| Session {
             id,
-            live: LiveSession {
-                store: live.store.clone(),
-                logger: live.logger.clone(),
-            },
+            live: live.clone(),
         })
     }
 
@@ -314,13 +393,22 @@ impl CheckResult {
     ///
     /// # Errors
     ///
-    /// Raises `JevError`. Dry-run uses `CONFIG_INVALID`. A Jev session uses
-    /// `INPUT_INVALID`. `code` is the stable id and `message` is the fix hint.
+    /// Raises `JevError`. Dry-run uses `CONFIG_INVALID`. A run with no
+    /// session (Jev only) uses `INPUT_INVALID`. `code` is the stable id and
+    /// `message` is the fix hint.
     fn ask(&self, py: Python<'_>, follow_up: &str) -> PyResult<Py<PyAny>> {
-        let (Some(id), Some(live)) = (self.inner.session_id, self.inner.live.as_ref()) else {
+        let Some(live) = self.inner.live.as_ref() else {
             return Err(error::to_py_err(
                 py,
                 &JevError::config_invalid("dry-run does not create a session; ask a live run"),
+            ));
+        };
+        let Some(id) = self.inner.session_id() else {
+            return Err(error::to_py_err(
+                py,
+                &JevError::operational_io(
+                    "This run saved no session: only Haiku and Luna support ask, and Jev has no rationale field. Run with backends=[\"anthropic_haiku\"] or [\"openai_luna\"] to ask.",
+                ),
             ));
         };
         ask_with(py, live, id, follow_up)
@@ -330,7 +418,7 @@ impl CheckResult {
         format!(
             "CheckResult(session_id={:?}, prompt_sha256={})",
             self.session_id(),
-            self.inner.prompt_sha256
+            self.inner.prompt_sha256()
         )
     }
 }
@@ -367,9 +455,11 @@ impl Session {
 
 /// Builds the canonical payload for repo-relative `check_path` without sending.
 ///
-/// Assembly is `sc_jev_check::run::build_request` (ADR-SAG-0005). This
-/// function maps that result into Python. It does not run extractors or call
-/// `PayloadBuilder`. `repo_root` defaults to the process current directory.
+/// Assembly is `sc_jev_check::run::prepare` (ADR-SAG-0005, ADR-SAG-0024).
+/// This function maps the prepared run into Python. It does not run
+/// extractors or build the payload itself. `repo_root` defaults to the git
+/// toplevel of the process current directory (the directory itself outside
+/// git).
 /// `rev` defaults to `WORKTREE`. The GIL is released while the request is
 /// assembled (git reads and command extractors may take seconds). The result
 /// mapping contains `payload`, `prompt_sha256`, and `producer`.
@@ -419,7 +509,7 @@ fn check_run(
 ) -> Result<CheckRun, JevError> {
     Ok(CheckRun {
         check_path: check_path_text(check_path)?,
-        backends: backends.unwrap_or_else(|| vec![DEFAULT_BACKEND.to_owned()]),
+        backends,
         dry_run,
         repo_root: non_empty(repo_root),
         rev,
@@ -438,9 +528,10 @@ fn finish_check(py: Python<'_>, spec: CheckRun) -> PyResult<CheckResult> {
 
 /// Runs `check_path` through `sc-jev-check`.
 ///
-/// `backends` defaults to `["jev"]`; ids are `jev`, `anthropic_haiku`, and
-/// `openai_luna`. `dry_run` returns the payload digest and does not resolve
-/// keys, send, or create a session store or log. Path arguments accept `str`
+/// `backends` wins over `check.toml`'s `backends`; with neither the run uses
+/// `["jev"]`. Ids are `jev`, `anthropic_haiku`, and `openai_luna`. `dry_run`
+/// returns the payload digest and does not resolve keys, send, or create a
+/// session store or log. Path arguments accept `str`
 /// or `os.PathLike`. This function does not register a judge. Live runs use
 /// the HTTP backends inside `sc-jev-check` (ADR-SAG-0009). The GIL is
 /// released while the check runs.
@@ -628,7 +719,6 @@ pub(crate) fn log_file(log_dir: PathBuf) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sc_jev_check::session::SessionStore;
     use tempfile::TempDir;
 
     fn workspace_root() -> PathBuf {
@@ -673,7 +763,7 @@ mod tests {
     ) -> CheckRun {
         CheckRun {
             check_path: "check.toml".to_owned(),
-            backends: vec![backend.to_owned()],
+            backends: Some(vec![backend.to_owned()]),
             dry_run,
             repo_root: Some(repo.to_path_buf()),
             rev: "WORKTREE".to_owned(),
@@ -686,6 +776,20 @@ mod tests {
 
     fn live(finished: &FinishedRun) -> &LiveSession {
         finished.live.as_ref().expect("live run")
+    }
+
+    /// `ask` through the run's own (scripted) registry and logger.
+    fn ask_live(
+        finished: &FinishedRun,
+        follow_up: &str,
+    ) -> Result<sc_agent_types::JudgeOutcome, JevError> {
+        let live = live(finished);
+        live.store.ask(
+            &finished.session_id().expect("session"),
+            follow_up,
+            live.registry.as_ref().expect("scripted registry"),
+            &live.session_log,
+        )
     }
 
     fn jsonl_lines(logs: &Path) -> Vec<String> {
@@ -730,11 +834,19 @@ mod tests {
         let sessions = root.path().join("sessions");
         let repo = workspace_root().join("tests/fixtures/jev/git-repo");
         let finished = execute(run_spec(&repo, &logs, &sessions, "jev", true)).expect("dry-run");
-        assert!(finished.session_id.is_none());
+        assert!(finished.session_id().is_none());
         assert!(finished.live.is_none());
         assert!(finished.payload.contains("alpha note"));
-        assert!(finished.outcomes.is_empty());
-        assert!(finished.equal_input.is_none());
+        assert!(finished.response.dry_run());
+        assert!(finished.response.results().is_empty());
+        assert!(
+            finished
+                .response
+                .equal_input()
+                .backends()
+                .iter()
+                .all(|entry| entry.attestation() == &sc_agent_types::Attestation::NotSent)
+        );
         assert!(!logs.exists(), "dry-run must not create the log root");
         assert!(
             !sessions.exists(),
@@ -753,19 +865,17 @@ mod tests {
         write_questions(&repo, sentinel);
         let finished =
             execute(run_spec(&repo, &logs, &sessions, "anthropic_haiku", false)).expect("run");
-        assert!(finished.session_id.is_some());
+        assert!(finished.session_id().is_some());
         assert!(finished.payload.contains(sentinel));
         assert!(!finished.system_prompt.as_deref().unwrap_or("").is_empty());
         let lines = jsonl_lines(&logs);
         assert_eq!(lines.len(), 1, "{lines:?}");
         assert!(lines[0].contains("judge"));
-        assert!(lines[0].contains(finished.prompt_sha256.as_str()));
+        assert!(lines[0].contains(finished.prompt_sha256().as_str()));
         assert!(lines[0].contains("anthropic_haiku"));
         assert!(!lines[0].contains(sentinel));
         assert!(!lines[0].to_ascii_lowercase().contains("api_key"));
-        let follow = live(&finished)
-            .store
-            .ask(&finished.session_id.expect("session"), "why?");
+        let follow = ask_live(&finished, "why?");
         live(&finished).logger.flush();
         let outcome = follow.expect("ask");
         assert_eq!(outcome.backend(), BackendId::AnthropicHaiku);
@@ -804,12 +914,9 @@ mod tests {
         std::fs::create_dir_all(&repo).expect("repo");
         write_questions(&repo, "Does it apply?");
         let finished = execute(run_spec(&repo, &logs, &sessions, "jev", false)).expect("run");
-        let error = live(&finished)
-            .store
-            .ask(&finished.session_id.expect("session"), "why?")
-            .expect_err("jev ask");
-        assert_eq!(error.code(), "INPUT_INVALID");
-        assert!(error.fix_hint().contains("rationale"));
+        // Jev has no `ask`, so a Jev-only run saves no session file.
+        assert!(finished.session_id().is_none());
+        assert_eq!(std::fs::read_dir(&sessions).expect("dir").count(), 0);
         assert_eq!(jsonl_lines(&logs).len(), 1);
         let mut spec = run_spec(&repo, &logs, &sessions, "jev", false);
         spec.check_path = "missing.toml".to_owned();
@@ -824,19 +931,30 @@ mod tests {
     #[test]
     fn backend_ids_use_from_str_and_reject_kebab_aliases() {
         assert_eq!(
-            parse_backends(&["jev".into(), "anthropic_haiku".into(), "openai_luna".into()])
-                .expect("documented ids"),
+            parse_backends(Some(&[
+                "jev".into(),
+                "anthropic_haiku".into(),
+                "openai_luna".into()
+            ]))
+            .expect("documented ids")
+            .expect("set")
+            .as_slice(),
             [
                 BackendId::Jev,
                 BackendId::AnthropicHaiku,
                 BackendId::OpenAiLuna
             ]
         );
+        assert!(parse_backends(None).expect("unset").is_none());
         for alias in ["anthropic-haiku", "openai-luna", "not-a-backend"] {
-            let error = parse_backends(&[alias.to_owned()]).expect_err(alias);
+            let error = parse_backends(Some(&[alias.to_owned()])).expect_err(alias);
             assert_eq!(error.code(), "INPUT_INVALID", "{alias}");
             assert!(error.to_string().contains(alias), "{error}");
         }
+        assert_eq!(
+            parse_backends(Some(&[])).expect_err("empty").code(),
+            "CONFIG_INVALID"
+        );
     }
 
     #[test]
@@ -859,10 +977,10 @@ mod tests {
         );
         let relative = resolve_repo(Some(Path::new("."))).expect("relative repo");
         assert!(relative.as_path().is_absolute());
-        let empty = resolve_repo(Some(Path::new(""))).expect("empty means cwd");
+        let empty = resolve_repo(Some(Path::new(""))).expect("empty means discovery");
         assert_eq!(
-            empty.as_path(),
-            std::env::current_dir().expect("cwd").as_path()
+            empty,
+            discover_repo_root(&std::env::current_dir().expect("cwd")).expect("root")
         );
     }
 
@@ -955,7 +1073,14 @@ mod tests {
             .expect("dry run");
             assert_eq!(result.prompt_sha256(), digest);
             assert!(result.session().is_none());
-            assert!(result.equal_input(py).is_none(py));
+            let equal: bool = result
+                .equal_input(py)
+                .bind(py)
+                .get_item("equal")
+                .expect("equal")
+                .extract()
+                .expect("bool");
+            assert!(!equal, "a dry run sends nothing, so equal is false");
             let error = result.ask(py, "why?").expect_err("dry-run ask");
             let code: String = error
                 .value(py)

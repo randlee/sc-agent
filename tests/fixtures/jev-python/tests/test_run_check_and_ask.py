@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
+import subprocess
 import sys
 import threading
 import time
@@ -105,7 +107,12 @@ def test_dry_run_git_repo_returns_digest(tmp_path: Path) -> None:
     assert result.session_id is None
     assert result.session is None
     assert result.outcomes == []
-    assert result.equal_input is None
+    # A dry run sends nothing: every backend is "not_sent" and `equal` is False.
+    assert result.equal_input["equal"] is False
+    assert result.equal_input["backends"] == [
+        {"backend": "jev", "attestation": {"status": "not_sent"}}
+    ]
+    assert result.equal_input["prompt_sha256"] == result.prompt_sha256
     assert len(result.prompt_sha256) == 64
     assert "alpha note" in result.payload
     assert _lines(tmp_path / "log") == []
@@ -179,6 +186,10 @@ def test_jev_ask_and_missing_check_map_error_codes(
         log_dir=str(tmp_path / "log"),
         session_dir=str(tmp_path / "sessions"),
     )
+    # Jev has no `ask`, so a Jev-only run saves no session.
+    assert result.session_id is None
+    assert result.session is None
+    assert not (tmp_path / "sessions").exists() or not any((tmp_path / "sessions").iterdir())
     with pytest.raises(sc_jev_py.JevError) as caught:
         result.ask("why?")
     assert caught.value.code == "INPUT_INVALID"
@@ -207,6 +218,44 @@ def test_jev_ask_and_missing_check_map_error_codes(
             )
         assert unknown.value.code == "INPUT_INVALID"
         assert name in unknown.value.message
+
+
+def test_dotenv_read_from_toplevel_in_subdir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """ADR-SAG-0003 r-2 amendment: without ``repo_root`` the repo root is the
+    git toplevel of the current directory, so a call from a subdirectory reads
+    the toplevel ``check.toml`` and the toplevel ``.env``.
+
+    The toplevel ``.env`` holds a key with interior whitespace, which key
+    resolution refuses (``CONFIG_INVALID``) before any send. Before r-2 the
+    subdirectory was the root, so ``check.toml`` was missing
+    (``INPUT_MISSING``) and the toplevel ``.env`` was never read.
+    """
+    for name in ["TYPESAFE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
+        monkeypatch.delenv(name, raising=False)
+    repo = _repo(tmp_path, "Does it apply?")
+    subprocess.run(
+        ["git", "init", "-q", str(repo)],
+        check=True,
+        env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"},
+    )
+    (repo / ".env").write_text(f"TYPESAFE_API_KEY={SECRET} spaced\n", encoding="utf-8")
+    sub = repo / "src" / "pkg"
+    sub.mkdir(parents=True)
+    monkeypatch.chdir(sub)
+    built = sc_jev_py.build_request("check.toml")
+    assert "Does it apply?" in built["payload"]
+    with pytest.raises(sc_jev_py.JevError) as caught:
+        sc_jev_py.run_check(
+            "check.toml",
+            backends=["jev"],
+            log_dir=tmp_path / "log",
+            session_dir=tmp_path / "sessions",
+        )
+    assert caught.value.code == "CONFIG_INVALID", caught.value.message
+    assert SECRET not in caught.value.message
+    assert SECRET not in str(caught.value)
 
 
 # Extractor half of the GIL handshake: announce start, then wait (bounded)

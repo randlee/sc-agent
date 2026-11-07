@@ -60,8 +60,10 @@ use crate::error::JevError;
 /// Session directory resolution, first match wins: the `session_dir`
 /// argument, `SC_AGENT_SESSION_DIR`, then `{log_root}/sessions`.
 ///
-/// `build_request` calls `sc_jev_check::run::build_request`. `run_check` calls
-/// `sc_jev_check::run::run_check`. This module does not run extractors,
+/// `build_request` calls `sc_jev_check::run::prepare`. `run_check` calls
+/// `sc_jev_check::run::prepare` then `run` (ADR-SAG-0024). Without
+/// `repo_root`, both use `discover_repo_root` of the current directory (the
+/// git toplevel). This module does not run extractors,
 /// reimplement payload canonicalization or Jev HTTP, or implement
 /// `JudgeBackend` (ADR-SAG-0005, ADR-SAG-0009). `run_check` has one signature
 /// in every build. Feature `test-util` adds the `_testing` submodule, whose

@@ -1,20 +1,27 @@
-//! Backend registry (ADR-SAG-0009).
+//! Backend registry (ADR-SAG-0009, ADR-SAG-0024).
 //!
-//! Callers pass [`BackendId`] values to [`crate::run::run_check`]. A new
-//! [`JudgeBackend`] is added by [`BackendRegistry::register`]. That does not
-//! change the `run_check` signature. Production wiring resolves API keys with
-//! [`sc_agent_secrets::resolve_key`] and constructs the Jev, Haiku, and Luna
-//! clients. Those clients receive the resolved secret at construction.
+//! Callers select backends with a [`BackendSet`] on
+//! [`crate::run::RunConfig::backends`]. [`BackendRegistry::from_env`] is the
+//! production registry: it resolves each backend's key with
+//! [`sc_agent_secrets::resolve_key`] (the only key read site, ADR-SAG-0003,
+//! ADR-SAG-0020) and constructs the Jev, Haiku, and Luna clients, which
+//! receive the resolved secret at construction. [`BackendRegistry::from_resolver`]
+//! builds the same backends from caller-resolved keys. Embedders that need
+//! no secrets inject a registry through [`crate::run::RunConfig::registry`]
+//! (EXT-009). [`BackendRegistry::register`] installs a double or scripted
+//! backend for an existing [`BackendId`]; it cannot add an id.
 //!
 //! The production factory is data, not a `match`: the private `FACTORIES`
 //! table has one row per built-in backend, each calling that backend's
-//! `with_default_transport` (ADR-SAG-0009/0027 r-1). Adding a built-in backend
-//! adds one row; `tests::test_every_backend_has_factory` checks the table
-//! against [`sc_agent_types::BACKENDS`].
+//! `with_default_transport` (ADR-SAG-0009/0027 r-1). It is the only id
+//! dispatch. Adding a built-in backend adds one row;
+//! `tests::test_every_backend_has_factory` checks the table against
+//! [`sc_agent_types::BACKENDS`].
 //!
 //! The `test-util` feature exposes `register_scripted_backends` for tests
-//! (ADR-SAG-0022). Production builds leave that feature off. It does not add
-//! a `run_check` parameter (ADR-SAG-0009).
+//! (ADR-SAG-0022). Production builds leave that feature off. It adds no
+//! `RunConfig` setter: the scripted registry goes through
+//! [`crate::run::RunConfig::registry`].
 
 #![warn(missing_docs)]
 
@@ -24,7 +31,9 @@ use std::sync::Arc;
 mod scripted;
 
 use sc_agent_secrets::resolve_key;
-use sc_agent_types::{BackendId, BackendKeyId, JevError, JudgeBackend, RepoRoot, ResolvedApiKey};
+use sc_agent_types::{
+    BackendId, BackendKeyId, BackendSet, JevError, JudgeBackend, RepoRoot, ResolvedApiKey,
+};
 use sc_jev::JevClient;
 use sc_jev_backends::{AnthropicHaikuBackend, OpenAiLunaBackend};
 
@@ -69,8 +78,8 @@ fn factory_for(id: BackendId) -> Result<Factory, JevError> {
 
 /// Selected judge backends for one run.
 ///
-/// The registry is a list of trait objects. Registering a local judge does
-/// not change [`crate::run::run_check`]'s parameters.
+/// The registry is a list of trait objects, at most one per [`BackendId`].
+/// Registering a double does not change any run API (ADR-SAG-0009).
 #[derive(Clone, Default)]
 pub struct BackendRegistry {
     backends: Vec<Arc<dyn JudgeBackend>>,
@@ -129,6 +138,68 @@ impl BackendRegistry {
     pub fn contains(&self, id: BackendId) -> bool {
         self.backends.iter().any(|backend| backend.id() == id)
     }
+
+    /// Production registry: resolves each key at `repo_root` and constructs
+    /// one backend per `backends` entry.
+    ///
+    /// Each key comes from [`resolve_key`]`(id.key_id(), repo_root)`
+    /// (process env, then the repo-root `.env`, then the keyring;
+    /// ADR-SAG-0003). The key is not retained in the registry's `Debug`
+    /// output. No judge request is sent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JevError::KeyMissing`] when a credential is absent,
+    /// `CONFIG_INVALID` when a key is rejected, and
+    /// [`JevError::RegistryInvalid`] when an id has no factory row or no
+    /// credential.
+    pub fn from_env(repo_root: &RepoRoot, backends: &BackendSet) -> Result<Self, JevError> {
+        Self::from_resolver(backends, |key_id| resolve_key(key_id, repo_root))
+    }
+
+    /// Constructs one production backend per `backends` entry from keys
+    /// returned by `resolve`.
+    ///
+    /// `resolve` is called once per backend with that backend's
+    /// [`BackendKeyId`]. Use it to supply keys from a source other than the
+    /// environment; [`Self::from_env`] is this function over
+    /// [`resolve_key`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `resolve`'s error, or [`JevError::RegistryInvalid`] when an
+    /// id has no factory row or no credential.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::{BackendId, BackendSet, ResolvedApiKey};
+    /// use sc_jev_check::registry::BackendRegistry;
+    ///
+    /// let backends: BackendSet = "jev,anthropic_haiku".parse()?;
+    /// let registry = BackendRegistry::from_resolver(&backends, |key_id| {
+    ///     ResolvedApiKey::try_new(key_id, "example-key".to_owned())
+    /// })?;
+    /// assert!(registry.contains(BackendId::AnthropicHaiku));
+    /// # Ok::<(), sc_agent_types::JevError>(())
+    /// ```
+    pub fn from_resolver(
+        backends: &BackendSet,
+        resolve: impl Fn(BackendKeyId) -> Result<ResolvedApiKey, JevError>,
+    ) -> Result<Self, JevError> {
+        let mut registry = Self::new();
+        for id in backends.iter() {
+            let factory = factory_for(id)?;
+            let key_id = id.key_id().ok_or_else(|| {
+                JevError::registry_invalid(
+                    format!("Backend {id} needs no credential but has a credential factory"),
+                    "Report this build as a bug.",
+                )
+            })?;
+            registry.register(factory(resolve(key_id)?))?;
+        }
+        Ok(registry)
+    }
 }
 
 impl std::fmt::Debug for BackendRegistry {
@@ -139,43 +210,6 @@ impl std::fmt::Debug for BackendRegistry {
             .field("backends", &ids)
             .finish()
     }
-}
-
-/// Resolves keys at `repo` and constructs one backend per `ids` entry.
-///
-/// This is the production path [`crate::run::run_check`] uses when the caller
-/// does not inject a registry. Each backend is built with
-/// [`resolve_key`]`(id.key_id(), repo)` and its `FACTORIES` row.
-/// The key is not retained in the registry's `Debug` output.
-///
-/// # Errors
-///
-/// Returns [`JevError::KeyMissing`] when a credential is absent,
-/// [`JevError::RegistryInvalid`] when a duplicate id is rejected or an id has
-/// no factory row or credential, and `CONFIG_INVALID` when a key is
-/// rejected. No judge request is sent.
-pub fn registry_for_repo(repo: &RepoRoot, ids: &[BackendId]) -> Result<BackendRegistry, JevError> {
-    registry_from_resolver(repo, ids, &mut |id, root| resolve_key(id, root))
-}
-
-pub(crate) fn registry_from_resolver(
-    repo: &RepoRoot,
-    ids: &[BackendId],
-    resolve: &mut dyn FnMut(BackendKeyId, &RepoRoot) -> Result<ResolvedApiKey, JevError>,
-) -> Result<BackendRegistry, JevError> {
-    let mut registry = BackendRegistry::new();
-    for id in ids.iter().copied() {
-        let factory = factory_for(id)?;
-        let key_id = id.key_id().ok_or_else(|| {
-            JevError::registry_invalid(
-                format!("Backend {id} needs no credential but has a credential factory"),
-                "Report this build as a bug.",
-            )
-        })?;
-        let key = resolve(key_id, repo)?;
-        registry.register(factory(key))?;
-    }
-    Ok(registry)
 }
 
 #[cfg(test)]
@@ -247,21 +281,18 @@ mod tests {
     }
 
     #[test]
-    fn resolver_builds_backends_with_the_repo_root_and_no_send() {
-        let dir = crate::extract::test_support::temp_dir("registry-root");
-        let repo = RepoRoot::new(dir.path());
-        let mut seen = Vec::new();
-        let registry = registry_from_resolver(
-            &repo,
-            &[BackendId::Jev, BackendId::AnthropicHaiku],
-            &mut |id, root| {
-                assert_eq!(root.as_path(), repo.as_path());
-                seen.push(id);
-                ResolvedApiKey::try_new(id, "test-key".to_owned())
-            },
-        )
+    fn resolver_builds_backends_in_set_order_and_no_send() {
+        let seen = std::sync::Mutex::new(Vec::new());
+        let backends: BackendSet = "jev,anthropic_haiku".parse().expect("set");
+        let registry = BackendRegistry::from_resolver(&backends, |id| {
+            seen.lock().expect("seen").push(id);
+            ResolvedApiKey::try_new(id, "test-key".to_owned())
+        })
         .expect("registry");
-        assert_eq!(seen, [BackendKeyId::TypeSafe, BackendKeyId::Anthropic]);
+        assert_eq!(
+            *seen.lock().expect("seen"),
+            [BackendKeyId::TypeSafe, BackendKeyId::Anthropic]
+        );
         assert!(registry.contains(BackendId::Jev));
         assert!(registry.contains(BackendId::AnthropicHaiku));
         let rendered = format!("{registry:?}");

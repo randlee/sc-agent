@@ -1,27 +1,17 @@
-//! Versioned stdout envelope (ADR-SAG-0014).
+//! Versioned stdout envelope (ADR-SAG-0014, ADR-SAG-0024).
+//!
+//! The envelope type and its operation names live in
+//! [`sc_jev_check::run`]; this module only encodes it as one stdout line.
 
 use sc_agent_types::JevError;
-use serde_json::Value;
+use sc_jev_check::run::Envelope;
 
-/// Envelope `version` field.
-pub const ENVELOPE_VERSION: &str = "1";
+#[doc(inline)]
+pub use sc_jev_check::run::{ENVELOPE_VERSION, OP_ASK, OP_DRY_RUN, OP_RUN};
 
-/// `sc-ai jev run` operation name.
-pub const OP_RUN: &str = "jev.run";
-
-/// `sc-ai jev dry-run` operation name.
-pub const OP_DRY_RUN: &str = "jev.dry-run";
-
-/// `sc-ai jev ask` operation name.
-pub const OP_ASK: &str = "jev.ask";
-
-pub(crate) fn envelope(operation: &str, data: Value) -> Result<Vec<u8>, JevError> {
-    let value = serde_json::json!({
-        "version": ENVELOPE_VERSION,
-        "operation": operation,
-        "data": data,
-    });
-    let mut bytes = serde_json::to_vec(&value)
+/// `envelope` as compact JSON plus a trailing newline.
+pub(crate) fn to_bytes(envelope: &Envelope) -> Result<Vec<u8>, JevError> {
+    let mut bytes = serde_json::to_vec(envelope)
         .map_err(|error| JevError::encode_failed("response JSON", &error))?;
     bytes.push(b'\n');
     Ok(bytes)

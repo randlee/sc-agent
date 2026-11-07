@@ -1,7 +1,7 @@
 //! Session and orchestration tests selected by `--exact`.
 //!
 //! The sprint a-6 acceptance commands run
-//! `cargo test -p sc-jev-check -- <name> --exact`, so each function stays at
+//! `cargo test -p sc-jev-check --test sessions_exact -- <name> --exact`, so each function stays at
 //! the root of this integration test and owns its name. The run and session
 //! unit tests do not repeat these cases.
 
@@ -12,16 +12,18 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use sc_agent_types::observability::v2::{LogEvent, LogRejected, NoopSessionLog, SessionLog};
+use sc_agent_types::observability::v2::{
+    LogEvent, LogRejected, NoopSessionLog, SessionLog, SharedSessionLog,
+};
 use sc_agent_types::test_util::MockJudgeBackend;
 use sc_agent_types::{
-    Attestation, BackendId, CanonicalJudgePayload, JudgeBackend, MultiBackendMode, PayloadBundle,
-    RepoRoot, Rev, SessionId,
+    Attestation, BackendId, BackendSet, CanonicalJudgePayload, JudgeBackend, JudgeOutcome,
+    JudgeRequest, MultiBackendMode, PayloadBundle, RepoRoot, Rev, SessionId,
 };
 use sc_jev_check::config::{PACKAGED_SYSTEM_PROMPT, load_check_at};
 use sc_jev_check::registry::BackendRegistry;
-use sc_jev_check::run::{RunOptions, run_check};
-use sc_jev_check::session::{FileSessionStore, SESSION_CONTEXT_HEADER, SessionStore};
+use sc_jev_check::run::{CheckSource, PreparedRun, RunConfig, RunResponse, prepare, run};
+use sc_jev_check::session::{FileSessionStore, SESSION_CONTEXT_HEADER, StoredSession};
 use tempfile::TempDir;
 
 const QUESTIONS: &str = r#"{
@@ -52,8 +54,8 @@ fn bare_repo() -> TempDir {
 }
 
 /// The workspace judge double (`sc-agent-types/test-util`, enabled by this
-/// crate's dev-dependency). It records requests and answers against the
-/// request it receives.
+/// crate's `sc-agent-types` dev-dependency). It records requests and answers
+/// against the request it receives.
 fn judge(id: BackendId, choice: &str) -> Arc<MockJudgeBackend> {
     let answers = serde_json::from_value(serde_json::json!({"relevant": {"choice": choice}}))
         .expect("answers");
@@ -68,6 +70,24 @@ fn registry(judges: &[&Arc<MockJudgeBackend>]) -> BackendRegistry {
             .expect("register");
     }
     registry
+}
+
+fn set(ids: &[BackendId]) -> BackendSet {
+    BackendSet::try_from(ids.to_vec()).expect("backend set")
+}
+
+/// A live config against `root`, saving into `sessions`, logging to `log`.
+fn live(root: RepoRoot, sessions: &Path, log: SharedSessionLog) -> RunConfig {
+    RunConfig::new(root, log).sessions_dir(sessions)
+}
+
+fn run_spec(
+    spec: sc_jev_check::config::CheckSpec,
+    config: RunConfig,
+) -> (PreparedRun, RunResponse) {
+    let prepared = prepare(CheckSource::Spec(spec.clone()), config.clone()).expect("prepare");
+    let response = run(prepare(CheckSource::Spec(spec), config).expect("prepare")).expect("run");
+    (prepared, response)
 }
 
 struct JsonlSink {
@@ -105,25 +125,37 @@ fn bundle() -> PayloadBundle {
 fn test_session_round_trip() {
     let dir = temp_dir();
     let haiku = judge(BackendId::AnthropicHaiku, "yes");
-    let store = FileSessionStore::new(dir.path(), Arc::new(NoopSessionLog)).expect("store");
-    store.install_registry(registry(&[&haiku]));
+    let store = FileSessionStore::new(dir.path()).expect("store");
     let payload = bundle();
-    let id = store
-        .open(
-            BackendId::AnthropicHaiku,
-            &payload,
-            Some("base prompt".to_owned()),
-        )
-        .expect("open");
+    let request = JudgeRequest::new(Arc::new(payload.clone()), None);
+    let answers =
+        serde_json::from_value(serde_json::json!({"relevant": {"choice": "no"}})).expect("answers");
+    let id = SessionId::new();
+    store
+        .save(&StoredSession {
+            session_id: id,
+            backend: BackendId::AnthropicHaiku,
+            created_at: store.now(),
+            payload: payload.clone(),
+            system_prompt: Some("base prompt".to_owned()),
+            outcomes: vec![
+                JudgeOutcome::new(BackendId::AnthropicHaiku, &request, answers).expect("outcome"),
+            ],
+            follow_ups: Vec::new(),
+        })
+        .expect("save");
     let loaded = store.load(&id).expect("load");
     assert_eq!(loaded.session_id, id);
     assert_eq!(loaded.payload.bytes(), payload.bytes());
     assert_eq!(loaded.payload.sha256(), payload.sha256());
     assert_eq!(loaded.system_prompt.as_deref(), Some("base prompt"));
+    assert_eq!(loaded.outcomes.len(), 1);
 
-    let reopened = FileSessionStore::new(store.dir(), Arc::new(NoopSessionLog)).expect("reopen");
-    reopened.install_registry(registry(&[&haiku]));
-    let outcome = reopened.ask(&id, "why?").expect("ask");
+    let reopened = FileSessionStore::new(store.dir()).expect("reopen");
+    let log: SharedSessionLog = Arc::new(NoopSessionLog);
+    let outcome = reopened
+        .ask(&id, "why?", &registry(&[&haiku]), &log)
+        .expect("ask");
     assert_eq!(outcome.backend(), BackendId::AnthropicHaiku);
     assert_eq!(outcome.answers()["relevant"].choice(), "yes");
     let requests = haiku.requests();
@@ -131,8 +163,7 @@ fn test_session_round_trip() {
     assert!(prompt.contains("base prompt"));
     assert!(prompt.contains("why?"));
     let again = store.load(&id).expect("reload");
-    assert_eq!(again.follow_ups, ["why?"]);
-    assert_eq!(again.outcomes.len(), 1);
+    assert_eq!(again, loaded, "ask does not rewrite the session");
     let missing = SessionId::new();
     assert_eq!(
         store.load(&missing).expect_err("missing").code(),
@@ -143,12 +174,23 @@ fn test_session_round_trip() {
 #[test]
 fn test_session_file_mode_0600() {
     let dir = temp_dir();
-    let store = FileSessionStore::new(dir.path(), Arc::new(NoopSessionLog)).expect("store");
-    let id = store.create(BackendId::Jev, &bundle()).expect("create");
+    let store = FileSessionStore::new(dir.path()).expect("store");
+    let id = SessionId::new();
+    store
+        .save(&StoredSession {
+            session_id: id,
+            backend: BackendId::Jev,
+            created_at: store.now(),
+            payload: bundle(),
+            system_prompt: None,
+            outcomes: Vec::new(),
+            follow_ups: Vec::new(),
+        })
+        .expect("save");
     let path = store.path(&id);
     assert_eq!(
         path.file_name().and_then(|name| name.to_str()),
-        Some(id.to_string().as_str())
+        Some(format!("{id}.json").as_str())
     );
     #[cfg(unix)]
     {
@@ -158,23 +200,39 @@ fn test_session_file_mode_0600() {
     }
 }
 
+/// Test clock: a fixed instant the test moves forward.
+static NOW_MS: AtomicU64 = AtomicU64::new(1_700_000_000_000);
+
+fn test_clock() -> SystemTime {
+    UNIX_EPOCH + Duration::from_millis(NOW_MS.load(Ordering::SeqCst))
+}
+
 #[test]
 fn test_session_expiry_uses_created_at() {
-    let now = Arc::new(AtomicU64::new(1_700_000_000_000));
-    let clock_now = Arc::clone(&now);
     let dir = temp_dir();
-    let store = FileSessionStore::new(dir.path(), Arc::new(NoopSessionLog))
+    let store = FileSessionStore::new(dir.path())
         .expect("store")
         .with_ttl(Duration::from_secs(60))
-        .with_clock(move || UNIX_EPOCH + Duration::from_millis(clock_now.load(Ordering::Relaxed)));
-    let id = store.create(BackendId::Jev, &bundle()).expect("create");
+        .with_clock(test_clock);
+    let id = SessionId::new();
+    store
+        .save(&StoredSession {
+            session_id: id,
+            backend: BackendId::Jev,
+            created_at: store.now(),
+            payload: bundle(),
+            system_prompt: None,
+            outcomes: Vec::new(),
+            follow_ups: Vec::new(),
+        })
+        .expect("save");
     let path = store.path(&id);
     let document: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&path).expect("json")).expect("parse");
     assert_eq!(document["created_at"], 1_700_000_000_000_u64);
     set_modified(&path, UNIX_EPOCH + Duration::from_secs(4_000_000_000));
     store.load(&id).expect("created_at is still fresh");
-    now.store(1_700_000_060_000, Ordering::Relaxed);
+    NOW_MS.store(1_700_000_060_000, Ordering::SeqCst);
     set_modified(&path, UNIX_EPOCH + Duration::from_millis(1_700_000_000_000));
     let error = store.load(&id).expect_err("expired from created_at");
     assert_eq!(error.code(), "SESSION_EXPIRED");
@@ -208,20 +266,19 @@ fn test_equal_input_record() {
     let root = RepoRoot::new(repo.path());
     let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("spec");
     let sessions = temp_dir();
-    let store = FileSessionStore::new(sessions.path(), Arc::new(NoopSessionLog)).expect("store");
     let jev = judge(BackendId::Jev, "yes");
     let haiku = judge(BackendId::AnthropicHaiku, "no");
-    let result = run_check(
-        &spec,
-        &[BackendId::Jev, BackendId::AnthropicHaiku],
-        RunOptions::new(root, store, Arc::new(NoopSessionLog)).registry(registry(&[&jev, &haiku])),
-    )
-    .expect("run");
-    let equal = result.equal_input.expect("record");
-    assert_eq!(equal.prompt_sha256(), result.bundle.sha256());
+    let (prepared, result) = run_spec(
+        spec,
+        live(root, sessions.path(), Arc::new(NoopSessionLog))
+            .backends(set(&[BackendId::Jev, BackendId::AnthropicHaiku]))
+            .registry(Arc::new(registry(&[&jev, &haiku]))),
+    );
+    let equal = result.equal_input();
+    assert_eq!(equal.prompt_sha256(), prepared.prompt_sha256());
     assert!(!equal.leak());
-    // r-1: no backend attests yet, so every entry is `Unattested` and the
-    // derived `equal` is false (r-2b adds backend-side hashing).
+    // r-1 interim: no backend digest is trusted yet, so every entry is
+    // `Unattested` and the derived `equal` is false (r-2b adds hashing).
     assert!(!equal.equal());
     assert_eq!(equal.mode(), MultiBackendMode::ChainContext);
     let ids: Vec<BackendId> = equal
@@ -251,16 +308,14 @@ fn test_multi_backend_one_payload() {
     let root = RepoRoot::new(repo.path());
     let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("spec");
     let sessions = temp_dir();
-    let store = FileSessionStore::new(sessions.path(), Arc::new(NoopSessionLog)).expect("store");
     let jev = judge(BackendId::Jev, "yes");
     let haiku = judge(BackendId::AnthropicHaiku, "no");
-    let result = run_check(
-        &spec,
-        &[BackendId::Jev, BackendId::AnthropicHaiku],
-        RunOptions::new(root, store.clone(), Arc::new(NoopSessionLog))
-            .registry(registry(&[&jev, &haiku])),
-    )
-    .expect("run");
+    let config = live(root, sessions.path(), Arc::new(NoopSessionLog))
+        .backends(set(&[BackendId::Jev, BackendId::AnthropicHaiku]))
+        .registry(Arc::new(registry(&[&jev, &haiku])));
+    let prepared = prepare(CheckSource::Spec(spec), config).expect("prepare");
+    let payload = prepared.request().payload().clone();
+    let result = run(prepared).expect("run");
     let jev_seen = jev.requests();
     let haiku_seen = haiku.requests();
     assert_eq!(jev_seen.len(), 1);
@@ -269,25 +324,35 @@ fn test_multi_backend_one_payload() {
         jev_seen[0].payload().bytes(),
         haiku_seen[0].payload().bytes()
     );
-    assert_eq!(jev_seen[0].payload().bytes(), result.bundle.bytes());
+    assert_eq!(jev_seen[0].payload().bytes(), payload.bytes());
     assert!(jev_seen[0].llm().is_none());
     let prompt = &haiku_seen[0].llm().expect("prompt").system_prompt;
     assert!(prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
     assert!(prompt.contains(SESSION_CONTEXT_HEADER));
     assert!(prompt.contains("\"choice\":\"yes\""));
-    let payload_text = String::from_utf8_lossy(result.bundle.bytes());
+    let payload_text = String::from_utf8_lossy(payload.bytes());
     assert!(!payload_text.contains(SESSION_CONTEXT_HEADER));
     assert!(!payload_text.contains(PACKAGED_SYSTEM_PROMPT.trim()));
-    let equal = result.equal_input.expect("equal");
-    assert!(!equal.equal(), "r-1 records Unattested for every backend");
+    let equal = result.equal_input();
+    assert!(
+        !equal.equal(),
+        "r-1 interim records Unattested for every backend"
+    );
     assert!(!equal.leak());
     assert!(equal.producer().is_none());
-    assert_eq!(equal.prompt_sha256(), result.bundle.sha256());
-    assert_eq!(result.outcomes.len(), 2);
-    let session_id = result.session_id.expect("session");
+    assert_eq!(equal.prompt_sha256(), payload.sha256());
+    assert_eq!(result.results().len(), 2);
+    let session_id = result.session_id().expect("session");
+    let store = FileSessionStore::new(sessions.path()).expect("store");
     assert_eq!(store.load(&session_id).expect("stored").outcomes.len(), 2);
+    let log: SharedSessionLog = Arc::new(NoopSessionLog);
     let asked = store
-        .ask(&session_id, "why the first answer?")
+        .ask(
+            &session_id,
+            "why the first answer?",
+            &registry(&[&haiku]),
+            &log,
+        )
         .expect("ask");
     assert_eq!(asked.backend(), BackendId::AnthropicHaiku);
 }
@@ -308,30 +373,30 @@ fn test_log_event_has_no_secrets() {
         path: log_path.clone(),
     });
     let sessions = temp_dir();
-    let store = FileSessionStore::new(sessions.path(), Arc::clone(&log) as _).expect("store");
-    let result = run_check(
-        &spec,
-        &[BackendId::Jev, BackendId::OpenAiLuna],
-        RunOptions::new(root, store, Arc::clone(&log) as _)
+    let result = run(prepare(
+        CheckSource::Spec(spec),
+        live(root, sessions.path(), Arc::clone(&log) as _)
+            .backends(set(&[BackendId::Jev, BackendId::OpenAiLuna]))
             .system_prompt_override(repo.path().join("override.md"))
-            .registry(registry(&[
+            .registry(Arc::new(registry(&[
                 &judge(BackendId::Jev, "yes"),
                 &judge(BackendId::OpenAiLuna, "no"),
-            ])),
+            ]))),
     )
+    .expect("prepare"))
     .expect("run");
     let text = fs::read_to_string(&log_path).expect("jsonl");
     assert!(!text.contains("sk-test-DO_NOT_LOG_9f3a"));
     assert!(!text.to_ascii_lowercase().contains("authorization"));
     assert!(!text.to_ascii_lowercase().contains("bearer"));
-    let session_id = result.session_id.expect("session").to_string();
+    let session_id = result.session_id().expect("session").to_string();
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 2);
     for (line, backend) in lines.iter().zip(["jev", "openai_luna"]) {
         let value: serde_json::Value = serde_json::from_str(line).expect("line");
         assert_eq!(value["session_id"], session_id);
         assert_eq!(value["backend"], backend);
-        assert_eq!(value["prompt_sha256"], result.bundle.sha256().as_str());
+        assert_eq!(value["prompt_sha256"], result.prompt_sha256().as_str());
         assert_eq!(value["operation"], "judge");
     }
 }
@@ -343,26 +408,23 @@ fn test_packaged_default_prompt_available() {
     let root = RepoRoot::new(repo.path());
     let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("spec");
     let sessions = temp_dir();
-    let store = FileSessionStore::new(sessions.path(), Arc::new(NoopSessionLog)).expect("store");
     let haiku = judge(BackendId::AnthropicHaiku, "yes");
-    let result = run_check(
-        &spec,
-        &[BackendId::AnthropicHaiku],
-        RunOptions::new(root, store, Arc::new(NoopSessionLog)).registry(registry(&[&haiku])),
-    )
-    .expect("run");
+    let config = live(root, sessions.path(), Arc::new(NoopSessionLog))
+        .backends(set(&[BackendId::AnthropicHaiku]))
+        .registry(Arc::new(registry(&[&haiku])));
+    let prepared = prepare(CheckSource::Spec(spec), config).expect("prepare");
+    assert_eq!(
+        prepared
+            .request()
+            .llm()
+            .map(|llm| llm.system_prompt.as_str()),
+        Some(PACKAGED_SYSTEM_PROMPT)
+    );
+    let payload = prepared.request().payload().clone();
+    let result = run(prepared).expect("run");
     let requests = haiku.requests();
     let prompt = &requests[0].llm().expect("llm").system_prompt;
     assert_eq!(prompt, PACKAGED_SYSTEM_PROMPT);
-    assert_eq!(
-        result.system_prompt.as_deref(),
-        Some(PACKAGED_SYSTEM_PROMPT)
-    );
-    assert!(
-        !String::from_utf8_lossy(result.bundle.bytes()).contains(PACKAGED_SYSTEM_PROMPT.trim())
-    );
-    assert_eq!(
-        result.equal_input.expect("equal").prompt_sha256(),
-        result.bundle.sha256()
-    );
+    assert!(!String::from_utf8_lossy(payload.bytes()).contains(PACKAGED_SYSTEM_PROMPT.trim()));
+    assert_eq!(result.equal_input().prompt_sha256(), payload.sha256());
 }

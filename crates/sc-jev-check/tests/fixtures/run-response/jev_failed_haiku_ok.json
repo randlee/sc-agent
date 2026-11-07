@@ -1,0 +1,67 @@
+{
+  "answers": {
+    "q": {
+      "choice": "yes"
+    }
+  },
+  "model": "claude-haiku-test",
+  "primary_backend": "anthropic_haiku",
+  "session_id": "3f2b8c1e-5d4a-4e6f-9a7b-0c1d2e3f4a5b",
+  "session_saved": true,
+  "prompt_sha256": "4761e8e5cb3c8da165b4869c6a252459ca5adc4cb23cfb45ce6800583d982587",
+  "payload_bytes": 89,
+  "results": [
+    {
+      "backend": "jev",
+      "status": "failed",
+      "error": {
+        "error": "NETWORK_ERROR",
+        "message": "Check connectivity and retry. Transport detail: connect to the Jev API failed. Backends retry busy responses before returning this error.",
+        "schema_version": 1,
+        "retryable": true
+      }
+    },
+    {
+      "backend": "anthropic_haiku",
+      "status": "ok",
+      "outcome": {
+        "answers": {
+          "q": {
+            "choice": "yes"
+          }
+        },
+        "backend": "anthropic_haiku",
+        "provider_meta": {
+          "commands": 0,
+          "input_tokens": 412,
+          "model": "claude-haiku-test",
+          "prompt_tokens": 377,
+          "status": "complete",
+          "stop_reason": "end_turn"
+        },
+        "input_sha256": null
+      }
+    }
+  ],
+  "equal_input": {
+    "prompt_sha256": "4761e8e5cb3c8da165b4869c6a252459ca5adc4cb23cfb45ce6800583d982587",
+    "mode": "chain_context",
+    "backends": [
+      {
+        "backend": "jev",
+        "attestation": {
+          "status": "failed"
+        }
+      },
+      {
+        "backend": "anthropic_haiku",
+        "attestation": {
+          "status": "unattested"
+        }
+      }
+    ],
+    "leak": true,
+    "equal": false,
+    "producer": null
+  }
+}

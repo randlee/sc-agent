@@ -1,0 +1,53 @@
+{
+  "session_id": null,
+  "session_saved": false,
+  "prompt_sha256": "79b58710e937c53180dc2f263c9e09fce6afc2168b4a3f019b4f600aac30e0a3",
+  "payload_bytes": 93,
+  "results": [],
+  "equal_input": {
+    "prompt_sha256": "79b58710e937c53180dc2f263c9e09fce6afc2168b4a3f019b4f600aac30e0a3",
+    "mode": "chain_context",
+    "backends": [
+      {
+        "backend": "jev",
+        "attestation": {
+          "status": "not_sent"
+        }
+      },
+      {
+        "backend": "anthropic_haiku",
+        "attestation": {
+          "status": "not_sent"
+        }
+      }
+    ],
+    "leak": false,
+    "equal": false,
+    "producer": null
+  },
+  "payload": {
+    "questions": [
+      {
+        "choices": [
+          "no",
+          "yes"
+        ],
+        "id": "relevant",
+        "prompt": "Does it apply?"
+      }
+    ],
+    "state": []
+  },
+  "limits": [
+    {
+      "backend": "jev",
+      "request_limit_bytes": 96000,
+      "over_limit": false
+    },
+    {
+      "backend": "anthropic_haiku",
+      "request_limit_bytes": 96000,
+      "over_limit": false
+    }
+  ]
+}
