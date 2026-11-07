@@ -147,6 +147,19 @@ phase_publish() {
   if [[ "${SC_PUBLISH_ALLOW_DIRTY:-0}" == "1" ]]; then
     publish_args+=(--allow-dirty)
   fi
+  # A multi-package dry-run serves the packaged workspace crates from a
+  # local registry at <target-dir>/package/tmp-registry and unpacks each one
+  # under $CARGO_HOME/registry/src/-<hash of that path>/. Cargo does not
+  # unpack again while that directory exists, so with a fixed target dir a
+  # copy from an earlier run of the same version (locally, or restored from
+  # the CI cache of ~/.cargo/registry) is compiled instead of the current
+  # source, and a new public item in sc-agent-types fails to resolve when
+  # sc-jev-check is verified. Keying the target dir on the source content
+  # means a reused unpack always holds identical sources.
+  local content_key
+  content_key="$({ git rev-parse 'HEAD^{tree}'; git diff HEAD --binary; } |
+    python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest()[:16])')"
+  publish_args+=(--target-dir "target/sc-publish-dry-run/$content_key")
   printf 'cargo publish --dry-run --locked %s\n' "${publish_args[*]}"
   bounded "$build_timeout" "cargo publish --dry-run" \
     cargo publish --dry-run --locked "${publish_args[@]}"

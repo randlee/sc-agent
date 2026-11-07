@@ -1036,8 +1036,11 @@ mod tests {
     }
 
     /// Stops and joins the Python worker even when an assertion panics.
+    /// Only the Unix GIL test (which needs `sh`) uses it.
+    #[cfg(unix)]
     struct WorkerGuard(Py<pyo3::types::PyDict>);
 
+    #[cfg(unix)]
     impl Drop for WorkerGuard {
         fn drop(&mut self) {
             Python::attach(|py| {
