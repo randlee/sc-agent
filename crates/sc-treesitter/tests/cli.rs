@@ -111,7 +111,8 @@ fn cli_unknown_language_is_jev_error_on_stderr() {
             .expect("message")
             .contains("cobol")
     );
-    assert_eq!(value.as_object().expect("object").len(), 2);
+    assert_eq!(value["schema_version"], 1);
+    assert_eq!(value.as_object().expect("object").len(), 3);
 }
 
 #[cfg(feature = "python")]

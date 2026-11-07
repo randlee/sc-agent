@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use sc_agent_types::JevError;
+use sc_agent_types::{JevError, NetworkErrorKind};
 
 use crate::transport::HttpResponse;
 
@@ -48,9 +48,10 @@ pub(crate) fn retry_after_header(response: &HttpResponse) -> Option<&str> {
 }
 
 pub(crate) fn http_failure(provider: &str, response: &HttpResponse) -> JevError {
-    JevError::NetworkError {
-        detail: format!("{provider} HTTP {}: {}", response.status, snippet(response)),
-    }
+    JevError::network(
+        NetworkErrorKind::Status,
+        format!("{provider} HTTP {}: {}", response.status, snippet(response)),
+    )
 }
 
 fn snippet(response: &HttpResponse) -> String {

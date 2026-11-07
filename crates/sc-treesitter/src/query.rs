@@ -67,7 +67,5 @@ pub fn query_source(language: &str, name: &str) -> Result<&'static str, JevError
         .iter()
         .find(|asset| asset.name == name)
         .map(|asset| asset.source)
-        .ok_or_else(|| JevError::QueryNotFound {
-            query: name.to_owned(),
-        })
+        .ok_or_else(|| JevError::query_not_found(crate::PRODUCER_NAME, name))
 }

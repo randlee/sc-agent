@@ -9,9 +9,10 @@ use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyBytes};
+use sc_agent_types::schema::subjects::SubjectsProducer;
 use sc_agent_types::{
     BackendId, EqualInputRecord, JevError, JudgeOutcome, PayloadBundle, RepoRoot, Rev, SessionId,
-    Sha256Digest, SubjectsProducer, canonical_json_bytes,
+    Sha256Digest, canonical_json_bytes,
 };
 use sc_jev_check::config::load_check_at;
 use sc_jev_check::run::{
@@ -166,9 +167,7 @@ fn resolve_repo(repo_root: Option<&Path>) -> Result<RepoRoot, JevError> {
     match repo_root.filter(|path| !path.as_os_str().is_empty()) {
         Some(path) => {
             if !path.is_dir() {
-                return Err(JevError::InputMissing {
-                    path: path.display().to_string(),
-                });
+                return Err(JevError::input_missing(path.display().to_string()));
             }
             let absolute = std::path::absolute(path)
                 .map_err(|error| JevError::io_failed("repo_root", &error))?;
@@ -189,18 +188,18 @@ fn non_empty(path: Option<PathBuf>) -> Option<PathBuf> {
 
 /// Repo-relative check path as text.
 fn check_path_text(check_path: &Path) -> Result<String, JevError> {
-    check_path
-        .to_str()
-        .map(str::to_owned)
-        .ok_or_else(|| JevError::InputInvalid {
-            detail: format!("check path {} is not valid UTF-8", check_path.display()),
-        })
+    check_path.to_str().map(str::to_owned).ok_or_else(|| {
+        JevError::input_invalid(format!(
+            "check path {} is not valid UTF-8",
+            check_path.display()
+        ))
+    })
 }
 
 #[cfg(any(test, feature = "test-util"))]
 fn py_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, JevError> {
-    let text = python_json(obj).map_err(|error| JevError::InputInvalid {
-        detail: format!("scripted_answers is not JSON: {error}"),
+    let text = python_json(obj).map_err(|error| {
+        JevError::input_invalid(format!("scripted_answers is not JSON: {error}"))
     })?;
     serde_json::from_str(&text).map_err(|error| JevError::encode_failed("scripted_answers", &error))
 }
@@ -335,9 +334,7 @@ impl CheckResult {
         let (Some(id), Some(live)) = (self.inner.session_id, self.inner.live.as_ref()) else {
             return Err(error::to_py_err(
                 py,
-                &JevError::ConfigInvalid {
-                    detail: "dry-run does not create a session; ask a live run".into(),
-                },
+                &JevError::config_invalid("dry-run does not create a session; ask a live run"),
             ));
         };
         ask_with(py, live, id, follow_up)
@@ -785,7 +782,7 @@ mod tests {
             .ask(&finished.session_id.expect("session"), "why?");
         live(&finished).logger.flush();
         let outcome = follow.expect("ask");
-        assert_eq!(outcome.backend, BackendId::AnthropicHaiku);
+        assert_eq!(outcome.backend(), BackendId::AnthropicHaiku);
         let lines = jsonl_lines(&logs);
         assert_eq!(lines.len(), 2, "{lines:?}");
         assert!(lines[1].contains("ask"));

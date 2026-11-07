@@ -1,11 +1,9 @@
 //! Matches-mode extraction into `sc/subjects/1`.
 
-use std::collections::BTreeMap;
-
-use sc_agent_types::{
-    JevError, Rev, SUBJECTS_SCHEMA_V1, Sha256Digest, Span, Subject, SubjectsDocument,
-    SubjectsProducer, SubjectsSource,
+use sc_agent_types::schema::subjects::{
+    Span, SubjectsBuilder, SubjectsDocument, SubjectsProducer, SubjectsSource,
 };
+use sc_agent_types::{BlobSha, JevError, RepoRelativePath, Rev, Sha256Digest};
 use tree_sitter::{Node, Parser, Point, Query, QueryCursor, StreamingIterator};
 
 use crate::grammar;
@@ -131,50 +129,42 @@ struct RawCapture<'a> {
 ///     .with_rev("HEAD")
 ///     .with_blob_sha("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 /// let document = sc_treesitter::extract(&input).expect("identifier");
-/// assert_eq!(document.subjects[0].capture, "name");
-/// assert_eq!(document.subjects[0].text, "value");
+/// assert_eq!(document.subjects()[0].capture(), "name");
+/// assert_eq!(document.subjects()[0].text(), "value");
 /// # }
 /// ```
 pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
     if input.path.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "source path is empty".into(),
-        });
+        return Err(JevError::input_invalid("source path is empty"));
     }
+    let path = RepoRelativePath::try_from(input.path)?;
     let rev = Rev::parse(input.rev)?;
     if input.blob_sha.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "blob sha is empty".into(),
-        });
+        return Err(JevError::input_invalid("blob sha is empty"));
     }
+    let blob_sha = BlobSha::try_from(input.blob_sha)?;
     if input.query.is_empty() {
-        return Err(JevError::QueryInvalid {
-            detail: "query text is empty".into(),
-        });
+        return Err(JevError::query_invalid(
+            PRODUCER_NAME,
+            "query text is empty",
+        ));
     }
     let Ok(source) = std::str::from_utf8(input.source) else {
-        return Err(JevError::InputInvalid {
-            detail: "source is not UTF-8".into(),
-        });
+        return Err(JevError::input_invalid("source is not UTF-8"));
     };
 
     let grammar = grammar::lookup(input.language)?;
     let info = &grammar.info;
     let language = (grammar.load)();
     let mut parser = Parser::new();
-    parser
-        .set_language(&language)
-        .map_err(|error| JevError::ExtractionFailed {
-            detail: format!("grammar for {} failed to load: {error}", info.id),
-        })?;
-    let query = Query::new(&language, input.query).map_err(|error| JevError::QueryInvalid {
-        detail: error.to_string(),
+    parser.set_language(&language).map_err(|error| {
+        JevError::extraction_failed(format!("grammar for {} failed to load: {error}", info.id))
     })?;
+    let query = Query::new(&language, input.query)
+        .map_err(|error| JevError::query_invalid(PRODUCER_NAME, error.to_string()))?;
     let tree = parser
         .parse(source, None)
-        .ok_or_else(|| JevError::ExtractionFailed {
-            detail: "parser returned no tree".into(),
-        })?;
+        .ok_or_else(|| JevError::extraction_failed("parser returned no tree"))?;
 
     let capture_names = query.capture_names();
     let mut found = Vec::new();
@@ -220,53 +210,20 @@ pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
             .filter_map(|capture| error_line_inside(root, capture.start_byte, capture.end_byte))
             .min();
         if let Some(line) = parse_error_line {
-            return Err(JevError::ExtractionParseError {
-                path: input.path.to_owned(),
+            return Err(JevError::extraction_parse_error(
+                input.path.to_owned(),
                 line,
-            });
+            ));
         }
     }
 
-    let mut subjects = Vec::with_capacity(found.len());
-    let mut line_counts: BTreeMap<u32, u32> = BTreeMap::new();
-    for capture in found {
-        debug_assert!(
-            capture.start_byte <= capture.end_byte && capture.end_byte <= source.len(),
-            "tree-sitter node spans always lie inside the parsed source"
-        );
-        let text = source
-            .get(capture.start_byte..capture.end_byte)
-            .ok_or_else(|| JevError::ExtractionInvalid {
-                detail: format!(
-                    "subject bytes {}..{} are not on UTF-8 character boundaries",
-                    capture.start_byte, capture.end_byte
-                ),
-            })?;
-        let (start_line, end_line) = inclusive_lines(capture.start, capture.end)?;
-        let index_on_line = line_counts.entry(start_line).or_insert(0);
-        let id = subject_id(input.path, start_line, *index_on_line);
-        *index_on_line = index_on_line.saturating_add(1);
-        subjects.push(Subject {
-            id,
-            capture: capture.name.to_owned(),
-            text: text.to_owned(),
-            span: Span {
-                start_line,
-                end_line,
-                start_byte: u32_from_usize("start byte", capture.start_byte)?,
-                end_byte: u32_from_usize("end byte", capture.end_byte)?,
-            },
-        });
-    }
-
-    Ok(SubjectsDocument {
-        schema: SUBJECTS_SCHEMA_V1.to_owned(),
-        source: SubjectsSource {
-            path: input.path.to_owned(),
+    let mut builder = SubjectsBuilder::new(
+        SubjectsSource {
+            path: path.clone(),
             rev,
-            blob_sha: input.blob_sha.to_owned(),
+            blob_sha,
         },
-        producer: SubjectsProducer {
+        SubjectsProducer {
             name: PRODUCER_NAME.to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
             language: info.id.to_owned(),
@@ -275,8 +232,30 @@ pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
             query_sha256: Sha256Digest::of(input.query.as_bytes()),
             mode: PRODUCER_MODE.to_owned(),
         },
-        subjects,
-    })
+    );
+    for capture in found {
+        debug_assert!(
+            capture.start_byte <= capture.end_byte && capture.end_byte <= source.len(),
+            "tree-sitter node spans always lie inside the parsed source"
+        );
+        let text = source
+            .get(capture.start_byte..capture.end_byte)
+            .ok_or_else(|| {
+                JevError::extraction_invalid(format!(
+                    "subject bytes {}..{} are not on UTF-8 character boundaries",
+                    capture.start_byte, capture.end_byte
+                ))
+            })?;
+        let (start_line, end_line) = inclusive_lines(capture.start, capture.end)?;
+        let span = Span::new(
+            start_line,
+            end_line,
+            u32_from_usize("start byte", capture.start_byte)?,
+            u32_from_usize("end byte", capture.end_byte)?,
+        );
+        builder.push_subject(path.clone(), span, text, capture.name);
+    }
+    builder.build()
 }
 
 fn capture_allowed(name: &str, captures: Option<&[&str]>) -> bool {
@@ -286,15 +265,6 @@ fn capture_allowed(name: &str, captures: Option<&[&str]>) -> bool {
     match captures {
         Some(allow) => allow.contains(&name),
         None => true,
-    }
-}
-
-/// First subject on a line has no suffix. Later ones use `:1`, `:2`, …
-fn subject_id(path: &str, line: u32, index_on_line: u32) -> String {
-    if index_on_line == 0 {
-        format!("{path}:{line}")
-    } else {
-        format!("{path}:{line}:{index_on_line}")
     }
 }
 
@@ -314,10 +284,10 @@ fn inclusive_lines(start: Point, end: Point) -> Result<(u32, u32), JevError> {
 /// A source large enough to overflow is an input problem, not a byte-cap hit,
 /// so the error is `INPUT_INVALID` naming the field and value.
 fn u32_from_usize(field: &str, value: usize) -> Result<u32, JevError> {
-    u32::try_from(value).map_err(|_| JevError::InputInvalid {
-        detail: format!(
+    u32::try_from(value).map_err(|_| {
+        JevError::input_invalid(format!(
             "subject {field} {value} does not fit the u32 span fields of sc/subjects/1"
-        ),
+        ))
     })
 }
 
@@ -406,22 +376,25 @@ mod tests {
             None,
         )
         .expect("extract branches");
-        assert_eq!(document.schema, SUBJECTS_SCHEMA_V1);
-        assert_eq!(document.producer.mode, PRODUCER_MODE);
-        assert_eq!(document.producer.name, PRODUCER_NAME);
-        assert_eq!(document.producer.grammar, "tree-sitter-python");
-        assert_eq!(document.producer.grammar_version, "0.25.0");
+        assert_eq!(
+            document.schema(),
+            sc_agent_types::schema::subjects::SUBJECTS_SCHEMA_V1
+        );
+        assert_eq!(document.producer().mode, PRODUCER_MODE);
+        assert_eq!(document.producer().name, PRODUCER_NAME);
+        assert_eq!(document.producer().grammar, "tree-sitter-python");
+        assert_eq!(document.producer().grammar_version, "0.25.0");
         let arms: Vec<&str> = document
-            .subjects
+            .subjects()
             .iter()
-            .filter(|subject| subject.capture == "arm")
-            .map(|subject| subject.text.as_str())
+            .filter(|subject| subject.capture() == "arm")
+            .map(|subject| subject.text())
             .collect();
         let refusals: Vec<&str> = document
-            .subjects
+            .subjects()
             .iter()
-            .filter(|subject| subject.capture == "refusal")
-            .map(|subject| subject.text.as_str())
+            .filter(|subject| subject.capture() == "refusal")
+            .map(|subject| subject.text())
             .collect();
         assert_eq!(
             arms,
@@ -446,11 +419,11 @@ mod tests {
         .expect("arm allow-list");
         assert!(
             only_arms
-                .subjects
+                .subjects()
                 .iter()
-                .all(|subject| subject.capture == "arm")
+                .all(|subject| subject.capture() == "arm")
         );
-        assert_eq!(only_arms.producer.mode, PRODUCER_MODE);
+        assert_eq!(only_arms.producer().mode, PRODUCER_MODE);
     }
 
     #[cfg(feature = "rust")]
@@ -468,20 +441,20 @@ fn classify(value: Transition) -> &'static str {
         let document =
             run("rust", query, source.as_bytes(), "src/classify.rs", None).expect("rust");
         let arms: Vec<&str> = document
-            .subjects
+            .subjects()
             .iter()
-            .map(|subject| subject.text.as_str())
+            .map(|subject| subject.text())
             .collect();
         assert_eq!(arms, vec!["Transition::GiveBack", "Transition::Keep"]);
         assert!(
             document
-                .subjects
+                .subjects()
                 .iter()
-                .all(|subject| subject.capture == "arm")
+                .all(|subject| subject.capture() == "arm")
         );
-        assert_eq!(document.producer.mode, PRODUCER_MODE);
-        assert_eq!(document.producer.grammar, "tree-sitter-rust");
-        assert_eq!(document.producer.grammar_version, "0.24.2");
+        assert_eq!(document.producer().mode, PRODUCER_MODE);
+        assert_eq!(document.producer().grammar, "tree-sitter-rust");
+        assert_eq!(document.producer().grammar_version, "0.24.2");
     }
 
     #[cfg(feature = "python")]
@@ -493,21 +466,21 @@ fn classify(value: Transition) -> &'static str {
         let document = run("python", query, &source, "hook.py", None).expect("extract");
         assert!(
             document
-                .subjects
+                .subjects()
                 .iter()
-                .all(|subject| !subject.capture.starts_with('_'))
+                .all(|subject| !subject.capture().starts_with('_'))
         );
         assert!(
             document
-                .subjects
+                .subjects()
                 .iter()
-                .all(|subject| subject.capture != "_fn" && subject.text != "Refusal")
+                .all(|subject| subject.capture() != "_fn" && subject.text() != "Refusal")
         );
         assert!(
             document
-                .subjects
+                .subjects()
                 .iter()
-                .any(|subject| subject.capture == "refusal" && subject.text.contains("Refusal"))
+                .any(|subject| subject.capture() == "refusal" && subject.text().contains("Refusal"))
         );
     }
 
@@ -519,20 +492,16 @@ fn classify(value: Transition) -> &'static str {
         let once = run("python", query, source, "same.py", None).expect("once");
         let twice = run("python", query, source, "same.py", None).expect("twice");
         assert_eq!(once, twice);
-        assert_eq!(once.subjects.len(), 2);
+        assert_eq!(once.subjects().len(), 2);
         assert_eq!(
-            once.subjects[0].span.start_line,
-            once.subjects[1].span.start_line
+            once.subjects()[0].span().start_line(),
+            once.subjects()[1].span().start_line()
         );
-        assert_eq!(once.subjects[0].id, "same.py:1");
-        assert_eq!(once.subjects[1].id, "same.py:1:1");
-        assert!(once.subjects[0].span.start_byte < once.subjects[1].span.start_byte);
-        let ids: BTreeSet<&str> = once
-            .subjects
-            .iter()
-            .map(|subject| subject.id.as_str())
-            .collect();
-        assert_eq!(ids.len(), once.subjects.len());
+        assert_eq!(once.subjects()[0].id(), "same.py:1");
+        assert_eq!(once.subjects()[1].id(), "same.py:1:1");
+        assert!(once.subjects()[0].span().start_byte() < once.subjects()[1].span().start_byte());
+        let ids: BTreeSet<&str> = once.subjects().iter().map(|subject| subject.id()).collect();
+        assert_eq!(ids.len(), once.subjects().len());
     }
 
     #[cfg(feature = "python")]
@@ -542,7 +511,7 @@ fn classify(value: Transition) -> &'static str {
             .expect_err("syntax error must fail");
         assert_eq!(error.code(), "EXTRACTION_PARSE_ERROR");
         match error {
-            JevError::ExtractionParseError { path, line } => {
+            JevError::ExtractionParseError { path, line, .. } => {
                 assert_eq!(path, "broken.py");
                 assert!(line >= 1, "line {line}");
             }
@@ -555,7 +524,7 @@ fn classify(value: Transition) -> &'static str {
         let error = run("cobol", "(identifier) @name\n", b"x\n", "a.py", None).expect_err("cobol");
         assert_eq!(error.code(), "LANGUAGE_UNAVAILABLE");
         match error {
-            JevError::LanguageUnavailable { language } => assert_eq!(language, "cobol"),
+            JevError::LanguageUnavailable { language, .. } => assert_eq!(language, "cobol"),
             other => panic!("unexpected {}", other.code()),
         }
     }
@@ -566,12 +535,12 @@ fn classify(value: Transition) -> &'static str {
         let query = "(binary_operator left: (identifier) @name right: (identifier) @name)\n";
         let document =
             run("python", query, b"value = left + right\n", "dup.py", None).expect("dup");
-        assert_eq!(document.producer.mode, "matches");
+        assert_eq!(document.producer().mode, "matches");
         let names: Vec<&str> = document
-            .subjects
+            .subjects()
             .iter()
-            .filter(|subject| subject.capture == "name")
-            .map(|subject| subject.text.as_str())
+            .filter(|subject| subject.capture() == "name")
+            .map(|subject| subject.text())
             .collect();
         assert_eq!(names, vec!["left", "right"]);
     }
@@ -592,7 +561,10 @@ fn classify(value: Transition) -> &'static str {
         let bytes = subjects_to_json_bytes(&document).expect("json");
         let parsed: SubjectsDocument = serde_json::from_slice(&bytes).expect("parse");
         assert_eq!(parsed, document);
-        assert_eq!(parsed.schema, SUBJECTS_SCHEMA_V1);
+        assert_eq!(
+            parsed.schema(),
+            sc_agent_types::schema::subjects::SUBJECTS_SCHEMA_V1
+        );
         assert_eq!(subjects_to_json_bytes(&parsed).expect("again"), bytes);
         let value: serde_json::Value = serde_json::from_slice(&bytes).expect("value");
         assert_eq!(value["schema"], "sc/subjects/1");
@@ -653,13 +625,7 @@ fn classify(value: Transition) -> &'static str {
             None,
         )
         .expect_err("MISSING node must fail");
-        assert_eq!(
-            error,
-            JevError::ExtractionParseError {
-                path: "missing.py".into(),
-                line: 1,
-            }
-        );
+        assert_eq!(error, JevError::extraction_parse_error("missing.py", 1));
     }
 
     #[cfg(feature = "python")]
@@ -667,7 +633,7 @@ fn classify(value: Transition) -> &'static str {
     fn clean_source_skips_the_error_walk_and_succeeds() {
         let document =
             run("python", "(identifier) @name\n", b"a = b\n", "ok.py", None).expect("clean source");
-        assert_eq!(document.subjects.len(), 2);
+        assert_eq!(document.subjects().len(), 2);
     }
 
     #[cfg(feature = "python")]

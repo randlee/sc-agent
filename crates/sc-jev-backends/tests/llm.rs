@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use sc_agent_types::test_util::judge_outcome_field_names;
 use sc_agent_types::{
-    BackendId, BackendKeyId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, LlmWireContext,
-    PayloadBundle, ResolvedApiKey, Sha256Digest,
+    BackendId, BackendKeyId, CanonicalJudgePayload, JevError, JudgeBackend, JudgeOutcome,
+    JudgeRequest, LlmWireContext, NetworkErrorKind, PayloadBundle, ResolvedApiKey, Sha256Digest,
 };
 use sc_jev_backends::{
     AnthropicHaikuBackend, BackendTransport, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT,
@@ -58,9 +58,7 @@ impl BackendTransport for ScriptedTransport {
             .lock()
             .expect("replies")
             .pop()
-            .ok_or_else(|| JevError::NetworkError {
-                detail: "script exhausted".into(),
-            })
+            .ok_or_else(|| JevError::network(NetworkErrorKind::Connect, "script exhausted"))
     }
 }
 
@@ -149,17 +147,15 @@ fn question(choices: &[&str]) -> Value {
 }
 
 fn request_with(questions: Value, prompt: Option<&str>) -> JudgeRequest {
-    let bytes = sc_agent_types::canonical_json_bytes(&json!({
+    let payload: CanonicalJudgePayload = serde_json::from_value(json!({
         "questions": questions,
         "state": [],
     }))
-    .expect("canonical");
-    JudgeRequest {
-        payload: PayloadBundle::from_canonical_bytes(bytes),
-        llm: prompt.map(|system_prompt| LlmWireContext {
-            system_prompt: system_prompt.to_owned(),
-        }),
-    }
+    .expect("payload");
+    JudgeRequest::new(
+        Arc::new(PayloadBundle::encode(&payload).expect("bundle")),
+        prompt.map(LlmWireContext::new),
+    )
 }
 
 fn standard_request(prompt: &str) -> JudgeRequest {
@@ -189,9 +185,7 @@ fn haiku(replies: Vec<HttpResponse>) -> (AnthropicHaikuBackend, Arc<Recorded>) {
     let sleeper = ScriptedSleeper {
         recorded: Arc::clone(&recorded),
     };
-    let backend = AnthropicHaikuBackend::new(credential(), transport)
-        .expect("key")
-        .with_retry_sleeper(sleeper);
+    let backend = AnthropicHaikuBackend::new(credential(), transport).with_retry_sleeper(sleeper);
     (backend, recorded)
 }
 
@@ -200,21 +194,28 @@ fn luna(replies: Vec<HttpResponse>) -> (OpenAiLunaBackend, Arc<Recorded>) {
     let sleeper = ScriptedSleeper {
         recorded: Arc::clone(&recorded),
     };
-    let backend = OpenAiLunaBackend::new(credential(), transport)
-        .expect("key")
-        .with_retry_sleeper(sleeper);
+    let backend = OpenAiLunaBackend::new(credential(), transport).with_retry_sleeper(sleeper);
     (backend, recorded)
 }
 
-/// The constructors return `Result` for API stability only (RBP-007
-/// observation, a-10). If a construction check is added, update this test
-/// and the `# Errors` docs together.
+/// The constructors are infallible (ADR-SAG-0020 r-1 amendment); the ids
+/// come from the provider and the default transports exist.
 #[test]
-fn llm_backend_constructors_always_succeed_today() {
+fn llm_backend_constructors_are_infallible() {
     let (transport, _) = ScriptedTransport::new(Vec::new());
-    assert!(AnthropicHaikuBackend::new(credential(), transport).is_ok());
+    assert_eq!(
+        AnthropicHaikuBackend::new(credential(), transport).id(),
+        BackendId::AnthropicHaiku
+    );
     let (transport, _) = ScriptedTransport::new(Vec::new());
-    assert!(OpenAiLunaBackend::new(credential(), transport).is_ok());
+    assert_eq!(
+        OpenAiLunaBackend::new(credential(), transport).id(),
+        BackendId::OpenAiLuna
+    );
+    assert_eq!(
+        OpenAiLunaBackend::with_default_transport(credential()).id(),
+        BackendId::OpenAiLuna
+    );
 }
 
 fn posts(recorded: &Recorded) -> Vec<HttpRequest> {
@@ -251,15 +252,18 @@ fn assert_outcome_fields(outcome: &JudgeOutcome, backend: BackendId) {
         .map(String::as_str)
         .collect();
     assert_eq!(names, judge_outcome_field_names());
-    assert_eq!(outcome.backend, backend);
-    assert!(outcome.probabilities.is_none());
-    assert!(outcome.provider_meta.is_some());
+    assert_eq!(outcome.backend(), backend);
+    assert!(outcome.provider_meta().is_some());
+    assert!(
+        outcome.input_sha256().is_none(),
+        "backend-side hashing lands in r-2b"
+    );
 }
 
 #[test]
 fn test_haiku_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload().bytes()).expect("utf-8");
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 100),
         count_reply(100),
@@ -296,22 +300,16 @@ fn test_haiku_request_embeds_canonical_payload() {
         .remove("max_tokens");
     assert_eq!(count, without_max);
     assert_eq!(
-        outcome.answers["q"],
+        serde_json::to_value(&outcome.answers()["q"]).expect("answer"),
         json!({
             "choice": "no",
             "confidence": 0.7,
             "probabilities": { "no": 0.7, "yes": 0.3 }
         })
     );
-    assert_eq!(
-        outcome.provider_meta.as_ref().expect("meta")["input_tokens"],
-        102
-    );
-    assert_eq!(
-        outcome.provider_meta.as_ref().expect("meta")["prompt_tokens"],
-        100
-    );
-    assert_eq!(outcome.provider_meta.as_ref().expect("meta")["commands"], 0);
+    assert_eq!(outcome.provider_meta().expect("meta")["input_tokens"], 102);
+    assert_eq!(outcome.provider_meta().expect("meta")["prompt_tokens"], 100);
+    assert_eq!(outcome.provider_meta().expect("meta")["commands"], 0);
     assert_outcome_fields(&outcome, BackendId::AnthropicHaiku);
     let rendered = format!("{backend:?}");
     assert!(!rendered.contains(KEY));
@@ -320,7 +318,7 @@ fn test_haiku_request_embeds_canonical_payload() {
 #[test]
 fn test_luna_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload().bytes()).expect("utf-8");
     let (backend, recorded) = luna(vec![
         luna_message(&answer_text(), "completed", 50),
         count_reply(50),
@@ -397,10 +395,10 @@ fn test_llm_system_prompt_is_injected_not_hardcoded() {
 fn test_prompt_change_does_not_alter_prompt_sha256() {
     let first = standard_request("prompt-alpha");
     let second = standard_request("prompt-beta");
-    assert_eq!(first.payload.sha256(), second.payload.sha256());
+    assert_eq!(first.payload().sha256(), second.payload().sha256());
     assert_eq!(
-        first.payload.sha256(),
-        &Sha256Digest::of(first.payload.bytes())
+        first.payload().sha256(),
+        &Sha256Digest::of(first.payload().bytes())
     );
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 4),
@@ -410,7 +408,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     ]);
     backend.judge(&first).expect("first");
     backend.judge(&second).expect("second");
-    assert_eq!(first.payload.sha256(), second.payload.sha256());
+    assert_eq!(first.payload().sha256(), second.payload().sha256());
     let seen = posts(&recorded);
     let alpha = body_json(&seen[1]);
     let beta = body_json(&seen[3]);
@@ -418,7 +416,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     assert_ne!(alpha["system"], beta["system"]);
     assert_eq!(alpha["system"], "prompt-alpha");
     assert_eq!(beta["system"], "prompt-beta");
-    assert_ne!(first.payload.sha256(), &Sha256Digest::of(&seen[1].body));
+    assert_ne!(first.payload().sha256(), &Sha256Digest::of(&seen[1].body));
 }
 
 #[test]
@@ -444,13 +442,16 @@ fn test_llm_input_is_refused_like_jev_and_nothing_is_sent() {
 #[test]
 fn test_unknown_question_type_has_no_answer_schema() {
     let (backend, recorded) = haiku(vec![count_reply(1)]);
+    // A question type outside the canonical payload is unrepresentable: it
+    // never becomes a `PayloadBundle`, so no request reaches a backend.
     let mut ranked = question(&["a", "b"]);
     ranked["type"] = json!("rank");
-    let request = request_with(json!([ranked]), Some(PROMPT));
-    let error = backend.judge(&request).expect_err("rank");
-    assert_eq!(error.code(), "INPUT_INVALID");
-    assert!(error.to_string().contains("no answer schema"));
-    assert!(error.to_string().contains("rank"));
+    let parsed = serde_json::from_value::<CanonicalJudgePayload>(json!({
+        "questions": [ranked],
+        "state": [],
+    }));
+    assert!(parsed.is_err());
+    let _ = backend.id();
     assert!(posts(&recorded).is_empty());
 }
 
@@ -567,7 +568,6 @@ fn test_with_timeouts_reaches_every_request() {
         count_reply(5),
     ]);
     let backend = OpenAiLunaBackend::new(credential(), transport)
-        .expect("key")
         .with_timeouts(Duration::from_millis(250), Duration::from_secs(3));
     backend.judge(&standard_request(PROMPT)).expect("judge");
     let seen = posts(&recorded);
@@ -616,7 +616,6 @@ fn test_llm_missing_key_does_not_build() {
             let (transport, _) = ScriptedTransport::new(Vec::new());
             transport
         })
-        .expect("luna")
     );
     assert!(!rendered.contains(KEY));
 }

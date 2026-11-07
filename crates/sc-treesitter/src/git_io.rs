@@ -66,20 +66,20 @@ fn read_worktree(repo: &Path, path: String) -> Result<Blob, JevError> {
     let full = match std::fs::canonicalize(repo.join(&path)) {
         Ok(full) => full,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            return Err(JevError::InputMissing { path });
+            return Err(JevError::input_missing(path));
         }
         Err(error) => return Err(JevError::io_failed(&path, &error)),
     };
     if !full.starts_with(repo) {
-        return Err(JevError::InputInvalid {
-            detail: format!("{path} resolves outside the repository"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "{path} resolves outside the repository"
+        )));
     }
     let metadata = std::fs::metadata(&full).map_err(|error| JevError::io_failed(&path, &error))?;
     if !metadata.is_file() {
-        return Err(JevError::InputInvalid {
-            detail: format!("{path} is not a regular file"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "{path} is not a regular file"
+        )));
     }
     too_large(metadata.len())?;
     let file = std::fs::File::open(&full).map_err(|error| JevError::io_failed(&path, &error))?;
@@ -110,12 +110,9 @@ fn hash_bytes(repo: &Path, bytes: &[u8], path: &str) -> Result<String, JevError>
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| JevError::io_failed("git process spawn", &error))?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| JevError::ExtractionFailed {
-            detail: format!("git hash-object stdin unavailable for {path}"),
-        })?;
+    let mut stdin = child.stdin.take().ok_or_else(|| {
+        JevError::extraction_failed(format!("git hash-object stdin unavailable for {path}"))
+    })?;
     // Write on the current thread is safe: hash-object reads all of stdin
     // before it prints the 40/64-byte id, so stdout cannot fill first.
     let written = stdin.write_all(bytes);
@@ -124,9 +121,9 @@ fn hash_bytes(repo: &Path, bytes: &[u8], path: &str) -> Result<String, JevError>
         .wait_with_output()
         .map_err(|error| JevError::io_failed("git hash-object", &error))?;
     if written.is_err() || !hashed.status.success() {
-        return Err(JevError::ExtractionFailed {
-            detail: format!("git hash-object failed for {path}"),
-        });
+        return Err(JevError::extraction_failed(format!(
+            "git hash-object failed for {path}"
+        )));
     }
     object_id(&hashed.stdout, "git hash-object")
 }
@@ -149,29 +146,29 @@ fn read_at_rev(repo: &Path, rev: &Rev, path: String) -> Result<Blob, JevError> {
     let sha = object_id(&parsed.stdout, "git rev-parse")?;
     let kind = run_git(repo, ["cat-file", "-t", sha.as_str()])?;
     if !kind.status.success() {
-        return Err(JevError::ExtractionFailed {
-            detail: format!("git cat-file -t failed for {path} at {rev}"),
-        });
+        return Err(JevError::extraction_failed(format!(
+            "git cat-file -t failed for {path} at {rev}"
+        )));
     }
     if kind.stdout.trim_ascii() != b"blob" {
-        return Err(JevError::InputInvalid {
-            detail: format!("{path} is not a file at {rev}"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "{path} is not a file at {rev}"
+        )));
     }
     let size = run_git(repo, ["cat-file", "-s", sha.as_str()])?;
     let size = std::str::from_utf8(size.stdout.trim_ascii())
         .ok()
         .filter(|_| size.status.success())
         .and_then(|text| text.parse::<u64>().ok())
-        .ok_or_else(|| JevError::ExtractionFailed {
-            detail: format!("git cat-file -s failed for {path} at {rev}"),
+        .ok_or_else(|| {
+            JevError::extraction_failed(format!("git cat-file -s failed for {path} at {rev}"))
         })?;
     too_large(size)?;
     let blob = run_git(repo, ["cat-file", "blob", sha.as_str()])?;
     if !blob.status.success() {
-        return Err(JevError::ExtractionFailed {
-            detail: format!("git cat-file blob failed for {path} at {rev}"),
-        });
+        return Err(JevError::extraction_failed(format!(
+            "git cat-file blob failed for {path} at {rev}"
+        )));
     }
     too_large(u64::try_from(blob.stdout.len()).unwrap_or(u64::MAX))?;
     Ok(Blob {
@@ -184,10 +181,7 @@ fn read_at_rev(repo: &Path, rev: &Rev, path: String) -> Result<Blob, JevError> {
 /// [`JevError::InputTooLarge`] when `actual_bytes` exceeds [`MAX_INPUT_BYTES`].
 fn too_large(actual_bytes: u64) -> Result<(), JevError> {
     if actual_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes,
-        });
+        return Err(JevError::input_too_large(MAX_INPUT_BYTES, actual_bytes));
     }
     Ok(())
 }
@@ -200,11 +194,9 @@ fn classify_unresolved(repo: &Path, rev: &Rev, path: String) -> Result<JevError,
     let tree = format!("{}^{{tree}}", rev.as_str());
     let exists = run_git(repo, ["cat-file", "-e", "--end-of-options", &tree])?;
     Ok(if exists.status.success() {
-        JevError::InputMissing { path }
+        JevError::input_missing(path)
     } else {
-        JevError::InputInvalid {
-            detail: format!("revision {rev} was not found"),
-        }
+        JevError::input_invalid(format!("revision {rev} was not found"))
     })
 }
 
@@ -216,9 +208,9 @@ fn object_id(stdout: &[u8], source: &str) -> Result<String, JevError> {
             .iter()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte));
     if !well_formed {
-        return Err(JevError::ExtractionFailed {
-            detail: format!("{source} returned an unexpected object id"),
-        });
+        return Err(JevError::extraction_failed(format!(
+            "{source} returned an unexpected object id"
+        )));
     }
     // Every byte is an ASCII hex digit, so the lossy conversion is exact.
     Ok(String::from_utf8_lossy(id).into_owned())
@@ -229,17 +221,17 @@ fn object_id(stdout: &[u8], source: &str) -> Result<String, JevError> {
 /// `repo` must be canonical. An absolute `path_arg` is canonicalized with
 /// [`canonicalize_lenient`] before the prefix check.
 fn repo_relative(repo: &Path, path_arg: &str) -> Result<String, JevError> {
-    let invalid = || JevError::InputInvalid {
-        detail: format!("{path_arg} must be a repo-relative path inside the repository"),
+    let invalid = || {
+        JevError::input_invalid(format!(
+            "{path_arg} must be a repo-relative path inside the repository"
+        ))
     };
     let relative = if Path::new(path_arg).is_absolute() {
         let resolved = canonicalize_lenient(Path::new(path_arg))
             .map_err(|error| JevError::io_failed(path_arg, &error))?;
-        let inside = resolved
-            .strip_prefix(repo)
-            .map_err(|_| JevError::InputInvalid {
-                detail: format!("{path_arg} is outside the repository"),
-            })?;
+        let inside = resolved.strip_prefix(repo).map_err(|_| {
+            JevError::input_invalid(format!("{path_arg} is outside the repository"))
+        })?;
         let mut parts = Vec::new();
         for component in inside.components() {
             let Component::Normal(part) = component else {
@@ -319,14 +311,12 @@ fn repo_root() -> Result<PathBuf, JevError> {
         .output()
         .map_err(|error| JevError::io_failed("git process spawn", &error))?;
     if !output.status.success() {
-        return Err(JevError::ExtractionFailed {
-            detail: "git rev-parse --show-toplevel failed; run sc-treesitter inside a repository"
-                .into(),
-        });
+        return Err(JevError::extraction_failed(
+            "git rev-parse --show-toplevel failed; run sc-treesitter inside a repository",
+        ));
     }
-    let text = String::from_utf8(output.stdout).map_err(|_| JevError::ExtractionFailed {
-        detail: "git rev-parse returned a non-utf8 path".into(),
-    })?;
+    let text = String::from_utf8(output.stdout)
+        .map_err(|_| JevError::extraction_failed("git rev-parse returned a non-utf8 path"))?;
     let toplevel = PathBuf::from(text.trim_end_matches(['\r', '\n']));
     std::fs::canonicalize(&toplevel).map_err(|error| JevError::io_failed("repository root", &error))
 }

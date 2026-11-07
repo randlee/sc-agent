@@ -17,7 +17,6 @@ pub struct JevClientConfig {
     model: String,
     host: String,
     path: String,
-    max_request_bytes: u64,
     attempts: u32,
     timeout: Duration,
 }
@@ -30,7 +29,6 @@ struct RawJevToml {
     model: String,
     host: String,
     path: String,
-    max_request_bytes: u64,
     attempts: u32,
     timeout_seconds: u64,
 }
@@ -55,14 +53,12 @@ impl JevClientConfig {
     /// required field is missing or has the wrong type, an unknown key is
     /// present, or a value fails [`Self::try_new`].
     pub fn from_toml(text: &str) -> Result<Self, JevError> {
-        let raw: RawJevToml = toml::from_str(text).map_err(|error| JevError::ConfigInvalid {
-            detail: format!("jev.toml: {}", error.message()),
-        })?;
+        let raw: RawJevToml = toml::from_str(text)
+            .map_err(|error| JevError::config_invalid(format!("jev.toml: {}", error.message())))?;
         Self::try_new(
             raw.model,
             raw.host,
             raw.path,
-            raw.max_request_bytes,
             raw.attempts,
             Duration::from_secs(raw.timeout_seconds),
         )
@@ -72,13 +68,12 @@ impl JevClientConfig {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::ConfigInvalid`] when the model, host, path, byte
-    /// cap, attempt count, or timeout cannot be used for a check request.
+    /// Returns [`JevError::ConfigInvalid`] when the model, host, path,
+    /// attempt count, or timeout cannot be used for a check request.
     pub fn try_new(
         model: impl Into<String>,
         host: impl Into<String>,
         path: impl Into<String>,
-        max_request_bytes: u64,
         attempts: u32,
         timeout: Duration,
     ) -> Result<Self, JevError> {
@@ -104,9 +99,6 @@ impl JevClientConfig {
                 "path must be an absolute URL path such as /v1/systemone",
             ));
         }
-        if max_request_bytes == 0 {
-            return Err(invalid("max_request_bytes must be at least 1"));
-        }
         if !(1..=8).contains(&attempts) {
             return Err(invalid("attempts must be from 1 to 8"));
         }
@@ -117,7 +109,6 @@ impl JevClientConfig {
             model,
             host,
             path,
-            max_request_bytes,
             attempts,
             timeout,
         })
@@ -141,12 +132,6 @@ impl JevClientConfig {
         &self.path
     }
 
-    /// Maximum check body size in bytes. One check is never split.
-    #[must_use]
-    pub fn max_request_bytes(&self) -> u64 {
-        self.max_request_bytes
-    }
-
     /// Total sends on a busy reply, including the first.
     #[must_use]
     pub fn attempts(&self) -> u32 {
@@ -167,23 +152,20 @@ impl JevClientConfig {
 }
 
 fn invalid(detail: impl Into<String>) -> JevError {
-    JevError::ConfigInvalid {
-        detail: detail.into(),
-    }
+    JevError::config_invalid(detail.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const VALID: &str = "model = \"m\"\nhost = \"h.example\"\npath = \"/v1/x\"\nmax_request_bytes = 10\nattempts = 2\ntimeout_seconds = 5\n";
+    const VALID: &str = "model = \"m\"\nhost = \"h.example\"\npath = \"/v1/x\"\nattempts = 2\ntimeout_seconds = 5\n";
 
     #[test]
     fn from_toml_reads_every_field() {
         let config = JevClientConfig::from_toml(VALID).expect("valid");
         assert_eq!(config.model(), "m");
         assert_eq!(config.endpoint(), "https://h.example/v1/x");
-        assert_eq!(config.max_request_bytes(), 10);
         assert_eq!(config.attempts(), 2);
         assert_eq!(config.timeout(), Duration::from_secs(5));
     }
@@ -208,7 +190,7 @@ mod tests {
             ),
             (&VALID.replace("attempts = 2", "attempts = 9"), "attempts"),
             (
-                &VALID.replace("max_request_bytes = 10", "max_request_bytes = 0"),
+                &format!("{VALID}max_request_bytes = 10\n"),
                 "max_request_bytes",
             ),
             (&VALID.replace("\"m\"", "\"\""), "model"),
