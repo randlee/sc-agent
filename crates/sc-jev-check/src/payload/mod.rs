@@ -18,7 +18,7 @@ use sc_agent_types::{
     payload_bundle_from_value,
 };
 
-use crate::config::{CheckSpec, PackagedConfig, ResolvedPromptPath, load_packaged_config};
+use crate::config::{CheckSpec, load_packaged_config};
 use crate::extract::{Extracted, extract_input, read_repo_text};
 
 #[doc(inline)]
@@ -35,8 +35,6 @@ pub struct PayloadBuilder {
 pub struct BuiltPayload {
     /// Sorted compact JSON and its SHA-256. Prompt text is not included.
     pub bundle: PayloadBundle,
-    /// System-prompt path selected for a later inject step.
-    pub prompt: ResolvedPromptPath,
     /// Extractor output keyed by `[inputs.<name>]`.
     pub extractions: BTreeMap<String, Extracted>,
 }
@@ -87,17 +85,6 @@ impl PayloadBuilder {
         repo: &RepoRoot,
         rev: &Rev,
     ) -> Result<BuiltPayload, JevError> {
-        let packaged = load_packaged_config()?;
-        self.build_with_packaged(spec, repo, rev, &packaged)
-    }
-
-    fn build_with_packaged(
-        &self,
-        spec: &CheckSpec,
-        repo: &RepoRoot,
-        rev: &Rev,
-        packaged: &PackagedConfig,
-    ) -> Result<BuiltPayload, JevError> {
         let questions = parse_question_set(&read_repo_text(repo, rev, &spec.questions_path)?)?;
         let state = match &spec.state_path {
             Some(path) => parse_state(&read_repo_text(repo, rev, path)?, &questions)?,
@@ -112,7 +99,6 @@ impl PayloadBuilder {
         refuse_over_cap(bundle.bytes(), self.max_input_bytes)?;
         Ok(BuiltPayload {
             bundle,
-            prompt: spec.resolve_prompt_path(packaged),
             extractions,
         })
     }
@@ -191,9 +177,7 @@ pub(crate) fn encode_payload(
         questions: questions.to_vec(),
         state: state.to_vec(),
     })
-    .map_err(|error| JevError::InputInvalid {
-        detail: format!("payload encoding failed: {error}"),
-    })?;
+    .map_err(|error| JevError::encode_failed("canonical payload", &error))?;
     payload_bundle_from_value(&value)
 }
 
@@ -265,7 +249,6 @@ mod tests {
         );
         assert!(!text.contains("PROMPT-TOKEN-a3-check"));
         assert!(!text.contains(crate::config::PACKAGED_SYSTEM_PROMPT.trim()));
-        assert_eq!(built.prompt.path, "prompt.md");
         assert_eq!(
             built.bundle.sha256(),
             &sc_agent_types::Sha256Digest::of(built.bundle.bytes())
@@ -283,7 +266,13 @@ mod tests {
         spec.system_prompt_file = Some("other-prompt.md".into());
         let second = builder.build(&spec, &repo, &rev).expect("second");
         assert_eq!(first.bundle.sha256(), second.bundle.sha256());
-        assert_ne!(first.prompt.path, second.prompt.path);
+        assert_ne!(
+            spec.resolve_prompt_path().path,
+            load_check_at(&repo, &rev, "check.toml")
+                .expect("check")
+                .resolve_prompt_path()
+                .path
+        );
     }
 
     #[test]
@@ -379,6 +368,6 @@ mod tests {
         let value: serde_json::Value = serde_json::from_slice(built.bundle.bytes()).expect("json");
         let questions = value["questions"].as_array().expect("questions");
         assert!(questions.len() >= 4);
-        assert_eq!(built.prompt.path, "llm-evaluator-system.md");
+        assert_eq!(spec.resolve_prompt_path().path, "llm-evaluator-system.md");
     }
 }

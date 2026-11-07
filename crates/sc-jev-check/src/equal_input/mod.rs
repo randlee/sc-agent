@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use sc_agent_types::{BackendId, EqualInputRecord, PayloadBundle, SubjectsProducer};
+use sc_agent_types::{BackendId, EqualInputRecord, JevError, PayloadBundle, SubjectsProducer};
 
 use crate::extract::Extracted;
 
@@ -56,21 +56,37 @@ pub fn commands_for(backends: &[BackendId]) -> Vec<String> {
     backends.iter().map(ToString::to_string).collect()
 }
 
-/// Copies the producer from the first `subjects` or `command` extraction.
+/// Copies the producer from the `subjects` or `command` extractions.
 ///
 /// File and table inputs have no subjects document, so they contribute
-/// nothing. When several documents are present, the earliest input name in
-/// lexicographic order wins.
-#[must_use]
+/// nothing. Several documents from the same producer yield that producer.
+/// The equal-input record attests to one producer, so documents from
+/// different producers are refused rather than silently dropped.
+///
+/// # Errors
+///
+/// Returns [`JevError::ConfigInvalid`] when two inputs carry different producers.
 pub fn producer_from_extractions(
     extractions: &BTreeMap<String, Extracted>,
-) -> Option<SubjectsProducer> {
-    extractions.values().find_map(|extracted| {
-        extracted
-            .document
-            .as_ref()
-            .map(|document| document.producer.clone())
-    })
+) -> Result<Option<SubjectsProducer>, JevError> {
+    let mut found: Option<(&str, &SubjectsProducer)> = None;
+    for (name, extracted) in extractions {
+        let Some(document) = &extracted.document else {
+            continue;
+        };
+        match found {
+            None => found = Some((name, &document.producer)),
+            Some((first, producer)) if producer != &document.producer => {
+                return Err(JevError::ConfigInvalid {
+                    detail: format!(
+                        "inputs {first} and {name} come from different subjects producers; one check attests to one producer, so split them into separate checks"
+                    ),
+                });
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(found.map(|(_, producer)| producer.clone()))
 }
 
 /// Reports whether every entry is the same byte string.
@@ -151,7 +167,19 @@ mod tests {
                 }),
             },
         );
-        assert_eq!(producer_from_extractions(&extractions), Some(producer));
+        assert_eq!(
+            producer_from_extractions(&extractions).expect("one producer"),
+            Some(producer.clone())
+        );
+        let mut other = producer;
+        other.name = "another-producer".to_owned();
+        let mut second = extractions["branches"].clone();
+        if let Some(document) = second.document.as_mut() {
+            document.producer = other;
+        }
+        extractions.insert("zeta".to_owned(), second);
+        let error = producer_from_extractions(&extractions).expect_err("two producers");
+        assert_eq!(error.code(), "CONFIG_INVALID");
         assert!(same_bytes(&[b"abc".as_slice(), b"abc".as_slice()]));
         assert!(!same_bytes(&[b"abc".as_slice(), b"abd".as_slice()]));
         assert!(!same_bytes(&[] as &[&[u8]]));

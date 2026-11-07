@@ -1,23 +1,9 @@
-# Packaged check defaults. Model ids are facade pins (tighten #12).
-# HTTP clients in later sprints read these ids; this crate does not send.
+# Packaged check limits. The packaged LLM system prompt is compiled in from
+# llm-evaluator-system.md (sc_jev_check::config::PACKAGED_SYSTEM_PROMPT) and
+# is not configured here. Model ids live with each backend crate.
 
 [limits]
 # One check is one request. The payload builder returns INPUT_TOO_LARGE
 # above this size and never splits the input. 200_000 bytes sits under a
 # single provider request so refusal happens before any backend send.
 max_input_bytes = 200000
-
-[llm_judge]
-system_prompt_file = "llm-evaluator-system.md"
-
-[vendors.typesafe]
-provider = "typesafe"
-model = "jev"
-
-[vendors.anthropic]
-provider = "anthropic"
-model = "haiku"
-
-[vendors.openai]
-provider = "openai"
-model = "luna"

@@ -12,7 +12,7 @@ mod prompt;
 
 use std::path::{Path, PathBuf};
 
-use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, NoopSessionLog, SharedSessionLog};
 use sc_agent_types::{
     BackendId, EqualInputRecord, JevError, JudgeOutcome, JudgeRequest, LlmWireContext,
     PayloadBundle, RepoRoot, Rev, SessionId, SubjectsProducer,
@@ -22,7 +22,7 @@ use crate::config::CheckSpec;
 use crate::equal_input::{commands_for, producer_from_extractions, record, same_bytes};
 use crate::payload::PayloadBuilder;
 use crate::registry::{BackendRegistry, registry_for_repo};
-use crate::session::{FileSessionStore, emit_log, is_llm, render_session_context};
+use crate::session::{FileSessionStore, emit_log, render_session_context};
 
 /// Inputs for one check run.
 ///
@@ -39,8 +39,9 @@ pub struct RunOptions {
     pub session_log: SharedSessionLog,
     /// Revision for check inputs and the `check.toml` prompt file.
     pub rev: Rev,
-    /// Session files created for a live run.
-    pub sessions: FileSessionStore,
+    /// Session files created for a live run. `None` is valid only for a
+    /// dry-run, which creates no session (see [`Self::dry_run_only`]).
+    pub sessions: Option<FileSessionStore>,
     /// Injected backends. `None` resolves keys and constructs the HTTP backends.
     pub registry: Option<BackendRegistry>,
 }
@@ -59,7 +60,25 @@ impl RunOptions {
             system_prompt_override: None,
             session_log,
             rev: Rev::worktree(),
-            sessions,
+            sessions: Some(sessions),
+            registry: None,
+        }
+    }
+
+    /// Options for a dry-run at `WORKTREE` that needs no session store or logger.
+    ///
+    /// Nothing is written to disk: no session directory, session file, or
+    /// log is created. A run built from these options with
+    /// [`Self::dry_run`]`(false)` fails with `CONFIG_INVALID` before any send.
+    #[must_use]
+    pub fn dry_run_only(repo_root: RepoRoot) -> Self {
+        Self {
+            repo_root,
+            dry_run: true,
+            system_prompt_override: None,
+            session_log: std::sync::Arc::new(NoopSessionLog),
+            rev: Rev::worktree(),
+            sessions: None,
             registry: None,
         }
     }
@@ -172,7 +191,7 @@ fn assemble_payload(
     let built = PayloadBuilder::packaged()?.build(spec, repo, rev)?;
     Ok(BuiltRequest {
         bundle: built.bundle,
-        producer: producer_from_extractions(&built.extractions),
+        producer: producer_from_extractions(&built.extractions)?,
     })
 }
 
@@ -212,7 +231,7 @@ pub fn run_check(
 ) -> Result<CheckResult, JevError> {
     require_backends(backends)?;
     let built = assemble_payload(spec, &opts.repo_root, &opts.rev)?;
-    let needs_llm = backends.iter().copied().any(is_llm);
+    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
     let system_prompt = prompt::load_system_prompt(
         spec,
         &opts.repo_root,
@@ -246,11 +265,11 @@ pub fn run_request(
     opts: RunOptions,
 ) -> Result<CheckResult, JevError> {
     require_backends(backends)?;
-    let needs_llm = backends.iter().copied().any(is_llm);
+    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
     if needs_llm && request.system_prompt.is_none() {
-        return Err(JevError::ConfigInvalid {
-            detail: "an LLM backend requires a system prompt on the run request; pass system_prompt or load it with run_check".into(),
-        });
+        return Err(run_request_invalid(
+            "An LLM backend requires a system prompt on the run request. Pass system_prompt, or load it with run_check.",
+        ));
     }
     if opts.dry_run {
         return Ok(CheckResult {
@@ -262,11 +281,16 @@ pub fn run_request(
         });
     }
 
+    let Some(sessions) = opts.sessions.as_ref() else {
+        return Err(run_request_invalid(
+            "A live run needs a session store. Build RunOptions with RunOptions::new, or keep dry_run set.",
+        ));
+    };
     let registry = match &opts.registry {
         Some(registry) => registry.clone(),
         None => registry_for_repo(&opts.repo_root, backends)?,
     };
-    opts.sessions.install_registry(registry.clone());
+    sessions.install_registry(registry.clone());
     for id in backends {
         let backend = registry.get(*id)?;
         let judge_request =
@@ -277,15 +301,13 @@ pub fn run_request(
     let primary = backends
         .iter()
         .copied()
-        .find(|&id| is_llm(id))
+        .find(|id| id.is_llm())
         .unwrap_or(backends[0]);
-    let session_id = opts
-        .sessions
-        .open(primary, &request.bundle, request.system_prompt.clone())?;
+    let session_id = sessions.open(primary, &request.bundle, request.system_prompt.clone())?;
     let mut outcomes = Vec::with_capacity(backends.len());
     let mut payloads = Vec::with_capacity(backends.len());
     for id in backends {
-        let prior = opts.sessions.load(&session_id)?.outcomes;
+        let prior = sessions.load(&session_id)?.outcomes;
         let judge_request = judge_request(
             *id,
             &request.bundle,
@@ -294,7 +316,11 @@ pub fn run_request(
         )?;
         payloads.push(judge_request.payload.bytes().to_vec());
         let backend = registry.get(*id)?;
-        backend.validate_for_send(&judge_request)?;
+        // Pre-flight above validated the context-free request
+        // (ADR-SAG-0004). Re-validate only when session context was appended.
+        if id.is_llm() && !prior.is_empty() {
+            backend.validate_for_send(&judge_request)?;
+        }
         let judged = backend.judge(&judge_request);
         emit_log(
             &opts.session_log,
@@ -306,7 +332,7 @@ pub fn run_request(
             },
         );
         let outcome = judged?;
-        opts.sessions.record_outcome(&session_id, &outcome)?;
+        sessions.record_outcome(&session_id, &outcome)?;
         outcomes.push(outcome);
     }
 
@@ -371,7 +397,7 @@ pub fn prepare_caller_request(
     } else {
         vec![BackendId::Jev]
     };
-    let needs_llm = backends.iter().copied().any(is_llm);
+    let needs_llm = backends.iter().copied().any(BackendId::is_llm);
     let system_prompt = prompt::load_request_system_prompt(repo, prompt_file, needs_llm)?;
     Ok(PreparedCallerRequest {
         bundle: parsed.bundle,
@@ -382,12 +408,20 @@ pub fn prepare_caller_request(
 
 fn require_backends(backends: &[BackendId]) -> Result<(), JevError> {
     if backends.is_empty() {
-        Err(JevError::ConfigInvalid {
-            detail: "at least one backend is required".into(),
-        })
+        Err(JevError::registry_invalid(
+            "Request at least one backend: jev, anthropic_haiku, or openai_luna.",
+        ))
     } else {
         Ok(())
     }
+}
+
+/// `CONFIG_INVALID` for a run request whose fix hint is `recovery` verbatim.
+///
+/// The failure is in how the caller built the run, not in `check.toml`, so
+/// the `check.toml` hint would point at the wrong file.
+fn run_request_invalid(recovery: &str) -> JevError {
+    JevError::operational_config(recovery)
 }
 
 fn judge_request(
@@ -396,7 +430,7 @@ fn judge_request(
     base_prompt: Option<&str>,
     prior: &[JudgeOutcome],
 ) -> Result<JudgeRequest, JevError> {
-    let llm = if is_llm(id) {
+    let llm = if id.is_llm() {
         let mut text = base_prompt.unwrap_or("").to_owned();
         text.push_str(&render_session_context(prior)?);
         Some(LlmWireContext {
@@ -448,7 +482,7 @@ mod tests {
         }
 
         fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-            if is_llm(self.id) && request.llm.is_none() {
+            if self.id.is_llm() && request.llm.is_none() {
                 return Err(JevError::InputInvalid {
                     detail: "LLM system prompt is required".into(),
                 });
@@ -1045,5 +1079,95 @@ mod tests {
         let text = std::str::from_utf8(llm.bundle.bytes()).expect("utf8");
         assert!(!text.contains("OVERRIDE-PROMPT-TOKEN-a7"));
         assert!(text.contains("Judge this"));
+    }
+
+    #[test]
+    fn dry_run_only_needs_no_store_and_writes_nothing() {
+        let repo = bare_repo();
+        let root = RepoRoot::new(repo.path());
+        let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("check");
+        let before: Vec<_> = std::fs::read_dir(repo.path()).expect("dir").collect();
+        let result = run_check(
+            &spec,
+            &[BackendId::Jev],
+            RunOptions::dry_run_only(root.clone()),
+        )
+        .expect("dry-run");
+        assert!(result.session_id.is_none());
+        let after: Vec<_> = std::fs::read_dir(repo.path()).expect("dir").collect();
+        assert_eq!(before.len(), after.len());
+        let live = run_check(
+            &spec,
+            &[BackendId::Jev],
+            RunOptions::dry_run_only(root).dry_run(false),
+        )
+        .expect_err("live run needs sessions");
+        assert_eq!(live.code(), "CONFIG_INVALID");
+        assert!(live.fix_hint().contains("session store"));
+    }
+
+    struct CountingJudge {
+        id: BackendId,
+        validations: Arc<Mutex<Vec<BackendId>>>,
+    }
+
+    impl JudgeBackend for CountingJudge {
+        fn id(&self) -> BackendId {
+            self.id
+        }
+
+        fn validate_for_send(&self, _request: &JudgeRequest) -> Result<(), JevError> {
+            self.validations
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(self.id);
+            Ok(())
+        }
+
+        fn judge(&self, _request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
+            Ok(JudgeOutcome {
+                answers: serde_json::json!({"relevant": {"choice": "yes"}}),
+                backend: self.id,
+                probabilities: None,
+                provider_meta: None,
+            })
+        }
+    }
+
+    #[test]
+    fn validate_for_send_repeats_only_for_context_bearing_requests() {
+        let repo = bare_repo();
+        let root = RepoRoot::new(repo.path());
+        let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("check");
+        let (sessions, _session_dir) = sessions_for(Arc::new(NoopSessionLog));
+        let validations = Arc::new(Mutex::new(Vec::new()));
+        let mut registry = BackendRegistry::new();
+        for id in [BackendId::Jev, BackendId::AnthropicHaiku] {
+            registry
+                .register(Arc::new(CountingJudge {
+                    id,
+                    validations: Arc::clone(&validations),
+                }))
+                .expect("register");
+        }
+        run_check(
+            &spec,
+            &[BackendId::Jev, BackendId::AnthropicHaiku],
+            RunOptions::new(root, sessions, Arc::new(NoopSessionLog)).registry(registry),
+        )
+        .expect("run");
+        let seen = validations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert_eq!(
+            seen,
+            [
+                BackendId::Jev,
+                BackendId::AnthropicHaiku,
+                BackendId::AnthropicHaiku
+            ],
+            "pre-flight once each, then Haiku again with session context"
+        );
     }
 }

@@ -9,6 +9,7 @@ use sc_agent_types::{BackendId, ChoiceAnswer, JevError, PayloadBundle, Question}
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::questions::{validate_question_set, validate_state};
 use super::{encode_payload, refuse_over_cap};
 use crate::config::load_packaged_config;
 
@@ -39,18 +40,14 @@ pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, 
     let value: Value = serde_json::from_slice(bytes).map_err(request_json_error)?;
     reject_inline_prompt(&value)?;
     let document: RequestDocument = serde_json::from_value(value).map_err(request_json_error)?;
-    if document.questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "request JSON has no questions".into(),
-        });
-    }
-    validate_state(&document)?;
+    validate_question_set(&document.questions)?;
+    validate_state(&document.state, &document.questions)?;
     let bundle = encode_payload(&document.questions, &document.state)?;
     let packaged = load_packaged_config()?;
     refuse_over_cap(bundle.bytes(), packaged.max_input_bytes)?;
     let mut backends = Vec::with_capacity(document.backends.len());
     for name in &document.backends {
-        backends.push(parse_backend(name)?);
+        backends.push(name.parse::<BackendId>()?);
     }
     Ok(ParsedCallerRequest { bundle, backends })
 }
@@ -75,42 +72,6 @@ fn reject_inline_prompt(value: &Value) -> Result<(), JevError> {
         });
     }
     Ok(())
-}
-
-fn validate_state(document: &RequestDocument) -> Result<(), JevError> {
-    for answer in &document.state {
-        let Some(question) = document
-            .questions
-            .iter()
-            .find(|question| question.id == answer.question_id)
-        else {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} is not in the question set",
-                    answer.question_id
-                ),
-            });
-        };
-        if !question
-            .choices
-            .iter()
-            .any(|choice| choice == &answer.choice)
-        {
-            return Err(JevError::InputInvalid {
-                detail: format!(
-                    "state question {} has a choice that is not in the question",
-                    answer.question_id
-                ),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn parse_backend(text: &str) -> Result<BackendId, JevError> {
-    serde_json::from_value(Value::String(text.to_owned())).map_err(|_| JevError::InputInvalid {
-        detail: format!("backend {text} is not jev, anthropic_haiku, or openai_luna"),
-    })
 }
 
 fn request_json_error(error: serde_json::Error) -> JevError {
@@ -170,6 +131,24 @@ mod tests {
         assert!(hint.contains("check.toml"));
         assert!(hint.contains("packaged default"));
         assert!(!hint.contains("INLINE-PROMPT-TOKEN"));
+    }
+
+    #[test]
+    fn caller_json_uses_the_check_toml_rules() {
+        let repeated_state = br#"{"questions":[{"id":"q","prompt":"p","choices":["a","b"]}],"state":[{"question_id":"q","choice":"a"},{"question_id":"q","choice":"b"}]}"#;
+        let error = parse_caller_request(repeated_state).expect_err("repeat");
+        assert!(error.fix_hint().contains("repeats question q"));
+        let duplicate_id = br#"{"questions":[{"id":"q","prompt":"p","choices":["a"]},{"id":"q","prompt":"p","choices":["a"]}]}"#;
+        let error = parse_caller_request(duplicate_id).expect_err("duplicate");
+        assert!(error.fix_hint().contains("repeated"));
+        let empty_prompt = br#"{"questions":[{"id":"q","prompt":"  ","choices":["a"]}]}"#;
+        let error = parse_caller_request(empty_prompt).expect_err("empty");
+        assert!(error.fix_hint().contains("instructions are empty"));
+        let empty_id = br#"{"questions":[{"id":"","prompt":"p","choices":["a"]}]}"#;
+        assert_eq!(
+            parse_caller_request(empty_id).expect_err("id").code(),
+            "INPUT_INVALID"
+        );
     }
 
     #[test]

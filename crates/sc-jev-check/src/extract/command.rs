@@ -149,7 +149,7 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
     let mut child = command
         .spawn()
         .map_err(|error| JevError::ExtractionFailed {
-            detail: format!("failed to spawn {}: {error}", argv[0]),
+            detail: format!("failed to spawn {} (cause: {})", argv[0], error.kind()),
         })?;
     let stdout = child
         .stdout
@@ -182,7 +182,7 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
                 let _ = stdout_reader.finish_by(deadline);
                 let _ = stderr_reader.finish_by(deadline);
                 return Err(JevError::ExtractionFailed {
-                    detail: format!("failed to wait for command: {error}"),
+                    detail: format!("failed to wait for command (cause: {})", error.kind()),
                 });
             }
         }
@@ -221,7 +221,7 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
             detail: format!("stdout exceeds {MAX_COMMAND_STDOUT_BYTES} bytes"),
         }),
         Err(CapError::Io(error)) => Err(JevError::ExtractionFailed {
-            detail: format!("stdout read failed: {error}"),
+            detail: format!("stdout read failed (cause: {})", error.kind()),
         }),
     }
 }

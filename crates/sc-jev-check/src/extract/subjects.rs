@@ -57,9 +57,9 @@ pub(crate) fn extract_subjects(
 ///
 /// # Errors
 ///
-/// Returns [`JevError::ExtractionInvalid`] when the document is not the
-/// schema, [`JevError::ExtractionEmpty`] when `subjects` is empty, and
-/// [`JevError::InputInvalid`] when the bytes are not JSON.
+/// Returns [`JevError::ExtractionInvalid`] when the bytes are not JSON or
+/// the document is not the schema, and [`JevError::ExtractionEmpty`] when
+/// `subjects` is empty.
 pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
     let document: SubjectsDocument =
         serde_json::from_slice(bytes).map_err(|error| JevError::ExtractionInvalid {
@@ -72,7 +72,10 @@ pub fn parse_subjects_bytes(bytes: &[u8]) -> Result<Extracted, JevError> {
     })
 }
 
-/// Checks schema id, id rules, spans, and sort order.
+/// Checks schema id, id rules, spans, sort order, and the helper-capture rule.
+///
+/// A capture name beginning with `_` (a query helper, stored without `@`)
+/// must not appear.
 ///
 /// # Errors
 ///
@@ -97,7 +100,9 @@ pub fn validate_subjects_document(document: &SubjectsDocument) -> Result<(), Jev
     let mut previous: Option<(u32, &str)> = None;
     let mut line_counts: Vec<(u32, u32)> = Vec::new();
     for subject in &document.subjects {
-        if subject.capture.starts_with("@_") {
+        // Capture names are stored without `@`; query helpers (`@_name`)
+        // arrive as `_name`. Producers drop them, so one here is a leak.
+        if subject.capture.trim_start_matches('@').starts_with('_') {
             return Err(JevError::ExtractionInvalid {
                 detail: format!("helper capture {} must not be emitted", subject.capture),
             });
@@ -236,10 +241,12 @@ mod tests {
     #[test]
     fn subjects_helper_capture_is_rejected() {
         let mut value = minimal_value();
-        value["subjects"][0]["capture"] = serde_json::json!("@_skip");
-        let error =
-            parse_subjects_bytes(&serde_json::to_vec(&value).expect("bytes")).expect_err("helper");
-        assert_eq!(error.code(), "EXTRACTION_INVALID");
+        for helper in ["_skip", "@_skip"] {
+            value["subjects"][0]["capture"] = serde_json::json!(helper);
+            let error = parse_subjects_bytes(&serde_json::to_vec(&value).expect("bytes"))
+                .expect_err("helper");
+            assert_eq!(error.code(), "EXTRACTION_INVALID", "{helper}");
+        }
     }
 
     #[test]

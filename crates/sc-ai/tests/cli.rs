@@ -779,44 +779,66 @@ fn cli_run_resolves_dotenv_key_and_dry_run_does_not() {
 }
 
 #[test]
-fn cli_default_log_root_and_env_override() {
+fn cli_dry_run_writes_nothing_and_ask_uses_default_log_root() {
     let repo = TempDir::new("logroot");
     write_repo(repo.path());
-    let sessions = TempDir::new("logroot-sessions");
-    let default_run = Command::new(binary())
+    let sessions_parent = TempDir::new("logroot-sessions");
+    let sessions = sessions_parent.path().join("sessions");
+    let dry = Command::new(binary())
         .args([
             "jev",
             "dry-run",
             "--repo-root",
             repo.path().to_str().expect("utf8"),
             "--sessions-dir",
-            sessions.path().to_str().expect("utf8"),
+            sessions.to_str().expect("utf8"),
         ])
         .env_remove("SC_LOG_ROOT")
         .output()
-        .expect("default log root");
-    assert!(default_run.status.success());
-    assert!(repo.path().join(".sc-ai").is_dir());
+        .expect("dry-run");
+    assert!(
+        dry.status.success(),
+        "{}",
+        String::from_utf8_lossy(&dry.stderr)
+    );
+    assert!(
+        !repo.path().join(".sc-ai").exists(),
+        "dry-run made a log root"
+    );
+    assert!(!sessions.exists(), "dry-run made a sessions dir");
 
-    let custom = TempDir::new("logroot-env");
-    let env_run = Command::new(binary())
-        .args([
+    let absent = "00000000-0000-4000-8000-000000000000";
+    let ask = |log_root: Option<&Path>| {
+        let mut command = Command::new(binary());
+        command.args([
             "jev",
-            "dry-run",
+            "ask",
             "--repo-root",
             repo.path().to_str().expect("utf8"),
             "--sessions-dir",
-            sessions.path().to_str().expect("utf8"),
-        ])
-        .env("SC_LOG_ROOT", custom.path())
-        .output()
-        .expect("env log root");
-    assert!(
-        env_run.status.success(),
-        "{}",
-        String::from_utf8_lossy(&env_run.stderr)
-    );
-    assert!(custom.path().is_dir());
+            sessions.to_str().expect("utf8"),
+            "--session-id",
+            absent,
+            "--text",
+            "why?",
+        ]);
+        match log_root {
+            Some(root) => command.env("SC_LOG_ROOT", root),
+            None => command.env_remove("SC_LOG_ROOT"),
+        };
+        command.output().expect("ask")
+    };
+    let default_root = ask(None);
+    assert_eq!(default_root.status.code(), Some(2));
+    let err: Value = serde_json::from_slice(&default_root.stderr).expect("stderr json");
+    assert_eq!(err["error"], "SESSION_NOT_FOUND");
+    assert!(repo.path().join(".sc-ai").is_dir());
+
+    let custom = TempDir::new("logroot-env");
+    let env_root = custom.path().join("root");
+    let env_run = ask(Some(&env_root));
+    assert_eq!(env_run.status.code(), Some(2));
+    assert!(env_root.is_dir());
 }
 
 fn null_device() -> &'static str {

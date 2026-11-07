@@ -38,7 +38,7 @@ impl JudgeBackend for ScriptedJudge {
     }
 
     fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-        if is_llm(self.id) && request.llm.is_none() {
+        if self.id.is_llm() && request.llm.is_none() {
             return Err(JevError::InputInvalid {
                 detail: "LLM system prompt is required".into(),
             });
@@ -83,10 +83,6 @@ fn shared_judges(ids: &[BackendId], answers: serde_json::Value) -> Vec<ScriptedJ
         .copied()
         .map(|id| ScriptedJudge::new(id, Arc::clone(&shared)))
         .collect()
-}
-
-fn is_llm(id: BackendId) -> bool {
-    matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
 }
 
 #[cfg(test)]

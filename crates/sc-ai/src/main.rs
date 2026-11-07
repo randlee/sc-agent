@@ -15,9 +15,7 @@ fn main() -> ExitCode {
     let stdin = if reads_stdin(&args) {
         let mut buf = Vec::new();
         if let Err(error) = io::stdin().read_to_end(&mut buf) {
-            emit(&JevError::operational_io(&format!(
-                "stdin could not be read ({error}). Retry or pass --request-json as a file path."
-            )));
+            emit(&JevError::io_failed("stdin", &error));
             return ExitCode::from(2);
         }
         buf
@@ -27,9 +25,7 @@ fn main() -> ExitCode {
     match execute(&args, &stdin, ExecuteOverrides::default()) {
         Ok(bytes) => {
             if let Err(error) = io::stdout().write_all(&bytes) {
-                emit(&JevError::operational_io(&format!(
-                    "stdout write failed ({error}). Check that stdout is writable and retry."
-                )));
+                emit(&JevError::io_failed("stdout", &error));
                 return ExitCode::from(2);
             }
             ExitCode::SUCCESS

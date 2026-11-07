@@ -63,10 +63,10 @@ pub fn execute(
     stdin: &[u8],
     overrides: ExecuteOverrides,
 ) -> Result<Vec<u8>, JevError> {
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+    if args.is_empty() || leading(args).any(|arg| arg == "--help" || arg == "-h") {
         return Ok(text_bytes(help_for(args)));
     }
-    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+    if leading(args).any(|arg| arg == "--version" || arg == "-V") {
         return Ok(text_bytes(&version_line()));
     }
     match parse(args, stdin)? {
@@ -75,6 +75,16 @@ pub fn execute(
         Parsed::Ask(ask) => dispatch_ask(ask, &overrides),
     }
 }
+
+/// Argument slots where `--help` and `--version` are recognised.
+///
+/// `sc-ai --help`, `sc-ai jev --help`, and `sc-ai jev run --help` print help.
+/// Later positions are flag values, so `ask --text --help` is not help.
+fn leading(args: &[String]) -> impl Iterator<Item = &String> {
+    args.iter().take(HELP_POSITIONS)
+}
+
+const HELP_POSITIONS: usize = 3;
 
 fn version_line() -> String {
     format!("sc-ai {}", env!("CARGO_PKG_VERSION"))
@@ -312,8 +322,12 @@ fn parse_flags(args: &[String]) -> Result<Flags, JevError> {
     Ok(flags)
 }
 
+/// Stores `--flag=value`.
+///
+/// The `=` form binds the value explicitly, so a value may start with `-`
+/// (`--text=-1 is wrong`, `--rev=-`). Only an empty value is refused.
 fn assign(flags: &mut Flags, flag: &str, value: String) -> Result<(), JevError> {
-    if value.is_empty() || (value.starts_with('-') && !(flag == "--request-json" && value == "-")) {
+    if value.is_empty() {
         return Err(missing_value(flag));
     }
     match flag {
@@ -429,7 +443,10 @@ fn dispatch_run(
     overrides: &ExecuteOverrides,
 ) -> Result<Vec<u8>, JevError> {
     let repo = resolve_repo(command.repo_root.as_deref())?;
-    let rev = command.rev.as_deref().map_or_else(Rev::worktree, Rev::new);
+    let rev = command
+        .rev
+        .as_deref()
+        .map_or_else(|| Ok(Rev::worktree()), Rev::parse)?;
     let sessions_dir = command
         .sessions_dir
         .clone()
@@ -466,8 +483,6 @@ fn dispatch_run(
         };
         PreparedRun::Check { spec, backends }
     };
-    let prepared = prepare_log(&log_root, overrides)?;
-    let sessions = open_sessions(&sessions_dir, Arc::clone(&prepared.shared), overrides)?;
     let readback = RunReadback {
         check_toml: command
             .check
@@ -491,9 +506,21 @@ fn dispatch_run(
         }),
         sessions_dir: path_text(&sessions_dir),
     };
-    let mut opts = RunOptions::new(repo, sessions, Arc::clone(&prepared.shared))
-        .dry_run(dry_run)
-        .rev(rev);
+    // A dry-run sends nothing, so it opens no log, logger thread, or
+    // session directory (ARCHE-019).
+    let prepared = if dry_run {
+        None
+    } else {
+        Some(prepare_log(&log_root, overrides)?)
+    };
+    let mut opts = match &prepared {
+        None => RunOptions::dry_run_only(repo),
+        Some(prepared) => {
+            let sessions = open_sessions(&sessions_dir, Arc::clone(&prepared.shared), overrides)?;
+            RunOptions::new(repo, sessions, Arc::clone(&prepared.shared))
+        }
+    }
+    .rev(rev);
     if let Some(registry) = &overrides.registry {
         opts = opts.registry(registry.clone());
     }
@@ -518,7 +545,7 @@ fn dispatch_run(
             run_check(&spec, &backends, opts)
         }
     }?;
-    let warning = finish_log(&prepared);
+    let warning = prepared.as_ref().and_then(finish_log);
     let operation = if dry_run { OP_DRY_RUN } else { OP_RUN };
     let mut data = run_data(&result, &readback, dry_run)?;
     attach_warning(&mut data, warning);
@@ -580,9 +607,8 @@ fn dispatch_ask(command: AskCommand, overrides: &ExecuteOverrides) -> Result<Vec
     );
     body.insert(
         "readback".to_owned(),
-        serde_json::to_value(&readback).map_err(|_| JevError::InputInvalid {
-            detail: "response JSON could not be encoded".into(),
-        })?,
+        serde_json::to_value(&readback)
+            .map_err(|error| JevError::encode_failed("ask readback", &error))?,
     );
     let mut data = Value::Object(body);
     attach_warning(&mut data, warning);
@@ -600,9 +626,8 @@ fn run_data(
     }
     data.insert(
         "session_id".to_owned(),
-        serde_json::to_value(result.session_id).map_err(|_| JevError::InputInvalid {
-            detail: "response JSON could not be encoded".into(),
-        })?,
+        serde_json::to_value(result.session_id)
+            .map_err(|error| JevError::encode_failed("session id", &error))?,
     );
     data.insert(
         "prompt_sha256".to_owned(),
@@ -610,29 +635,25 @@ fn run_data(
     );
     data.insert(
         "readback".to_owned(),
-        serde_json::to_value(readback).map_err(|_| JevError::InputInvalid {
-            detail: "response JSON could not be encoded".into(),
-        })?,
+        serde_json::to_value(readback)
+            .map_err(|error| JevError::encode_failed("run readback", &error))?,
     );
     if dry_run {
         data.insert(
             "payload".to_owned(),
-            serde_json::from_slice(result.bundle.bytes()).map_err(|_| JevError::InputInvalid {
-                detail: "canonical payload was not JSON".into(),
-            })?,
+            serde_json::from_slice(result.bundle.bytes())
+                .map_err(|error| JevError::encode_failed("canonical payload", &error))?,
         );
     } else {
         data.insert(
             "outcomes".to_owned(),
-            serde_json::to_value(&result.outcomes).map_err(|_| JevError::InputInvalid {
-                detail: "response JSON could not be encoded".into(),
-            })?,
+            serde_json::to_value(&result.outcomes)
+                .map_err(|error| JevError::encode_failed("judge outcomes", &error))?,
         );
         data.insert(
             "equal_input".to_owned(),
-            serde_json::to_value(&result.equal_input).map_err(|_| JevError::InputInvalid {
-                detail: "response JSON could not be encoded".into(),
-            })?,
+            serde_json::to_value(&result.equal_input)
+                .map_err(|error| JevError::encode_failed("equal-input record", &error))?,
         );
     }
     Ok(Value::Object(data))
@@ -698,22 +719,13 @@ fn request_bytes(repo: &RepoRoot, spec: &str, stdin: &[u8]) -> Result<Vec<u8>, J
                 path: path.display().to_string(),
             }
         } else {
-            JevError::operational_io(&format!(
-                "request JSON {} could not be read ({error}). Check the file permissions and retry.",
-                path.display()
-            ))
+            JevError::io_failed(&format!("request JSON {}", path.display()), &error)
         }
     })
 }
 
 fn parse_flag_backends(flags: &[String]) -> Result<Vec<BackendId>, JevError> {
-    flags.iter().map(|text| parse_backend(text)).collect()
-}
-
-fn parse_backend(text: &str) -> Result<BackendId, JevError> {
-    serde_json::from_value(Value::String(text.to_owned())).map_err(|_| JevError::InputInvalid {
-        detail: format!("backend {text} is not jev, anthropic_haiku, or openai_luna"),
-    })
+    flags.iter().map(|text| text.parse::<BackendId>()).collect()
 }
 
 fn parse_session_id(text: &str) -> Result<SessionId, JevError> {
@@ -906,6 +918,47 @@ mod tests {
     fn relative_repo_root_is_absolutized() {
         let repo = resolve_repo(Some(Path::new("."))).expect("cwd is a directory");
         assert!(repo.as_path().is_absolute());
+    }
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| (*item).to_owned()).collect()
+    }
+
+    #[test]
+    fn equals_form_accepts_values_starting_with_dash() {
+        let flags = parse_flags(&args(&["--text=-1 is wrong", "--rev=-x"])).expect("flags");
+        assert_eq!(flags.text.as_deref(), Some("-1 is wrong"));
+        assert_eq!(flags.rev.as_deref(), Some("-x"));
+        let error = match parse_flags(&args(&["--text="])) {
+            Ok(_) => panic!("empty value must fail"),
+            Err(error) => error,
+        };
+        assert!(error.fix_hint().contains("--text requires a value"));
+    }
+
+    #[test]
+    fn help_is_recognised_only_in_leading_positions() {
+        for help in [
+            args(&["--help"]),
+            args(&["jev", "--help"]),
+            args(&["jev", "ask", "-h"]),
+        ] {
+            let bytes = execute(&help, &[], ExecuteOverrides::default()).expect("help");
+            assert!(String::from_utf8_lossy(&bytes).contains("sc-ai jev"));
+        }
+        let error = execute(
+            &args(&["jev", "ask", "--session-id", "x", "--text=--help"]),
+            &[],
+            ExecuteOverrides::default(),
+        )
+        .expect_err("--help as a value is not help");
+        assert!(error.fix_hint().contains("UUID"), "{}", error.fix_hint());
+    }
+
+    #[test]
+    fn rev_flag_uses_rev_parse() {
+        let error = Rev::parse("-x").expect_err("leading dash");
+        assert_eq!(error.code(), "INPUT_INVALID");
     }
 
     #[test]

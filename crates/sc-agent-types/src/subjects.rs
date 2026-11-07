@@ -61,7 +61,8 @@ pub struct Span {
 pub struct Subject {
     /// `{path}:{start_line}` or `{path}:{start_line}:{n}` for later same-line hits.
     pub id: String,
-    /// Capture name. Names starting with `@_` are not emitted.
+    /// Capture name, stored without `@`. Names starting with `_` (query
+    /// helper captures `@_…`) are not emitted.
     pub capture: String,
     /// UTF-8 slice `[start_byte, end_byte)` of the source.
     pub text: String,

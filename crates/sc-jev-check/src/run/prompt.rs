@@ -8,7 +8,7 @@ use std::path::Path;
 
 use sc_agent_types::{JevError, RepoRoot, Rev};
 
-use crate::config::{CheckSpec, PromptOrigin, load_packaged_config};
+use crate::config::{CheckSpec, PromptOrigin};
 use crate::extract::read_repo_text;
 
 pub(crate) fn load_request_system_prompt(
@@ -43,8 +43,7 @@ pub(crate) fn load_system_prompt(
     if let Some(path) = override_path {
         return Ok(Some(read_override(repo.as_path(), path)?));
     }
-    let packaged = load_packaged_config()?;
-    let resolved = spec.resolve_prompt_path(&packaged);
+    let resolved = spec.resolve_prompt_path();
     match resolved.origin {
         PromptOrigin::PackagedAsset => {
             non_empty(crate::config::PACKAGED_SYSTEM_PROMPT, &resolved.path)

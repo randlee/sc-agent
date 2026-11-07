@@ -131,8 +131,9 @@ impl FileSessionStore {
         let dir = dir.into();
         create_private_dir(&dir).map_err(|error| {
             JevError::session_store_io(&format!(
-                "Create session directory {} or choose a writable directory ({error}).",
-                dir.display()
+                "Create session directory {} or choose a writable directory (cause: {}).",
+                dir.display(),
+                error.kind()
             ))
         })?;
         Ok(Self {
@@ -304,7 +305,7 @@ impl FileSessionStore {
                 return Err(session_io(
                     &path,
                     &self.dir,
-                    &format!("could not be opened ({error})"),
+                    &format!("could not be opened (cause: {})", error.kind()),
                 ));
             }
         };
@@ -312,7 +313,11 @@ impl FileSessionStore {
         file.take(MAX_SESSION_BYTES.saturating_add(1))
             .read_to_end(&mut bytes)
             .map_err(|error| {
-                session_io(&path, &self.dir, &format!("could not be read ({error})"))
+                session_io(
+                    &path,
+                    &self.dir,
+                    &format!("could not be read (cause: {})", error.kind()),
+                )
             })?;
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_SESSION_BYTES {
             return Err(session_parse(
@@ -321,7 +326,10 @@ impl FileSessionStore {
             ));
         }
         let document: SessionDocument = serde_json::from_slice(&bytes).map_err(|error| {
-            session_parse(&path, &format!("is not a session document ({error})"))
+            session_parse(
+                &path,
+                &format!("is not a session document ({})", json_cause(&error)),
+            )
         })?;
         if document.version != SESSION_VERSION || document.session_id != *id {
             return Err(session_parse(
@@ -338,10 +346,18 @@ impl FileSessionStore {
 
     fn write_document(&self, document: &SessionDocument) -> Result<(), JevError> {
         let path = self.path(&document.session_id);
-        let bytes = serde_json::to_vec(document)
-            .map_err(|error| session_parse(&path, &format!("could not be encoded ({error})")))?;
+        let bytes = serde_json::to_vec(document).map_err(|error| {
+            session_parse(
+                &path,
+                &format!("could not be encoded ({})", json_cause(&error)),
+            )
+        })?;
         write_private(&path, &bytes).map_err(|error| {
-            session_io(&path, &self.dir, &format!("could not be written ({error})"))
+            session_io(
+                &path,
+                &self.dir,
+                &format!("could not be written (cause: {})", error.kind()),
+            )
         })
     }
 
@@ -360,15 +376,15 @@ impl SessionStore for FileSessionStore {
 
     fn ask(&self, id: &SessionId, follow_up: &str) -> Result<JudgeOutcome, JevError> {
         if follow_up.trim().is_empty() {
-            return Err(JevError::InputInvalid {
-                detail: "follow-up text is empty".into(),
-            });
+            return Err(follow_up_invalid(
+                "The follow-up text is empty. Pass non-empty text to ask.",
+            ));
         }
         let stored = self.load(id)?;
-        if !is_llm(stored.backend) {
-            return Err(JevError::InputInvalid {
-                detail: "Jev sessions have no rationale field; ask a Haiku or Luna session".into(),
-            });
+        if !stored.backend.is_llm() {
+            return Err(follow_up_invalid(
+                "Jev sessions have no rationale field. Ask a Haiku or Luna session instead.",
+            ));
         }
         let backend = self.backend(stored.backend)?;
         let mut prompt = stored.system_prompt.clone().unwrap_or_default();
@@ -439,9 +455,8 @@ pub fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String, JevEr
             answers: &outcome.answers,
         })
         .collect();
-    let json = serde_json::to_string(&prior).map_err(|error| JevError::InputInvalid {
-        detail: format!("session context encoding failed: {error}"),
-    })?;
+    let json = serde_json::to_string(&prior)
+        .map_err(|error| JevError::encode_failed("session context", &error))?;
     Ok(format!("\n\n{SESSION_CONTEXT_HEADER}\n{json}"))
 }
 
@@ -449,8 +464,14 @@ pub(crate) fn emit_log(log: &SharedSessionLog, event: LogEvent) {
     let _ = log.try_log(event);
 }
 
-pub(crate) fn is_llm(id: BackendId) -> bool {
-    matches!(id, BackendId::AnthropicHaiku | BackendId::OpenAiLuna)
+/// `serde_json` failure without its message, which can quote document values.
+fn json_cause(error: &serde_json::Error) -> String {
+    format!(
+        "{:?} error at line {} column {}",
+        error.classify(),
+        error.line(),
+        error.column()
+    )
 }
 
 fn session_io(path: &Path, dir: &Path, problem: &str) -> JevError {
@@ -468,10 +489,22 @@ fn session_parse(path: &Path, problem: &str) -> JevError {
     ))
 }
 
-fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
+/// Canonical payload bytes as UTF-8 text.
+///
+/// The one definition in this crate; session files store the payload as text.
+///
+/// # Errors
+///
+/// Returns [`JevError::InputInvalid`] when the bytes are not UTF-8.
+pub(crate) fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
     String::from_utf8(bytes.to_vec()).map_err(|_| JevError::InputInvalid {
         detail: "canonical payload is not UTF-8".into(),
     })
+}
+
+/// `INPUT_INVALID` for a refused `ask` whose fix hint is `recovery` verbatim.
+fn follow_up_invalid(recovery: &str) -> JevError {
+    JevError::operational_io(recovery)
 }
 
 fn unix_ms(time: SystemTime) -> Result<u64, JevError> {

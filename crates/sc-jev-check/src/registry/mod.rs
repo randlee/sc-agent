@@ -101,11 +101,7 @@ impl std::fmt::Debug for BackendRegistry {
 /// Credential id used to construct `id`.
 #[must_use]
 pub(crate) fn backend_key_id(id: BackendId) -> BackendKeyId {
-    match id {
-        BackendId::Jev => BackendKeyId::TypeSafe,
-        BackendId::AnthropicHaiku => BackendKeyId::Anthropic,
-        BackendId::OpenAiLuna => BackendKeyId::OpenAi,
-    }
+    id.key_id()
 }
 
 /// Resolves keys at `repo` and constructs one backend per `ids` entry.
