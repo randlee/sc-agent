@@ -42,7 +42,6 @@ mimalloc = "=0.1.52"
 # Dev-only. Tests use tempfile::TempDir instead of hand-rolled temp dirs.
 tempfile = "3"
 
-# Every crate opts in with `[lints] workspace = true`. sc-jev-py keeps its own
-# lint settings (PyO3 macros); wave 3 of a-10 decides how it opts in.
+# Every crate, sc-jev-py included, opts in with `[lints] workspace = true`.
 [workspace.lints.rust]
 unsafe_code = "forbid"

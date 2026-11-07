@@ -75,6 +75,16 @@ features to maturin.
   and `coverage/summary.json` as the `coverage-summary` artifact and writes the
   table to the job summary. Nothing is sent to a third-party service.
 
+- **Tests do not run from a packaged `.crate`.** Some `cfg(test)` code reads
+  files outside the crate directory: `sc-jev-check` (`lib.rs`), `sc-ai` and
+  `sc-treesitter` tests and `jev_cross_impl` include
+  `tests/support/deadline.rs` with `#[path]`, and `sc-jev`'s `shared_copies`
+  test uses `include_str!` on `sc-jev-backends` sources. Those paths are not in
+  the packaged `include` lists, so `cargo test` inside an extracted tarball
+  does not compile. Nothing runs tests from tarballs: `cargo publish
+  --dry-run` builds the library targets only, and every test job runs in the
+  workspace checkout. No gating is applied (QA-010).
+
 ## Upstream issues to file (sc-lint)
 
 These belong to the sc-lint kit, not sc-publish (sc-publish kit issues are in

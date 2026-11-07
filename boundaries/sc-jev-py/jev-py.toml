@@ -53,7 +53,9 @@ scope = "outside_owner_crate"
 forbidden = []
 
 # Required by the schema. Declarative: sc-lint 0.8.0 reports nothing for
-# these fields. Paths name the feature-gated (`test-util`) test doubles.
+# these fields. None listed: this crate has no test doubles of its own; the
+# `test-util` feature only registers `_testing.run_check_scripted`, which
+# forwards to sc-jev-check's scripted judges (ADR-SAG-0029).
 [testing]
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
