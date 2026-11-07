@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "session_id": "0b7c9d1e-2f3a-4b5c-8d6e-7f8091a2b3c4",
+  "backend": "anthropic_haiku",
+  "created_at": 1700000000000,
+  "payload_utf8": "{\"questions\":[{\"choices\":[\"no\",\"yes\"],\"id\":\"relevant\",\"prompt\":\"Does it apply?\"}],\"state\":[]}",
+  "prompt_sha256": "79b58710e937c53180dc2f263c9e09fce6afc2168b4a3f019b4f600aac30e0a3",
+  "system_prompt": "base prompt",
+  "outcomes": [
+    {
+      "answers": {
+        "relevant": {
+          "choice": "yes"
+        }
+      },
+      "backend": "anthropic_haiku",
+      "probabilities": null,
+      "provider_meta": null
+    }
+  ],
+  "follow_ups": []
+}

@@ -5,8 +5,8 @@
 use super::*;
 use crate::config::{PACKAGED_SYSTEM_PROMPT, load_check_at};
 use crate::extract::test_support::{self, copy_fixture};
-use crate::registry::ScriptedJudge;
-use sc_agent_types::observability::v2::{EventError, LogEvent, NoopSessionLog, SessionLog};
+use sc_agent_types::observability::v2::{LogEvent, LogRejected, NoopSessionLog, SessionLog};
+use sc_agent_types::test_util::MockJudgeBackend;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -27,13 +27,13 @@ struct JsonlSink {
 }
 
 impl SessionLog for JsonlSink {
-    fn try_log(&self, event: LogEvent) -> Result<(), EventError> {
+    fn emit(&self, event: LogEvent) -> Result<(), LogRejected> {
         use std::io::Write;
         let line = serde_json::json!({
-            "session_id": event.session_id.to_string(),
-            "backend": event.backend.to_string(),
-            "prompt_sha256": event.prompt_sha256.as_str(),
-            "operation": event.operation.as_str(),
+            "session_id": event.session_id().to_string(),
+            "backend": event.backend().to_string(),
+            "prompt_sha256": event.prompt_sha256().as_str(),
+            "operation": event.operation().as_str(),
         });
         let mut file = std::fs::OpenOptions::new()
             .create(true)
@@ -62,22 +62,32 @@ fn sessions_for(log: SharedSessionLog) -> (FileSessionStore, tempfile::TempDir) 
     (store, dir)
 }
 
-fn judge(id: BackendId, choice: &str) -> ScriptedJudge {
-    ScriptedJudge::new(id, serde_json::json!({"relevant": {"choice": choice}}))
+fn judge(id: BackendId, choice: &str) -> Arc<MockJudgeBackend> {
+    let answers = serde_json::from_value(serde_json::json!({"relevant": {"choice": choice}}))
+        .expect("answers");
+    Arc::new(MockJudgeBackend::new(id, answers))
 }
 
-fn registry_of(judges: &[&ScriptedJudge]) -> BackendRegistry {
+fn registry_of(judges: &[&Arc<MockJudgeBackend>]) -> BackendRegistry {
     let mut registry = BackendRegistry::new();
     for judge in judges {
         registry
-            .register(Arc::new((*judge).clone()))
+            .register(Arc::clone(*judge) as Arc<dyn sc_agent_types::JudgeBackend>)
             .expect("register");
     }
     registry
 }
 
+fn empty_bundle() -> PayloadBundle {
+    PayloadBundle::encode(&sc_agent_types::CanonicalJudgePayload::new(
+        Vec::new(),
+        Vec::new(),
+    ))
+    .expect("bundle")
+}
+
 fn system_prompt(request: &JudgeRequest) -> &str {
-    &request.llm.as_ref().expect("llm prompt").system_prompt
+    &request.llm().expect("llm prompt").system_prompt
 }
 
 #[test]
@@ -191,7 +201,7 @@ fn run_missing_llm_prompt_does_not_send() {
     )
     .expect("jev ignores missing prompt");
     assert!(jev.system_prompt.is_none());
-    assert!(jev.outcomes[0].answers["relevant"]["choice"] == "yes");
+    assert!(jev.outcomes[0].answers()["relevant"].choice().as_str() == "yes");
 }
 
 #[test]
@@ -210,10 +220,7 @@ fn run_refusing_backend_does_not_log() {
         .register(Arc::new(
             sc_agent_types::test_util::MockJudgeBackend::refusing(
                 BackendId::Jev,
-                JevError::InputTooLarge {
-                    limit_bytes: 4,
-                    actual_bytes: 8,
-                },
+                JevError::input_too_large(4, 8),
             ),
         ))
         .expect("register");
@@ -233,7 +240,7 @@ fn run_request_missing_llm_prompt_is_config_invalid() {
     let (sessions, _session_dir) = sessions_for(Arc::new(NoopSessionLog));
     let error = run_request(
         &RunRequest {
-            bundle: PayloadBundle::from_canonical_bytes(br#"{"questions":[],"state":[]}"#.to_vec()),
+            bundle: empty_bundle(),
             system_prompt: None,
             producer: None,
         },
@@ -261,7 +268,7 @@ fn run_without_backends_is_a_registry_hint() {
     let dir = test_support::temp_dir("no-backends");
     let error = run_request(
         &RunRequest {
-            bundle: PayloadBundle::from_canonical_bytes(br#"{"questions":[],"state":[]}"#.to_vec()),
+            bundle: empty_bundle(),
             system_prompt: None,
             producer: None,
         },
@@ -298,11 +305,8 @@ fn run_command_input_copies_producer() {
             .registry(registry_of(&[&judge(BackendId::Jev, "yes")])),
     )
     .expect("run");
-    let producer = result
-        .equal_input
-        .expect("equal")
-        .producer
-        .expect("producer");
+    let equal_input = result.equal_input.expect("equal");
+    let producer = equal_input.producer().expect("producer");
     assert_eq!(producer.name, "sc-treesitter");
     assert_eq!(producer.language, "python");
 }

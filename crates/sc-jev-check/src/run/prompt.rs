@@ -53,8 +53,8 @@ pub(crate) fn load_system_prompt(
         PromptOrigin::CheckToml => {
             let text = match read_repo_text(repo, rev, &resolved.path) {
                 Ok(text) => text,
-                Err(JevError::InputMissing { path }) => {
-                    return Err(JevError::PromptFileMissing { path });
+                Err(JevError::InputMissing { path, .. }) => {
+                    return Err(JevError::prompt_file_missing(path));
                 }
                 Err(error) => return Err(error),
             };
@@ -67,9 +67,9 @@ pub(crate) fn load_system_prompt(
 
 fn non_empty<'a>(text: &'a str, path: &str) -> Result<&'a str, JevError> {
     if text.trim().is_empty() {
-        Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {path} is empty"),
-        })
+        Err(JevError::config_invalid(format!(
+            "system prompt {path} is empty"
+        )))
     } else {
         Ok(text)
     }
@@ -91,45 +91,42 @@ fn read_override(repo: &Path, path: &Path) -> Result<String, JevError> {
     let metadata = match std::fs::metadata(&full) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(JevError::PromptFileMissing { path: display });
+            return Err(JevError::prompt_file_missing(display));
         }
         Err(error) => {
-            return Err(JevError::ConfigInvalid {
-                detail: format!(
-                    "system prompt {display} could not be read ({})",
-                    error.kind()
-                ),
-            });
+            return Err(JevError::config_invalid(format!(
+                "system prompt {display} could not be read ({})",
+                error.kind()
+            )));
         }
     };
     if !metadata.is_file() {
-        return Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {display} is not a regular file"),
-        });
+        return Err(JevError::config_invalid(format!(
+            "system prompt {display} is not a regular file"
+        )));
     }
-    let file = std::fs::File::open(&full).map_err(|error| JevError::ConfigInvalid {
-        detail: format!(
+    let file = std::fs::File::open(&full).map_err(|error| {
+        JevError::config_invalid(format!(
             "system prompt {display} could not be opened ({})",
             error.kind()
-        ),
+        ))
     })?;
     let mut bytes = Vec::new();
     file.take(MAX_PROMPT_BYTES.saturating_add(1))
         .read_to_end(&mut bytes)
-        .map_err(|error| JevError::ConfigInvalid {
-            detail: format!(
+        .map_err(|error| {
+            JevError::config_invalid(format!(
                 "system prompt {display} could not be read ({})",
                 error.kind()
-            ),
+            ))
         })?;
     if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_PROMPT_BYTES {
-        return Err(JevError::ConfigInvalid {
-            detail: format!("system prompt {display} exceeds {MAX_PROMPT_BYTES} bytes"),
-        });
+        return Err(JevError::config_invalid(format!(
+            "system prompt {display} exceeds {MAX_PROMPT_BYTES} bytes"
+        )));
     }
-    let text = String::from_utf8(bytes).map_err(|_| JevError::ConfigInvalid {
-        detail: format!("system prompt {display} is not UTF-8"),
-    })?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| JevError::config_invalid(format!("system prompt {display} is not UTF-8")))?;
     non_empty(&text, &display).map(str::to_owned)
 }
 

@@ -17,7 +17,9 @@ mod private {
     pub trait Sealed {}
 }
 
-use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev, Subject, SubjectsDocument};
+use crate::config::InputSpec;
+use sc_agent_types::schema::subjects::{Subject, SubjectsDocument};
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 /// Subjects produced by one input, plus the source document when there is one.
 #[derive(Debug, Clone, PartialEq, Eq)]

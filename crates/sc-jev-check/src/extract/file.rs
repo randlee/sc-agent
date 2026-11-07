@@ -1,6 +1,8 @@
 //! `file` extractor.
 
-use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev, Span, Subject};
+use crate::config::InputSpec;
+use sc_agent_types::schema::subjects::{Span, Subject};
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 use super::Extracted;
 use super::Extractor;
@@ -34,31 +36,24 @@ pub(crate) fn extract_file(
     input: &InputSpec,
 ) -> Result<Extracted, JevError> {
     let InputSpec::File { path } = input else {
-        return Err(JevError::ConfigInvalid {
-            detail: "file extractor received a different input kind".into(),
-        });
+        return Err(JevError::config_invalid(
+            "file extractor received a different input kind",
+        ));
     };
     let text = read_repo_text(repo, rev, path)?;
     if text.is_empty() {
         return Err(JevError::InputEmpty);
     }
-    let end_byte = u32::try_from(text.len()).map_err(|_| JevError::InputTooLarge {
-        limit_bytes: u64::from(u32::MAX),
-        actual_bytes: text.len() as u64,
-    })?;
+    let end_byte = u32::try_from(text.len())
+        .map_err(|_| JevError::input_too_large(u64::from(u32::MAX), text.len() as u64))?;
     let end_line = u32::try_from(text.lines().count().max(1)).unwrap_or(u32::MAX);
     Ok(Extracted {
-        subjects: vec![Subject {
-            id: format!("{path}:1"),
-            capture: "file".into(),
+        subjects: vec![Subject::new(
+            format!("{path}:1"),
+            "file",
             text,
-            span: Span {
-                start_line: 1,
-                end_line,
-                start_byte: 0,
-                end_byte,
-            },
-        }],
+            Span::new(1, end_line, 0, end_byte),
+        )],
         document: None,
     })
 }
@@ -66,8 +61,8 @@ pub(crate) fn extract_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::InputSpec;
     use crate::extract::test_support::{git_fixture, temp_dir};
-    use sc_agent_types::InputSpec;
 
     #[test]
     fn extractors_file_reads_git_rev_not_the_worktree() {
@@ -83,9 +78,9 @@ mod tests {
         let worktree = FileExtractor
             .extract(&repo, &Rev::worktree(), &input)
             .expect("worktree");
-        assert_eq!(head[0].text, "alpha note\n");
-        assert_eq!(worktree[0].text, "worktree edit\n");
-        assert_eq!(head[0].id, "notes/readme.txt:1");
+        assert_eq!(head[0].text(), "alpha note\n");
+        assert_eq!(worktree[0].text(), "worktree edit\n");
+        assert_eq!(head[0].id(), "notes/readme.txt:1");
     }
 
     #[test]
@@ -109,7 +104,7 @@ mod tests {
                 },
             )
             .expect("note");
-        assert_eq!(found[0].text, "from-root\n");
+        assert_eq!(found[0].text(), "from-root\n");
     }
 
     #[test]

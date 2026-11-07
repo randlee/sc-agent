@@ -5,7 +5,11 @@ use super::*;
 use sc_agent_types::observability::v2::NoopSessionLog;
 
 fn bundle() -> PayloadBundle {
-    PayloadBundle::from_canonical_bytes(br#"{"questions":[],"state":[]}"#.to_vec())
+    PayloadBundle::encode(&sc_agent_types::CanonicalJudgePayload::new(
+        Vec::new(),
+        Vec::new(),
+    ))
+    .expect("bundle")
 }
 
 fn store(ttl: Duration) -> (FileSessionStore, tempfile::TempDir) {
@@ -86,12 +90,12 @@ fn session_writes_leave_no_temporary_files() {
     store
         .record_outcome(
             &id,
-            &JudgeOutcome {
-                answers: serde_json::json!({}),
-                backend: BackendId::Jev,
-                probabilities: None,
-                provider_meta: None,
-            },
+            &JudgeOutcome::new(
+                BackendId::Jev,
+                &JudgeRequest::new(Arc::new(bundle()), None),
+                BTreeMap::new(),
+            )
+            .expect("outcome"),
         )
         .expect("record");
     let names: Vec<String> = fs::read_dir(dir.path())

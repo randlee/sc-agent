@@ -58,11 +58,11 @@ pub(crate) fn read_repo_text(
     relative: &str,
 ) -> Result<String, JevError> {
     let bytes = read_repo_bytes(repo, rev, relative)?;
-    String::from_utf8(bytes).map_err(|error| JevError::InputInvalid {
-        detail: format!(
+    String::from_utf8(bytes).map_err(|error| {
+        JevError::input_invalid(format!(
             "{relative} is not UTF-8 (first invalid byte at offset {})",
             error.utf8_error().valid_up_to()
-        ),
+        ))
     })
 }
 
@@ -73,9 +73,9 @@ fn validate_relative(relative: &str) -> Result<(), JevError> {
         || relative.contains('\0')
         || relative.contains(':')
     {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} must be a repo-relative path"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} must be a repo-relative path"
+        )));
     }
     let path = Path::new(relative);
     if path.is_absolute()
@@ -83,9 +83,9 @@ fn validate_relative(relative: &str) -> Result<(), JevError> {
             .components()
             .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)))
     {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} escapes the repo root"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} escapes the repo root"
+        )));
     }
     Ok(())
 }
@@ -93,9 +93,7 @@ fn validate_relative(relative: &str) -> Result<(), JevError> {
 fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
     let root = std::fs::canonicalize(repo.as_path()).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            JevError::InputMissing {
-                path: repo.as_path().display().to_string(),
-            }
+            JevError::input_missing(repo.as_path().display().to_string())
         } else {
             JevError::io_failed("repo root", &error)
         }
@@ -103,23 +101,21 @@ fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
     let full = match std::fs::canonicalize(repo.as_path().join(relative)) {
         Ok(full) => full,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(JevError::InputMissing {
-                path: relative.to_owned(),
-            });
+            return Err(JevError::input_missing(relative.to_owned()));
         }
         Err(error) => return Err(JevError::io_failed(relative, &error)),
     };
     if !full.starts_with(&root) {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} resolves outside the repo root"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} resolves outside the repo root"
+        )));
     }
     let metadata =
         std::fs::metadata(&full).map_err(|error| JevError::io_failed(relative, &error))?;
     if !metadata.is_file() {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} is not a regular file"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} is not a regular file"
+        )));
     }
     let file = File::open(&full).map_err(|error| JevError::io_failed(relative, &error))?;
     let mut bytes = Vec::new();
@@ -128,10 +124,10 @@ fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
         .map_err(|error| JevError::io_failed(relative, &error))?;
     let actual_bytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if actual_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes: actual_bytes.max(metadata.len()),
-        });
+        return Err(JevError::input_too_large(
+            MAX_INPUT_BYTES,
+            actual_bytes.max(metadata.len()),
+        ));
     }
     Ok(bytes)
 }
@@ -153,7 +149,7 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         return Err(classify_git_failure(rev, relative, &probe));
     }
     let oid = object_id(&parsed.stdout).ok_or_else(|| {
-        JevError::operational_io(&format!(
+        JevError::operational_io(format!(
             "git rev-parse returned an unexpected object id for {relative} at {rev}. Retry; if it persists, check the git installation."
         ))
     })?;
@@ -162,9 +158,9 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         return Err(classify_git_failure(rev, relative, &kind));
     }
     if String::from_utf8_lossy(&kind.stdout).trim() != "blob" {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} is not a file at {rev}"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} is not a file at {rev}"
+        )));
     }
     let size = git(repo, &["cat-file", "-s", oid])?;
     if !size.status.success() {
@@ -174,15 +170,12 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         .trim()
         .parse::<u64>()
         .map_err(|_| {
-            JevError::operational_io(&format!(
+            JevError::operational_io(format!(
                 "git cat-file -s returned an unreadable size for {relative} at {rev}. Retry; if it persists, check the git installation."
             ))
         })?;
     if actual_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes,
-        });
+        return Err(JevError::input_too_large(MAX_INPUT_BYTES, actual_bytes));
     }
     let blob = git(repo, &["cat-file", "blob", oid])?;
     if !blob.status.success() {
@@ -190,10 +183,7 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
     }
     let read_bytes = u64::try_from(blob.stdout.len()).unwrap_or(u64::MAX);
     if read_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes: read_bytes,
-        });
+        return Err(JevError::input_too_large(MAX_INPUT_BYTES, read_bytes));
     }
     Ok(blob.stdout)
 }
@@ -216,7 +206,7 @@ fn git(repo: &RepoRoot, args: &[&str]) -> Result<Output, JevError> {
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|error| {
-            JevError::operational_io(&format!(
+            JevError::operational_io(format!(
                 "git could not be started (cause: {}). Install git or put it on PATH, then retry.",
                 error.kind()
             ))
@@ -237,9 +227,7 @@ fn classify_git_message(rev: &Rev, relative: &str, output: &Output) -> JevError 
     let message = stderr_tail(&output.stderr);
     let lower = message.to_ascii_lowercase();
     if lower.contains("does not exist in") || lower.contains("exists on disk, but not in") {
-        return JevError::InputMissing {
-            path: relative.to_owned(),
-        };
+        return JevError::input_missing(relative.to_owned());
     }
     if lower.contains("invalid object name")
         || lower.contains("not a valid object name")
@@ -247,11 +235,9 @@ fn classify_git_message(rev: &Rev, relative: &str, output: &Output) -> JevError 
         || lower.contains("unknown revision")
         || lower.contains("ambiguous argument")
     {
-        return JevError::InputInvalid {
-            detail: format!("revision {rev} could not be resolved: {message}"),
-        };
+        return JevError::input_invalid(format!("revision {rev} could not be resolved: {message}"));
     }
-    JevError::operational_io(&format!(
+    JevError::operational_io(format!(
         "git cat-file failed for {relative} at {rev} ({message}). Check that the repo root is a git repository and retry."
     ))
 }
