@@ -32,8 +32,10 @@ Later changes are additive: new enum variants (every public enum is
 
 `secret` and `judge` are independent; `git` needs only the core. Every
 combination builds (`cargo hack check -p sc-agent-types --feature-powerset
---no-dev-deps`). The catalog and the error-code enums sit in private sibling
-modules re-exported at the `ids` / `error` paths, because sc-boundary 0.8
+--no-dev-deps`). Every type above is reached through a crate-root
+re-export; the modules named in the table are private except `schema`,
+`observability`, `git` and `test_util`. The catalog and the error-code enums
+live in the private `catalog` and `code` modules because sc-boundary 0.8
 reports a type cycle inside one module.
 
 ## Errors (ADR-SAG-0027)

@@ -1,7 +1,8 @@
 //! The static backend catalog: [`BACKENDS`] rows of [`BackendDescriptor`].
 //!
-//! Re-exported through `ids` and the crate root; [`BackendId::descriptor`] is
-//! the one lookup.
+//! Private module, reached through the crate-root re-exports;
+//! [`BackendId::descriptor`] is the one lookup. Kept apart from `ids`
+//! because sc-boundary reports a type cycle inside one module.
 
 use crate::ids::{BackendId, BackendKeyId};
 

@@ -1,9 +1,9 @@
-//! Domain newtypes and the static backend catalog.
+//! Domain newtypes and [`BackendId`].
 //!
-//! [`BACKENDS`] is the one table of backend facts (REQ-SAG-0105,
-//! ADR-SAG-0009 r-1 amendment). [`BackendId::descriptor`] holds the only
-//! exhaustive `match` over [`BackendId`]; every other read goes through the
-//! descriptor.
+//! The backend catalog ([`BACKENDS`], one row of facts per id, REQ-SAG-0105)
+//! lives in the private `catalog` module. [`BackendId::descriptor`] holds the
+//! only exhaustive `match` over [`BackendId`]; every other read goes through
+//! the descriptor.
 
 use std::collections::BTreeSet;
 use std::fmt;

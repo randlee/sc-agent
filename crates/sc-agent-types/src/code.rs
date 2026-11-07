@@ -1,6 +1,7 @@
 //! Stable error ids and the closed enums `JevError` variants carry.
 //!
-//! Re-exported through `error` and the crate root.
+//! Private module, reached through the crate-root re-exports. Kept apart
+//! from `error` because sc-boundary reports a type cycle inside one module.
 
 use std::fmt;
 use std::str::FromStr;
