@@ -202,11 +202,12 @@ fn test_agent_is_reused_across_sends() {
 #[test]
 fn test_timeout_is_network_error_without_the_key() {
     // The server holds the connection until `finish`, so the only clock in
-    // play is the client request timeout.
+    // play is the client request timeout. 1 s leaves ample time to connect
+    // and write the request first, so the stall is the only possible cause.
     let server = LoopbackServer::start(vec![Reply::Stall]);
     let transport = UreqTransport::loopback_for_tests(Timeouts::new(
         Duration::from_secs(2),
-        Duration::from_millis(150),
+        Duration::from_secs(1),
     ));
     let error = send_with_busy_retry(
         &transport,
