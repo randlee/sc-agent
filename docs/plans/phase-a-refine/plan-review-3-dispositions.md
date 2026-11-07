@@ -155,3 +155,10 @@ D1–D13 and owner decisions (a), (b) are not reopened; (c) D9 stays pending.
 4. Spike in r-1 (D0), not r-4 — r-1.
 5. `std::process::Command::new` becomes a clippy disallowed method from r-3b, with test-file expect sites allowed — r-3b D7.3.
 6. The plan PR targets `integrate/phase-a`, merging after PR 20 — plan intro.
+
+## Round-4 verification additions (arch-qa)
+
+| id | disposition | where |
+| --- | --- | --- |
+| ARCH-020 | applied — ADR-SAG-0029 added to r-2b `adrs` | r-2b frontmatter |
+| ARCH-021 | applied — ADR-SAG-0029 added to r-3c `adrs`; `adr:ADR-SAG-0029` acceptance row keeps the 0029 (c) error-code dispositions | r-3c frontmatter, acceptance |

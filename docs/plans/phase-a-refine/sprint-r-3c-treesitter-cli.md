@@ -28,6 +28,7 @@ adrs:
   - ADR-SAG-0017
   - ADR-SAG-0023
   - ADR-SAG-0027
+  - ADR-SAG-0029
 owned_paths:
   - "crates/sc-treesitter/Cargo.toml"
   - "crates/sc-treesitter/src/main.rs"
@@ -92,6 +93,7 @@ RBQA-F006 (producer caller), RBQA-F009 (`default-features = false`).
 | --- | --- |
 | boundary:treesitter | No hand-rolled argv tables (deleted); `tests/argv.rs` edge cases green; `test_version_flag_exits_zero`; `test_rev_option_injection_rejected` (`--rev=--output=FILE` creates no file); `cargo build -p sc-treesitter --lib --no-default-features` green and its tree has no `clap`, `mimalloc`, `sc-observability`; `cargo hack` feature powerset green. Regression: REQ-SAG-0310 `cargo test -p sc-treesitter --test cli`; REQ-SAG-0134 the mimalloc `cargo tree` assertion below; NFR-SAG-0004 `bash .github/scripts/check-exact-pins.sh` (tree-sitter pins unchanged) |
 | adr:ADR-SAG-0015 | Library still links no judge module: the asserted row below finds no `judge`, `secret`, `obs` or `git` feature of `sc-agent-types` in `cargo tree -p sc-treesitter --no-default-features -e normal,features -i sc-agent-types` (`-e normal,features` so a future dev-dependency cannot trip it, CPR-M208; r-3b adds the same row to `cargo-tree-gates.sh`) |
+| adr:ADR-SAG-0029 | The clap parser and the shared git reads keep the 0029 (c) error-code dispositions: missing positional, leading-`-` revision, bad path or revision, and non-blob object are `INPUT_INVALID`; a blob or worktree file over 8 MiB is `INPUT_TOO_LARGE`; `io_failed`/`encode_failed` mapping unchanged. `cargo test -p sc-treesitter --test cli` keeps the existing code assertions green. |
 
 ## Required validation
 

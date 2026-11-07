@@ -37,6 +37,7 @@ adrs:
   - ADR-SAG-0022
   - ADR-SAG-0024
   - ADR-SAG-0025
+  - ADR-SAG-0029
 owned_paths:
   - "crates/sc-jev-check/Cargo.toml"
   - "crates/sc-jev-check/src/run/**"
