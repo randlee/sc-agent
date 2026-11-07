@@ -3,7 +3,8 @@
 //! Every subprocess goes through [`spawn_with_deadline`], which wraps the
 //! workspace's one bounded runner (`tests/support/deadline.rs`), so a hung
 //! child fails the test instead of stalling CI. Git runs with the global and
-//! system config disabled and no terminal prompt.
+//! system config disabled, no terminal prompt, and no inherited variable
+//! that would point it at another repository or inject config (FTQ-001).
 
 #[path = "../../../../tests/support/deadline.rs"]
 mod deadline;
@@ -16,10 +17,31 @@ pub fn null_device() -> &'static str {
     if cfg!(windows) { "NUL" } else { "/dev/null" }
 }
 
-/// Isolates `command` from the user's git config and credential prompts.
+/// Variables a git hook or `git -c` caller exports that would redirect a
+/// fixture's git (or the binary under test) to another repository or add
+/// config behind the isolation below.
+const INHERITED_GIT_VARS: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_PREFIX",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+];
+
+/// Isolates `command` from the user's git config, credential prompts and
+/// hook-inherited repository variables. The single scrubbing point for
+/// every git and binary spawn in these tests.
 pub fn isolate_git(command: &mut Command) -> &mut Command {
+    for name in INHERITED_GIT_VARS {
+        command.env_remove(name);
+    }
     command
         .env("GIT_CONFIG_GLOBAL", null_device())
+        .env("GIT_CONFIG_SYSTEM", null_device())
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_TERMINAL_PROMPT", "0")
 }
