@@ -16,7 +16,7 @@ include = ["Cargo.toml", "README.md", "LICENSE", "src/**"]
 
 [features]
 default = []
-# Test doubles for JudgeBackend and SessionLog. Unit tests compile this module
+# JudgeBackend test double and contract helpers. Unit tests compile this module
 # via cfg(test); downstream crates enable the feature explicitly.
 test-util = []
 

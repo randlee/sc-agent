@@ -89,10 +89,11 @@ fn execute(spec: CheckRun) -> Result<FinishedRun, JevError> {
     }
     let result = run_check_facade(&check, &backends, options)?;
     logger.flush();
-    let payload = utf8_payload(result.bundle.bytes)?;
+    let (payload_bytes, prompt_sha256) = result.bundle.into_parts();
+    let payload = utf8_payload(payload_bytes)?;
     Ok(FinishedRun {
         session_id: result.session_id,
-        prompt_sha256: result.bundle.sha256,
+        prompt_sha256,
         payload,
         outcomes: result.outcomes,
         equal_input: result.equal_input,
@@ -110,9 +111,10 @@ fn build(
     let repo = resolve_repo(repo_root)?;
     let rev = parse_rev(rev_text);
     let built = build_request_facade(&repo, &rev, check_path)?;
+    let (payload_bytes, prompt_sha256) = built.bundle.into_parts();
     Ok(PreparedRequest {
-        payload: utf8_payload(built.bundle.bytes)?,
-        prompt_sha256: built.bundle.sha256,
+        payload: utf8_payload(payload_bytes)?,
+        prompt_sha256,
         producer: built.producer,
     })
 }

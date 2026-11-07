@@ -153,7 +153,7 @@ pub struct BuiltRequest {
 ///
 /// let repo = RepoRoot::new(".");
 /// let built = build_request(&repo, &Rev::worktree(), "check.toml")?;
-/// let _digest = built.bundle.sha256;
+/// let _digest = built.bundle.sha256();
 /// # Ok::<(), sc_agent_types::JevError>(())
 /// ```
 pub fn build_request(
@@ -293,7 +293,7 @@ pub fn run_request(
             request.system_prompt.as_deref(),
             &prior,
         )?;
-        payloads.push(judge_request.payload.bytes.clone());
+        payloads.push(judge_request.payload.bytes().to_vec());
         let backend = registry.get(*id)?;
         backend.validate_for_send(&judge_request)?;
         let judged = backend.judge(&judge_request);
@@ -302,7 +302,7 @@ pub fn run_request(
             LogEvent {
                 session_id,
                 backend: *id,
-                prompt_sha256: request.bundle.sha256.clone(),
+                prompt_sha256: request.bundle.sha256().clone(),
                 operation: "judge".to_owned(),
             },
         );
@@ -550,7 +550,7 @@ mod tests {
         assert!(result.session_id.is_none());
         assert!(result.outcomes.is_empty());
         assert!(result.equal_input.is_none());
-        assert_eq!(result.bundle.sha256.as_str().len(), 64);
+        assert_eq!(result.bundle.sha256().as_str().len(), 64);
         assert!(
             seen.lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -585,21 +585,21 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert_eq!(jev.len(), 1);
         assert_eq!(haiku.len(), 1);
-        assert_eq!(jev[0].payload.bytes, haiku[0].payload.bytes);
-        assert_eq!(jev[0].payload.sha256, result.bundle.sha256);
+        assert_eq!(jev[0].payload.bytes(), haiku[0].payload.bytes());
+        assert_eq!(jev[0].payload.sha256(), result.bundle.sha256());
         assert!(jev[0].llm.is_none());
         let prompt = haiku[0].llm.as_ref().expect("haiku prompt");
         assert!(prompt.system_prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
         assert!(prompt.system_prompt.contains(SESSION_CONTEXT_HEADER));
         assert!(prompt.system_prompt.contains("\"choice\":\"yes\""));
-        assert!(!String::from_utf8_lossy(&result.bundle.bytes).contains(SESSION_CONTEXT_HEADER));
+        assert!(!String::from_utf8_lossy(result.bundle.bytes()).contains(SESSION_CONTEXT_HEADER));
         assert!(
-            !String::from_utf8_lossy(&result.bundle.bytes).contains("PACKAGED-PROMPT-TOKEN-a3")
+            !String::from_utf8_lossy(result.bundle.bytes()).contains("PACKAGED-PROMPT-TOKEN-a3")
         );
         let equal = result.equal_input.expect("equal");
         assert!(equal.equal);
         assert!(!equal.leak);
-        assert_eq!(equal.prompt_sha256, result.bundle.sha256);
+        assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
         assert_eq!(equal.commands, ["jev", "anthropic_haiku"]);
         assert!(equal.producer.is_none());
         let session_id = result.session_id.expect("session");
@@ -658,7 +658,7 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let override_prompt = &seen[0].llm.as_ref().expect("override prompt").system_prompt;
         assert_eq!(override_prompt, "OVERRIDE-PROMPT-TOKEN");
-        assert_eq!(first.bundle.sha256, second.bundle.sha256);
+        assert_eq!(first.bundle.sha256(), second.bundle.sha256());
     }
 
     #[test]
@@ -796,7 +796,7 @@ mod tests {
             let value: serde_json::Value = serde_json::from_str(line).expect("line");
             assert_eq!(value["session_id"], session_id);
             assert_eq!(value["backend"], backend);
-            assert_eq!(value["prompt_sha256"], result.bundle.sha256.as_str());
+            assert_eq!(value["prompt_sha256"], result.bundle.sha256().as_str());
             assert_eq!(value["operation"], "judge");
             assert!(!line.contains("sk-test-DO_NOT_LOG_9f3a"));
             assert!(!line.to_ascii_lowercase().contains("authorization"));
@@ -934,7 +934,7 @@ mod tests {
         let producer = equal.producer.expect("producer");
         assert_eq!(producer.name, "sc-treesitter");
         assert_eq!(producer.mode, "matches");
-        assert_eq!(equal.prompt_sha256, result.bundle.sha256);
+        assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
         assert!(equal.equal);
         assert!(!equal.leak);
     }
@@ -992,10 +992,10 @@ mod tests {
         let root = RepoRoot::new(repo.path());
         let built = build_request(&root, &Rev::worktree(), "check.toml").expect("build");
         let again = build_request(&root, &Rev::worktree(), "check.toml").expect("rebuild");
-        assert_eq!(built.bundle.sha256, again.bundle.sha256);
+        assert_eq!(built.bundle.sha256(), again.bundle.sha256());
         assert_eq!(
-            built.bundle.sha256,
-            sc_agent_types::Sha256Digest::of(&built.bundle.bytes)
+            built.bundle.sha256(),
+            &sc_agent_types::Sha256Digest::of(built.bundle.bytes())
         );
         let producer = built.producer.expect("producer");
         assert_eq!(producer.name, "sc-treesitter");
@@ -1042,8 +1042,8 @@ mod tests {
             llm.system_prompt.as_deref(),
             Some("OVERRIDE-PROMPT-TOKEN-a7\n")
         );
-        assert_eq!(packaged.bundle.sha256, llm.bundle.sha256);
-        let text = std::str::from_utf8(&llm.bundle.bytes).expect("utf8");
+        assert_eq!(packaged.bundle.sha256(), llm.bundle.sha256());
+        let text = std::str::from_utf8(llm.bundle.bytes()).expect("utf8");
         assert!(!text.contains("OVERRIDE-PROMPT-TOKEN-a7"));
         assert!(text.contains("Judge this"));
     }

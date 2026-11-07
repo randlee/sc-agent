@@ -206,13 +206,13 @@ fn test_multi_backend_cli_equal_input() {
     let haiku = haiku_seen.lock().expect("haiku");
     assert_eq!(jev.len(), 1);
     assert_eq!(haiku.len(), 1);
-    assert_eq!(jev[0].payload.bytes, haiku[0].payload.bytes);
-    assert_eq!(jev[0].payload.sha256.as_str(), data["prompt_sha256"]);
+    assert_eq!(jev[0].payload.bytes(), haiku[0].payload.bytes());
+    assert_eq!(jev[0].payload.sha256().as_str(), data["prompt_sha256"]);
     assert!(jev[0].llm.is_none());
     let prompt = &haiku[0].llm.as_ref().expect("haiku prompt").system_prompt;
     assert!(prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
     assert!(prompt.contains("Session context:"));
-    let payload = String::from_utf8_lossy(&jev[0].payload.bytes);
+    let payload = String::from_utf8_lossy(jev[0].payload.bytes());
     assert!(!payload.contains("Session context:"));
     assert!(!payload.contains("PACKAGED-PROMPT-TOKEN-a3"));
     assert_no_prompt_leak(&value.to_string());
@@ -402,7 +402,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         .clone();
     assert!(wire.contains("EVALUATOR-PROMPT-a7"));
     assert!(
-        !String::from_utf8_lossy(&seen.lock().expect("bytes")[0].payload.bytes)
+        !String::from_utf8_lossy(seen.lock().expect("bytes")[0].payload.bytes())
             .contains("EVALUATOR-PROMPT-a7")
     );
     #[cfg(unix)]

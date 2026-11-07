@@ -234,7 +234,7 @@ fn assert_outcome_fields(outcome: &JudgeOutcome, backend: BackendId) {
 #[test]
 fn test_haiku_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(&request.payload.bytes).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 100),
         count_reply(100),
@@ -295,7 +295,7 @@ fn test_haiku_request_embeds_canonical_payload() {
 #[test]
 fn test_luna_request_embeds_canonical_payload() {
     let request = standard_request(PROMPT);
-    let payload_text = std::str::from_utf8(&request.payload.bytes).expect("utf-8");
+    let payload_text = std::str::from_utf8(request.payload.bytes()).expect("utf-8");
     let (backend, recorded) = luna(vec![
         luna_message(&answer_text(), "completed", 50),
         count_reply(50),
@@ -372,8 +372,11 @@ fn test_llm_system_prompt_is_injected_not_hardcoded() {
 fn test_prompt_change_does_not_alter_prompt_sha256() {
     let first = standard_request("prompt-alpha");
     let second = standard_request("prompt-beta");
-    assert_eq!(first.payload.sha256, second.payload.sha256);
-    assert_eq!(first.payload.sha256, Sha256Digest::of(&first.payload.bytes));
+    assert_eq!(first.payload.sha256(), second.payload.sha256());
+    assert_eq!(
+        first.payload.sha256(),
+        &Sha256Digest::of(first.payload.bytes())
+    );
     let (backend, recorded) = haiku(vec![
         haiku_message(&answer_text(), "end_turn", 4),
         count_reply(4),
@@ -382,7 +385,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     ]);
     backend.judge(&first).expect("first");
     backend.judge(&second).expect("second");
-    assert_eq!(first.payload.sha256, second.payload.sha256);
+    assert_eq!(first.payload.sha256(), second.payload.sha256());
     let seen = posts(&recorded);
     let alpha = body_json(&seen[1]);
     let beta = body_json(&seen[3]);
@@ -390,7 +393,7 @@ fn test_prompt_change_does_not_alter_prompt_sha256() {
     assert_ne!(alpha["system"], beta["system"]);
     assert_eq!(alpha["system"], "prompt-alpha");
     assert_eq!(beta["system"], "prompt-beta");
-    assert_ne!(first.payload.sha256, Sha256Digest::of(&seen[1].body));
+    assert_ne!(first.payload.sha256(), &Sha256Digest::of(&seen[1].body));
 }
 
 #[test]

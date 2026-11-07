@@ -4,11 +4,11 @@
 //!
 //! The canonical payload is compact JSON encoded as UTF-8:
 //!
-//! - Objects use [`std::collections::BTreeMap`] key order (lexicographic UTF-8).
-//!   [`serde_json::Map`] in this crate is that map because `serde_json` is
-//!   built without `preserve_order`.
-//! - [`canonical_json_bytes`] still walks objects and reinserts keys in sorted
-//!   order so the byte contract does not depend on map iteration.
+//! - Object keys are emitted in lexicographic byte order. The guarantee is
+//!   [`canonical_json_bytes`]'s recursive re-sort: it walks every object and
+//!   reinserts keys in sorted order before encoding. It does not depend on
+//!   which map [`serde_json::Map`] is, so the bytes stay the same even if
+//!   Cargo feature unification turns on `serde_json/preserve_order`.
 //! - Strings use `serde_json`'s default escapes (`\"`, `\\`, and `\u00XX` for
 //!   controls). Other characters are raw UTF-8, not `\u` escapes.
 //! - Arrays keep their element order. Numbers, booleans, and null use

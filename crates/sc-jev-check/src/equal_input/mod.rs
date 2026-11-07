@@ -29,7 +29,7 @@ use crate::extract::Extracted;
 ///
 /// let bundle = PayloadBundle::from_canonical_bytes(b"{}".to_vec());
 /// let record = record(&bundle, &["jev".to_owned()], false, true, None);
-/// assert_eq!(record.prompt_sha256, bundle.sha256);
+/// assert_eq!(&record.prompt_sha256, bundle.sha256());
 /// assert!(record.equal);
 /// assert!(!record.leak);
 /// assert!(record.producer.is_none());
@@ -43,7 +43,7 @@ pub fn record(
     producer: Option<SubjectsProducer>,
 ) -> EqualInputRecord {
     EqualInputRecord {
-        prompt_sha256: bundle.sha256.clone(),
+        prompt_sha256: bundle.sha256().clone(),
         leak,
         commands: commands.to_vec(),
         equal,

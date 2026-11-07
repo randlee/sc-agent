@@ -552,7 +552,7 @@ fn dispatch_ask(command: AskCommand, overrides: &ExecuteOverrides) -> Result<Vec
     );
     body.insert(
         "prompt_sha256".to_owned(),
-        Value::String(stored.payload.sha256.as_str().to_owned()),
+        Value::String(stored.payload.sha256().as_str().to_owned()),
     );
     body.insert(
         "readback".to_owned(),
@@ -580,7 +580,7 @@ fn run_data(
     );
     data.insert(
         "prompt_sha256".to_owned(),
-        Value::String(result.bundle.sha256.as_str().to_owned()),
+        Value::String(result.bundle.sha256().as_str().to_owned()),
     );
     data.insert(
         "readback".to_owned(),
@@ -591,7 +591,7 @@ fn run_data(
     if dry_run {
         data.insert(
             "payload".to_owned(),
-            serde_json::from_slice(&result.bundle.bytes).map_err(|_| JevError::InputInvalid {
+            serde_json::from_slice(result.bundle.bytes()).map_err(|_| JevError::InputInvalid {
                 detail: "canonical payload was not JSON".into(),
             })?,
         );

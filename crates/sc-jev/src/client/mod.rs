@@ -178,12 +178,12 @@ impl JudgeBackend for JevClient {
 
     fn validate_for_send(&self, req: &JudgeRequest) -> Result<(), JevError> {
         let _ = &req.llm;
-        check::prepare(&self.config, &req.payload.bytes).map(|_| ())
+        check::prepare(&self.config, req.payload.bytes()).map(|_| ())
     }
 
     fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
         let _ = &req.llm;
-        let prepared = check::prepare(&self.config, &req.payload.bytes)?;
+        let prepared = check::prepare(&self.config, req.payload.bytes())?;
         self.execute(&prepared)
     }
 }

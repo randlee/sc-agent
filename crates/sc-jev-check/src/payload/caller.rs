@@ -47,7 +47,7 @@ pub(crate) fn parse_caller_request(bytes: &[u8]) -> Result<ParsedCallerRequest, 
     validate_state(&document)?;
     let bundle = encode_payload(&document.questions, &document.state)?;
     let packaged = load_packaged_config()?;
-    refuse_over_cap(&bundle.bytes, packaged.max_input_bytes)?;
+    refuse_over_cap(bundle.bytes(), packaged.max_input_bytes)?;
     let mut backends = Vec::with_capacity(document.backends.len());
     for name in &document.backends {
         backends.push(parse_backend(name)?);
@@ -146,11 +146,11 @@ mod tests {
     fn caller_request_builds_a_canonical_bundle() {
         let parsed = parse_caller_request(QUESTIONS.as_bytes()).expect("request");
         assert_eq!(parsed.backends, vec![BackendId::AnthropicHaiku]);
-        let text = std::str::from_utf8(&parsed.bundle.bytes).expect("utf8");
+        let text = std::str::from_utf8(parsed.bundle.bytes()).expect("utf8");
         assert!(text.contains("\"id\":\"relevant\""));
         assert!(text.contains("\"choice\":\"yes\""));
         assert!(!text.contains("system_prompt"));
-        assert_eq!(parsed.bundle.sha256.as_str().len(), 64);
+        assert_eq!(parsed.bundle.sha256().as_str().len(), 64);
     }
 
     #[test]

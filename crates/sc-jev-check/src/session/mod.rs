@@ -186,8 +186,8 @@ impl FileSessionStore {
             session_id,
             backend,
             created_at,
-            payload_utf8: utf8_payload(&bundle.bytes)?,
-            prompt_sha256: bundle.sha256.clone(),
+            payload_utf8: utf8_payload(bundle.bytes())?,
+            prompt_sha256: bundle.sha256().clone(),
             system_prompt,
             outcomes: Vec::new(),
             follow_ups: Vec::new(),
@@ -377,7 +377,7 @@ impl SessionStore for FileSessionStore {
             LogEvent {
                 session_id: *id,
                 backend: stored.backend,
-                prompt_sha256: stored.payload.sha256.clone(),
+                prompt_sha256: stored.payload.sha256().clone(),
                 operation: "ask".to_owned(),
             },
         );
@@ -618,8 +618,8 @@ mod tests {
             .expect("create");
         let loaded = store.load(&id).expect("load");
         assert_eq!(loaded.session_id, id);
-        assert_eq!(loaded.payload.bytes, payload.bytes);
-        assert_eq!(loaded.payload.sha256, payload.sha256);
+        assert_eq!(loaded.payload.bytes(), payload.bytes());
+        assert_eq!(loaded.payload.sha256(), payload.sha256());
         assert_eq!(loaded.system_prompt.as_deref(), Some("base prompt"));
         let again = FileSessionStore::new(store.dir(), Arc::new(NoopSessionLog))
             .expect("reopen")

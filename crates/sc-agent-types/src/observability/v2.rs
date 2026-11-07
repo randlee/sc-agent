@@ -29,7 +29,10 @@ pub struct LogEvent {
 
 /// Best-effort session logger.
 ///
-/// Implementations return promptly and do not panic.
+/// Implementations return promptly and do not panic. The trait is
+/// intentionally open (not sealed): composition roots (`sc-ai`, `sc-jev-py`)
+/// adapt their own `sc-observability` logger to it and tests inject doubles,
+/// so third-party implementations are expected.
 pub trait SessionLog: Send + Sync {
     /// Records `event`.
     ///
@@ -53,88 +56,6 @@ impl SessionLog for NoopSessionLog {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
-mod doubles {
-    use std::sync::Mutex;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    use sc_observability_types::{ErrorContext, Remediation, error_codes};
-
-    use super::{EventError, LogEvent, SessionLog};
-
-    /// Records events in call order.
-    #[derive(Debug, Default)]
-    pub struct RecordingSessionLog {
-        events: Mutex<Vec<LogEvent>>,
-    }
-
-    impl RecordingSessionLog {
-        /// Creates an empty recorder.
-        #[must_use]
-        pub fn new() -> Self {
-            Self::default()
-        }
-
-        /// Returns a snapshot of recorded events.
-        #[must_use]
-        pub fn events(&self) -> Vec<LogEvent> {
-            self.lock().clone()
-        }
-
-        fn lock(&self) -> std::sync::MutexGuard<'_, Vec<LogEvent>> {
-            self.events
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-        }
-    }
-
-    impl SessionLog for RecordingSessionLog {
-        fn try_log(&self, event: LogEvent) -> Result<(), EventError> {
-            self.lock().push(event);
-            Ok(())
-        }
-    }
-
-    /// Rejects every event and counts the attempts.
-    #[derive(Debug, Default)]
-    pub struct RejectingSessionLog {
-        attempts: AtomicU64,
-    }
-
-    impl RejectingSessionLog {
-        /// Creates a rejecting log with zero attempts.
-        #[must_use]
-        pub fn new() -> Self {
-            Self::default()
-        }
-
-        /// Returns how many `try_log` calls were rejected.
-        #[must_use]
-        pub fn attempts(&self) -> u64 {
-            self.attempts.load(Ordering::Relaxed)
-        }
-    }
-
-    impl SessionLog for RejectingSessionLog {
-        fn try_log(&self, _event: LogEvent) -> Result<(), EventError> {
-            self.attempts.fetch_add(1, Ordering::Relaxed);
-            Err(EventError::Routing {
-                context: Box::new(ErrorContext::new(
-                    error_codes::DIAGNOSTIC_INVALID,
-                    "test session log rejected the event",
-                    Remediation::recoverable(
-                        "Use RecordingSessionLog when the test should accept events.",
-                        [] as [&str; 0],
-                    ),
-                )),
-            })
-        }
-    }
-}
-
-#[cfg(any(test, feature = "test-util"))]
-pub use doubles::{RecordingSessionLog, RejectingSessionLog};
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,16 +73,6 @@ mod tests {
     #[test]
     fn noop_accepts_events() {
         NoopSessionLog.try_log(event()).expect("noop accepts");
-    }
-
-    #[test]
-    fn recording_and_rejecting_doubles() {
-        let recording = RecordingSessionLog::new();
-        recording.try_log(event()).expect("record");
-        assert_eq!(recording.events().len(), 1);
-        let rejecting = RejectingSessionLog::new();
-        assert!(rejecting.try_log(event()).is_err());
-        assert_eq!(rejecting.attempts(), 1);
     }
 
     #[test]

@@ -109,7 +109,7 @@ impl PayloadBuilder {
         }
         let questions = substitute_inputs(questions, &extractions);
         let bundle = encode_payload(&questions, &state)?;
-        refuse_over_cap(&bundle.bytes, self.max_input_bytes)?;
+        refuse_over_cap(bundle.bytes(), self.max_input_bytes)?;
         Ok(BuiltPayload {
             bundle,
             prompt: spec.resolve_prompt_path(packaged),
@@ -194,7 +194,7 @@ mod tests {
             .expect("builder")
             .build(&spec, &repo, &rev)
             .expect("payload");
-        let text = std::str::from_utf8(&built.bundle.bytes).expect("utf-8");
+        let text = std::str::from_utf8(built.bundle.bytes()).expect("utf-8");
         assert!(text.contains("alpha note"));
         assert!(text.contains("\"choice\":\"yes\"") || text.contains("\"choice\": \"yes\""));
         assert!(
@@ -207,8 +207,8 @@ mod tests {
         assert!(!text.contains("PACKAGED-PROMPT-TOKEN-a3"));
         assert_eq!(built.prompt.path, "prompt.md");
         assert_eq!(
-            built.bundle.sha256,
-            sc_agent_types::Sha256Digest::of(&built.bundle.bytes)
+            built.bundle.sha256(),
+            &sc_agent_types::Sha256Digest::of(built.bundle.bytes())
         );
     }
 
@@ -222,7 +222,7 @@ mod tests {
         let first = builder.build(&spec, &repo, &rev).expect("first");
         spec.system_prompt_file = Some("other-prompt.md".into());
         let second = builder.build(&spec, &repo, &rev).expect("second");
-        assert_eq!(first.bundle.sha256, second.bundle.sha256);
+        assert_eq!(first.bundle.sha256(), second.bundle.sha256());
         assert_ne!(first.prompt.path, second.prompt.path);
     }
 
@@ -294,13 +294,13 @@ mod tests {
         let head_again = builder
             .build(&spec, &repo, &Rev::new(sha))
             .expect("head again");
-        let worktree_text = std::str::from_utf8(&worktree.bundle.bytes).expect("utf-8");
-        let head_text = std::str::from_utf8(&head.bundle.bytes).expect("utf-8");
+        let worktree_text = std::str::from_utf8(worktree.bundle.bytes()).expect("utf-8");
+        let head_text = std::str::from_utf8(head.bundle.bytes()).expect("utf-8");
         assert!(worktree_text.contains("worktree edit"));
         assert!(head_text.contains("alpha note"));
         assert!(!head_text.contains("worktree edit"));
-        assert_eq!(head.bundle.sha256, head_again.bundle.sha256);
-        assert_ne!(head.bundle.sha256, worktree.bundle.sha256);
+        assert_eq!(head.bundle.sha256(), head_again.bundle.sha256());
+        assert_ne!(head.bundle.sha256(), worktree.bundle.sha256());
     }
 
     #[test]
@@ -316,7 +316,7 @@ mod tests {
             .expect("builder")
             .build(&spec, &repo, &Rev::worktree())
             .expect("dev questions");
-        let value: serde_json::Value = serde_json::from_slice(&built.bundle.bytes).expect("json");
+        let value: serde_json::Value = serde_json::from_slice(built.bundle.bytes()).expect("json");
         let questions = value["questions"].as_array().expect("questions");
         assert!(questions.len() >= 4);
         assert_eq!(built.prompt.path, "llm-evaluator-system.md");

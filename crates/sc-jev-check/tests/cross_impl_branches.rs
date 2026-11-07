@@ -55,7 +55,7 @@ fn cross_impl_branches() {
     let dir = std::env::temp_dir().join(format!(
         "sc-jev-check-branches-{}-{}",
         std::process::id(),
-        expected.sha256.as_str()
+        expected.sha256().as_str()
     ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("temp");
@@ -77,12 +77,12 @@ fn cross_impl_branches() {
         .expect("builder")
         .build(&spec, &repo, &Rev::worktree())
         .expect("payload");
-    let payload = std::str::from_utf8(&built.bundle.bytes).expect("utf-8");
+    let payload = std::str::from_utf8(built.bundle.bytes()).expect("utf-8");
     assert!(payload.contains("Transition.GIVE_BACK"));
     assert!(payload.contains("Transition.KEEP"));
     assert!(payload.contains("Transition.STOP"));
-    assert_eq!(built.bundle.sha256, expected.sha256);
-    assert_eq!(built.bundle.bytes, expected.bytes);
+    assert_eq!(built.bundle.sha256(), expected.sha256());
+    assert_eq!(built.bundle.bytes(), expected.bytes());
 
     let producer = producer_from_extractions(&built.extractions).expect("producer");
     assert_eq!(producer.name, "sc-treesitter");
@@ -102,7 +102,7 @@ fn cross_impl_branches() {
         RunOptions::new(repo, store, Arc::new(NoopSessionLog)).dry_run(true),
     )
     .expect("dry-run");
-    assert_eq!(dry.bundle.sha256, expected.sha256);
+    assert_eq!(dry.bundle.sha256(), expected.sha256());
     assert!(dry.session_id.is_none());
     assert!(dry.outcomes.is_empty());
 

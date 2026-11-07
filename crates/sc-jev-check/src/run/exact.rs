@@ -200,8 +200,8 @@ fn test_session_round_trip() {
         )
         .expect("open");
     let loaded = store.load(&id).expect("load");
-    assert_eq!(loaded.payload.bytes, payload.bytes);
-    assert_eq!(loaded.payload.sha256, payload.sha256);
+    assert_eq!(loaded.payload.bytes(), payload.bytes());
+    assert_eq!(loaded.payload.sha256(), payload.sha256());
     let outcome = store.ask(&id, "why?").expect("ask");
     assert_eq!(outcome.answers["relevant"]["choice"], "yes");
     let saved = prompts
@@ -299,7 +299,7 @@ fn test_equal_input_record() {
     )
     .expect("run");
     let equal = result.equal_input.expect("record");
-    assert_eq!(equal.prompt_sha256, result.bundle.sha256);
+    assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
     assert!(!equal.leak);
     assert!(equal.equal);
     assert_eq!(equal.commands, ["jev", "anthropic_haiku"]);
@@ -309,7 +309,7 @@ fn test_equal_input_record() {
     let requests = seen
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(requests[0].payload.bytes, requests[1].payload.bytes);
+    assert_eq!(requests[0].payload.bytes(), requests[1].payload.bytes());
 }
 
 #[test]
@@ -336,8 +336,8 @@ fn test_multi_backend_one_payload() {
     let haiku = haiku_seen
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(jev[0].payload.bytes, haiku[0].payload.bytes);
-    assert_eq!(jev[0].payload.bytes, result.bundle.bytes);
+    assert_eq!(jev[0].payload.bytes(), haiku[0].payload.bytes());
+    assert_eq!(jev[0].payload.bytes(), result.bundle.bytes());
     assert!(jev[0].llm.is_none());
     let prompt = &haiku[0].llm.as_ref().expect("prompt").system_prompt;
     assert!(prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
@@ -345,7 +345,7 @@ fn test_multi_backend_one_payload() {
     assert!(prompt.contains("\"choice\":\"yes\""));
     let equal = result.equal_input.expect("equal");
     assert!(equal.equal);
-    assert_eq!(equal.prompt_sha256, result.bundle.sha256);
+    assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
     assert_eq!(result.outcomes.len(), 2);
 }
 
@@ -389,7 +389,7 @@ fn test_log_event_has_no_secrets() {
         let value: serde_json::Value = serde_json::from_str(line).expect("line");
         assert_eq!(value["session_id"], session_id);
         assert_eq!(value["backend"], backend);
-        assert_eq!(value["prompt_sha256"], result.bundle.sha256.as_str());
+        assert_eq!(value["prompt_sha256"], result.bundle.sha256().as_str());
         assert_eq!(value["operation"], "judge");
     }
 }
@@ -422,9 +422,9 @@ fn test_packaged_default_prompt_available() {
         result.system_prompt.as_deref(),
         Some(PACKAGED_SYSTEM_PROMPT)
     );
-    assert!(!String::from_utf8_lossy(&result.bundle.bytes).contains("PACKAGED-PROMPT-TOKEN-a3"));
+    assert!(!String::from_utf8_lossy(result.bundle.bytes()).contains("PACKAGED-PROMPT-TOKEN-a3"));
     assert_eq!(
-        result.equal_input.expect("equal").prompt_sha256,
-        result.bundle.sha256
+        &result.equal_input.expect("equal").prompt_sha256,
+        result.bundle.sha256()
     );
 }

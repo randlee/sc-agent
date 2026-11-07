@@ -115,10 +115,10 @@ impl Client {
             detail: "LLM system prompt is required".into(),
         })?;
         let payload_text =
-            std::str::from_utf8(&request.payload.bytes).map_err(|_| JevError::InputInvalid {
+            std::str::from_utf8(request.payload.bytes()).map_err(|_| JevError::InputInvalid {
                 detail: "canonical payload is not UTF-8".into(),
             })?;
-        let questions = validate::validate_questions(&request.payload.bytes)?;
+        let questions = validate::validate_questions(request.payload.bytes())?;
         let message_body = wire::message_body(
             self.provider.kind,
             self.provider.model,

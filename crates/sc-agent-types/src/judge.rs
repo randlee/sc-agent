@@ -45,22 +45,42 @@ pub struct CanonicalJudgePayload {
 
 /// Canonical judge payload bytes and their SHA-256.
 ///
-/// `sha256` is computed on [`Self::bytes`] only. LLM system-prompt text is not
-/// part of the digest (ADR-SAG-0019).
+/// [`Self::sha256`] is computed on [`Self::bytes`] only. LLM system-prompt
+/// text is not part of the digest (ADR-SAG-0019). Both fields are private so
+/// the digest always matches the bytes; equal-input attestation relies on
+/// that invariant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadBundle {
-    /// Sorted-key compact JSON, UTF-8.
-    pub bytes: Vec<u8>,
-    /// SHA-256 of `bytes`.
-    pub sha256: Sha256Digest,
+    bytes: Vec<u8>,
+    sha256: Sha256Digest,
 }
 
 impl PayloadBundle {
     /// Wraps bytes that are already canonical and records their digest.
+    ///
+    /// This is the only constructor.
     #[must_use]
     pub fn from_canonical_bytes(bytes: Vec<u8>) -> Self {
         let sha256 = Sha256Digest::of(&bytes);
         Self { bytes, sha256 }
+    }
+
+    /// Sorted-key compact JSON, UTF-8.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// SHA-256 of [`Self::bytes`].
+    #[must_use]
+    pub fn sha256(&self) -> &Sha256Digest {
+        &self.sha256
+    }
+
+    /// Returns the bytes and their digest, consuming the bundle.
+    #[must_use]
+    pub fn into_parts(self) -> (Vec<u8>, Sha256Digest) {
+        (self.bytes, self.sha256)
     }
 }
 
@@ -91,6 +111,10 @@ pub struct JudgeOutcome {
     /// Backend that produced `answers`.
     pub backend: BackendId,
     /// Jev probability fields when present. `None` for LLM backends.
+    ///
+    /// Derived data: for Jev this is `answers[id].probabilities` collected
+    /// per question id, so it never carries information `answers` lacks. It
+    /// stays on the frozen contract for existing readers.
     pub probabilities: Option<Value>,
     /// Provider metadata for debugging. Not part of equal-input.
     pub provider_meta: Option<Value>,
