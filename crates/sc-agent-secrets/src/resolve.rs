@@ -121,7 +121,9 @@ pub fn resolve_key_with(
     keyring: &impl KeyringSource,
     account: impl AsRef<str>,
 ) -> Result<ResolvedApiKey, JevError> {
-    let var_name = env_var_name(id);
+    let Some(var_name) = env_var_name(id) else {
+        return Err(missing(id));
+    };
     let process_value = env.var(var_name);
     if let Some(raw) = process_value.clone().filter(|value| is_present(value)) {
         return ResolvedApiKey::try_new(id, raw);
@@ -153,13 +155,19 @@ pub fn resolve_key_with(
 
 /// Returns the environment variable name for `id`.
 #[must_use]
-pub(crate) fn env_var_name(id: BackendKeyId) -> &'static str {
-    match id {
-        BackendKeyId::TypeSafe => TYPESAFE_API_KEY_VAR,
-        BackendKeyId::Anthropic => ANTHROPIC_API_KEY_VAR,
-        BackendKeyId::OpenAi => OPENAI_API_KEY_VAR,
-    }
+pub(crate) fn env_var_name(id: BackendKeyId) -> Option<&'static str> {
+    KEY_ENV_VARS
+        .iter()
+        .find(|(key, _)| *key == id)
+        .map(|(_, name)| *name)
 }
+
+/// Environment variable of every credential this crate resolves.
+const KEY_ENV_VARS: &[(BackendKeyId, &str)] = &[
+    (BackendKeyId::TypeSafe, TYPESAFE_API_KEY_VAR),
+    (BackendKeyId::Anthropic, ANTHROPIC_API_KEY_VAR),
+    (BackendKeyId::OpenAi, OPENAI_API_KEY_VAR),
+];
 
 fn keyring_service(
     id: BackendKeyId,
@@ -183,7 +191,7 @@ fn keyring_service(
             }
         }
     }
-    env_var_name(id).to_owned()
+    env_var_name(id).unwrap_or_default().to_owned()
 }
 
 /// Whether a source holds a value worth sealing.
@@ -205,7 +213,7 @@ fn usable_secret(value: &str) -> Option<String> {
 }
 
 fn missing(id: BackendKeyId) -> JevError {
-    JevError::KeyMissing { backend: id }
+    JevError::key_missing(id)
 }
 
 /// In-memory environment map for tests.
@@ -319,7 +327,7 @@ mod tests {
 
     /// Expected key, compared by value so tests never read the secret.
     fn sealed(secret: &str) -> ResolvedApiKey {
-        ResolvedApiKey::new(secret.to_owned())
+        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, secret.to_owned()).expect("test key")
     }
 
     fn assert_no_secret(error: &JevError, secret: &str) {
@@ -373,7 +381,8 @@ mod tests {
         assert!(matches!(
             error,
             JevError::KeyMissing {
-                backend: BackendKeyId::Anthropic
+                backend: BackendKeyId::Anthropic,
+                ..
             }
         ));
     }
@@ -555,7 +564,7 @@ mod tests {
         assert!(rendered.contains("tester"));
         assert!(!rendered.contains(SECRET));
 
-        let resolved = ResolvedApiKey::new(SECRET.to_owned());
+        let resolved = sealed(SECRET);
         let rendered = format!("{resolved:?} {resolved}");
         assert!(rendered.contains("[redacted]"));
         assert!(!rendered.contains(SECRET));

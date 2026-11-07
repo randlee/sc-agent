@@ -6,7 +6,9 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use sc_agent_types::observability::v2::SharedSessionLog;
-use sc_agent_types::{BackendId, JevError, JudgeOutcome, PayloadBundle, RepoRoot, Rev, SessionId};
+use sc_agent_types::{
+    BackendFamily, BackendId, JevError, JudgeOutcome, PayloadBundle, RepoRoot, Rev, SessionId,
+};
 use sc_jev_check::config;
 use sc_jev_check::registry::{BackendRegistry, registry_for_repo};
 use sc_jev_check::run::{RunOptions, RunRequest, prepare_caller_request, run_check, run_request};
@@ -198,23 +200,23 @@ fn parse(args: &[String], stdin: &[u8]) -> Result<Parsed, JevError> {
         return Err(unknown_command(head));
     }
     let Some(sub) = args.get(1) else {
-        return Err(JevError::InputInvalid {
-            detail: "jev requires run, dry-run, or ask. See sc-ai jev --help.".into(),
-        });
+        return Err(JevError::input_invalid(
+            "jev requires run, dry-run, or ask. See sc-ai jev --help.",
+        ));
     };
     let flags = parse_flags(&args[2..])?;
     match sub.as_str() {
         "run" | "dry-run" => {
             reject_ask_flags(sub, &flags)?;
             if flags.request_json.is_some() && flags.check.is_some() {
-                return Err(JevError::InputInvalid {
-                    detail: "pass either --request-json or --check, not both".into(),
-                });
+                return Err(JevError::input_invalid(
+                    "pass either --request-json or --check, not both",
+                ));
             }
             if flags.request_json.is_some() && flags.rev.is_some() {
-                return Err(JevError::InputInvalid {
-                    detail: "--rev selects check inputs and does not apply to --request-json; drop --rev or use --check".into(),
-                });
+                return Err(JevError::input_invalid(
+                    "--rev selects check inputs and does not apply to --request-json; drop --rev or use --check",
+                ));
             }
             let command = RunCommand {
                 repo_root: flags.repo_root,
@@ -235,11 +237,11 @@ fn parse(args: &[String], stdin: &[u8]) -> Result<Parsed, JevError> {
         }
         "ask" => {
             reject_run_flags(&flags)?;
-            let session_id = flags.session_id.ok_or_else(|| JevError::InputInvalid {
-                detail: "ask requires --session-id. See sc-ai jev --help.".into(),
+            let session_id = flags.session_id.ok_or_else(|| {
+                JevError::input_invalid("ask requires --session-id. See sc-ai jev --help.")
             })?;
-            let text = flags.text.ok_or_else(|| JevError::InputInvalid {
-                detail: "ask requires --text. See sc-ai jev --help.".into(),
+            let text = flags.text.ok_or_else(|| {
+                JevError::input_invalid("ask requires --text. See sc-ai jev --help.")
             })?;
             Ok(Parsed::Ask(AskCommand {
                 repo_root: flags.repo_root,
@@ -249,17 +251,17 @@ fn parse(args: &[String], stdin: &[u8]) -> Result<Parsed, JevError> {
                 log_dir: flags.log_dir,
             }))
         }
-        other => Err(JevError::InputInvalid {
-            detail: format!("unknown jev command {other}. See sc-ai jev --help."),
-        }),
+        other => Err(JevError::input_invalid(format!(
+            "unknown jev command {other}. See sc-ai jev --help."
+        ))),
     }
 }
 
 fn reject_ask_flags(command: &str, flags: &Flags) -> Result<(), JevError> {
     if flags.session_id.is_some() || flags.text.is_some() {
-        return Err(JevError::InputInvalid {
-            detail: format!("{command} does not take --session-id or --text"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "{command} does not take --session-id or --text"
+        )));
     }
     Ok(())
 }
@@ -271,9 +273,9 @@ fn reject_run_flags(flags: &Flags) -> Result<(), JevError> {
         || flags.rev.is_some()
         || !flags.backends.is_empty()
     {
-        return Err(JevError::InputInvalid {
-            detail: "ask does not take --check, --request-json, --backend, --rev, or --llm-system-prompt-file".into(),
-        });
+        return Err(JevError::input_invalid(
+            "ask does not take --check, --request-json, --backend, --rev, or --llm-system-prompt-file",
+        ));
     }
     Ok(())
 }
@@ -318,14 +320,14 @@ fn parse_flags(args: &[String]) -> Result<Flags, JevError> {
             "--session-id" => flags.session_id = Some(next_value(args, &mut index, &arg, false)?),
             "--text" => flags.text = Some(next_value(args, &mut index, &arg, false)?),
             other if other.starts_with('-') => {
-                return Err(JevError::InputInvalid {
-                    detail: format!("unknown flag {other}. See sc-ai jev --help."),
-                });
+                return Err(JevError::input_invalid(format!(
+                    "unknown flag {other}. See sc-ai jev --help."
+                )));
             }
             other => {
-                return Err(JevError::InputInvalid {
-                    detail: format!("unexpected argument {other}. See sc-ai jev --help."),
-                });
+                return Err(JevError::input_invalid(format!(
+                    "unexpected argument {other}. See sc-ai jev --help."
+                )));
             }
         }
     }
@@ -352,9 +354,9 @@ fn assign(flags: &mut Flags, flag: &str, value: String) -> Result<(), JevError> 
         "--session-id" => flags.session_id = Some(value),
         "--text" => flags.text = Some(value),
         other => {
-            return Err(JevError::InputInvalid {
-                detail: format!("unknown flag {other}. See sc-ai jev --help."),
-            });
+            return Err(JevError::input_invalid(format!(
+                "unknown flag {other}. See sc-ai jev --help."
+            )));
         }
     }
     Ok(())
@@ -377,15 +379,11 @@ fn next_value(
 }
 
 fn missing_value(flag: &str) -> JevError {
-    JevError::InputInvalid {
-        detail: format!("{flag} requires a value. See sc-ai jev --help."),
-    }
+    JevError::input_invalid(format!("{flag} requires a value. See sc-ai jev --help."))
 }
 
 fn unknown_command(name: &str) -> JevError {
-    JevError::InputInvalid {
-        detail: format!("unknown command {name}. See sc-ai --help."),
-    }
+    JevError::input_invalid(format!("unknown command {name}. See sc-ai --help."))
 }
 
 struct PreparedLog {
@@ -680,18 +678,19 @@ fn run_data(
 /// fields stay out of `data`. Values are copied, not rebuilt, and are not
 /// nested under `provider_meta`.
 fn merge_jev_response(data: &mut Map<String, Value>, outcome: &JudgeOutcome) {
-    if outcome.backend == BackendId::Jev {
-        if let Some(meta) = outcome.provider_meta.as_ref().and_then(Value::as_object) {
+    let answers = serde_json::to_value(outcome.answers()).unwrap_or(Value::Null);
+    if outcome.backend().family() == BackendFamily::TypeSafeJev {
+        if let Some(meta) = outcome.provider_meta().and_then(Value::as_object) {
             for (key, value) in meta {
                 data.insert(key.clone(), value.clone());
             }
         }
-        data.insert("answers".to_owned(), outcome.answers.clone());
+        data.insert("answers".to_owned(), answers);
         return;
     }
 
-    data.insert("answers".to_owned(), outcome.answers.clone());
-    let Some(meta) = outcome.provider_meta.as_ref().and_then(Value::as_object) else {
+    data.insert("answers".to_owned(), answers);
+    let Some(meta) = outcome.provider_meta().and_then(Value::as_object) else {
         return;
     };
     if let Some(model) = meta.get("model") {
@@ -725,11 +724,9 @@ fn request_bytes(repo: &RepoRoot, spec: &str, stdin: &[u8]) -> Result<Vec<u8>, J
     let path = joined_path(repo.as_path().to_path_buf(), Path::new(spec));
     std::fs::read(&path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            JevError::InputMissing {
-                path: path.display().to_string(),
-            }
+            JevError::input_missing(path.display().to_string())
         } else {
-            JevError::io_failed(&format!("request JSON {}", path.display()), &error)
+            JevError::io_failed(format!("request JSON {}", path.display()), &error)
         }
     })
 }
@@ -739,8 +736,10 @@ fn parse_flag_backends(flags: &[String]) -> Result<Vec<BackendId>, JevError> {
 }
 
 fn parse_session_id(text: &str) -> Result<SessionId, JevError> {
-    let id = uuid::Uuid::parse_str(text).map_err(|_| JevError::InputInvalid {
-        detail: format!("session id {text} is not a UUID. Pass the id from a jev run envelope."),
+    let id = uuid::Uuid::parse_str(text).map_err(|_| {
+        JevError::input_invalid(format!(
+            "session id {text} is not a UUID. Pass the id from a jev run envelope."
+        ))
     })?;
     Ok(SessionId::from_uuid(id))
 }
@@ -756,12 +755,10 @@ fn parse_session_id(text: &str) -> Result<SessionId, JevError> {
 fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
     if let Some(path) = flag {
         if !path.is_dir() {
-            return Err(JevError::InputMissing {
-                path: path.display().to_string(),
-            });
+            return Err(JevError::input_missing(path.display().to_string()));
         }
         let absolute = std::path::absolute(path).map_err(|error| {
-            JevError::operational_config(&format!(
+            JevError::operational_config(format!(
                 "--repo-root {} could not be made absolute (cause: {}). Pass an absolute --repo-root.",
                 path.display(),
                 error.kind()
@@ -770,7 +767,7 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
         return Ok(RepoRoot::new(absolute));
     }
     let cwd = std::env::current_dir().map_err(|error| {
-        JevError::operational_config(&format!(
+        JevError::operational_config(format!(
             "current directory is unavailable ({error}). Pass --repo-root."
         ))
     })?;
@@ -780,7 +777,7 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|error| {
-            JevError::operational_config(&format!(
+            JevError::operational_config(format!(
                 "git rev-parse failed ({error}). Pass --repo-root."
             ))
         })?;
@@ -793,13 +790,10 @@ fn resolve_repo(flag: Option<&Path>) -> Result<RepoRoot, JevError> {
         JevError::operational_config("git rev-parse returned non-UTF-8. Pass --repo-root.")
     })?;
     let path = PathBuf::from(text.trim());
-    let canonical = std::fs::canonicalize(&path).map_err(|_| JevError::InputMissing {
-        path: path.display().to_string(),
-    })?;
+    let canonical = std::fs::canonicalize(&path)
+        .map_err(|_| JevError::input_missing(path.display().to_string()))?;
     if !canonical.is_dir() {
-        return Err(JevError::InputMissing {
-            path: canonical.display().to_string(),
-        });
+        return Err(JevError::input_missing(canonical.display().to_string()));
     }
     Ok(RepoRoot::new(canonical))
 }
@@ -822,20 +816,18 @@ fn relative_to_repo(repo: &RepoRoot, path: &Path) -> Result<String, JevError> {
         match part {
             "" | "." => {}
             ".." => {
-                return Err(JevError::InputInvalid {
-                    detail: format!(
-                        "--check {} must not contain '..'. Pass a path inside --repo-root.",
-                        path.display()
-                    ),
-                });
+                return Err(JevError::input_invalid(format!(
+                    "--check {} must not contain '..'. Pass a path inside --repo-root.",
+                    path.display()
+                )));
             }
             other => parts.push(other),
         }
     }
     if parts.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "check path must be a file inside the repo, not the repo root itself".into(),
-        });
+        return Err(JevError::input_invalid(
+            "check path must be a file inside the repo, not the repo root itself",
+        ));
     }
     Ok(parts.join("/"))
 }
@@ -849,13 +841,11 @@ fn strip_repo_prefix(repo: &RepoRoot, path: &Path) -> Result<PathBuf, JevError> 
     {
         return Ok(rest.to_path_buf());
     }
-    Err(JevError::InputInvalid {
-        detail: format!(
-            "{} is outside the repo root {}. Pass a path inside --repo-root.",
-            path.display(),
-            repo.as_path().display()
-        ),
-    })
+    Err(JevError::input_invalid(format!(
+        "{} is outside the repo root {}. Pass a path inside --repo-root.",
+        path.display(),
+        repo.as_path().display()
+    )))
 }
 
 fn absolute_text(repo: &RepoRoot, path: &Path) -> String {

@@ -4,7 +4,9 @@
 //! A subject's span covers the trimmed cell in the source line, so it is the
 //! cell's own bytes rather than the whole row.
 
-use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev, Span, Subject};
+use crate::config::InputSpec;
+use sc_agent_types::schema::subjects::{Span, Subject};
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 use super::Extracted;
 use super::Extractor;
@@ -38,11 +40,11 @@ pub(crate) fn extract_table(
     input: &InputSpec,
 ) -> Result<Extracted, JevError> {
     let InputSpec::TableColumn { path, column } = input else {
-        return Err(JevError::ConfigInvalid {
-            detail: "table-column extractor received a different input kind".into(),
-        });
+        return Err(JevError::config_invalid(
+            "table-column extractor received a different input kind",
+        ));
     };
-    let text = read_repo_text(repo, rev, path)?;
+    let text = read_repo_text(repo, rev, &super::read::repo_path(path)?)?;
     let subjects = column_subjects(&text, path, column)?;
     if subjects.is_empty() {
         return Err(JevError::ExtractionEmpty);
@@ -81,9 +83,9 @@ fn column_subjects(text: &str, path: &str, column: &str) -> Result<Vec<Subject>,
         }
         index += 1;
     }
-    Err(JevError::InputInvalid {
-        detail: format!("column {column} was not found in {path}"),
-    })
+    Err(JevError::input_invalid(format!(
+        "column {column} was not found in {path}"
+    )))
 }
 
 fn data_subjects(
@@ -102,26 +104,21 @@ fn data_subjects(
             continue;
         }
         let Some(cell) = cells.get(column_index) else {
-            return Err(JevError::InputInvalid {
-                detail: format!("{path}:{line_no} is missing column {column}"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "{path}:{line_no} is missing column {column}"
+            )));
         };
         if cell.text.is_empty() {
             continue;
         }
         let start_byte = byte_offset(offset + cell.start, path)?;
         let end_byte = byte_offset(offset + cell.end, path)?;
-        subjects.push(Subject {
-            id: format!("{path}:{line_no}"),
-            capture: "column".into(),
-            text: cell.text.clone(),
-            span: Span {
-                start_line: *line_no,
-                end_line: *line_no,
-                start_byte,
-                end_byte,
-            },
-        });
+        subjects.push(Subject::new(
+            format!("{path}:{line_no}"),
+            "column",
+            cell.text.clone(),
+            Span::new(*line_no, *line_no, start_byte, end_byte),
+        ));
     }
     Ok(subjects)
 }
@@ -137,9 +134,8 @@ struct Cell {
 }
 
 fn byte_offset(offset: usize, path: &str) -> Result<u32, JevError> {
-    u32::try_from(offset).map_err(|_| JevError::InputInvalid {
-        detail: format!("{path} is too large for a u32 byte span"),
-    })
+    u32::try_from(offset)
+        .map_err(|_| JevError::input_invalid(format!("{path} is too large for a u32 byte span")))
 }
 
 fn split_row(line: &str) -> Vec<Cell> {
@@ -200,8 +196,8 @@ fn is_delimiter(cell: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::InputSpec;
     use crate::extract::test_support::fixture_root;
-    use sc_agent_types::InputSpec;
 
     #[test]
     fn extractors_table_column_keeps_escaped_pipes() {
@@ -216,13 +212,10 @@ mod tests {
                 },
             )
             .expect("column");
-        let texts: Vec<&str> = subjects
-            .iter()
-            .map(|subject| subject.text.as_str())
-            .collect();
+        let texts: Vec<&str> = subjects.iter().map(|subject| subject.text()).collect();
         assert_eq!(texts, ["ship | hold", "drop"]);
-        assert_eq!(subjects[0].id, "docs/decisions.md:3");
-        assert_eq!(subjects[1].id, "docs/decisions.md:4");
+        assert_eq!(subjects[0].id(), "docs/decisions.md:3");
+        assert_eq!(subjects[1].id(), "docs/decisions.md:4");
     }
 
     #[test]
@@ -244,7 +237,7 @@ mod tests {
             )
             .expect("column");
         assert_eq!(subjects.len(), 1);
-        assert_eq!(subjects[0].text, "`a|b`");
+        assert_eq!(subjects[0].text(), "`a|b`");
     }
 
     #[test]
@@ -262,10 +255,10 @@ mod tests {
                 },
             )
             .expect("column");
-        let span = &subjects[0].span;
-        let start = usize::try_from(span.start_byte).expect("start");
-        let end = usize::try_from(span.end_byte).expect("end");
+        let span = &subjects[0].span();
+        let start = usize::try_from(span.start_byte()).expect("start");
+        let end = usize::try_from(span.end_byte()).expect("end");
         assert_eq!(&text[start..end], "ship it");
-        assert_eq!(subjects[0].text.len(), end - start);
+        assert_eq!(subjects[0].text().len(), end - start);
     }
 }

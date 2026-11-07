@@ -11,7 +11,7 @@
 use std::io::Read;
 use std::time::Duration;
 
-use sc_agent_types::JevError;
+use sc_agent_types::{JevError, NetworkErrorKind};
 use ureq::Agent;
 
 use super::{JevTransport, WireRequest, WireResponse};
@@ -77,11 +77,12 @@ impl Default for HttpsTransport {
 impl JevTransport for HttpsTransport {
     fn send(&self, request: &WireRequest<'_>) -> Result<WireResponse, JevError> {
         if self.require_https && !request.url.starts_with("https://") {
-            return Err(JevError::NetworkError {
-                detail: "Jev connection failed: URL is not https".to_owned(),
-            });
+            return Err(JevError::network(
+                NetworkErrorKind::Tls,
+                "Jev connection failed: URL is not https",
+            ));
         }
-        #[allow(
+        #[expect(
             clippy::disallowed_methods,
             reason = "ADR-SAG-0020: the sending transport is the one reader of the key"
         )]
@@ -95,7 +96,7 @@ impl JevTransport for HttpsTransport {
             .header("Authorization", &authorization)
             .header("Content-Type", "application/json")
             .send(request.body)
-            .map_err(|error| network(&error, &authorization))?;
+            .map_err(|error| network(ureq_error_kind(&error), &error, &authorization))?;
         let status = response.status().as_u16();
         let retry_after = response
             .headers()
@@ -109,11 +110,11 @@ impl JevTransport for HttpsTransport {
         let mut body = Vec::new();
         reader
             .read_to_end(&mut body)
-            .map_err(|error| network(&error, &authorization))?;
+            .map_err(|error| network(io_error_kind(&error), &error, &authorization))?;
         if body.len() as u64 > MAX_RESPONSE_BYTES {
-            return Err(JevError::ResponseInvalid {
-                detail: format!("Jev response exceeds {MAX_RESPONSE_BYTES} bytes"),
-            });
+            return Err(JevError::response_invalid(format!(
+                "Jev response exceeds {MAX_RESPONSE_BYTES} bytes"
+            )));
         }
         Ok(WireResponse {
             status,
@@ -127,9 +128,38 @@ impl JevTransport for HttpsTransport {
 ///
 /// The underlying error text is formatted here, so the full header value is
 /// removed before the client's key redaction runs.
-fn network(error: &dyn std::fmt::Display, authorization: &str) -> JevError {
-    JevError::NetworkError {
-        detail: format!("Jev connection failed: {error}").replace(authorization, "[redacted]"),
+fn network(kind: NetworkErrorKind, error: &dyn std::fmt::Display, authorization: &str) -> JevError {
+    JevError::network(
+        kind,
+        format!("Jev connection failed: {error}").replace(authorization, "[redacted]"),
+    )
+}
+
+/// Classifies a ureq failure for [`JevError::retryable`].
+///
+/// TLS and certificate failures are `Tls` (not retryable); an oversize body
+/// is `BodyTooLarge`; everything else that fails before a response is
+/// `Connect`.
+fn ureq_error_kind(error: &ureq::Error) -> NetworkErrorKind {
+    match error {
+        ureq::Error::Timeout(_) => NetworkErrorKind::Timeout,
+        ureq::Error::Io(io) => io_error_kind(io),
+        ureq::Error::Tls(_)
+        | ureq::Error::TlsRequired
+        | ureq::Error::RequireHttpsOnly(_)
+        | ureq::Error::Pem(_)
+        | ureq::Error::Rustls(_) => NetworkErrorKind::Tls,
+        ureq::Error::BodyExceedsLimit(_) => NetworkErrorKind::BodyTooLarge,
+        _ => NetworkErrorKind::Connect,
+    }
+}
+
+/// `Timeout` for a timed-out read, otherwise `Connect`.
+fn io_error_kind(error: &std::io::Error) -> NetworkErrorKind {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        NetworkErrorKind::Timeout
+    } else {
+        NetworkErrorKind::Connect
     }
 }
 
@@ -137,7 +167,10 @@ fn network(error: &dyn std::fmt::Display, authorization: &str) -> JevError {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use sc_agent_types::{JudgeBackend, JudgeRequest, ResolvedApiKey, payload_bundle_from_value};
+    use sc_agent_types::{
+        BackendKeyId, CanonicalJudgePayload, JudgeBackend, JudgeRequest, PayloadBundle,
+        ResolvedApiKey,
+    };
 
     use super::*;
     use crate::test_server::{LoopbackServer, Reply, UNREACHED_URL, closed_port};
@@ -146,7 +179,7 @@ mod tests {
     const KEY: &str = "sk-loopback-secret";
 
     fn key() -> ResolvedApiKey {
-        ResolvedApiKey::new(KEY.to_owned())
+        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, KEY.to_owned()).expect("key")
     }
 
     fn send(url: &str, timeout: Duration) -> Result<WireResponse, JevError> {
@@ -256,7 +289,11 @@ mod tests {
 
     #[test]
     fn network_detail_drops_the_header_value() {
-        let error = network(&format!("echo Bearer {KEY}"), &format!("Bearer {KEY}"));
+        let error = network(
+            NetworkErrorKind::Connect,
+            &format!("echo Bearer {KEY}"),
+            &format!("Bearer {KEY}"),
+        );
         assert_no_key(&error);
     }
 
@@ -277,7 +314,6 @@ mod tests {
             "jev-test",
             host,
             "/v1/check",
-            4_000,
             attempts,
             Duration::from_secs(5),
         )
@@ -288,7 +324,6 @@ mod tests {
             key(),
             Arc::new(LoopbackClientTransport(HttpsTransport::loopback_for_tests())),
         )
-        .expect("client")
         .with_retry_delay(Arc::clone(&waits) as Arc<dyn RetryDelay>);
         (client, waits)
     }
@@ -309,12 +344,15 @@ mod tests {
     }
 
     fn request() -> JudgeRequest {
-        let payload = payload_bundle_from_value(&serde_json::json!({
+        let payload: CanonicalJudgePayload = serde_json::from_value(serde_json::json!({
             "questions": [{"id": "q", "prompt": "p", "choices": ["no", "yes"]}],
             "state": []
         }))
         .expect("payload");
-        JudgeRequest { payload, llm: None }
+        JudgeRequest::new(
+            Arc::new(PayloadBundle::encode(&payload).expect("bundle")),
+            None,
+        )
     }
 
     #[test]
@@ -329,7 +367,7 @@ mod tests {
         ]);
         let (client, waits) = loopback_client(&server, 2);
         let outcome = client.judge(&request()).expect("judge after busy");
-        assert_eq!(outcome.answers["q"]["choice"], "yes");
+        assert_eq!(outcome.answers()["q"].choice().as_str(), "yes");
         let exhausted = client.judge(&request()).expect_err("busy twice");
         assert_eq!(exhausted.code(), "NETWORK_ERROR");
         assert_eq!(
@@ -343,5 +381,35 @@ mod tests {
         assert!(waits[0] >= Duration::from_millis(500));
         assert!(waits[1] >= Duration::from_secs(1));
         assert_eq!(server.finish().len(), 5);
+    }
+
+    #[test]
+    fn ureq_errors_map_to_network_kinds() {
+        let cases = [
+            (
+                ureq::Error::Timeout(ureq::Timeout::Global),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::TimedOut)),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset)),
+                NetworkErrorKind::Connect,
+            ),
+            (ureq::Error::Tls("handshake"), NetworkErrorKind::Tls),
+            (ureq::Error::TlsRequired, NetworkErrorKind::Tls),
+            (
+                ureq::Error::BodyExceedsLimit(1),
+                NetworkErrorKind::BodyTooLarge,
+            ),
+            (ureq::Error::ConnectionFailed, NetworkErrorKind::Connect),
+            (ureq::Error::HostNotFound, NetworkErrorKind::Connect),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(ureq_error_kind(&error), kind, "{error}");
+        }
+        assert!(!NetworkErrorKind::Tls.retryable());
     }
 }

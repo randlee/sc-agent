@@ -140,7 +140,12 @@ def test_run_check_and_ask_append_jsonl_without_secrets(
     assert SECRET not in result.payload
     assert result.outcomes[0]["backend"] == "anthropic_haiku"
     assert result.outcomes[0]["answers"]["relevant"]["choice"] == "yes"
-    assert result.equal_input["equal"] is True
+    # r-1: no backend reports an input digest yet, so the attestation is
+    # "unattested" and the derived `equal` is False (r-2b adds hashing).
+    assert result.equal_input["equal"] is False
+    assert result.equal_input["backends"] == [
+        {"backend": "anthropic_haiku", "attestation": {"status": "unattested"}}
+    ]
     assert result.equal_input["prompt_sha256"] == result.prompt_sha256
     lines = _lines(log_dir)
     assert len(lines) == 1

@@ -3,10 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use sc_agent_types::observability::v2::{
-    EventError, LogEvent as SessionEvent, LogOperation, SessionLog,
-};
-use sc_agent_types::{JevError, RepoRoot};
+use sc_agent_types::observability::v2::{LogEvent as SessionEvent, LogRejected, SessionLog};
+use sc_agent_types::{JevError, Operation, RepoRoot};
 use sc_observability::v2::{Logger, LoggerBuilder};
 use sc_observability::{
     ActionName, Level, LogEvent, LoggerConfig, OBSERVATION_ENVELOPE_VERSION, ProcessIdentity,
@@ -76,7 +74,7 @@ impl ObservabilitySessionLog {
     /// material.
     pub fn open(log_root: &Path) -> Result<Arc<Self>, JevError> {
         std::fs::create_dir_all(log_root).map_err(|error| {
-            JevError::operational_config(&format!(
+            JevError::operational_config(format!(
                 "Create log directory {} or pass a writable --log-dir ({error}).",
                 log_root.display()
             ))
@@ -100,7 +98,7 @@ impl ObservabilitySessionLog {
     /// `check.toml`.
     pub fn flush(&self) -> Result<(), JevError> {
         self.logger.flush().map_err(|error| {
-            JevError::operational_config(&format!(
+            JevError::operational_config(format!(
                 "session log flush failed ({}). Check that the log root is writable.",
                 error.diagnostic().message
             ))
@@ -115,8 +113,10 @@ impl Drop for ObservabilitySessionLog {
 }
 
 impl SessionLog for ObservabilitySessionLog {
-    fn try_log(&self, event: SessionEvent) -> Result<(), EventError> {
-        self.logger.try_log(obs_event(event))
+    fn emit(&self, event: SessionEvent) -> Result<(), LogRejected> {
+        self.logger
+            .try_log(obs_event(event)?)
+            .map_err(|error| LogRejected::new(error.to_string()))
     }
 }
 
@@ -125,7 +125,7 @@ fn service_name() -> ServiceName {
 }
 
 fn init_error(error: &impl DiagnosticMessage) -> JevError {
-    JevError::operational_config(&format!(
+    JevError::operational_config(format!(
         "session log could not be started ({}). Choose a writable --log-dir or set {LOG_ROOT_ENV}.",
         error.diagnostic_message()
     ))
@@ -141,31 +141,31 @@ impl DiagnosticMessage for sc_observability::v2::InitError {
     }
 }
 
-fn obs_event(event: SessionEvent) -> LogEvent {
+fn obs_event(event: SessionEvent) -> Result<LogEvent, LogRejected> {
     let mut fields = Map::new();
     fields.insert(
         "backend".to_owned(),
-        Value::String(event.backend.to_string()),
+        Value::String(event.backend().to_string()),
     );
     fields.insert(
         "prompt_sha256".to_owned(),
-        Value::String(event.prompt_sha256.as_str().to_owned()),
+        Value::String(event.prompt_sha256().as_str().to_owned()),
     );
     fields.insert(
         "operation".to_owned(),
-        Value::String(event.operation.as_str().to_owned()),
+        Value::String(event.operation().as_str().to_owned()),
     );
     fields.insert(
         "session_id".to_owned(),
-        Value::String(event.session_id.to_string()),
+        Value::String(event.session_id().to_string()),
     );
-    LogEvent {
+    Ok(LogEvent {
         version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).expect("v1 schema"),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
         service: service_name(),
         target: TargetCategory::new("jev.session").expect("jev.session is a valid target"),
-        action: action_name(event.operation),
+        action: action_name(event.operation())?,
         message: None,
         identity: ProcessIdentity::default(),
         trace: None,
@@ -175,13 +175,20 @@ fn obs_event(event: SessionEvent) -> LogEvent {
         diagnostic: None,
         state_transition: None,
         fields,
-    }
+    })
 }
 
-/// Every [`LogOperation`] spelling is a valid action name; the unit test
+/// Every [`Operation`] spelling is a valid action name; the unit test
 /// `every_log_operation_is_an_action_name` proves it.
-fn action_name(operation: LogOperation) -> ActionName {
-    ActionName::new(operation.as_str()).expect("LogOperation spellings are valid action names")
+///
+/// A spelling that is not a valid action name is a rejected event, never a
+/// panic.
+fn action_name(operation: Operation) -> Result<ActionName, LogRejected> {
+    ActionName::new(operation.as_str()).map_err(|_| {
+        LogRejected::new(format!(
+            "operation {operation} is not a valid sc-observability action name"
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -190,8 +197,11 @@ mod tests {
 
     #[test]
     fn every_log_operation_is_an_action_name() {
-        for operation in LogOperation::ALL {
-            assert_eq!(action_name(operation).as_str(), operation.as_str());
+        for operation in Operation::ALL.iter().copied() {
+            assert_eq!(
+                action_name(operation).expect("valid").as_str(),
+                operation.as_str()
+            );
         }
     }
 
@@ -206,28 +216,28 @@ mod tests {
         value
     }
 
-    fn golden_event(operation: LogOperation) -> SessionEvent {
-        SessionEvent {
-            session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
+    fn golden_event(operation: Operation) -> SessionEvent {
+        SessionEvent::new(
+            serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
                 .expect("nil session id"),
-            backend: sc_agent_types::BackendId::AnthropicHaiku,
-            prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
+            sc_agent_types::BackendId::AnthropicHaiku,
+            sc_agent_types::Sha256Digest::of(b"payload"),
             operation,
-        }
+        )
     }
 
     /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
     /// (where a shared one lives is decision D2). Both compare against this
-    /// one golden (every `LogOperation`), so they cannot drift apart.
+    /// one golden (every `Operation`), so they cannot drift apart.
     #[test]
     fn adapter_matches_the_shared_session_event_golden() {
         let golden: serde_json::Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/observability/session-event.json"
         ))
         .expect("golden json");
-        for operation in LogOperation::ALL {
+        for operation in Operation::ALL.iter().copied() {
             assert_eq!(
-                projection(&obs_event(golden_event(operation))),
+                projection(&obs_event(golden_event(operation)).expect("event")),
                 golden[operation.as_str()],
                 "{operation}"
             );

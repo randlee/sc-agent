@@ -1365,10 +1365,10 @@ dependencies = [
 name = "sc-agent-types"
 version = "0.1.0"
 dependencies = [
- "sc-observability-types",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror",
  "uuid",
 ]

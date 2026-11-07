@@ -45,6 +45,8 @@ requirements:
 adrs:
   - ADR-SAG-0001
   - ADR-SAG-0002
+  - ADR-SAG-0003
+  - ADR-SAG-0009
   - ADR-SAG-0010
   - ADR-SAG-0011
   - ADR-SAG-0013
@@ -60,6 +62,7 @@ adrs:
   - ADR-SAG-0024
   - ADR-SAG-0025
   - ADR-SAG-0026
+  - ADR-SAG-0027
   - ADR-SAG-0028
   - ADR-SAG-0029
 owned_paths:
@@ -100,12 +103,15 @@ owned_paths:
   - "docs/architecture.md#ADR-SAG-0013 amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0016 heading and amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0017 amendment (r-3b)"
+  - "docs/architecture.md#ADR-SAG-0020 amendment (r-3b) (inserted as Proposed by r-3; r-3b flips it)"
+  - "docs/architecture.md#ADR-SAG-0025 r-3b bullet (REQ-SAG-0604 consumer output), Status line (r-3b clause)"
   - "docs/architecture.md#ADR-SAG-0023 amendment (r-3b)"
   - "docs/architecture.md#ADR-SAG-0026 Status line and compose half"
   - "docs/architecture.md#ADR-SAG-0028"
   - "docs/architecture.md#ADR index row ADR-SAG-0016 (Title cell)"
   - "docs/architecture.md#ADR index row ADR-SAG-0023 (Status cell: compose pin)"
-  - "docs/architecture.md#ADR index Amended-by marker (r-3b) in ADR-SAG-0010, 0011, 0013, 0016, 0017"
+  - "docs/architecture.md#ADR index Amended-by marker (r-3b) in ADR-SAG-0010, 0011, 0013, 0016, 0017, 0020"
+  - "docs/architecture.md#ADR index row ADR-SAG-0025 (Status cell: consumer-output bullet)"
   - "docs/architecture.md#ADR index row ADR-SAG-0026 (Status cell: compose half)"
   - "docs/architecture.md#ADR index row ADR-SAG-0028"
   - "docs/requirements.md#REQ-SAG-0109, 0135, 0604, 0605, 0712 rows; REQ-SAG-0130 (r-3b bullet), REQ-SAG-0711 amendments"
@@ -228,8 +234,11 @@ graph); contributes ARCHE-002 (consumer flag).
 3. Tests: `test_cli_partial_failure_both_streams_exit_2`,
    `test_cli_chain_context_flag`, `test_cli_log_flush_warning_in_data`
    (`crates/sc-ai/tests/cli.rs`). Seam per the plan "Test seams"
-   convention: `sc-ai` gains `test-util = ["sc-jev-check/test-util"]`, enabled
-   by its self dev-dependency (no `version` key); only under that feature
+   convention: `sc-ai` gains `test-util = ["sc-jev-check/test-util"]`; its
+   `cli` target is declared `[[test]] name = "cli" required-features = ["test-util"]`
+   and its validation lines pass `--features test-util` (no self
+   dev-dependency: r-1's D0 spike result, `boundaries/README.md`
+   "Dev-dependency and self edges"); only under that feature
    does the binary accept a hidden `--scripted-answers <file>` flag. The file
    is the r-2b D5 scripted-answers JSON (shared or per-backend form), passed
    unchanged to `register_scripted_backends` and injected through
@@ -285,8 +294,9 @@ graph); contributes ARCHE-002 (consumer flag).
    (`crates/workspace-tests` is two levels down; `cargo test` runs each
    target with the package directory as cwd, so a relative `target/` would
    land in `crates/workspace-tests/target`). It is never the directory `cargo test` uplifts
-   `CARGO_BIN_EXE_sc-ai` into: that test binary has `test-util` on through
-   `sc-ai`'s self dev-dependency, so sharing an uplift path would make the
+   `CARGO_BIN_EXE_sc-ai` into: that test binary is built with `test-util`
+   on (`--features test-util`, or Cargo feature unification in a workspace
+   test run), so sharing an uplift path would make the
    parity golden and `test_util_off` depend on test order (RBQA-F103 (b)).
    The helper therefore runs release-shaped binaries only. A fixed isolated
    directory is used instead of a tempdir per test so `sc-ai` and
@@ -454,7 +464,47 @@ amendment (published library set + publish order gains `sc-agent-compose`)
 Active; ADR-SAG-0028 (`workspace-tests`: purpose, dev-only edges, the
 built-binary contract, forbidden edges, spike outcome) → Active, with its
 index row; ADR-SAG-0010, ADR-SAG-0011, ADR-SAG-0013 r-3b amendments →
-Active; A.1 crate graph section added. REQ-SAG-0711 amended in
+Active; A.1 crate graph section added.
+
+**ADR-SAG-0020 r-3b bullet** (plan review 4, pre-screen r-3 fix 1). r-3
+moves the `source_scans` clause out of its Active ADR-SAG-0020 r-3 bullet
+and inserts it as a Proposed "Amendment (Phase A.1, r-3b)" subsection with
+exactly this bullet; r-3b flips the subsection, its bullet label and the
+"(Proposed, r-3b)" marker in the ADR-SAG-0020 index row to Active:
+
+> - (Proposed, r-3b) `workspace-tests --test source_scans` is the
+>   cross-crate proof of the ADR-SAG-0020 r-3 read-site convention:
+>   `test_disallowed_methods_expect_sites` fails if an `expect` naming
+>   `clippy::disallowed_methods` (item- or crate-level, also inside
+>   `cfg_attr`) appears in any file of any target (`src`, `tests`,
+>   `benches`, `examples`, `build.rs`) other than
+>   `crates/sc-agent-http/src/ureq_transport.rs` and the process-spawn sites
+>   ADR-SAG-0028 lists, and a spawn-site file must not contain
+>   `ResolvedApiKey`; `test_every_crate_inherits_workspace_lints` fails if a
+>   crate stops inheriting the workspace lints or adds a per-crate
+>   `[lints.*]` override. From r-3b this replaces r-3's local `rg` check.
+
+**ADR-SAG-0025 consumer-output bullet.** r-2b split bullet 2 and left the
+"(Proposed, r-3b) REQ-SAG-0604 consumer output" bullet Proposed; r-3b flips
+that bullet to Active, sets the ADR-SAG-0025 Status line to "Active" and the
+index row Status cell to "Active" (D3.2 delivers it).
+
+**ADR-SAG-0028 self dev-dependency sentence reworded** (D0 outcome 4 of
+r-1, `boundaries/README.md`). In the "Built-binary contract" bullet,
+replace "which has `test-util` on through its self dev-dependency" with
+"which is built with `test-util` on (`--features test-util`, or Cargo
+feature unification in a workspace test run; there is no self
+dev-dependency; `boundaries/README.md`, section Dev-dependency and self edges)".
+
+**Markers r-3b flips and markers it must not touch.** r-3b flips only the
+"(Proposed, r-3b)" markers in index rows 0010, 0011, 0013, 0016, 0017,
+0020 and 0023 (compose pin), the compose-half parts of the ADR-SAG-0026
+row, the ADR-SAG-0025 Status cell and the ADR-SAG-0028 row. In the
+ADR-SAG-0017 cell ("Amended by ADR-SAG-0023 (Proposed, r-4); ADR-SAG-0026
+(Proposed, r-3), (Proposed, r-3b)") it flips only the last "(Proposed,
+r-3b)"; the r-4 and r-3 markers there belong to r-4 and r-3, which have
+already flipped them (wave 1 and wave 2), and r-3b must not rewrite them.
+The same holds for the r-4 and r-1 markers in row 0016. REQ-SAG-0711 amended in
 `docs/requirements.md` **and** the crate-level row in
 `docs/sc-ai/requirements.md` (which still says
 `sc-observability = "1.5.0"` + adapter): "`sc-ai` wires the logger through
@@ -479,13 +529,16 @@ below.
 | req:REQ-SAG-0135 | `cargo-tree-gates.sh` clap rows pass in CI for both libraries |
 | adr:ADR-SAG-0026 | Compose half and ADR-level Status Active; `sc-ai`/`sc-jev-py` contain no adapter or path-default code (the moved files are deleted); `ComposeInputs` has no public field |
 | adr:ADR-SAG-0028 | Status Active; index row Active; text matches the manifest and the spike outcome |
-| adr:ADR-SAG-0016, 0017, 0010, 0011, 0013, 0023 | r-3b subsections Active; ADR-SAG-0016 retitled |
+| adr:ADR-SAG-0016, 0017, 0010, 0011, 0013, 0023 | r-3b subsections Active; ADR-SAG-0016 retitled; in rows 0016 and 0017 only the r-3b markers changed |
+| adr:ADR-SAG-0020 | r-3b subsection Active with the bullet above; index row marker "(Active, r-3b)"; `cargo test -p workspace-tests --test source_scans -- test_disallowed_methods_expect_sites --exact` and `-- test_every_crate_inherits_workspace_lints --exact` print `1 passed` |
+| adr:ADR-SAG-0025 | consumer-output bullet, Status line and index row Status cell Active; `test_cli_partial_failure_both_streams_exit_2`; pytest `test_partial_failure_raises_with_response` |
+| adr:ADR-SAG-0003, 0009, 0027 | `.env` and API-key environment reads stay in `sc-jev-check` (`BackendRegistry::from_env`; 0003, `test_env_reads_only_in_owners`); compose builds `BackendRegistry::from_env` unless `ComposeInputs::registry` is set and adds no id dispatch (0009); consumer errors keep the r-1 `ErrorCode` mapping and NFR-SAG-0001 field rule in `sc-ai` and `sc-jev-py` (0027, `test_error_response_stderr_golden`, `test_cli_partial_failure_both_streams_exit_2`) |
 | adr:ADR-SAG-0021 | `test_cli_path_policy_precedence`, `test_python_path_policy_precedence` in compose reproduce every existing precedence case; `test_custom_path_policy_resolves` (EXT-031) |
 | adr:ADR-SAG-0029 | (b) holds: pytest reaches scripted backends only through `sc_jev_py._testing.run_check_scripted`; the release wheel has no `_testing` submodule (check below) |
 | boundary:agent-compose | Manifest enforced (`just lint` output attached); `cargo tree` gates for compose pass |
-| boundary:sc-ai-cli | Regression: REQ-SAG-0700–0711 tests green (REQ-SAG-0702 readback: `cargo test -p sc-ai --test cli`); `test_cli_and_python_data_match_golden`; `test_cli_log_flush_warning_in_data` |
+| boundary:sc-ai-cli | Regression: REQ-SAG-0700–0711 tests green (REQ-SAG-0702 readback: `cargo test -p sc-ai --features test-util --test cli`); `test_cli_and_python_data_match_golden`; `test_cli_log_flush_warning_in_data` |
 | boundary:workspace | `source_scans` and `test_util_off` targets green (incl. `test_release_binary_rejects_scripted_answers`); isolated library builds green; release wheel has no `_testing`; duplicate-version rows pass for `sc-ai` and `sc-jev-py` |
-| boundary:regressions | REQ-SAG-0310 `cargo test -p sc-treesitter --test cli` and `e2e_treesitter_producer`; REQ-SAG-0313 `test_e2e_producer_error_reraised`; REQ-SAG-0600/0601 `cargo test -p sc-jev-check --test sessions_exact` and `--test run_response`; REQ-SAG-0603 `test_cli_partial_failure_both_streams_exit_2` (two backends in one run); REQ-SAG-0610/0611 `cargo test -p sc-agent-compose --test obs`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`; NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-ai --test cli`; NFR-SAG-0003 `cargo test -p sc-agent-compose --test paths` (default and configured session/log roots); NFR-SAG-0004 `bash .github/scripts/check-exact-pins.sh`; REQ-SAG-0800/0801/0802 maturin build + pytest below; REQ-SAG-0131/0132 `bash .github/scripts/run-consumer-preflight.sh` and the publish dry-run with `sc-agent-compose` in order |
+| boundary:regressions | REQ-SAG-0310 `cargo test -p sc-treesitter --test cli` and `e2e_treesitter_producer`; REQ-SAG-0313 `test_e2e_producer_error_reraised`; REQ-SAG-0600/0601 `cargo test -p sc-jev-check --features test-util --test sessions_exact` and `--test run_response`; REQ-SAG-0603 `test_cli_partial_failure_both_streams_exit_2` (two backends in one run); REQ-SAG-0610/0611 `cargo test -p sc-agent-compose --test obs`; NFR-SAG-0001 `cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact`; NFR-SAG-0002 `cargo test -p sc-jev-backends --test llm` and `cargo test -p sc-ai --features test-util --test cli`; NFR-SAG-0003 `cargo test -p sc-agent-compose --test paths` (default and configured session/log roots); NFR-SAG-0004 `bash .github/scripts/check-exact-pins.sh`; REQ-SAG-0800/0801/0802 maturin build + pytest below; REQ-SAG-0131/0132 `bash .github/scripts/run-consumer-preflight.sh` and the publish dry-run with `sc-agent-compose` in order |
 
 ## Required validation
 
@@ -506,7 +559,7 @@ cargo test -p workspace-tests --test test_util_off -- test_test_util_absent_from
 cargo test -p workspace-tests --test test_util_off -- test_release_binary_rejects_scripted_answers --exact
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p sc-agent-compose --test obs
-cargo test -p sc-jev-check --test sessions_exact
+cargo test -p sc-jev-check --features test-util --test sessions_exact
 cargo test -p sc-treesitter --test cli
 cargo test -p sc-agent-compose --test paths -- test_cli_path_policy_precedence --exact
 cargo test -p sc-agent-compose --test paths -- test_python_path_policy_precedence --exact
@@ -515,9 +568,9 @@ cargo test -p sc-agent-compose --test paths
 cargo test -p sc-agent-types --test errors -- test_error_response_stderr_golden --exact
 cargo test -p sc-jev-backends --test llm
 cargo test -p sc-ai --test argv
-cargo test -p sc-ai --test cli -- test_cli_partial_failure_both_streams_exit_2 --exact
-cargo test -p sc-ai --test cli -- test_cli_chain_context_flag --exact
-cargo test -p sc-ai --test cli -- test_cli_log_flush_warning_in_data --exact
+cargo test -p sc-ai --features test-util --test cli -- test_cli_partial_failure_both_streams_exit_2 --exact
+cargo test -p sc-ai --features test-util --test cli -- test_cli_chain_context_flag --exact
+cargo test -p sc-ai --features test-util --test cli -- test_cli_log_flush_warning_in_data --exact
 cargo test -p sc-treesitter --test argv
 cargo build -p sc-ai --lib --no-default-features
 cargo build -p sc-treesitter --lib --no-default-features

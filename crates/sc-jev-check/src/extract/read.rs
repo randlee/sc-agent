@@ -9,10 +9,9 @@
 
 use std::fs::File;
 use std::io::Read;
-use std::path::{Component, Path};
 use std::process::{Command, Output};
 
-use sc_agent_types::{JevError, RepoRoot, Rev};
+use sc_agent_types::{JevError, RepoRelativePath, RepoRoot, Rev};
 
 use super::sanitize::{redact_error, stderr_tail};
 
@@ -30,16 +29,18 @@ pub(crate) const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 ///
 /// # Errors
 ///
-/// Returns [`JevError::InputInvalid`] for absolute paths, `..`, a symlink
-/// that leaves the repo root, a non-file target, or an invalid revision.
+/// The path is already a [`RepoRelativePath`], so absolute paths and `..`
+/// cannot reach this function. Returns [`JevError::InputInvalid`] for a
+/// symlink that leaves the repo root, a non-file target, or an invalid
+/// revision.
 /// Returns [`JevError::InputMissing`] when the path is absent and
 /// [`JevError::InputTooLarge`] above 8 MiB.
 pub(crate) fn read_repo_bytes(
     repo: &RepoRoot,
     rev: &Rev,
-    relative: &str,
+    relative: &RepoRelativePath,
 ) -> Result<Vec<u8>, JevError> {
-    validate_relative(relative)?;
+    let relative = relative.as_str();
     if rev.as_str() == Rev::WORKTREE {
         return read_worktree(repo, relative);
     }
@@ -55,47 +56,21 @@ pub(crate) fn read_repo_bytes(
 pub(crate) fn read_repo_text(
     repo: &RepoRoot,
     rev: &Rev,
-    relative: &str,
+    relative: &RepoRelativePath,
 ) -> Result<String, JevError> {
     let bytes = read_repo_bytes(repo, rev, relative)?;
-    String::from_utf8(bytes).map_err(|error| JevError::InputInvalid {
-        detail: format!(
+    String::from_utf8(bytes).map_err(|error| {
+        JevError::input_invalid(format!(
             "{relative} is not UTF-8 (first invalid byte at offset {})",
             error.utf8_error().valid_up_to()
-        ),
+        ))
     })
-}
-
-fn validate_relative(relative: &str) -> Result<(), JevError> {
-    if relative.is_empty()
-        || relative.starts_with('/')
-        || relative.contains('\\')
-        || relative.contains('\0')
-        || relative.contains(':')
-    {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} must be a repo-relative path"),
-        });
-    }
-    let path = Path::new(relative);
-    if path.is_absolute()
-        || path
-            .components()
-            .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)))
-    {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} escapes the repo root"),
-        });
-    }
-    Ok(())
 }
 
 fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
     let root = std::fs::canonicalize(repo.as_path()).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            JevError::InputMissing {
-                path: repo.as_path().display().to_string(),
-            }
+            JevError::input_missing(repo.as_path().display().to_string())
         } else {
             JevError::io_failed("repo root", &error)
         }
@@ -103,23 +78,21 @@ fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
     let full = match std::fs::canonicalize(repo.as_path().join(relative)) {
         Ok(full) => full,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(JevError::InputMissing {
-                path: relative.to_owned(),
-            });
+            return Err(JevError::input_missing(relative.to_owned()));
         }
         Err(error) => return Err(JevError::io_failed(relative, &error)),
     };
     if !full.starts_with(&root) {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} resolves outside the repo root"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} resolves outside the repo root"
+        )));
     }
     let metadata =
         std::fs::metadata(&full).map_err(|error| JevError::io_failed(relative, &error))?;
     if !metadata.is_file() {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} is not a regular file"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} is not a regular file"
+        )));
     }
     let file = File::open(&full).map_err(|error| JevError::io_failed(relative, &error))?;
     let mut bytes = Vec::new();
@@ -128,10 +101,10 @@ fn read_worktree(repo: &RepoRoot, relative: &str) -> Result<Vec<u8>, JevError> {
         .map_err(|error| JevError::io_failed(relative, &error))?;
     let actual_bytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if actual_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes: actual_bytes.max(metadata.len()),
-        });
+        return Err(JevError::input_too_large(
+            MAX_INPUT_BYTES,
+            actual_bytes.max(metadata.len()),
+        ));
     }
     Ok(bytes)
 }
@@ -153,7 +126,7 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         return Err(classify_git_failure(rev, relative, &probe));
     }
     let oid = object_id(&parsed.stdout).ok_or_else(|| {
-        JevError::operational_io(&format!(
+        JevError::operational_io(format!(
             "git rev-parse returned an unexpected object id for {relative} at {rev}. Retry; if it persists, check the git installation."
         ))
     })?;
@@ -162,9 +135,9 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         return Err(classify_git_failure(rev, relative, &kind));
     }
     if String::from_utf8_lossy(&kind.stdout).trim() != "blob" {
-        return Err(JevError::InputInvalid {
-            detail: format!("input path {relative} is not a file at {rev}"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input path {relative} is not a file at {rev}"
+        )));
     }
     let size = git(repo, &["cat-file", "-s", oid])?;
     if !size.status.success() {
@@ -174,15 +147,12 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
         .trim()
         .parse::<u64>()
         .map_err(|_| {
-            JevError::operational_io(&format!(
+            JevError::operational_io(format!(
                 "git cat-file -s returned an unreadable size for {relative} at {rev}. Retry; if it persists, check the git installation."
             ))
         })?;
     if actual_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes,
-        });
+        return Err(JevError::input_too_large(MAX_INPUT_BYTES, actual_bytes));
     }
     let blob = git(repo, &["cat-file", "blob", oid])?;
     if !blob.status.success() {
@@ -190,10 +160,7 @@ fn read_git_show(repo: &RepoRoot, rev: &Rev, relative: &str) -> Result<Vec<u8>, 
     }
     let read_bytes = u64::try_from(blob.stdout.len()).unwrap_or(u64::MAX);
     if read_bytes > MAX_INPUT_BYTES {
-        return Err(JevError::InputTooLarge {
-            limit_bytes: MAX_INPUT_BYTES,
-            actual_bytes: read_bytes,
-        });
+        return Err(JevError::input_too_large(MAX_INPUT_BYTES, read_bytes));
     }
     Ok(blob.stdout)
 }
@@ -216,7 +183,7 @@ fn git(repo: &RepoRoot, args: &[&str]) -> Result<Output, JevError> {
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|error| {
-            JevError::operational_io(&format!(
+            JevError::operational_io(format!(
                 "git could not be started (cause: {}). Install git or put it on PATH, then retry.",
                 error.kind()
             ))
@@ -237,9 +204,7 @@ fn classify_git_message(rev: &Rev, relative: &str, output: &Output) -> JevError 
     let message = stderr_tail(&output.stderr);
     let lower = message.to_ascii_lowercase();
     if lower.contains("does not exist in") || lower.contains("exists on disk, but not in") {
-        return JevError::InputMissing {
-            path: relative.to_owned(),
-        };
+        return JevError::input_missing(relative.to_owned());
     }
     if lower.contains("invalid object name")
         || lower.contains("not a valid object name")
@@ -247,17 +212,28 @@ fn classify_git_message(rev: &Rev, relative: &str, output: &Output) -> JevError 
         || lower.contains("unknown revision")
         || lower.contains("ambiguous argument")
     {
-        return JevError::InputInvalid {
-            detail: format!("revision {rev} could not be resolved: {message}"),
-        };
+        return JevError::input_invalid(format!("revision {rev} could not be resolved: {message}"));
     }
-    JevError::operational_io(&format!(
+    JevError::operational_io(format!(
         "git cat-file failed for {relative} at {rev} ({message}). Check that the repo root is a git repository and retry."
     ))
 }
 
+/// Converts a `check.toml` path into the one repo-relative path type.
+///
+/// # Errors
+///
+/// `INPUT_INVALID` when `text` is not a repo-relative path.
+pub(crate) fn repo_path(text: &str) -> Result<RepoRelativePath, JevError> {
+    RepoRelativePath::try_from(text)
+}
+
 #[cfg(test)]
 mod tests {
+    fn rel(text: &str) -> sc_agent_types::RepoRelativePath {
+        sc_agent_types::RepoRelativePath::try_from(text).expect("path")
+    }
+
     use super::*;
     use crate::extract::test_support::{commit_all, git_fixture};
 
@@ -267,8 +243,9 @@ mod tests {
         std::fs::write(dir.path().join("readme.txt"), "toplevel decoy\n").expect("decoy");
         commit_all(dir.path(), "decoy");
         let sub = RepoRoot::new(dir.path().join("notes"));
-        let head = read_repo_text(&sub, &Rev::new("HEAD"), "readme.txt").expect("head");
-        let worktree = read_repo_text(&sub, &Rev::worktree(), "readme.txt").expect("worktree");
+        let head = read_repo_text(&sub, &Rev::new("HEAD"), &rel("readme.txt")).expect("head");
+        let worktree =
+            read_repo_text(&sub, &Rev::worktree(), &rel("readme.txt")).expect("worktree");
         assert_eq!(head, worktree);
         assert_eq!(head, "alpha note\n");
     }
@@ -291,8 +268,12 @@ mod tests {
     fn non_utf8_detail_names_the_offset() {
         let dir = tempfile::tempdir().expect("temp");
         std::fs::write(dir.path().join("bad.txt"), b"ok\xffno").expect("write");
-        let error = read_repo_text(&RepoRoot::new(dir.path()), &Rev::worktree(), "bad.txt")
-            .expect_err("not utf-8");
+        let error = read_repo_text(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("bad.txt"),
+        )
+        .expect_err("not utf-8");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(error.to_string().contains("offset 2"), "{error}");
     }
@@ -301,7 +282,7 @@ mod tests {
     fn bad_revision_is_input_invalid_with_git_message() {
         let (dir, _sha) = git_fixture();
         let repo = RepoRoot::new(dir.path());
-        let error = read_repo_bytes(&repo, &Rev::new("no-such-rev"), "notes/readme.txt")
+        let error = read_repo_bytes(&repo, &Rev::new("no-such-rev"), &rel("notes/readme.txt"))
             .expect_err("bad rev");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(error.to_string().contains("no-such-rev"), "{error}");
@@ -311,8 +292,8 @@ mod tests {
     fn path_absent_at_rev_is_input_missing() {
         let (dir, _sha) = git_fixture();
         let repo = RepoRoot::new(dir.path());
-        let error =
-            read_repo_bytes(&repo, &Rev::new("HEAD"), "notes/absent.txt").expect_err("absent");
+        let error = read_repo_bytes(&repo, &Rev::new("HEAD"), &rel("notes/absent.txt"))
+            .expect_err("absent");
         assert_eq!(error.code(), "INPUT_MISSING");
     }
 
@@ -320,7 +301,7 @@ mod tests {
     fn tree_at_rev_is_not_a_file() {
         let (dir, _sha) = git_fixture();
         let repo = RepoRoot::new(dir.path());
-        let error = read_repo_bytes(&repo, &Rev::new("HEAD"), "notes").expect_err("tree");
+        let error = read_repo_bytes(&repo, &Rev::new("HEAD"), &rel("notes")).expect_err("tree");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(error.to_string().contains("not a file"), "{error}");
     }
@@ -329,7 +310,7 @@ mod tests {
     fn worktree_directory_is_not_a_file() {
         let (dir, _sha) = git_fixture();
         let repo = RepoRoot::new(dir.path());
-        let error = read_repo_bytes(&repo, &Rev::worktree(), "notes").expect_err("dir");
+        let error = read_repo_bytes(&repo, &Rev::worktree(), &rel("notes")).expect_err("dir");
         assert_eq!(error.code(), "INPUT_INVALID");
     }
 
@@ -338,8 +319,12 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp");
         let big = vec![b'a'; usize::try_from(MAX_INPUT_BYTES).expect("cap") + 1];
         std::fs::write(dir.path().join("big.txt"), big).expect("write");
-        let error = read_repo_bytes(&RepoRoot::new(dir.path()), &Rev::worktree(), "big.txt")
-            .expect_err("too large");
+        let error = read_repo_bytes(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("big.txt"),
+        )
+        .expect_err("too large");
         assert_eq!(error.code(), "INPUT_TOO_LARGE");
     }
 
@@ -349,8 +334,12 @@ mod tests {
         let big = vec![b'a'; usize::try_from(MAX_INPUT_BYTES).expect("cap") + 1];
         std::fs::write(dir.path().join("big.txt"), big).expect("write");
         commit_all(dir.path(), "big");
-        let error = read_repo_bytes(&RepoRoot::new(dir.path()), &Rev::new("HEAD"), "big.txt")
-            .expect_err("too large");
+        let error = read_repo_bytes(
+            &RepoRoot::new(dir.path()),
+            &Rev::new("HEAD"),
+            &rel("big.txt"),
+        )
+        .expect_err("too large");
         assert_eq!(error.code(), "INPUT_TOO_LARGE");
     }
 
@@ -363,8 +352,12 @@ mod tests {
         std::fs::write(&secret, "OUTSIDE-SECRET").expect("secret");
         std::os::unix::fs::symlink(&secret, dir.path().join("leak.txt")).expect("symlink");
         commit_all(dir.path(), "symlink");
-        let error = read_repo_bytes(&RepoRoot::new(dir.path()), &Rev::worktree(), "leak.txt")
-            .expect_err("symlink");
+        let error = read_repo_bytes(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("leak.txt"),
+        )
+        .expect_err("symlink");
         assert_eq!(error.code(), "INPUT_INVALID");
         assert!(!error.to_string().contains("OUTSIDE-SECRET"));
     }
@@ -375,8 +368,12 @@ mod tests {
         let (dir, _sha) = git_fixture();
         std::os::unix::fs::symlink("notes/readme.txt", dir.path().join("alias.txt"))
             .expect("symlink");
-        let text = read_repo_text(&RepoRoot::new(dir.path()), &Rev::worktree(), "alias.txt")
-            .expect("inside");
+        let text = read_repo_text(
+            &RepoRoot::new(dir.path()),
+            &Rev::worktree(),
+            &rel("alias.txt"),
+        )
+        .expect("inside");
         assert_eq!(text, "alpha note\n");
     }
 }

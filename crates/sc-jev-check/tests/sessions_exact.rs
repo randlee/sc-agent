@@ -8,14 +8,15 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use sc_agent_types::observability::v2::{EventError, LogEvent, NoopSessionLog, SessionLog};
+use sc_agent_types::observability::v2::{LogEvent, LogRejected, NoopSessionLog, SessionLog};
+use sc_agent_types::test_util::MockJudgeBackend;
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, PayloadBundle, RepoRoot, Rev,
-    SessionId,
+    Attestation, BackendId, CanonicalJudgePayload, JudgeBackend, MultiBackendMode, PayloadBundle,
+    RepoRoot, Rev, SessionId,
 };
 use sc_jev_check::config::{PACKAGED_SYSTEM_PROMPT, load_check_at};
 use sc_jev_check::registry::BackendRegistry;
@@ -50,90 +51,20 @@ fn bare_repo() -> TempDir {
     dir
 }
 
-/// Requests seen by one or more [`Capture`] judges.
-#[derive(Clone, Default)]
-struct RequestLog(Arc<Mutex<Vec<JudgeRequest>>>);
-
-impl RequestLog {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn snapshot(&self) -> Vec<JudgeRequest> {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
+/// The workspace judge double (`sc-agent-types/test-util`, enabled by this
+/// crate's dev-dependency). It records requests and answers against the
+/// request it receives.
+fn judge(id: BackendId, choice: &str) -> Arc<MockJudgeBackend> {
+    let answers = serde_json::from_value(serde_json::json!({"relevant": {"choice": choice}}))
+        .expect("answers");
+    Arc::new(MockJudgeBackend::new(id, answers))
 }
 
-/// Recording judge for this file only.
-///
-/// The crate's `ScriptedJudge` is behind its own `test-util` feature, and an
-/// integration test cannot enable its own crate's feature without a self
-/// dev-dependency (refused by the boundary lint and by crates.io publish).
-/// This mirrors the `ScriptedJudge` calls the tests use.
-#[derive(Clone)]
-struct Capture {
-    id: BackendId,
-    choice: String,
-    requests: RequestLog,
-}
-
-impl Capture {
-    fn with_request_log(mut self, log: &RequestLog) -> Self {
-        self.requests = log.clone();
-        self
-    }
-
-    fn requests(&self) -> Vec<JudgeRequest> {
-        self.requests.snapshot()
-    }
-}
-
-impl JudgeBackend for Capture {
-    fn id(&self) -> BackendId {
-        self.id
-    }
-
-    fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
-        if self.id.is_llm() && request.llm.is_none() {
-            return Err(JevError::InputInvalid {
-                detail: "LLM system prompt is required".into(),
-            });
-        }
-        Ok(())
-    }
-
-    fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-        self.validate_for_send(request)?;
-        self.requests
-            .0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push(request.clone());
-        Ok(JudgeOutcome {
-            answers: serde_json::json!({"relevant": {"choice": self.choice}}),
-            backend: self.id,
-            probabilities: None,
-            provider_meta: None,
-        })
-    }
-}
-
-fn judge(id: BackendId, choice: &str) -> Capture {
-    Capture {
-        id,
-        choice: choice.to_owned(),
-        requests: RequestLog::new(),
-    }
-}
-
-fn registry(judges: &[&Capture]) -> BackendRegistry {
+fn registry(judges: &[&Arc<MockJudgeBackend>]) -> BackendRegistry {
     let mut registry = BackendRegistry::new();
     for judge in judges {
         registry
-            .register(Arc::new((*judge).clone()))
+            .register(Arc::clone(*judge) as Arc<dyn JudgeBackend>)
             .expect("register");
     }
     registry
@@ -144,12 +75,12 @@ struct JsonlSink {
 }
 
 impl SessionLog for JsonlSink {
-    fn try_log(&self, event: LogEvent) -> Result<(), EventError> {
+    fn emit(&self, event: LogEvent) -> Result<(), LogRejected> {
         let line = serde_json::json!({
-            "session_id": event.session_id.to_string(),
-            "backend": event.backend.to_string(),
-            "prompt_sha256": event.prompt_sha256.as_str(),
-            "operation": event.operation.as_str(),
+            "session_id": event.session_id().to_string(),
+            "backend": event.backend().to_string(),
+            "prompt_sha256": event.prompt_sha256().as_str(),
+            "operation": event.operation().as_str(),
         });
         let mut file = fs::OpenOptions::new()
             .create(true)
@@ -162,7 +93,12 @@ impl SessionLog for JsonlSink {
 }
 
 fn bundle() -> PayloadBundle {
-    PayloadBundle::from_canonical_bytes(br#"{"questions":[],"state":[]}"#.to_vec())
+    let payload: CanonicalJudgePayload = serde_json::from_value(serde_json::json!({
+        "questions": [{"id": "relevant", "prompt": "Does it apply?", "choices": ["no", "yes"]}],
+        "state": []
+    }))
+    .expect("payload");
+    PayloadBundle::encode(&payload).expect("bundle")
 }
 
 #[test]
@@ -188,10 +124,10 @@ fn test_session_round_trip() {
     let reopened = FileSessionStore::new(store.dir(), Arc::new(NoopSessionLog)).expect("reopen");
     reopened.install_registry(registry(&[&haiku]));
     let outcome = reopened.ask(&id, "why?").expect("ask");
-    assert_eq!(outcome.backend, BackendId::AnthropicHaiku);
-    assert_eq!(outcome.answers["relevant"]["choice"], "yes");
+    assert_eq!(outcome.backend(), BackendId::AnthropicHaiku);
+    assert_eq!(outcome.answers()["relevant"].choice(), "yes");
     let requests = haiku.requests();
-    let prompt = &requests[0].llm.as_ref().expect("prompt").system_prompt;
+    let prompt = &requests[0].llm().expect("prompt").system_prompt;
     assert!(prompt.contains("base prompt"));
     assert!(prompt.contains("why?"));
     let again = store.load(&id).expect("reload");
@@ -273,26 +209,40 @@ fn test_equal_input_record() {
     let spec = load_check_at(&root, &Rev::worktree(), "check.toml").expect("spec");
     let sessions = temp_dir();
     let store = FileSessionStore::new(sessions.path(), Arc::new(NoopSessionLog)).expect("store");
-    let seen = RequestLog::new();
+    let jev = judge(BackendId::Jev, "yes");
+    let haiku = judge(BackendId::AnthropicHaiku, "no");
     let result = run_check(
         &spec,
         &[BackendId::Jev, BackendId::AnthropicHaiku],
-        RunOptions::new(root, store, Arc::new(NoopSessionLog)).registry(registry(&[
-            &judge(BackendId::Jev, "yes").with_request_log(&seen),
-            &judge(BackendId::AnthropicHaiku, "no").with_request_log(&seen),
-        ])),
+        RunOptions::new(root, store, Arc::new(NoopSessionLog)).registry(registry(&[&jev, &haiku])),
     )
     .expect("run");
     let equal = result.equal_input.expect("record");
-    assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
-    assert!(!equal.leak);
-    assert!(equal.equal);
-    assert_eq!(equal.commands, ["jev", "anthropic_haiku"]);
-    let producer = equal.producer.expect("producer");
+    assert_eq!(equal.prompt_sha256(), result.bundle.sha256());
+    assert!(!equal.leak());
+    // r-1: no backend attests yet, so every entry is `Unattested` and the
+    // derived `equal` is false (r-2b adds backend-side hashing).
+    assert!(!equal.equal());
+    assert_eq!(equal.mode(), MultiBackendMode::ChainContext);
+    let ids: Vec<BackendId> = equal
+        .backends()
+        .iter()
+        .map(|entry| entry.backend())
+        .collect();
+    assert_eq!(ids, [BackendId::Jev, BackendId::AnthropicHaiku]);
+    assert!(
+        equal
+            .backends()
+            .iter()
+            .all(|entry| entry.attestation() == &Attestation::Unattested)
+    );
+    let producer = equal.producer().expect("producer");
     assert_eq!(producer.name, "sc-treesitter");
     assert_eq!(producer.mode, "matches");
-    let requests = seen.snapshot();
-    assert_eq!(requests[0].payload.bytes(), requests[1].payload.bytes());
+    assert_eq!(
+        jev.requests()[0].payload().bytes(),
+        haiku.requests()[0].payload().bytes()
+    );
 }
 
 #[test]
@@ -315,10 +265,13 @@ fn test_multi_backend_one_payload() {
     let haiku_seen = haiku.requests();
     assert_eq!(jev_seen.len(), 1);
     assert_eq!(haiku_seen.len(), 1);
-    assert_eq!(jev_seen[0].payload.bytes(), haiku_seen[0].payload.bytes());
-    assert_eq!(jev_seen[0].payload.bytes(), result.bundle.bytes());
-    assert!(jev_seen[0].llm.is_none());
-    let prompt = &haiku_seen[0].llm.as_ref().expect("prompt").system_prompt;
+    assert_eq!(
+        jev_seen[0].payload().bytes(),
+        haiku_seen[0].payload().bytes()
+    );
+    assert_eq!(jev_seen[0].payload().bytes(), result.bundle.bytes());
+    assert!(jev_seen[0].llm().is_none());
+    let prompt = &haiku_seen[0].llm().expect("prompt").system_prompt;
     assert!(prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
     assert!(prompt.contains(SESSION_CONTEXT_HEADER));
     assert!(prompt.contains("\"choice\":\"yes\""));
@@ -326,17 +279,17 @@ fn test_multi_backend_one_payload() {
     assert!(!payload_text.contains(SESSION_CONTEXT_HEADER));
     assert!(!payload_text.contains(PACKAGED_SYSTEM_PROMPT.trim()));
     let equal = result.equal_input.expect("equal");
-    assert!(equal.equal);
-    assert!(!equal.leak);
-    assert!(equal.producer.is_none());
-    assert_eq!(&equal.prompt_sha256, result.bundle.sha256());
+    assert!(!equal.equal(), "r-1 records Unattested for every backend");
+    assert!(!equal.leak());
+    assert!(equal.producer().is_none());
+    assert_eq!(equal.prompt_sha256(), result.bundle.sha256());
     assert_eq!(result.outcomes.len(), 2);
     let session_id = result.session_id.expect("session");
     assert_eq!(store.load(&session_id).expect("stored").outcomes.len(), 2);
     let asked = store
         .ask(&session_id, "why the first answer?")
         .expect("ask");
-    assert_eq!(asked.backend, BackendId::AnthropicHaiku);
+    assert_eq!(asked.backend(), BackendId::AnthropicHaiku);
 }
 
 #[test]
@@ -399,7 +352,7 @@ fn test_packaged_default_prompt_available() {
     )
     .expect("run");
     let requests = haiku.requests();
-    let prompt = &requests[0].llm.as_ref().expect("llm").system_prompt;
+    let prompt = &requests[0].llm().expect("llm").system_prompt;
     assert_eq!(prompt, PACKAGED_SYSTEM_PROMPT);
     assert_eq!(
         result.system_prompt.as_deref(),
@@ -409,7 +362,7 @@ fn test_packaged_default_prompt_available() {
         !String::from_utf8_lossy(result.bundle.bytes()).contains(PACKAGED_SYSTEM_PROMPT.trim())
     );
     assert_eq!(
-        &result.equal_input.expect("equal").prompt_sha256,
+        result.equal_input.expect("equal").prompt_sha256(),
         result.bundle.sha256()
     );
 }

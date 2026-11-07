@@ -118,6 +118,12 @@ jobs:
         timeout-minutes: 30
         run: cargo test --workspace
 
+      # r-1 D0: sc-agent-types' `git` and `mock` targets declare
+      # required-features, so the workspace run skips `git`.
+      - name: cargo test -p sc-agent-types --features git,test-util
+        timeout-minutes: 15
+        run: cargo test -p sc-agent-types --features git,test-util
+
   python:
     name: python (${{ matrix.os }})
     strategy:

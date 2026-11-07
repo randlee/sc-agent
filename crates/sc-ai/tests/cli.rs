@@ -16,11 +16,13 @@ use deadline::spawn_with_deadline;
 use sc_agent_types::BackendId;
 use sc_agent_types::JevError;
 use sc_agent_types::observability::v2::NoopSessionLog;
+use sc_agent_types::test_util::MockJudgeBackend;
+use sc_agent_types::{JudgeBackend, JudgeRequest};
 use sc_ai::{
     ExecuteOverrides, OP_ASK, OP_DRY_RUN, OP_RUN, ObservabilitySessionLog, session_log_file,
 };
 use sc_jev_check::config::PACKAGED_SYSTEM_PROMPT;
-use sc_jev_check::registry::{BackendRegistry, RequestLog, ScriptedJudge};
+use sc_jev_check::registry::BackendRegistry;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -42,14 +44,50 @@ fn temp_dir(label: &str) -> TempDir {
         .expect("temp")
 }
 
-fn judge(id: BackendId, choice: &str) -> ScriptedJudge {
-    ScriptedJudge::new(id, serde_json::json!({"relevant": {"choice": choice}}))
+fn judge(id: BackendId, choice: &str) -> MockJudgeBackend {
+    let answers = serde_json::from_value(serde_json::json!({"relevant": {"choice": choice}}))
+        .expect("answers");
+    MockJudgeBackend::new(id, answers)
 }
 
-fn registry(judges: Vec<ScriptedJudge>) -> BackendRegistry {
+/// Requests recorded by the judges attached to this log, in judge order.
+#[derive(Clone, Default)]
+struct SeenRequests(Arc<Mutex<Vec<Arc<MockJudgeBackend>>>>);
+
+impl SeenRequests {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn snapshot(&self) -> Vec<JudgeRequest> {
+        self.0
+            .lock()
+            .expect("log")
+            .iter()
+            .flat_map(|judge| judge.requests())
+            .collect()
+    }
+}
+
+/// Keeps a handle on a judge so the test can read what it received.
+trait WithSeen {
+    fn with_seen(self, log: &SeenRequests) -> Arc<MockJudgeBackend>;
+}
+
+impl WithSeen for MockJudgeBackend {
+    fn with_seen(self, log: &SeenRequests) -> Arc<MockJudgeBackend> {
+        let judge = Arc::new(self);
+        log.0.lock().expect("log").push(Arc::clone(&judge));
+        judge
+    }
+}
+
+fn registry<T: Into<Arc<MockJudgeBackend>>>(judges: Vec<T>) -> BackendRegistry {
     let mut registry = BackendRegistry::new();
     for judge in judges {
-        registry.register(Arc::new(judge)).expect("register");
+        registry
+            .register(judge.into() as Arc<dyn JudgeBackend>)
+            .expect("register");
     }
     registry
 }
@@ -88,8 +126,11 @@ fn noop_overrides(registry: BackendRegistry) -> ExecuteOverrides {
 fn execute(args: &[&str], overrides: ExecuteOverrides) -> Result<Value, JevError> {
     let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
     let bytes = sc_ai::execute_with_overrides(&args, &[], overrides)?;
-    serde_json::from_slice(&bytes).map_err(|_| JevError::InputInvalid {
-        detail: format!("stdout was not JSON: {}", String::from_utf8_lossy(&bytes)),
+    serde_json::from_slice(&bytes).map_err(|_| {
+        JevError::input_invalid(format!(
+            "stdout was not JSON: {}",
+            String::from_utf8_lossy(&bytes)
+        ))
     })
 }
 
@@ -125,8 +166,8 @@ fn test_multi_backend_cli_equal_input() {
     let repo = temp_dir("multi");
     write_repo(repo.path());
     let sessions = temp_dir("multi-sessions");
-    let jev_seen = RequestLog::new();
-    let haiku_seen = RequestLog::new();
+    let jev_seen = SeenRequests::new();
+    let haiku_seen = SeenRequests::new();
     let value = execute(
         &[
             "jev",
@@ -143,8 +184,8 @@ fn test_multi_backend_cli_equal_input() {
             "anthropic_haiku",
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::Jev, "yes").with_request_log(&jev_seen),
-            judge(BackendId::AnthropicHaiku, "no").with_request_log(&haiku_seen),
+            judge(BackendId::Jev, "yes").with_seen(&jev_seen),
+            judge(BackendId::AnthropicHaiku, "no").with_seen(&haiku_seen),
         ])),
     )
     .expect("run");
@@ -158,24 +199,30 @@ fn test_multi_backend_cli_equal_input() {
     assert!(data.get("provider_meta").is_none());
     assert!(data.get("probabilities").is_none());
     assert_eq!(data["outcomes"].as_array().expect("outcomes").len(), 2);
-    assert_eq!(data["equal_input"]["equal"], true);
+    // r-1: no backend reports an input digest yet, so each is `unattested`
+    // and the derived `equal` is false (backend-side hashing lands in r-2b).
+    assert_eq!(data["equal_input"]["equal"], false);
     assert_eq!(data["equal_input"]["leak"], false);
+    assert_eq!(data["equal_input"]["mode"], "chain_context");
     assert_eq!(data["equal_input"]["prompt_sha256"], data["prompt_sha256"]);
     assert_eq!(
-        data["equal_input"]["commands"],
-        serde_json::json!(["jev", "anthropic_haiku"])
+        data["equal_input"]["backends"],
+        serde_json::json!([
+            {"backend": "jev", "attestation": {"status": "unattested"}},
+            {"backend": "anthropic_haiku", "attestation": {"status": "unattested"}}
+        ])
     );
     let jev = jev_seen.snapshot();
     let haiku = haiku_seen.snapshot();
     assert_eq!(jev.len(), 1);
     assert_eq!(haiku.len(), 1);
-    assert_eq!(jev[0].payload.bytes(), haiku[0].payload.bytes());
-    assert_eq!(jev[0].payload.sha256().as_str(), data["prompt_sha256"]);
-    assert!(jev[0].llm.is_none());
-    let prompt = &haiku[0].llm.as_ref().expect("haiku prompt").system_prompt;
+    assert_eq!(jev[0].payload().bytes(), haiku[0].payload().bytes());
+    assert_eq!(jev[0].payload().sha256().as_str(), data["prompt_sha256"]);
+    assert!(jev[0].llm().is_none());
+    let prompt = &haiku[0].llm().as_ref().expect("haiku prompt").system_prompt;
     assert!(prompt.starts_with(PACKAGED_SYSTEM_PROMPT));
     assert!(prompt.contains("Session context:"));
-    let payload = String::from_utf8_lossy(jev[0].payload.bytes());
+    let payload = String::from_utf8_lossy(jev[0].payload().bytes());
     assert!(!payload.contains("Session context:"));
     assert!(!payload.contains(PACKAGED_SYSTEM_PROMPT.trim()));
     assert_no_prompt_leak(&value.to_string());
@@ -187,7 +234,7 @@ fn test_cli_prompt_override() {
     write_repo(repo.path());
     let override_path = repo.path().join("override.md");
     std::fs::write(&override_path, "OVERRIDE-PROMPT-TOKEN-a7\n").expect("override");
-    let first_seen = RequestLog::new();
+    let first_seen = SeenRequests::new();
     let first = execute(
         &[
             "jev",
@@ -200,11 +247,11 @@ fn test_cli_prompt_override() {
             "anthropic_haiku",
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&first_seen),
+            judge(BackendId::AnthropicHaiku, "yes").with_seen(&first_seen),
         ])),
     )
     .expect("packaged");
-    let second_seen = RequestLog::new();
+    let second_seen = SeenRequests::new();
     let sessions = temp_dir("prompt-sessions-b");
     let second = execute(
         &[
@@ -220,7 +267,7 @@ fn test_cli_prompt_override() {
             override_path.to_str().expect("utf8"),
         ],
         noop_overrides(registry(vec![
-            judge(BackendId::AnthropicHaiku, "no").with_request_log(&second_seen),
+            judge(BackendId::AnthropicHaiku, "no").with_seen(&second_seen),
         ])),
     )
     .expect("override");
@@ -229,13 +276,13 @@ fn test_cli_prompt_override() {
         second["data"]["prompt_sha256"]
     );
     let packaged = first_seen.snapshot()[0]
-        .llm
+        .llm()
         .as_ref()
         .expect("prompt")
         .system_prompt
         .clone();
     let overridden = second_seen.snapshot()[0]
-        .llm
+        .llm()
         .as_ref()
         .expect("prompt")
         .system_prompt
@@ -263,12 +310,12 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     let sessions = temp_dir("ask-sessions");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7\n").expect("prompt");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let now = Arc::new(Mutex::new(UNIX_EPOCH + Duration::from_secs(1_700_000_000)));
     let clock_now = Arc::clone(&now);
     let overrides = ExecuteOverrides {
         registry: Some(registry(vec![
-            judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+            judge(BackendId::AnthropicHaiku, "yes").with_seen(&seen),
         ])),
         clock: Some(Arc::new(move || {
             *clock_now
@@ -349,14 +396,14 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
         .to_owned();
     assert_eq!(ran["data"]["prompt_sha256"], dry["data"]["prompt_sha256"]);
     let wire = seen.snapshot()[0]
-        .llm
+        .llm()
         .as_ref()
         .expect("wire")
         .system_prompt
         .clone();
     assert!(wire.contains("EVALUATOR-PROMPT-a7"));
     assert!(
-        !String::from_utf8_lossy(seen.snapshot()[0].payload.bytes())
+        !String::from_utf8_lossy(seen.snapshot()[0].payload().bytes())
             .contains("EVALUATOR-PROMPT-a7")
     );
     #[cfg(unix)]
@@ -403,7 +450,7 @@ fn cli_dry_run_readback_and_ask_session_ttl() {
     );
     assert_eq!(asked["data"]["prompt_sha256"], ran["data"]["prompt_sha256"]);
     let follow = seen.snapshot()[1]
-        .llm
+        .llm()
         .as_ref()
         .expect("follow")
         .system_prompt
@@ -447,7 +494,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
     let logs = temp_dir("log-root");
     let prompt = repo.path().join("prompt.md");
     std::fs::write(&prompt, "EVALUATOR-PROMPT-a7 sk-ant-test-secret\n").expect("prompt");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let value = execute(
         &[
             "jev",
@@ -465,7 +512,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
         ],
         ExecuteOverrides {
             registry: Some(registry(vec![
-                judge(BackendId::AnthropicHaiku, "yes").with_request_log(&seen),
+                judge(BackendId::AnthropicHaiku, "yes").with_seen(&seen),
             ])),
             ..ExecuteOverrides::default()
         },
@@ -484,7 +531,7 @@ fn cli_logger_adapter_records_session_without_secrets() {
     assert_no_prompt_leak(&value.to_string());
     assert!(
         seen.snapshot()[0]
-            .llm
+            .llm()
             .as_ref()
             .expect("prompt")
             .system_prompt
@@ -534,16 +581,16 @@ fn cli_keeps_typesafe_response_fields() {
     let repo = temp_dir("verbatim");
     write_repo(repo.path());
     let sessions = temp_dir("verbatim-sessions");
-    let seen = RequestLog::new();
+    let seen = SeenRequests::new();
     let usage = serde_json::json!({"input_tokens": 318, "output_tokens": 31});
     let backend = judge(BackendId::Jev, "yes")
-        .with_request_log(&seen)
         .with_provider_meta(serde_json::json!({
             "model": "jev-test",
             "usage": usage,
             "stop_reason": "end_turn",
             "id": "resp-1"
-        }));
+        }))
+        .with_seen(&seen);
     let value = execute(
         &[
             "jev",
@@ -625,10 +672,19 @@ fn cli_process_version_help_and_typed_stderr() {
     );
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
+    // REQ-SAG-0701 (r-1): every stderr line is one `ScAgentErrorResponse`
+    // with `schema_version: 1`.
+    let stderr = String::from_utf8(output.stderr.clone()).expect("utf8 stderr");
+    for line in stderr.lines() {
+        let parsed: sc_agent_types::ScAgentErrorResponse =
+            serde_json::from_str(line).expect("stderr line is an error response");
+        assert_eq!(parsed.schema_version(), 1);
+    }
     let err: Value = serde_json::from_slice(&output.stderr).expect("stderr json");
     let object = err.as_object().expect("object");
-    assert_eq!(object.len(), 2);
+    assert_eq!(object.len(), 3);
     assert_eq!(err["error"], "INPUT_INVALID");
+    assert_eq!(err["schema_version"], 1);
     assert!(err["message"].is_string());
     let codes: Value = serde_json::from_str(
         &std::fs::read_to_string(

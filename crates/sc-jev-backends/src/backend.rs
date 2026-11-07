@@ -13,8 +13,11 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
+use std::collections::BTreeMap;
+
 use sc_agent_types::{
-    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, ResolvedApiKey,
+    BackendId, JevError, JudgeBackend, JudgeOutcome, JudgeRequest, NetworkErrorKind,
+    QuestionAnswer, QuestionId, ResolvedApiKey,
 };
 
 use crate::retry::{self, RetrySleeper, ThreadSleeper};
@@ -69,6 +72,28 @@ struct Prepared {
     count_body: Vec<u8>,
 }
 
+/// Converts the normalized answer object into typed answers.
+///
+/// A confidence or probability outside `[0, 1]` is `RESPONSE_INVALID`.
+fn typed_answers(
+    normalized: serde_json::Value,
+) -> Result<BTreeMap<QuestionId, QuestionAnswer>, JevError> {
+    let serde_json::Value::Object(map) = normalized else {
+        return Err(JevError::response_invalid("LLM answers are not an object"));
+    };
+    map.into_iter()
+        .map(|(id, answer)| {
+            let question = QuestionId::try_from(id.as_str()).map_err(|_| {
+                JevError::response_invalid(format!("answer id {id:?} is not valid"))
+            })?;
+            let answer: QuestionAnswer = serde_json::from_value(answer).map_err(|error| {
+                JevError::response_invalid(format!("answer {id} is invalid: {error}"))
+            })?;
+            Ok((question, answer))
+        })
+        .collect()
+}
+
 #[derive(Clone)]
 struct Client {
     provider: Provider,
@@ -98,7 +123,11 @@ impl Client {
     /// Builds both bodies and applies every pre-send limit.
     fn prepare_checked(&self, request: &JudgeRequest) -> Result<Prepared, JevError> {
         let prepared = self.prepare(request)?;
-        validate::enforce_count_and_message_limits(&prepared.count_body, &prepared.message_body)?;
+        validate::enforce_count_and_message_limits(
+            self.provider.id.descriptor().request_limit_bytes(),
+            &prepared.count_body,
+            &prepared.message_body,
+        )?;
         Ok(prepared)
     }
 
@@ -114,32 +143,22 @@ impl Client {
         let judged = self.send(self.provider.message_path, &prepared.message_body)?;
         let reply = wire::parse_vendor(self.provider.kind, self.provider.name, &judged.body)?;
         if let Some(reason) = &reply.truncation {
-            return Err(JevError::ResponseInvalid {
-                detail: reason.clone(),
-            });
+            return Err(JevError::response_invalid(reason.clone()));
         }
-        let answers = wire::parse_answers(&reply.text, &prepared.questions)?;
-        Ok(JudgeOutcome {
-            answers,
-            backend: self.provider.id,
-            probabilities: None,
-            provider_meta: Some(wire::provider_meta(
-                &reply,
-                self.provider.model,
-                prompt_tokens,
-            )),
-        })
+        let answers = typed_answers(wire::parse_answers(&reply.text, &prepared.questions)?)?;
+        Ok(
+            JudgeOutcome::new(self.provider.id, request, answers)?.with_provider_meta(
+                wire::provider_meta(&reply, self.provider.model, prompt_tokens),
+            ),
+        )
     }
 
     fn prepare(&self, request: &JudgeRequest) -> Result<Prepared, JevError> {
-        let prompt = request.llm.as_ref().ok_or_else(|| JevError::InputInvalid {
-            detail: "LLM system prompt is required".into(),
-        })?;
-        let payload_text =
-            std::str::from_utf8(request.payload.bytes()).map_err(|_| JevError::InputInvalid {
-                detail: "canonical payload is not UTF-8".into(),
-            })?;
-        let questions = validate::validate_questions(request.payload.bytes())?;
+        let prompt = request
+            .llm()
+            .ok_or_else(|| JevError::input_invalid("LLM system prompt is required"))?;
+        let payload_text = request.payload().as_str();
+        let questions = validate::validate_questions(request.payload().bytes())?;
         let message_body = wire::message_body(
             self.provider.kind,
             self.provider.model,
@@ -184,13 +203,10 @@ impl Client {
                 })
                 .flatten();
             let Some(wait) = wait else {
-                return Err(JevError::NetworkError {
-                    detail: retry_policy::exhausted_detail(
-                        self.provider.name,
-                        response.status,
-                        sends,
-                    ),
-                });
+                return Err(JevError::network(
+                    NetworkErrorKind::Busy,
+                    retry_policy::exhausted_detail(self.provider.name, response.status, sends),
+                ));
             };
             self.sleeper.wait(wait);
         }
@@ -241,21 +257,22 @@ macro_rules! llm_backend {
             #[doc = concat!("[`BackendTransport::send`] installs the `", $header, "` header")]
             /// (ADR-SAG-0020).
             ///
-            /// # Errors
-            ///
-            /// Does not fail today: key validation happens once, in
-            /// [`ResolvedApiKey::try_new`]. The `Result` is a deliberate
-            /// stability choice, matching `sc_jev::JevClient::new`, so
-            /// construction checks can be added without an API break. The
-            /// test `llm_backend_constructors_always_succeed_today` pins the
-            /// current behaviour.
-            pub fn new(
-                api_key: ResolvedApiKey,
-                transport: impl BackendTransport + 'static,
-            ) -> Result<Self, JevError> {
-                Ok(Self {
+            /// Construction is infallible: key validation happens once, in
+            /// [`ResolvedApiKey::try_new`] (ADR-SAG-0020 r-1 amendment).
+            #[must_use]
+            pub fn new(api_key: ResolvedApiKey, transport: impl BackendTransport + 'static) -> Self {
+                Self {
                     client: Client::new($provider, api_key, Arc::new(transport)),
-                })
+                }
+            }
+
+            /// Creates the backend over [`UreqTransport`](crate::UreqTransport).
+            ///
+            /// The backend registry calls only this constructor, so the
+            /// transport type can change without touching `sc-jev-check`.
+            #[must_use]
+            pub fn with_default_transport(api_key: ResolvedApiKey) -> Self {
+                Self::new(api_key, crate::UreqTransport::new())
             }
 
             /// Replaces the wait used between busy retries of the same body.
@@ -314,9 +331,11 @@ llm_backend! {
     /// # Examples
     ///
     /// ```
+    /// use std::sync::Arc;
+    ///
     /// use sc_agent_types::{
-    ///     payload_bundle_from_value, BackendKeyId, JevError, JudgeBackend, JudgeRequest,
-    ///     LlmWireContext, ResolvedApiKey,
+    ///     BackendKeyId, CanonicalJudgePayload, JevError, JudgeBackend, JudgeRequest,
+    ///     LlmWireContext, NetworkErrorKind, PayloadBundle, ResolvedApiKey,
     /// };
     /// use sc_jev_backends::{
     ///     AnthropicHaikuBackend, BackendTransport, HttpRequest, HttpResponse,
@@ -326,22 +345,21 @@ llm_backend! {
     ///
     /// impl BackendTransport for Offline {
     ///     fn send(&self, _request: HttpRequest) -> Result<HttpResponse, JevError> {
-    ///         Err(JevError::NetworkError {
-    ///             detail: "offline".into(),
-    ///         })
+    ///         Err(JevError::network(NetworkErrorKind::Connect, "offline"))
     ///     }
     /// }
     ///
     /// let key = ResolvedApiKey::try_new(BackendKeyId::Anthropic, "test-key".to_owned())?;
-    /// let backend = AnthropicHaikuBackend::new(key, Offline)?;
-    /// let payload = payload_bundle_from_value(&serde_json::json!({
+    /// let backend = AnthropicHaikuBackend::new(key, Offline);
+    /// let payload: CanonicalJudgePayload = serde_json::from_value(serde_json::json!({
     ///     "questions": [{"id": "q", "prompt": "Is it?", "choices": ["no", "yes"]}],
     ///     "state": []
-    /// }))?;
-    /// let request = JudgeRequest {
-    ///     payload,
-    ///     llm: Some(LlmWireContext { system_prompt: "Judge.".into() }),
-    /// };
+    /// }))
+    /// .expect("payload");
+    /// let request = JudgeRequest::new(
+    ///     Arc::new(PayloadBundle::encode(&payload)?),
+    ///     Some(LlmWireContext::new("Judge.")),
+    /// );
     /// backend.validate_for_send(&request)?;
     /// assert_eq!(backend.judge(&request).unwrap_err().code(), "NETWORK_ERROR");
     /// # Ok::<(), JevError>(())

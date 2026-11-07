@@ -137,15 +137,14 @@ pub(crate) struct VendorReply {
 }
 
 pub(crate) fn parse_count(provider: &str, body: &[u8]) -> Result<u64, JevError> {
-    let value: Value = serde_json::from_slice(body).map_err(|_| JevError::ResponseInvalid {
-        detail: format!("{provider} token count is not JSON"),
-    })?;
+    let value: Value = serde_json::from_slice(body)
+        .map_err(|_| JevError::response_invalid(format!("{provider} token count is not JSON")))?;
     let tokens = value.get("input_tokens");
     match tokens.and_then(Value::as_i64) {
         Some(tokens) if tokens >= 0 => Ok(u64::try_from(tokens).unwrap_or(0)),
-        _ => Err(JevError::ResponseInvalid {
-            detail: format!("{provider} token count has no input_tokens"),
-        }),
+        _ => Err(JevError::response_invalid(format!(
+            "{provider} token count has no input_tokens"
+        ))),
     }
 }
 
@@ -154,12 +153,11 @@ pub(crate) fn parse_vendor(
     provider: &str,
     body: &[u8],
 ) -> Result<VendorReply, JevError> {
-    let value: Value = serde_json::from_slice(body).map_err(|_| JevError::ResponseInvalid {
-        detail: format!("{provider} reply is not JSON"),
-    })?;
-    let object = value.as_object().ok_or_else(|| JevError::ResponseInvalid {
-        detail: format!("{provider} reply is not JSON"),
-    })?;
+    let value: Value = serde_json::from_slice(body)
+        .map_err(|_| JevError::response_invalid(format!("{provider} reply is not JSON")))?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| JevError::response_invalid(format!("{provider} reply is not JSON")))?;
     let usage = object.get("usage").and_then(Value::as_object);
     let (text, non_text_blocks, input_tokens) = match kind {
         ProviderKind::Anthropic => parse_anthropic(object, usage)?,
@@ -175,9 +173,9 @@ pub(crate) fn parse_vendor(
         .map(str::to_owned);
     let truncation = truncation_reason(provider, object, stop_reason.as_deref(), status.as_deref());
     if text.is_none() && truncation.is_none() {
-        return Err(JevError::ResponseInvalid {
-            detail: format!("{provider} reply has no text"),
-        });
+        return Err(JevError::response_invalid(format!(
+            "{provider} reply has no text"
+        )));
     }
     Ok(VendorReply {
         text: text.unwrap_or_default(),
@@ -190,24 +188,21 @@ pub(crate) fn parse_vendor(
 }
 
 pub(crate) fn parse_answers(text: &str, questions: &[ParsedQuestion]) -> Result<Value, JevError> {
-    let value: Value = serde_json::from_str(text).map_err(|_| JevError::ResponseInvalid {
-        detail: "LLM reply is not JSON".into(),
-    })?;
+    let value: Value = serde_json::from_str(text)
+        .map_err(|_| JevError::response_invalid("LLM reply is not JSON"))?;
     let answers = value
         .get("answers")
         .and_then(Value::as_object)
-        .ok_or_else(|| JevError::ResponseInvalid {
-            detail: "LLM answer ids differ from the question ids".into(),
-        })?;
+        .ok_or_else(|| JevError::response_invalid("LLM answer ids differ from the question ids"))?;
     let expected: BTreeSet<&str> = questions
         .iter()
         .map(|question| question.id.as_str())
         .collect();
     let actual: BTreeSet<&str> = answers.keys().map(String::as_str).collect();
     if expected != actual {
-        return Err(JevError::ResponseInvalid {
-            detail: "LLM answer ids differ from the question ids".into(),
-        });
+        return Err(JevError::response_invalid(
+            "LLM answer ids differ from the question ids",
+        ));
     }
 
     let mut normalized = Map::new();
@@ -388,9 +383,8 @@ fn usage_i64(usage: Option<&Map<String, Value>>, key: &str) -> i64 {
 }
 
 fn nonneg(value: i64) -> Result<u64, JevError> {
-    u64::try_from(value).map_err(|_| JevError::ResponseInvalid {
-        detail: "provider input_tokens is negative".into(),
-    })
+    u64::try_from(value)
+        .map_err(|_| JevError::response_invalid("provider input_tokens is negative"))
 }
 
 fn is_number(value: &Value) -> bool {
@@ -398,15 +392,13 @@ fn is_number(value: &Value) -> bool {
 }
 
 fn bad_answer(id: &str) -> JevError {
-    JevError::ResponseInvalid {
-        detail: format!("LLM answer {id} needs a criterion choice and a probability per criterion"),
-    }
+    JevError::response_invalid(format!(
+        "LLM answer {id} needs a criterion choice and a probability per criterion"
+    ))
 }
 
 fn not_a_number() -> JevError {
-    JevError::ResponseInvalid {
-        detail: "LLM confidence or probability is not a number".into(),
-    }
+    JevError::response_invalid("LLM confidence or probability is not a number")
 }
 
 fn encode(value: &Value) -> Vec<u8> {

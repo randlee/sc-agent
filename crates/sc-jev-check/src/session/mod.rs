@@ -31,12 +31,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use sc_agent_types::observability::v2::{LogEvent, LogOperation, SharedSessionLog};
+use sc_agent_types::observability::v2::{LogEvent, SharedSessionLog};
 use sc_agent_types::{
-    BackendId, JevError, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle, SessionId,
+    BackendId, JevError, JudgeOutcome, JudgeRequest, LlmWireContext, PayloadBundle, QuestionAnswer,
+    QuestionId, SessionId,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 use crate::registry::BackendRegistry;
 
@@ -49,7 +51,11 @@ pub const SESSION_CONTEXT_HEADER: &str = "Session context:";
 /// Largest session file this store will read.
 const MAX_SESSION_BYTES: u64 = 8 * 1024 * 1024;
 
-const SESSION_VERSION: u32 = 1;
+/// Session document version written and accepted by this store.
+///
+/// Version 1 (Phase A) files are refused: their outcomes carry the removed
+/// `probabilities` field and untyped answers (r-1 D7.6).
+const SESSION_VERSION: u64 = 2;
 
 /// Creates a session and continues an LLM session with `ask`.
 ///
@@ -130,11 +136,11 @@ impl FileSessionStore {
     pub fn new(dir: impl Into<PathBuf>, session_log: SharedSessionLog) -> Result<Self, JevError> {
         let dir = dir.into();
         create_private_dir(&dir).map_err(|error| {
-            JevError::session_store_io(&format!(
-                "Create session directory {} or choose a writable directory (cause: {}).",
-                dir.display(),
-                error.kind()
-            ))
+            JevError::session_store_io(
+                format!("Create session directory {}", dir.display()),
+                error.kind(),
+                "Choose a writable directory, then retry.",
+            )
         })?;
         Ok(Self {
             dir,
@@ -186,8 +192,9 @@ impl FileSessionStore {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::InputInvalid`] when the payload is not UTF-8, and
-    /// [`JevError::session_store_io`] when the session file cannot be written.
+    /// Returns [`JevError::SessionStoreIo`] when the session file cannot be
+    /// written. Canonical payload text is UTF-8 by construction
+    /// ([`PayloadBundle::as_str`]), so there is no encoding failure.
     /// The write failure code is `CONFIG_INVALID` and names the session file.
     pub fn open(
         &self,
@@ -202,7 +209,7 @@ impl FileSessionStore {
             session_id,
             backend,
             created_at,
-            payload_utf8: utf8_payload(bundle.bytes())?,
+            payload_utf8: bundle.as_str().to_owned(),
             prompt_sha256: bundle.sha256().clone(),
             system_prompt,
             outcomes: Vec::new(),
@@ -231,7 +238,8 @@ impl FileSessionStore {
             .io
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        self.read_document(id).map(StoredSession::from_document)
+        self.read_document(id)
+            .and_then(|document| StoredSession::from_document(document, &self.path(id)))
     }
 
     /// Loads `id` when `created_at` plus the TTL is still in the future.
@@ -270,7 +278,7 @@ impl FileSessionStore {
     fn ensure_fresh(&self, id: &SessionId, stored: &StoredSession) -> Result<(), JevError> {
         let created_at = unix_ms(stored.created_at)?;
         if self.is_expired(created_at)? {
-            Err(JevError::SessionExpired { session_id: *id })
+            Err(JevError::session_expired(*id))
         } else {
             Ok(())
         }
@@ -282,7 +290,7 @@ impl FileSessionStore {
         document: &SessionDocument,
     ) -> Result<(), JevError> {
         if self.is_expired(document.created_at)? {
-            Err(JevError::SessionExpired { session_id: *id })
+            Err(JevError::session_expired(*id))
         } else {
             Ok(())
         }
@@ -299,46 +307,41 @@ impl FileSessionStore {
         let file = match File::open(&path) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(JevError::SessionNotFound { session_id: *id });
+                return Err(JevError::session_not_found(*id));
             }
             Err(error) => {
-                return Err(session_io(
-                    &path,
-                    &self.dir,
-                    &format!("could not be opened (cause: {})", error.kind()),
-                ));
+                return Err(session_io(&path, &self.dir, "open", error.kind()));
             }
         };
         let mut bytes = Vec::new();
         file.take(MAX_SESSION_BYTES.saturating_add(1))
             .read_to_end(&mut bytes)
-            .map_err(|error| {
-                session_io(
-                    &path,
-                    &self.dir,
-                    &format!("could not be read (cause: {})", error.kind()),
-                )
-            })?;
+            .map_err(|error| session_io(&path, &self.dir, "read", error.kind()))?;
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_SESSION_BYTES {
             return Err(session_parse(
                 &path,
                 &format!("exceeds {MAX_SESSION_BYTES} bytes"),
             ));
         }
-        let document: SessionDocument = serde_json::from_slice(&bytes).map_err(|error| {
+        let value: Value = serde_json::from_slice(&bytes).map_err(|error| {
             session_parse(
                 &path,
                 &format!("is not a session document ({})", json_cause(&error)),
             )
         })?;
-        if document.version != SESSION_VERSION || document.session_id != *id {
-            return Err(session_parse(
+        check_version(&path, &value)?;
+        let document: SessionDocument = serde_json::from_value(value).map_err(|error| {
+            session_parse(
                 &path,
-                "does not match this session id or version",
-            ));
+                &format!("is not a session document ({})", json_cause(&error)),
+            )
+        })?;
+        if document.session_id != *id {
+            return Err(session_parse(&path, "does not match this session id"));
         }
-        let payload = utf8_payload(document.payload_utf8.as_bytes())?;
-        if sc_agent_types::Sha256Digest::of(payload.as_bytes()) != document.prompt_sha256 {
+        if sc_agent_types::Sha256Digest::of(document.payload_utf8.as_bytes())
+            != document.prompt_sha256
+        {
             return Err(session_parse(&path, "payload digest does not match"));
         }
         Ok(document)
@@ -352,13 +355,8 @@ impl FileSessionStore {
                 &format!("could not be encoded ({})", json_cause(&error)),
             )
         })?;
-        write_private(&path, &bytes).map_err(|error| {
-            session_io(
-                &path,
-                &self.dir,
-                &format!("could not be written (cause: {})", error.kind()),
-            )
-        })
+        write_private(&path, &bytes)
+            .map_err(|error| session_io(&path, &self.dir, "write", error.kind()))
     }
 
     fn backend(&self, id: BackendId) -> Result<Arc<dyn sc_agent_types::JudgeBackend>, JevError> {
@@ -381,7 +379,7 @@ impl SessionStore for FileSessionStore {
             ));
         }
         let stored = self.load(id)?;
-        if !stored.backend.is_llm() {
+        if !stored.backend.descriptor().supports_session_ask() {
             return Err(follow_up_invalid(
                 "Jev sessions have no rationale field. Ask a Haiku or Luna session instead.",
             ));
@@ -395,22 +393,20 @@ impl SessionStore for FileSessionStore {
         }
         prompt.push_str("\n\nFollow-up:\n");
         prompt.push_str(follow_up);
-        let request = JudgeRequest {
-            payload: stored.payload.clone(),
-            llm: Some(LlmWireContext {
-                system_prompt: prompt,
-            }),
-        };
+        let request = JudgeRequest::new(
+            std::sync::Arc::new(stored.payload.clone()),
+            Some(LlmWireContext::new(prompt)),
+        );
         backend.validate_for_send(&request)?;
         let judged = backend.judge(&request);
         emit_log(
             &self.session_log,
-            LogEvent {
-                session_id: *id,
-                backend: stored.backend,
-                prompt_sha256: stored.payload.sha256().clone(),
-                operation: LogOperation::Ask,
-            },
+            LogEvent::new(
+                *id,
+                stored.backend,
+                stored.payload.sha256().clone(),
+                sc_agent_types::Operation::Ask,
+            ),
         );
         let outcome = judged?;
         let _guard = self
@@ -451,8 +447,8 @@ pub(crate) fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String
     let prior: Vec<Prior<'_>> = outcomes
         .iter()
         .map(|outcome| Prior {
-            backend: outcome.backend,
-            answers: &outcome.answers,
+            backend: outcome.backend(),
+            answers: outcome.answers(),
         })
         .collect();
     let json = serde_json::to_string(&prior)
@@ -461,7 +457,7 @@ pub(crate) fn render_session_context(outcomes: &[JudgeOutcome]) -> Result<String
 }
 
 pub(crate) fn emit_log(log: &SharedSessionLog, event: LogEvent) {
-    let _ = log.try_log(event);
+    let _ = log.emit(event);
 }
 
 /// `serde_json` failure without its message, which can quote document values.
@@ -474,38 +470,47 @@ fn json_cause(error: &serde_json::Error) -> String {
     )
 }
 
-fn session_io(path: &Path, dir: &Path, problem: &str) -> JevError {
-    JevError::session_store_io(&format!(
-        "Session file {} {problem}. Check that session directory {} is accessible, then retry.",
-        path.display(),
-        dir.display()
-    ))
+fn session_io(path: &Path, dir: &Path, op: &str, kind: std::io::ErrorKind) -> JevError {
+    JevError::session_store_io(
+        format!("Session file {} {op}", path.display()),
+        kind,
+        format!(
+            "Check that session directory {} is accessible, then retry.",
+            dir.display()
+        ),
+    )
 }
 
 fn session_parse(path: &Path, problem: &str) -> JevError {
-    JevError::session_document_invalid(&format!(
-        "Session file {} {problem}. Delete it and start a new session.",
-        path.display()
-    ))
+    JevError::session_document_invalid(
+        format!("Session file {} {problem}", path.display()),
+        "Delete it and start a new session.",
+    )
 }
 
-/// Canonical payload bytes as UTF-8 text.
+/// Refuses any session document whose `version` is not [`SESSION_VERSION`].
 ///
-/// The one definition in this crate; session files store the payload as text.
-///
-/// # Errors
-///
-/// Returns [`JevError::InputInvalid`] built by
-/// [`JevError::operational_io`] when the bytes are not UTF-8. Canonical
-/// payload bytes are always UTF-8, so this is an internal invariant failure,
-/// not a schema problem; the fix hint says so (RBP-F015).
-pub(crate) fn utf8_payload(bytes: &[u8]) -> Result<String, JevError> {
-    String::from_utf8(bytes.to_vec()).map_err(|error| {
-        JevError::operational_io(&format!(
-            "the canonical payload was not UTF-8 (first invalid byte at offset {}); this is an internal error, report it with the check that produced it",
-            error.utf8_error().valid_up_to()
-        ))
-    })
+/// A missing or older version is a Phase A file; a newer one was written by
+/// a newer sc-agent. Both are `SessionDocumentInvalid` (`INPUT_INVALID`).
+fn check_version(path: &Path, value: &Value) -> Result<(), JevError> {
+    match value.get("version").and_then(Value::as_u64) {
+        Some(SESSION_VERSION) => Ok(()),
+        Some(newer) if newer > SESSION_VERSION => Err(JevError::session_document_invalid(
+            format!(
+                "Session file {} is version {newer}; this sc-agent reads version {SESSION_VERSION}",
+                path.display()
+            ),
+            "written by a newer sc-agent; upgrade or re-run the check",
+        )),
+        older => Err(JevError::session_document_invalid(
+            format!(
+                "Session file {} is version {}; this sc-agent reads version {SESSION_VERSION}",
+                path.display(),
+                older.map_or_else(|| "missing".to_owned(), |v| v.to_string())
+            ),
+            "re-run the check; Phase A session files cannot be resumed",
+        )),
+    }
 }
 
 /// `INPUT_INVALID` for a refused `ask` whose fix hint is `recovery` verbatim.
@@ -517,12 +522,12 @@ fn unix_ms(time: SystemTime) -> Result<u64, JevError> {
     let elapsed = time
         .duration_since(UNIX_EPOCH)
         .map_err(|_| {
-            JevError::session_store_io(
+            JevError::operational_config(
                 "the system clock is before the unix epoch, so the session timestamp cannot be written. Fix the system clock and retry.",
             )
         })?;
     u64::try_from(elapsed.as_millis()).map_err(|_| {
-        JevError::session_store_io(
+        JevError::operational_config(
             "the system clock is out of range for a session timestamp. Fix the system clock and retry.",
         )
     })
@@ -622,12 +627,13 @@ fn tighten_0600(path: &Path) -> std::io::Result<()> {
 #[derive(Debug, Serialize)]
 struct Prior<'a> {
     backend: BackendId,
-    answers: &'a Value,
+    answers: &'a BTreeMap<QuestionId, QuestionAnswer>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SessionDocument {
-    version: u32,
+    version: u64,
     session_id: SessionId,
     backend: BackendId,
     created_at: u64,
@@ -639,17 +645,23 @@ struct SessionDocument {
 }
 
 impl StoredSession {
-    fn from_document(document: SessionDocument) -> Self {
-        let bytes = document.payload_utf8.into_bytes();
-        Self {
+    fn from_document(document: SessionDocument, path: &Path) -> Result<Self, JevError> {
+        let payload = PayloadBundle::decode(document.payload_utf8.as_bytes())
+            .map_err(|_| session_parse(path, "holds a payload that is not canonical"))?;
+        for outcome in &document.outcomes {
+            outcome.check_against(&payload).map_err(|_| {
+                session_parse(path, "holds an outcome that does not match its payload")
+            })?;
+        }
+        Ok(Self {
             session_id: document.session_id,
             backend: document.backend,
             created_at: system_time_from_unix_ms(document.created_at),
-            payload: PayloadBundle::from_canonical_bytes(bytes),
+            payload,
             system_prompt: document.system_prompt,
             outcomes: document.outcomes,
             follow_ups: document.follow_ups,
-        }
+        })
     }
 }
 

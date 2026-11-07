@@ -16,11 +16,6 @@ pub(crate) struct ParsedQuestion {
     pub(crate) choices: Vec<String>,
 }
 
-/// Single-request byte cap shared with the Jev check client.
-///
-/// A larger judge body is `INPUT_TOO_LARGE` and is never split.
-pub(crate) const MAX_REQUEST_BYTES: u64 = 96_000;
-
 /// Pre-send input token ceiling for one judge call (ADR-SAG-0004).
 ///
 /// `validate_for_send` applies [`local_input_tokens`] to the count body and
@@ -32,7 +27,7 @@ pub(crate) const MAX_INPUT_TOKENS: u64 = 32_000;
 /// Conservative token count of an assembled provider body.
 ///
 /// One token per four bytes, rounded up. A body that already passed
-/// [`MAX_REQUEST_BYTES`] estimates to at most 24_000 tokens, under
+/// the 96 000-byte descriptor limit estimates to at most 24_000 tokens, under
 /// [`MAX_INPUT_TOKENS`]. The provider count is the check that can still
 /// refuse the judge message.
 pub(crate) fn local_input_tokens(body: &[u8]) -> u64 {
@@ -47,9 +42,9 @@ pub(crate) fn local_input_tokens(body: &[u8]) -> u64 {
 /// Returns [`JevError::InputInvalid`] when `tokens` exceeds the ceiling.
 pub(crate) fn enforce_input_token_limit(tokens: u64) -> Result<(), JevError> {
     if tokens > MAX_INPUT_TOKENS {
-        return Err(JevError::InputInvalid {
-            detail: format!("input is {tokens} tokens; limit is {MAX_INPUT_TOKENS} tokens"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "input is {tokens} tokens; limit is {MAX_INPUT_TOKENS} tokens"
+        )));
     }
     Ok(())
 }
@@ -59,16 +54,18 @@ pub(crate) fn enforce_input_token_limit(tokens: u64) -> Result<(), JevError> {
 /// # Errors
 ///
 /// Returns [`JevError::InputTooLarge`] when either body exceeds
-/// [`MAX_REQUEST_BYTES`], and [`JevError::InputInvalid`] when the local token
+/// `limit_bytes` (the backend descriptor's `request_limit_bytes`; a larger
+/// body is never split), and [`JevError::InputInvalid`] when the local token
 /// estimate exceeds [`MAX_INPUT_TOKENS`].
 pub(crate) fn enforce_count_and_message_limits(
+    limit_bytes: u64,
     count_body: &[u8],
     message_body: &[u8],
 ) -> Result<(), JevError> {
     for body in [count_body, message_body] {
         let actual = u64::try_from(body.len()).unwrap_or(u64::MAX);
-        if actual > MAX_REQUEST_BYTES {
-            return Err(too_large(actual));
+        if actual > limit_bytes {
+            return Err(JevError::input_too_large(limit_bytes, actual));
         }
         enforce_input_token_limit(local_input_tokens(body))?;
     }
@@ -76,19 +73,17 @@ pub(crate) fn enforce_count_and_message_limits(
 }
 
 pub(crate) fn validate_questions(bytes: &[u8]) -> Result<Vec<ParsedQuestion>, JevError> {
-    let value: Value = serde_json::from_slice(bytes).map_err(|error| JevError::InputInvalid {
-        detail: format!("canonical payload is not JSON: {error}"),
+    let value: Value = serde_json::from_slice(bytes).map_err(|error| {
+        JevError::input_invalid(format!("canonical payload is not JSON: {error}"))
     })?;
     let questions = value
         .get("questions")
         .and_then(Value::as_array)
-        .ok_or_else(|| JevError::InputInvalid {
-            detail: "canonical payload needs a questions array".into(),
-        })?;
+        .ok_or_else(|| JevError::input_invalid("canonical payload needs a questions array"))?;
     if questions.is_empty() {
-        return Err(JevError::InputInvalid {
-            detail: "a check needs at least one question".into(),
-        });
+        return Err(JevError::input_invalid(
+            "a check needs at least one question",
+        ));
     }
 
     let mut unknown = BTreeSet::new();
@@ -107,43 +102,41 @@ pub(crate) fn validate_questions(bytes: &[u8]) -> Result<Vec<ParsedQuestion>, Je
             .map(|kind| format!("\"{kind}\""))
             .collect::<Vec<_>>()
             .join(", ");
-        return Err(JevError::InputInvalid {
-            detail: format!("no answer schema for question type [{joined}]; known: [\"choice\"]"),
-        });
+        return Err(JevError::input_invalid(format!(
+            "no answer schema for question type [{joined}]; known: [\"choice\"]"
+        )));
     }
 
     let mut parsed = Vec::with_capacity(questions.len());
     let mut seen = BTreeSet::new();
     for question in questions {
-        let object = question.as_object().ok_or_else(|| JevError::InputInvalid {
-            detail: "question is not an object".into(),
-        })?;
+        let object = question
+            .as_object()
+            .ok_or_else(|| JevError::input_invalid("question is not an object"))?;
         let id = object
             .get("id")
             .and_then(Value::as_str)
             .filter(|id| !id.is_empty())
-            .ok_or_else(|| JevError::InputInvalid {
-                detail: "question is missing id".into(),
-            })?;
+            .ok_or_else(|| JevError::input_invalid("question is missing id"))?;
         if !seen.insert(id.to_owned()) {
-            return Err(JevError::InputInvalid {
-                detail: format!("duplicate question id {id}"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "duplicate question id {id}"
+            )));
         }
         if object.get("prompt").and_then(Value::as_str).is_none() {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {id} is missing prompt"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "question {id} is missing prompt"
+            )));
         }
         let Some(items) = object.get("choices").and_then(Value::as_array) else {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {id} is not a choice question with two or more criteria"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "question {id} is not a choice question with two or more criteria"
+            )));
         };
         if items.len() < 2 || items.iter().any(|item| item.as_str().is_none()) {
-            return Err(JevError::InputInvalid {
-                detail: format!("question {id} is not a choice question with two or more criteria"),
-            });
+            return Err(JevError::input_invalid(format!(
+                "question {id} is not a choice question with two or more criteria"
+            )));
         }
         let labels = items
             .iter()
@@ -162,11 +155,4 @@ fn type_label(value: &Value) -> String {
     value
         .as_str()
         .map_or_else(|| value.to_string(), str::to_owned)
-}
-
-pub(crate) fn too_large(actual_bytes: u64) -> JevError {
-    JevError::InputTooLarge {
-        limit_bytes: MAX_REQUEST_BYTES,
-        actual_bytes,
-    }
 }

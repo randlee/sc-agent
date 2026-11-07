@@ -11,8 +11,49 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use sc_agent_types::{InputSpec, JevError};
-use serde::Deserialize;
+use sc_agent_types::JevError;
+use serde::{Deserialize, Serialize};
+
+/// Check input stored under `[inputs.<name>]` in `check.toml`.
+///
+/// `<name>` is the table key, not a field. Keys match
+/// `docs/sc-jev-check/extraction.md`: `kind`, `path`, `column`, and for
+/// `command` the argv array `command` plus optional `timeout_seconds`
+/// (default 30). Only these four Phase A kinds exist. `sc-jev-check` is the
+/// only crate that runs them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum InputSpec {
+    /// Read a file at the caller-supplied revision.
+    File {
+        /// Repo-relative path.
+        path: String,
+    },
+    /// Read one markdown table column.
+    TableColumn {
+        /// Repo-relative path.
+        path: String,
+        /// Column header to extract.
+        column: String,
+    },
+    /// Read a `sc/subjects/1` document from `path`.
+    Subjects {
+        /// Repo-relative path of the artifact.
+        path: String,
+    },
+    /// Run an argv array. No shell.
+    Command {
+        /// Argument vector. The check.toml key is `command`.
+        command: Vec<String>,
+        /// Process time limit in seconds. Omitted toml uses 30.
+        #[serde(default = "default_command_timeout_seconds")]
+        timeout_seconds: u64,
+    },
+}
+
+fn default_command_timeout_seconds() -> u64 {
+    30
+}
 
 /// Packaged evaluator instructions (`include_str` of the asset file).
 pub const PACKAGED_SYSTEM_PROMPT: &str = include_str!("../../assets/llm-evaluator-system.md");
@@ -104,26 +145,25 @@ pub fn load_packaged_config() -> Result<PackagedConfig, JevError> {
 /// Returns [`JevError::ConfigInvalid`] when the document does not match the
 /// Phase A check shape.
 pub fn load_check_str(text: &str) -> Result<CheckSpec, JevError> {
-    let raw: RawCheck = toml::from_str(text).map_err(|error| JevError::ConfigInvalid {
-        detail: format!("check.toml: {error}"),
-    })?;
+    let raw: RawCheck = toml::from_str(text)
+        .map_err(|error| JevError::config_invalid(format!("check.toml: {error}")))?;
     if raw.questions.path.is_empty() {
-        return Err(JevError::ConfigInvalid {
-            detail: "check.toml questions.path is empty".into(),
-        });
+        return Err(JevError::config_invalid(
+            "check.toml questions.path is empty",
+        ));
     }
     if let Some(prompt) = &raw.llm_judge
         && prompt.system_prompt_file.is_empty()
     {
-        return Err(JevError::ConfigInvalid {
-            detail: "check.toml llm_judge.system_prompt_file is empty".into(),
-        });
+        return Err(JevError::config_invalid(
+            "check.toml llm_judge.system_prompt_file is empty",
+        ));
     }
     for name in raw.inputs.keys() {
         if !is_input_name(name) {
-            return Err(JevError::ConfigInvalid {
-                detail: format!("check.toml input name {name} must be [A-Za-z0-9_-]+"),
-            });
+            return Err(JevError::config_invalid(format!(
+                "check.toml input name {name} must be [A-Za-z0-9_-]+"
+            )));
         }
     }
     Ok(CheckSpec {
@@ -144,21 +184,19 @@ pub fn load_check_at(
     rev: &sc_agent_types::Rev,
     relative: &str,
 ) -> Result<CheckSpec, JevError> {
-    let bytes = crate::extract::read_repo_bytes(repo, rev, relative)?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| JevError::ConfigInvalid {
-        detail: format!("{relative} is not UTF-8"),
-    })?;
+    let bytes = crate::extract::read_repo_bytes(repo, rev, &crate::extract::repo_path(relative)?)?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| JevError::config_invalid(format!("{relative} is not UTF-8")))?;
     load_check_str(text)
 }
 
 fn parse_packaged(text: &str) -> Result<PackagedConfig, JevError> {
-    let raw: RawPackaged = toml::from_str(text).map_err(|error| JevError::ConfigInvalid {
-        detail: format!("jev.toml: {error}"),
-    })?;
+    let raw: RawPackaged = toml::from_str(text)
+        .map_err(|error| JevError::config_invalid(format!("jev.toml: {error}")))?;
     if raw.limits.max_input_bytes == 0 {
-        return Err(JevError::ConfigInvalid {
-            detail: "jev.toml limits.max_input_bytes must be greater than zero".into(),
-        });
+        return Err(JevError::config_invalid(
+            "jev.toml limits.max_input_bytes must be greater than zero",
+        ));
     }
     Ok(PackagedConfig {
         max_input_bytes: raw.limits.max_input_bytes,
@@ -213,7 +251,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use sc_agent_types::InputSpec;
+    use crate::config::InputSpec;
 
     #[test]
     fn payload_packaged_system_prompt_matches_asset() {
@@ -290,5 +328,66 @@ mod tests {
         let resolved = bare.resolve_prompt_path();
         assert_eq!(resolved.origin, PromptOrigin::PackagedAsset);
         assert_eq!(resolved.path, "llm-evaluator-system.md");
+    }
+
+    #[test]
+    fn input_spec_matches_extraction_check_toml_keys() {
+        let file: InputSpec = serde_json::from_str(
+            r#"{"kind":"file","path":"skills/atm-bd-lite/scripts/atm-bd-task-hook.py"}"#,
+        )
+        .expect("file");
+        assert_eq!(
+            file,
+            InputSpec::File {
+                path: "skills/atm-bd-lite/scripts/atm-bd-task-hook.py".into(),
+            }
+        );
+
+        let subjects: InputSpec = serde_json::from_str(
+            r#"{"kind":"subjects","path":"tests/fixtures/cross-impl/branches/subjects.json"}"#,
+        )
+        .expect("subjects");
+        assert!(matches!(subjects, InputSpec::Subjects { .. }));
+
+        let column: InputSpec = serde_json::from_str(
+            r#"{"kind":"table-column","path":"docs/decisions.md","column":"Choice"}"#,
+        )
+        .expect("table-column");
+        assert_eq!(
+            column,
+            InputSpec::TableColumn {
+                path: "docs/decisions.md".into(),
+                column: "Choice".into(),
+            }
+        );
+
+        let command: InputSpec = serde_json::from_str(
+            r#"{"kind":"command","command":["sc-treesitter","extract","--language","python","--query","branches","{path}"]}"#,
+        )
+        .expect("command");
+        assert_eq!(
+            command,
+            InputSpec::Command {
+                command: vec![
+                    "sc-treesitter".into(),
+                    "extract".into(),
+                    "--language".into(),
+                    "python".into(),
+                    "--query".into(),
+                    "branches".into(),
+                    "{path}".into(),
+                ],
+                timeout_seconds: 30,
+            }
+        );
+
+        let with_name =
+            serde_json::from_str::<InputSpec>(r#"{"kind":"file","name":"hook","path":"a.py"}"#);
+        assert!(
+            with_name.is_err(),
+            "input name is the table key, not a field"
+        );
+        let with_argv = serde_json::from_str::<InputSpec>(r#"{"kind":"command","argv":["echo"]}"#);
+        assert!(with_argv.is_err(), "argv is the check.toml key command");
     }
 }

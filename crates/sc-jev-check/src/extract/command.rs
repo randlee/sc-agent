@@ -18,7 +18,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sc_agent_types::{InputSpec, JevError, RepoRoot, Rev};
+use crate::config::InputSpec;
+use sc_agent_types::{JevError, RepoRoot, Rev};
 
 use super::Extracted;
 use super::Extractor;
@@ -61,7 +62,7 @@ impl Extractor for CommandExtractor {
         repo: &RepoRoot,
         rev: &Rev,
         input: &InputSpec,
-    ) -> Result<Vec<sc_agent_types::Subject>, JevError> {
+    ) -> Result<Vec<sc_agent_types::schema::subjects::Subject>, JevError> {
         Ok(self.extract_with_source(repo, rev, input, None)?.subjects)
     }
 }
@@ -91,14 +92,14 @@ impl CommandExtractor {
             timeout_seconds,
         } = input
         else {
-            return Err(JevError::ConfigInvalid {
-                detail: "command extractor received a different input kind".into(),
-            });
+            return Err(JevError::config_invalid(
+                "command extractor received a different input kind",
+            ));
         };
         if *timeout_seconds == 0 {
-            return Err(JevError::ConfigInvalid {
-                detail: "command timeout_seconds must be greater than zero".into(),
-            });
+            return Err(JevError::config_invalid(
+                "command timeout_seconds must be greater than zero",
+            ));
         }
         let argv = substitute_placeholders(command, repo, rev, source_path)?;
         let stdout = run_argv(repo, &argv, Duration::from_secs(*timeout_seconds))?;
@@ -113,9 +114,9 @@ pub(crate) fn substitute_placeholders(
     source_path: Option<&str>,
 ) -> Result<Vec<String>, JevError> {
     if argv.is_empty() || argv[0].is_empty() {
-        return Err(JevError::ConfigInvalid {
-            detail: "command argv must start with a program".into(),
-        });
+        return Err(JevError::config_invalid(
+            "command argv must start with a program",
+        ));
     }
     let repo_root = std::path::absolute(repo.as_path())
         .unwrap_or_else(|_| repo.as_path().to_path_buf())
@@ -129,9 +130,9 @@ pub(crate) fn substitute_placeholders(
     let mut out = Vec::with_capacity(argv.len());
     for arg in argv {
         if arg.contains("{path}") && source_path.is_none() {
-            return Err(JevError::ConfigInvalid {
-                detail: "command argv contains {path} but no source path was provided".into(),
-            });
+            return Err(JevError::config_invalid(
+                "command argv contains {path} but no source path was provided",
+            ));
         }
         // One left-to-right pass: a path containing `{rev}`, or a rev
         // containing `{repo_root}`, is emitted verbatim (RBP observation).
@@ -149,11 +150,13 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|error| JevError::ExtractionFailed {
-            detail: format!("failed to spawn {} (cause: {})", argv[0], error.kind()),
-        })?;
+    let mut child = command.spawn().map_err(|error| {
+        JevError::extraction_failed(format!(
+            "failed to spawn {} (cause: {})",
+            argv[0],
+            error.kind()
+        ))
+    })?;
     let stdout = child
         .stdout
         .take()
@@ -174,9 +177,7 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
                 kill_and_reap(child, deadline);
                 let _ = stdout_reader.finish_by(deadline);
                 let _ = stderr_reader.finish_by(deadline);
-                return Err(JevError::ExtractionTimeout {
-                    timeout_seconds: timeout.as_secs(),
-                });
+                return Err(JevError::extraction_timeout(timeout.as_secs()));
             }
             Ok(None) => thread::sleep(POLL_INTERVAL),
             Err(error) => {
@@ -184,9 +185,10 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
                 kill_and_reap(child, deadline);
                 let _ = stdout_reader.finish_by(deadline);
                 let _ = stderr_reader.finish_by(deadline);
-                return Err(JevError::ExtractionFailed {
-                    detail: format!("failed to wait for command (cause: {})", error.kind()),
-                });
+                return Err(JevError::extraction_failed(format!(
+                    "failed to wait for command (cause: {})",
+                    error.kind()
+                )));
             }
         }
     };
@@ -196,15 +198,13 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         Ok(stdout) => stdout,
         Err(ReaderStop::Stopped) => {
             let _ = stderr_reader.finish_by(deadline);
-            return Err(JevError::ExtractionFailed {
-                detail: "command stdout reader stopped".into(),
-            });
+            return Err(JevError::extraction_failed("command stdout reader stopped"));
         }
         Err(ReaderStop::TimedOut) => {
             let _ = stderr_reader.finish_by(deadline);
-            return Err(JevError::ExtractionFailed {
-                detail: "command stdout reader did not finish before the cleanup deadline".into(),
-            });
+            return Err(JevError::extraction_failed(
+                "command stdout reader did not finish before the cleanup deadline",
+            ));
         }
     };
     let stderr = stderr_reader.finish_by(deadline).unwrap_or_default();
@@ -216,16 +216,17 @@ fn run_argv(repo: &RepoRoot, argv: &[String], timeout: Duration) -> Result<Vec<u
         } else {
             format!("exit {code}; stderr: {tail}")
         };
-        return Err(redact_error(JevError::ExtractionFailed { detail }));
+        return Err(redact_error(JevError::extraction_failed(detail)));
     }
     match stdout {
         Ok(bytes) => Ok(bytes),
-        Err(CapError::TooLarge) => Err(JevError::ExtractionInvalid {
-            detail: format!("stdout exceeds {MAX_COMMAND_STDOUT_BYTES} bytes"),
-        }),
-        Err(CapError::Io(error)) => Err(JevError::ExtractionFailed {
-            detail: format!("stdout read failed (cause: {})", error.kind()),
-        }),
+        Err(CapError::TooLarge) => Err(JevError::extraction_invalid(format!(
+            "stdout exceeds {MAX_COMMAND_STDOUT_BYTES} bytes"
+        ))),
+        Err(CapError::Io(error)) => Err(JevError::extraction_failed(format!(
+            "stdout read failed (cause: {})",
+            error.kind()
+        ))),
     }
 }
 
@@ -338,8 +339,8 @@ fn read_tail(mut pipe: impl Read, keep: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::InputSpec;
     use crate::extract::test_support::{self, temp_dir};
-    use sc_agent_types::InputSpec;
 
     const EMIT: &str = r#"
 import json, sys
@@ -396,10 +397,10 @@ sys.stdout.write(json.dumps(doc))
             .extract_with_source(&repo, &rev, &input, Some("src/hook.py"))
             .expect("command");
         let document = extracted.document.expect("document");
-        assert_eq!(document.source.path, "src/hook.py");
-        assert_eq!(document.source.rev.as_str(), "abc123");
-        assert_eq!(extracted.subjects[0].text, "arm");
-        assert_eq!(extracted.subjects[0].id, "src/hook.py:1");
+        assert_eq!(document.source().path, "src/hook.py");
+        assert_eq!(document.source().rev.as_str(), "abc123");
+        assert_eq!(extracted.subjects[0].text(), "arm");
+        assert_eq!(extracted.subjects[0].id(), "src/hook.py:1");
     }
 
     #[test]
@@ -449,7 +450,9 @@ sys.stdout.write(json.dumps(doc))
             .expect_err("timeout");
         assert_eq!(error.code(), "EXTRACTION_TIMEOUT");
         match error {
-            JevError::ExtractionTimeout { timeout_seconds } => assert_eq!(timeout_seconds, 1),
+            JevError::ExtractionTimeout {
+                timeout_seconds, ..
+            } => assert_eq!(timeout_seconds, 1),
             other => panic!("unexpected {other:?}"),
         }
     }
@@ -610,7 +613,7 @@ sys.stdout.write(json.dumps(doc))
         let extracted = CommandExtractor
             .extract(&repo, &Rev::worktree(), &input)
             .expect("env probe");
-        let text = &extracted[0].text;
+        let text = &extracted[0].text();
         assert!(!text.contains(PROBE_VALUE), "sentinel leaked: {text}");
         assert!(!text.contains(PROBE_ENV), "key name leaked: {text}");
         assert!(!text.contains(PROBE_SECRET_ENV), "SC_ name leaked: {text}");

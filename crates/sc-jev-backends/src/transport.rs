@@ -7,7 +7,7 @@ use std::fmt;
 use std::io::Read;
 use std::time::Duration;
 
-use sc_agent_types::{JevError, ResolvedApiKey};
+use sc_agent_types::{JevError, NetworkErrorKind, ResolvedApiKey};
 use ureq::RequestExt;
 
 /// TCP connect timeout for provider calls.
@@ -78,7 +78,7 @@ impl HttpRequest {
         if self.auth_installed {
             return;
         }
-        #[allow(
+        #[expect(
             clippy::disallowed_methods,
             reason = "ADR-SAG-0020: install_auth runs inside the sending transport only"
         )]
@@ -204,9 +204,10 @@ impl BackendTransport for UreqTransport {
     fn send(&self, mut request: HttpRequest) -> Result<HttpResponse, JevError> {
         request.install_auth();
         if self.require_https && !request.url.starts_with("https://") {
-            return Err(request.credential.redact_error(JevError::NetworkError {
-                detail: "provider connection failed: URL is not https".to_owned(),
-            }));
+            return Err(request.credential.redact_error(JevError::network(
+                NetworkErrorKind::Tls,
+                "provider connection failed: URL is not https",
+            )));
         }
         let mut builder = ureq::http::Request::builder()
             .method(request.method.as_str())
@@ -217,9 +218,10 @@ impl BackendTransport for UreqTransport {
         let outbound = match builder.body(std::mem::take(&mut request.body)) {
             Ok(outbound) => outbound,
             Err(error) => {
-                return Err(request.credential.redact_error(JevError::NetworkError {
-                    detail: format!("provider request is invalid: {error}"),
-                }));
+                return Err(request.credential.redact_error(JevError::network(
+                    NetworkErrorKind::Connect,
+                    format!("provider request is invalid: {error}"),
+                )));
             }
         };
         let result = outbound
@@ -233,9 +235,10 @@ impl BackendTransport for UreqTransport {
             Ok(response) => {
                 read_response(response).map_err(|error| request.credential.redact_error(error))
             }
-            Err(error) => Err(request.credential.redact_error(JevError::NetworkError {
-                detail: format!("provider connection failed: {error}"),
-            })),
+            Err(error) => Err(request.credential.redact_error(JevError::network(
+                ureq_error_kind(&error),
+                format!("provider connection failed: {error}"),
+            ))),
         }
     }
 }
@@ -257,21 +260,50 @@ fn read_response(mut response: ureq::http::Response<ureq::Body>) -> Result<HttpR
         .as_reader()
         .take(MAX_RESPONSE_BYTES.saturating_add(1));
     let mut body = Vec::new();
-    reader
-        .read_to_end(&mut body)
-        .map_err(|error| JevError::NetworkError {
-            detail: format!("reading provider response failed: {error}"),
-        })?;
+    reader.read_to_end(&mut body).map_err(|error| {
+        JevError::network(
+            io_error_kind(&error),
+            format!("reading provider response failed: {error}"),
+        )
+    })?;
     if body.len() as u64 > MAX_RESPONSE_BYTES {
-        return Err(JevError::ResponseInvalid {
-            detail: format!("provider response exceeds {MAX_RESPONSE_BYTES} bytes"),
-        });
+        return Err(JevError::response_invalid(format!(
+            "provider response exceeds {MAX_RESPONSE_BYTES} bytes"
+        )));
     }
     Ok(HttpResponse {
         status,
         headers,
         body,
     })
+}
+
+/// Classifies a ureq failure for [`JevError::retryable`].
+///
+/// TLS and certificate failures are `Tls` (not retryable); an oversize body
+/// is `BodyTooLarge`; everything else that fails before a response is
+/// `Connect`.
+fn ureq_error_kind(error: &ureq::Error) -> NetworkErrorKind {
+    match error {
+        ureq::Error::Timeout(_) => NetworkErrorKind::Timeout,
+        ureq::Error::Io(io) => io_error_kind(io),
+        ureq::Error::Tls(_)
+        | ureq::Error::TlsRequired
+        | ureq::Error::RequireHttpsOnly(_)
+        | ureq::Error::Pem(_)
+        | ureq::Error::Rustls(_) => NetworkErrorKind::Tls,
+        ureq::Error::BodyExceedsLimit(_) => NetworkErrorKind::BodyTooLarge,
+        _ => NetworkErrorKind::Connect,
+    }
+}
+
+/// `Timeout` for a timed-out read, otherwise `Connect`.
+fn io_error_kind(error: &std::io::Error) -> NetworkErrorKind {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        NetworkErrorKind::Timeout
+    } else {
+        NetworkErrorKind::Connect
+    }
 }
 
 #[cfg(test)]
@@ -289,7 +321,11 @@ mod tests {
             body: br#"{"q":1}"#.to_vec(),
             connect_timeout: Duration::from_secs(2),
             request_timeout,
-            credential: ResolvedApiKey::new(KEY.to_owned()),
+            credential: ResolvedApiKey::try_new(
+                sc_agent_types::BackendKeyId::Anthropic,
+                KEY.to_owned(),
+            )
+            .expect("key"),
             scheme,
             auth_installed: false,
         }
@@ -449,5 +485,35 @@ mod tests {
         assert_eq!(invalid.code(), "NETWORK_ERROR");
         assert!(invalid.to_string().contains("provider request is invalid"));
         assert_no_key(&invalid);
+    }
+
+    #[test]
+    fn ureq_errors_map_to_network_kinds() {
+        let cases = [
+            (
+                ureq::Error::Timeout(ureq::Timeout::Global),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::TimedOut)),
+                NetworkErrorKind::Timeout,
+            ),
+            (
+                ureq::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset)),
+                NetworkErrorKind::Connect,
+            ),
+            (ureq::Error::Tls("handshake"), NetworkErrorKind::Tls),
+            (ureq::Error::TlsRequired, NetworkErrorKind::Tls),
+            (
+                ureq::Error::BodyExceedsLimit(1),
+                NetworkErrorKind::BodyTooLarge,
+            ),
+            (ureq::Error::ConnectionFailed, NetworkErrorKind::Connect),
+            (ureq::Error::HostNotFound, NetworkErrorKind::Connect),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(ureq_error_kind(&error), kind, "{error}");
+        }
+        assert!(!NetworkErrorKind::Tls.retryable());
     }
 }

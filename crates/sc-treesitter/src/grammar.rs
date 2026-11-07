@@ -91,9 +91,7 @@ pub(crate) fn lookup(id: &str) -> Result<&'static Grammar, JevError> {
     GRAMMARS
         .iter()
         .find(|grammar| grammar.info.id == id)
-        .ok_or_else(|| JevError::LanguageUnavailable {
-            language: id.to_owned(),
-        })
+        .ok_or_else(|| JevError::language_unavailable(crate::PRODUCER_NAME, id))
 }
 
 /// Every compiled-in grammar, for listing queries.

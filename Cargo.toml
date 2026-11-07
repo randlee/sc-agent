@@ -36,7 +36,6 @@ ureq = "3.5.1"
 # the deliberate-lockstep crates listed there; .github/scripts/check-exact-pins.sh
 # fails on any other `=` requirement (NFR-SAG-0004).
 sc-observability = "=1.5.0"
-sc-observability-types = "=1.5.0"
 # Binary-only: optional behind the `cli` feature of sc-ai and sc-treesitter.
 mimalloc = "0.1.52"
 clap = { version = "4", features = ["derive"] }

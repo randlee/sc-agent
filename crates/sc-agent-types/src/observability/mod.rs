@@ -1,7 +1,6 @@
-//! Temporary v2 logging port.
+//! Session log port (feature `obs`, ADR-SAG-0016 r-1 amendment).
 //!
-//! Delete this module and the `sc-observability-types` dependency when upstream
-//! v2 ships (bead `agt-obs-v2-shim-removal`). Full `sc-observability` belongs
-//! on the composition roots `sc-ai` and `sc-jev-py`, not on this crate.
+//! This crate links no `sc-observability*` crate. Composition roots adapt
+//! their logger to [`v2::SessionLog`].
 
 pub mod v2;
