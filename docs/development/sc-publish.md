@@ -33,7 +33,8 @@ pin and re-run install. `install.py` overwrites kit paths without warning.
 - **crates.io**, in publish order: `sc-agent-types` (1), `sc-agent-secrets` (2),
   `sc-jev` (3), `sc-jev-backends` (4), `sc-jev-check` (5), `sc-treesitter` (6),
   `sc-ai` (7). Crates 1 to 5 have dependents, so each waits 30 s and sets
-  `verify_registry_visibility` before the next upload.
+  `verify_registry_visibility` before the next upload. crates.io is enabled by
+  this `crates` list (entries with `publish: true`), not by a `channels` key.
 - **PyPI**: `sc-jev-py`, a maturin wheel plus sdist on Linux, macOS and Windows.
   `sc-jev-py` is a workspace member with `publish = false`. It is not in the
   `crates` list, so it never reaches crates.io.
@@ -54,7 +55,7 @@ The kit is cloned at the pinned SHA into `.sc-publish-kit/`. The `sc-compose`
 renderer lives in `.sc-publish-venv/`. Both are gitignored.
 
 ```bash
-SC_PUBLISH_REVISION="$(sed -n 's/^revision = "\([0-9a-f]*\)"/\1/p' release/sc-publish-pin.toml)"
+SC_PUBLISH_REVISION="$(python3 -c 'import tomllib; print(tomllib.load(open("release/sc-publish-pin.toml", "rb"))["sc-publish"]["revision"])')"
 git clone --depth 1 "https://github.com/randlee/sc-publish" .sc-publish-kit
 git -C .sc-publish-kit fetch origin "$SC_PUBLISH_REVISION" --depth 1
 git -C .sc-publish-kit checkout "$SC_PUBLISH_REVISION"
@@ -79,26 +80,70 @@ local recipe is the same script PR CI runs:
 bash scripts/sc-publish-dry-run.sh
 # with uncommitted edits:
 SC_PUBLISH_ALLOW_DIRTY=1 bash scripts/sc-publish-dry-run.sh
+# keep the wheel (dir must be missing, empty, or named sc-agent-wheels):
+SC_AGENT_WHEEL_DIR="$PWD/target/sc-agent-wheels" bash scripts/sc-publish-dry-run.sh
 ```
 
-The script runs, in order:
+The script runs these phases in order. Pass phase names (`kit`, `checks`,
+`publish`, `wheel`) to run only some of them; CI runs one per step.
 
-1. Clone or check out the kit at the pin.
-2. Run `install.py --dry-run`, which fails on drift.
-3. Run `release_artifacts.py validate-manifest` and `verify-version-lockstep`.
-4. Run `.github/scripts/run-consumer-preflight.sh`. It runs the checks in
-   `release/publish-preflight.toml` and is a no-op while none are declared.
-5. Run `cargo publish --dry-run --locked` for every manifest crate, in
-   publish order.
-6. Run `maturin build --release -m crates/sc-jev-py/Cargo.toml`. It needs
-   `maturin>=1.8,<2` on `PATH`.
+1. `kit`: parse and validate the pin (`tomllib`; https URL, 40-hex SHA),
+   clone or fetch the kit at it, then `git reset --hard` and `git clean -fdx`
+   the checkout. Bootstrap `sc-compose` and run `install.py --dry-run`, which
+   fails on drift.
+2. `checks`: run `release_artifacts.py validate-manifest` and
+   `verify-version-lockstep`, then `.github/scripts/run-consumer-preflight.sh`.
+   The preflight runs the checks in `release/publish-preflight.toml` and is a
+   no-op while none are declared.
+3. `publish`: run `cargo publish --dry-run --locked` for every manifest crate,
+   in publish order.
+4. `wheel`: run `maturin build --release -m crates/sc-jev-py/Cargo.toml`. It
+   needs `maturin` on `PATH`; CI pins `maturin==1.16.0`. Without
+   `SC_AGENT_WHEEL_DIR` the wheel goes to a `mktemp -d` directory that is
+   removed on exit.
+
+Network steps run under a deadline (`SC_PUBLISH_NET_TIMEOUT`, default 300 s;
+cargo and maturin `SC_PUBLISH_BUILD_TIMEOUT`, default 1800 s) and fail with the
+step name. The script sets `CARGO_HTTP_TIMEOUT=60`, `CARGO_NET_RETRY=2` and
+`PIP_DEFAULT_TIMEOUT=60` unless already set, and never retries a step.
 
 `.github/workflows/sc-publish-dry-run.yml` runs that script on every pull
-request. The kit's `release-preflight.yml` runs only on `workflow_dispatch`
-from the publisher, because it needs the release secrets and environments
-below. Its kit-owned checks are the same manifest, lockstep and
+request (REQ-SAG-0132). It pins every action to a commit SHA, runs on
+`ubuntu-24.04` with Rust 1.94.1, Python 3.11 and `maturin==1.16.0`, and gives
+each phase its own `timeout-minutes`. The kit's Release Preflight
+(`release-preflight.yml`) is `workflow_dispatch`-only and is run by the
+publisher at release time, because it needs the release secrets and
+environments below. Its kit-owned checks are the same manifest, lockstep and
 consumer-preflight steps, plus credential liveness, registry state and
 `cargo package`.
+
+## Dependency pinning policy
+
+- Exact `=` pins on `sc-observability` and `sc-observability-types`
+  (`sc-agent-types`, `sc-ai`, `sc-jev-py`) are deliberate: they move in
+  lockstep with the sc-observability release train.
+- `sc-treesitter` pins `tree-sitter`, its grammars, and `mimalloc` exactly,
+  because the queries and the shipped binary are tested against those
+  releases. `sc-ai` pins `mimalloc` the same way.
+- `mimalloc` is an unconditional dependency of the `sc-treesitter` library,
+  not only its binary, so library users also build its C code. That cost is
+  accepted for now.
+- Shared requirements (`toml`, `ureq`, `sc-observability*`, `mimalloc`) live in
+  root `[workspace.dependencies]`; crates reference them with
+  `.workspace = true`.
+- Under review at the Phase A architectural review: caret ranges for library
+  crates (exact pins only for leaf binaries), and gating `mimalloc` behind a
+  bin-only feature.
+
+## Installing the binaries from crates.io
+
+```bash
+cargo install sc-ai --locked
+cargo install sc-treesitter --locked
+```
+
+`--locked` builds with the `Cargo.lock` shipped in the package, so transitive
+dependency versions match the tested release.
 
 ## Pin bump
 
@@ -161,7 +206,7 @@ Dry-run gate (local and CI, on the release candidate commit):
       A single multi-package invocation resolves the unpublished in-workspace
       dependencies in this order.
 - [ ] `maturin build -m crates/sc-jev-py/Cargo.toml -o <dir>` produces a
-      `.whl`.
+      `.whl` (or run `bash scripts/sc-publish-dry-run.sh` for all of the above).
 - [ ] `[workspace.package].version` equals `crates/sc-jev-py/pyproject.toml`
       `[project].version` (static, not `dynamic`).
 
