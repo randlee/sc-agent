@@ -15,6 +15,10 @@
 # Rows added by r-4: REQ-SAG-0134 (no mimalloc in either library tree). The
 # remaining rows of the plan table are added by r-3b.
 #
+# Only `cargo tree` stdout is matched; stderr (download and lock messages)
+# goes to a temporary file and is printed only when cargo fails. Every call
+# uses `--locked`, so Cargo.lock drift fails instead of being resolved.
+#
 # Usage: bash .github/scripts/cargo-tree-gates.sh
 # Exit codes: 0 every row passes; 1 a row matched or `cargo tree` failed.
 set -euo pipefail
@@ -28,10 +32,12 @@ rows=(
 )
 
 failures=0
+errfile="$(mktemp)"
+trap 'rm -f "$errfile"' EXIT
 
 run_row() {
   local crate="$1" features="$2" extra="$3" names="$4"
-  local -a args=(tree -p "$crate" -e normal --prefix none)
+  local -a args=(tree --locked -p "$crate" -e normal --prefix none)
   [[ -n "$features" ]] && args+=("$features")
   if [[ -n "$extra" ]]; then
     local -a extra_args
@@ -40,9 +46,9 @@ run_row() {
   fi
   local label="cargo ${args[*]}"
   local tree
-  if ! tree="$(cargo "${args[@]}" 2>&1)"; then
+  if ! tree="$(cargo "${args[@]}" 2>"$errfile")"; then
     echo "FAIL  $label: cargo tree failed"
-    printf '%s\n' "$tree" | sed 's/^/    /'
+    sed 's/^/    /' "$errfile"
     failures=$((failures + 1))
     return
   fi

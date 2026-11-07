@@ -246,11 +246,11 @@ jobs:
       # REQ-SAG-0134: the libraries build without the binaries' `cli` feature.
       - name: cargo build -p sc-treesitter --lib --no-default-features
         timeout-minutes: 15
-        run: cargo build -p sc-treesitter --lib --no-default-features
+        run: cargo build --locked -p sc-treesitter --lib --no-default-features
 
       - name: cargo build -p sc-ai --lib --no-default-features
         timeout-minutes: 15
-        run: cargo build -p sc-ai --lib --no-default-features
+        run: cargo build --locked -p sc-ai --lib --no-default-features
 
       - name: cargo tree gates
         timeout-minutes: 10
