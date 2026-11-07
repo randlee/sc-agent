@@ -18,6 +18,13 @@ command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warni
 name = "workspace"
 command = ["cargo", "test", "--workspace"]
 
+# sc-jev-py Python harness: maturin develop (extension-module,test-util) into a
+# venv, then tests/fixtures/jev-python pytest. Commands are argv-only, so the
+# multi-step recipe lives in the justfile. Needs Python 3.11+ on PATH.
+[[tool.sc-lint.test]]
+name = "jev-python"
+command = ["just", "test-python"]
+
 # Third-party dependency ownership (SCB-MANIFEST-004). sc-boundary enforces
 # only workspace-to-workspace edges from boundaries/**; these records make the
 # third-party edges in each manifest's forbidden_edges mechanical. Each record
