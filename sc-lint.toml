@@ -84,13 +84,6 @@ manifest_message = "Only the composition roots sc-ai and sc-jev-py may depend on
 source_message = "Only the composition roots sc-ai and sc-jev-py may depend on full sc-observability (ADR-SAG-0016)."
 
 [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
-dependency = "sc-observability-types"
-allowed_manifest_paths = ["crates/sc-agent-types/Cargo.toml"]
-allowed_source_roots = ["crates/sc-agent-types"]
-manifest_message = "Only sc-agent-types may depend on sc-observability-types (v2 shim, ADR-SAG-0016)."
-source_message = "Only sc-agent-types may depend on sc-observability-types (v2 shim, ADR-SAG-0016)."
-
-[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
 dependency = "mimalloc"
 allowed_manifest_paths = ["crates/sc-ai/Cargo.toml", "crates/sc-treesitter/Cargo.toml"]
 allowed_source_roots = ["crates/sc-ai", "crates/sc-treesitter"]

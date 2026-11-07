@@ -1,18 +1,51 @@
 //! Injectable session log aligned with `sc-observability` v2.
 //!
 //! Libraries take [`SharedSessionLog`]. Composition roots adapt a real v2
-//! logger to this trait. This module depends on `sc-observability-types` only.
+//! logger to this trait. The rejection type is the local [`LogRejected`].
 
 use std::fmt;
-use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::error::JevError;
-use crate::ids::{BackendId, SessionId, Sha256Digest};
+use crate::ids::{BackendId, Operation, SessionId, Sha256Digest};
 
-/// Rejection returned by a [`SessionLog`] implementation.
-#[doc(inline)]
-pub use sc_observability_types::v2::EventError;
+/// A [`SessionLog`] refused an event.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::observability::v2::LogRejected;
+///
+/// let rejected = LogRejected::new("queue full");
+/// assert_eq!(rejected.to_string(), "session log rejected the event: queue full");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogRejected {
+    reason: String,
+}
+
+impl LogRejected {
+    /// A rejection with a human-readable `reason` (no secrets).
+    #[must_use]
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
+
+    /// Why the event was rejected.
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+impl fmt::Display for LogRejected {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "session log rejected the event: {}", self.reason)
+    }
+}
+
+impl std::error::Error for LogRejected {}
 
 /// One prompt or judge send.
 ///
@@ -20,87 +53,68 @@ pub use sc_observability_types::v2::EventError;
 /// (NFR-SAG-0002).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogEvent {
-    /// Session the send belongs to.
-    pub session_id: SessionId,
-    /// Backend that received the payload.
-    pub backend: BackendId,
-    /// SHA-256 of the canonical payload bytes.
-    pub prompt_sha256: Sha256Digest,
-    /// Which send this is (RBP-F011).
-    pub operation: LogOperation,
+    session_id: SessionId,
+    backend: BackendId,
+    prompt_sha256: Sha256Digest,
+    operation: Operation,
 }
 
-/// The send a [`LogEvent`] records.
-///
-/// Log adapters write [`Self::as_str`] (`judge` or `ask`), the same strings
-/// the field carried before it was typed, so the JSONL output is unchanged.
-/// Every value is a valid `sc-observability` action name, so adapters need
-/// no fallback.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LogOperation {
-    /// A `run_check` judge send.
-    Judge,
-    /// A session `ask` send.
-    Ask,
-}
-
-impl LogOperation {
-    /// Every operation, in declaration order.
-    pub const ALL: [Self; 2] = [Self::Judge, Self::Ask];
-
-    /// The wire and action-name spelling: `judge` or `ask`.
+impl LogEvent {
+    /// An event for one send.
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Judge => "judge",
-            Self::Ask => "ask",
+    pub fn new(
+        session_id: SessionId,
+        backend: BackendId,
+        prompt_sha256: Sha256Digest,
+        operation: Operation,
+    ) -> Self {
+        Self {
+            session_id,
+            backend,
+            prompt_sha256,
+            operation,
         }
     }
-}
 
-impl fmt::Display for LogOperation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
+    /// Session the send belongs to.
+    #[must_use]
+    pub fn session_id(&self) -> SessionId {
+        self.session_id
     }
-}
 
-impl FromStr for LogOperation {
-    type Err = JevError;
+    /// Backend that received the payload.
+    #[must_use]
+    pub fn backend(&self) -> BackendId {
+        self.backend
+    }
 
-    /// Parses the [`Self::as_str`] spelling.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sc_agent_types::observability::v2::LogOperation;
-    ///
-    /// assert_eq!("ask".parse::<LogOperation>().unwrap(), LogOperation::Ask);
-    /// assert_eq!("Judge".parse::<LogOperation>().unwrap_err().code(), "INPUT_INVALID");
-    /// ```
-    fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|operation| operation.as_str() == text)
-            .ok_or_else(|| JevError::InputInvalid {
-                detail: format!("log operation must be judge or ask, not {text:?}"),
-            })
+    /// SHA-256 of the canonical payload bytes.
+    #[must_use]
+    pub fn prompt_sha256(&self) -> &Sha256Digest {
+        &self.prompt_sha256
+    }
+
+    /// Which send this is.
+    #[must_use]
+    pub fn operation(&self) -> Operation {
+        self.operation
     }
 }
 
 /// Best-effort session logger.
 ///
-/// Implementations return promptly and do not panic. The trait is
-/// intentionally open (not sealed): composition roots (`sc-ai`, `sc-jev-py`)
-/// adapt their own `sc-observability` logger to it and tests inject doubles,
-/// so third-party implementations are expected.
+/// This is an **open port** (not sealed): composition roots (`sc-ai`,
+/// `sc-jev-py`) adapt their own `sc-observability` logger to it and tests
+/// inject doubles, so third-party implementations are expected.
+/// Implementations return promptly and do not panic.
 pub trait SessionLog: Send + Sync {
     /// Records `event`.
     ///
     /// # Errors
     ///
-    /// Returns [`EventError`] when the receiver rejects the event. Callers
+    /// Returns [`LogRejected`] when the receiver rejects the event. Callers
     /// treat that as best effort.
-    fn try_log(&self, event: LogEvent) -> Result<(), EventError>;
+    fn emit(&self, event: LogEvent) -> Result<(), LogRejected>;
 }
 
 /// Shared session log injected into `sc-jev-check`.
@@ -111,55 +125,7 @@ pub type SharedSessionLog = Arc<dyn SessionLog>;
 pub struct NoopSessionLog;
 
 impl SessionLog for NoopSessionLog {
-    fn try_log(&self, _event: LogEvent) -> Result<(), EventError> {
+    fn emit(&self, _event: LogEvent) -> Result<(), LogRejected> {
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use uuid::Uuid;
-
-    fn event() -> LogEvent {
-        LogEvent {
-            session_id: SessionId::from_uuid(Uuid::nil()),
-            backend: BackendId::Jev,
-            prompt_sha256: Sha256Digest::of(b"payload"),
-            operation: LogOperation::Judge,
-        }
-    }
-
-    #[test]
-    fn noop_accepts_events() {
-        NoopSessionLog.try_log(event()).expect("noop accepts");
-    }
-
-    #[test]
-    fn log_event_fields_carry_no_secrets() {
-        let event = event();
-        let LogEvent {
-            session_id,
-            backend,
-            prompt_sha256,
-            operation,
-        } = event;
-        let rendered = format!("{session_id} {backend} {prompt_sha256} {operation}");
-        let lower = rendered.to_ascii_lowercase();
-        for forbidden in ["secret", "api_key", "password", "authorization", "bearer"] {
-            assert!(!lower.contains(forbidden), "{forbidden} in {rendered}");
-        }
-        assert_eq!(operation, LogOperation::Judge);
-    }
-
-    #[test]
-    fn log_operation_round_trips_its_wire_spelling() {
-        for operation in LogOperation::ALL {
-            assert_eq!(operation.to_string(), operation.as_str());
-            assert_eq!(operation.as_str().parse::<LogOperation>(), Ok(operation));
-        }
-        assert_eq!(LogOperation::Judge.as_str(), "judge");
-        assert_eq!(LogOperation::Ask.as_str(), "ask");
-        assert!("event".parse::<LogOperation>().is_err());
     }
 }

@@ -1,18 +1,24 @@
-//! Domain newtypes frozen in sprint a-1.
+//! Domain newtypes and the static backend catalog.
+//!
+//! [`BACKENDS`] is the one table of backend facts (REQ-SAG-0105,
+//! ADR-SAG-0009 r-1 amendment). [`BackendId::descriptor`] holds the only
+//! exhaustive `match` over [`BackendId`]; every other read goes through the
+//! descriptor.
 
+use std::collections::BTreeSet;
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::error::JevError;
 
 /// Git toplevel used for path resolution.
 ///
-/// Callers obtain this from `git rev-parse --show-toplevel`. This type does
-/// not run git.
+/// Callers obtain this from `git rev-parse --show-toplevel` (or
+/// `git::discover_toplevel` with the `git` feature).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepoRoot(PathBuf);
 
@@ -84,9 +90,9 @@ impl Rev {
         if well_formed {
             Ok(Self(text.to_owned()))
         } else {
-            Err(JevError::InputInvalid {
-                detail: "revision must be WORKTREE or a git revision that is non-empty, does not start with '-', and has no whitespace or NUL".to_owned(),
-            })
+            Err(JevError::input_invalid(
+                "revision must be WORKTREE or a git revision that is non-empty, does not start with '-', and has no whitespace or NUL",
+            ))
         }
     }
 
@@ -121,7 +127,7 @@ impl SessionId {
     /// fresh random UUID would surprise callers that expect `default()` to be
     /// deterministic.
     #[must_use]
-    #[allow(
+    #[expect(
         clippy::new_without_default,
         reason = "a random id is not a sensible Default value"
     )]
@@ -149,8 +155,13 @@ impl fmt::Display for SessionId {
 }
 
 /// Backend credential id consumed by `sc-agent-secrets`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+///
+/// The documented spelling is the [`Display`](fmt::Display) form
+/// (`typesafe`, `anthropic`, `openai`). Serde writes that form and reads it
+/// through [`FromStr`], which also accepts the one-release alias `open_ai`
+/// (bead `agt-backend-serde-alias-removal`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum BackendKeyId {
     /// TypeSafe Jev API credential.
     TypeSafe,
@@ -160,38 +171,190 @@ pub enum BackendKeyId {
     OpenAi,
 }
 
+/// `(id, documented name, read aliases)` for every credential id.
+const KEY_NAMES: &[(BackendKeyId, &str, &[&str])] = &[
+    (BackendKeyId::TypeSafe, "typesafe", &[]),
+    (BackendKeyId::Anthropic, "anthropic", &[]),
+    (BackendKeyId::OpenAi, "openai", &["open_ai"]),
+];
+
+impl BackendKeyId {
+    /// Every credential id, in declaration order.
+    pub const ALL: &'static [Self] = &[Self::TypeSafe, Self::Anthropic, Self::OpenAi];
+
+    /// The documented spelling.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        KEY_NAMES
+            .iter()
+            .find(|(id, _, _)| *id == self)
+            .map_or("unknown", |(_, name, _)| name)
+    }
+}
+
 impl fmt::Display for BackendKeyId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::TypeSafe => "typesafe",
-            Self::Anthropic => "anthropic",
-            Self::OpenAi => "openai",
-        })
+        formatter.write_str(self.as_str())
     }
 }
 
 impl FromStr for BackendKeyId {
     type Err = JevError;
 
-    /// Parses the documented id: the [`Display`](fmt::Display) form.
+    /// Parses the documented id or its read alias (`open_ai`).
     ///
-    /// Only `typesafe`, `anthropic`, and `openai` are accepted. Kebab-case or
-    /// other aliases are not part of the contract.
+    /// Kebab-case and other spellings are rejected.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        match text {
-            "typesafe" => Ok(Self::TypeSafe),
-            "anthropic" => Ok(Self::Anthropic),
-            "openai" => Ok(Self::OpenAi),
-            _ => Err(JevError::InputInvalid {
-                detail: format!("backend key {text} is not typesafe, anthropic, or openai"),
-            }),
-        }
+        KEY_NAMES
+            .iter()
+            .find(|(_, name, aliases)| *name == text || aliases.contains(&text))
+            .map(|(id, _, _)| *id)
+            .ok_or_else(|| {
+                JevError::input_invalid(format!(
+                    "backend key {text} is not typesafe, anthropic, or openai"
+                ))
+            })
     }
 }
 
+impl Serialize for BackendKeyId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for BackendKeyId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        text.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+/// Broad class of a judge backend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum BackendFamily {
+    /// The TypeSafe Jev API.
+    TypeSafeJev,
+    /// An API-direct LLM judge that needs a system prompt.
+    Llm,
+    /// A local judge (no network credential).
+    Local,
+}
+
+/// Static facts about one built-in backend (one row of [`BACKENDS`]).
+///
+/// Fields are private; read them with the `const fn` accessors. Adding a
+/// backend is a new row, not a new `match` (ADR-SAG-0027 checklist).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackendDescriptor {
+    id: BackendId,
+    name: &'static str,
+    aliases: &'static [&'static str],
+    key_id: Option<BackendKeyId>,
+    family: BackendFamily,
+    requires_llm_context: bool,
+    supports_session_ask: bool,
+    request_limit_bytes: u64,
+}
+
+impl BackendDescriptor {
+    /// The backend id this row describes.
+    #[must_use]
+    pub const fn id(&self) -> BackendId {
+        self.id
+    }
+
+    /// The documented spelling (`Display`, serde, CLI, `check.toml`).
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Spellings accepted on read in addition to [`Self::name`].
+    #[must_use]
+    pub const fn aliases(&self) -> &'static [&'static str] {
+        self.aliases
+    }
+
+    /// The credential the backend sends, if any.
+    #[must_use]
+    pub const fn key_id(&self) -> Option<BackendKeyId> {
+        self.key_id
+    }
+
+    /// The backend family.
+    #[must_use]
+    pub const fn family(&self) -> BackendFamily {
+        self.family
+    }
+
+    /// Whether a request must carry `JudgeRequest::llm` (a system prompt).
+    #[must_use]
+    pub const fn requires_llm_context(&self) -> bool {
+        self.requires_llm_context
+    }
+
+    /// Whether a session for this backend accepts a follow-up `ask`.
+    #[must_use]
+    pub const fn supports_session_ask(&self) -> bool {
+        self.supports_session_ask
+    }
+
+    /// Largest wire request this backend sends, in bytes.
+    #[must_use]
+    pub const fn request_limit_bytes(&self) -> u64 {
+        self.request_limit_bytes
+    }
+}
+
+/// The backend catalog: one row per built-in [`BackendId`].
+///
+/// `test_backend_catalog_roundtrip` checks that serde, `Display`, `FromStr`
+/// and the aliases agree for every row.
+pub static BACKENDS: &[BackendDescriptor] = &[JEV, ANTHROPIC_HAIKU, OPENAI_LUNA];
+
+const JEV: BackendDescriptor = BackendDescriptor {
+    id: BackendId::Jev,
+    name: "jev",
+    aliases: &[],
+    key_id: Some(BackendKeyId::TypeSafe),
+    family: BackendFamily::TypeSafeJev,
+    requires_llm_context: false,
+    supports_session_ask: false,
+    request_limit_bytes: 96_000,
+};
+
+const ANTHROPIC_HAIKU: BackendDescriptor = BackendDescriptor {
+    id: BackendId::AnthropicHaiku,
+    name: "anthropic_haiku",
+    aliases: &[],
+    key_id: Some(BackendKeyId::Anthropic),
+    family: BackendFamily::Llm,
+    requires_llm_context: true,
+    supports_session_ask: true,
+    request_limit_bytes: 96_000,
+};
+
+const OPENAI_LUNA: BackendDescriptor = BackendDescriptor {
+    id: BackendId::OpenAiLuna,
+    name: "openai_luna",
+    aliases: &["open_ai_luna"],
+    key_id: Some(BackendKeyId::OpenAi),
+    family: BackendFamily::Llm,
+    requires_llm_context: true,
+    supports_session_ask: true,
+    request_limit_bytes: 96_000,
+};
+
 /// Judge implementation id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+///
+/// The documented spelling is [`BackendDescriptor::name`]. Serde writes it;
+/// `Deserialize` goes through [`FromStr`], which also accepts the
+/// descriptor's [`BackendDescriptor::aliases`] (one alias source; there is no
+/// `#[serde(alias)]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum BackendId {
     /// TypeSafe Jev.
     Jev,
@@ -202,47 +365,56 @@ pub enum BackendId {
 }
 
 impl BackendId {
-    /// Returns the credential this backend sends.
+    /// Returns this backend's row of [`BACKENDS`].
+    ///
+    /// This is the one exhaustive `match` over `BackendId` in the workspace.
     ///
     /// # Examples
     ///
     /// ```
-    /// use sc_agent_types::{BackendId, BackendKeyId};
+    /// use sc_agent_types::{BackendFamily, BackendId, BackendKeyId};
     ///
-    /// assert_eq!(BackendId::Jev.key_id(), BackendKeyId::TypeSafe);
-    /// assert_eq!(BackendId::OpenAiLuna.key_id(), BackendKeyId::OpenAi);
+    /// let luna = BackendId::OpenAiLuna.descriptor();
+    /// assert_eq!(luna.name(), "openai_luna");
+    /// assert_eq!(luna.key_id(), Some(BackendKeyId::OpenAi));
+    /// assert_eq!(luna.family(), BackendFamily::Llm);
     /// ```
     #[must_use]
-    pub const fn key_id(self) -> BackendKeyId {
+    pub const fn descriptor(self) -> &'static BackendDescriptor {
         match self {
-            Self::Jev => BackendKeyId::TypeSafe,
-            Self::AnthropicHaiku => BackendKeyId::Anthropic,
-            Self::OpenAiLuna => BackendKeyId::OpenAi,
+            Self::Jev => &JEV,
+            Self::AnthropicHaiku => &ANTHROPIC_HAIKU,
+            Self::OpenAiLuna => &OPENAI_LUNA,
         }
     }
 
-    /// Returns whether this backend is an LLM judge that needs a system prompt.
-    ///
-    /// Haiku and Luna read [`crate::JudgeRequest::llm`]; Jev ignores it.
+    /// The documented spelling ([`BackendDescriptor::name`]).
     #[must_use]
-    pub const fn is_llm(self) -> bool {
-        match self {
-            Self::Jev => false,
-            Self::AnthropicHaiku | Self::OpenAiLuna => true,
-        }
+    pub const fn as_str(self) -> &'static str {
+        self.descriptor().name()
+    }
+
+    /// The credential this backend sends ([`BackendDescriptor::key_id`]).
+    #[must_use]
+    pub const fn key_id(self) -> Option<BackendKeyId> {
+        self.descriptor().key_id()
+    }
+
+    /// The backend family ([`BackendDescriptor::family`]).
+    #[must_use]
+    pub const fn family(self) -> BackendFamily {
+        self.descriptor().family()
     }
 }
 
 impl FromStr for BackendId {
     type Err = JevError;
 
-    /// Parses the documented id: the [`Display`](fmt::Display) form.
+    /// Parses a descriptor name or alias.
     ///
-    /// Only `jev`, `anthropic_haiku`, and `openai_luna` are accepted, so the
-    /// CLI, `check.toml`, and Python share one spelling. Kebab-case aliases
-    /// such as `anthropic-haiku` are deliberately rejected. The serde form of
-    /// [`Self::OpenAiLuna`] is currently `open_ai_luna` (a `snake_case`
-    /// artifact); that form is not accepted here.
+    /// `jev`, `anthropic_haiku`, and `openai_luna` are the documented ids;
+    /// `open_ai_luna` is a one-release read alias. Kebab-case spellings such
+    /// as `anthropic-haiku` are rejected.
     ///
     /// # Examples
     ///
@@ -250,34 +422,131 @@ impl FromStr for BackendId {
     /// use sc_agent_types::BackendId;
     ///
     /// assert_eq!("openai_luna".parse::<BackendId>().unwrap(), BackendId::OpenAiLuna);
+    /// assert_eq!("open_ai_luna".parse::<BackendId>().unwrap(), BackendId::OpenAiLuna);
     /// assert_eq!("openai-luna".parse::<BackendId>().unwrap_err().code(), "INPUT_INVALID");
     /// ```
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        match text {
-            "jev" => Ok(Self::Jev),
-            "anthropic_haiku" => Ok(Self::AnthropicHaiku),
-            "openai_luna" => Ok(Self::OpenAiLuna),
-            _ => Err(JevError::InputInvalid {
-                detail: format!("backend {text} is not jev, anthropic_haiku, or openai_luna"),
-            }),
-        }
+        BACKENDS
+            .iter()
+            .find(|row| row.name() == text || row.aliases().contains(&text))
+            .map(BackendDescriptor::id)
+            .ok_or_else(|| {
+                JevError::input_invalid(format!(
+                    "backend {text} is not jev, anthropic_haiku, or openai_luna"
+                ))
+            })
     }
 }
 
 impl fmt::Display for BackendId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::Jev => "jev",
-            Self::AnthropicHaiku => "anthropic_haiku",
-            Self::OpenAiLuna => "openai_luna",
-        })
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl Serialize for BackendId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for BackendId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        text.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+/// A non-empty, duplicate-free list of backends, in request order.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::{BackendId, BackendSet};
+///
+/// let set: BackendSet = "jev,anthropic_haiku".parse().unwrap();
+/// assert_eq!(set.as_slice(), [BackendId::Jev, BackendId::AnthropicHaiku]);
+/// assert_eq!("jev,jev".parse::<BackendSet>().unwrap_err().code(), "CONFIG_INVALID");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendSet(Vec<BackendId>);
+
+impl BackendSet {
+    /// The backends, in request order.
+    #[must_use]
+    pub fn as_slice(&self) -> &[BackendId] {
+        &self.0
+    }
+
+    /// Iterates the backends in request order.
+    pub fn iter(&self) -> impl Iterator<Item = BackendId> + '_ {
+        self.0.iter().copied()
+    }
+
+    /// Number of backends (never zero).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Always false: a `BackendSet` has at least one backend.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl TryFrom<Vec<BackendId>> for BackendSet {
+    type Error = JevError;
+
+    /// # Errors
+    ///
+    /// `CONFIG_INVALID` when the list is empty or repeats a backend.
+    fn try_from(ids: Vec<BackendId>) -> Result<Self, Self::Error> {
+        if ids.is_empty() {
+            return Err(JevError::config_invalid(
+                "the backend list is empty; name at least one of jev, anthropic_haiku, or openai_luna",
+            ));
+        }
+        let mut seen = BTreeSet::new();
+        for id in &ids {
+            if !seen.insert(*id) {
+                return Err(JevError::config_invalid(format!(
+                    "backend {id} is listed more than once"
+                )));
+            }
+        }
+        Ok(Self(ids))
+    }
+}
+
+impl FromStr for BackendSet {
+    type Err = JevError;
+
+    /// Parses a comma-separated list (`jev,anthropic_haiku`).
+    ///
+    /// Surrounding whitespace on each entry is ignored.
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let ids = text
+            .split(',')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .map(str::parse)
+            .collect::<Result<Vec<BackendId>, JevError>>()?;
+        Self::try_from(ids)
+    }
+}
+
+impl AsRef<[BackendId]> for BackendSet {
+    fn as_ref(&self) -> &[BackendId] {
+        self.as_slice()
     }
 }
 
 /// Lowercase hex SHA-256 (64 characters).
 ///
 /// Used for canonical payload digests and equal-input `prompt_sha256`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct Sha256Digest(String);
 
@@ -306,16 +575,12 @@ impl Sha256Digest {
     /// hex characters.
     pub fn parse(text: impl AsRef<str>) -> Result<Self, JevError> {
         let text = text.as_ref();
-        if text.len() == 64
-            && text
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-        {
+        if text.len() == 64 && is_lower_hex(text) {
             Ok(Self(text.to_owned()))
         } else {
-            Err(JevError::InputInvalid {
-                detail: "SHA-256 digest must be 64 lowercase hex characters".into(),
-            })
+            Err(JevError::input_invalid(
+                "SHA-256 digest must be 64 lowercase hex characters",
+            ))
         }
     }
 
@@ -352,6 +617,364 @@ impl TryFrom<String> for Sha256Digest {
     }
 }
 
+/// Git object id of a blob: 40 (SHA-1) or 64 (SHA-256) lowercase hex digits.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::BlobSha;
+///
+/// assert!("a".repeat(40).parse::<BlobSha>().is_ok());
+/// assert!("A".repeat(40).parse::<BlobSha>().is_err());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct BlobSha(String);
+
+impl BlobSha {
+    /// Returns the lowercase hex text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for BlobSha {
+    type Error = JevError;
+
+    /// # Errors
+    ///
+    /// `INPUT_INVALID` unless the text is 40 or 64 lowercase hex digits.
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        if matches!(text.len(), 40 | 64) && is_lower_hex(text) {
+            Ok(Self(text.to_owned()))
+        } else {
+            Err(JevError::input_invalid(format!(
+                "blob sha {text:?} is not 40 or 64 lowercase hex digits"
+            )))
+        }
+    }
+}
+
+impl TryFrom<String> for BlobSha {
+    type Error = JevError;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        Self::try_from(text.as_str())
+    }
+}
+
+impl FromStr for BlobSha {
+    type Err = JevError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::try_from(text)
+    }
+}
+
+impl From<BlobSha> for String {
+    fn from(value: BlobSha) -> Self {
+        value.0
+    }
+}
+
+impl fmt::Display for BlobSha {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// A path relative to the repository root, with `/` separators.
+///
+/// The one validator for repo-relative paths: non-empty, not absolute, no
+/// `..` component, and no `\`, NUL, or `:`. The text is kept as written.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::RepoRelativePath;
+///
+/// assert_eq!(RepoRelativePath::try_from("src/a.py").unwrap().as_str(), "src/a.py");
+/// for bad in ["", "/etc/passwd", "../x", "a\\b", "c:x"] {
+///     assert_eq!(RepoRelativePath::try_from(bad).unwrap_err().code(), "INPUT_INVALID");
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct RepoRelativePath(String);
+
+impl RepoRelativePath {
+    /// Returns the path text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Returns the path as a [`Path`].
+    #[must_use]
+    pub fn as_path(&self) -> &Path {
+        Path::new(&self.0)
+    }
+}
+
+impl TryFrom<&str> for RepoRelativePath {
+    type Error = JevError;
+
+    /// # Errors
+    ///
+    /// `INPUT_INVALID` for empty text, an absolute path, a `..` component, or
+    /// a `\`, NUL, or `:` character.
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        let path = Path::new(text);
+        let well_formed = !text.is_empty()
+            && !text.starts_with('/')
+            && !text.contains(['\\', '\0', ':'])
+            && !path.is_absolute()
+            && path
+                .components()
+                .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+            && path
+                .components()
+                .any(|component| matches!(component, Component::Normal(_)));
+        if well_formed {
+            Ok(Self(text.to_owned()))
+        } else {
+            Err(JevError::input_invalid(format!(
+                "path {text} must be a repo-relative path inside the repository (no leading /, .., \\, NUL, or :)"
+            )))
+        }
+    }
+}
+
+impl TryFrom<String> for RepoRelativePath {
+    type Error = JevError;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        Self::try_from(text.as_str())
+    }
+}
+
+impl FromStr for RepoRelativePath {
+    type Err = JevError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::try_from(text)
+    }
+}
+
+impl From<RepoRelativePath> for String {
+    fn from(value: RepoRelativePath) -> Self {
+        value.0
+    }
+}
+
+impl fmt::Display for RepoRelativePath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<str> for RepoRelativePath {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for RepoRelativePath {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl AsRef<str> for RepoRelativePath {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+macro_rules! label_newtype {
+    ($(#[$meta:meta])* $name:ident, $what:literal) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[serde(try_from = "String", into = "String")]
+        pub struct $name(String);
+
+        impl $name {
+            /// Returns the text.
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl TryFrom<&str> for $name {
+            type Error = JevError;
+
+            /// # Errors
+            ///
+            /// `INPUT_INVALID` when the text is empty or has a control character.
+            fn try_from(text: &str) -> Result<Self, Self::Error> {
+                if text.is_empty() || text.chars().any(char::is_control) {
+                    Err(JevError::input_invalid(format!(
+                        concat!($what, " {:?} must be non-empty and have no control characters"),
+                        text
+                    )))
+                } else {
+                    Ok(Self(text.to_owned()))
+                }
+            }
+        }
+
+        impl TryFrom<String> for $name {
+            type Error = JevError;
+
+            fn try_from(text: String) -> Result<Self, Self::Error> {
+                if text.is_empty() || text.chars().any(char::is_control) {
+                    Self::try_from(text.as_str())
+                } else {
+                    Ok(Self(text))
+                }
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = JevError;
+
+            fn from_str(text: &str) -> Result<Self, Self::Err> {
+                Self::try_from(text)
+            }
+        }
+
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl PartialEq<str> for $name {
+            fn eq(&self, other: &str) -> bool {
+                self.as_str() == other
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl std::borrow::Borrow<str> for $name {
+            fn borrow(&self) -> &str {
+                self.as_str()
+            }
+        }
+    };
+}
+
+label_newtype!(
+    /// Caller-chosen question id (non-empty, no control characters).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::QuestionId;
+    ///
+    /// assert_eq!(QuestionId::try_from("relevant").unwrap().as_str(), "relevant");
+    /// assert!(QuestionId::try_from("").is_err());
+    /// ```
+    QuestionId,
+    "question id"
+);
+
+label_newtype!(
+    /// One choice label of a question (non-empty, no control characters).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::ChoiceId;
+    ///
+    /// assert_eq!(ChoiceId::try_from("yes").unwrap().as_str(), "yes");
+    /// assert!(ChoiceId::try_from("a\nb").is_err());
+    /// ```
+    ChoiceId,
+    "choice"
+);
+
+/// The send a log event records: a judge send or a session `ask`.
+///
+/// Log adapters write [`Self::as_str`] (`judge` or `ask`), which is also a
+/// valid `sc-observability` action name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Operation {
+    /// A judge send of a check run.
+    Judge,
+    /// A session `ask` send.
+    Ask,
+}
+
+impl Operation {
+    /// Every operation, in declaration order.
+    pub const ALL: &'static [Self] = &[Self::Judge, Self::Ask];
+
+    /// The wire and action-name spelling: `judge` or `ask`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Judge => "judge",
+            Self::Ask => "ask",
+        }
+    }
+}
+
+impl fmt::Display for Operation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Operation {
+    type Err = JevError;
+
+    /// Parses the [`Self::as_str`] spelling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sc_agent_types::Operation;
+    ///
+    /// assert_eq!("ask".parse::<Operation>().unwrap(), Operation::Ask);
+    /// assert_eq!("Judge".parse::<Operation>().unwrap_err().code(), "INPUT_INVALID");
+    /// ```
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|operation| operation.as_str() == text)
+            .ok_or_else(|| {
+                JevError::input_invalid(format!("log operation must be judge or ask, not {text:?}"))
+            })
+    }
+}
+
+fn is_lower_hex(text: &str) -> bool {
+    text.bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
@@ -375,58 +998,10 @@ mod tests {
     }
 
     #[test]
-    fn backend_ids_round_trip_through_display_and_from_str() {
-        for id in [
-            BackendId::Jev,
-            BackendId::AnthropicHaiku,
-            BackendId::OpenAiLuna,
-        ] {
-            assert_eq!(id.to_string().parse::<BackendId>().unwrap(), id);
-            assert_eq!(id.is_llm(), id != BackendId::Jev);
+    fn descriptor_lookup_matches_catalog_rows() {
+        for row in BACKENDS {
+            assert_eq!(row.id().descriptor(), row);
         }
-        for key in [
-            BackendKeyId::TypeSafe,
-            BackendKeyId::Anthropic,
-            BackendKeyId::OpenAi,
-        ] {
-            assert_eq!(key.to_string().parse::<BackendKeyId>().unwrap(), key);
-        }
-        assert_eq!(BackendId::AnthropicHaiku.key_id(), BackendKeyId::Anthropic);
-    }
-
-    /// Pins a known divergence: `rename_all = "snake_case"` splits `OpenAi`
-    /// into `open_ai`, so the serde form differs from `Display`, `FromStr`,
-    /// and the docs (`openai_luna`, `openai`). Changing serde changes the
-    /// wire form of `JudgeOutcome.backend`, which is a contract decision, so
-    /// this test records today's behaviour instead of fixing it.
-    #[test]
-    fn serde_form_of_openai_ids_differs_from_display() {
-        let wire = |value| serde_json::to_value(value).unwrap();
-        assert_eq!(wire(BackendId::Jev), "jev");
-        assert_eq!(wire(BackendId::AnthropicHaiku), "anthropic_haiku");
-        assert_eq!(wire(BackendId::OpenAiLuna), "open_ai_luna");
-        assert_eq!(
-            serde_json::to_value(BackendKeyId::OpenAi).unwrap(),
-            "open_ai"
-        );
-        assert_eq!(BackendId::OpenAiLuna.to_string(), "openai_luna");
-        assert!("open_ai_luna".parse::<BackendId>().is_err());
-    }
-
-    #[test]
-    fn backend_from_str_rejects_aliases_with_the_cli_message() {
-        for text in ["anthropic-haiku", "openai-luna", "Jev", "", "haiku"] {
-            let error = text.parse::<BackendId>().unwrap_err();
-            assert_eq!(error.code(), "INPUT_INVALID");
-            assert_eq!(
-                error.to_string(),
-                format!(
-                    "input is invalid: backend {text} is not jev, anthropic_haiku, or openai_luna"
-                )
-            );
-        }
-        let error = "open-ai".parse::<BackendKeyId>().unwrap_err();
-        assert_eq!(error.code(), "INPUT_INVALID");
     }
 
     #[test]

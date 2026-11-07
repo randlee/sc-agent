@@ -1,43 +1,134 @@
-//! Test doubles for the frozen judge contract.
+//! Test doubles for the judge contract (feature `test-util`).
 //!
-//! Enable the `test-util` feature to use these types from another crate.
-//! Crate unit tests compile this module without the feature.
+//! The one `JudgeBackend` double of the workspace (ARCHC-010). Enable the
+//! `test-util` feature from a dev-dependency (or pass `--features test-util`)
+//! to use it.
+
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
+
+use serde_json::Value;
 
 use crate::error::JevError;
-use crate::ids::BackendId;
-use crate::judge::{JudgeBackend, JudgeOutcome, JudgeRequest};
+use crate::ids::{BackendId, QuestionId, Sha256Digest};
+use crate::judge::{JudgeBackend, JudgeOutcome, JudgeRequest, QuestionAnswer};
 
-/// Judge backend that returns a fixed outcome or a fixed refusal.
-#[derive(Debug, Clone)]
+/// In-process judge that answers from a script and records its requests.
+///
+/// Contract:
+///
+/// - the outcome is built at `judge` time with [`JudgeOutcome::new`] against
+///   the request received, so answers must match its questions;
+/// - every accepted request is recorded ([`Self::requests`]) and every
+///   `validate_for_send` call is counted ([`Self::validations`]); the
+///   counters use interior mutability, so a test that keeps an `Arc` and
+///   registers a clone of it reads its own log;
+/// - the outcome reports `input_sha256` = the digest of the bundle it
+///   received, or the digest set by [`Self::with_reported_digest`];
+/// - [`Self::with_failure`] makes `judge` fail after validation passed;
+///   [`Self::refusing`] makes `validate_for_send` (and `judge`) fail, so
+///   nothing is sent;
+/// - when the id's descriptor requires LLM context and the request carries
+///   none, `validate_for_send` (still counted) and `judge` return
+///   `INPUT_INVALID` and record nothing (ADR-SAG-0022).
+#[derive(Debug)]
 pub struct MockJudgeBackend {
     id: BackendId,
-    outcome: JudgeOutcome,
+    answers: BTreeMap<QuestionId, QuestionAnswer>,
+    provider_meta: Option<Value>,
+    reported_digest: Option<Sha256Digest>,
+    failure: Option<JevError>,
     refusal: Option<JevError>,
+    requests: Mutex<Vec<JudgeRequest>>,
+    validations: AtomicUsize,
+}
+
+impl Clone for MockJudgeBackend {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            answers: self.answers.clone(),
+            provider_meta: self.provider_meta.clone(),
+            reported_digest: self.reported_digest.clone(),
+            failure: self.failure.clone(),
+            refusal: self.refusal.clone(),
+            requests: Mutex::new(self.requests()),
+            validations: AtomicUsize::new(self.validations()),
+        }
+    }
 }
 
 impl MockJudgeBackend {
-    /// Returns `outcome` for every accepted request.
+    /// A judge for `id` that returns `answers` for every accepted request.
     #[must_use]
-    pub fn new(id: BackendId, outcome: JudgeOutcome) -> Self {
+    pub fn new(id: BackendId, answers: BTreeMap<QuestionId, QuestionAnswer>) -> Self {
         Self {
             id,
-            outcome,
+            answers,
+            provider_meta: None,
+            reported_digest: None,
+            failure: None,
             refusal: None,
+            requests: Mutex::new(Vec::new()),
+            validations: AtomicUsize::new(0),
         }
     }
 
-    /// Fails `validate_for_send` and `judge` with `error`.
+    /// A judge for `id` whose `validate_for_send` returns `error`.
     #[must_use]
     pub fn refusing(id: BackendId, error: JevError) -> Self {
-        Self {
-            id,
-            outcome: JudgeOutcome {
-                answers: serde_json::json!({}),
-                backend: id,
-                probabilities: None,
-                provider_meta: None,
-            },
-            refusal: Some(error),
+        let mut mock = Self::new(id, BTreeMap::new());
+        mock.refusal = Some(error);
+        mock
+    }
+
+    /// Sets the outcome's `provider_meta`.
+    #[must_use]
+    pub fn with_provider_meta(mut self, meta: Value) -> Self {
+        self.provider_meta = Some(meta);
+        self
+    }
+
+    /// Reports `digest` as `input_sha256` instead of the received bundle's.
+    #[must_use]
+    pub fn with_reported_digest(mut self, digest: Sha256Digest) -> Self {
+        self.reported_digest = Some(digest);
+        self
+    }
+
+    /// Makes `judge` return `error` after `validate_for_send` passed.
+    #[must_use]
+    pub fn with_failure(mut self, error: JevError) -> Self {
+        self.failure = Some(error);
+        self
+    }
+
+    /// Requests judged so far, in call order.
+    #[must_use]
+    pub fn requests(&self) -> Vec<JudgeRequest> {
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Number of `validate_for_send` calls.
+    #[must_use]
+    pub fn validations(&self) -> usize {
+        self.validations.load(Ordering::SeqCst)
+    }
+
+    fn check(&self, request: &JudgeRequest) -> Result<(), JevError> {
+        if self.id.descriptor().requires_llm_context() && request.llm().is_none() {
+            return Err(JevError::input_invalid(format!(
+                "backend {} requires an LLM system prompt",
+                self.id
+            )));
+        }
+        match &self.refusal {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
         }
     }
 }
@@ -47,83 +138,38 @@ impl JudgeBackend for MockJudgeBackend {
         self.id
     }
 
-    fn validate_for_send(&self, _req: &JudgeRequest) -> Result<(), JevError> {
-        match &self.refusal {
-            Some(error) => Err(error.clone()),
-            None => Ok(()),
-        }
+    fn validate_for_send(&self, request: &JudgeRequest) -> Result<(), JevError> {
+        self.validations.fetch_add(1, Ordering::SeqCst);
+        self.check(request)
     }
 
-    fn judge(&self, req: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
-        self.validate_for_send(req)?;
-        let mut outcome = self.outcome.clone();
-        outcome.backend = self.id;
+    fn judge(&self, request: &JudgeRequest) -> Result<JudgeOutcome, JevError> {
+        self.check(request)?;
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(request.clone());
+        if let Some(error) = &self.failure {
+            return Err(error.clone());
+        }
+        let digest = self
+            .reported_digest
+            .clone()
+            .unwrap_or_else(|| request.payload().sha256().clone());
+        let mut outcome =
+            JudgeOutcome::new(self.id, request, self.answers.clone())?.with_input_sha256(digest);
+        if let Some(meta) = &self.provider_meta {
+            outcome = outcome.with_provider_meta(meta.clone());
+        }
         Ok(outcome)
     }
 }
 
-/// Field names every serialized `JudgeOutcome` carries, in serde order.
+/// Field names every serialized `JudgeOutcome` carries, sorted.
 ///
 /// Contract tests in `sc-jev` and `sc-jev-backends` compare their outcomes'
 /// serialized keys to this list so both backend families fill the same set.
 #[must_use]
 pub fn judge_outcome_field_names() -> &'static [&'static str] {
-    &["answers", "backend", "probabilities", "provider_meta"]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ids::Sha256Digest;
-    use crate::judge::{JudgeRequest, LlmWireContext, PayloadBundle};
-    use serde_json::Value;
-
-    fn request() -> JudgeRequest {
-        JudgeRequest {
-            payload: PayloadBundle::from_canonical_bytes(b"{}".to_vec()),
-            llm: Some(LlmWireContext {
-                system_prompt: "evaluate".into(),
-            }),
-        }
-    }
-
-    fn outcome() -> JudgeOutcome {
-        JudgeOutcome {
-            answers: serde_json::json!({"relevant": {"choice": "yes"}}),
-            backend: BackendId::Jev,
-            probabilities: Some(serde_json::json!({"yes": 0.9})),
-            provider_meta: Some(serde_json::json!({"model": "mock"})),
-        }
-    }
-
-    #[test]
-    fn mock_fills_every_judge_outcome_field() {
-        let backend = MockJudgeBackend::new(BackendId::AnthropicHaiku, outcome());
-        assert_eq!(backend.id(), BackendId::AnthropicHaiku);
-        let judged = backend.judge(&request()).expect("judge");
-        let value = serde_json::to_value(&judged).expect("serialize");
-        let object = value.as_object().expect("object");
-        let names: Vec<&str> = object.keys().map(String::as_str).collect();
-        assert_eq!(names, judge_outcome_field_names());
-        assert_eq!(judged.backend, BackendId::AnthropicHaiku);
-        assert!(judged.probabilities.is_some());
-        assert!(judged.provider_meta.is_some());
-        assert!(matches!(judged.answers, Value::Object(_)));
-        let req = request();
-        assert_eq!(req.payload.sha256(), &Sha256Digest::of(req.payload.bytes()));
-    }
-
-    #[test]
-    fn mock_refusal_does_not_return_an_outcome() {
-        let backend = MockJudgeBackend::refusing(
-            BackendId::Jev,
-            JevError::InputTooLarge {
-                limit_bytes: 4,
-                actual_bytes: 8,
-            },
-        );
-        let error = backend.judge(&request()).expect_err("refused");
-        assert_eq!(error.code(), "INPUT_TOO_LARGE");
-        assert!(!error.fix_hint().is_empty());
-    }
+    &["answers", "backend", "input_sha256", "provider_meta"]
 }
