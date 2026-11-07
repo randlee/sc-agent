@@ -5,7 +5,9 @@
 //! failures by exit status and follow-up probes, never by parsing localized
 //! messages. Blob bytes come from `git cat-file blob <sha>`, which writes the
 //! stored bytes without textconv or filters, through a reader bounded by
-//! the caller's byte limit.
+//! the caller's byte limit. [`hash_blob`] computes the blob id of bytes the
+//! caller already holds (`hash-object --stdin --no-filters`), so a working
+//! tree read and its id always agree.
 //!
 //! The user's git config is honoured (for example `safe.directory`); the
 //! commands are read-only plumbing that run no hooks and do not sign.
@@ -15,12 +17,25 @@
 //! deadline: output is bounded by `max_bytes`, prompts are off, and the
 //! callers that migrate here in r-2 / r-3c own any timeout policy.
 
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 use crate::error::JevError;
 use crate::ids::{BlobSha, RepoRelativePath, RepoRoot, Rev};
+
+/// Largest source input the git readers' callers accept: 8 MiB (RSH-007).
+///
+/// Pass it as `max_bytes` to [`read_at_rev`]; working-tree readers apply the
+/// same cap before [`hash_blob`]. `sc-jev-check` still keeps its own copy
+/// until it migrates (r-2).
+pub const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Bytes of git's stderr kept for an error detail.
+const STDERR_DETAIL_BYTES: u64 = 4096;
+
+/// Bytes of `hash-object` stdout read: a 64-digit id plus a newline fits.
+const OBJECT_ID_OUTPUT_BYTES: u64 = 128;
 
 /// One blob read from git: its object id and bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,7 +133,7 @@ pub fn read_at_rev(
     max_bytes: u64,
 ) -> Result<GitBlob, JevError> {
     let rev_text = rev.as_str();
-    if rev_text == Rev::WORKTREE || rev_text.starts_with('-') || rev_text.is_empty() {
+    if rev.is_worktree() || rev_text.starts_with('-') || rev_text.is_empty() {
         return Err(JevError::input_invalid(format!(
             "revision {rev_text} is not a git revision that can be read"
         )));
@@ -196,6 +211,90 @@ pub fn read_at_rev(
             path = path.as_str()
         ))),
     }
+}
+
+/// Returns the blob id of `bytes` in the repository at `root`.
+///
+/// Runs `git hash-object -t blob --stdin --no-filters` and writes `bytes`
+/// to its stdin, so git never sees a filesystem path (Windows verbatim
+/// `\\?\` paths cannot reach it), clean filters (`autocrlf`, attributes) do
+/// not apply, and the id is that of exactly these bytes. The repository's
+/// object format (SHA-1 or SHA-256) decides the id length. Nothing is
+/// written to the object database. Callers bound `bytes` (for example by
+/// [`MAX_INPUT_BYTES`]); the output read is bounded here.
+///
+/// # Errors
+///
+/// - `INPUT_INVALID` (`io_failed`) when git cannot be started or its pipes
+///   fail;
+/// - `EXTRACTION_FAILED` when git exits non-zero (the detail carries the
+///   start of git's stderr) or prints something other than an object id.
+pub fn hash_blob(root: &RepoRoot, bytes: &[u8]) -> Result<BlobSha, JevError> {
+    let mut command = git(root.as_path());
+    command
+        .args(["hash-object", "-t", "blob", "--stdin", "--no-filters"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command
+        .spawn()
+        .map_err(|error| JevError::io_failed("git", &error))?;
+    let (stdin, stdout, stderr) =
+        match (child.stdin.take(), child.stdout.take(), child.stderr.take()) {
+            (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(JevError::extraction_failed(
+                    "git hash-object pipes are unavailable",
+                ));
+            }
+        };
+    // Each pipe has its own thread, so a full stdout or stderr buffer cannot
+    // stall the stdin write (or the reverse).
+    let (written, id, detail) = std::thread::scope(|scope| {
+        let writer = scope.spawn(move || {
+            let mut stdin = stdin;
+            stdin.write_all(bytes)
+        });
+        let errors = scope.spawn(move || bounded_read(stderr, STDERR_DETAIL_BYTES));
+        let id = bounded_read(stdout, OBJECT_ID_OUTPUT_BYTES);
+        let written = writer
+            .join()
+            .unwrap_or_else(|_| Err(io::Error::other("stdin writer panicked")));
+        let detail = errors
+            .join()
+            .unwrap_or_else(|_| Err(io::Error::other("stderr reader panicked")));
+        (written, id, detail)
+    });
+    let exit = child
+        .wait()
+        .map_err(|error| JevError::io_failed("git hash-object", &error))?;
+    let id = id.map_err(|error| JevError::io_failed("git hash-object output", &error))?;
+    if !exit.success() || written.is_err() {
+        let detail = detail.unwrap_or_default();
+        let reason = String::from_utf8_lossy(detail.trim_ascii());
+        let reason = reason.lines().next().unwrap_or("no stderr");
+        return Err(JevError::extraction_failed(format!(
+            "git hash-object failed: {reason}"
+        )));
+    }
+    std::str::from_utf8(id.trim_ascii())
+        .ok()
+        .and_then(|text| BlobSha::try_from(text).ok())
+        .ok_or_else(|| {
+            JevError::extraction_failed("git hash-object returned an unexpected object id")
+        })
+}
+
+/// Reads up to `limit` bytes of `reader`, then drains the rest so the
+/// writer never blocks on a full pipe.
+fn bounded_read(reader: impl Read, limit: u64) -> io::Result<Vec<u8>> {
+    let mut reader = reader;
+    let mut kept = Vec::new();
+    (&mut reader).take(limit).read_to_end(&mut kept)?;
+    io::copy(&mut reader, &mut io::sink())?;
+    Ok(kept)
 }
 
 /// `INPUT_MISSING` when `rev` has a tree (the path is absent), otherwise

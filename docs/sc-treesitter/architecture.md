@@ -34,8 +34,10 @@ which rejects it before git runs; a source path that starts with `-` follows
 **Git reads (Phase A.1, r-3c).** The binary finds the repository with
 `sc_agent_types::git::discover_toplevel` and reads a revision with
 `sc_agent_types::git::read_at_rev` (RBQA-F006); paths are
-`RepoRelativePath`. `WORKTREE` reads stay local (file read plus
-`git hash-object`), because the shared module has no hashing helper.
+`RepoRelativePath`. A `WORKTREE` read is a bounded file read whose id comes
+from `sc_agent_types::git::hash_blob` (`hash-object --stdin --no-filters`);
+the 8 MiB cap is `sc_agent_types::git::MAX_INPUT_BYTES`. The binary spawns
+no git process of its own.
 
 **Helper captures.** Capture names beginning with `_` (stored without `@`)
 are helper captures: queries use them for predicates and they are never

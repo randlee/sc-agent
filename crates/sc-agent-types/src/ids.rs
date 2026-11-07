@@ -122,6 +122,20 @@ impl Rev {
         Self::new(Self::WORKTREE)
     }
 
+    /// Whether this is the [`Self::WORKTREE`] sentinel rather than a git
+    /// revision.
+    ///
+    /// ```
+    /// use sc_agent_types::Rev;
+    ///
+    /// assert!(Rev::worktree().is_worktree());
+    /// assert!(!Rev::parse("HEAD").unwrap().is_worktree());
+    /// ```
+    #[must_use]
+    pub fn is_worktree(&self) -> bool {
+        self.0 == Self::WORKTREE
+    }
+
     /// Returns the revision text.
     #[must_use]
     pub fn as_str(&self) -> &str {

@@ -37,6 +37,14 @@ owned_paths:
   - "crates/sc-treesitter/tests/**"
   - "boundaries/sc-treesitter/**"
   - "docs/sc-treesitter/**"
+  # QA-1 fix round, parent-authorized cross-crate edits (RBQA-F006 close; no
+  # other wave-2 sprint owns these files or items):
+  - "crates/sc-agent-types/src/git.rs#hash_blob, MAX_INPUT_BYTES"
+  - "crates/sc-agent-types/src/ids.rs#Rev::is_worktree"
+  - "crates/sc-agent-types/tests/git.rs#hash_blob tests"
+  - ".github/scripts/cargo-tree-gates.sh#sc-treesitter no-default-features feature row (r-4 merged)"
+  - "tests/support/deadline.rs#unit-test wall-clock asserts (FTQ-002; written by r-1, no running owner)"
+  - "clippy.toml#allow-invalid on the ResolvedApiKey::as_str entry (QA-001; the path is unreachable in sc-treesitter's default-features = false build, the all-features workspace clippy still enforces it)"
 ---
 
 # Sprint r-3c — sc-treesitter clap and shared git read (D12 producer, RBQA-F006 caller)

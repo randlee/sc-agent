@@ -11,9 +11,8 @@
 //!
 //! A `WORKTREE` read checks the file length, reads at most
 //! [`MAX_INPUT_BYTES`] + 1 bytes, and hashes the bytes it returns with
-//! `git hash-object -t blob --stdin --no-filters`, so the id is the blob id
-//! of exactly those bytes and git never sees a filesystem path. The shared
-//! module has no hashing helper, so this one git call stays here.
+//! [`git::hash_blob`], so the id is the blob id of exactly those bytes and
+//! git never sees a filesystem path. This module spawns no process itself.
 //!
 //! Paths are validated by [`RepoRelativePath`] (the shared repo-relative
 //! rules: no absolute path after resolution, no `..`, no backslash, no `:`,
@@ -21,19 +20,11 @@
 //! argument is canonicalized (through symlinks such as macOS `/tmp`) and
 //! must sit under the canonical repository toplevel.
 
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
 
-use sc_agent_types::git;
+use sc_agent_types::git::{self, MAX_INPUT_BYTES};
 use sc_agent_types::{BlobSha, JevError, RepoRelativePath, RepoRoot, Rev};
-
-/// Largest blob the binary reads (RSH-007).
-///
-/// Same 8 MiB value as `sc-jev-check`'s `MAX_INPUT_BYTES`; this crate does
-/// not depend on `sc-jev-check`, so the value is repeated here. Larger
-/// inputs are [`JevError::InputTooLarge`] before they are buffered.
-pub(crate) const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 
 /// One blob read from the repository.
 pub(crate) struct Blob {
@@ -58,7 +49,7 @@ pub(crate) struct Blob {
 pub(crate) fn read_blob(rev: &Rev, path_arg: &str) -> Result<Blob, JevError> {
     let repo = repo_root()?;
     let path = repo_relative(repo.as_path(), path_arg)?;
-    if rev.as_str() == Rev::WORKTREE {
+    if rev.is_worktree() {
         return read_worktree(&repo, path);
     }
     let blob = git::read_at_rev(&repo, rev, &path, MAX_INPUT_BYTES)?;
@@ -97,47 +88,8 @@ fn read_worktree(repo: &RepoRoot, path: RepoRelativePath) -> Result<Blob, JevErr
         .read_to_end(&mut bytes)
         .map_err(|error| JevError::io_failed(path.as_str(), &error))?;
     too_large(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
-    let sha = hash_bytes(repo, &bytes, &path)?;
+    let sha = git::hash_blob(repo, &bytes)?;
     Ok(Blob { path, bytes, sha })
-}
-
-/// Hashes `bytes` as a blob with `git hash-object -t blob --stdin --no-filters`.
-///
-/// Hashing the bytes already read (not the path) keeps the id and the
-/// returned bytes in step even if the file changes between calls, skips clean
-/// filters (`autocrlf`, attributes) so the id is that of the raw bytes, and
-/// never hands git a platform path (Windows `canonicalize` yields `\\?\`
-/// verbatim paths git cannot open). The repository's object format (SHA-1 or
-/// SHA-256) applies because the command runs inside `repo`.
-fn hash_bytes(repo: &RepoRoot, bytes: &[u8], path: &RepoRelativePath) -> Result<BlobSha, JevError> {
-    let mut child = git_command(repo)
-        .args(["hash-object", "-t", "blob", "--stdin", "--no-filters"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| JevError::io_failed("git process spawn", &error))?;
-    let mut stdin = child.stdin.take().ok_or_else(|| {
-        JevError::extraction_failed(format!("git hash-object stdin unavailable for {path}"))
-    })?;
-    // Write on the current thread is safe: hash-object reads all of stdin
-    // before it prints the 40/64-byte id, so stdout cannot fill first.
-    let written = stdin.write_all(bytes);
-    drop(stdin);
-    let hashed = child
-        .wait_with_output()
-        .map_err(|error| JevError::io_failed("git hash-object", &error))?;
-    if written.is_err() || !hashed.status.success() {
-        return Err(JevError::extraction_failed(format!(
-            "git hash-object failed for {path}"
-        )));
-    }
-    std::str::from_utf8(hashed.stdout.trim_ascii())
-        .ok()
-        .and_then(|text| BlobSha::try_from(text).ok())
-        .ok_or_else(|| {
-            JevError::extraction_failed("git hash-object returned an unexpected object id")
-        })
 }
 
 /// [`JevError::InputTooLarge`] when `actual_bytes` exceeds [`MAX_INPUT_BYTES`].
@@ -235,25 +187,6 @@ fn repo_root() -> Result<RepoRoot, JevError> {
     std::fs::canonicalize(toplevel.as_path())
         .map(RepoRoot::new)
         .map_err(|error| JevError::io_failed("repository root", &error))
-}
-
-/// `git -C <repo>` for `hash-object`, with the same environment policy as
-/// [`sc_agent_types::git`]: fixed locale, no prompt, and no inherited
-/// variable that would point git at another repository.
-fn git_command(repo: &RepoRoot) -> Command {
-    let mut command = Command::new("git");
-    command
-        .arg("--no-pager")
-        .arg("-C")
-        .arg(repo.as_path())
-        .env("LC_ALL", "C")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_OBJECT_DIRECTORY")
-        .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
-    command
 }
 
 #[cfg(test)]
