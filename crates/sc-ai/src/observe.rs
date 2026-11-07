@@ -206,25 +206,31 @@ mod tests {
         value
     }
 
-    fn golden_event() -> SessionEvent {
+    fn golden_event(operation: LogOperation) -> SessionEvent {
         SessionEvent {
             session_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")
                 .expect("nil session id"),
             backend: sc_agent_types::BackendId::AnthropicHaiku,
             prompt_sha256: sc_agent_types::Sha256Digest::of(b"payload"),
-            operation: LogOperation::Ask,
+            operation,
         }
     }
 
     /// QA-004: `sc-ai` and `sc-jev-py` each keep a `SessionEvent` adapter
     /// (where a shared one lives is decision D2). Both compare against this
-    /// one golden, so they cannot drift apart.
+    /// one golden (every `LogOperation`), so they cannot drift apart.
     #[test]
     fn adapter_matches_the_shared_session_event_golden() {
         let golden: serde_json::Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/observability/session-event.json"
         ))
         .expect("golden json");
-        assert_eq!(projection(&obs_event(golden_event())), golden);
+        for operation in LogOperation::ALL {
+            assert_eq!(
+                projection(&obs_event(golden_event(operation))),
+                golden[operation.as_str()],
+                "{operation}"
+            );
+        }
     }
 }
