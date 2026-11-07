@@ -160,8 +160,12 @@ recorded outcome decides every later self edge:
   the self edge (r-1 `sc-agent-types`; r-2 `sc-jev-check`; r-3
   `sc-agent-http`; r-2b `sc-jev`, `sc-jev-backends`; r-3b `sc-ai`).
   `workspace-tests` takes the "counted" branch.
-- **Dev edges counted, self entries rejected:** no crate gets a self
-  dev-dependency. Each integration target that needs a hook is declared
+- **Dev edges counted, self edge ignored:** cross-crate dev edges need
+  manifest entries (the `workspace-tests` "counted" branch), but a self
+  dev-dependency is neither flagged nor listed, so no self entry is
+  written and no `[[test]] required-features` rework is needed.
+- **Dev edges counted, self edge flagged and self entry rejected:** no
+  crate gets a self dev-dependency. Each integration target that needs a hook is declared
   `[[test]] name = "<t>" required-features = ["test-util"]`, and every
   validation line for it passes `--features test-util` (a plain
   `cargo test` then skips it instead of failing to compile). The

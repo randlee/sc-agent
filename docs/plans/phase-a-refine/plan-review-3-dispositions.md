@@ -162,3 +162,6 @@ D1–D13 and owner decisions (a), (b) are not reopened; (c) D9 stays pending.
 | --- | --- | --- |
 | ARCH-020 | applied — ADR-SAG-0029 added to r-2b `adrs` | r-2b frontmatter |
 | ARCH-021 | applied — ADR-SAG-0029 added to r-3c `adrs`; `adr:ADR-SAG-0029` acceptance row keeps the 0029 (c) error-code dispositions | r-3c frontmatter, acceptance |
+| RBQA obs 1 (round 4) | applied — test-file `disallowed_methods` expects are item-level on the spawning helper, never crate-level | r-3b D7.3 |
+| RBQA obs 2 (round 4) | applied — D0 gains a fourth outcome "dev edges counted, self edge ignored"; third outcome reworded as "self edge flagged and entry rejected" | r-1 D0 |
+| RBQA obs 3 (round 4) | noted — r-5 test files carry their own expect; clippy -D warnings self-enforces | — |

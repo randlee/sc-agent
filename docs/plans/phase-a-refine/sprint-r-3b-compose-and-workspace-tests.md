@@ -328,10 +328,12 @@ graph); contributes ARCHE-002 (consumer flag).
        `ResolvedApiKey::as_str` read), `crates/sc-agent-types/src/git.rs` and
        `crates/sc-jev-check/src/extract/command.rs` (`Command::new`; the
        extractor spawns the configured argv), and in test files
-       (`crates/*/tests/**`, `crates/*/src/**/tests.rs`) whose crate-level
+       (`crates/*/tests/**`, `crates/*/src/**/tests.rs`) whose item-level
        expect has a reason naming a process spawn. A file of the last two
-       kinds must not contain the token `ResolvedApiKey`, so its expect
-       cannot cover a secret read. The type-aware half is clippy:
+       kinds must not contain the token `ResolvedApiKey`, and a test file's
+       expect must be item-level on the spawning helper (or on a named
+       `support` module), never crate-level, so an expect cannot cover a
+       secret read made through an inferred type. The type-aware half is clippy:
        `clippy.toml` `disallowed-methods` lists `std::process::Command::new`
        (added here, once r-2 and r-3c have moved every `git` caller to
        `sc_agent_types::git`) besides `ResolvedApiKey::as_str`, under
