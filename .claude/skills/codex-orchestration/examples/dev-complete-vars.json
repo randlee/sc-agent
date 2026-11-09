@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-09-25T05:00:00Z",
+  "task_id": "run-a-2",
+  "sprint": "a-2",
+  "branch": "sprint/a-2-config",
+  "commit": "abc1234",
+  "pr_number": 28,
+  "deliverables_complete": 4,
+  "deliverables_total": 4,
+  "deliverables_md": "- sc-config facade: done\n- error inventory ADR: done\n- boundary manifest: done\n- tests: done",
+  "validation_md": "- `just lint gates`: ok (when workspace present)\n- `cargo test -p sc-config`: passed"
+}

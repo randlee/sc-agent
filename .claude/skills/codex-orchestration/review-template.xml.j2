@@ -1,0 +1,66 @@
+---
+name: review-task
+version: 1.2.0
+description: lead phase-ending code review template for codex-orchestration phases.
+format: xml
+required_variables:
+  - task_id
+  - phase
+  - branch
+  - commit
+  - worktree_path
+  - review_focus
+  - review_questions
+  - references
+optional_variables:
+  - lead
+  - cc
+defaults:
+  lead: team-lead
+  cc: team-lead
+metadata:
+  type: review-task
+  tags:
+    - stage:review
+  workflow:
+    scope:
+      kind: phase
+      variable: phase
+    state: review-start
+    stage: review
+    transition: start
+---
+<atm-review id="{{ task_id }}" phase="{{ phase }}">
+  <description><![CDATA[Phase-ending code review. Read-only analysis only; no code changes.]]></description>
+
+  <branch><![CDATA[{{ branch | string | cdata_escape }}]]></branch>
+  <commit><![CDATA[{{ commit | string | cdata_escape }}]]></commit>
+  <worktree><![CDATA[{{ worktree_path | string | cdata_escape }}]]></worktree>
+
+  <review-focus><![CDATA[
+{{ review_focus | string | cdata_escape }}
+  ]]></review-focus>
+
+  <review-questions><![CDATA[
+{{ review_questions | string | cdata_escape }}
+  ]]></review-questions>
+
+  <references><![CDATA[
+{{ references | string | cdata_escape }}
+  ]]></references>
+
+  <output-format><![CDATA[
+    Structured findings report with sections:
+    1. SUMMARY — one-paragraph verdict
+    2. FINDINGS — numbered list, each with severity, location, finding, recommendation
+    3. EXTRACTION-READINESS — score 1-5 per relevant module with rationale
+    4. RECOMMENDED-NEXT-SPRINTS — concrete follow-up work items
+  ]]></output-format>
+
+  <workflow>
+    <step id="a"><![CDATA[Start the task immediately with `atm task start {{ task_id | string | cdata_escape }} "<one line: what you will do first>"`, then begin the review in the same work session. If `{{ task_id | string | cdata_escape }}` is also a bead (`bd show {{ task_id | string | cdata_escape }}` succeeds), claim it now with `bd update {{ task_id | string | cdata_escape }} --claim`.]]></step>
+    <step id="b"><![CDATA[Verify that `{{ worktree_path | string | cdata_escape }}` is on `{{ branch | string | cdata_escape }}` with `HEAD` exactly `{{ commit | string | cdata_escape }}`; reject a mismatched or moving checkout. Read relevant source and doc files at the assigned commit with `git show {{ commit | string | cdata_escape }}:<path>` or another read guaranteed to use that immutable tree.]]></step>
+    <step id="c"><![CDATA[Do not make any code changes.]]></step>
+    <step id="d"><![CDATA[Deliver the structured findings report by closing the task with the report as the body: `atm task close {{ task_id | string | cdata_escape }} completed --template .claude/skills/codex-orchestration/review-complete.md.j2 --vars <scratch>/review-complete-{{ task_id | string | cdata_escape }}-vars.json`, with the vars built from that template's `required_variables` (`task_id`, `phase` and `commit` unchanged from this assignment) and written outside the repository. If this task claimed a bead, run `bd close {{ task_id | string | cdata_escape }}` right after the close. Only this close frees your queue: the next assignment stays queued and never starts until `{{ task_id | string | cdata_escape }}` is closed, and a plain `atm send` report does not close it. Re-verify every cited file:line at `{{ commit | string | cdata_escape }}`, never at a newer branch tip or moving worktree state; stale or missing evidence is a finding, not a guess.{% if cc and cc != lead %} Copy a one-line summary to `{{ cc | string | cdata_escape }}` with a plain `atm send {{ cc | string | cdata_escape }} --stdin`.{% endif %}]]></step>
+  </workflow>
+</atm-review>

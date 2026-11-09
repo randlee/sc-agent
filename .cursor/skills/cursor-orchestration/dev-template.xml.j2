@@ -1,0 +1,55 @@
+---
+name: dev-task
+version: 1.0.0
+description: Parent sprint assignment template for cursor-orchestration development work. Parent spawns rust-developer Task — assignee does not spawn child Tasks.
+format: xml
+required_variables:
+  - task_id
+  - sprint
+  - sprint_doc
+  - description
+  - worktree_path
+  - branch
+  - pr_target
+  - deliverables
+  - acceptance_criteria
+  - references
+---
+<cursor-task id="{{ task_id }}" sprint="{{ sprint }}" assignee="rust-developer">
+  <description>{{ description }}</description>
+
+  <worktree>{{ worktree_path }}</worktree>
+  <branch>{{ branch }}</branch>
+  <pr-target>{{ pr_target }}</pr-target>
+  <authoritative-sprint-doc>{{ sprint_doc }}</authoritative-sprint-doc>
+
+  <deliverables>
+{{ deliverables }}
+  </deliverables>
+
+  <acceptance-criteria>
+{{ acceptance_criteria }}
+- sprint doc deliverables gate:
+  - `{{ sprint_doc }}` exists
+  - sprint doc frontmatter sets `status: complete`
+  - sprint doc frontmatter sets `branch:`
+  - sprint doc frontmatter sets `worktree:`
+- planning index gate:
+  - `docs/plans/project-plan.md` includes the sprint entry before closeout
+  </acceptance-criteria>
+
+  <references>
+{{ references }}
+  </references>
+
+  <workflow>
+    <step id="a">ACK this Task assignment immediately in your completion preamble. Make reasonable assumptions; do not ask clarifying questions unless a real blocker prevents execution.</step>
+    <step id="b">Begin executing in this Task session immediately after ACK.</step>
+    <step id="c">Read `{{ sprint_doc }}` before coding. Treat it as the authoritative source for scope, deliverables, deletion targets, validation, and acceptance criteria. If this assignment summary and the sprint doc differ, the sprint doc wins and the mismatch must be reported.</step>
+    <step id="d">Before coding, update the worktree from the sprint target branch and include prior fixes already merged to that target.</step>
+    <step id="e">As soon as the development changes are complete and the branch is pushable, commit and push immediately. Report branch name and commit hash so the parent can open/update the PR.</step>
+    <step id="f">After the push report, run the required validation and tests. Do not wait for PR creation before starting validation.</step>
+    <step id="g">When validation completes, send a second report with PASS or FAIL, concrete failure details if any, and whether follow-up fixes are required.</step>
+    <step id="h">Stop after the validation report. Wait for parent Tasks (QA reviewers are spawned by parent, not by you). Do not self-merge. Do not spawn child Tasks (no rust-best-practices-agent, reviewers, or cursor-quality-mgr from this session).</step>
+  </workflow>
+</cursor-task>

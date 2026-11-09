@@ -1,0 +1,18 @@
+{
+  "task_id": "bd-c3d4",
+  "sprint": "p3-2",
+  "sprint_doc": "docs/plans/phase-p3/sprint-p3-2-retry-policy.md",
+  "review_mode": "sprint_review",
+  "description": "QA-1 for sprint p3-2 retry policy.",
+  "pr_number": "123",
+  "branch": "sprint/p3-2-retry-policy",
+  "commit": "0123abc",
+  "worktree_path": "/path/to/repo-worktrees/sprint-p3-2-retry-policy",
+  "review_targets": "- crates/example/src/retry.rs\n- crates/example/src/exporter.rs",
+  "references": "- docs/requirements.md\n- docs/architecture.md\n- .claude/project/quality-policy.md",
+  "commits": "0123abc retry policy",
+  "changed_files": "",
+  "triage_records": "",
+  "lead": "team-lead",
+  "cc": "team-lead"
+}

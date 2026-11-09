@@ -1,0 +1,11 @@
+# Minimal manifest until Rust crates and channels are declared.
+# Publisher and release_artifacts.py require this file to exist.
+
+schema_version = 1
+
+[project]
+name = "sc-agent"
+archive_prefix = "sc-agent"
+description = "Synaptic Canvas agent teams and orchestration assets"
+homepage = "https://github.com/randlee/sc-agent"
+license = "MIT"

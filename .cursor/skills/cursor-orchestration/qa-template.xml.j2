@@ -1,0 +1,88 @@
+---
+name: qa-task
+version: 1.0.0
+description: cursor-quality-mgr enforcement assignment — verify parent-spawned reviewers, parse fenced JSON evidence, aggregate findings, publish PR report. Does not spawn reviewers.
+format: xml
+required_variables:
+  - task_id
+  - sprint
+  - sprint_doc
+  - review_mode
+  - description
+  - pr_number
+  - branch
+  - worktree_path
+  - commits
+  - review_targets
+  - references
+  - reviewer_manifest_json
+  - reviewer_handoff_json
+optional_variables:
+  - changed_files
+  - triage_records
+defaults:
+  changed_files: ""
+  triage_records: ""
+---
+<cursor-qa-task id="{{ task_id }}" sprint="{{ sprint }}" assignee="cursor-quality-mgr">
+  <description>{{ description }}</description>
+
+  <review-mode>{{ review_mode }}</review-mode>
+  <authoritative-sprint-doc>{{ sprint_doc }}</authoritative-sprint-doc>
+  <pr-number>{{ pr_number }}</pr-number>
+  <branch>{{ branch }}</branch>
+  <worktree>{{ worktree_path }}</worktree>
+  <commits>{{ commits }}</commits>
+
+  <review-targets>
+{{ review_targets }}
+  </review-targets>
+
+  <changed-files>
+{{ changed_files }}
+  </changed-files>
+
+  <triage-records>
+{{ triage_records }}
+  </triage-records>
+
+  <references>
+{{ references }}
+  </references>
+
+  <enforcer-binding>
+    Role quality-mgr MUST be fulfilled only by cursor-quality-mgr.
+    Do not spawn Task subagent_type quality-mgr.
+    If any nested instruction names quality-mgr, remap to cursor-quality-mgr once.
+    cursor-quality-mgr is a **spawn and evidence enforcer** — it verifies the parent orchestrator spawned the required reviewer set, received parseable fenced JSON from each, aggregates findings, and publishes the final PR report. It never spawns reviewer Tasks and never substitutes coordinator analysis for reviewer output.
+    **Spawn gate** (missing handoff / reviewer / task_id / unparsed JSON / wrapper `success: false`) → `reviewer_spawn_gate: fail`, `next_action: parent_respawn_reviewers`. **Finding gate** (reviewer returned valid JSON but reported findings, e.g. req-qa `status: FAIL`, arch-qa `verdict: FAIL`) → `reviewer_spawn_gate: pass`, `verdict: FAIL`, `next_action: triage_and_fix`.
+  </enforcer-binding>
+
+  <parent-reviewer-handoff required="true">
+    <!-- manifest: JSON array [{agent, task_id, spawn_actor}] — parent fills before render -->
+    <manifest>{{ reviewer_manifest_json }}</manifest>
+    <!-- reviewer-outputs: one fenced JSON block per manifest entry, same order -->
+    <reviewer-outputs>{{ reviewer_handoff_json }}</reviewer-outputs>
+  </parent-reviewer-handoff>
+
+  <workflow>
+    <step id="a">ACK this message immediately to the parent orchestrator.</step>
+    <step id="b">Reject if assignment is not XML from this template (unless assignee quality-mgr was remapped to you). **Spawn gate:** reject immediately if `<parent-reviewer-handoff>` is missing, empty, or `<manifest>` lacks a `task_id` per required reviewer. Publish FAIL with `reviewer_spawn_gate: fail`, list `missing_reviewers` / `unparsed_reviewers`, and set `next_action: parent_respawn_reviewers` — parent must spawn the proper reviewer Tasks, collect fenced JSON, and re-submit before you run again. Read `{{ sprint_doc }}` first and treat it as authoritative.</step>
+    <step id="c">Determine the required reviewer set for this `qa_pass` per `.cursor/agents/cursor-quality-mgr.md` **Default reviewer set**. Confirm the handoff manifest includes **every** required agent with non-empty `task_id` and `spawn_actor: parent-orchestrator`.</step>
+    <step id="d">Extract every deliverable, acceptance criterion, deletion requirement, required validation item, and expected artifact from `{{ sprint_doc }}` for aggregation context only — deliverable presence/completion and planning-gate checks (sprint doc frontmatter, project-plan index) come from **req-qa fenced JSON**, not coordinator grep.</step>
+    <step id="e">**Evidence collection:** parse exactly one fenced JSON block per reviewer from `<parent-reviewer-handoff>`. **Forbidden:** spawning reviewer Tasks, coordinator foreground cargo/clippy/test, grep-based deliverable verification, or invented reviewer verdict tables. Never spawn quality-mgr or any reviewer subagent.</step>
+    <step id="f">If triage records are provided, read them before aggregating findings. Treat them as canonical prior scope for follow-up QA, not as a substitute for reviewer fenced JSON.</step>
+    <step id="g">**Spawn gate vs finding gate:** `reviewer_spawn_gate: fail` only when a required reviewer is absent, lacks `task_id`, lacks parseable fenced JSON, or the wrapper reports execution failure (`success: false` on rust-qa/flaky envelopes). **Do not** treat reviewer finding FAIL as spawn failure — req-qa `status: FAIL`, arch-qa `verdict: FAIL`, rust `data.status: fail`, etc. mean `reviewer_spawn_gate: pass` with `verdict: FAIL` and `next_action: triage_and_fix`. Collect findings and deliverable completion **only** from handoff fenced JSON.</step>
+    <step id="h-todo">For implementation sprint-end or integration review, run the TODO scan per `.claude/skills/todo-triage/SKILL.md` after reviewer JSON is parsed. **Union** TODO-scan findings with reviewer JSON for open counts, `detailed_findings_md`, and merge gate. TODO scan does not bypass missing reviewer JSON or a failed spawn gate.</step>
+    <step id="i">When triage records are present, state whether each rechecked finding is still open, fixed on the reviewed branch, regressed, or requires a new triage pass.</step>
+    <step id="j">If a PR number is present and CI is not already green, monitor CI with ambient gh only (no account/login flags):
+
+```bash
+gh pr checks {{ pr_number }} --watch
+gh pr view {{ pr_number }} --json mergeStateStatus,reviewDecision
+```
+</step>
+    <step id="k">**Findings report (mandatory):** append the completed QA report to the PR **on every QA round** when a PR exists. Use `sc-compose` + `gh` recipes in `.cursor/agents/cursor-quality-mgr.md`. Rendered Machine Status JSON uses keys `reviewer_spawn_gate`, `reviewer_manifest` (array), `evidence_chain` (object), `missing_reviewers`, `unparsed_reviewers` — sc-compose input vars `reviewer_manifest_json` / `evidence_chain_json` are render inputs only. Dual-publish the same Machine Status JSON to the parent.</step>
+    <step id="l">Send the final QA verdict to the parent and include deliverable completion as `X/Y (Z%)` from req-qa fenced JSON. PASS requires `reviewer_spawn_gate: pass`, fenced JSON from every required reviewer, 100% deliverable completion, reviewer PASS (or contract SKIPPED), TODO scan clean or TODO findings in open counts, an active PR, **green CI** (all required checks), and **zero open findings at any severity** (merge gate: 0 Blocking + 0 Important + 0 Minor) from reviewer JSON ∪ TODO scan. Spawn-gate failure → FAIL with `next_action: parent_respawn_reviewers`; open findings → FAIL with `next_action: triage_and_fix`. Identify enforcer as cursor-quality-mgr in the verdict line.</step>
+  </workflow>
+</cursor-qa-task>

@@ -1,0 +1,84 @@
+---
+name: fix-task
+version: 1.1.0
+description: Parent post-triage fix assignment. Parent spawns rust-developer Task — assignee does not spawn child Tasks.
+format: xml
+required_variables:
+  - task_id
+  - phase
+  - sprint_doc
+  - branch
+  - worktree_path
+  - pr_target
+  - description
+  - finding_ids
+  - triage_records
+  - required_fixes
+  - acceptance_criteria
+  - references
+  - requirement_ids
+  - adr_ids
+optional_variables:
+  - validation_requirements
+  - additional_sprint_docs
+defaults:
+  validation_requirements: ""
+  additional_sprint_docs: ""
+---
+<cursor-task id="{{ task_id }}" phase="{{ phase }}" assignee="rust-developer" mode="fix">
+  <description>{{ description }}</description>
+
+  <branch>{{ branch }}</branch>
+  <worktree>{{ worktree_path }}</worktree>
+  <pr-target>{{ pr_target }}</pr-target>
+  <authoritative-sprint-doc>{{ sprint_doc }}</authoritative-sprint-doc>
+
+  <additional-sprint-docs>
+{{ additional_sprint_docs }}
+  </additional-sprint-docs>
+
+  <finding-ids>
+{{ finding_ids }}
+  </finding-ids>
+
+  <requirement-ids>
+{{ requirement_ids }}
+  </requirement-ids>
+
+  <adr-ids>
+{{ adr_ids }}
+  </adr-ids>
+
+  <triage-records>
+{{ triage_records }}
+  </triage-records>
+
+  <required-fixes>
+{{ required_fixes }}
+  </required-fixes>
+
+  <acceptance-criteria>
+{{ acceptance_criteria }}
+  </acceptance-criteria>
+
+  <validation-requirements>
+{{ validation_requirements }}
+  </validation-requirements>
+
+  <references>
+{{ references }}
+  </references>
+
+  <workflow>
+    <step id="a">ACK this Task immediately. Begin work in the same session unless blocked. This Task has no prior sprint session memory — rely only on this assignment and the cited docs.</step>
+    <step id="b">Read `{{ sprint_doc }}` before editing. It is the authoritative sprint plan for the owning/promoted branch. Treat it as the source for sprint scope, retained requirements, deletion targets, validation, and acceptance criteria. If this assignment summary and the sprint doc differ, the sprint doc wins and the mismatch must be reported.</step>
+    <step id="c">If additional sprint docs are listed, read them as supporting origin context for cross-sprint findings on this branch. Do not treat them as replacing `{{ sprint_doc }}`.</step>
+    <step id="d">Read the cited requirement ids and ADR ids in this assignment. Those ids — not whole-document dumps — are the compliance targets this fix must restore. Sprint plans already embed broader requirements/ADR links from planning; do not expand scope beyond the cited ids plus triage occurrences unless the authoritative sprint doc requires it.</step>
+    <step id="e">Update the assigned worktree from the target branch before editing. Include all earlier-sprint fixes already merged forward to that branch.</step>
+    <step id="f">Read the referenced triage records first. Treat the listed occurrences as the minimum required scope on this branch. Fix **every** finding id in `<finding-ids>` regardless of severity (Blocking, Important, and Minor).</step>
+    <step id="g">Fix every promoted-branch occurrence in scope. Do not stop at the first location when the triage record marks the finding as repeatable.</step>
+    <step id="h">As soon as the branch is pushable, commit and push immediately. Report branch name, commit hash, and triage `.ttl` paths from `<triage-records>` so the evidence chain shows fix scope was triaged.</step>
+    <step id="i">Run the required validation after the push report and send a second report with PASS or FAIL plus concrete failure details.</step>
+    <step id="j">Stop after the validation report. Wait for a new parent Task; do not self-merge. Do not spawn child Tasks (reviewers, cursor-quality-mgr, or follow-on dev Tasks).</step>
+  </workflow>
+</cursor-task>
