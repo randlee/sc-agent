@@ -1,6 +1,6 @@
 ---
 name: planning-gate
-version: 0.8.5
+version: 0.10.1
 description: Running the planning gate end to end - what to pass, what Jev sees, the command and exit codes, and how to read results for one sprint item and a whole phase.
 ---
 
@@ -15,7 +15,7 @@ compression failure before any code exists.
 | Input | Source | Notes |
 | --- | --- | --- |
 | Planning item | the sprint text the caller already has, as `item_file`: the Markdown sprint file, `"$ANCHOR_TRACKER" show <id> --json` composed with `compose-item --show-json <file> --for plan`, or text from the caller's context | One agent run per complete sprint item; any layout is accepted |
-| Anchors | `doc/plan/phase-current/anchors.json` | `locked` and `promoted` only; `validate` must pass and each anchor's questions must have passed tuning (`question-tuning.md`) |
+| Anchors | `$A`: `docs/plans/phase-<current>/anchors.json` | `locked` and `promoted` only; `validate` must pass and each anchor's questions must have passed tuning (`question-tuning.md`) |
 | Question overrides | each anchor's plan-questions bead | Fenced JSON in the bead description; `{}` means defaults |
 | Script | `scripts/jev_judge.py` next to `SKILL.md`, absolute | Passed to the agent as `script` |
 
@@ -36,7 +36,7 @@ independent question tuning. The gate agent runs once per item:
 
 ```bash
 python3 "$S" judge --anchors "$A" --gate plan --all --item-id <sprint-id> --item-title "<title>" \
-  --item-file "$W/item.txt" [--overrides-file "$W/overrides.json"] --run-dir doc/plan/phase-current/anchor-runs
+  --item-file "$W/item.txt" [--overrides-file "$W/overrides.json"] --run-dir "$P/anchor-runs"
 ```
 
 | Exit | Meaning |
@@ -47,7 +47,7 @@ python3 "$S" judge --anchors "$A" --gate plan --all --item-id <sprint-id> --item
 Then, across all sprint items:
 
 ```bash
-python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --format md
+python3 "$S" coverage --runs "$P/anchor-runs" --gate plan --anchors "$A" --format md
 ```
 
 ## Reading results

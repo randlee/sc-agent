@@ -1,6 +1,6 @@
 ---
 name: installation-and-troubleshooting
-version: 0.8.5
+version: 0.10.1
 description: Installing plan-anchor into a repository or a parent folder with the plan-anchor-installer skill (install.py), per-repository overrides and per-folder upgrades, the anchor tracker this install is rendered for and how to switch it, the CLIs and credentials plan-anchoring depends on (python3, PyYAML, bd, sc-compose, jq, TypeSafe API key), minimum versions, PATH issues in Claude Code, Codex and Cursor environment policy, validation, and known issues.
 ---
 
@@ -15,10 +15,10 @@ python3 "<skill dir>/scripts/anchor_tracker.py" resolve      # selected tracker,
 which bd && bd --version
 which sc-compose && sc-compose --version
 which jq && jq --version
-test -n "$TYPESAFE_API_KEY" && echo "key set" || echo "key missing"
+test -n "$TYPESAFE_API_KEY" && echo "environment key set (preferred)" || echo "environment key absent; check the documented platform credential store"
 ```
 
-If these checks succeed, skip to Validation.
+If these checks succeed, skip to Validation. The environment-key message is informational: a documented local platform credential can also satisfy live Jev authentication.
 
 ## Install plan-anchor into a folder
 
@@ -28,7 +28,7 @@ The marketplace plugin (`/plugin install sc-plan-anchor`, the Codex and Cursor p
 uv run "<installer plugin>/install.py" --dest <folder> --tracker br|bd --allow-remote-judge|--no-remote-judge [--target claude,codex,cursor] [--dry-run]
 ```
 
-`uv` reads the script's inline dependencies (PyYAML and the `sc-compose` wheel) and needs no pip step; from a plan-anchor checkout, `uv run plugins/sc-plan-anchor/install.py ...` is the same command. The installer renders the skill and agent text for one tracker, so an installed copy names only that tracker, and writes `<folder>/.claude/skills/plan-anchoring/` and `<folder>/.claude/agents/anchor-*.md` (`.codex/` or `.cursor/` with `--target`; default `claude`). It records the version, tracker, targets and the sha256 of every file it wrote in `<folder>/.sc/plan-anchor/install-lock.json`; commit that file with the installed files. When no settings file says so yet, the installer skill asks once for the tracker and whether plan text may be sent to TypeSafe (Jev); it never infers that consent from earlier runs.
+`uv` reads the script's inline dependencies (PyYAML and the `sc-compose` wheel) and needs no pip step; from a plan-anchor checkout, `uv run plugins/sc-plan-anchor/install.py ...` is the same command. The installer renders the skill and agent text for one tracker, so an installed copy names only that tracker, and writes `<folder>/.claude/skills/plan-anchoring/` and `<folder>/.claude/agents/anchor-*.md` (and `.codex/`, `.cursor/`: without `--target` every harness the folder uses, meaning the locked targets, existing installs and every harness directory present, `claude` when there is none; `--target` only adds one). It records the version, tracker, targets and the sha256 of every file it wrote in `<folder>/.sc/plan-anchor/install-lock.json`; commit that file with the installed files. When no settings file says so yet, the installer skill asks once for the tracker and whether plan text may be sent to TypeSafe (Jev); it never infers that consent from earlier runs.
 
 **Destination.** `<folder>` is a repository, or a parent folder that holds several repositories (it need not be a git repository). Global locations are refused with `INSTALL.DEST_GLOBAL` (exit 2): the home directory itself, `~/.claude`, `~/.codex`, `~/.cursor`, `~/.agents`, `/etc/codex`, and any plugin cache under them. A parent folder that is not a repository and has no `.beads/` needs `--tracker` (`TRACKER.REQUIRED` otherwise); `--init-br` is ignored there, so run `br init` in each repository. A subfolder of a repository is not a parent folder: without `--tracker` the installer takes the tracker from the nearest `.sc/plan-anchor/settings.yaml` above it, or from the enclosing repository's `.beads/`, and `--init-br` runs at the repository root.
 
@@ -59,9 +59,11 @@ Exit codes follow the plugin convention shared by every script: 0 the command ra
 # Repository settings for the sc-plan-anchor plugin; commit this file, never put secrets in it.
 schema_version: 1
 anchor_tracker: bd
+# plan_dir: the current phase's plan folder (anchors.json, intent.md, anchor-runs/). Set it again when the phase changes.
+plan_dir: "docs/plans/phase-b"
 ```
 
-`schema_version` must be `1`. Unknown or duplicate keys are rejected (`SETTINGS.UNKNOWN_KEY`, `SETTINGS.MALFORMED`) so a typo never falls back silently. When the file or its `anchor_tracker` key is absent, the installer detects (rule 2) and the installed `anchor_tracker.py` selects `bd`, checked against disk. `.gitignore` may ignore `.sc/sessions/` and `.sc/*/cache/`, never this file; `write` reports `settings_ignored_by_git` when it is.
+`plan_dir` names the current phase folder, `docs/plans/phase-<current>` with the phase id written out: a relative path with forward slashes and no `..` or `<placeholder>` (`SETTINGS.INVALID_PLAN_DIR`). Set it with `plan_anchor_settings.py set plan_dir docs/plans/phase-<id>`; the installer and `anchor_tracker.py write` keep it. `schema_version` must be `1`. Unknown or duplicate keys are rejected (`SETTINGS.UNKNOWN_KEY`, `SETTINGS.MALFORMED`) so a typo never falls back silently. When the file or its `anchor_tracker` key is absent, the installer detects (rule 2) and the installed `anchor_tracker.py` selects `bd`, checked against disk. `.gitignore` may ignore `.sc/sessions/` and `.sc/*/cache/`, never this file; `write` reports `settings_ignored_by_git` when it is.
 
 This install is rendered for `bd`; both gates read anchor and question beads with it. The sprint text comes from the caller, from wherever it wrote it (`item_file`).
 
@@ -95,6 +97,12 @@ Rerun the installer for the install folder with the other `--tracker` value. It 
   request/result. Do not continue with hand-built JSON when this CLI is absent.
 
 **TypeSafe API key**
+
+The live judge looks for the key in this order: `TYPESAFE_API_KEY` in the process environment, then the platform credential store. An invalid environment value fails closed; it does not silently select another credential. The platform entry is local-interactive convenience only—cloud, CI, and remote agents should use their platform secret injection.
+
+- macOS: Keychain generic-password item with service `plan-anchor` and account `typesafe-api-key`.
+- Windows: Credential Manager generic credential with target `plan-anchor:typesafe-api-key`.
+- Linux: Secret Service item returned by `secret-tool lookup service plan-anchor account typesafe-api-key`. Create it without putting the key on a command line with `secret-tool store --label="plan-anchor TypeSafe API key" service plan-anchor account typesafe-api-key` and enter the value on standard input.
 
 - Create a key at typesafe.ai. Read it silently so it does not appear in the command line, shell history, or terminal output, then export it in the shell that launches Claude Code or Codex:
   ```bash
@@ -172,7 +180,7 @@ The smoke `judge` runs the full gating path offline: expect `not_addressed` for 
 - `bd comment --body-file`: does not exist; use `--file` (or `--stdin`).
 - `TRACKER.MISMATCH`, `TRACKER.DOLT_REQUIRED`: the settings file in effect (possibly a parent folder's) and the repository's `.beads/` disagree. Dolt provisioning is outside this skill; give the repository its own `.sc/plan-anchor/settings.yaml`, or rerun the installer with the `--tracker` that matches it.
 - `TRACKER.CLI_MISSING`: the selected tracker is not on PATH; see Find an existing install.
-- `SETTINGS.UNKNOWN_KEY`, `SETTINGS.SCHEMA_VERSION`, `SETTINGS.INVALID_TRACKER`, `SETTINGS.MALFORMED`: fix `.sc/plan-anchor/settings.yaml` to the form above.
+- `SETTINGS.UNKNOWN_KEY`, `SETTINGS.SCHEMA_VERSION`, `SETTINGS.INVALID_TRACKER`, `SETTINGS.INVALID_PLAN_DIR`, `SETTINGS.MALFORMED`: fix `.sc/plan-anchor/settings.yaml` to the form above.
 - `BEADS.METADATA_INVALID`: `.beads/metadata.json` is not a readable JSON object; repair it before selection can run.
 - Installer `INSTALL.DEST_GLOBAL`: `--dest` named the home directory, a global harness directory or a plugin cache; pass a repository or a parent folder of repositories.
 - `VALIDATION.PATH` from a gate with plan-anchor installed: the script passed is not the nearest per-folder copy (or is a global one); pass the `jev_judge.py` of the install at or above the repository.

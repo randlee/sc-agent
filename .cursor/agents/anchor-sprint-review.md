@@ -1,6 +1,6 @@
 ---
 name: anchor-sprint-review
-version: 0.8.5
+version: 0.10.1
 description: Judges one sprint's delivered work against anchors at the development gate - judges the sprint text the caller wrote plus an account of the delivered work, resolves question overrides from the dev-questions beads, runs jev_judge.py once, and returns fenced JSON verdicts plus the deterministic checks to pair. Read-only on beads, PRs and code.
 model: composer
 force-default-model: true
@@ -26,7 +26,7 @@ Run the development gate for one sprint: take the sprint text the caller passes,
 - `evidence` (list of file paths, optional): sprint report, PR body, test summary, read in the given order.
 - `pr_number` (string, optional): with `gh` available, `gh pr view "$pr_number" --json title,body,baseRefOid,headRefOid` supplies the PR text and immutable commit OIDs for the file list.
 - `anchor_ids` (list or `all`, required).
-- `anchors_path` (string, default `doc/plan/phase-current/anchors.json`).
+- `anchors_path` (string): the skill passes `$A`, the current phase's `docs/plans/phase-<current>/anchors.json` (e.g. `docs/plans/phase-a/anchors.json`). When it is not passed, use `<plan_dir>/anchors.json`, with `plan_dir` from the accepted script's sibling `plan_anchor_settings.py show`; when that is null, return `VALIDATION.INPUT`.
 - `run_dir`, `threshold`, `dry_run`, `correlation_id`, `run`: as for `anchor-plan-review`; with `run`, skip steps 6 and 7. The skill sets `correlation_id` to the sprint ID.
 
 ## Execution Steps
@@ -43,7 +43,7 @@ Return `VALIDATION.INPUT` when `item_id` or `item_file` is missing.
    4. `## Tests` summary lines only, never full logs.
    Record what a command printed, never your summary. Never include full diffs or source files. If no section could be filled, return `EVIDENCE.NONE`.
 5. Complete the item: `printf '\n' >> "$W/item.txt"; cat "$W/account.md" >> "$W/item.txt"`. Track the section names you filled, `Closed beads` included when present, as `evidence_sections`.
-6. Resolve question overrides exactly as `anchor-plan-review` step 3, with `beads.dev_questions` in place of `beads.plan_questions`, into `"$W/overrides.json"`. Read each question bead with `"$ANCHOR_TRACKER" show "$qb" --json`.
+6. Resolve question overrides exactly as `anchor-plan-review` step 3, with `beads.dev_questions` in place of `beads.plan_questions`, into `"$W/overrides.json"`. Read each question bead with `"$ANCHOR_TRACKER" show "$qb" --json`, with the same 3 attempts.
 7. Judge, once:
    ```bash
    python3 "$SCRIPT" judge --anchors "$ANCHORS" --gate dev [--all | --anchor "$ID" ...] \
@@ -68,7 +68,7 @@ Return fenced JSON:
     "gate": "dev",
     "item_id": "A2",
     "run_id": "dev-20261022T101500Z-A2",
-    "run_path": "doc/plan/phase-current/anchor-runs/dev-20261022T101500Z-A2.json",
+    "run_path": "docs/plans/phase-a/anchor-runs/dev-20261022T101500Z-A2.json",
     "dry_run": false,
     "reused_run": false,
     "pass": false,
@@ -104,7 +104,7 @@ On exit 2 or any fatal condition: `success: false`, `data: null`, `error: {code,
 - `PREREQ.MISSING`, `EVIDENCE.NONE`.
 - `VALIDATION.PATH`, `VALIDATION.ID`: an untrusted path or identifier failed preflight.
 - `VALIDATION.INPUT`, `VALIDATION.TRACKER`: missing sprint inputs or a tracker mismatch; stop before judging.
-- `TRACKER.SHOW_FAILED`: a linked question bead could not be shown; stop before judging.
+- `TRACKER.SHOW_FAILED`: a linked question bead could not be shown in 3 attempts; stop before judging.
 - Script exit 2 because an anchor got no answer from Jev (the script already retried; `JEV.*` or `FIXTURE.MISSING`): return the error object with its `data.run_path` and `data.failures`; do not re-run.
 - `anchor_tracker.py resolve` errors (`TRACKER.MISMATCH`, `TRACKER.DOLT_REQUIRED`, `TRACKER.CLI_MISSING`, `SETTINGS.*`, `BEADS.METADATA_INVALID`, `BEADS.NOT_DIRECTORY`, `DEPENDENCY.PYYAML`, `REPO.NOT_FOUND`): return its error object unchanged; never switch trackers.
 - Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `SCRIPT.INTERNAL`: return the error object; never bypass.

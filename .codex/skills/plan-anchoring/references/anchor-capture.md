@@ -1,6 +1,6 @@
 ---
 name: anchor-capture
-version: 0.8.5
+version: 0.10.1
 description: How the planning orchestrator detects candidate anchors, writes each one as a clear testable requirement with the user's verbatim words kept as provenance, deduplicates, and gets the user's approval before locking.
 ---
 
@@ -122,4 +122,4 @@ python3 "$S" add --anchors "$A" \
 
 ## Re-opening a plan
 
-When a planning session resumes, read `anchors.md` before the plan and say so: "Loaded 14 anchors for phase-current." The user never re-states a locked fact; if they do, it is the same anchor, not a second. If their wording now implies a different constraint, `update --statement`; if the directive itself changed, add a new anchor and retire the old.
+When a planning session resumes, read `anchors.md` before the plan and say so: "Loaded 14 anchors for phase-b." The user never re-states a locked fact; if they do, it is the same anchor, not a second. If their wording now implies a different constraint, `update --statement`; if the directive itself changed, add a new anchor and retire the old.

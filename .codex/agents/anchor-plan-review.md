@@ -1,6 +1,6 @@
 ---
 name: anchor-plan-review
-version: 0.8.5
+version: 0.10.1
 description: Judges one complete sprint item against anchors at the planning gate - judges the sprint text the caller wrote, unchanged, resolves question overrides, returns Jev's verdicts unchanged, and points to the weak spot in each failing cell. Read-only on beads and the plan.
 model: luna
 color: yellow
@@ -25,7 +25,7 @@ Run the planning gate for one complete sprint item: take the text the caller pas
 - `item_file` (string, required): repository-local text file holding the complete sprint text exactly as the caller wrote it: the Markdown sprint file itself, the plan bead as the selected tracker shows it (`"$ANCHOR_TRACKER" show <id> --json` composed with `compose-item --show-json <file> --for plan`), or text from the caller's own context written to a file. Any headings and layout are accepted. The leaf never fetches, rebuilds, or edits it.
 - `anchor_tracker` (string, optional): `bd`, as the parent obtained it from `anchor_tracker.py resolve`, selected for anchor/question storage independently of where the plan lives. The leaf resolves the tracker itself in step 1; a supplied value must equal the resolved one. Never infer it from the plan, hardcode it, or fall back to the other CLI.
 - `anchor_ids` (list of strings or `all`, required): `all` means every `locked` or `promoted` anchor.
-- `anchors_path` (string, default `doc/plan/phase-current/anchors.json`).
+- `anchors_path` (string): the skill passes `$A`, the current phase's `docs/plans/phase-<current>/anchors.json` (e.g. `docs/plans/phase-a/anchors.json`). When it is not passed, use `<plan_dir>/anchors.json`, with `plan_dir` from the accepted script's sibling `plan_anchor_settings.py show`; when that is null, return `VALIDATION.INPUT`.
 - `run_dir` (string, default `<anchors dir>/anchor-runs`).
 - `threshold` (number, default 0.6).
 - `dry_run` (bool, default false): write the requests to the run directory without calling Jev.
@@ -47,15 +47,19 @@ Return `VALIDATION.INPUT` when `item_id` or `item_file` is missing.
      python3 "$SCRIPT" agent-preflight --workspace-root "$ROOT" --script "$SCRIPT" \
        --anchors "$ANCHORS" --run-dir "$RUN_DIR" --identifier "$qb" > "$W/question-preflight.json" ||
        { cat "$W/question-preflight.json" > "$W/error.json"; exit 2; }
-     "$ANCHOR_TRACKER" show "$qb" --json > "$W/show.json" 2> "$W/show.err" ||
-       { jq -n --arg qb "$qb" --arg t "$ANCHOR_TRACKER" --rawfile e "$W/show.err" '{success:false,data:null,error:{code:"TRACKER.SHOW_FAILED",message:("\($t) show \($qb) failed: " + ($e|.[-300:])),recoverable:true,suggested_action:"Restore the question bead, or clear the anchor'"'"'s beads question link, then rerun"}}' > "$W/error.json"; exit 2; }
+     n=1
+     until "$ANCHOR_TRACKER" show "$qb" --json > "$W/show.json" 2> "$W/show.err"; do
+       [ "$n" -lt 3 ] ||
+         { jq -n --arg qb "$qb" --arg t "$ANCHOR_TRACKER" --rawfile e "$W/show.err" '{success:false,data:null,error:{code:"TRACKER.SHOW_FAILED",message:("\($t) show \($qb) failed after 3 attempts: " + ($e|.[-300:])),recoverable:true,suggested_action:"Restore the question bead, or clear the anchor'"'"'s beads question link, then rerun"}}' > "$W/error.json"; exit 2; }
+       sleep "$n"; n=$((n + 1))
+     done
      jq -r 'if type=="array" then .[0].description else .description end' "$W/show.json" | awk '/^```json/{f=1;next} /^```/{f=0} f' > "$W/q.json"
      jq -e 'type=="object" and length>0' "$W/q.json" >/dev/null 2>&1 || continue
      jq --arg id "$id" --slurpfile q "$W/q.json" '.[$id]=$q[0]' "$W/overrides.json" > "$W/o.tmp" && cat "$W/o.tmp" > "$W/overrides.json"
    done || { cat "$W/error.json"; exit 2; }
    jq -r 'keys[]' "$W/overrides.json"
    ```
-   A question bead with no JSON block, or an empty one, is not an error; defaults apply for that anchor. A question bead the tracker cannot show is an error, never a silent fallback to defaults: the loop stops with `TRACKER.SHOW_FAILED` (or the preflight error) in `$W/error.json`; return it unchanged and do not judge. Pass `--overrides-file` only if the file has at least one entry. The run's `question_set.overridden` must match the anchors listed; say so if it does not.
+   A question bead with no JSON block, or an empty one, is not an error; defaults apply for that anchor. A transient tracker failure (for example a database timeout) is retried: each `show` gets 3 attempts, 1 s then 2 s apart. A question bead the tracker still cannot show is an error, never a silent fallback to defaults: the loop stops with `TRACKER.SHOW_FAILED` (or the preflight error) in `$W/error.json`; return it unchanged and do not judge. Pass `--overrides-file` only if the file has at least one entry. The run's `question_set.overridden` must match the anchors listed; say so if it does not.
 4. Judge, once:
    ```bash
    python3 "$SCRIPT" judge --anchors "$ANCHORS" --gate plan [--all | --anchor "$ID" ...] \
@@ -84,7 +88,7 @@ Return fenced JSON:
     "gate": "plan",
     "item_id": "A1",
     "run_id": "plan-20261009T183000Z-proj-a3f8",
-    "run_path": "doc/plan/phase-current/anchor-runs/plan-20261009T183000Z-proj-a3f8.json",
+    "run_path": "docs/plans/phase-a/anchor-runs/plan-20261009T183000Z-proj-a3f8.json",
     "dry_run": false,
     "reused_run": false,
     "pass": false,
@@ -121,7 +125,7 @@ On exit 2 or any fatal condition: `success: false`, `data: null`, and `error` as
 - `PREREQ.MISSING`: script, python3, selected anchor tracker, jq, or anchors file absent.
 - `VALIDATION.PATH`, `VALIDATION.ID`: an untrusted path or identifier failed preflight.
 - `VALIDATION.INPUT`, `VALIDATION.TRACKER`: missing item input or invalid tracker selection; stop before judging.
-- `TRACKER.SHOW_FAILED`: a linked question bead could not be shown; stop before judging.
+- `TRACKER.SHOW_FAILED`: a linked question bead could not be shown in 3 attempts; stop before judging.
 - Script exit 2 because an anchor got no answer from Jev (the script already retried; `JEV.RATE_LIMITED`, `JEV.CONTEXT_EXCEEDED`, `JEV.RESPONSE_INVALID`, `JEV.UNREACHABLE` and the like, or `FIXTURE.MISSING`): return the error object with its `data.run_path` and `data.failures`; do not re-run.
 - `anchor_tracker.py resolve` errors (`TRACKER.MISMATCH`, `TRACKER.DOLT_REQUIRED`, `TRACKER.CLI_MISSING`, `SETTINGS.*`, `BEADS.METADATA_INVALID`, `BEADS.NOT_DIRECTORY`, `DEPENDENCY.PYYAML`, `REPO.NOT_FOUND`): return its error object unchanged; never switch trackers.
 - Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or remote-judge errors, and never split, trim or re-cap a bead to pass `PLAN.TOO_LARGE` (size is a symptom; the skill triages it).
