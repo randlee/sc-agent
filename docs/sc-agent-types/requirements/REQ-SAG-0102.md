@@ -1,4 +1,4 @@
-# Requirement: User-editable model catalog
+# Requirement: Model catalog: built-in models plus global configuration
 
 **Status:** Draft  
 **Version:** 0.1.0  
@@ -8,18 +8,19 @@
 
 ---
 
-## REQ-SAG-0102: User-editable model catalog
+## REQ-SAG-0102: Model catalog: built-in models plus global configuration
 
 **Status:** Draft  
 
 ### Requirement Statement
 
-Definitions: The model catalog is the list of known models, each with its line and release date.
+Definitions: The model catalog is the union of the models built into sc-agent and the models read from the global configuration, each with its line and release date.
 
 **MUST statements:**
 
-- A user MUST be able to add a model to the catalog without upgrading any crate.
-- A short name MUST resolve to the catalog model of its line with the latest release date, including models the user added.
+- sc-agent MUST read additional models from the global configuration.
+- A user MUST be able to add a model to the global configuration without upgrading any crate.
+- A short name MUST resolve to the model of its line with the latest release date across the union of built-in and global-configuration models.
 
 ### Rationale
 
@@ -29,7 +30,7 @@ When a new model is released, short names such as `haiku`, `luna`, `opus` and `s
 
 **Acceptance Criteria:**
 
-- [ ] After a user adds a `haiku` model with a release date later than every built-in `haiku` model, `haiku` resolves to it with no rebuild.
+- [ ] After a user adds to the global configuration a `haiku` model with a release date later than every built-in `haiku` model, `haiku` resolves to it with no rebuild.
 - [ ] A user-added model with an earlier release date does not change what its short name resolves to.
 
 ### Dependencies

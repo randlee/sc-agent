@@ -26,11 +26,11 @@
 
 ### Context
 
-The owner builds tools that read session logs to tune consumer code, analysing 10,000 to 20,000 or more decisions at a time. One task produced 40,000 sessions, each a single Jev query with its own ULID and `request_sha256`.
+The owner builds tools that read session logs to tune consumer code, analysing 10,000 to 20,000 or more decisions at a time. One task produced 40,000 sessions, each a single Jev query with its own ULID and question digest.
 
 **Problem Statement:**
 
-Session logs must be separable by repository, type of work and project, kept indefinitely, usable for cached-response lookup, and storable long term on a server.
+Session logs must be separable by repository, type of work and project, kept indefinitely, and storable long term on a server.
 
 ### Decision
 
@@ -43,7 +43,7 @@ For the MVP, session logs are JSONL under `<log_root>/<repo>/<agent_role>/<proje
 
 ### Rationale
 
-JSONL is simple to write and to read with the owner's tools now. Self-describing rows load into SQLite without parsing paths, and SQLite gives indexed lookup by `request_sha256`.
+JSONL is simple to write and to read with the owner's tools now. Self-describing rows load into SQLite without parsing paths, and SQLite gives indexed retrieval of a response by its question digest.
 
 ### Consequences
 
@@ -53,7 +53,7 @@ JSONL is simple to write and to read with the owner's tools now. Self-describing
 
 **Negative:**
 
-- Until the SQLite stage, cached-response lookup needs a load of the JSONL rows.
+- Until the SQLite stage, retrieving a response by digest needs a load of the JSONL rows.
 
 ### Alternatives Considered
 

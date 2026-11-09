@@ -31,7 +31,7 @@ sc-agent launches any model, not only decision models, and callers select models
 
 **Acceptance Criteria:**
 
-- [ ] Each of the nine short names parses and resolves to the newest catalog entry of its line.
+- [ ] Each of the nine short names parses and resolves to the newest model of its line across built-in and global-configuration models.
 - [ ] A specific version id from the catalog parses and resolves to itself.
 
 ### Dependencies

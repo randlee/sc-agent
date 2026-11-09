@@ -1,4 +1,4 @@
-# Requirement: Request digest for cache lookup
+# Requirement: Question digest computed by sc-sha
 
 **Status:** Draft  
 **Version:** 0.1.0  
@@ -8,30 +8,38 @@
 
 ---
 
-## REQ-SAG-0202: Request digest for cache lookup
+## REQ-SAG-0202: Question digest computed by sc-sha
 
 **Status:** Draft  
 
 ### Requirement Statement
 
-Definitions: `request_sha256` is the SHA-256 digest of the complete request body sent to the decision API.
+Definitions: The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question. sc-sha is the SHA-256 library sc-agent uses.
+
+Decision-model caching is out of scope of this requirement and will be specified separately.
 
 **MUST statements:**
 
-- Every decision send MUST record `request_sha256` computed over 100% of the request body sent.
-- `request_sha256` MUST be the key for cached-response lookup.
+- For every question sent to a decision model, sc-agent MUST compute a question digest over 100% of the information sent plus that single question.
+- The question digest MUST be computed by sc-sha.
+- The question digest MUST be recorded with that question's response, so the response can be retrieved by its digest.
+
+**MUST NOT statements:**
+
+- sc-agent MUST NOT compute the question digest with any SHA-256 implementation other than sc-sha.
 
 ### Rationale
 
-Two sends with the same digest sent identical requests, so a stored answer can stand in for a repeat. The digest is a decision-model concern, so it belongs in `sc-decision-schema`, not `sc-agent-types`.
+A response must be retrievable from the exact information and question that produced it. Computing every digest with one library keeps digests from different crates and tools equal.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] Two sends of byte-identical request bodies record the same `request_sha256`.
-- [ ] Changing any byte of a request body changes its `request_sha256`.
-- [ ] A lookup by `request_sha256` returns the stored answer of a previous successful send with that digest.
+- [ ] Two sends of the same information and the same single question record the same question digest.
+- [ ] Changing any part of the information, or the question, changes the question digest.
+- [ ] A request with three questions records three question digests, one per question.
+- [ ] A workspace search finds SHA-256 computed only through sc-sha.
 
 ### Dependencies
 

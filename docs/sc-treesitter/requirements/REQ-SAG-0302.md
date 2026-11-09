@@ -17,7 +17,7 @@
 **MUST statements:**
 
 - `sc-treesitter` MUST load tree-sitter grammars and run queries against any loaded grammar.
-- The C# (.NET) and Go grammars MUST be supported early.
+- The dotnet and Go grammars MUST be supported early.
 
 **MUST NOT statements:**
 
@@ -31,5 +31,5 @@ The design must support any language; .NET and Go are the first needed.
 
 **Acceptance Criteria:**
 
-- [ ] A query runs against C# source and against Go source through the same API call.
+- [ ] A query runs against dotnet source and against Go source through the same API call.
 - [ ] A grammar added after release is queried through the existing API with no API change.

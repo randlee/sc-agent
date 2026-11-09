@@ -22,7 +22,7 @@
 
 ### Context
 
-sc-agent sends decisions to Jev and to LLM backends such as Haiku and Luna. The earlier implementation built two forms of the same request, a Jev request and a canonical payload, and spread mock knowledge into shared types.
+sc-agent sends decisions to Jev and to LLM backends such as Haiku and Luna.
 
 **Problem Statement:**
 

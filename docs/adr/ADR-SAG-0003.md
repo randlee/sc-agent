@@ -29,13 +29,13 @@ Every REQ, NFR and ADR is one Markdown file written from the Raptor authoring te
 
 ### Rationale
 
-Records that import into Raptor with no diagnostics can be queried and judged by tools, and owner approval in plan review stops requirements drifting to match code.
+Records that import into Raptor with no diagnostics can be queried and judged by tools, and owner approval in plan review keeps every change deliberate.
 
 ### Consequences
 
 **Positive:**
 
-- Every record imports into Raptor and can be judged by judge-jev.
+- Every record imports into Raptor and can be queried.
 
 **Negative:**
 
@@ -56,7 +56,6 @@ Keep requirements as table rows in one Markdown file.
 **Cons:**
 
 - Not parseable by Raptor.
-- Rows were rewritten to match code without owner approval.
 
 **Why Rejected:**
 
