@@ -1,0 +1,652 @@
+{
+  "schema": "plan-anchoring/anchors/1",
+  "plan": "phase-a",
+  "intent_ref": "docs/plans/phase-a/intent.md",
+  "anchors": [
+    {
+      "id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "crates/sc-decision-schema must contain only the code necessary to send and receive 100% of the decision API, with nothing beyond that minimum.",
+      "quote": "Has the absolute minimum code that is necessary to send/receive 100% of the decision api",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T07:40:40Z",
+      "context": "planning session",
+      "summary": "sc-decision-schema holds only minimum decision-API code",
+      "scope": "adds or changes code in crates/sc-decision-schema",
+      "deterministic_check": "every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-e49",
+        "plan_questions": "agt-e49.1",
+        "dev_questions": "agt-e49.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T21:30:52+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T22:43:22+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-e49",
+            "plan_questions": "agt-e49.1",
+            "dev_questions": "agt-e49.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every operation available in the sc-ai CLI must also be available in the sc-agent Python API.",
+      "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-08T21:07:35Z",
+      "context": "planning session",
+      "summary": "Python API offers every sc-ai CLI operation",
+      "scope": "adds or changes an sc-ai command or the sc-agent Python API",
+      "deterministic_check": "each sc-ai subcommand has a matching Python API function, checked by a test that lists both",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-ug0",
+        "plan_questions": "agt-ug0.1",
+        "dev_questions": "agt-ug0.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T21:30:52+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T22:43:24+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ug0",
+            "plan_questions": "agt-ug0.1",
+            "dev_questions": "agt-ug0.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No sc-agent REQ, NFR, ADR or bead must cite plan-anchor or judge-jev as the source of a requirement.",
+      "quote": "I didn't give you plan-anchor or judge-jev requirements.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T07:24:54Z",
+      "context": "planning session",
+      "summary": "No requirements sourced from plan-anchor or judge-jev",
+      "scope": "adds or changes a requirement, type or feature in sc-agent",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-09T21:31:01+00:00",
+          "event": "created",
+          "status": "proposed"
+        }
+      ]
+    },
+    {
+      "id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent library code must log through an injected sc-observability logger.",
+      "quote": "You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T00:26:57Z",
+      "context": "planning session",
+      "summary": "Library code logs through injected sc-observability logger",
+      "scope": "adds or changes code in an sc-agent library crate",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-09T21:31:01+00:00",
+          "event": "created",
+          "status": "proposed"
+        }
+      ]
+    },
+    {
+      "id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must run the Jev requests of one JSONL file, stdio stream or Python call in parallel.",
+      "quote": "if I send 1000 jev requests in a single jsonl file/stdio/python call that the calls will be run in parallel w/ a degree of parallelism which has been shown to work.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-08T21:07:35Z",
+      "context": "planning session",
+      "summary": "One batch of Jev requests runs in parallel",
+      "scope": "adds or changes handling of batches of decision requests",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "retired",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-09T21:31:01+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-09T23:00:29+00:00",
+          "event": "retired",
+          "replaced_by": "REQ-SAG-0701",
+          "reason": "duplicate of REQ-SAG-0701, which now carries the parallel-batch requirement"
+        }
+      ]
+    },
+    {
+      "id": "ADR-SAG-0001",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0001",
+      "statement": "Every sc-agent decision backend must implement the Backend trait defined in the sc-decision-schema crate.",
+      "quote": "Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) must implement the sans-IO Backend trait in sc-decision-schema, and callers must reach backends only through the Decision trait.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Every decision backend implements Backend; callers use Decision",
+      "scope": "adds or changes a decision backend, the Backend or Decision trait, or sc-decision-runner",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-7mi",
+        "plan_questions": "agt-7mi.1",
+        "dev_questions": "agt-7mi.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:16+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:30+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-7mi",
+            "plan_questions": "agt-7mi.1",
+            "dev_questions": "agt-7mi.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:46+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) must implement the sans-IO Backend trait in sc-decision-schema, and callers must reach backends only through the Decision trait."
+        }
+      ]
+    },
+    {
+      "id": "ADR-SAG-0004",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0004",
+      "statement": "No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.",
+      "quote": "No sc-agent crate must depend on a crate above it in the ADR-SAG-0004 layering, and sc-treesitter must depend on no sc-agent crate.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "No crate depends on a crate above it in the layering",
+      "scope": "adds or changes a crate dependency in a Cargo.toml",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-mud",
+        "plan_questions": "agt-mud.1",
+        "dev_questions": "agt-mud.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:16+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:32+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-mud",
+            "plan_questions": "agt-mud.1",
+            "dev_questions": "agt-mud.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:46+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No sc-agent crate must depend on a crate above it in the ADR-SAG-0004 layering, and sc-treesitter must depend on no sc-agent crate."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0002",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0002",
+      "statement": "Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.",
+      "quote": "Every public sc-agent function must return Result with its crate's error enum, and that error must carry the id and message of every lower-layer error that caused it.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Each crate returns its own error union carrying lower errors",
+      "scope": "adds or changes an error type or a public function's return type",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-t70",
+        "plan_questions": "agt-t70.1",
+        "dev_questions": "agt-t70.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:16+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:34+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-t70",
+            "plan_questions": "agt-t70.1",
+            "dev_questions": "agt-t70.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:46+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Every public sc-agent function must return Result with its crate's error enum, and that error must carry the id and message of every lower-layer error that caused it."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0006",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0006",
+      "statement": "No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.",
+      "quote": "sc-agent-types and sc-decision-schema must not contain types specific to plan-anchor, judge-jev, another consumer application, or a model acting as a Jev mock.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "No consumer-app or Jev-mock types in shared crates",
+      "scope": "adds or changes a type in sc-agent-types or sc-decision-schema",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-qyd",
+        "plan_questions": "agt-qyd.1",
+        "dev_questions": "agt-qyd.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:35+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-qyd",
+            "plan_questions": "agt-qyd.1",
+            "dev_questions": "agt-qyd.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:46+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-agent-types and sc-decision-schema must not contain types specific to plan-anchor, judge-jev, another consumer application, or a model acting as a Jev mock."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0009",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0009",
+      "statement": "No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.",
+      "quote": "No low-level sc-agent crate must require tokio with its default features.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Low-level crates build and run without tokio",
+      "scope": "adds or changes dependencies of a low-level sc-agent crate",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-wth",
+        "plan_questions": "agt-wth.1",
+        "dev_questions": "agt-wth.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:37+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-wth",
+            "plan_questions": "agt-wth.1",
+            "dev_questions": "agt-wth.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:47+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No low-level sc-agent crate must require tokio with its default features."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0010",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0010",
+      "statement": "sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.",
+      "quote": "sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "No sleep calls in sc-agent source",
+      "scope": "adds or changes Rust source in an sc-agent crate",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-6dm",
+        "plan_questions": "agt-6dm.1",
+        "dev_questions": "agt-6dm.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:38+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-6dm",
+            "plan_questions": "agt-6dm.1",
+            "dev_questions": "agt-6dm.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0201",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0201",
+      "statement": "Every Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models) must be defined in the sc-decision-schema crate.",
+      "quote": "Every type that maps to a TypeSafe API request or response field must be defined in sc-decision-schema and match the TypeSafe OpenAPI 0.2.0 spec.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Jev API types defined only in sc-decision-schema, built from the spec",
+      "scope": "adds or changes a type that maps to a TypeSafe API field",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-gc6",
+        "plan_questions": "agt-gc6.1",
+        "dev_questions": "agt-gc6.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:40+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-gc6",
+            "plan_questions": "agt-gc6.1",
+            "dev_questions": "agt-gc6.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:47+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Every type that maps to a TypeSafe API request or response field must be defined in sc-decision-schema and match the TypeSafe OpenAPI 0.2.0 spec."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0601",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0601",
+      "statement": "A request that receives an HTTP 429, 502 or 529 response must be resent until a configurable maximum number of sends, 5 by default, is reached.",
+      "quote": "A busy response must be resent up to a configurable maximum of sends (default 5), with the holdoff waited in the runner's queue and ended at once by cancellation.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Busy resend: configurable sends, holdoff in the queue",
+      "scope": "adds or changes busy-response handling, resend, holdoff or the runner queue",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-ebd",
+        "plan_questions": "agt-ebd.1",
+        "dev_questions": "agt-ebd.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:41+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ebd",
+            "plan_questions": "agt-ebd.1",
+            "dev_questions": "agt-ebd.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:47+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "A busy response must be resent up to a configurable maximum of sends (default 5), with the holdoff waited in the runner's queue and ended at once by cancellation."
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0701",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0701",
+      "statement": "sc-decision-runner must send the requests of one batch in parallel across a configurable number of worker threads, 8 by default.",
+      "quote": "sc-decision-runner must run one batch's requests across a configurable number of workers (default 8) and return each result as it finishes, tagged with its session ULID.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "phase-a records",
+      "summary": "Batches run in parallel, fastest first, failures returned",
+      "scope": "adds or changes batch handling in sc-decision-runner or decide",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-ocy",
+        "plan_questions": "agt-ocy.1",
+        "dev_questions": "agt-ocy.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-09T23:00:17+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-09T23:00:43+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ocy",
+            "plan_questions": "agt-ocy.1",
+            "dev_questions": "agt-ocy.2"
+          }
+        },
+        {
+          "at": "2026-11-09T23:01:47+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-decision-runner must run one batch's requests across a configurable number of workers (default 8) and return each result as it finishes, tagged with its session ULID."
+        }
+      ]
+    }
+  ]
+}
