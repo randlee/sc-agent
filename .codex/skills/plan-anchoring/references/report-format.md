@@ -1,6 +1,6 @@
 ---
 name: report-format
-version: 0.8.5
+version: 0.10.1
 description: The provenance-quoting report format for gate results, what the planning agent or quality manager should do with each verdict, and where reports are posted.
 ---
 
@@ -47,10 +47,10 @@ Before acting on a failing verdict, re-read the sent text (the composed item fil
   python3 "$S" report --run <run.json> --format md > "$W/report.md" && bd comment <bead> --file "$W/report.md"
   ```
 - Development gate: comment on the sprint bead and, when there is a PR, on the PR, with the deterministic check outcomes beneath.
-- Both: the run JSON stays in `doc/plan/phase-current/anchor-runs/` and is committed with the plan.
+- Both: the run JSON stays in `docs/plans/phase-<current>/anchor-runs/` (`$P/anchor-runs/`) and is committed with the plan.
 
-The skill posts in the main session; agents return JSON and never write to beads or PRs.
+The skill posts in the main session; the gate agents return JSON and never write to beads or PRs.
 
 ## Coverage report
 
-`coverage --format md` renders the anchor x item matrix with a Covered column and a list of uncovered anchors. Include it at the end of a planning-gate pass so the user sees the whole plan's state.
+`coverage --format md` renders the anchor x item matrix with a Covered column and a list of uncovered anchors. Include it at the end of a planning-gate pass so the user sees the whole plan's state. Each cell is the latest result for that anchor and item, so re-running some anchors keeps the others; a cell taken from an earlier run than the item's latest is listed under `carried_from_earlier_run`. With `--anchors`, the record's current exclusions apply: an exclusion recorded after a run shows as `excluded`, and one removed since is listed to re-judge and does not count.

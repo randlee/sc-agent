@@ -1,6 +1,6 @@
 ---
 name: verdict-gating
-version: 0.8.5
+version: 0.10.1
 description: How jev_judge.py turns independent Jev answers into one verdict per anchor and item, the role contract, thresholds, severity order, pass criteria and exit codes, coverage, run diffs, and offline fixtures.
 ---
 
@@ -61,7 +61,7 @@ Contradiction outranks underspecification: a confident conflict is actionable ev
 ## Coverage, in code
 
 ```bash
-python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --format md
+python3 "$S" coverage --runs "$P/anchor-runs" --gate plan --format md
 ```
 
 Takes the latest non-dry run per (gate, item), builds the anchor x item matrix, and lists anchors with no `satisfied` cell. Without `--gate`, columns are labelled `gate:item` so plan and dev verdicts are not merged. "Is ANC-012 satisfied anywhere?" is answered here, never by Jev. An anchor `not_applicable` to every bead is reported as uncovered on purpose: its scope is wrong or the plan lacks the bead that should carry it. Excluded cells show as `excluded` and are listed with their reasons (`data.excluded`); they never count as covering.

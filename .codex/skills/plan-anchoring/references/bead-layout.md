@@ -1,6 +1,6 @@
 ---
 name: bead-layout
-version: 0.8.5
+version: 0.10.1
 description: The anchor bead tree in beads (bd), the commands to create it, labels, how question overrides live in the child beads, how agents read beads, and how reports are posted back.
 ---
 
@@ -66,14 +66,15 @@ Edit with `bd update <question bead> --body-file <file>`. Overrides may also liv
 - Question beads resolve from `anchors.json` (`beads.plan_questions` / `beads.dev_questions`) first, then `bd children <anchor bead> --json` filtered on the `gate:plan` or `gate:dev` label.
 - The fenced JSON from the question bead's `description` goes into an overrides file keyed by anchor ID, passed as `--overrides-file`; the script merges.
 
-All read-only. Agents never create, update, close or comment on beads.
+All read-only for these gate agents: they never create, update, close or comment on beads.
+The planner in the main session writes beads as planning happens.
 
 ## Posting results back
 
 The planning gate posts its report on the judged planning bead; the development gate on the sprint bead or the PR. Done in the main session after the agent returns:
 
 ```bash
-python3 "$S" report --run doc/plan/phase-current/anchor-runs/<run>.json --format md > "$W/report.md"
+python3 "$S" report --run "$P/anchor-runs/<run>.json" --format md > "$W/report.md"
 bd comment <bead> --file "$W/report.md"          # or: bd comment <bead> "$(cat "$W/report.md")"
 ```
 
