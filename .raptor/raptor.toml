@@ -1,0 +1,7 @@
+schema_version = "1.0.0"
+repository_id = "urn:raptor:repo:sc-agent"
+
+[files]
+scan = "sources.toml"
+routing = "routing.toml"
+identity = "identity.json"

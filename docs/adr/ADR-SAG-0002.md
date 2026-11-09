@@ -1,0 +1,94 @@
+# Decision: Session logs are JSONL first, then SQLite with server sync
+
+**Status:** Draft  
+**Version:** 0.1.0  
+**Created:** 2026-11-09  
+**Last Updated:** 2026-11-09  
+**Owner:** Rand Lee  
+**Decision Date:** 2026-11-09  
+
+---
+
+## ADR-SAG-0002: Session logs are JSONL first, then SQLite with server sync
+
+**Status:** Draft  
+
+### Related Documents
+
+**Requirements:**
+
+- REQ-SAG-0001
+- REQ-SAG-0003
+- REQ-SAG-0004
+- REQ-SAG-0005
+- REQ-SAG-0202
+- NFR-SAG-0001
+
+### Context
+
+The owner builds tools that read session logs to tune consumer code, analysing 10,000 to 20,000 or more decisions at a time. One task produced 40,000 sessions, each a single Jev query with its own ULID and `request_sha256`.
+
+**Problem Statement:**
+
+Session logs must be separable by repository, type of work and project, kept indefinitely, usable for cached-response lookup, and storable long term on a server.
+
+### Decision
+
+For the MVP, session logs are JSONL under `<log_root>/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project`, `agent_role` and `agent_name`.
+
+**Key Principles:**
+
+- Every row describes itself, so it stays meaningful when moved or loaded.
+- Session logs are never rotated or deleted.
+
+### Rationale
+
+JSONL is simple to write and to read with the owner's tools now. Self-describing rows load into SQLite without parsing paths, and SQLite gives indexed lookup by `request_sha256`.
+
+### Consequences
+
+**Positive:**
+
+- Path globs select a repository, role or project without opening files.
+
+**Negative:**
+
+- Until the SQLite stage, cached-response lookup needs a load of the JSONL rows.
+
+### Alternatives Considered
+
+#### Alternative 1: One JSONL file per session
+
+**Description:**
+
+Write each session to its own file named by its ULID.
+
+**Pros:**
+
+- One writer per file.
+
+**Cons:**
+
+- A task of 40,000 sessions creates 40,000 files.
+
+**Why Rejected:**
+
+Tasks create tens of thousands of single-query sessions.
+
+#### Alternative 2: Encode repo, project and role in one hyphenated name
+
+**Description:**
+
+Name logs `<repo>-<project>-<agent-name>`.
+
+**Pros:**
+
+- Short names.
+
+**Cons:**
+
+- Repository names contain hyphens, so the parts cannot be recovered from the name.
+
+**Why Rejected:**
+
+Tools must separate by each part.
