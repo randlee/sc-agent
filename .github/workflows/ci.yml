@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+    # `branches` filters on the PR *base*. Any branch a stacked layer can sit
+    # on must be listed, or that layer's PR gets no CI at all. `*` does not
+    # match `/`, which the lower-case naming rule already forbids in slugs.
+    branches:
+      - develop
+      - main
+      - "integrate/*"
+      - "integration/*"
+      - "sprint/*"
+      - "fix/*"
+      - "hotfix/*"
+      - "feature/*"
+      - "plan/*"
+      - "docs/*"
+      - "chore/*"
+      - "ci/*"
+      - "release/*"
+      - "merge/*"
+      - "evidence/*"
+      - "triage/*"
+  push:
+    branches: [develop, main]
+
+# One live run per ref: a new push to a PR branch cancels the queued/running
+# run for the superseded commit instead of stacking a full matrix behind it.
+# Pushes to develop/main are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  RUST_TOOLCHAIN: "1.99.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The Rust jobs run once the workspace exists (sprint a-1 adds the root
+  # Cargo.toml). Until then they are skipped, which GitHub counts as passing
+  # for required status checks.
+  detect:
+    name: Detect workspace
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.detect.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        name: Look for the Cargo workspace
+        run: |
+          if [ -f Cargo.toml ]; then echo "rust=true" >> "$GITHUB_OUTPUT"; else echo "rust=false" >> "$GITHUB_OUTPUT"; echo "No Cargo.toml yet: Rust jobs are skipped."; fi
+
+  fmt:
+    name: Format check
+    needs: [detect]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check --all
+
+  clippy:
+    name: Clippy
+    needs: [detect, fmt]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test (${{ matrix.os }})
+    needs: [detect, fmt]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.os }}-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run workspace tests
+        run: cargo test --workspace --all-features
+
+  # The one required status check: it always reports, passes when every job
+  # above succeeded or was skipped, and fails if any failed or was cancelled.
+  ci-result:
+    name: CI result
+    if: ${{ always() }}
+    needs: [detect, fmt, clippy, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a CI job ended $r"; exit 1;; esac
+          done
