@@ -10,41 +10,60 @@ mod cli;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Instant;
 
 use sc_observability::v2::{Logger, LoggerConfig};
 use sc_observability::{
     ActionName, Level, LogEvent, OBSERVATION_ENVELOPE_VERSION, OutcomeLabel, ProcessIdentity,
     SchemaVersion, ServiceName, TargetCategory, Timestamp,
 };
-use sc_treesitter::{Error, queries, query_source, read_source, run_query, to_json_bytes};
+use sc_treesitter::{
+    Error, LanguageId, queries, query_source, read_source, run_query, to_json_bytes,
+};
 
 use crate::cli::{Command, Parsed};
 
 /// Service name, and so the log file name `tsq.log.jsonl`.
 const SERVICE: &str = "tsq";
 
+/// What the `tsq.command` event records about one run.
+#[derive(Debug, Default)]
+struct CommandFields {
+    subcommand: &'static str,
+    language: Option<String>,
+    query: Option<String>,
+    file: Option<PathBuf>,
+    bytes: Option<usize>,
+}
+
 fn main() -> ExitCode {
+    let started = Instant::now();
     let logger = match general_log() {
         Ok(logger) => logger,
         Err(error) => return emit(&error),
     };
     let parsed = cli::parse(std::env::args_os());
-    let subcommand = match &parsed {
-        Ok(Parsed::Run(cli)) => cli.command.name(),
-        Ok(Parsed::Print(_)) => "help",
-        Err(_) => "usage",
+    let mut fields = CommandFields {
+        subcommand: match &parsed {
+            Ok(Parsed::Run(cli)) => cli.command.name(),
+            Ok(Parsed::Print(_)) => "help",
+            Err(_) => "usage",
+        },
+        ..CommandFields::default()
     };
-    let result = parsed.and_then(run).and_then(|bytes| {
-        io::stdout()
-            .lock()
-            .write_all(&bytes)
-            .and_then(|()| io::stdout().lock().flush())
-            .map_err(|error| Error::Write {
-                kind: format!("{:?}", error.kind()),
-                detail: error.to_string(),
-            })
-    });
-    record(&logger, subcommand, result.as_ref().err());
+    let result = parsed
+        .and_then(|parsed| run(parsed, &mut fields))
+        .and_then(|bytes| {
+            let mut stdout = io::stdout().lock();
+            stdout
+                .write_all(&bytes)
+                .and_then(|()| stdout.flush())
+                .map_err(|error| Error::Write {
+                    kind: error.kind(),
+                    detail: error.to_string(),
+                })
+        });
+    record(&logger, &fields, started, result.as_ref().err());
     // A log failure never changes the result.
     let _shutdown = logger.shutdown();
     match result {
@@ -53,26 +72,35 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(parsed: Parsed) -> Result<Vec<u8>, Error> {
+fn run(parsed: Parsed, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
     let cli = match parsed {
         Parsed::Print(text) => return Ok(text.into_bytes()),
         Parsed::Run(cli) => cli,
     };
     match cli.command {
         Command::Languages => {
-            let ids: Vec<&str> = sc_treesitter::languages().collect();
+            let ids: Vec<LanguageId> = sc_treesitter::languages().collect();
             json_line(&ids)
         }
-        Command::Queries(args) => json_line(&queries(args.language.as_deref())?),
+        Command::Queries(args) => {
+            fields.language.clone_from(&args.language);
+            let language = args.language.as_deref().map(LanguageId::new).transpose()?;
+            json_line(&queries(language))
+        }
         Command::Query(args) => {
+            fields.language = Some(args.language.clone());
+            fields.query = Some(args.query.clone());
+            fields.file = Some(args.file.clone());
             let capture_refs: Option<Vec<&str>> = args
                 .captures
                 .as_ref()
                 .map(|captures| captures.names().collect());
-            let text = query_source(&args.language, &args.query)?;
+            let language = LanguageId::new(&args.language)?;
+            let text = query_source(language, &args.query)?;
             let bytes = read_source(&args.file)?;
+            fields.bytes = Some(bytes.len());
             let captures = run_query(
-                &args.language,
+                language,
                 text,
                 &bytes,
                 Some(&args.file),
@@ -92,9 +120,10 @@ fn json_line<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> 
     Ok(bytes)
 }
 
-/// One stderr line: the serialized Error `{"id": ..., "message": ...}`; exit 1.
+/// One stderr line: the serialized Error `{"id", "message", "recovery"?}`; exit 1.
 ///
-/// Nothing is left to report to if stderr itself cannot be written.
+/// A failed stderr write is dropped on purpose: stderr is the last channel, so there is
+/// nowhere to report it, and exit code 1 is the only signal left.
 fn emit(error: &Error) -> ExitCode {
     let line = json_line(error).unwrap_or_else(|_| {
         // Serializing two strings cannot fail; keep a well-formed line regardless.
@@ -130,15 +159,41 @@ fn log_root(home: PathBuf) -> PathBuf {
 }
 
 /// Records the one `tsq.command` event; a failure here is dropped (it never changes the result).
-fn record(logger: &Logger, subcommand: &str, error: Option<&Error>) {
-    if let Some(event) = command_event(logger, subcommand, error) {
+fn record(logger: &Logger, command: &CommandFields, started: Instant, error: Option<&Error>) {
+    if let Some(event) = command_event(logger, command, started, error) {
         let _logged = logger.log(event);
     }
 }
 
-fn command_event(logger: &Logger, subcommand: &str, error: Option<&Error>) -> Option<LogEvent> {
+fn command_event(
+    logger: &Logger,
+    command: &CommandFields,
+    started: Instant,
+    error: Option<&Error>,
+) -> Option<LogEvent> {
+    let optional = |value: Option<serde_json::Value>| value.unwrap_or(serde_json::Value::Null);
+    let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     let mut fields = serde_json::Map::new();
-    fields.insert("subcommand".to_owned(), subcommand.into());
+    fields.insert("subcommand".to_owned(), command.subcommand.into());
+    fields.insert(
+        "language".to_owned(),
+        optional(command.language.clone().map(Into::into)),
+    );
+    fields.insert(
+        "query".to_owned(),
+        optional(command.query.clone().map(Into::into)),
+    );
+    fields.insert(
+        "file".to_owned(),
+        optional(
+            command
+                .file
+                .as_ref()
+                .map(|file| file.display().to_string().into()),
+        ),
+    );
+    fields.insert("bytes".to_owned(), optional(command.bytes.map(Into::into)));
+    fields.insert("duration_ms".to_owned(), duration_ms.into());
     fields.insert(
         "error_id".to_owned(),
         error.map_or(serde_json::Value::Null, |error| error.id().into()),

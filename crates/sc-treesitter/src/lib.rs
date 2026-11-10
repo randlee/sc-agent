@@ -1,7 +1,7 @@
 //! Load tree-sitter grammars and run any query against them.
 //!
 //! [`run_query`] runs one caller-written query against one source with any loaded grammar
-//! ([`languages`]) and returns its captures sorted by (start byte, name, end byte). The crate
+//! ([`languages`], named by a checked [`LanguageId`]) and returns its captures sorted by (start byte, name, end byte). The crate
 //! also ships predefined queries ([`queries`], [`query_source`]), a size-limited file reader
 //! ([`read_source`]) and a JSON encoder ([`to_json_bytes`]).
 //!
@@ -13,8 +13,9 @@
 //!
 //! ```
 //! # #[cfg(feature = "grammar-python")] {
+//! let python = sc_treesitter::LanguageId::new("python")?;
 //! let captures = sc_treesitter::run_query(
-//!     "python",
+//!     python,
 //!     "(identifier) @name",
 //!     b"answer = 42\n",
 //!     None,
@@ -38,13 +39,13 @@ mod run;
 mod source;
 
 #[doc(inline)]
-pub use error::Error;
+pub use error::{Error, Limit};
 #[doc(inline)]
-pub use grammar::languages;
+pub use grammar::{LanguageId, languages};
 #[doc(inline)]
 pub use query::{QueryInfo, queries, query_source};
 #[doc(inline)]
-pub use run::{Capture, run_query};
+pub use run::{Capture, MATCH_LIMIT, MAX_CAPTURE_TEXT_BYTES, MAX_CAPTURES, run_query};
 #[doc(inline)]
 pub use source::{MAX_SOURCE_BYTES, read_source};
 

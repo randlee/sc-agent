@@ -7,7 +7,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyModule, PyString};
 
-use crate::{Capture, Error};
+use crate::{Capture, Error, LanguageId};
 
 pyo3::create_exception!(
     sc_treesitter,
@@ -26,7 +26,7 @@ impl From<Error> for PyErr {
 #[pyfunction]
 #[must_use]
 pub fn languages() -> Vec<&'static str> {
-    crate::languages().collect()
+    crate::languages().map(|id| id.as_str()).collect()
 }
 
 /// Returns the predefined queries as `(language, query)` pairs.
@@ -37,7 +37,8 @@ pub fn languages() -> Vec<&'static str> {
 #[pyfunction]
 #[pyo3(signature = (language = None))]
 pub fn queries(language: Option<&str>) -> PyResult<Vec<(&'static str, &'static str)>> {
-    Ok(crate::queries(language)?
+    let language = language.map(LanguageId::new).transpose()?;
+    Ok(crate::queries(language)
         .into_iter()
         .map(|info| (info.language, info.name))
         .collect())
@@ -50,7 +51,7 @@ pub fn queries(language: Option<&str>) -> PyResult<Vec<(&'static str, &'static s
 /// `TreesitterError` for an unknown language or query.
 #[pyfunction]
 pub fn query_source(language: &str, name: &str) -> PyResult<&'static str> {
-    Ok(crate::query_source(language, name)?)
+    Ok(crate::query_source(LanguageId::new(language)?, name)?)
 }
 
 /// Runs `query` against `source` (`bytes` or `str`) and returns its captures.
@@ -70,6 +71,7 @@ pub fn run_query(
     source: &Bound<'_, PyAny>,
     captures: Option<Vec<String>>,
 ) -> PyResult<Vec<Capture>> {
+    let language = LanguageId::new(language)?;
     let python_error = |error: PyErr| Error::Python {
         detail: error.to_string(),
     };

@@ -1,7 +1,6 @@
 //! Predefined query assets, one or more per grammar.
 
-use crate::Error;
-use crate::grammar;
+use crate::{Error, LanguageId};
 
 /// One predefined query.
 ///
@@ -34,18 +33,13 @@ pub(crate) const RUST: &[QueryInfo] = &[QueryInfo {
 }];
 
 /// Returns the predefined queries for `language`, or for every compiled-in language.
-///
-/// # Errors
-///
-/// [`Error::UnknownLanguage`] or [`Error::GrammarUnavailable`] when `language` is set and
-/// that grammar is not compiled into this build.
-pub fn queries(language: Option<&str>) -> Result<Vec<&'static QueryInfo>, Error> {
+#[must_use]
+pub fn queries(language: Option<LanguageId>) -> Vec<&'static QueryInfo> {
     match language {
-        Some(id) => Ok(grammar::lookup(id)?.queries.iter().collect()),
-        None => Ok(grammar::all()
-            .iter()
-            .flat_map(|grammar| grammar.queries)
-            .collect()),
+        Some(id) => id.grammar().queries.iter().collect(),
+        None => crate::languages()
+            .flat_map(|id| id.grammar().queries)
+            .collect(),
     }
 }
 
@@ -55,21 +49,21 @@ pub fn queries(language: Option<&str>) -> Result<Vec<&'static QueryInfo>, Error>
 ///
 /// # Errors
 ///
-/// [`Error::UnknownLanguage`] or [`Error::GrammarUnavailable`] when the grammar is not
-/// compiled in, and [`Error::UnknownQuery`] when the language has no query by that name.
-pub fn query_source(language: &str, name: &str) -> Result<&'static str, Error> {
-    grammar::lookup(language)?
+/// [`Error::UnknownQuery`] when the language has no query by that name.
+pub fn query_source(language: LanguageId, name: &str) -> Result<&'static str, Error> {
+    language
+        .grammar()
         .queries
         .iter()
         .find(|asset| asset.name == name)
         .map(|asset| asset.source)
         .ok_or_else(|| Error::UnknownQuery {
-            language: language.to_owned(),
+            language,
             name: name.to_owned(),
         })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "grammar-python"))]
 mod tests {
     use super::*;
 
@@ -78,13 +72,14 @@ mod tests {
     #[test]
     fn listings_name_every_predefined_query() {
         let all: Vec<(&str, &str)> = queries(None)
-            .expect("all")
             .iter()
             .map(|info| (info.language, info.name))
             .collect();
         assert_eq!(all, [("python", "branches"), ("rust", "match-arms")]);
-        assert_eq!(crate::languages().collect::<Vec<_>>(), ["python", "rust"]);
-        let json = serde_json::to_value(queries(Some("rust")).expect("rust")).expect("json");
+        let ids: Vec<&str> = crate::languages().map(|id| id.as_str()).collect();
+        assert_eq!(ids, ["python", "rust"]);
+        let rust = LanguageId::new("rust").expect("rust");
+        let json = serde_json::to_value(queries(Some(rust))).expect("json");
         assert_eq!(
             json,
             serde_json::json!([{"language": "rust", "query": "match-arms"}])
@@ -93,20 +88,15 @@ mod tests {
 
     /// AC: REQ-SAG-0303 listings.
     #[test]
-    fn unknown_language_and_query_are_typed() {
+    fn unknown_query_is_typed() {
+        let python = LanguageId::new("python").expect("python");
         assert_eq!(
-            queries(Some("cobol")),
-            Err(Error::UnknownLanguage {
-                language: "cobol".to_owned()
-            })
-        );
-        #[cfg(feature = "grammar-python")]
-        assert_eq!(
-            query_source("python", "nope"),
+            query_source(python, "nope"),
             Err(Error::UnknownQuery {
-                language: "python".to_owned(),
+                language: python,
                 name: "nope".to_owned()
             })
         );
+        assert!(query_source(python, "branches").is_ok());
     }
 }

@@ -42,25 +42,108 @@ static GRAMMARS: &[Grammar] = &[
     },
 ];
 
-/// Returns the ids of the grammars compiled into this build, in listing order.
+/// A language id checked once against the grammars compiled into this build.
+///
+/// The only way to get one is [`LanguageId::new`] (or [`languages`]), so every function that
+/// takes a `LanguageId` knows its grammar is loaded. It serializes and displays as the id.
 ///
 /// # Examples
 ///
 /// ```
-/// let ids: Vec<&str> = sc_treesitter::languages().collect();
-/// for id in &ids {
-///     assert!(sc_treesitter::queries(Some(id)).is_ok());
-/// }
+/// # #[cfg(feature = "grammar-python")] {
+/// let python = sc_treesitter::LanguageId::new("python")?;
+/// assert_eq!(python.as_str(), "python");
+/// # }
+/// assert!(sc_treesitter::LanguageId::new("cobol").is_err());
+/// # Ok::<(), sc_treesitter::Error>(())
 /// ```
-pub fn languages() -> impl ExactSizeIterator<Item = &'static str> {
-    GRAMMARS.iter().map(|grammar| grammar.id)
+#[derive(Clone, Copy)]
+pub struct LanguageId {
+    grammar: &'static Grammar,
+}
+
+impl LanguageId {
+    /// Checks `id` against the compiled-in grammars.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::GrammarUnavailable`] for a known id whose grammar feature is off, otherwise
+    /// [`Error::UnknownLanguage`].
+    pub fn new(id: &str) -> Result<Self, Error> {
+        lookup(id).map(|grammar| Self { grammar })
+    }
+
+    /// The id, for example `"python"`.
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        self.grammar.id
+    }
+
+    /// The grammar this id names.
+    pub(crate) fn grammar(&self) -> &'static Grammar {
+        self.grammar
+    }
+}
+
+impl PartialEq for LanguageId {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for LanguageId {}
+
+impl std::hash::Hash for LanguageId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
+
+impl std::fmt::Debug for LanguageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("LanguageId").field(&self.as_str()).finish()
+    }
+}
+
+impl std::fmt::Display for LanguageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for LanguageId {
+    type Err = Error;
+
+    fn from_str(id: &str) -> Result<Self, Error> {
+        Self::new(id)
+    }
+}
+
+impl serde::Serialize for LanguageId {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// Returns the grammars compiled into this build, in listing order.
+///
+/// # Examples
+///
+/// ```
+/// for language in sc_treesitter::languages() {
+///     assert_eq!(sc_treesitter::LanguageId::new(language.as_str())?, language);
+/// }
+/// # Ok::<(), sc_treesitter::Error>(())
+/// ```
+pub fn languages() -> impl ExactSizeIterator<Item = LanguageId> {
+    GRAMMARS.iter().map(|grammar| LanguageId { grammar })
 }
 
 /// Single lookup into [`GRAMMARS`] by language id.
 ///
 /// [`Error::GrammarUnavailable`] for a known id whose feature is off, otherwise
 /// [`Error::UnknownLanguage`].
-pub(crate) fn lookup(id: &str) -> Result<&'static Grammar, Error> {
+fn lookup(id: &str) -> Result<&'static Grammar, Error> {
     GRAMMARS
         .iter()
         .find(|grammar| grammar.id == id)
@@ -77,11 +160,6 @@ pub(crate) fn lookup(id: &str) -> Result<&'static Grammar, Error> {
         })
 }
 
-/// Every compiled-in grammar, for listing queries.
-pub(crate) fn all() -> &'static [Grammar] {
-    GRAMMARS
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,14 +167,14 @@ mod tests {
     #[test]
     fn every_loaded_language_is_known() {
         for id in languages() {
-            assert!(KNOWN_LANGUAGES.contains(&id), "{id}");
+            assert!(KNOWN_LANGUAGES.contains(&id.as_str()), "{id}");
         }
     }
 
     #[test]
     fn unknown_id_is_unknown_language() {
         assert!(matches!(
-            lookup("cobol"),
+            LanguageId::new("cobol"),
             Err(Error::UnknownLanguage { language }) if language == "cobol"
         ));
     }
@@ -105,8 +183,9 @@ mod tests {
     #[cfg(all(feature = "grammar-python", not(feature = "grammar-rust")))]
     #[test]
     fn known_language_without_its_feature_is_grammar_unavailable() {
-        assert_eq!(languages().collect::<Vec<_>>(), ["python"]);
-        let error = lookup("rust").err().expect("rust is not compiled in");
+        let ids: Vec<&str> = languages().map(|id| id.as_str()).collect();
+        assert_eq!(ids, ["python"]);
+        let error = LanguageId::new("rust").expect_err("rust is not compiled in");
         assert_eq!(
             error,
             Error::GrammarUnavailable {

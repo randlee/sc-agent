@@ -12,13 +12,15 @@ pub const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Reads the file at `path`, refusing files over [`MAX_SOURCE_BYTES`].
 ///
-/// At most `MAX_SOURCE_BYTES + 1` bytes are read, so an oversized file is never loaded whole.
+/// At most `MAX_SOURCE_BYTES + 1` bytes are read, so a file that grows past the limit after its
+/// size check is still never loaded whole.
 ///
 /// # Errors
 ///
-/// [`Error::FileNotFound`] when the file does not exist, [`Error::FileRead`] for any other
-/// I/O error (for example `path` is a directory), and [`Error::InputTooLarge`] when the file
-/// is over the limit.
+/// [`Error::FileNotFound`] when the file does not exist; [`Error::FileRead`] for any other
+/// I/O error, or when `path` is not a regular file (kind `IsADirectory` for a directory,
+/// `InvalidInput` otherwise); [`Error::InputTooLarge`] when the file is over the limit, checked
+/// from its metadata before any read.
 pub fn read_source(path: &Path) -> Result<Vec<u8>, Error> {
     let read_error = |error: std::io::Error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -28,24 +30,41 @@ pub fn read_source(path: &Path) -> Result<Vec<u8>, Error> {
         } else {
             Error::FileRead {
                 path: path.to_path_buf(),
-                kind: format!("{:?}", error.kind()),
+                kind: error.kind(),
                 detail: error.to_string(),
             }
         }
     };
     let file = std::fs::File::open(path).map_err(read_error)?;
+    let metadata = file.metadata().map_err(read_error)?;
+    if !metadata.is_file() {
+        let kind = if metadata.is_dir() {
+            std::io::ErrorKind::IsADirectory
+        } else {
+            std::io::ErrorKind::InvalidInput
+        };
+        return Err(Error::FileRead {
+            path: path.to_path_buf(),
+            kind,
+            detail: "not a regular file".to_owned(),
+        });
+    }
     let limit = MAX_SOURCE_BYTES as u64;
+    let too_large = |bytes: u64| Error::InputTooLarge {
+        path: Some(path.to_path_buf()),
+        bytes,
+        limit,
+    };
+    if metadata.len() > limit {
+        return Err(too_large(metadata.len()));
+    }
+    // Backstop: the file may grow between `metadata` and the read.
     let mut bytes = Vec::new();
     file.take(limit.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(read_error)?;
     if bytes.len() > MAX_SOURCE_BYTES {
-        let size = std::fs::metadata(path).map_or(bytes.len() as u64, |meta| meta.len());
-        return Err(Error::InputTooLarge {
-            path: Some(path.to_path_buf()),
-            bytes: size,
-            limit,
-        });
+        return Err(too_large(bytes.len() as u64));
     }
     Ok(bytes)
 }
@@ -67,14 +86,18 @@ mod tests {
         );
         let error = read_source(dir.path()).expect_err("a directory is not a file");
         assert_eq!(error.id(), "treesitter.file_read");
-        match error {
-            Error::FileRead { path, kind, detail } => {
-                assert_eq!(path, dir.path());
-                assert!(!kind.is_empty());
-                assert!(!detail.is_empty());
+        // Windows refuses to open a directory at all (PermissionDenied from `File::open`);
+        // Unix opens it and the regular-file check rejects it.
+        #[cfg(unix)]
+        assert_eq!(
+            error,
+            Error::FileRead {
+                path: dir.path().to_path_buf(),
+                kind: std::io::ErrorKind::IsADirectory,
+                detail: "not a regular file".to_owned(),
             }
-            other => panic!("unexpected {other}"),
-        }
+        );
+        assert!(matches!(error, Error::FileRead { ref path, .. } if path == dir.path()));
     }
 
     #[test]

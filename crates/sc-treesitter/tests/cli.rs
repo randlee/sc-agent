@@ -10,7 +10,8 @@ fn binary() -> &'static str {
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
+        .join("tests")
+        .join("fixtures")
         .join(name)
 }
 
@@ -29,7 +30,7 @@ fn run(home: &Path, args: &[&str]) -> std::io::Result<Output> {
     command(home, args).output()
 }
 
-/// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message"}`.
+/// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message", "recovery"?}`.
 fn error_json(output: &Output) -> Result<serde_json::Value, String> {
     if output.status.code() != Some(1) {
         return Err(format!("status {:?}", output.status));
@@ -44,16 +45,18 @@ fn error_json(output: &Output) -> Result<serde_json::Value, String> {
     let value: serde_json::Value =
         serde_json::from_slice(stderr).map_err(|error| format!("stderr json: {error}"))?;
     let shape_ok = value.as_object().is_some_and(|object| {
-        object.len() == 2
+        let recovery = object.get("recovery");
+        object.len() == 2 + usize::from(recovery.is_some())
             && object.get("id").is_some_and(serde_json::Value::is_string)
             && object
                 .get("message")
                 .is_some_and(serde_json::Value::is_string)
+            && recovery.is_none_or(serde_json::Value::is_string)
     });
     if shape_ok {
         Ok(value)
     } else {
-        Err(format!("not {{id, message}}: {value}"))
+        Err(format!("not {{id, message, recovery?}}: {value}"))
     }
 }
 
@@ -126,6 +129,11 @@ fn unknown_language_and_missing_positional_fail_with_ids() {
         .expect("failure contract");
     assert_eq!(unknown["id"], "treesitter.unknown_language");
     assert_eq!(unknown["message"], "unknown language \"cobol\"");
+    assert!(
+        unknown["recovery"]
+            .as_str()
+            .is_some_and(|hint| hint.contains("tsq languages"))
+    );
 
     let usage = error_json(&run(home.path(), &["query", "rust"]).expect("spawn tsq"))
         .expect("failure contract");
@@ -174,7 +182,7 @@ fn closed_stdout_is_a_write_error() {
     assert!(
         value["message"]
             .as_str()
-            .is_some_and(|message| message.contains("BrokenPipe")),
+            .is_some_and(|message| message.contains("broken pipe")),
         "{value}"
     );
 }
@@ -184,7 +192,11 @@ fn closed_stdout_is_a_write_error() {
 fn each_run_writes_one_tsq_command_event_to_its_own_log() {
     let home = tempfile::tempdir().expect("home");
     success(&run(home.path(), &["languages"]).expect("spawn tsq"));
-    let log = home.path().join(".sc-agent/logs/tsq.log.jsonl");
+    let log = home
+        .path()
+        .join(".sc-agent")
+        .join("logs")
+        .join("tsq.log.jsonl");
     let text = std::fs::read_to_string(&log).expect("tsq.log.jsonl");
     let events: Vec<serde_json::Value> = text
         .lines()
@@ -211,8 +223,30 @@ fn each_run_writes_one_tsq_command_event_to_its_own_log() {
     assert_eq!(last["outcome"], "error");
     assert_eq!(last["fields"]["subcommand"], "query");
     assert_eq!(last["fields"]["error_id"], "treesitter.unknown_language");
+    assert_eq!(last["fields"]["language"], "cobol");
+    assert_eq!(last["fields"]["query"], "x");
+    assert_eq!(last["fields"]["file"], "y");
+    assert!(last["fields"]["bytes"].is_null(), "no file was read");
+    assert!(last["fields"]["duration_ms"].is_u64());
+
+    // A successful query records the source size.
+    let file = fixture("match.rs");
+    let path = file.to_str().expect("utf8 path");
+    success(&run(home.path(), &["query", "rust", "match-arms", path]).expect("spawn tsq"));
+    let text = std::fs::read_to_string(&log).expect("tsq.log.jsonl");
+    let last: serde_json::Value = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .rfind(|event| event["action"] == "tsq.command")
+        .expect("third event");
+    assert_eq!(last["outcome"], "ok");
+    assert_eq!(last["fields"]["language"], "rust");
+    assert_eq!(last["fields"]["query"], "match-arms");
+    assert_eq!(last["fields"]["file"], path);
+    let size = std::fs::metadata(&file).expect("fixture").len();
+    assert_eq!(last["fields"]["bytes"], size);
     // A separate file: nothing but tsq's own log lives in the logs directory.
-    let files: Vec<_> = std::fs::read_dir(home.path().join(".sc-agent/logs"))
+    let files: Vec<_> = std::fs::read_dir(home.path().join(".sc-agent").join("logs"))
         .expect("logs dir")
         .filter_map(Result::ok)
         .map(|entry| entry.file_name())
