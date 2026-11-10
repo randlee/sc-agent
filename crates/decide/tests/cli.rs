@@ -1,12 +1,12 @@
 //! The `decide` binary as a process: help, slug refusal, interrupts, broken stdout and the
 //! fail-fast batch, against a loopback runner (no external network).
 //!
-//! Each child gets a cleared environment whose HOME is a tempdir: the `decide` binary has no
-//! config-dir flag (decide reads `~/.sc-agent`, sc-observability's default for app
-//! `sc-agent`), so HOME is the one way to give a child process its own config and log root.
-//! On Unix `std::env::home_dir` reads HOME; on Windows it does not, which is one reason these
-//! process tests are Unix-only (the others: Unix signals, `kill` and `mkfifo`). Only the
-//! child's environment is set; the test process's own environment is never changed.
+//! Each child gets a cleared environment (only PATH) and `--config-dir <tempdir>/.sc-agent`,
+//! whose default.json sets `log_root` to that same directory: no HOME or USERPROFILE is set,
+//! so no test reads or writes the real home. (The real-home default of `log_root` is
+//! sc-agent-config's `default_dir`, unit-tested there.) The process tests here are Unix-only
+//! because they use Unix signals, `kill` and `mkfifo`. The test process's own environment is
+//! never changed.
 
 mod common;
 
@@ -133,28 +133,36 @@ mod tests {
         }
     }
 
-    /// A HOME whose `.sc-agent/default.json` names runner `dec` on `port`.
+    /// The `default.json` of these tests: runner `dec` on `port`, and `log_root` = `config`.
+    fn config_json(config: &Path, port: u16) -> String {
+        serde_json::json!({
+            "log_root": config,
+            "local_runners": {
+                "dec": { "kind": "mapika", "host": "127.0.0.1", "port": port, "model": "jev-latest" }
+            }
+        })
+        .to_string()
+    }
+
+    /// A tempdir whose `.sc-agent/default.json` (the child's `--config-dir`) names runner `dec`
+    /// on `port` and sets `log_root` to `.sc-agent` itself.
     fn home(port: u16) -> tempfile::TempDir {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        std::fs::write(
-            config.join("default.json"),
-            format!(
-                r#"{{"local_runners":{{"dec":{{"kind":"mapika","host":"127.0.0.1","port":{port},"model":"jev-latest"}}}}}}"#
-            ),
-        )
-        .expect("default.json");
+        std::fs::write(config.join("default.json"), config_json(&config, port))
+            .expect("default.json");
         home
     }
 
     fn decide(home: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(DECIDE);
         command
+            .arg("--config-dir")
+            .arg(home.join(".sc-agent"))
             .args(args)
             .env_clear()
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-            .env("HOME", home)
             .current_dir(env!("CARGO_MANIFEST_DIR"));
         command
     }
@@ -182,7 +190,7 @@ mod tests {
 
     fn rows(home: &Path) -> usize {
         let mut files = Vec::new();
-        find_rows(&home.join(".sc-agent/logs"), &mut files);
+        find_rows(&home.join(".sc-agent").join("logs"), &mut files);
         files
             .iter()
             .map(|file| std::fs::read_to_string(file).expect("rows").lines().count())
@@ -307,7 +315,13 @@ mod tests {
         );
         assert!(String::from_utf8_lossy(&output.stdout).contains("0.123456789"));
         assert_eq!(rows(home.path()), 3);
-        assert!(home.path().join(".sc-agent/logs/decide.log.jsonl").exists());
+        assert!(
+            home.path()
+                .join(".sc-agent")
+                .join("logs")
+                .join("decide.log.jsonl")
+                .exists()
+        );
     }
 
     /// AC: REQ-SAG-0701 output. A closed stdout makes decide cancel and report `decide.write`.
@@ -465,11 +479,7 @@ mod tests {
             .recv_timeout(HANG_GUARD)
             .expect("decide opened its config")
             .expect("fifo");
-        write!(
-            writer,
-            r#"{{"local_runners":{{"dec":{{"kind":"mapika","host":"127.0.0.1","port":{port},"model":"jev-latest"}}}}}}"#
-        )
-        .expect("config");
+        write!(writer, "{}", config_json(&config, port)).expect("config");
         drop(writer);
         let status = Command::new("kill")
             .args(["-TERM", &child.id().to_string()])

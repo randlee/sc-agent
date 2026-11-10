@@ -65,11 +65,12 @@ fn run(
         Parsed::Print(text) => return Ok(print_stdout(text.as_bytes())),
         Parsed::Run(cli) => cli,
     };
+    let config_dir = cli.config_dir;
     match cli.command {
-        Command::Send(args) => run_send(args, cancel, watch, stdin, stdout),
+        Command::Send(args) => run_send(args, config_dir, cancel, watch, stdin, stdout),
         Command::Models(args) => {
             watch.logs_opened();
-            let (context, general) = context_with_general()?;
+            let (context, general) = context_with_general(config_dir.clone())?;
             let options = ModelsOptions {
                 runner: args.runner,
                 context,
@@ -82,7 +83,7 @@ fn run(
         }
         Command::Doctor => {
             watch.logs_opened();
-            let (context, general) = context_with_general()?;
+            let (context, general) = context_with_general(config_dir.clone())?;
             let options = DoctorOptions { context };
             let report = doctor(&options, cancel);
             drop(options);
@@ -101,6 +102,7 @@ enum Input {
 
 fn run_send(
     args: SendArgs,
+    config_dir: Option<std::path::PathBuf>,
     cancel: &CancelToken,
     watch: &SignalWatch,
     stdin: &mut dyn Read,
@@ -109,7 +111,7 @@ fn run_send(
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
     let project = Slug::new("project", &args.project)?;
     let agent_role = Slug::new("agent_role", &args.agent_role)?;
-    let config = load_config(&Context::new(SERVICE))?;
+    let config = load_config(&base_context(config_dir.clone()))?;
     let model = ModelSelector::parse(&args.model, &config)?;
     let provider = args
         .provider
@@ -137,7 +139,7 @@ fn run_send(
     };
     // From here an interrupt cancels and the run drains, flushes and closes the logs.
     watch.logs_opened();
-    let (context, general) = context_with_general()?;
+    let (context, general) = context_with_general(config_dir)?;
     let mut options = SendOptions {
         model,
         provider,
@@ -182,8 +184,17 @@ fn run_send(
 }
 
 /// The binary's context with its general logger opened (and kept, to close it later).
-fn context_with_general() -> Result<(Context, GeneralLogger), DecideError> {
+/// The binary's context: `--config-dir` (else `~/.sc-agent`) and every other seam default.
+fn base_context(config_dir: Option<std::path::PathBuf>) -> Context {
     let mut context = Context::new(SERVICE);
+    context.config_dir = config_dir;
+    context
+}
+
+fn context_with_general(
+    config_dir: Option<std::path::PathBuf>,
+) -> Result<(Context, GeneralLogger), DecideError> {
+    let mut context = base_context(config_dir);
     let general = general_logger(&context)?;
     context.general = Some(general.clone());
     Ok((context, general))

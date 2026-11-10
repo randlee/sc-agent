@@ -16,6 +16,9 @@ use sc_agent_config::RunnerName;
     about = "Send TypeSafe (Jev) decision requests."
 )]
 pub(crate) struct Cli {
+    /// Configuration directory holding default.json (and local.json); default ~/.sc-agent. Logs go to the configured log_root, else ~/.sc-agent.
+    #[arg(long, global = true, value_name = "PATH", value_parser = non_empty_path)]
+    pub(crate) config_dir: Option<PathBuf>,
     #[command(subcommand)]
     pub(crate) command: Command,
 }
@@ -107,6 +110,10 @@ fn parse_runner_name(value: &str) -> Result<RunnerName, String> {
         .map_err(|reason| format!("{reason}: {value:?}. See decide --help."))
 }
 
+fn non_empty_path(value: &str) -> Result<PathBuf, String> {
+    non_empty_text(value).map(PathBuf::from)
+}
+
 fn non_empty_text(value: &str) -> Result<String, String> {
     if value.is_empty() {
         Err("a flag value must not be empty. See decide --help.".to_owned())
@@ -173,5 +180,34 @@ mod tests {
             args.images,
             vec![("a".to_owned(), PathBuf::from("x=y.png"))]
         );
+    }
+
+    /// `--config-dir` is global: accepted before or after the subcommand, on send, models and
+    /// doctor.
+    #[test]
+    fn config_dir_is_a_global_flag() {
+        for args in [
+            &["decide", "--config-dir", "/c", "doctor"][..],
+            &["decide", "doctor", "--config-dir", "/c"],
+            &["decide", "models", "--config-dir", "/c"],
+            &[
+                "decide",
+                "send",
+                "--model",
+                "jev",
+                "--project",
+                "p",
+                "--agent-role",
+                "r",
+                "--config-dir",
+                "/c",
+            ],
+        ] {
+            let Ok(Parsed::Run(cli)) = parse(args) else {
+                panic!("parses: {args:?}");
+            };
+            assert_eq!(cli.config_dir, Some(PathBuf::from("/c")), "{args:?}");
+        }
+        assert!(parse(["decide", "--config-dir", "", "doctor"]).is_err());
     }
 }

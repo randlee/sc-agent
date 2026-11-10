@@ -1,8 +1,8 @@
 """The sc-agent Python API over the maturin build, against a loopback runner.
 
 Each call passes `config_dir=` (a tempdir whose default.json names the loopback runner `dec`
-and sets the log root); no environment variable and no HOME is set for sc_agent. Only the one
-`decide` CLI child gets HOME, because the CLI has no config-dir flag. No test reaches an
+and sets the log root); the one `decide` CLI child gets the same directory as `--config-dir`.
+No environment variable, HOME or USERPROFILE is set anywhere. No test reaches an
 external network. Each test names the acceptance line it proves.
 Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
 depends on elapsed time.
@@ -16,7 +16,6 @@ import pathlib
 import re
 import subprocess
 import threading
-import os
 import signal
 import warnings
 
@@ -116,20 +115,27 @@ def test_an_invalid_project_is_refused(env, args):
     assert session_files(log_root) == []
 
 
-@pytest.mark.skipif(os.name == "nt", reason="the decide child gets its config through HOME")
-def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, args):
+def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, args, config_dir):
     """AC: REQ-SAG-0004 AC3."""
     loopback, log_root = env
     request = tmp_path / "request.json"
     request.write_text(NOUL)
     child = subprocess.run(
-        [decide_bin, "send", "--model", "dec", "--project", "proj", "--agent-role", "role", str(request)],
+        [
+            decide_bin,
+            "--config-dir",
+            str(config_dir),
+            "send",
+            "--model",
+            "dec",
+            "--project",
+            "proj",
+            "--agent-role",
+            "role",
+            str(request),
+        ],
         capture_output=True,
         text=True,
-        # The decide CLI has no config-dir flag: it reads ~/.sc-agent, so the child alone gets
-        # HOME = tmp_path (where the fixture wrote .sc-agent). POSIX only: on Windows the home
-        # directory does not come from HOME.
-        env=dict(os.environ, HOME=str(tmp_path)),
         timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
