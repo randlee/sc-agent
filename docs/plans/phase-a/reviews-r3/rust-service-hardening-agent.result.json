@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "data": {
+    "status": "findings",
+    "reviewed_branch": "main",
+    "reviewed_commit": "3f31bef",
+    "review_mode": "doc_review",
+    "service_indicators_found": ["ureq (UreqTransport / Timeouts in a-5, a-10)"],
+    "topics_reviewed": ["timeouts"],
+    "findings": [
+      {
+        "id": "RSH-013",
+        "topic": "timeouts",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+        "line": 171,
+        "issue": "RESOLVED (fixed). Local runners now have their own request timeout (default 300 s, bounds 10..=3600) and load timeout (default 600 s, bounds 10..=7200). Model load is waited out before the first decision and does not count toward the request timeout or the 90 s start budget.",
+        "recommendation": "No action on RSH-013. See RSH-013-F1 below for one stale line the fix left behind.",
+        "evidence": "a-4:171-184 add request_timeout_secs, load_timeout_secs, request_timeout(), load_timeout() and the 300 s / 600 s defaults. a-4:332-334 test the defaults, per-runner isolation, and both bounds. REQ-SAG-0015.md:21-25 and :40-41 state the requirement. a-5:191-193 add Timeouts::with_request, and a-5:156 adds HttpRequest::with_deadline. a-5:296 and :483 (A5-26) say the 90 s budget starts at the first send, and a-5:424 tests it (budget_starts_at_first_send). a-6:215 adds wait_until_loaded(.., load_timeout, ..) and a-6:246 adds LoadTimeout (local.load_timeout). a-6:228 covers load-on-first-request per daemon kind. a-6:320-323 test polling, load timeout, cancel, and the Laya deadline of load+request. a-10:230-231 build one UreqTransport per local runner with Timeouts::default().with_request(runner.request_timeout())."
+      },
+      {
+        "id": "RSH-013-F1",
+        "topic": "timeouts",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 298,
+        "issue": "Introduced by the fix. The worst-case wall-clock paragraph still says 'last start's send ends within its 120 s request deadline ... finishes within 210 s'. That is true only for remote providers. For a local runner with the default 300 s timeout the worst case is about 90 s + 300 s = 390 s. For a Laya first request it is 90 s + (600 + 300) s.",
+        "recommendation": "Qualify line 298 as remote-only. Add the local formula: 90 s + the runner's request timeout, and 90 s + load + request for the first Laya request.",
+        "evidence": "a-5:298 compared with a-5:191-193 and a-6:219."
+      }
+    ],
+    "summary": {
+      "total_findings": 2,
+      "by_severity": {"critical": 0, "important": 1, "minor": 1}
+    },
+    "notes": [
+      "RSH-013 is fixed. The 'important' count above is the closed RSH-013 record, not a new problem. The only open item is minor RSH-013-F1 (stale worst-case arithmetic in a-5:298).",
+      "I had no shell tool, so I could not run git to confirm HEAD is 3f31bef on main. The assigned commit matches the 'Recent commits' list in the context I was given. Please confirm HEAD independently.",
+      "Minor observation, not a finding: a-4:184 defines a bounds constant for the request timeout (RUNNER_REQUEST_TIMEOUT_SECS) but the grep showed no matching constant for the load bounds. The line 231 content was too long to display. The load bounds are covered by the load_timeout_in_bounds deserializer and the test at a-4:334."
+    ]
+  },
+  "error": null
+}
