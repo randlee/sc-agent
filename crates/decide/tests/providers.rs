@@ -348,15 +348,22 @@ mod tests {
             )
             .expect("send");
             assert_eq!(transport.sends(), sends);
-            let detail = result.outcome.expect_err("busy").detail();
-            let cause = detail.cause.expect("cause");
-            assert_eq!(cause.id, "http.provider_busy");
-            assert!(cause.message.contains("sends"), "{}", cause.message);
-            assert!(
-                cause.message.contains(&sends.to_string()),
-                "{}",
-                cause.message
+            let error = result.outcome.expect_err("busy");
+            assert_eq!(
+                error.detail().cause.expect("cause").id,
+                "http.provider_busy"
             );
+            // Exact fields, not substrings ("5" would also match "529").
+            let DecisionError::Http(sc_agent_http::HttpError::ProviderBusy {
+                reason,
+                attempts,
+                ..
+            }) = error
+            else {
+                panic!("not http.provider_busy: {error:?}");
+            };
+            assert_eq!(reason, sc_agent_http::BusyReason::Sends);
+            assert_eq!(attempts, u32::try_from(sends).expect("small"));
         }
     }
 

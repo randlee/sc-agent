@@ -65,6 +65,29 @@ def test_every_decide_operation_has_its_python_function(decide_bin):
         assert callable(getattr(sc_agent, function, None)), operation
 
 
+@pytest.mark.mode("ok")
+def test_send_and_send_batch_return_the_decided_response(env):
+    """REQ-SAG-0501 (successful path), REQ-SAG-0007: a runner that answers gives send() one
+    result line with the response, its session ULID and position 0, the probability
+    unrounded; send_batch() gives one such line per request, positions 0..n-1."""
+    loopback, log_root = env
+    text = sc_agent.send(NOUL, **ARGS)
+    line = json.loads(text)
+    assert "error" not in line
+    assert line["position"] == 0
+    assert len(line["session_id"]) == 26
+    assert line["response"]["answers"]["q"] == {"type": "noul", "noul": 0.123456789}
+    assert '"noul":0.123456789' in text
+    assert set(line["digests"]) == {"q"}
+    lines = [json.loads(item) for item in sc_agent.send_batch([NOUL] * 3, **ARGS)]
+    assert sorted(item["position"] for item in lines) == [0, 1, 2]
+    assert all(item["response"]["answers"]["q"]["noul"] == 0.123456789 for item in lines)
+    assert len(loopback.requests) == 4
+    rows = session_rows(log_root)
+    assert len(rows) == 4
+    assert all(row["fields"]["outcome"] == "ok" for row in rows), rows
+
+
 def test_a_cancelled_token_stops_send_and_send_batch(env):
     """AC: REQ-SAG-0104 AC2."""
     loopback, _log_root = env

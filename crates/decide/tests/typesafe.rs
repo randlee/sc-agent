@@ -22,7 +22,7 @@ mod tests {
 
     /// Every request example of openapi.json v0.2.0 and the TypeSafe guides that needs no
     /// image part (those are in `every_part_example_is_sent_as_multipart`).
-    const REQUESTS: [(&str, &str); 9] = [
+    const REQUESTS: [(&str, &str); 11] = [
         ("request_noul", "response_noul"),
         ("request_choice", "response_choice"),
         ("request_score", "response_score"),
@@ -32,7 +32,40 @@ mod tests {
         ("property_examples_request", "docs_quickstart_response_1"),
         ("docs_p_models_request_1", "docs_noul_response_1"),
         ("docs_p_images_request_1", "docs_noul_response_2"),
+        ("docs_p_images_request_3", "docs_noul_response_1"),
+        ("docs_p_images_request_4", "docs_choice_response_1"),
     ];
+
+    /// The request examples sent as multipart in `every_part_example_is_sent_as_multipart`.
+    const PART_REQUESTS: [&str; 2] = ["request_assets_part", "docs_box_request_1"];
+
+    /// REQ-SAG-0501 AC1: every request fixture (openapi.json and the guides) is sent by one
+    /// of the two tests; none is left out.
+    #[test]
+    fn every_request_fixture_is_sent() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sc-decision-schema/tests/fixtures/typesafe");
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .expect("fixtures")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter_map(|file| file.strip_suffix(".json").map(str::to_owned))
+            .filter(|name| name.contains("request"))
+            .collect();
+        names.sort();
+        let mut sent: Vec<String> = REQUESTS
+            .iter()
+            .map(|(request, _)| (*request).to_owned())
+            .chain(PART_REQUESTS.iter().map(|name| (*name).to_owned()))
+            .collect();
+        sent.sort();
+        assert_eq!(names, sent);
+    }
 
     /// AC: REQ-SAG-0501 AC1. Each example request goes through `decide::send` (real runner,
     /// SystemOneBackend), reaches the transport unchanged, and returns the API's response.
@@ -97,7 +130,7 @@ mod tests {
     /// with one part per asset, and `--long-context` adds the long-context header.
     #[test]
     fn every_part_example_is_sent_as_multipart() {
-        for name in ["request_assets_part", "docs_box_request_1"] {
+        for name in PART_REQUESTS {
             let request_text = fixture(name);
             let parts = part_names(&request_text);
             assert!(!parts.is_empty(), "{name} names a part");

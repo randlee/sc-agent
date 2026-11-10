@@ -1,8 +1,8 @@
 """A loopback decision runner for the sc-agent tests (no external network).
 
 It speaks the Mapika/decider shape: ``GET /health`` says the model is loaded, ``GET /v1/models``
-lists it, and ``POST /v1/systemone`` either never answers (``hang``) or answers one fixed
-error (``error``). Every systemone request is recorded with its headers and body.
+lists it, and ``POST /v1/systemone`` never answers (``hang``), answers one fixed error (``error``), or
+answers a valid SystemOne response (``ok``). Every systemone request is recorded with its headers and body.
 """
 
 from __future__ import annotations
@@ -13,13 +13,19 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODEL = "jev-latest"
 FIXED_ERROR = {"detail": "the loopback runner always refuses"}
+#: A valid SystemOne response to a noul question ``q``; the probability is kept as text so
+#: tests can check it is returned unrounded.
+OK_RESPONSE = (
+    '{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.123456789}},'
+    '"usage":{"input_tokens":3,"output_tokens":1}}'
+)
 
 
 class Loopback:
     """A runner on 127.0.0.1 in a background thread."""
 
     def __init__(self, mode: str) -> None:
-        if mode not in ("hang", "error"):
+        if mode not in ("hang", "error", "ok"):
             raise ValueError(mode)
         self.mode = mode
         self.requests: list[dict] = []
@@ -61,6 +67,14 @@ class Loopback:
                 if loopback.mode == "hang":
                     loopback.release.wait(60.0)
                     self.close_connection = True
+                    return
+                if loopback.mode == "ok":
+                    data = OK_RESPONSE.encode()
+                    self.send_response(200)
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
                     return
                 self._reply(503, FIXED_ERROR)
 

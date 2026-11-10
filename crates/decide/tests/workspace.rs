@@ -97,21 +97,102 @@ mod tests {
         }
     }
 
-    /// AC: REQ-SAG-0201 AC2. Outside sc-decision-schema no serde type is named like a Jev API
-    /// type (`SystemOne*`, `Question*`, `Asset*`, `ModelMetadata*`, `NoulCriteria*`).
-    ///
-    /// The literal `rg 'struct (SystemOne|...)'` also matches `SystemOneBackend`
-    /// (sc-decision-systemone), a sans-IO backend with no serde derive; this check looks at
-    /// the derive, so it does not count it.
+    /// Field names distinctive of the Jev wire format (SystemOneRequest, SystemOneResponse,
+    /// Question, Answer, Asset, ModelMetadata); generic words such as `model` or `state` are
+    /// left out so a config key or an LLM envelope does not count.
+    const JEV_FIELDS: [&str; 10] = [
+        "questions",
+        "answers",
+        "assets",
+        "noul",
+        "criteria",
+        "probabilities",
+        "legend",
+        "data_base64",
+        "release_date",
+        "instructions",
+    ];
+
+    /// Every serde-derived struct or enum in `text` that has a Jev wire field (by its Rust
+    /// name or its `#[serde(rename = "...")]`), as `(type line, fields)`.
+    fn jev_types(text: &str) -> Vec<(String, Vec<String>)> {
+        let lines: Vec<&str> = text.lines().collect();
+        let mut found = Vec::new();
+        for (index, line) in lines.iter().enumerate() {
+            if !(line.contains("derive(")
+                && (line.contains("Serialize") || line.contains("Deserialize")))
+            {
+                continue;
+            }
+            let Some(start) = (index + 1..lines.len()).find(|&at| {
+                let trimmed = lines[at].trim_start();
+                let trimmed = trimmed
+                    .strip_prefix("pub(crate) ")
+                    .or_else(|| trimmed.strip_prefix("pub "))
+                    .unwrap_or(trimmed);
+                trimmed.starts_with("struct ") || trimmed.starts_with("enum ")
+            }) else {
+                continue;
+            };
+            let mut depth = 0_i64;
+            let mut fields = Vec::new();
+            for at in start..lines.len() {
+                let line = lines[at];
+                depth += line.matches('{').count() as i64 - line.matches('}').count() as i64;
+                let trimmed = line.trim_start();
+                let trimmed = trimmed
+                    .strip_prefix("pub(crate) ")
+                    .or_else(|| trimmed.strip_prefix("pub "))
+                    .unwrap_or(trimmed);
+                let name: String = trimmed
+                    .trim_start_matches("r#")
+                    .chars()
+                    .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '_')
+                    .collect();
+                if trimmed
+                    .get(name.len()..)
+                    .is_some_and(|rest| rest.trim_start().starts_with(':'))
+                    && JEV_FIELDS.contains(&name.as_str())
+                {
+                    fields.push(name);
+                }
+                if let Some(rename) = trimmed
+                    .split("rename = \"")
+                    .nth(1)
+                    .and_then(|rest| rest.split('"').next())
+                {
+                    if JEV_FIELDS.contains(&rename) {
+                        fields.push(rename.to_owned());
+                    }
+                }
+                if at > start && depth <= 0 || (depth == 0 && line.trim_end().ends_with(';')) {
+                    break;
+                }
+            }
+            if !fields.is_empty() {
+                found.push((lines[start].trim().to_owned(), fields));
+            }
+        }
+        found
+    }
+
+    /// AC: REQ-SAG-0201 AC2. Outside sc-decision-schema no serde-derived type carries a Jev
+    /// wire field (checked by field name and serde rename, not by type name). The scanner is
+    /// proven on sc-decision-schema itself, where it must find the request and response
+    /// types, so a broken scanner cannot pass vacuously.
     #[test]
     fn only_sc_decision_schema_maps_the_jev_api() {
-        let prefixes = [
-            "SystemOne",
-            "Question",
-            "Asset",
-            "ModelMetadata",
-            "NoulCriteria",
-        ];
+        let schema_hits: Vec<String> = rust_files(&crates_dir().join("sc-decision-schema/src"))
+            .iter()
+            .flat_map(|path| jev_types(&std::fs::read_to_string(path).expect("read")))
+            .map(|(line, _)| line)
+            .collect();
+        for expected in ["SystemOneRequest", "SystemOneResponse"] {
+            assert!(
+                schema_hits.iter().any(|line| line.contains(expected)),
+                "the scanner must find {expected} in sc-decision-schema: {schema_hits:?}"
+            );
+        }
         for path in rust_files(&crates_dir()) {
             if path
                 .components()
@@ -120,28 +201,12 @@ mod tests {
                 continue;
             }
             let text = std::fs::read_to_string(&path).expect("read");
-            let lines: Vec<&str> = text.lines().collect();
-            for (index, line) in lines.iter().enumerate() {
-                let Some(name) = line
-                    .trim_start()
-                    .strip_prefix("pub struct ")
-                    .or_else(|| line.trim_start().strip_prefix("struct "))
-                else {
-                    continue;
-                };
-                if !prefixes.iter().any(|prefix| name.starts_with(prefix)) {
-                    continue;
-                }
-                let derives = lines[index.saturating_sub(6)..index]
-                    .iter()
-                    .any(|above| above.contains("Serialize") || above.contains("Deserialize"));
-                assert!(
-                    !derives,
-                    "{}:{} maps the Jev API: {line}",
-                    path.display(),
-                    index + 1
-                );
-            }
+            let hits = jev_types(&text);
+            assert!(
+                hits.is_empty(),
+                "{} maps the Jev API: {hits:?}",
+                path.display()
+            );
         }
     }
 }
