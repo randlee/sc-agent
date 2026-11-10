@@ -22,7 +22,7 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 | sc-agent-config | config/secrets/log | AgentConfig, DEFAULT_WORKERS | types | a-4 |
 | sc-agent-secrets | config/secrets/log | ApiKey, KeySource, resolve | types | a-4 |
 | sc-agent-log | config/secrets/log | GeneralLogger, SessionLogger, Level, LogError; testing::MemoryLog | types | a-8 |
-| sc-agent-http | http | HttpRequest, HttpResponse, HttpError, Transport, HttpClient, Attempts::may_start, ResendPolicy; testing::{ScriptedTransport, BlockingTransport} | types, secrets, log | a-5 |
+| sc-agent-http | http | HttpRequest, HttpResponse, HttpError, Transport, HttpClient (may_start, may_resend, send_once), ResendPolicy; testing::{ScriptedTransport, BlockingTransport} | types, secrets, log | a-5 |
 | sc-decision-schema | decision schema | Backend, Decision, DecisionRequest (+validate), DecisionResult, DecisionError, question_digests | types, http | a-2 |
 | sc-decision-systemone, sc-decision-local (over sc-decision-systemone) | decision backends | SystemOneBackend, LocalBackend (+with_log, discover, wait_until_loaded) | systemone: types, secrets, http, schema; local: also config, log and sc-decision-systemone | a-6 |
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
