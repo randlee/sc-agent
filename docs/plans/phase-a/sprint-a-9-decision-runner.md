@@ -20,10 +20,10 @@ sprint:
   owned_paths: [crates/sc-decision-runner/**]
   must_follow:
     - sprint: a-2
-      artifact: sc_decision_schema::{Decision, Backend, DecisionRequest, DecisionResult, DecisionError, question_digests}
+      artifact: sc_decision_schema::{Decision, Backend, DecisionRequest, DecisionResult, DecisionError} (DecisionRequest::new/digests)
       trigger: dev-push
     - sprint: a-5
-      artifact: sc_agent_http::{HttpClient, Attempts (incl. may_start), Next, ResendPolicy, BusyReason} + testing::{ScriptedTransport, BlockingTransport} (feature `testing`)
+      artifact: sc_agent_http::{HttpClient (may_start, may_resend, send_once), Start, SendPermit, Attempts, Pending, Next, LogContext (re-export), ResendPolicy, BusyReason, ProviderPause} + testing::{ScriptedTransport, BlockingTransport, ManualClock} (feature `testing`)
       trigger: dev-push
     - sprint: a-8
       artifact: sc_agent_log::{SessionLogger, GeneralLogger, Level, LogError} + testing::{MemoryLog, MemoryRecord} (feature `testing`)
@@ -31,12 +31,13 @@ sprint:
     - sprint: a-4
       artifact: sc_agent_config::{AgentConfig, DEFAULT_WORKERS}
       trigger: dev-push
-  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, NFR-SAG-0001]
+  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, NFR-SAG-0001]
   adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0701 end to end (a parallel batch through decide --batch and sc-agent-py, against real backends): a-10; a-9 closes it at the runner boundary with scripted transports"
-    - "PLAN-CRIT-003 budget-vs-timeout default rule (does a timeout count against the 90 s budget): OPEN owner question, owned by a-5's send_once; a-9 only calls Attempts::may_start"
-    - "Busy classification, Retry-After, jitter, max_sends and the 90 s budget themselves: a-5 acceptance"
+    - "Budget-vs-timeout rule: closed in a-5 (A5-04, A5-06); a-9 only calls HttpClient::may_start / may_resend"
+    - "Busy classification, Retry-After floor and jitter, the provider pause (REQ-SAG-0012 rule), max_sends and the 90 s budget themselves: a-5 acceptance; a-9 closes only that one HttpClient's pause covers every worker"
+    - "REQ-SAG-0011 interrupt (SIGINT/SIGTERM, KeyboardInterrupt cancel the token): a-10 wires the signals; a-9 supplies the cancel path they use"
 ```
 
 # Sprint A-9: sc-decision-runner (bead agt-4p2.9)
@@ -48,7 +49,9 @@ Copy script: `docs/plans/phase-a/copy/a-9.sh` (dry run 2026-11-09, reconciliatio
 
 ## Shape in one paragraph
 
-`DecisionRunner` owns one `Arc<dyn Backend>` (A-2), one `HttpClient` (A-5: transport, `ResendPolicy`, general logger), a `SessionLogger` and a `GeneralLogger` (A-8), and implements `Decision`. Its fields live in one `Arc<Shared>` so worker and feeder threads (`thread::Builder::spawn`, `'static`) own a clone. `decide_stream` takes an owned `'static` iterator (A-2 §3) and starts one feeder thread (pulls the caller's iterator into a bounded `JobQueue`) and `workers` worker threads (default 8, `AgentConfig.workers`). A worker takes a ready job; on its first attempt it computes the question digests and encodes the request once; it calls `HttpClient::send_once`. `Next::ResendAt(t)` puts the job back in the queue's held heap and frees the worker. `Next::Done(response)` goes to `backend.decode(response, &request)`; `Err(DecisionError::SchemaMismatch)` first asks `job.attempts.may_start(&http.policy(), now)` (A-5 §3): `Ok` puts the job back as ready with the same `Attempts` and the same encoded bytes; `Err(BusyReason::Sends | Budget)` finishes the job with that `SchemaMismatch`, whose detail names what did not match (REQ-SAG-0901) — never `http.provider_busy`. Every send of a request (busy, timeout and schema resends alike) counts against one `max_sends` and one 90 s budget; anything else finishes the job. Idle workers wait with `Condvar::wait_timeout` to the earliest holdoff end; a `CancelToken::on_cancel` hook (A-1) cancels the queue and wakes every waiter at once. Cancel also ends a request whose send is in flight: each job carries an `Arc<Claim>` (one `AtomicBool`); the worker registers the job in the queue's in-flight list before `send_once`; `cancel()` moves every in-flight entry to an orphan list and interrupts the result queue; the result iterator (on the consumer's thread) wins each orphan's claim and yields `Cancelled { sends }` with its one session row, so the result arrives without waiting for the transport. When the blocked send later returns, the worker loses the claim, discards the reply and writes nothing. The hook itself only flips state and notifies; it never blocks or does I/O. Each finished job writes exactly one session row, then its `DecisionResult` goes to a bounded result queue that the returned iterator drains, so results come back fastest first. `decide` runs the same machinery with one request and one worker (`run(Box::new(iter::once(request)), cancel, 1)`), so its send runs on a runner worker, not the caller's thread, and cancel is immediate there too; holdoffs wait in the `JobQueue` as in a stream. A session-log write failure never replaces the decision result: the row's Err is logged to the general log and counted by the `SessionLogger`, and `flush_session_log` reports it.
+`DecisionRunner` owns one `Arc<dyn Backend>` (A-2), one `HttpClient` (A-5: transport, `ResendPolicy`, provider pause, general logger), a `SessionLogger` and a `GeneralLogger` (A-8), and implements `Decision`. Its fields live in one `Arc<Shared>` so worker and feeder threads (`thread::Builder::spawn`, `'static`) own a clone; every worker sends through that one `HttpClient`, so a provider pause set by one busy reply (REQ-SAG-0012, A-5) delays every job's next send to that host — the runner sees it only as `Start::Wait { at, .. }` and holds the job. `decide_stream` takes an owned `'static` iterator (A-2 §3) and starts one feeder thread (pulls the caller's iterator into a bounded `JobQueue`) and `workers` worker threads (default 8, `AgentConfig.workers`). A job is `Fresh` until a worker prepares it (`Fresh::prepare` encodes once; digests come from `DecisionRequest::digests`, A-2) into `Prepared`; only a `Prepared` job can be sent or held. Before each send the worker asks the `HttpClient` for a start (A-5 §3): a `Start` state calls `may_start(&request, attempts, now)`, a `Resend` state calls `may_resend(&request, pending, now)`. `Start::Go(permit)` -> `send_once(&request, permit, ctx, &*now)` with `ctx = LogContext::request(session_id, Some(position))`; `Start::Wait { at, state }` (the provider pause or a holdoff not yet over) holds the job until `at` with `state` back in it and frees the worker. `may_start` Err (sends or budget used up — only possible on a resend after a Done) finishes the job with the `SchemaMismatch` it kept (REQ-SAG-0901), never `http.provider_busy`; `may_resend` Err finishes it with `DecisionError::Http(error)` unchanged. `Next::ResendAt { at, pending }` holds the job until `at` as `Resend(pending)`. `Next::Done { response, attempts }` goes to `backend.decode(response, &request, &ctx)`; `Err(DecisionError::SchemaMismatch)` puts the job back as ready in `Start { attempts, mismatch: Some(error) }` with the same encoded bytes. Every send of a request (busy, timeout and schema resends alike) counts against one `max_sends` and one 90 s budget; anything else finishes the job. Idle workers wait with `Condvar::wait_timeout` to the earliest holdoff end; a `CancelToken::on_cancel` hook (A-1) cancels the queue and wakes every waiter at once. Exactly one result and one row per request is enforced by a value: each job carries an `Arc<Claim>`; `Claim::win(&self) -> Option<Finish>` hands out the one non-Clone `Finish` token, the row writer consumes it and returns a non-Clone `RowWritten`, and the result push consumes that, so no path can write a row or result without winning, or twice. Cancel also ends a request whose send is in flight: the worker registers the job in the queue's in-flight list before `send_once`; `cancel()` moves every in-flight entry to an orphan list and interrupts the result queue; the result iterator (on the consumer's thread) wins each orphan's claim and yields `Cancelled { sends }` with its one row, so the result arrives without waiting for the transport. When the blocked send later returns, the worker's `win()` is `None`: it discards the reply and writes nothing. The hook itself only flips state and notifies; it never blocks or does I/O. The result queue holds at most `queue_capacity` results; a worker whose push finds it full blocks there (after its send, holding no HTTP slot) until the consumer reads, so a slow consumer throttles workers and nothing buffers without bound; held jobs count toward the job capacity, so a provider pause can also stall feeding (accepted). Results come back fastest first. `decide` runs the same machinery with one request and one worker (`run(Box::new(iter::once(request)), cancel, 1)`), so its send runs on a runner worker, not the caller's thread, and cancel is immediate there too. A session-log write failure never replaces the decision result: the row's Err is logged to the general log and counted by the `SessionLogger`, and `flush_session_log` reports it.
+
+Drop of the result iterator (`abandon`, RSH-006): (1) stop intake — the `JobQueue` is cancelled, so the feeder's next `submit` fails and it ends; a feeder blocked inside the caller's iterator `next()` cannot be interrupted and ends when that call returns; (2) every queued and held job is taken as `Cancelled` by the workers, which write its one row (results are discarded); (3) the dropping thread wins every orphan's claim and writes its one `Cancelled` row; (4) no thread is joined — workers blocked in a send linger at most the transport's request deadline (A-5 `Timeouts.request`, a global deadline), then lose the claim and exit; (5) the caller's `CancelToken` is never cancelled. Requests the feeder never pulled get no row.
 
 ## 1. Copy list (source `sc-agent-ref@dce239a` -> `crates/sc-decision-runner/`)
 
@@ -64,11 +67,11 @@ Not copied: `stream/mod.rs` (JSONL wire format, exit codes, `serve_jsonl`, `Batc
 
 ## 2. Interfaces consumed (defined by their owning sprints; not restated here)
 
-- A-1 §3: `CancelToken` (`is_cancelled`, `on_cancel` -> `CancelHook`), `SessionId::new`, `ErrorId`, `ErrorDetail`.
-- A-2 §3 and §5: `Decision`, `Backend`, `DecisionRequest`, `DecisionResult`, `question_digests`, `DecisionError`.
+- A-1 §3: `CancelToken` (`is_cancelled`, `on_cancel` -> `CancelHook`), `SessionId::new`, `ErrorId` (`cause_detail()`, provided `recovery()`), `ErrorDetail` (with optional `recovery`).
+- A-2 §3 and §5: `Decision`, `Backend`, `DecisionRequest` (`new`, `body()`, `digests()`), `DecisionResult`, `DecisionError`.
 - A-4 §3: `AgentConfig { workers, .. }`, `DEFAULT_WORKERS`.
-- A-5 §3 and §4: `HttpClient::{send_once, policy}`, `Attempts::{sends, may_start}`, `Next`, `ResendPolicy`, `BusyReason`, `HttpRequest`, `HttpResponse`; `testing::{ScriptedTransport, BlockingTransport}` (dev).
-- A-8 §2 and §3: `SessionLogger::{write, flush}`, `GeneralLogger::write`, `Level`, `LogError`, `SessionIdentity`; `testing::{MemoryLog, MemoryRecord}` (dev): `MemoryLog::new() -> Result<MemoryLog, LogError>`, `general(&self) -> GeneralLogger`, `session(&self, identity: SessionIdentity) -> SessionLogger`, `records(&self) -> Result<Vec<MemoryRecord>, LogError>`; `MemoryRecord { level, target, action, fields }`.
+- A-5 §3 and §4: `HttpClient::{send_once, policy}`, `HttpClient::{may_start, may_resend}`, `Start<S>`, `SendPermit`, `Attempts`, `Pending`, `ProviderPause`, `LogContext` (sc-agent-log's, re-exported), `Next`, `ResendPolicy`, `BusyReason`, `HttpRequest`, `HttpResponse`; `testing::{ScriptedTransport, BlockingTransport}` (dev).
+- A-8 §2 and §3: `SessionLogger::{write, flush}`, `GeneralLogger::write`, `Level`, `LogError`, `SessionIdentity`; `GeneralLogger::{write, try_write}`, `SessionLogger::try_write`; `testing::{MemoryLog, MemoryRecord}` (dev): `MemoryLog::new() -> Result<MemoryLog, LogError>`, `general(&self) -> GeneralLogger`, `session(&self, identity: SessionIdentity) -> SessionLogger`, `records(&self) -> Result<Vec<MemoryRecord>, LogError>`; `MemoryRecord { level, target, action, fields }`.
 
 Busy classification, quota, `Retry-After`, the schedule with jitter, max sends and the 90 s budget are A-5's. The runner only waits and requeues; it computes no holdoff.
 
@@ -103,7 +106,7 @@ struct Shared {
     http: HttpClient,
     session: SessionLogger,
     general: GeneralLogger,
-    now: Clock,          // Instant::now; crate-private test seam (src/runner/tests.rs sets a manual clock), passed to send_once/may_start
+    now: Clock,          // Instant::now; crate-private test seam (src/runner/tests.rs uses sc_agent_http::testing::ManualClock), passed to may_start/may_resend/send_once
 }
 type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 impl DecisionRunner {
@@ -124,8 +127,15 @@ impl Decision for DecisionRunner {
 pub(crate) enum Step<J, A> { Done(A), HoldOff { until: Instant, job: J } }   // a schema resend is HoldOff { until: now }
 pub(crate) struct JobQueue<J> { state: Mutex<JobState<J>>, changed: Condvar, capacity: usize }
 struct JobState<J> { ready: VecDeque<J>, held: BinaryHeap<Held<J>>, running: usize, in_flight: Vec<InFlight>, orphans: Vec<InFlight>, closed: bool, cancelled: bool, seq: u64 }
-struct InFlight { key: u64, session_id: SessionId, position: u64, model: String, digests: OrderedMap<String, QuestionDigest>, sends: u32, claim: Arc<Claim> }
-struct Claim(AtomicBool);   // win(): compare_exchange(false, true); the winner alone writes the row and the result
+struct InFlight { key: u64, session_id: SessionId, position: u64, model: String, digests: OrderedMap<String, QuestionDigest>, sends: u32 /* sends including this one, taken from SendState before the permit */, claim: Arc<Claim> }
+struct Claim(AtomicBool);
+impl Claim { fn win(&self) -> Option<Finish>; }      // compare_exchange(false, true): Some exactly once
+/// Proof that this caller alone finishes the request. Not Clone, not Copy; only Claim::win makes one.
+struct Finish(PhantomData<Claim>);
+/// Proof that the one row was written (or its failure logged). Not Clone, not Copy.
+struct RowWritten(PhantomData<Finish>);
+fn write_row(session: &SessionLogger, general: &GeneralLogger, proof: Finish, row: Row) -> RowWritten;   // worker path: write; cancel/orphan/abandon paths: try_write (never blocks)
+// result push: BoundedQueue<DecisionResult>::push(&self, proof: RowWritten, result: DecisionResult) (blocks while full)
 struct Held<J> { until: Instant, seq: u64, job: J }       // Ord: earliest `until`, then `seq`
 pub(crate) enum Taken<J> { Run(J), Cancelled(J), Finished }
 impl<J> JobQueue<J> {
@@ -139,27 +149,35 @@ impl<J> JobQueue<J> {
     fn end_send(&self, key: u64);               // after send_once returns (removes from in_flight or orphans)
     fn take_orphans(&self) -> Vec<InFlight>;    // result iterator: in-flight jobs cut off by cancel
 }
-struct Job {
-    session_id: SessionId, position: u64, request: DecisionRequest,
-    digests: OrderedMap<String, QuestionDigest>,  // computed on the first attempt
-    http: Option<HttpRequest>,                    // encoded once; every send (busy or schema resend) sends the same bytes
-    attempts: Attempts,                           // one per request: busy and schema resends share it; row "sends" = attempts.sends()
+enum Job { Fresh(Fresh), Prepared(Prepared) }
+struct Fresh { session_id: SessionId, position: u64, request: DecisionRequest, claim: Arc<Claim> }
+struct Prepared {
+    session_id: SessionId, position: u64, request: DecisionRequest,   // digests: request.digests()
+    http: HttpRequest,                            // encoded once; every send (busy or schema resend) sends the same bytes
+    state: SendState,                             // one per request: busy, timeout and schema resends share it; row "sends" from it
     schema_resends: u32,
     claim: Arc<Claim>,
 }
+impl Fresh { fn prepare(self, backend: &dyn Backend) -> Result<Prepared, (Fresh, DecisionError)>; }   // Err: encode failed; the job finishes with it
+/// Where the request's resend state lives between sends (the SendPermit carries it during a send).
+enum SendState {
+    Start { attempts: Attempts, mismatch: Option<DecisionError> },  // first send, or resend after Done (mismatch = the last SchemaMismatch)
+    Resend(Pending),                                                // after Next::ResendAt
+}
+impl Job { fn log_context(&self) -> LogContext; }   // LogContext::request(session_id, Some(position))
 ```
 
 Session row (`src/row.rs`, one per result: ok, failed and cancelled; `SessionLogger` adds `session_id`, `repo`, `project`, `agent_role`):
 
 ```text
-{ "position": <u64>, "model": <request model string>, "sends": <u32>, "schema_resends": <u32>,
+{ "position": <u64>, "model": <request.body().model>, "sends": <u32>, "schema_resends": <u32>,
   "outcome": "ok" | "error",
   "digests": { "<question id>": "<sc-sha hex>", ... },
   "response": <SystemOneResponse, unrounded>,           // ok
   "error": <ErrorDetail of the DecisionError> }          // error: id, message and every lower id and message
 ```
 
-General log (`GeneralLogger::write`, target `sc_decision_runner`): `runner.stream.start` (workers), `runner.stream.end` (results, failed), `runner.worker.stopped` (reason), `runner.session_log_failed` (session_id, error detail). No request or response content.
+General log (`GeneralLogger::write`, target `sc_decision_runner`): `runner.stream.start` (workers), `runner.stream.end` (results, failed), `runner.worker.stopped` (reason), `runner.session_log_failed` (ctx = the job's `LogContext`; error detail). Stream-level events pass `LogContext { session_id: None, position: None }`. Every http.* event of a job's sends carries its `LogContext` through `send_once`, and `backend.decode(response, &request, &ctx)` gets the same one. Cancel, orphan and abandon paths use `try_write` only. No request or response content.
 
 ## 4. Errors
 
@@ -174,7 +192,7 @@ pub enum RunnerError {
     /// The session log could not be flushed or lost rows (LogError kept unchanged: log.flush, log.rows_lost).
     SessionLog(LogError),                       // "runner.session_log"
 }
-impl ErrorId for RunnerError {}                // cause = LogError detail; source() = Some(inner)
+impl ErrorId for RunnerError {}                // cause_detail() = LogError detail; source() = Some(inner); Display = `id: message`
 ```
 
 Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-1); `catch_unwind` around backend and transport calls is the only panic handling.
@@ -182,10 +200,10 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 ## 5. New code (not in the copy)
 
 - N1 `Cargo.toml`, `README.md`, `src/lib.rs`, `src/config.rs`, `src/error.rs`.
-- N2 `JobQueue<J>` in `src/queue.rs` (~110 lines), incl. the in-flight/orphan lists; `BoundedQueue::interrupt()` (notify_all without closing) added on top of C2 so the result iterator wakes for orphans.
-- N3 `src/runner.rs` (~200 lines): `DecisionRunner`, `run(requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>, cancel, workers)` shared by `decide` (workers 1, `iter::once`) and `decide_stream`; the step fn (prepare on first attempt -> `start_send` -> `send_once` -> `end_send`; lost claim -> discard; `ResendAt` hold / `Done` -> `decode` -> `SchemaMismatch` -> `attempts.may_start(&policy, now)` Ok: hold now / Err: finish with the mismatch / other: finish), the skipped fn (`Cancelled { sends: attempts.sends() }`), the feeder thread (owns the `'static` iterator), the `on_cancel` hook calling `jobs.cancel()` + `results.interrupt()` (the `CancelHook` lives as long as the run), the result iterator (drains `take_orphans()` before popping; Drop = `abandon`, never cancels the caller's token).
+- N2 `JobQueue<J>` in `src/queue.rs` (~110 lines), incl. the in-flight/orphan lists; `BoundedQueue::interrupt()` (notify_all without closing) added on top of C2 so the result iterator wakes for orphans; the result `BoundedQueue` is built with capacity `queue_capacity` and its `push` takes `RowWritten`.
+- N3 `src/runner.rs` (~200 lines): `DecisionRunner`, `run(requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>, cancel, workers)` shared by `decide` (workers 1, `iter::once`) and `decide_stream`; the step fn (`Fresh::prepare` -> `Start`: `http.may_start(&req, attempts, now)` / `Resend`: `http.may_resend(&req, pending, now)` -> `Go(permit)`: `start_send` -> `send_once(&req, permit, ctx, &*now)` -> `end_send`; `Wait { at, state }`: hold until `at`; `may_start` Err: finish with the kept mismatch; `may_resend` Err: finish `Http`; `win()` None -> discard; `ResendAt { at, pending }` hold / `Done { response, attempts }` -> `decode(response, &req, &ctx)` -> `SchemaMismatch` -> ready as `Start { attempts, mismatch }` / other: finish), the skipped fn (`Cancelled { sends }`, sends read from the job's `SendState`: `attempts.sends()` for `Start { attempts, .. }`, `pending.attempts().sends()` for `Resend(pending)`), the feeder thread (owns the `'static` iterator), the `on_cancel` hook calling `jobs.cancel()` + `results.interrupt()` (the `CancelHook` lives as long as the run), the result iterator (drains `take_orphans()` before popping; Drop = `abandon` as stated in the shape section, never cancels the caller's token).
 - N4 `src/row.rs` (~30 lines).
-- N5 `tests/support/scripted_backend.rs` (~50 lines, private to a-9's tests; `mod support;` in each test file): `ScriptedBackend { encode: EncodeFn, decode: DecodeFn, encodes: AtomicU32, decodes: AtomicU32 }` implementing `sc_decision_schema::Backend`; `new()` (encode: POST https://scripted.test/v1/systemone with `request.body.to_json()`; decode: `SystemOneResponse::from_json`), `with_encode(Fn(&DecisionRequest) -> Result<HttpRequest, DecisionError>)`, `with_decode(Fn(u32 /*0-based decode index*/, HttpResponse, &DecisionRequest) -> Result<SystemOneResponse, DecisionError>)`, `encodes()`, `decodes()`.
+- N5 `tests/support/scripted_backend.rs` (~50 lines, private to a-9's tests; `mod support;` in each test file): `ScriptedBackend { encode: EncodeFn, decode: DecodeFn, encodes: AtomicU32, decodes: AtomicU32 }` implementing `sc_decision_schema::Backend`; `new()` (encode: POST https://scripted.test/v1/systemone with `request.body().to_json()`; decode: `SystemOneResponse::from_json`), `with_encode(Fn(&DecisionRequest) -> Result<HttpRequest, DecisionError>)`, `with_decode(Fn(u32 /*0-based decode index*/, HttpResponse, &DecisionRequest, &LogContext) -> Result<SystemOneResponse, DecisionError>)`, `encodes()`, `decodes()`.
 - Config keys used (A-4): `workers`, `max_sends` (through the caller's `ResendPolicy` in `HttpClient`). No new keys.
 
 ## 6. Tests (in-process; `ScriptedBackend` (a-9's own, `tests/support/scripted_backend.rs`), `ScriptedTransport` / `BlockingTransport` (A-5) and `MemoryLog` (A-8) as dev-dependencies with feature `testing`; delays wait on a Condvar, never sleep). Each test names the acceptance line it proves.
@@ -195,8 +213,8 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 | `forty_requests_parallel` (Rendezvous(8) in the transport) | REQ-SAG-0701 AC1 |
 | `one_worker_is_serial` | REQ-SAG-0701 AC2 |
 | `failed_request_returned_rest_continue`, `fastest_first` | REQ-SAG-0701 AC3 |
-| `cancel_running_batch` | REQ-SAG-0701 AC4 |
-| `cancel_in_flight_send` (BlockingTransport; cancel; result within 100 ms; release; no second result or row) — stream and `decide` | Cancel in flight |
+| `cancel_running_batch` (token created in the test crate) | REQ-SAG-0701 AC4, REQ-SAG-0104 AC1 |
+| `cancel_in_flight_send` (BlockingTransport; cancel; the Cancelled result is received on an mpsc channel (`recv_timeout(2 s)` failsafe) while the transport is still blocked; then release; no second result or row) — stream and `decide` | Cancel in flight, REQ-SAG-0104 AC1 |
 | `decide_runs_on_a_worker` (transport records the thread name `sc-decision-worker`) | Cancel in flight |
 | `static_iterator_accepted` (compile test: `Box::new(vec.into_iter())` passed to `decide_stream` through `&dyn Decision`) | decide_stream signature |
 | `busy_four_then_ok`, `busy_every_time_stops_at_max_sends`, `same_bytes_each_send` | REQ-SAG-0601 resend |
@@ -205,12 +223,16 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 | `busy_quota_network_passed_through` | REQ-SAG-0601/0602 |
 | `schema_mismatch_resent_once`, `cancel_ends_schema_resends` | REQ-SAG-0901 AC2 |
 | `schema_mismatch_after_max_sends`, `busy_twice_then_mismatch_stops_at_five` | REQ-SAG-0901 AC3 |
-| `budget_runs_out_after_mismatch` (manual clock: 91 s after the first send; `may_start` -> Err(Budget)) | REQ-SAG-0901 budget |
+| `budget_runs_out_after_mismatch` (ManualClock advanced 91 s after the first send; `may_start` -> Err(Budget)) | REQ-SAG-0901 budget |
 | `one_row_per_result` (50 requests incl. failed, cancelled and cancelled-in-flight) | NFR-SAG-0001 / ADR-SAG-0002 |
 | `three_questions_three_digests` | REQ-SAG-0202 |
 | `two_backends_one_runner` | ADR-SAG-0001 |
 | `lower_errors_reach_the_top`, `panic_in_backend_is_a_result`, `session_log_failure_keeps_result` | REQ-SAG-0002 |
 | `dropping_the_stream_does_not_cancel_the_token` | Token ownership |
+| `drop_mid_batch_one_row_per_started_job` (20 requests, BlockingTransport, drop after 3 results, release; MemoryLog rows: one per job the feeder submitted, no duplicate session_id) | Abandon |
+| `slow_consumer_blocks_workers` (workers 2, queue_capacity 8, consumer reads nothing: transport calls stop at 8 + 2 — the next call does not arrive within an `mpsc::recv_timeout(500 ms)`; one read lets the next send through) | Result queue bound |
+| `provider_pause_holds_other_jobs` (workers 2; A gets 529 `Retry-After: 1`; B's next send reaches the transport no earlier than A's pause end) | REQ-SAG-0012 (runner side) |
+| `busy_records_carry_session` (two concurrent requests busy once; MemoryLog http.busy records carry the two different session_ids and positions) | LogContext |
 | `runner_general_records` (`MemoryLog::new()?`; runner built with `log.general()` and `log.session(identity)`; `log.records()?` filtered on `target == "sc_decision_runner"` and `action`) | ANC-007 |
 | ported pool tests (T1) | pool mechanics (no acceptance line; kept from the copy) |
 
@@ -224,7 +246,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 
 ## 7. Dependencies
 
-- `sc-agent-types` (CancelToken, SessionId, ErrorId), `sc-agent-config` (AgentConfig, DEFAULT_WORKERS), `sc-decision-schema` (Decision, Backend, DecisionRequest/Result/Error, digests), `sc-agent-http` (HttpClient, HttpRequest, Attempts, Next, BusyReason), `sc-agent-log` (SessionLogger, GeneralLogger, Level, LogError) — all path. No sc-agent-secrets (keys never reach the runner; they live in the HttpRequest built by the backend).
+- `sc-agent-types` (CancelToken, SessionId, ErrorId), `sc-agent-config` (AgentConfig, DEFAULT_WORKERS), `sc-decision-schema` (Decision, Backend, DecisionRequest/Result/Error, DecisionRequest::digests), `sc-agent-http` (HttpClient, HttpRequest, Start, SendPermit, Attempts, Pending, Next, LogContext, BusyReason), `sc-agent-log` (SessionLogger, GeneralLogger, Level, LogError) — all path. No sc-agent-secrets (keys never reach the runner; they live in the HttpRequest built by the backend).
 - dev-dependencies: `sc-agent-http`, `sc-agent-log`, each with `features = ["testing"]`.
 - `serde_json = "1"` (row payload).
 - No backend crate (backends arrive as `Arc<dyn Backend>`), no sc-observability, no tokio, no thiserror.
@@ -236,19 +258,25 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 - [ ] REQ-SAG-0701 AC2: sc-decision-runner: with RunnerConfig.workers = 1 the same batch runs one request at a time; RunnerConfig::from_config takes workers from AgentConfig.workers, default 8.
 - [ ] REQ-SAG-0701 AC3: sc-decision-runner: a batch with one failing request returns that error tagged with its session ULID and returns every other result; results come back in finish order, each with its session ULID and input position.
 - [ ] REQ-SAG-0701 AC4: sc-decision-runner: cancelling a running decide_stream returns decision.cancelled for every unfinished request; one result per request, always.
-- [ ] Cancel in flight: sc-decision-runner: with a BlockingTransport that blocks until the test releases it, cancelling returns decision.cancelled { sends } within 100 ms for decide_stream and for decide (decide's send runs on a `sc-decision-worker` thread, not the caller's); releasing the transport afterwards produces no further result and no second session row.
+- [ ] Cancel in flight: sc-decision-runner: with a BlockingTransport that blocks until the test releases it, cancelling delivers decision.cancelled { sends } while the transport is still blocked (received on a channel, 2 s failsafe bound) for decide_stream and for decide (decide's send runs on a `sc-decision-worker` thread, not the caller's); releasing the transport afterwards produces no further result and no second session row.
+- [ ] REQ-SAG-0104 AC1: a CancelToken created in the test crate stops work inside sc-decision-runner: cancel_running_batch and cancel_in_flight_send end every unfinished request of DecisionRunner::decide_stream and decide with decision.cancelled.
+- [ ] REQ-SAG-0012 (runner side): sc-decision-runner sends every job through its one HttpClient, so a provider pause set by one busy reply makes may_start/may_resend return Start::Wait for the other jobs to that host and the runner holds them (test: B's next send reaches the transport no earlier than the end of A's Retry-After pause); the pause rule itself is a-5's.
+- [ ] Exactly once by construction: sc-decision-runner's row writer takes the non-Clone Finish token that only Claim::win returns, and the result push takes the RowWritten token the row writer returns; jobs are Fresh until prepared and only Prepared jobs are sent or held.
+- [ ] Abandon: dropping sc-decision-runner's result iterator mid-batch stops intake, cancels the JobQueue (never the caller's token), joins no thread (a worker blocked in a send lingers at most the transport request deadline) and writes exactly one row per job the feeder submitted (test drop_mid_batch_one_row_per_started_job).
+- [ ] Result queue bound: sc-decision-runner's result queue holds at most queue_capacity results and a worker blocks on a full queue (test slow_consumer_blocks_workers).
+- [ ] LogContext: sc-decision-runner passes each job's LogContext::request(session_id, Some(position)) to HttpClient::send_once and Backend::decode; two concurrent busy requests' http.busy records carry their own session_ids; runner.session_log_failed carries session_id and position.
 - [ ] decide_stream signature: sc-decision-runner implements decide_stream with `requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>` (A-2) and pulls it on its feeder thread; a compile test passes `Box::new(vec.into_iter())` through `&dyn Decision`.
-- [ ] REQ-SAG-0601: sc-decision-runner resends a request whose HttpClient::send_once returns Next::ResendAt (HTTP 429, 502 or 529, classified by a-5) until max_sends (default 5, set in the HttpClient ResendPolicy) is reached, and sends the same encoded bytes each time (encode called once). Test: a ScriptedTransport answering 529 four times then 200 yields the answer; one answering 529 every time stops after max_sends sends. A held-off request waits in the JobQueue, not in a worker (with 1 worker a second request is answered during the first one's holdoff); the wait is a Condvar timed wait woken by a CancelToken::on_cancel hook; no sleep.
+- [ ] REQ-SAG-0601: sc-decision-runner resends a request whose HttpClient::send_once returns Next::ResendAt { at, pending } (HTTP 429, 502 or 529, classified by a-5), through HttpClient::may_resend, until max_sends (default 5, set in the HttpClient ResendPolicy) is reached, and sends the same encoded bytes each time (encode called once). Test: a ScriptedTransport answering 529 four times then 200 yields the answer; one answering 529 every time stops after max_sends sends. A held-off request waits in the JobQueue, not in a worker (with 1 worker a second request is answered during the first one's holdoff); the wait (ResendAt or Start::Wait) is a Condvar timed wait woken by a CancelToken::on_cancel hook; no sleep. Rows and general records on the cancel, orphan and abandon paths use try_write.
 - [ ] REQ-SAG-0601 AC4: sc-decision-runner: cancelling a held-off request ends its wait at once and returns decision.cancelled (decide_stream and decide).
-- [ ] REQ-SAG-0601/0602: sc-decision-runner resends only on Next::ResendAt and returns http.provider_busy / http.quota_exhausted / http.network unchanged inside decision.http.
+- [ ] REQ-SAG-0601/0602: sc-decision-runner resends only on Next::ResendAt (and a schema mismatch) and returns http.provider_busy / http.quota_exhausted / http.network unchanged inside decision.http.
 - [ ] REQ-SAG-0901 AC2: sc-decision-runner: a test backend (tests/support ScriptedBackend) that first returns decision.schema_mismatch (a reply missing probabilities) and then a valid answer yields the valid answer after one resend (2 sends, schema_resends 1 in the row); resends stop at once on cancel.
 - [ ] REQ-SAG-0901 AC3: sc-decision-runner: a backend that never matches yields decision.schema_mismatch, with what did not match, after max_sends sends in total (default 5; max_sends = 2 gives 2); a transport answering 529 twice and then a backend that never matches stops after 5 sends, not more.
-- [ ] REQ-SAG-0901 budget: sc-decision-runner calls Attempts::may_start(&policy, now) before requeueing a schema-mismatch resend; when the 90 s budget has run out after a mismatch (test clock 91 s after the first send) the result is decision.schema_mismatch, never decision.http/http.provider_busy.
+- [ ] REQ-SAG-0901 budget: sc-decision-runner resends after a schema mismatch only through HttpClient::may_start(&request, attempts, now); when it refuses because the 90 s budget has run out (ManualClock 91 s after the first send) the result is decision.schema_mismatch, never decision.http/http.provider_busy.
 - [ ] NFR-SAG-0001 / ADR-SAG-0002: sc-decision-runner writes exactly one session row per result (ok, failed, cancelled and cancelled in flight), each with its session ULID and the identity fields session_id, repo, project, agent_role; error rows carry the DecisionError ErrorDetail chain; "sends" is Attempts::sends().
 - [ ] REQ-SAG-0202: sc-decision-runner: each ok row records one sc-sha question digest per question with the response (three questions -> three digests).
 - [ ] ADR-SAG-0001: every backend sc-decision-runner drives implements sc_decision_schema::Backend (the sans-IO trait: encode a Jev request into an HTTP request, decode an HTTP response into a Jev response); DecisionRunner holds only an Arc<dyn sc_decision_schema::Backend> and implements the one Decision trait (no associated error) over it and an HttpClient. Test: the runner tests drive two different Backend implementations through the same DecisionRunner.
 - [ ] ADR-SAG-0004: sc-decision-runner sits in the runner layer; its direct sc-agent crate dependencies are sc-agent-types, sc-agent-config, sc-agent-log, sc-agent-http and sc-decision-schema (no sc-agent-secrets), and it depends on no decision-backend crate, checked by `cargo tree -p sc-decision-runner -e normal --depth 1` and a full `cargo tree -p sc-decision-runner -e normal` with no sc-decision-systemone, sc-decision-local, sc-decision-llm or sc-llm-provider.
-- [ ] REQ-SAG-0002: every error returned by a public sc-decision-runner function (decide, the decide_stream results, flush_session_log) carries the error id and message of each lower-layer error that caused it: HttpError inside decision.http, LogError inside runner.session_log, and the backend's own error. Test: inject a failure in the transport, in the session log and in backend decode, and assert that failure's id and message are in the returned DecisionError chain. Runner-level failures are decision.cancelled and decision.shutdown (a backend panic becomes decision.shutdown); a session-log write failure never replaces the decision result; no thread::spawn (Builder::spawn only); clippy with the workspace denies passes.
+- [ ] REQ-SAG-0002: every error returned by a public sc-decision-runner function (decide, the decide_stream results, flush_session_log) carries the error id and message of each lower-layer error that caused it: HttpError inside decision.http, LogError inside runner.session_log, and the backend's own error. Test: inject a failure in the transport, in the session log and in backend decode, and assert that failure's id and message are in the returned DecisionError chain. RunnerError uses cause_detail() and Display `id: message`. Runner-level failures are decision.cancelled and decision.shutdown (a backend panic becomes decision.shutdown); a session-log write failure never replaces the decision result; no thread::spawn (Builder::spawn only); clippy with the workspace denies passes.
 - [ ] Token ownership: dropping sc-decision-runner's result iterator never cancels the caller's CancelToken.
 - [ ] REQ-SAG-0009/0010: `cargo tree -p sc-decision-runner` shows no tokio; a search of sc-decision-runner non-test source finds no sleep call.
 - [ ] REQ-SAG-0010: sc-decision-runner waits out holdoffs and idle workers with Condvar timed waits woken by CancelToken::on_cancel, never a sleep function; enforced by the workspace clippy disallowed-methods rule.
@@ -262,4 +290,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7):
 - Schema resend limit: max_sends decoded replies, then decision.schema_mismatch (REQ-SAG-0901).
 - Result correlation: session ULID and input position (REQ-SAG-0701).
 No open questions.
-Hardening round 1 (2026-11-09, decisions.md): PLAN-CRIT-001 'static request iterator, feeder kept; PLAN-CRIT-002 in-flight cancel via claim/orphans, decide on a worker (replaces "decide on the caller's thread with wait_until"); PLAN-CRIT-003 runner side only (may_start before a schema resend); budget-vs-timeout default remains an OPEN owner question owned by a-5. CRIT-M2 sc-agent-secrets dropped; CRIT-M4 Job.sends dropped.
+Hardening round 1 (2026-11-09, decisions.md): PLAN-CRIT-001 'static request iterator, feeder kept; PLAN-CRIT-002 in-flight cancel via claim/orphans, decide on a worker (replaces "decide on the caller's thread with wait_until"); PLAN-CRIT-003 runner side only (may_start before a schema resend); budget-vs-timeout rule closed in a-5 (A5-04, A5-06). CRIT-M2 sc-agent-secrets dropped; CRIT-M4 Job.sends dropped.
+Round 2 (2026-11-09, round2.md): REQ-QA-012 OPEN note removed; REQ-QA-007 REQ-SAG-0104 AC1 owned here; RBP-F003 Finish/RowWritten tokens; RBP-F009(1) Fresh/Prepared; RSH-006 abandon contract + test; RSH-011 result queue = queue_capacity + slow-consumer test; RSH-009 LogContext into send_once; RSH-003 one HttpClient shares the provider pause (REQ-SAG-0012 runner side); REQ-QA-018 channel check, 2 s bound; REQ-SAG-0011 to a-10; cause -> cause_detail. SendPermit/LogContext/provider-pause signatures are a-5 section 3's; a-9 names them but does not restate them.

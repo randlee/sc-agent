@@ -1,0 +1,161 @@
+{
+  "agent": "arch-qa",
+  "branch": "main",
+  "scope": {
+    "phase": "a",
+    "sprint": "phase-a-plan"
+  },
+  "commit": "2e0fed6",
+  "verdict": "FAIL",
+  "blocking": 6,
+  "important": 2,
+  "findings": [
+    {
+      "id": "ARCH-001",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0001",
+      "severity": "BLOCKING",
+      "file": "docs/adr/ADR-SAG-0001.md",
+      "line": 14,
+      "description": "ADR-SAG-0001, 0002, 0003 and 0004 all have Status: Draft (ADR-0002 line 14, ADR-0003 line 14, ADR-0004 line 14). Draft ADRs are not binding, and no sprint may depend on one. Every sprint's `adrs` list (a-1 through a-10) names only Draft ADRs, so no id resolves to a binding ADR. ADR-0004 was amended today and is still Draft.",
+      "remediation": "The owner approves the four ADRs and sets Status to Approved or Active before the plan is accepted. Re-run arch-qa afterward. Until then the plan has no binding architecture."
+    },
+    {
+      "id": "ARCH-002",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0004",
+      "severity": "BLOCKING",
+      "file": "docs/plans/phase-a/sprint-a-10-clis-python.md",
+      "line": 36,
+      "description": "a-10 `does_not_close` says the ADR-SAG-0004 amendment (decide as composition root, sc-agent-py on decide, ErrorId/ErrorDetail convention) is an 'open owner question; records unchanged'. Line 436 repeats this. ADR-0004 already contains that wording (Draft). The sprint doc contradicts the ADR text. The sprint's whole design (decide/src/select.rs as the one place a backend is chosen, sc-agent-py over decide) depends on the amendment, which is not yet binding.",
+      "remediation": "Make the ADR-0004 amendment Approved or Active. Then remove the open-question lines from a-10 (lines 36 and 436). If it stays unapproved, name the amendment as an a-10 deliverable."
+    },
+    {
+      "id": "ARCH-003",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0004",
+      "severity": "BLOCKING",
+      "file": "docs/plans/phase-a/sprint-a-6-decision-backends.md",
+      "line": 118,
+      "description": "a-6 says sc-decision-systemone has 'No error enum of its own: every failure is a DecisionError'. ADR-0004 says each crate defines its own error union that wraps the error of the layer below. The crate sc-decision-systemone is therefore planned against that ADR. Every other crate in the plan (config, secrets, log, http, schema, local, llm, decision-llm, runner, decide) defines its own union.",
+      "remediation": "Either give sc-decision-systemone a SystemOneError (ErrorId) that wraps the lower errors, or plan an ADR-0004 amendment that exempts backends whose Backend-trait error is fixed to DecisionError. Make the amendment Active before the plan is accepted."
+    },
+    {
+      "id": "ARCH-004",
+      "rule": "RULE-ADR-PLAN",
+      "adr": null,
+      "severity": "BLOCKING",
+      "file": "docs/plans/phase-a/sprint-a-3-sc-treesitter.md",
+      "line": 44,
+      "description": "a-3 introduces new structural decisions with no ADR: a new crate sc-treesitter-py, a `python` feature and a non-default `cli` feature on sc-treesitter, and a tsq bin. The sprint calls the PyO3 placement an 'assistant decision shown to the owner at architecture review' (line 450). ADR-0004 only says sc-treesitter stands alone. The crate set, feature gates and PyO3 edge have no ADR, and no ADR is a deliverable. a-3 lists only ADR-SAG-0004.",
+      "remediation": "Add an ADR (or amend ADR-0004) covering sc-treesitter-py, the python/cli feature gates and the tsq placement. Make it a deliverable and list it in a-3 `adrs`."
+    },
+    {
+      "id": "ARCH-005",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0002",
+      "severity": "BLOCKING",
+      "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+      "line": 26,
+      "description": "Expected-ADR coverage is incomplete. ADR-SAG-0002 is missing from the `adrs` lists of three sprints. (1) a-2 governs REQ-SAG-0202 (question digest recorded in session rows), a REQ that ADR-0002 lists. (2) a-4 owns AgentConfig.log_root and REQ-SAG-0002/0003/0005 (`<log_root>`, default ~/.sc-agent), which fix the ADR-0002 layout (adrs at a-4 line 27). (3) a-10 passes project and agent_role into the session rows and writes the logs end to end (REQ-SAG-0004, REQ-SAG-0003) (adrs at a-10 line 33).",
+      "remediation": "Add ADR-SAG-0002 to the `adrs` lists of a-2, a-4 and a-10, with an acceptance line for each."
+    },
+    {
+      "id": "ARCH-006",
+      "rule": "RULE-ADR-PLAN",
+      "adr": null,
+      "severity": "BLOCKING",
+      "file": "docs/architecture.md",
+      "line": 1,
+      "description": "docs/architecture.md, docs/design.md and docs/framework-charter.md do not exist (no docs/*.md files). The quality policy lists docs/requirements.md and docs/architecture.md as required for every review, and design.md and framework-charter.md for plan review. The ADRs sit only in docs/adr/. Per the verdict rule, an authoritative architecture file that cannot be read means FAIL. No per-crate docs/<crate>/architecture.md exists for the crates the sprints own either.",
+      "remediation": "Create docs/architecture.md (index of repo-level ADRs and the layer map) and the other policy-required docs. Or record in the quality policy that these paths are not yet required, so the absence is not Blocking."
+    },
+    {
+      "id": "ARCH-007",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0004",
+      "severity": "IMPORTANT",
+      "file": "docs/plans/phase-a/plan.md",
+      "line": 31,
+      "description": "The boundary map row for the tsq binary says 'sc-treesitter-py (tsq bin)'. a-3 line 41 puts `[[bin]] tsq` in sc-treesitter behind the `cli` feature. The two documents disagree about which crate owns the tsq binary.",
+      "remediation": "Correct the plan.md boundary map to match a-3. Do this together with the ARCH-004 ADR."
+    },
+    {
+      "id": "ARCH-008",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0001",
+      "severity": "IMPORTANT",
+      "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+      "line": 192,
+      "description": "ADR-0001 says Backend encodes a Jev API request and decodes into a Jev API response. a-2 defines Backend::encode(&DecisionRequest), where DecisionRequest is the SystemOneRequest plus image_parts and long_context. The a-7 and a-6 acceptance lines say the backends 'receive the SystemOneRequest unchanged'. The ADR does not say whether the wrapper is the one request form. This reading is consistent with the ADR's one-form principle, but it is not written in the ADR.",
+      "remediation": "State in ADR-0001 that DecisionRequest (the Jev body plus transport parts) is the one request form. Alternatively make a-7 and a-6 say DecisionRequest."
+    }
+  ],
+  "adr_checks": [
+    {
+      "adr": "ADR-SAG-0001",
+      "source": "docs/adr/ADR-SAG-0001.md:12",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "docs/adr/ADR-SAG-0001.md:14",
+        "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:224-245",
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:249"
+      ]
+    },
+    {
+      "adr": "ADR-SAG-0002",
+      "source": "docs/adr/ADR-SAG-0002.md:12",
+      "listed_in_sprint_doc": false,
+      "result": "violated",
+      "evidence_refs": [
+        "docs/adr/ADR-SAG-0002.md:14",
+        "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:26",
+        "docs/plans/phase-a/sprint-a-4-config-secrets.md:27",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:33"
+      ]
+    },
+    {
+      "adr": "ADR-SAG-0003",
+      "source": "docs/adr/ADR-SAG-0003.md:12",
+      "listed_in_sprint_doc": false,
+      "result": "not-applicable",
+      "evidence_refs": [
+        "docs/adr/ADR-SAG-0003.md:14"
+      ]
+    },
+    {
+      "adr": "ADR-SAG-0004",
+      "source": "docs/adr/ADR-SAG-0004.md:12",
+      "listed_in_sprint_doc": true,
+      "result": "violated",
+      "evidence_refs": [
+        "docs/adr/ADR-SAG-0004.md:14",
+        "docs/plans/phase-a/sprint-a-6-decision-backends.md:118",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:36"
+      ]
+    },
+    {
+      "adr": "NFR-SAG-0001",
+      "source": "docs/nfr/NFR-SAG-0001.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "docs/plans/phase-a/sprint-a-8-sc-agent-log.md:291",
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:247"
+      ]
+    }
+  ],
+  "gate_artifact_checks": [
+    {
+      "artifact": "docs/plans/phase-a/plan.md",
+      "status": "not-applicable",
+      "evidence_refs": [
+        "docs/plans/phase-a/plan.md:19-31"
+      ],
+      "notes": "The boundary map and wave table define no internal completion gate. They match the sprint docs, except the tsq row (ARCH-007)."
+    }
+  ],
+  "merge_ready": false,
+  "notes": "Review mode 'plan' is not in the contract enum. I treated it as doc_review. I read the quality policy, the four ADRs, NFR-SAG-0001, plan.md, and the grep-targeted parts of all 10 sprint docs. Layering looks consistent with ADR-0004 for every planned dependency edge. The runner is planned without secrets and without any backend crate. The schema layer is above http and below the backends. config, secrets and log sit above types. decide is the top layer. LlmError reaches DecisionError as ErrorDetail. No tokio is planned and no std Mutex guard is held across an await (no async is planned; the a-9 JobQueue uses Mutex+Condvar). The ADR-0002 single sessions.jsonl per directory with never_rotate and the 40,000-row test are planned (a-8 A8-04 and A8-11). Beyond the gaps above, the plan itself is architecturally sound. The main fix is owner approval of the four ADRs, plus closing the three gaps in ARCH-002, ARCH-003 and ARCH-004. Only the beads' exported copies were reviewed, not the beads themselves."
+}

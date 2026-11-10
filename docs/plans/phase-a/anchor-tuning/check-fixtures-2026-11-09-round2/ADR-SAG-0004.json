@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ADR-SAG-0004",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decide, which sits above the runner.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures/plan-20261110T043255Z-fixture_ADR-SAG-0004_pass_1.json"
+      },
+      {
+        "anchor_id": "ADR-SAG-0004",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures/plan-20261110T043255Z-fixture_ADR-SAG-0004_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "judged": 2,
+    "pass": true,
+    "path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures",
+    "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures",
+    "runs": [
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures/plan-20261110T043255Z-fixture_ADR-SAG-0004_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-round2/fixtures/fixtures/plan-20261110T043255Z-fixture_ADR-SAG-0004_fail_1.json"
+    ]
+  },
+  "error": null
+}

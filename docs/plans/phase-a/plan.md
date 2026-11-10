@@ -28,7 +28,7 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
 | sc-decision-runner | runner | DecisionRunner, RunnerConfig, RunnerError | types, config, log, http, schema | a-9 |
 | decide, sc-agent-py | top (decide library = composition root) | decide library API, decide CLI, Python module | all of the above | a-10 |
-| sc-treesitter, sc-treesitter-py (tsq bin) | stands alone | tsq CLI, Python query API | none (workspace root only) | a-3 |
+| sc-treesitter (tsq bin behind the non-default `cli` feature), sc-treesitter-py | stands alone (ADR-SAG-0005) | tsq CLI, Python query API | none (workspace root only) | a-3 |
 
 ## Wave table
 
@@ -40,13 +40,91 @@ Every edge is `must_follow` with trigger **dev-push**: the child starts when the
 | 2 | a-3, a-4, a-8 | a-1 push of the workspace root + its types |
 | 3 | a-5 | a-4 ApiKey, a-8 GeneralLogger/Level |
 | 4 | a-2 | a-5 src/request.rs + src/error.rs (pushed first after a-5's copy commit) |
-| 5 | a-6, a-7, a-9 | a-2 Backend/Decision/DecisionRequest/DecisionError |
+| 5 | a-6, a-7, a-9 | a-2's contract plus the a-4, a-5 and a-8 artifacts each names (edge table below) |
 | 6 | a-10 | a-6, a-7, a-9 named types |
 
 Sprint count 10; critical path 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
 Why more than three waves: ADR-SAG-0004 fixes the layer order, and the decision contract (a-2) carries the http types (HttpRequest/HttpResponse/HttpError, a-5), which carry ApiKey (a-4) and the logger (a-8). Hoisting the http types into a-1 would put them below their layer, so it is rejected. Dev-push triggers keep the elapsed cost of the extra waves to the time it takes each parent to push its named artifact.
 No sprint split: a-4, a-6, a-7, a-3 and a-10 each own two sibling crates with a recorded vertical_rationale; splitting would add sprints without shortening the critical path.
 owned_paths are disjoint across all sprints; the workspace root Cargo.toml and clippy.toml are owned by a-1 only (members = ["crates/*"], so no other sprint edits the root).
+
+## Every must_follow edge
+
+A sprint starts when every artifact it lists below has been pushed (dev-push).
+
+| Sprint | must_follow | Artifact (dev-push) |
+|---|---|---|
+| a-2 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, LogContext (re-export of sc-agent-log's)} (crates/sc-agent-http/src/request.rs + src/error.rs + lib.rs re-export) |
+| a-3 | a-1 | workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (test allowances, disallowed-methods sleep rule) |
+| a-4 | a-1 | sc_agent_types::{Provider, ModelId, ShortName, ReleaseDate, Catalog, ModelChoice, VarName, TypesError, ErrorId, ErrorDetail} + workspace root Cargo.toml + clippy.toml |
+| a-5 | a-4 | sc_agent_secrets::ApiKey (crates/sc-agent-secrets) |
+| a-5 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} (crates/sc-agent-log) |
+| a-6 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, ModelMetadataList, DecisionError} (crates/sc-decision-schema/src/) |
+| a-6 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe} and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
+| a-6 | a-4 | sc_agent_config::RunnerKind (closed enum) and sc_agent_secrets::ApiKey |
+| a-6 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`) |
+| a-7 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, Answer, DecisionError} (crates/sc-decision-schema/src/) |
+| a-7 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError} (src/request.rs, src/error.rs), plus Endpoint, SecretHeader, ProviderReply, Timeouts::probe, HttpClient::{may_start, send_once}, SendPermit and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
+| a-7 | a-4 | sc_agent_secrets::ApiKey |
+| a-7 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`) |
+| a-8 | a-1 | sc_agent_types::{SessionId, ErrorId, ErrorDetail} + workspace root Cargo.toml and clippy.toml |
+| a-9 | a-2 | sc_decision_schema::{Decision, Backend, DecisionRequest, DecisionResult, DecisionError} (DecisionRequest::new/digests) |
+| a-9 | a-5 | sc_agent_http::{HttpClient (may_start, may_resend, send_once), Start, SendPermit, Attempts, Pending, Next, LogContext (re-export), ResendPolicy, BusyReason, ProviderPause} + testing::{ScriptedTransport, BlockingTransport, ManualClock} (feature `testing`) |
+| a-9 | a-8 | sc_agent_log::{SessionLogger, GeneralLogger, Level, LogError} + testing::{MemoryLog, MemoryRecord} (feature `testing`) |
+| a-9 | a-4 | sc_agent_config::{AgentConfig, DEFAULT_WORKERS} |
+| a-10 | a-6 | sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL, models_request} and sc_decision_local::{LocalBackend (incl. with_log), DaemonKind} |
+| a-10 | a-7 | sc_llm_provider::{LlmClient (incl. with_log, models_request, decode_models), LlmProvider, catalog_model_id} and sc_decision_llm::LlmDecisionBackend (incl. with_log) |
+| a-10 | a-9 | sc_decision_runner::{DecisionRunner, RunnerConfig, RunnerError} |
+
+## Requirement ownership
+
+The owner closes the record's acceptance; contributing sprints prove their boundary part and name the owner in does_not_close. REQ-SAG-0002, 0006, 0009, 0010 and ADR-SAG-0004 are checked in every sprint's required validation.
+
+| Record | Owner of acceptance | Sprints that contribute |
+|---|---|---|
+| ADR-SAG-0001 | a-10 (end to end) | a-2, a-5, a-6, a-7, a-9, a-10 |
+| ADR-SAG-0002 | a-10 (end to end) | a-2, a-4, a-8, a-9, a-10 |
+| ADR-SAG-0004 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| ADR-SAG-0005 | a-3 | a-3 |
+| NFR-SAG-0001 | a-9 (last boundary) | a-8, a-9 |
+| REQ-SAG-0001 | a-10 (end to end) | a-1, a-2, a-3, a-6, a-8, a-9, a-10 |
+| REQ-SAG-0002 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0003 | a-10 (end to end) | a-3, a-4, a-8, a-10 |
+| REQ-SAG-0004 | a-10 (end to end) | a-8, a-9, a-10 |
+| REQ-SAG-0005 | a-8 (last boundary) | a-4, a-8 |
+| REQ-SAG-0006 | every sprint (shared validation) | a-1, a-2, a-7 |
+| REQ-SAG-0007 | a-10 (end to end) | a-2, a-5, a-6, a-7, a-9, a-10 |
+| REQ-SAG-0008 | a-10 (end to end) | a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0009 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0010 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0011 | a-10 (end to end) | a-10 |
+| REQ-SAG-0012 | a-10 (end to end) | a-5, a-9, a-10 |
+| REQ-SAG-0013 | a-10 (end to end) | a-4, a-10 |
+| REQ-SAG-0014 | a-10 (end to end) | a-2, a-10 |
+| REQ-SAG-0101 | a-10 (end to end) | a-1, a-10 |
+| REQ-SAG-0102 | a-10 (end to end) | a-1, a-4, a-10 |
+| REQ-SAG-0103 | a-10 (end to end) | a-1, a-7, a-10 |
+| REQ-SAG-0104 | a-10 (end to end) | a-1, a-2, a-9, a-10 |
+| REQ-SAG-0201 | a-9 (last boundary) | a-2, a-6, a-7, a-9 |
+| REQ-SAG-0202 | a-9 (last boundary) | a-2, a-9 |
+| REQ-SAG-0301 | a-3 | a-3 |
+| REQ-SAG-0302 | a-3 | a-3 |
+| REQ-SAG-0303 | a-3 | a-3 |
+| REQ-SAG-0401 | a-10 (end to end) | a-1, a-4, a-5, a-6, a-7, a-10 |
+| REQ-SAG-0501 | a-10 (end to end) | a-10 |
+| REQ-SAG-0502 | a-7 | a-7 |
+| REQ-SAG-0503 | a-10 (end to end) | a-7, a-10 |
+| REQ-SAG-0504 | a-10 (end to end) | a-2, a-10 |
+| REQ-SAG-0601 | a-10 (end to end) | a-1, a-4, a-5, a-6, a-9, a-10 |
+| REQ-SAG-0602 | a-10 (end to end) | a-5, a-9, a-10 |
+| REQ-SAG-0701 | a-10 (end to end) | a-2, a-4, a-9, a-10 |
+| REQ-SAG-0801 | a-10 (end to end) | a-4, a-6, a-10 |
+| REQ-SAG-0901 | a-10 (end to end) | a-2, a-7, a-9, a-10 |
+
+## Outside phase A
+
+- REQ-SAG-0302 AC2 (csharp and Go grammars): the record dates it to the second release.
+- ADR-SAG-0003 (records are Raptor files): governs the record format, not code; no sprint implements it.
 
 ## Sprints
 

@@ -1,0 +1,162 @@
+{
+  "success": true,
+  "data": {
+    "status": "findings",
+    "reviewed_branch": "main",
+    "reviewed_commit": "2e0fed6",
+    "review_mode": "doc_review",
+    "service_indicators_found": [
+      "ureq = \"=3.5.1\" (sc-agent-http sync transport)",
+      "ureq::Agent / UreqTransport (HTTP client)",
+      "worker-pool threads with Condvar queue (sc-decision-runner, long-running worker loops)",
+      "no tokio/axum/hyper/reqwest by design (REQ-SAG-0009)"
+    ],
+    "topics_reviewed": [
+      "config_validation",
+      "timeouts",
+      "retries",
+      "graceful_shutdown",
+      "backpressure",
+      "body_limits",
+      "structured_tracing"
+    ],
+    "findings": [
+      {
+        "id": "RSH-001",
+        "topic": "retries",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 229,
+        "issue": "The timeout resend rule cannot trigger against a real transport. The request timeout is 120 s (line 168) and Attempts::may_start refuses any send once 90 s have passed since the first send (line 201). A real read or request timeout takes at least 120 s, so the next send is always refused with Budget and the timeout error is returned. The 'timeout resent under max_sends' behavior (REQ-SAG-0601, A5-06) is only reachable with scripted instant timeouts, or a connect-phase timeout classified Timeout (10 s). The tests (`timeout_resent_under_max_sends`) pass while production behavior is a single send. The resend also repeats a POST after a timeout that may already have been processed, which can double-bill a paid LLM call. The plan does not state that this is acceptable.",
+        "recommendation": "Decide explicitly. Either the budget counts only holdoff and busy time, or the budget exceeds the request timeout, or timeout resend is documented as connect-timeout-only. Whichever is chosen, add a test using the real default Timeouts and the explicit clock showing which timeout kinds are resent. Document the duplicate-execution and billing risk of a post-send timeout resend. This relates to the open owner question PLAN-CRIT-003 but is a separate operational consequence.",
+        "evidence": "a-5 line 168 `Default 10 s / 120 s`; line 201 `Err(Budget) when ... now - first_send >= BUDGET (90 s)`; line 229 step 2 resends Timeout only `with sends < max_sends`; line 348 test only works by advancing the clock 120 s and then expects NO second send."
+      },
+      {
+        "id": "RSH-002",
+        "topic": "timeouts",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 321,
+        "issue": "Timeouts are a fixed code-level 10 s / 120 s for every caller (`Timeouts stays code-level`). decide builds UreqTransport::new(Timeouts::default()) (a-10 select.rs). That one value is applied to: non-streaming LLM calls with max_tokens up to 16 000, local runners such as Laya that load checkpoints on demand (first call can take minutes), and the discovery and health probes in sc-decision-local (`discover` goes through the same transport), where a 120 s wait for a /health answer is far too long. Because of RSH-001 a timeout is also terminal, so legitimately slow backends fail permanently with no operator knob. The plan also does not state whether 120 s is a whole-request deadline (including body read) or a per-read idle timeout in ureq. A slow-drip response could exceed it.",
+        "recommendation": "State in the design that `request` is a global deadline covering headers and body read (ureq timeout_global). Add per-use timeouts: a short probe timeout for discover, models and doctor, and an optional per-runner or per-provider request timeout in AgentConfig, validated at load with a sane min and max. Bound the total worst-case wall clock per request (about 90 s of starts plus one 120 s send, plus holdoff) and document it.",
+        "evidence": "a-5 lines 168, 321; a-6 line 81 (discovery sent through Transport::send once); a-7 `DEFAULT_MAX_TOKENS = 16_000`; a-6 Laya 'checkpoints load on demand'."
+      },
+      {
+        "id": "RSH-003",
+        "topic": "retries",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 232,
+        "issue": "Busy backoff is purely per request. Every job in a batch holds its own Attempts, so a 429/529 from a provider sends up to 8 workers times 5 sends, and a 40-request batch can issue 200 sends against an already overloaded provider. A valid Retry-After is used exactly with no jitter (0-30 s), so all held jobs that received the same header wake at the same instant and retry together (thundering herd). `Retry-After: 0` yields an immediate resend, and the plan's own test (a-10 test 16) does exactly 5 back-to-back sends. There is no shared provider-level pause, so one 429 does not slow the other in-flight requests.",
+        "recommendation": "Add a shared 'not before' for the HttpClient (or per endpoint host) updated from any busy reply, so later sends from the same client wait at least until it. Alternatively, make the runner hold new jobs while the provider is in holdoff. Add jitter to the Retry-After path or floor a 0 Retry-After at a small minimum. Keep max_sends bounded as designed.",
+        "evidence": "a-5 line 232 (`valid Retry-After -> RetryAfter::wait() (0-30 s, no jitter)`), A5-03 (line 374) says ResendAt(t + 3 s) exactly; a-9 line 51 resend is per-job, with no cross-job state; a-10 line 380."
+      },
+      {
+        "id": "RSH-004",
+        "topic": "graceful_shutdown",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-10-clis-python.md",
+        "line": 235,
+        "issue": "The decide CLI has a CancelToken design but nothing connects process signals (SIGINT/SIGTERM) to it. Cancel is triggered only by a stdout write failure. Ctrl-C or SIGTERM on a running `decide send --batch` kills the process abruptly. Session rows queued in the sc-observability writer, and rows for requests that finished or were cancelled but not yet flushed, are lost. That contradicts NFR-SAG-0001 (one session row per result) and the A8-14 'never lost silently' guarantee. `flush_session_log` runs only after the stream ends normally. Draining is not separated from stopping intake on a signal.",
+        "recommendation": "Add a signal handler in decide's main (a sync crate such as signal-hook or ctrlc, no tokio) that cancels the token. The existing path then returns decision.cancelled for unfinished work, the stream is drained, flush_session_log runs, and exit is non-zero. Add a test for this path. The binary stays parse-and-output only if the handler lives in the library or main.",
+        "evidence": "a-10 line 235 (cancel only on stdout write failure; flush after the stream); line 241 `no threads of its own`; no mention of signals anywhere in the A-9 or A-10 designs."
+      },
+      {
+        "id": "RSH-005",
+        "topic": "graceful_shutdown",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-10-clis-python.md",
+        "line": 336,
+        "issue": "Each sc-agent-py call releases the GIL and blocks until the whole call finishes. Python's KeyboardInterrupt is never delivered while the thread is in allow_threads, and nothing converts it to a CancelToken cancel. A Ctrl-C during `send_batch` of many requests hangs until all requests complete, or up to roughly 200 s per blocked send. The caller must create and cancel a CancelToken from another thread. `on_result` is invoked per result, but the plan does not say what happens when the callback raises (the batch continues and the exception is lost, or it cancels the token).",
+        "recommendation": "Run the call as a wait loop that reacquires the GIL periodically to check py.check_signals() (using a Condvar timed wait, not sleep) and cancels the token on interrupt. Specify the on_result exception behavior (cancel the token, drain, re-raise).",
+        "evidence": "a-10 line 336 `Each call releases the GIL (py.allow_threads)`; line 344 send_batch signature; test list covers only explicit CancelToken use (lines 386-389)."
+      },
+      {
+        "id": "RSH-006",
+        "topic": "graceful_shutdown",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-9-decision-runner.md",
+        "line": 186,
+        "issue": "The result-iterator Drop (`abandon`) cancels the queue and discards results but the design does not state whether worker and feeder threads are joined, whether in-flight workers are detached, or whether rows for jobs cancelled during abandon are still written. Cancelled in-flight sends keep their worker blocked until the transport returns (up to 120 s), so each abandoned run in a long-lived sc-agent-py process can leave up to 8 detached threads plus sockets for minutes. The feeder pulls a caller-supplied iterator that may itself block (for example a stdin reader), and cancel cannot interrupt that `next()`.",
+        "recommendation": "Document the Drop contract: stop intake, cancel, whether threads are joined, and the bound (request timeout) on lingering workers. State that rows for cancelled jobs are still written exactly once. Add a test that dropping a stream mid-batch yields one row per started job. Note that the feeder cannot be interrupted while blocked in the caller's iterator.",
+        "evidence": "a-9 line 51 (late reply discarded; the hook never blocks); line 186 `Drop = abandon, never cancels the caller's token`; line 59 `jobs.cancel() + results.discard()` with no join."
+      },
+      {
+        "id": "RSH-007",
+        "topic": "config_validation",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+        "line": 141,
+        "issue": "`workers` is validated only as non-zero. There is no upper bound, and the old `Concurrency::MAX = 64` was deliberately not copied because it is 'in no record'. A value like 100000 in default.json or SC_AGENT__WORKERS makes the runner spawn that many OS threads (thread::Builder::spawn per worker plus a queue of workers * 4), which exhausts threads or memory, or fails in the middle of start-up so that only some workers exist. `queue_capacity = workers * 4` is unchecked arithmetic on a NonZeroUsize, and the plan does not say how overflow is avoided. `max_sends` also has no upper bound (u32::MAX), although the 90 s budget caps it indirectly.",
+        "recommendation": "Validate at load time: workers in 1..=a documented maximum (for example 64), max_sends in 1..=a documented maximum, as CFG.DESERIALIZE errors that name the key. Use saturating or checked multiplication for queue_capacity. Document the maximums as magic values with their rationale.",
+        "evidence": "a-4 lines 141-142 (`NonZeroUsize` / `NonZeroU32` only); a-9 line 63 (`Concurrency (MAX = 64) is in no record`), line 90 (`queue_capacity ... workers * 4`)."
+      },
+      {
+        "id": "RSH-008",
+        "topic": "config_validation",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+        "line": 152,
+        "issue": "LocalRunner.host, port, kind and key_env are validated only structurally (types). `kind` is checked later, when the runner is built. `host` is a free String interpolated into `http://{host}:{port}`, so values with a path, '@', whitespace or an empty host are not rejected at config load. Endpoint::parse_local also accepts plain http for any host. When key_env is set, the API key is sent as a Bearer header in cleartext to whatever host is configured, including a non-loopback address. `key_env` can name any environment variable, so a config can exfiltrate an arbitrary variable to a configured host. A bad runner entry is therefore a latent failure at first use, not at startup.",
+        "recommendation": "Validate each local_runners entry in load(): non-empty host with only hostname or IP characters, kind in the known set, key_env matching a variable-name pattern, port nonzero. Refuse (or warn loudly) when a key is attached to an http endpoint whose host is not loopback. Parse the base URL once at load time so a bad runner fails startup.",
+        "evidence": "a-4 lines 152-159; a-5 line 55 (`parse_local` accepts http; runners often have no TLS); a-6 line 163 base built as `http://{host}:{port}`; a-4 line 185 (unknown kind caught only when the runner is built)."
+      },
+      {
+        "id": "RSH-009",
+        "topic": "structured_tracing",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-8-sc-agent-log.md",
+        "line": 53,
+        "issue": "The general log has no correlation key. The copied log_event deliberately sets `request_id/correlation_id: None`, and the http.* events (http.send, http.response, http.busy, http.quota_exhausted, http.timeout_resend) carry only method, endpoint, attempt and status. In a parallel batch of 40 requests across 8 workers these events interleave in one file and cannot be tied to a session_id, position or worker. Resends, holdoffs and failures cannot be attributed to the request that caused them, and the session rows cannot be joined to the general log. HttpClient::send_once also receives no session context to log.",
+        "recommendation": "Carry session_id and position (and worker name) in every http.*, llm.*, local.* and runner.* general event, for example by passing a small log-context argument to send_once or by setting LogEvent.correlation_id from the SessionId. Add a test that the http.busy records of two concurrent requests carry different session_ids.",
+        "evidence": "a-8 line 53 (`request_id/correlation_id: None`); a-5 line 234 (http.* field lists have no session or request identifier); a-9 line 162 (runner events carry no per-request id)."
+      },
+      {
+        "id": "RSH-010",
+        "topic": "structured_tracing",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 234,
+        "issue": "The log field lists have no durations or saturation measures. http.response has status and attempt but no elapsed_ms, there is no queue depth, running or held count, or per-job queue wait in runner events (only start and end counts), and no holdoff-resend count by reason. Operators cannot see slow or saturated backends from the logs. Separately, GeneralLogger::write and SessionLogger::write block while the sc-observability queue is full, and the orphan row for a cancelled in-flight job is written on the consumer thread, so a stalled disk could delay the 'within 100 ms' cancel result and workers.",
+        "recommendation": "Add elapsed_ms to http.response and http.transport_failed, queue wait and held count to runner.stream.end (or a periodic runner.queue event). Specify a bounded block (or drop-and-count) for log writes made on the cancel and result paths.",
+        "evidence": "a-5 line 234; a-9 line 162; a-8 line 131 `Blocks while the writer queue is full`; a-9 line 51 (orphan row written by the result iterator)."
+      },
+      {
+        "id": "RSH-011",
+        "topic": "backpressure",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-9-decision-runner.md",
+        "line": 51,
+        "issue": "The job queue is bounded (4 x workers, feeder blocks) and held jobs count toward capacity, which is good. The result queue is described as 'bounded' but its capacity is not specified anywhere, nor what a worker does when it is full (block, which stalls that worker while it holds an HTTP slot). A slow consumer (stdout pipe, Python on_result callback) therefore throttles workers, but the size is not a documented constant. When a provider is rate limiting, held jobs fill the capacity and starve fresh work from being fed, which is acceptable but undocumented.",
+        "recommendation": "Name and document the result queue capacity (for example equal to queue_capacity) and the full-queue behavior. Add one test of a slow consumer proving workers block rather than buffer without bound.",
+        "evidence": "a-9 lines 51 and 58 (BoundedQueue kept as result queue, capacity not stated); line 90 (queue_capacity applies only to jobs)."
+      },
+      {
+        "id": "RSH-012",
+        "topic": "body_limits",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-10-clis-python.md",
+        "line": 146,
+        "issue": "Ingress limits are partial. read_line_bounded caps a JSONL line at 1 MiB, but read_batch reads and validates the whole batch into a Vec<DecisionRequest> with no cap on line count or total bytes. 1000 lines at up to 1 MiB each plus image parts or base64 images is unbounded memory, and send_batch also takes a Vec. `request_bytes` for a single request has no size cap and reads a whole file or stdin. Outbound request size (image count, multipart, base64 doubling in a-7) has no limit. On the response side the 8 MiB cap is good, but ProviderReply text and the DecisionError ApiStatus body are explicitly kept whole (`never cut`), and both end up in stdout, ErrorDetail chains and session rows, so one hostile or buggy provider can write up to 8 MiB per row to sessions.jsonl for 40,000 sessions.",
+        "recommendation": "Add documented maxima: single-request bytes, batch line count and total batch bytes, and image count and size, with typed errors. Document the 8 MiB response cap as the deliberate bound on provider text. Consider a larger but finite cap on error-body text copied into session rows.",
+        "evidence": "a-10 lines 138-146 (MAX_LINE_BYTES only; read_batch returns Vec); a-5 lines 52 and 89 (`text is redacted, never cut`); a-6 line 111 (`body whole`)."
+      }
+    ],
+    "summary": {
+      "total_findings": 12,
+      "by_severity": {
+        "critical": 0,
+        "important": 8,
+        "minor": 4
+      }
+    },
+    "notes": [
+      "Service-hardening review applied: ureq HTTP client, a worker-pool runner and long-running worker loops are present. This is a sync client library plus CLI, not a server, so health endpoints, request-ID ingress and server-side body limits were treated as not applicable. The ingress-limit part of body_limits was applied to CLI and Python inputs.",
+      "Docs-only review at the assigned commit. I had no shell tool, so I could not run `git rev-parse HEAD` to verify that the worktree HEAD equals 2e0fed6 on main. The gitStatus snapshot in context listed 2e0fed6 as the most recent commit on main, but this was not independently checked. No code exists to review.",
+      "Strengths confirmed in the design: no sleep or tokio; Condvar timed waits woken by CancelToken::on_cancel; bounded job queue with the feeder blocking; the on_cancel hook only flips state; in-flight cancel via the claim/orphan mechanism; explicit connect and request timeouts; redirects disabled; 8 MiB response cap with a typed error; secrets redacted; structured named events through an injected logger; poisoned mutexes recovered; panics caught per worker.",
+      "Out of assigned topics, for later triage: the sprint required-validation lists contain no `cargo audit` or `cargo deny` step, and `ureq =3.5.1`, `sc-observability =1.5.0` and `pyo3 =0.29.2` are exact pins that block security patches unless audited (dependency hygiene).",
+      "Also unassigned: the retry duplicate-execution concern in RSH-001 depends on the owner answer that only timeouts and busy replies are resent (a-5 notes lines 397-402). If that stays, the cost of duplicate paid LLM calls should be stated."
+    ]
+  },
+  "error": null
+}

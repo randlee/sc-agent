@@ -8,6 +8,18 @@ this file instead of embedding repo names, commands, or exceptions in prompts.
 
 ## Repository baseline
 
+**Raptor records replace the index documents.** This repository keeps its
+requirements, non-functional requirements and architecture decisions as Raptor
+records (ADR-SAG-0003): repository-wide records under `docs/requirements/`,
+`docs/nfr/` and `docs/adr/`, and crate records under
+`docs/<crate>/requirements/`. The phase plan lives under
+`docs/plans/phase-<id>/`. Wherever this policy or a reviewer asks for
+`docs/requirements.md`, `docs/architecture.md`, `docs/design.md`,
+`docs/project-plan.md`, `docs/framework-charter.md` or
+`docs/<crate>/requirements.md` / `docs/<crate>/architecture.md`, reviewers read
+those record folders and the phase plan instead; the absence of the index files
+is not a finding.
+
 - Default comparison branch: `develop`
 - Requirements index: `docs/requirements.md`
 - Architecture index: `docs/architecture.md`
@@ -81,11 +93,10 @@ Reviewers read this table before treating missing paths as Blocking.
 
 | Path | When required |
 | --- | --- |
-| `docs/requirements.md`, `docs/architecture.md` | Every review |
-| `docs/design.md`, `docs/framework-charter.md` | Plan and architectural review |
-| `docs/project-plan.md` | When a phase is active |
+| `docs/requirements/`, `docs/nfr/`, `docs/adr/` (Raptor records; replace `docs/requirements.md`, `docs/architecture.md`, `docs/design.md`, `docs/framework-charter.md`) | Every review |
+| `docs/plans/phase-<phase>/plan.md` (replaces `docs/project-plan.md`) | When a phase is active |
 | `docs/plans/phase-<phase>/` | Plan and sprint reviews for that phase |
-| `docs/<crate>/requirements.md`, `docs/<crate>/architecture.md` | Sprint owns or references that crate |
+| `docs/<crate>/requirements/` (Raptor records; replace `docs/<crate>/requirements.md`, `docs/<crate>/architecture.md`) | Sprint owns or references that crate and the folder exists |
 | `crates/<crate>/` or root `Cargo.toml` | Rust implementation sprints |
 | `.claude/project/quality-policy.md` | Every QA round |
 | `.claude/assets/sc-rust/` | Rust QA orchestration |

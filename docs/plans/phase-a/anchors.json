@@ -401,7 +401,7 @@
       "id": "ADR-SAG-0004",
       "source_type": "ADR",
       "source_ref": "ADR-SAG-0004",
-      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.",
+      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.",
       "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
       "kind": "prohibition",
       "stated_by": "Rand Lee",
@@ -412,14 +412,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner."
+          "sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decide, which sits above the runner."
         ],
         "fail": [
           "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -463,6 +463,28 @@
           "item": "agt-4p2.3",
           "reason": "sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T04:32:39+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T04:32:55+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T04:54:05+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner."
         }
       ],
       "exclude": [
@@ -612,6 +634,20 @@
           "item": "agt-4p2.8",
           "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T04:41:13+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.4",
+          "reason": "A-4 builds sc-agent-config and sc-agent-secrets and adds no type, field or constant to sc-agent-types or sc-decision-schema (VarName and the catalog types are A-1's).",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T04:41:13+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.10",
+          "reason": "A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -630,6 +666,14 @@
         {
           "item": "agt-4p2.8",
           "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log."
+        },
+        {
+          "item": "agt-4p2.4",
+          "reason": "A-4 builds sc-agent-config and sc-agent-secrets and adds no type, field or constant to sc-agent-types or sc-decision-schema (VarName and the catalog types are A-1's)."
+        },
+        {
+          "item": "agt-4p2.10",
+          "reason": "A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them."
         }
       ]
     },
@@ -1186,6 +1230,13 @@
           "item": "agt-4p2.3",
           "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10.",
           "replaced": true
+        },
+        {
+          "at": "2026-11-10T04:32:39+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line).",
+          "replaced": true
         }
       ],
       "exclude": [
@@ -1203,7 +1254,7 @@
         },
         {
           "item": "agt-4p2.3",
-          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10."
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line)."
         }
       ]
     }

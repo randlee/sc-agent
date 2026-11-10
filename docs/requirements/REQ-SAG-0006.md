@@ -1,6 +1,6 @@
 # Requirement: No consumer-application types in shared crates
 
-**Status:** Draft  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-09  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0006: No consumer-application types in shared crates
 
-**Status:** Draft  
+**Status:** Approved  
 
 ### Requirement Statement
 

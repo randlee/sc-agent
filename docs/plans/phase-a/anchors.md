@@ -131,11 +131,11 @@ Fixtures:
 
 ## ADR-SAG-0004
 
-Anchor: No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.
+Anchor: No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 3.
+Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 6.
 
 Summary: No crate depends on a crate above it in the layering
 
@@ -147,7 +147,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 Beads: anchor `agt-mud`, plan questions `agt-mud.1`, dev questions `agt-mud.2`
 
 Fixtures:
-- pass: sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.
+- pass: sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decide, which sits above the runner.
 - fail: sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.
 
 ## REQ-SAG-0002
@@ -185,6 +185,8 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.6`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.
 - `agt-4p2.7`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.
 - `agt-4p2.8`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log.
+- `agt-4p2.4`: A-4 builds sc-agent-config and sc-agent-secrets and adds no type, field or constant to sc-agent-types or sc-decision-schema (VarName and the catalog types are A-1's).
+- `agt-4p2.10`: A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.
 
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
@@ -341,7 +343,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.1`: sc-agent-types is the bottom ADR-SAG-0004 layer, below sc-agent-log, and holds data types with no I/O; it cannot take a GeneralLogger.
 - `agt-4p2.2`: ANC-001 limits sc-decision-schema to the decision API types and traits with no logging code; its logging happens in the HTTP client and runner.
 - `agt-4p2.4`: sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.
-- `agt-4p2.3`: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10.
+- `agt-4p2.3`: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line).
 
 Beads: anchor `agt-em9`, plan questions `agt-em9.1`, dev questions `agt-em9.2`
 

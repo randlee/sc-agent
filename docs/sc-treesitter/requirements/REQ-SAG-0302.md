@@ -1,6 +1,6 @@
 # Requirement: Any tree-sitter grammar
 
-**Status:** Draft  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-09  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0302: Any tree-sitter grammar
 
-**Status:** Draft  
+**Status:** Approved  
 
 ### Requirement Statement
 

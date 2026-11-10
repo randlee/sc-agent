@@ -24,7 +24,9 @@ sprint:
   does_not_close:
     - "REQ-SAG-0101 end to end (decide --model <short name> resolves through the catalog built from the global config): a-10"
     - "REQ-SAG-0102 'add a model by editing JSON, no rebuild': config part a-4 (AgentConfig::catalog), end to end a-10"
+    - "REQ-SAG-0104 AC1 (a token cancelled by the caller stops an operation in another crate): a-9 (sc-decision-runner cancel tests, token created in the test crate); a-1 keeps the in-crate CancelToken tests"
     - "REQ-SAG-0104 AC2 (a CancelToken cancelled from Python stops a request): a-10, sc-agent-py"
+    - "REQ-SAG-0001 AC2 (workspace-wide search that no crate generates a UUID): a-10, the last sprint, once the workspace is complete; a-1 only rejects a UUID in SessionId::from_str"
     - "REQ-SAG-0601 cancel ends a runner holdoff at once: a-9 (uses CancelToken::wait_until/on_cancel from here)"
     - "REQ-SAG-0010 / ApiKey::as_str rule: a-1 writes both clippy.toml entries; each crate's clippy run enforces them; the single allowed as_str site is a-5's ureq_transport"
 ```
@@ -98,12 +100,13 @@ a-1 owns the workspace root `Cargo.toml` (`[workspace] members`, `[workspace.pac
 
 ```rust
 // src/lib.rs
-mod cancel; mod catalog; mod error; mod error_id; mod model; mod provider; mod release_date; mod session_id; mod short_name;
+mod cancel; mod catalog; mod error; mod error_id; mod model; mod provider; mod release_date; mod session_id; mod short_name; mod var_name;
 pub use cancel::{CancelHook, CancelToken, Wait};
 pub use catalog::{Catalog, ModelChoice};
 pub use error::TypesError;
 pub use error_id::{ErrorDetail, ErrorId};
 pub use model::{ModelDescriptor, ModelId, MODELS};
+pub use var_name::VarName;
 pub use provider::Provider;
 pub use release_date::ReleaseDate;
 pub use session_id::SessionId;
@@ -112,13 +115,22 @@ pub use short_name::ShortName;
 // src/error_id.rs  (the one error convention of the workspace)
 /// Every sc-agent error enum implements this. `id()` is stable per variant:
 /// "<crate-prefix>.<variant_snake>", e.g. "http.provider_busy", "decision.schema_mismatch".
+/// Open to workspace crates only (every sc-agent error enum implements it; it is not an extension
+/// point for outside crates). `recovery()` and `detail()` are provided; `detail()` must not be
+/// overridden (it is what keeps id, message, cause and recovery consistent across the workspace).
+/// The cause method is `cause_detail`, not `cause`: `std::error::Error::cause` (deprecated) has the
+/// same name on the supertrait and `x.cause()` would be ambiguous (E0034) wherever Error is in scope.
 pub trait ErrorId: std::error::Error {
     fn id(&self) -> &'static str;
     /// This layer's own message, without the cause.
     fn message(&self) -> String;
-    /// The lower error that caused this one, whole (its id, message and cause chain).
-    fn cause(&self) -> Option<ErrorDetail>;
-    /// Provided: `ErrorDetail { id, message, cause }`.
+    /// The lower error that caused this one, whole (its id, message, recovery and cause chain).
+    fn cause_detail(&self) -> Option<ErrorDetail>;
+    /// What the caller does next, if this layer knows. Provided: `None`. Sprints return non-empty
+    /// text for secrets.key_missing (a-4), http.provider_busy and http.quota_exhausted (a-5),
+    /// local.model_not_served (a-6), decide.no_provider_key and decide.request_parse (a-10).
+    fn recovery(&self) -> Option<&'static str> { None }
+    /// Provided: `ErrorDetail { id, message, recovery, cause: cause_detail() }`. Do not override.
     fn detail(&self) -> ErrorDetail;
 }
 /// An error as data: carries an error from a crate that is not below (an LlmError inside a
@@ -127,19 +139,28 @@ pub trait ErrorId: std::error::Error {
 pub struct ErrorDetail {
     pub id: String,
     pub message: String,
+    /// Cow, not &'static str: ErrorDetail is also deserialized (session rows, PyO3), which cannot
+    /// produce a &'static str. Values built from `ErrorId::recovery()` are Cow::Borrowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<Cow<'static, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<Box<ErrorDetail>>,
 }
 impl ErrorDetail {
+    /// recovery = None.
     #[must_use] pub fn new(id: impl Into<String>, message: impl Into<String>, cause: Option<ErrorDetail>) -> Self;
+    #[must_use] pub fn with_recovery(self, recovery: &'static str) -> Self;
     /// A foreign error (io, serde_json, sc-config, sc-observability, ureq, sc-sha): `id` is the
     /// foreign code or kind, `message` its Display; its `source()` chain becomes `cause`.
     #[must_use] pub fn foreign(id: impl Into<String>, error: &(dyn std::error::Error + 'static)) -> Self;
 }
-impl fmt::Display for ErrorDetail {}            // "<id>: <message>" then ": <cause>" for each cause
+impl fmt::Display for ErrorDetail {}            // "<id>: <message>" only; the chain is in source()
 impl std::error::Error for ErrorDetail {}       // source() = cause
-// Rule for every crate: `impl Display for XError` writes `self.detail()`; `source()` returns the
-// wrapped lower error; wrapping keeps the lower value unchanged (REQ-SAG-0002).
+// Rule for every crate: `impl Display for XError` writes "<id>: <message>" only (never the cause, so a
+// reporter that walks source() prints each level once); `source()` returns the wrapped lower error;
+// `detail()` carries the whole chain; wrapping keeps the lower value unchanged (REQ-SAG-0002).
+// A lower error kept as a `kind: String` (io::ErrorKind etc.) is display-only text, not a stable
+// format to match on.
 
 // src/cancel.rs
 #[derive(Clone, Default)]
@@ -170,6 +191,7 @@ pub struct ModelId(Cow<'static, str>);                      // non-empty, no con
 impl ModelId { #[must_use] pub fn as_str(&self) -> &str; pub(crate) const fn from_static(s: &'static str) -> Self; }
 impl FromStr for ModelId { type Err = TypesError; }         // InvalidModelId
 impl fmt::Display for ModelId {}  impl Serialize for ModelId {}  impl<'de> Deserialize<'de> for ModelId {}
+impl AsRef<str> for ModelId {}  impl Borrow<str> for ModelId {}   // derived Eq/Ord/Hash on Cow<str> agree with str; no Deref (a ModelId is a validated value)
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelDescriptor { model: ModelId, line: ShortName, released: ReleaseDate }
@@ -205,18 +227,39 @@ impl fmt::Display for ReleaseDate {}  impl Serialize for ReleaseDate {}  impl<'d
 
 // src/catalog.rs
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Catalog { latest: BTreeMap<ShortName, (ModelId, ReleaseDate)>, lines: BTreeMap<ModelId, ShortName> }
+pub struct Catalog { latest: Latest, lines: BTreeMap<ModelId, ShortName> }
+/// One slot per ShortName, so every line always has a model (total by construction).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Latest { jev: Slot, haiku: Slot, sonnet: Slot, opus: Slot, fable: Slot, luna: Slot, terra: Slot, sol: Slot, astra: Slot }
+type Slot = (ModelId, ReleaseDate);
+impl Latest {
+    fn slot(&self, line: ShortName) -> &Slot;            // exhaustive match, no indexing
+    fn slot_mut(&mut self, line: ShortName) -> &mut Slot;
+}
 impl Catalog {
+    /// Seeds each slot from a per-line const row of MODELS, then offers every MODELS row (newer replaces).
     #[must_use] pub fn builtin() -> Self;
     /// Adds one global-config model; it becomes the line's latest when `released` is later or equal (equal: the config model wins).
     pub fn with_config_model(self, model: ModelId, line: ShortName, released: ReleaseDate) -> Result<Self, TypesError>; // ModelOnTwoLines
-    pub fn resolve(&self, choice: &ModelChoice) -> Result<ModelId, TypesError>; // Latest -> newest of line (LineHasNoModel); Version -> itself
-    #[must_use] pub fn line_of(&self, model: &ModelId) -> Option<ShortName>;   // doctor: is a provider-listed id in the catalog
+    /// Latest -> the line's slot; Version -> itself. Cannot fail.
+    #[must_use] pub fn resolve(&self, choice: &ModelChoice) -> ModelId;
+    /// doctor: is a provider-listed id in the catalog; takes &ModelId or a plain &str (no parse needed).
+    #[must_use] pub fn line_of<Q>(&self, model: &Q) -> Option<ShortName> where ModelId: Borrow<Q>, Q: Ord + ?Sized;
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelChoice { Latest(ShortName), Version(ModelId) }
 impl FromStr for ModelChoice { type Err = TypesError; }     // short name first, else ModelId (InvalidModelId)
 impl fmt::Display for ModelChoice {}
+
+// src/var_name.rs
+/// The name of an environment variable a config may point at (a local runner's key_env):
+/// `^[A-Z_][A-Z0-9_]{0,127}$`. Holds no credential name (REQ-SAG-0401); sc-agent-secrets'
+/// resolve_var and sc-agent-config's LocalRunner.key_env share it (A-4, REQ-SAG-0013).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VarName(String);
+impl VarName { #[must_use] pub fn as_str(&self) -> &str; }
+impl FromStr for VarName { type Err = TypesError; }         // InvalidVarName
+impl fmt::Display for VarName {}  impl AsRef<str> for VarName {}  impl Serialize for VarName {}  impl<'de> Deserialize<'de> for VarName {}
 
 // src/session_id.rs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -228,7 +271,7 @@ impl fmt::Display for SessionId {}  impl Serialize for SessionId {}  impl<'de> D
 
 ## 4. Full error enum (src/error.rs, new)
 
-Bottom crate: nothing is wrapped, `cause()` is always `None`. Display = `detail()`.
+Bottom crate: nothing is wrapped, `cause_detail()` is always `None`, `recovery()` is the default `None`. Display = `"<id>: <message>"`.
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -244,8 +287,8 @@ pub enum TypesError {
     InvalidReleaseDate { text: String },                                        // "types.invalid_release_date"
     /// A config model id already belongs to another line.
     ModelOnTwoLines { model: ModelId, line: ShortName, other_line: ShortName }, // "types.model_on_two_lines"
-    /// A line has no model (cannot happen with the built-in rows; returned instead of a panic).
-    LineHasNoModel { line: ShortName },                                         // "types.line_has_no_model"
+    /// Not an environment-variable name (`^[A-Z_][A-Z0-9_]{0,127}$`).
+    InvalidVarName { text: String },                                            // "types.invalid_var_name"
     /// Not a canonical ULID (a UUID included).
     InvalidSessionId { text: String },                                          // "types.invalid_session_id"
 }
@@ -258,12 +301,12 @@ impl ErrorId for TypesError {}  impl fmt::Display for TypesError {}  impl std::e
 - N2 `src/error.rs`, `src/error_id.rs` (section 3-4).
 - N3 Workspace root `Cargo.toml`: `[workspace] members = ["crates/*"]`, `resolver = "3"`; `[workspace.package] edition = "2024"`, `rust-version = "1.94.1"`, `license = "MIT"`; `[workspace.lints.rust] unsafe_code = "deny"` (not `forbid`: PyO3's `#[pymodule]`/`#[pyfunction]` expansions carry `#[allow(unsafe_code)]`, which a workspace `forbid` rejects, so sc-treesitter-py (A-3) and sc-agent-py (A-10) would not compile); every non-PyO3 crate adds `#![forbid(unsafe_code)]` at its crate root (sc-agent-types does, in src/lib.rs); `[workspace.lints.clippy] panic = "deny"`, `unwrap_used = "deny"`, `expect_used = "deny"`, `indexing_slicing = "deny"` (REQ-SAG-0002 AC2; sc-lint does not enforce these yet, so clippy is the gate). `clippy.toml`: `allow-unwrap-in-tests`, `allow-expect-in-tests`, `allow-panic-in-tests`, `allow-indexing-slicing-in-tests` = true; `disallowed-methods = ["std::thread::sleep", "std::thread::sleep_until", { path = "sc_agent_secrets::ApiKey::as_str", reason = "the key is read only at sc-agent-http's ureq_transport (A-5)" }]` (REQ-SAG-0010 as a lint; the as_str entry is written here, see Shared files; A-5 does not edit clippy.toml).
 - N4 `CancelToken::wait_until`, `on_cancel`, `CancelHook`, `Wait`.
-- N5 `ModelChoice`, `Catalog::resolve`, `line_of`.
+- N5 `ModelChoice`, `Catalog::resolve` (infallible, total `Latest`), generic `line_of`, `VarName`.
 - Tests (each names the acceptance line it proves; the acceptance list holds the assertions):
-  - N6 tests/cancel.rs: proves AC "REQ-SAG-0104 AC1" and "REQ-SAG-0104 AC2" (Send + Sync). Extra cases not in an acceptance line: `DeadlineReached` with no cancel; a hook that registers or drops another hook does not deadlock. Waits use deadlines and channels, never sleep.
-  - N7 tests/catalog.rs: proves AC "REQ-SAG-0101 AC1", "REQ-SAG-0101 AC2", "REQ-SAG-0102 AC1/AC2" and "REQ-SAG-0102" (built-in dates). Extra cases: the same id on two lines is `types.model_on_two_lines`; every MODELS id round-trips through Display/serde; `line_of` for built-in and config ids.
-  - N8 tests/names.rs: proves AC "REQ-SAG-0103" and "REQ-SAG-0001". Extra cases: ShortName/Provider/ReleaseDate spellings and rejections with their ids.
-  - N9 tests/error_id.rs: proves AC "REQ-SAG-0002" (both ErrorId lines). Extra case: `ErrorDetail::foreign` keeps an io error's source chain.
+  - N6 tests/cancel.rs: proves AC "REQ-SAG-0104 (boundary part)" and "REQ-SAG-0104 AC2" (Send + Sync). Extra cases not in an acceptance line: `DeadlineReached` with no cancel; a hook that registers or drops another hook does not deadlock. Waits use deadlines and channels, never sleep.
+  - N7 tests/catalog.rs: proves AC "REQ-SAG-0101 AC1", "REQ-SAG-0101 AC2", "REQ-SAG-0102 AC1/AC2" and "REQ-SAG-0102" (built-in dates). Extra cases: the same id on two lines is `types.model_on_two_lines`; every MODELS id round-trips through Display/serde; `line_of` for built-in and config ids, called with `&ModelId` and with `&str`; each `Latest` slot of `builtin()` is the newest MODELS row of its line.
+  - N8 tests/names.rs: proves AC "REQ-SAG-0103" and "REQ-SAG-0001". Extra cases: ShortName/Provider/ReleaseDate/VarName spellings and rejections with their ids (VarName accepts MY_RUNNER_TOKEN (never a real credential name here, REQ-SAG-0401), rejects "", "lower", "1X", "A-B" and 129 characters).
+  - N9 tests/error_id.rs: proves AC "REQ-SAG-0002" (both ErrorId lines). Extra cases: `ErrorDetail::foreign` keeps an io error's source chain; `cause_detail()` and `recovery()` called through `&dyn ErrorId` with `std::error::Error` in scope compile (the E0034 guard); an ErrorDetail with no recovery serializes without the key.
 
 ## 6. Dependencies
 
@@ -283,15 +326,15 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-1.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] Shared files: right after the copy commit a-1 pushes the workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (sleep and sc_agent_secrets::ApiKey::as_str disallowed-methods entries); a-3, a-4 and a-8 start from that push; no later sprint edits either file.
-- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) returns the newest model of its line across built-in and with_config_model rows (test). The decide end-to-end check is a-10's.
+- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) (infallible: every line has a slot) returns the newest model of its line across built-in and with_config_model rows (test). The decide end-to-end check is a-10's.
 - [ ] REQ-SAG-0101 AC2: sc-agent-types: a specific catalog version id parses as ModelChoice::Version and Catalog::resolve returns it unchanged (test).
 - [ ] REQ-SAG-0102 AC1/AC2: sc-agent-types: Catalog::with_config_model adding a haiku model dated later than every built-in haiku makes resolve(Latest(Haiku)) return it with no rebuild; an equal date also makes it win; an earlier date changes nothing (tests). sc-agent-types reads no files (no std::fs use). Loading the row from JSON is a-4's.
 - [ ] REQ-SAG-0102: sc-agent-types: every built-in MODELS row carries the model's published release date (claude-fable-5-2, not 5-1), checked by test, including jev-1.13.0 = 2026-09-15 (date supplied by the owner 2026-11-09).
 - [ ] REQ-SAG-0103: sc-agent-types: Provider and ModelId are separate types; a catalog ModelId encodes no provider and is used with two Providers unchanged (test); Provider::PRIORITY is the fixed ranking and Provider::ranking(line) lists the providers serving a line in that order (test); Provider::OpenAi is spelled openai.
-- [ ] REQ-SAG-0104 AC1: sc-agent-types: a CancelToken cancelled on another thread ends wait_until with Wait::Cancelled at once (well before the deadline) and runs every registered on_cancel hook once (at once if registered after cancel; never after its CancelHook is dropped); clones share it (tests; no sleep).
+- [ ] REQ-SAG-0104 (boundary part; AC1 across crates is closed by a-9): sc-agent-types: a CancelToken cancelled on another thread ends wait_until with Wait::Cancelled at once (well before the deadline) and runs every registered on_cancel hook once (at once if registered after cancel; never after its CancelHook is dropped); clones share it (tests; no sleep).
 - [ ] REQ-SAG-0104 AC2 (Python, boundary part): sc-agent-types: CancelToken is Send + Sync (compile test), so the PyO3 crate can wrap it; the Python test is a-10's (sc-agent-py).
 - [ ] REQ-SAG-0001: sc-agent-types: SessionId::new() is a ULID; FromStr accepts only the canonical 26-char form and rejects a UUID with types.invalid_session_id (test).
-- [ ] REQ-SAG-0002: sc-agent-types: ErrorId (id, message, cause, detail) and ErrorDetail {id, message, cause} exist; every TypesError variant has a distinct id types.<variant_snake>; Display equals detail(); ErrorDetail round-trips through serde with its cause chain (tests).
+- [ ] REQ-SAG-0002: sc-agent-types: ErrorId (id, message, cause_detail, provided recovery and detail) and ErrorDetail {id, message, recovery (optional, omitted when None), cause} exist; every TypesError variant has a distinct id types.<variant_snake>; Display is "<id>: <message>" only and detail() carries the chain; ErrorDetail round-trips through serde with its cause chain (tests).
 - [ ] REQ-SAG-0002 AC2: workspace root Cargo.toml (a-1): denies clippy panic, unwrap_used, expect_used and indexing_slicing and sets rust unsafe_code = "deny" (not forbid, so PyO3 crates compile) for every member; sc-agent-types/src/lib.rs has #![forbid(unsafe_code)]; clippy.toml allows them only in tests and disallows std::thread::sleep/sleep_until; cargo clippy --workspace --all-targets -- -D warnings passes.
 - [ ] REQ-SAG-0006: sc-agent-types: no type, field or constant names plan-anchor, judge-jev or a mock backend (review).
 - [ ] REQ-SAG-0401: sc-agent-types: no credential env-var name appears in the crate (rg '_API_KEY' crates/sc-agent-types finds nothing).
@@ -299,6 +342,7 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 - [ ] REQ-SAG-0010: sc-agent-types source calls no sleep function (no std::thread::sleep, sleep_until or tokio::time::sleep): `rg 'sleep\(' crates/sc-agent-types/src` finds none, and the workspace clippy.toml that a-1 owns disallows std::thread::sleep and std::thread::sleep_until, so `cargo clippy --workspace -- -D warnings` fails on any sleep call.
 - [ ] ADR-SAG-0004: no sc-agent crate may depend on a higher layer (types; config, secrets and log; http; decision schema; decision backends over sc-llm-provider; runner); sc-agent-types is the bottom layer: its Cargo.toml declares no sc-agent crate dependency (only serde and ulid; dev serde_json), checked by `cargo tree -p sc-agent-types`.
 - [ ] REQ-SAG-0002: sc-agent-types: a test wraps a lower-layer error two levels deep (ErrorDetail::new with nested causes) and asserts the outermost ErrorDetail chain carries the id and message of every cause at every level.
+- [ ] sc-agent-types: ModelId implements AsRef<str> and Borrow<str>, and Catalog::line_of answers for a plain &str without parsing (test); VarName parses ^[A-Z_][A-Z0-9_]{0,127}$ and rejects anything else with types.invalid_var_name (test).
 
 ## Notes
 
@@ -309,3 +353,4 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7):
 - jev-1.13.0 release date 2026-09-15: date supplied by the owner 2026-11-09 (docs.typesafe.ai gives none; plan-hardening decision 10).
 No open questions.
 Hardening round 1 (2026-11-09): front matter added; a-1 owns workspace root Cargo.toml and clippy.toml (unsafe_code = "deny" at the workspace, #![forbid(unsafe_code)] per non-PyO3 crate) incl. the ApiKey::as_str entry (clippy 0.1.99 skips an entry whose crate is not a dependency, checked).
+Hardening round 2 (2026-11-09): ErrorId::cause -> cause_detail (E0034 with Error::cause); recovery() provided + ErrorDetail.recovery; Display = "<id>: <message>"; LineHasNoModel deleted (total Latest, resolve infallible); ModelId AsRef/Borrow<str>, generic line_of; VarName added for A-4 key_env (REQ-SAG-0013); REQ-SAG-0104 AC1 -> a-9, REQ-SAG-0001 AC2 -> a-10.

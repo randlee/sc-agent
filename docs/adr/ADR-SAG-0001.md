@@ -1,6 +1,6 @@
 # Decision: Decision backends implement one trait with one request form
 
-**Status:** Draft  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-09  
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0001: Decision backends implement one trait with one request form
 
-**Status:** Draft  
+**Status:** Approved  
 
 ### Related Documents
 
@@ -30,11 +30,11 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 ### Decision
 
-Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response. Callers use one sync `Decision` trait (`decide` for one request, `decide_stream` for many). `sc-decision-runner` implements `Decision` for any `Backend` and transport; the queue, worker threads, holdoff, cancellation and session logging live behind it. Each LLM backend adapts the request internally.
+Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response. Callers use one sync `Decision` trait (`decide` for one request, `decide_stream` for many). `sc-decision-runner` implements `Decision` for any `Backend` and transport; the queue, worker threads, holdoff, cancellation and session logging live behind it. Each LLM backend adapts the request internally. `DecisionRequest` (the Jev API request body plus its image parts and long-context flag) is the one request form the backends receive.
 
 **Key Principles:**
 
-- There is one request form: the Jev API request.
+- There is one request form: `DecisionRequest`, the Jev API request body plus its image parts and long-context flag.
 - Adaptation knowledge lives only in the backend that adapts.
 - Backends do no I/O; the transport is separate, so an async transport can be added without changing backends.
 - `decide_stream` returns results fastest first, each tagged with its session ULID; a failed request is returned in its result and the stream continues.

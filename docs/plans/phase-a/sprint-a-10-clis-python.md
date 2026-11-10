@@ -8,7 +8,7 @@
 
 ## Description
 
-The decide binary and library (send one request or a JSONL batch with --model, --project, --agent-role and an optional --provider override; models; doctor) and crates/sc-agent-py (one Python function per decide operation, ANC-006). Argument parsing, backend choice, wiring and output only. Records: REQ-SAG-0501, REQ-SAG-0503, REQ-SAG-0504 (docs/decide), REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801.
+The decide binary and library (send one request or a JSONL batch with --model, --project, --agent-role, an optional --provider override, --image and --long-context; models; doctor) and crates/sc-agent-py (one Python function per decide operation, ANC-006, with injectable logger callables). Argument parsing, backend choice, wiring, input limits, signals and output only. Records: REQ-SAG-0501, REQ-SAG-0503, REQ-SAG-0504 (docs/decide), REQ-SAG-0001, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0011..0014, REQ-SAG-0101..0104, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0701, REQ-SAG-0801, ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004.
 
 ## Design
 
@@ -24,16 +24,15 @@ sprint:
       artifact: sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL, models_request} and sc_decision_local::{LocalBackend (incl. with_log), DaemonKind}
       trigger: dev-push
     - sprint: a-7
-      artifact: sc_llm_provider::{LlmClient (incl. with_log, models_request, decode_models), catalog_model_id} and sc_decision_llm::LlmDecisionBackend (incl. with_log)
+      artifact: sc_llm_provider::{LlmClient (incl. with_log, models_request, decode_models), LlmProvider, catalog_model_id} and sc_decision_llm::LlmDecisionBackend (incl. with_log)
       trigger: dev-push
     - sprint: a-9
       artifact: sc_decision_runner::{DecisionRunner, RunnerConfig, RunnerError}
       trigger: dev-push
-  requirements: [REQ-SAG-0501, REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0008, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801, REQ-SAG-0901, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010]
-  adrs: [ADR-SAG-0001, ADR-SAG-0004]
+  requirements: [REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0011, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0014, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0501, REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0701, REQ-SAG-0801, REQ-SAG-0901]
+  adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
     - "Discovery is a library capability of sc-decision-local; no decide or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
-    - "ADR-SAG-0004 amendment (decide as composition root, sc-agent-py on decide, ErrorId/ErrorDetail convention): open owner question; records unchanged."
     - "tsq and REQ-SAG-0303: Sprint A-3."
 ```
 
@@ -42,17 +41,23 @@ sprint:
 Copy script: `docs/plans/phase-a/copy/a-10.sh` (dry run 2026-11-09 after the tsq rows moved to a-3.sh: 9 copy steps, 4 files, 210 lines before trimming).
 Source: sc-agent-ref @ dce239a (`crates/sc-ai`, `crates/sc-jev-host/src/stream`, and the `Parsed`/`parse()` pattern from `crates/sc-treesitter/src/cli/mod.rs`).
 Targets: `crates/decide/` (new lib + bin crate) and `crates/sc-agent-py/` (new PyO3 crate, the sc-agent Python API).
-Governing records: REQ-SAG-0501 and REQ-SAG-0503 (under `docs/decide/requirements/`, naming the CLI `decide`), REQ-SAG-0504 (a bad batch line stops decide before any send), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0008 (optional logger injection with defaults), REQ-SAG-0601 (busy resend, end to end through decide), REQ-SAG-0004 (CLI and PyO3 accept project and agent_role, one field for role and name; slugs; reject, do not rewrite), REQ-SAG-0103 (provider and model separate; provider chosen by ranking, never required), REQ-SAG-0104 AC2 (cancel from Python), REQ-SAG-0401 (keys: env, repo-root .env, keyring), REQ-SAG-0801 (a local runner selected by its configured name), REQ-SAG-0901, REQ-SAG-0701 (batch through the runner), REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009 / owner-lowlevel-no-tokio, ADR-SAG-0001 (one sync `Decision` trait), ADR-SAG-0004 (decide is the top layer: it may use every crate; it is where a backend is chosen and wired into the runner). Anchors: ANC-006 (every decide operation is also in the sc-agent Python API); batch parallelism is REQ-SAG-0701.
-Rule for the binary: argument parsing and output only. All behaviour lives in the libraries (A-1, A-2, A-4..A-9); decide's own logic (choosing the backend for `--model` with the optional `--provider` override, wiring `DecisionRunner`, models, doctor) is in decide's library target, which the `decide` binary and sc-agent-py share.
+Governing records: REQ-SAG-0501 and REQ-SAG-0503 (under `docs/decide/requirements/`, naming the CLI `decide`), REQ-SAG-0504 (a bad batch line stops decide before any send), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0008 (optional logger injection with defaults, in Rust and in Python), REQ-SAG-0011 (interrupt cancels cleanly), REQ-SAG-0012 (provider-wide busy pause, end to end), REQ-SAG-0013 (config bounds, end to end), REQ-SAG-0014 (input size limits), REQ-SAG-0101/0102 (short names through the config-built catalog), REQ-SAG-0601 (busy resend, end to end), REQ-SAG-0602 (quota passed through), REQ-SAG-0004 (CLI and PyO3 accept project and agent_role, one field for role and name; slugs; reject, do not rewrite), REQ-SAG-0103 (provider and model separate; provider chosen by ranking, never required), REQ-SAG-0104 AC2 (cancel from Python), REQ-SAG-0401 (keys: env, repo-root .env, keyring), REQ-SAG-0801 (a local runner selected by its configured name), REQ-SAG-0901, REQ-SAG-0701 (batch through the runner), REQ-SAG-0001 AC2 (no UUID anywhere in the finished workspace), REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009 / owner-lowlevel-no-tokio, ADR-SAG-0001 (one sync `Decision` trait; `DecisionRequest` — the Jev body plus image parts and the long-context flag — is the one request form), ADR-SAG-0002 (log layout: session rows under `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl`), ADR-SAG-0004 (decide is the top layer and the composition root; sc-agent-py depends on decide). Anchors: ANC-006 (every decide operation is also in the sc-agent Python API), ANC-007.
+Rule for the binary: argument parsing and output only. All behaviour lives in the libraries (A-1, A-2, A-4..A-9); decide's own logic (choosing the backend, wiring `DecisionRunner`, models, doctor, input limits, the signal hook) is in decide's library target, which the `decide` binary and sc-agent-py share.
 
-Decisions (assistant, 2026-11-09):
+Decisions (assistant, 2026-11-09; round 2 owner decisions folded in):
 - Names: binary and package `decide` (crates.io availability checked at publish time); subcommands `send`, `models`, `doctor`.
 - `--project` and `--agent-role` are required, no default; there is no `--agent-name`.
 - Provider: `--provider` is an optional override. Absent: the first provider in `Provider::ranking(line of the model)` (A-1) whose key `resolve` detects (A-4); never required (REQ-SAG-0103).
 - A batch is read and validated whole before anything is sent; the first bad line stops decide (REQ-SAG-0504).
-- Exit: 0 when the command ran and every result succeeded, else 1.
+- Exit: 0 when the command ran and every result succeeded; 1 otherwise; 130 after any interrupt (REQ-SAG-0011; `ctrlc` does not distinguish SIGINT from SIGTERM, so there is no 143).
 - `send` without `--batch` always calls `Decision::decide` (one request); `send --batch` always calls `Decision::decide_stream`, even for a one-line batch (CRIT-M3).
-- Injection seams (REQ-SAG-0008): `SendOptions`, `ModelsOptions` and `DoctorOptions` carry an optional transport and optional loggers; `None` uses the defaults (`UreqTransport`, the default general/session loggers under `log_root`). Tests inject `sc_agent_http::testing::ScriptedTransport`/`BlockingTransport` and an `sc_agent_log::testing::MemoryLog` (`let log = MemoryLog::new()?;` then `general: Some(log.general())`, `session: Some(log.session(identity))`) through them and go through the real `DecisionRunner`; assertions read `log.records()?` (`Vec<MemoryRecord>` with `level`, `target`, `action`, `fields`, in write order). Fake `Decision` impls in tests are local to crates/decide's tests (no `sc_decision_schema::testing`).
+- Images and long context (REQ-QA-001, ADR-SAG-0001): `decide send --image NAME=FILE` (repeatable; format from the extension `.png`/`.jpg`/`.jpeg`) and `--long-context`. A batch line is either a bare Jev request or `{"request": {...}, "images": {"NAME": "path"}, "long_context": true}` (paths relative to the working directory). Every request is built with `DecisionRequest::new(body, image_parts, long_context)` (A-2), which checks the parts and the REQ-SAG-0014 image limits.
+- Input limits (REQ-SAG-0014): one request (file, stdin or one batch line) at most 8 MiB; a batch at most 10,000 lines and 256 MiB; each image at most 20 MiB (checked from file metadata before reading) and at most 20 images per request (A-2's `DecisionRequest::new`). Over a limit: `DecideError::LimitExceeded { what, line, max }` (or `RequestInvalid` wrapping A-2's `DecisionError::Limits`); nothing is sent.
+- Typed options (RBP-F010): `SendOptions` takes `ModelSelector`, `Option<Provider>` and `Slug`s; the CLI and Python parse strings at the edge with `ModelSelector::parse` / `Provider::from_str` / `Slug::new`.
+- Seams (REQ-SAG-0008, REQ-QA-009): every options struct holds a `Context` with `config_dir`, `environment`, `keyring`, `transport` and `general` (all optional; `None` = the real default), and `SendOptions` adds `session`. Tests never touch the process environment or HOME: they pass a tempdir `config_dir`, an explicit `environment` Vec, a `MapKeyring`-style keyring, a `ScriptedTransport`/`BlockingTransport` (`sc_agent_http::testing`) and a `MemoryLog` (`let log = MemoryLog::new()?;` then `general: Some(log.general())`, `session: Some(log.session(identity))`; assertions read `log.records()?`, `MemoryRecord { level, target, action, fields }` in write order), and go through the real `DecisionRunner`. Fake `Decision` impls are local to crates/decide's tests.
+- Signals (REQ-SAG-0011, RSH-004): `decide::signal::install(&cancel)` registers a handler with the `ctrlc` crate, feature `termination` (SIGINT and SIGTERM on Unix, Ctrl-C and Ctrl-Break on Windows; sync, no tokio, no `unsafe`); ctrlc starts and owns the handler thread. On an interrupt the handler cancels the token. The normal path then returns `decision.cancelled` for every unfinished request, the stream is drained and printed, `flush_session_log` runs, and main exits 130.
+- Python interrupts (REQ-SAG-0011, RSH-005): sc-agent-py runs the decide call on a scoped worker thread and waits on its result channel with `recv_timeout(100 ms)` (a timed wait, not sleep) outside the GIL; after each timeout it reacquires the GIL and calls `py.check_signals()`. `KeyboardInterrupt` (or any signal exception) cancels the token, drains the remaining results, then re-raises. An exception raised by `on_result` does the same: cancel, drain, re-raise.
+- Python loggers (REQ-SAG-0008, owner 2026-11-09): `general_log` and `session_log` keyword arguments take `Callable[[dict], None]`; each becomes an sc-observability `LogSink` (`PyCallableSink`) that calls the callable with the GIL, wrapped as `GeneralLogger::injected` / `SessionLogger::injected`. A callable that raises makes that write a refused write (counted by sc-agent-log, reported by `flush`); it never changes a decision result.
 - ANC-006: this sprint delivers `crates/sc-agent-py` with one Python function per decide operation (section 3.3).
 
 ## 1. Copy list (a-10.sh)
@@ -76,7 +81,7 @@ Not copied: sc-ai `command.rs` dispatch (sc_jev_host compose, envelopes, readbac
 
 decide:
 - `cli.rs`: rewrite `Cli`/`Command` (section 3.2); `parse()` maps clap errors to `DecideError::Usage`; value parsers return `Result<_, String>`; message text "See decide --help.".
-- `input.rs` (library): `request_bytes` loses `RepoRoot`/`joined_path` (paths are relative to the working directory), errors -> `InputNotFound`/`InputRead`; `read_line_bounded`: replace `&available[..take]` with `available.get(..take)` (indexing_slicing); wrap the copied tests in `#[cfg(test)] mod tests { use super::*; use std::io::Cursor; ... }`.
+- `input.rs` (library): `request_bytes` loses `RepoRoot`/`joined_path` (paths are relative to the working directory), reads at most `MAX_REQUEST_BYTES + 1` bytes (`Read::take`) and returns `LimitExceeded` past the cap; errors -> `InputNotFound`/`InputRead`; `read_line_bounded`: replace `&available[..take]` with `available.get(..take)` (indexing_slicing); its `max` is `MAX_REQUEST_BYTES`; wrap the copied tests in `#[cfg(test)] mod tests { use super::*; use std::io::Cursor; ... }`.
 - `main.rs`: `print_stdout`/`emit` take `DecideError`; `emit` writes `DecideError::detail()` as one JSON line and must not `.expect`: when encoding fails it writes a fixed literal `{"id":"decide.encode","message":"..."}` line.
 
 ## 3. Rust code (exact; bodies elided)
@@ -113,9 +118,15 @@ pub(crate) struct SendArgs {
     /// Agent-role slug for the session rows (e.g. plan-anchor, judge-jev, sanity).
     #[arg(long, value_name = "SLUG", allow_hyphen_values = true, value_parser = non_empty_text)]
     pub(crate) agent_role: String,
-    /// Input is JSONL: one TypeSafe request per line.
+    /// Input is JSONL: one request per line (a bare Jev request or {"request", "images", "long_context"}).
     #[arg(long)]
     pub(crate) batch: bool,
+    /// Image part NAME read from FILE (png, jpg, jpeg); repeatable; single-request mode only.
+    #[arg(long = "image", value_name = "NAME=FILE", value_parser = parse_image_arg, conflicts_with = "batch")]
+    pub(crate) images: Vec<(String, std::path::PathBuf)>,
+    /// Send TypeSafe-Danger-Zone-Long-Context: true; single-request mode only.
+    #[arg(long, conflicts_with = "batch")]
+    pub(crate) long_context: bool,
     /// Request file, or - for stdin.
     #[arg(value_name = "FILE|-", default_value = "-", value_parser = non_empty_text)]
     pub(crate) input: String,
@@ -133,81 +144,122 @@ pub(crate) enum Parsed { Run(Cli), Print(String) }
 pub(crate) fn parse<I, T>(args: I) -> Result<Parsed, DecideError>
 where I: IntoIterator<Item = T>, T: Into<std::ffi::OsString> + Clone;
 fn non_empty_text(value: &str) -> Result<String, String>;
+fn parse_image_arg(value: &str) -> Result<(String, std::path::PathBuf), String>;   // split at the first '='; both sides non-empty
 
-// src/input.rs (library)
-pub const MAX_LINE_BYTES: usize = 1 << 20;
+// src/input.rs (library; REQ-SAG-0014 limits)
+pub const MAX_REQUEST_BYTES: usize = 8 * 1024 * 1024;        // one request, one batch line
+pub const MAX_BATCH_LINES: u64 = 10_000;
+pub const MAX_BATCH_BYTES: u64 = 256 * 1024 * 1024;
+pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;           // also enforced by DecisionRequest::new (A-2)
 pub fn request_bytes(spec: &str, stdin: &mut dyn std::io::Read) -> Result<Vec<u8>, DecideError>;
 pub fn open_lines(spec: &str, stdin: Box<dyn std::io::BufRead + Send>) -> Result<Box<dyn std::io::BufRead + Send>, DecideError>;
+/// Reads one image file: metadata length > MAX_IMAGE_BYTES -> LimitExceeded before reading; extension -> ImageFormat
+/// (else ImageFormat error); io errors -> ImageRead.
+pub fn read_image(name: &str, path: &std::path::Path) -> Result<sc_decision_schema::ImagePart, DecideError>;
+/// Builds a DecisionRequest from JSON bytes, image files and the flag: SystemOneRequest::from_json, read_image for each,
+/// DecisionRequest::new(body, parts, long_context) (A-2 checks parts and image count/size); errors -> RequestInvalid { line, .. }.
+pub fn build_request(json: &[u8], images: &[(String, std::path::PathBuf)], long_context: bool, line: Option<u64>) -> Result<sc_decision_schema::DecisionRequest, DecideError>;
 enum LineRead { End, Line, TooLong }
 fn read_line_bounded<R: std::io::BufRead>(reader: &mut R, max: usize, out: &mut Vec<u8>) -> std::io::Result<LineRead>;
-/// Reads and validates the whole JSONL batch before anything is sent (REQ-SAG-0504). Blank lines and a
-/// leading BOM are skipped. The first line that is too long, not UTF-8 or not a Jev request returns
-/// LineTooLong / LineNotUtf8 / RequestInvalid naming that line, the field and the reason; nothing is sent.
+/// One batch line: a bare Jev request, or this wrapper (chosen by the presence of the "request" key).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchLine { request: Box<serde_json::value::RawValue>, #[serde(default)] images: OrderedMap<String, std::path::PathBuf>, #[serde(default)] long_context: bool }
+/// Reads and validates the whole JSONL batch before anything is sent (REQ-SAG-0504, REQ-SAG-0014). Blank lines and a
+/// leading BOM are skipped. The first line that is too long, past MAX_BATCH_LINES / MAX_BATCH_BYTES, not UTF-8, or not a
+/// valid request returns LimitExceeded / LineNotUtf8 / RequestInvalid naming that line, the field and the reason; nothing is sent.
 pub fn read_batch(reader: &mut dyn std::io::BufRead) -> Result<Vec<sc_decision_schema::DecisionRequest>, DecideError>;
 
 // src/lib.rs: decide's library target, shared by the decide binary and sc-agent-py
-pub mod input; pub mod output; mod doctor; mod error; mod select;
-pub use doctor::{doctor, DetectedKey, DoctorOptions, DoctorReport};
+pub mod input; pub mod output; pub mod signal; mod doctor; mod error; mod select;
+pub use doctor::{doctor, DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie};
 pub use error::DecideError;
-pub use select::{models, send, send_batch, send_on, send_batch_on, ModelsOptions, SendOptions};
+pub use select::{load_config, models, send, send_batch, send_batch_on, send_on, session_identity, Context, ModelSelector, ModelsOptions, SendOptions};
 
-// src/select.rs  (the one place a backend is chosen; ADR-SAG-0004 top layer)
+// src/select.rs  (the one place a backend is chosen; ADR-SAG-0004 composition root)
+/// Shared seams; every field None = the real default (REQ-SAG-0008).
+#[derive(Clone)]
+pub struct Context {
+    pub service: &'static str,                                                  // "decide" | "sc-agent-py"
+    pub config_dir: Option<std::path::PathBuf>,                                 // None -> sc_agent_config::default_dir()
+    pub environment: Option<Vec<(std::ffi::OsString, std::ffi::OsString)>>,     // None -> std::env::vars_os(); SC_AGENT__ overrides and key lookup
+    pub keyring: Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>, // None -> the platform keyring
+    pub transport: Option<Arc<dyn sc_agent_http::Transport>>,                   // None -> UreqTransport::new(Timeouts::default())
+    pub general: Option<sc_agent_log::GeneralLogger>,                           // None -> GeneralLogger::open_default(log_root, service)
+}
+impl Context { pub fn new(service: &'static str) -> Self; }   // every seam None
+/// What --model names; parsed once at the edge against the loaded config.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModelSelector { Short(ShortName), Version(ModelId), Runner(String) }   // Runner: a key of config.local_runners
+impl ModelSelector {
+    /// A ShortName if it parses; else a configured local runner name; else a ModelId; else decide.types.
+    /// (Catalog::resolve is infallible for both ShortName and ModelId, A-1; no error arm.)
+    pub fn parse(text: &str, config: &AgentConfig) -> Result<Self, DecideError>;
+}
 #[derive(Clone)]
 pub struct SendOptions {
-    pub model: String,
-    pub provider: Option<String>,
-    pub project: String,
-    pub agent_role: String,
-    pub service: &'static str,                                  // "decide" | "sc-agent-py"
-    pub transport: Option<Arc<dyn sc_agent_http::Transport>>,   // None -> Arc::new(UreqTransport::new(Timeouts::default()))
-    pub general: Option<sc_agent_log::GeneralLogger>,           // None -> GeneralLogger::open_default(log_root, service)
+    pub model: ModelSelector,
+    pub provider: Option<Provider>,
+    pub project: sc_agent_log::Slug,
+    pub agent_role: sc_agent_log::Slug,
+    pub context: Context,
     pub session: Option<sc_agent_log::SessionLogger>,           // None -> SessionLogger::open_default(log_root, identity)
 }
 #[derive(Clone)]
-pub struct ModelsOptions {
-    pub runner: Option<String>,                                 // a configured local runner; TypeSafe when None
-    pub service: &'static str,
-    pub transport: Option<Arc<dyn sc_agent_http::Transport>>,
-    pub general: Option<sc_agent_log::GeneralLogger>,
-}
-/// model names a config local runner -> LocalBackend (DaemonKind from runner.kind, key via resolve_var(key_env));
-/// else model = catalog.resolve(ModelChoice); provider = options.provider, else the first of
-/// Provider::ranking(line) (line = the short name, or catalog.line_of(id)) whose key resolve() finds, with
-/// KeySources::system(Repo::work_tree_root(cwd)?); none -> NoProviderKey. TypeSafe -> SystemOneBackend::new(TYPESAFE_BASE_URL, key);
-/// any other provider -> LlmDecisionBackend(LlmClient::new(provider, key), model).
-fn backend(options: &SendOptions, config: &AgentConfig, catalog: &Catalog, sources: &KeySources<'_>, general: &GeneralLogger) -> Result<Arc<dyn Backend>, DecideError>;
-/// general = options.general.clone() or GeneralLogger::open_default(config.log_root()?, options.service);
-/// session = options.session.clone() or SessionLogger::open_default(config.log_root()?, identity) (identity already validated);
-/// transport = options.transport.clone() or Arc::new(UreqTransport::new(Timeouts::default()));
-/// HttpClient::new(transport, ResendPolicy::new(config.max_sends), general.clone()),
+pub struct ModelsOptions { pub runner: Option<String>, pub context: Context }   // runner: a configured local runner; TypeSafe when None
+/// sc_agent_config::load(context.config_dir or default_dir()?, context.environment or vars_os()); errors -> Config.
+pub fn load_config(context: &Context) -> Result<AgentConfig, DecideError>;
+/// SessionIdentity::new(Repo::detect(cwd)?, project, agent_role); used by send and by sc-agent-py for SessionLogger::injected.
+pub fn session_identity(project: &sc_agent_log::Slug, agent_role: &sc_agent_log::Slug) -> Result<SessionIdentity, DecideError>;
+/// Runner -> LocalBackend (DaemonKind from the runner's RunnerKind, key via resolve_var(key_env)) with_log(general);
+/// else model = catalog.resolve(ModelChoice) (catalog = config.catalog(), so config models are seen, REQ-SAG-0101/0102);
+/// provider = options.provider, else the first of Provider::ranking(line) whose key resolve() finds with
+/// KeySources { env: environment, repo_root: Repo::work_tree_root(cwd)?, keyring }; none -> NoProviderKey.
+/// TypeSafe -> SystemOneBackend::new(TYPESAFE_BASE_URL, key); any other provider -> LlmDecisionBackend(LlmClient::new(LlmProvider, key).with_log(general), model).with_log(general).
+fn backend(options: &SendOptions, config: &AgentConfig, general: &GeneralLogger) -> Result<Arc<dyn Backend>, DecideError>;
+/// transport = context.transport or UreqTransport; HttpClient::new(transport, ResendPolicy::new(config.max_sends), general.clone())
+/// (one HttpClient per runner, so the REQ-SAG-0012 provider pause is shared by every worker);
 /// DecisionRunner::new(backend, http, session, general, RunnerConfig::from_config(config)).
-/// The same `general` is passed to LocalBackend::with_log / LlmClient::with_log / LlmDecisionBackend::with_log in `backend`.
-fn runner(options: &SendOptions, config: &AgentConfig, identity: SessionIdentity, general: GeneralLogger, backend: Arc<dyn Backend>) -> Result<DecisionRunner, DecideError>;
-/// Session identity is validated before the backend is built; loads config from default_dir(); always
-/// `Decision::decide` (plain send); then flush_session_log; writes one `decide.send` general record.
+fn runner(config: &AgentConfig, context: &Context, session: SessionLogger, general: GeneralLogger, backend: Arc<dyn Backend>) -> Result<DecisionRunner, DecideError>;
+/// Always `Decision::decide` (plain send); then flush_session_log; writes one `decide.send` general record.
 pub fn send(options: &SendOptions, request: DecisionRequest, cancel: &CancelToken) -> Result<DecisionResult, DecideError>;
-/// As `send`, but always `Decision::decide_stream(Box::new(requests.into_iter()), cancel)` (an owned 'static
-/// iterator), even for one request; `on_result` gets each DecisionResult as it finishes.
+/// Always `Decision::decide_stream(Box::new(requests.into_iter()), cancel)` (an owned 'static iterator), even for one
+/// request; `on_result` gets each DecisionResult as it finishes; an Err from on_result cancels the token, the rest is
+/// drained (and dropped), flush_session_log runs, and that Err is returned.
 pub fn send_batch(options: &SendOptions, requests: Vec<DecisionRequest>, cancel: &CancelToken, on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecideError>) -> Result<(), DecideError>;
 /// Testable cores: any Decision (the runner in send/send_batch, a fake in tests).
 pub fn send_on(decision: &dyn Decision, request: DecisionRequest, cancel: &CancelToken) -> DecisionResult;
 pub fn send_batch_on(decision: &dyn Decision, requests: Vec<DecisionRequest>, cancel: &CancelToken, on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecideError>) -> Result<(), DecideError>;
-/// GET /v1/models of TypeSafe or a configured runner, through HttpClient::send_once (one-off holdoff on cancel.wait_until)
-/// over options.transport (or the default); writes one `decide.models` general record.
+/// GET /v1/models of TypeSafe or a configured runner, through HttpClient::send_once with Timeouts::probe() (A-5);
+/// writes one `decide.models` general record.
 pub fn models(options: &ModelsOptions, cancel: &CancelToken) -> Result<ModelMetadataList, DecideError>;
+
+// src/signal.rs (REQ-SAG-0011; the `ctrlc` crate with feature `termination`: SIGINT + SIGTERM on Unix,
+// Ctrl-C/Ctrl-Break on Windows; sync, no tokio, no unsafe in decide)
+pub struct SignalWatch { /* interrupted: Arc<AtomicBool> */ }
+/// ctrlc::set_handler(move || on_interrupt(&cancel, &interrupted)); ctrlc starts and owns its handler thread
+/// (decide's source spawns none). Err (a handler already set) -> DecideError::Signal.
+pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError>;
+/// What the handler does: set `interrupted`, cancel the token. Unit-tested directly.
+fn on_interrupt(cancel: &CancelToken, interrupted: &AtomicBool);
+impl SignalWatch {
+    /// True once any interrupt was received; main then exits 130. ctrlc does not report which signal fired,
+    /// so SIGINT, SIGTERM, Ctrl-C and Ctrl-Break all exit 130 (no 143).
+    pub fn interrupted(&self) -> bool;
+}
 
 // src/doctor.rs (REQ-SAG-0503)
 #[derive(Debug, serde::Serialize)]
-pub struct DetectedKey { pub provider: Provider, pub source: &'static str }   // never the value
+pub struct DetectedKey { pub provider: Provider, #[serde(serialize_with = "key_source_str")] pub source: KeySource }   // never the value
 #[derive(Debug, serde::Serialize)]
-pub struct DoctorReport { pub keys: Vec<DetectedKey>, pub missing: Vec<(Provider, String)>, pub ties: Vec<(ModelId, ModelId)> }
+pub struct MissingModel { pub provider: Provider, pub model: String }
+#[derive(Debug, serde::Serialize)]
+pub struct Tie { pub config: ModelId, pub builtin: ModelId }
+#[derive(Debug, serde::Serialize)]
+pub struct DoctorReport { pub keys: Vec<DetectedKey>, pub missing: Vec<MissingModel>, pub ties: Vec<Tie> }
 #[derive(Clone)]
-pub struct DoctorOptions {
-    pub service: &'static str,
-    pub transport: Option<Arc<dyn sc_agent_http::Transport>>,   // None -> UreqTransport
-    pub general: Option<sc_agent_log::GeneralLogger>,           // None -> GeneralLogger::open_default(log_root, service)
-}
-/// Writes one `decide.doctor` general record.
+pub struct DoctorOptions { pub context: Context }
+/// Model lists fetched with Timeouts::probe(); writes one `decide.doctor` general record.
 pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorReport, DecideError>;
 
 // src/output.rs (library)
@@ -217,48 +269,49 @@ pub struct ResultLine<'a> {
     pub position: u64,
     pub digests: &'a OrderedMap<String, QuestionDigest>,
     #[serde(skip_serializing_if = "Option::is_none")] pub response: Option<&'a SystemOneResponse>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub error: Option<ErrorDetail>,   // DecisionError::detail(): every lower id and message
+    #[serde(skip_serializing_if = "Option::is_none")] pub error: Option<ErrorDetail>,   // DecisionError::detail(): every lower id, message and recovery
 }
 pub fn result_line(result: &DecisionResult) -> Result<Vec<u8>, DecideError>;
 
-// src/main.rs (bin: argv -> decide::{send, models, doctor} -> stdout)
-fn main() -> std::process::ExitCode;
-fn run(parsed: Parsed, stdin: &mut dyn std::io::Read, stdout: &mut dyn std::io::Write) -> Result<std::process::ExitCode, DecideError>;
+// src/main.rs (bin: argv -> decide::{send, send_batch, models, doctor} -> stdout)
+fn main() -> std::process::ExitCode;   // install the SignalWatch first; exit 130 when it was interrupted
+fn run(parsed: Parsed, cancel: &CancelToken, stdin: &mut dyn std::io::Read, stdout: &mut dyn std::io::Write) -> Result<std::process::ExitCode, DecideError>;
 fn print_stdout(bytes: &[u8]) -> std::process::ExitCode;
-fn emit(error: &DecideError) -> std::process::ExitCode;     // one stderr line: error.detail() as JSON
+fn emit(error: &DecideError) -> std::process::ExitCode;     // one stderr line: error.detail() as JSON, `recovery` included when present
 ```
 
-Types used: `SessionId`, `ErrorId`, `ErrorDetail`, `Catalog`, `ModelChoice`, `Provider` (incl. `PRIORITY`, `ranking`), `MODELS`, `CancelToken` (A-1); `AgentConfig`, `load`, `default_dir` (A-4); `KeySources`, `ResolvedKey`, `resolve`, `resolve_var` (A-4); `HttpClient`, `ResendPolicy`, `Transport`, `UreqTransport`, `Timeouts`, `Attempts`, `Next` (A-5); `GeneralLogger`, `SessionLogger`, `Repo` (incl. `work_tree_root`), `SessionIdentity` (A-8); `Decision`, `Backend`, `DecisionRequest`, `DecisionResult`, `SystemOneResponse`, `OrderedMap`, `QuestionDigest`, `ModelMetadataList` (A-2); `SystemOneBackend`, `TYPESAFE_BASE_URL` (A-6); `LocalBackend`, `DaemonKind` (A-6); `LlmClient` (incl. `models_request`, `decode_models`), `catalog_model_id`, `LlmDecisionBackend` (A-7); `DecisionRunner`, `RunnerConfig` (A-9).
+Types used: `SessionId`, `ErrorId` (incl. `cause_detail()`, provided `recovery()`), `ErrorDetail` (incl. `recovery: Option<Cow<'static, str>>`), `VarName`, `Catalog`, `ModelChoice`, `ModelId`, `ShortName`, `Provider` (incl. `PRIORITY`, `ranking`, `FromStr`), `MODELS`, `CancelToken` (A-1); `AgentConfig` (incl. `catalog`, `local_runners`, `RunnerKind`), `load`, `default_dir` (A-4); `KeySources`, `KeySource`, `KeyringSource`, `EnvSource`, `ResolvedKey`, `resolve`, `resolve_var` (A-4); `HttpClient`, `ResendPolicy`, `Transport`, `UreqTransport`, `Timeouts` (incl. `probe`) (A-5); `GeneralLogger`, `SessionLogger` (incl. `injected`), `Slug`, `Repo` (incl. `work_tree_root`), `SessionIdentity` (A-8); `Decision`, `Backend`, `DecisionRequest` (incl. `new`), `ImagePart`, `ImageFormat`, `DecisionResult`, `SystemOneRequest`, `SystemOneResponse`, `OrderedMap`, `QuestionDigest`, `ModelMetadataList` (A-2); `SystemOneBackend`, `TYPESAFE_BASE_URL` (A-6); `LocalBackend`, `DaemonKind` (A-6); `LlmClient` (incl. `models_request`, `decode_models`), `LlmProvider`, `catalog_model_id`, `LlmDecisionBackend` (A-7); `DecisionRunner`, `RunnerConfig` (A-9).
 
 Behaviour:
-- `send` (no `--batch`): `request_bytes` -> `SystemOneRequest::from_json` (failure: `RequestInvalid { line: None }`) -> `DecisionRequest::from` -> `decide::send` (always `Decision::decide`) -> one `ResultLine` + `\n`. A failed decision is data in its result (owner-decision-trait), printed on stdout.
-- `send --batch`: `read_batch` reads and validates every line first; a bad line returns its error (line, field, reason) before anything is sent (REQ-SAG-0504). Then `decide::send_batch`, which always calls `decision.decide_stream(Box::new(requests.into_iter()), &cancel)` (owned `'static` iterator), also for a one-line batch; each result printed as one JSONL line as it arrives (fastest first, session ULID and input position); a failed request is data in its line and the batch continues. A stdout write failure cancels the token and returns `Write`. After the stream, `runner.flush_session_log()`; an Err is a command error (exit 1) printed after the results, never replacing them.
-- Session identity: `--project`/`--agent-role` validated by `SessionIdentity::new` before anything is sent; an invalid value is `decide.log` (cause `log.invalid_slug`), nothing is sent and no row is written (REQ-SAG-0004). `repo` comes from `Repo::detect` on the working folder.
-- `models`: `SystemOneBackend::models_request` for TypeSafe or the runner's base; sent with `HttpClient::send_once` over `ModelsOptions.transport` (default `UreqTransport`) (a one-off holdoff waits on `CancelToken::wait_until`, A-5); `decode_models`; prints the JSON.
-- `doctor` (REQ-SAG-0503): (1) one line per detected provider key in `Provider::PRIORITY` order with its source (`env`, `.env`, `keyring`), never the value; (2) for each provider with a key, its model list (`LlmClient::models_request`/`decode_models`; TypeSafe through A-6 `models_request`), each id mapped back with `catalog_model_id`, one warning `{provider, model}` per id `catalog.line_of` does not know; (3) one warning per config model whose release date equals a built-in model of its line (the config model wins, A-1). Nothing in (2) or (3) when nothing is missing or tied.
-- The configuration directory passed to `sc_agent_config::load` is `default_dir()` (`~/.sc-agent/`).
-- General-log records (ANC-007; never a key or key value): `decide.send` (service, model, provider, requests, succeeded, failed), `decide.models` (runner or `typesafe`, model count, outcome id), `decide.doctor` (detected key count, missing count, tie count, outcome id). The same `GeneralLogger` goes into `HttpClient::new` (its `http.send` records), `DecisionRunner::new`, `LocalBackend::with_log`, `LlmClient::with_log` and `LlmDecisionBackend::with_log`.
-- Exit: 0 when the command ran and every result succeeded; 1 otherwise. Numbers are printed as serde_json gives them (REQ-SAG-0007). No tokio, no sleep, no threads of its own.
+- `send` (no `--batch`): `request_bytes` (8 MiB cap) -> `build_request(json, --image list, --long-context, None)` -> `decide::send` (always `Decision::decide`) -> one `ResultLine` + `\n`. A failed decision is data in its result (owner-decision-trait), printed on stdout.
+- `send --batch`: `read_batch` reads and validates every line first (limits, schema, images); a bad line returns its error (line, field, reason) before anything is sent (REQ-SAG-0504). Then `decide::send_batch`; each result printed as one JSONL line as it arrives (fastest first, session ULID and input position); a failed request is data in its line and the batch continues. A stdout write failure cancels the token and returns `Write`. After the stream, `runner.flush_session_log()`; an Err is a command error (exit 1) printed after the results, never replacing them.
+- Signals: SIGINT/SIGTERM cancel the token; unfinished requests end `decision.cancelled` and are printed; `flush_session_log` runs; exit 130 (REQ-SAG-0011).
+- Session identity: the CLI and sc-agent-py parse `--project`/`--agent-role` with `Slug::new` before anything is built; an invalid value is `decide.log` (cause `log.invalid_slug`), nothing is sent and no row is written (REQ-SAG-0004). `repo` comes from `Repo::detect` on the working folder.
+- `models`: `SystemOneBackend::models_request` for TypeSafe or the runner's base; sent with `HttpClient::send_once` over the context transport with `Timeouts::probe()` (a one-off holdoff waits on `CancelToken::wait_until`, A-5); `decode_models`; prints the JSON.
+- `doctor` (REQ-SAG-0503): (1) one entry per detected provider key in `Provider::PRIORITY` order with its `KeySource` (`env`, `.env`, `keyring`), never the value; (2) for each provider with a key, its model list (`LlmClient::models_request`/`decode_models`; TypeSafe through A-6 `models_request`), each id mapped back with `catalog_model_id`, one `MissingModel { provider, model }` per id `catalog.line_of(&str)` does not know; (3) one `Tie { config, builtin }` per config model whose release date equals a built-in model of its line (the config model wins, A-1). Nothing in (2) or (3) when nothing is missing or tied.
+- Config: `load_config(context)`; bound violations (REQ-SAG-0013: workers, max_sends, runner host/kind/port/key_env, key on plain-http non-loopback) are A-4's `AgentConfigError`s with the key path, surfaced as `decide.config` before anything is sent.
+- General-log records are written with `GeneralLogger::write(level, target, action, LogContext::default(), fields)` (A-8; decide's own records carry no session; per-request `http.*`/`runner.*` events carry `LogContext { session_id, position }` from A-5/A-9). Records (ANC-007; never a key or key value): `decide.send` (service, model, provider, requests, succeeded, failed, cancelled), `decide.models` (runner or `typesafe`, model count, outcome id), `decide.doctor` (detected key count, missing count, tie count, outcome id). The same `GeneralLogger` goes into `HttpClient::new` (its `http.*` records), `DecisionRunner::new`, `LocalBackend::with_log`, `LlmClient::with_log` and `LlmDecisionBackend::with_log`.
+- Exit: 0 when the command ran and every result succeeded; 1 otherwise; 130 after an interrupt. Numbers are printed as serde_json gives them (REQ-SAG-0007). No tokio, no sleep; decide's source starts no thread; the only extra thread is the handler thread `ctrlc` starts and owns.
 
 ## 4. Error list
 
-decide (`crates/decide/src/error.rs`, new; ErrorId from A-1, Display = detail(); each wrapped error kept unchanged):
+decide (`crates/decide/src/error.rs`, new; ErrorId from A-1, Display = `id: message` only, the chain in `source()`/`detail()`; each wrapped error kept unchanged; `cause_detail` returns the wrapped error's detail):
 
 ```rust
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum DecideError {
-    /// clap error; kind = Debug of clap::error::ErrorKind, detail = clap's text.
+    /// clap error; kind = Debug of clap::error::ErrorKind (display only), detail = clap's text.
     Usage { kind: String, detail: String },                                       // "decide.usage"
-    /// The global configuration could not be loaded.
+    /// The global configuration could not be loaded or is out of bounds (REQ-SAG-0013; cause config.invalid with the key path, or config.key_on_plain_http).
     Config(sc_agent_config::AgentConfigError),                                     // "decide.config"
-    /// --provider or --model does not parse, or the short name has no model.
+    /// --provider or --model does not parse.
     Types(sc_agent_types::TypesError),                                             // "decide.types"
     /// The provider's or runner's key is missing or malformed.
     Secrets(sc_agent_secrets::SecretsError),                                       // "decide.secrets"
-    /// Session identity invalid (log.invalid_slug), repo detection or logger open failed.
+    /// Slug invalid (log.invalid_slug), repo detection or logger open failed.
     Log(sc_agent_log::LogError),                                                   // "decide.log"
-    /// A local runner's kind is unknown.
+    /// A local runner's kind cannot be served.
     Local(sc_decision_local::LocalError),                                          // "decide.local"
     /// Building a System One backend or decoding the models list failed.
     Decision(sc_decision_schema::DecisionError),                                   // "decide.decision"
@@ -269,23 +322,32 @@ pub enum DecideError {
     /// flush_session_log failed after the results were printed.
     Runner(sc_decision_runner::RunnerError),                                       // "decide.runner"
     /// No provider in Provider::ranking for the model has a detected key (and no --provider was given).
+    /// recovery: "set one of the listed providers' key variables, or pass --provider".
     NoProviderKey { model: String, tried: Vec<Provider> },                         // "decide.no_provider_key"
     InputNotFound { input: String },                                               // "decide.input_not_found"
-    /// io error other than NotFound; kind = Debug of io::ErrorKind, detail = Display.
+    /// io error other than NotFound; kind = Debug of io::ErrorKind (display only), detail = Display.
     InputRead { input: String, kind: String, detail: String },                     // "decide.input_read"
-    LineTooLong { line: u64, limit: usize },                                       // "decide.line_too_long"
+    /// REQ-SAG-0014: what = "request_bytes" | "batch_lines" | "batch_bytes" | "image_bytes"; line None for a single request.
+    LimitExceeded { what: &'static str, line: Option<u64>, max: u64 },             // "decide.limit_exceeded"
     LineNotUtf8 { line: u64, byte_offset: usize },                                 // "decide.line_not_utf8"
-    /// A request does not match the Jev request schema; line = JSONL line (None for a single request); the message names
-    /// the line, the field (RequestParse path) and the reason; source = decision.request_parse, kept (REQ-SAG-0504).
+    /// An image file could not be read; kind = Debug of io::ErrorKind (display only).
+    ImageRead { name: String, path: std::path::PathBuf, kind: String, detail: String },   // "decide.image_read"
+    /// An image file's extension is not png, jpg or jpeg.
+    ImageFormat { name: String, path: std::path::PathBuf },                        // "decide.image_format"
+    /// A request does not match the Jev request schema, or DecisionRequest::new refused it (image parts, image limits);
+    /// line = JSONL line (None for a single request); the message names the line, the field and the reason;
+    /// source = decision.request_parse / decision.image_parts / decision.limits, kept (REQ-SAG-0504).
     RequestInvalid { line: Option<u64>, source: sc_decision_schema::DecisionError },  // "decide.request_invalid"
     Encode { detail: String },                                                     // "decide.encode"
     /// stdout write failed.
     Write { kind: String, detail: String },                                        // "decide.write"
+    /// The interrupt handler could not be installed (ctrlc::Error Display).
+    Signal { detail: String },                                                     // "decide.signal"
 }
-impl ErrorId for DecideError {}
+impl ErrorId for DecideError {}   // recovery(): Some(..) for NoProviderKey; the wrapped errors carry their own
 ```
 
-18 variants. A decision that fails inside `decide`/`decide_stream` is not a `DecideError`: it is the `DecisionError` inside that `DecisionResult`, printed in its `ResultLine.error`.
+21 variants (round 2: `LineTooLong` folded into `LimitExceeded`; `ImageRead`, `ImageFormat` and `Signal` added). A decision that fails inside `decide`/`decide_stream` is not a `DecideError`: it is the `DecisionError` inside that `DecisionResult`, printed in its `ResultLine.error`.
 
 ## 5. Cargo.toml (decide, new)
 
@@ -304,7 +366,7 @@ workspace = true
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "raw_value"] }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-agent-config = { path = "../sc-agent-config", version = "0.1.0" }
 sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
@@ -316,6 +378,8 @@ sc-decision-local = { path = "../sc-decision-local", version = "0.1.0" }
 sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.0" }
 sc-decision-llm = { path = "../sc-decision-llm", version = "0.1.0" }
 sc-decision-runner = { path = "../sc-decision-runner", version = "0.1.0" }
+
+ctrlc = { version = "3", features = ["termination"] }   # sync; SIGINT/SIGTERM, Ctrl-C/Ctrl-Break; no tokio (REQ-SAG-0011)
 
 [dev-dependencies]
 sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }   # ScriptedTransport, BlockingTransport
@@ -333,96 +397,147 @@ path = "src/main.rs"
 
 ### 3.3 sc-agent Python API (`crates/sc-agent-py/`, ANC-006)
 
-Package `sc-agent-py` (`publish = false`), `[lib] name = "sc_agent", crate-type = ["cdylib"]`; maturin wheel `sc-agent`, module `sc_agent`. Deps: `decide` (path, lib), `sc-agent-types`, `sc-decision-schema`, `pyo3 = { version = "=0.29.2", features = ["abi3-py310", "extension-module"] }`, `serde_json`. Each call releases the GIL (`py.allow_threads`). Same output shapes as the CLI (JSON text). The general log service is `sc-agent-py`.
+Package `sc-agent-py` (`publish = false`), `[lib] name = "sc_agent", crate-type = ["cdylib"]`; maturin wheel `sc-agent`, module `sc_agent`. Deps: `decide` (path, lib), `sc-agent-types`, `sc-agent-log`, `sc-decision-schema`, `sc-observability = "=1.5.0"` (the `LogSink` trait), `pyo3 = { version = "=0.29.2", features = ["abi3-py310", "extension-module"] }`, `serde_json`. Same output shapes as the CLI (JSON text). The default general log service is `sc-agent-py`. Strings are parsed at the edge (`ModelSelector::parse`, `Provider::from_str`, `Slug::new`); errors raise `SagError`.
 
 ```rust
 #[pyclass(module = "sc_agent", frozen)] pub struct CancelToken(sc_agent_types::CancelToken);   // new(), cancel(), is_cancelled()
-create_exception!(sc_agent, SagError, PyException);   // args = (id, message, detail JSON with every cause)
-#[pyfunction] #[pyo3(signature = (request, *, model, project, agent_role, provider = None, cancel = None))]
-fn send(py: Python<'_>, request: &str, model: &str, project: &str, agent_role: &str, provider: Option<&str>, cancel: Option<&CancelToken>) -> PyResult<String>;   // one ResultLine
-#[pyfunction] #[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None))]
-fn send_batch(py: Python<'_>, requests: Vec<String>, model: &str, project: &str, agent_role: &str, provider: Option<&str>, cancel: Option<&CancelToken>, on_result: Option<PyObject>) -> PyResult<Vec<String>>;   // ResultLines in finish order; on_result(line) as each arrives
-#[pyfunction] #[pyo3(signature = (runner = None, cancel = None))] fn models(py: Python<'_>, runner: Option<&str>, cancel: Option<&CancelToken>) -> PyResult<String>;   // decide::models with ModelsOptions { transport: None, general: None, .. }
-#[pyfunction] #[pyo3(signature = (cancel = None))] fn doctor(py: Python<'_>, cancel: Option<&CancelToken>) -> PyResult<String>;   // DoctorReport JSON
+create_exception!(sc_agent, SagError, PyException);   // args = (id, message, detail JSON with every cause_detail and recovery when present)
+/// A batch item: a JSON request string, or (request, images, long_context).
+#[derive(FromPyObject)]
+enum BatchItem { Bare(String), Full(String, Option<std::collections::BTreeMap<String, Vec<u8>>>, bool) }
+#[pyfunction]
+#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None))]
+fn send(py: Python<'_>, request: &str, model: &str, project: &str, agent_role: &str, provider: Option<&str>,
+        images: Option<std::collections::BTreeMap<String, Vec<u8>>>, long_context: bool, cancel: Option<&CancelToken>,
+        general_log: Option<PyObject>, session_log: Option<PyObject>) -> PyResult<String>;   // one ResultLine
+#[pyfunction]
+#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None))]
+fn send_batch(py: Python<'_>, requests: Vec<BatchItem>, model: &str, project: &str, agent_role: &str, provider: Option<&str>,
+              cancel: Option<&CancelToken>, on_result: Option<PyObject>, general_log: Option<PyObject>, session_log: Option<PyObject>) -> PyResult<Vec<String>>;   // ResultLines in finish order; on_result(line) as each arrives
+#[pyfunction] #[pyo3(signature = (runner = None, cancel = None, general_log = None))]
+fn models(py: Python<'_>, runner: Option<&str>, cancel: Option<&CancelToken>, general_log: Option<PyObject>) -> PyResult<String>;
+#[pyfunction] #[pyo3(signature = (cancel = None, general_log = None))]
+fn doctor(py: Python<'_>, cancel: Option<&CancelToken>, general_log: Option<PyObject>) -> PyResult<String>;   // DoctorReport JSON
 #[pymodule] fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()>;
+
+/// Calls a Python `Callable[[dict], None]` with each record (fields plus level, target, action) under the GIL.
+/// A raised exception is a refused write (counted, reported by flush); never changes a result.
+struct PyCallableSink { callable: Py<PyAny> }
+impl sc_observability::v2::LogSink for PyCallableSink {}
+/// Logger built like MemoryLog (file and console sinks off, SinkRegistration::typed(PyCallableSink)) ->
+/// GeneralLogger::injected / SessionLogger::injected(logger, decide::session_identity(..)?).
+fn callable_logger(callable: Py<PyAny>) -> Result<Arc<sc_observability::v2::Logger>, SagError>;
+/// Runs `work` on a std::thread::scope worker; the Python thread waits on the result channel with
+/// recv_timeout(100 ms) inside py.allow_threads, then py.check_signals() with the GIL. A signal exception or an
+/// on_result exception cancels the token, drains the channel, joins, and re-raises (REQ-SAG-0011).
+fn run_interruptible<T: Send>(py: Python<'_>, cancel: &sc_agent_types::CancelToken, work: impl FnOnce(&mut dyn FnMut(DecisionResult) -> Result<(), DecideError>) -> Result<T, DecideError> + Send, on_result: Option<&PyObject>) -> PyResult<T>;
 ```
 
-decide subcommand -> Python: `send` -> `send` (`decide::send`), `send --batch` -> `send_batch` (`decide::send_batch`), `models` -> `models`, `doctor` -> `doctor`.
-Loggers and transport from Python: no record supports a Python `log_root` or logger argument, so the Python functions pass `transport: None, general: None, session: None` and use decide's default loggers (service `sc-agent-py`) and `UreqTransport`; ANC-007 is met by the decide library they call. Tests that need a scripted transport are Rust tests in crates/decide.
+decide subcommand -> Python: `send` -> `send` (`decide::send`; `--image` -> `images`, `--long-context` -> `long_context`), `send --batch` -> `send_batch` (`decide::send_batch`; batch-line wrapper -> `BatchItem::Full`), `models` -> `models`, `doctor` -> `doctor`. The Python API is a superset where useful (ANC-006): image bytes may be passed directly, and loggers may be injected.
+Transport from Python: no Python transport seam (the context transport is None -> `UreqTransport`); tests that need a scripted transport are Rust tests in crates/decide. Python tests use a loopback runner from a tempdir config (`HOME` set before import) and no external network.
 
 No tokio, no mimalloc. Dev: `tempfile 3`.
 
 ## 6. New code
 
-- decide: `src/error.rs` (~130 lines), `src/select.rs` (~110), `src/doctor.rs` (~70), `src/output.rs` (~40), `read_batch`/`open_lines` in `src/input.rs` (~50), `run`/`main` (~80), `Cli` (~70).
-- sc-agent-py: `src/lib.rs` (~150), `pyproject.toml`, `tests/test_api.py`.
+- decide: `src/error.rs` (~150 lines), `src/select.rs` (~160), `src/signal.rs` (~30), `src/doctor.rs` (~80), `src/output.rs` (~40), `read_batch`/`open_lines`/`read_image`/`build_request` in `src/input.rs` (~110), `run`/`main` (~90), `Cli` (~80).
+- sc-agent-py: `src/lib.rs` (~260: functions, `BatchItem`, `PyCallableSink`, `run_interruptible`), `pyproject.toml`, `tests/test_api.py`, `tests/loopback.py` (a TCP server that accepts and never answers, or answers one fixed error).
 
 ## 7. Tests
 
-Each test names the acceptance line it proves (`AC: <line key>`). "Real runner" = `decide::send`/`send_batch` with a `ScriptedTransport` (or `BlockingTransport`) and `MemoryLog` injected through `SendOptions` (`general: Some(log.general())`, `session: Some(log.session(identity))`), going through the real `DecisionRunner` and backend; no network.
+Each test names the acceptance line it proves (`AC: <line key>`). "Real runner" = `decide::send`/`send_batch` with a `Context` holding a tempdir `config_dir`, an explicit `environment`, a map keyring, a `ScriptedTransport` (or `BlockingTransport`) and `MemoryLog` (`general: Some(log.general())`, `session: Some(log.session(identity))`), going through the real `DecisionRunner` and backend; no network, process env and HOME untouched.
 
 decide (`crates/decide`):
 1. `cli_definition_is_consistent`; the 3 `read_line_bounded` tests (copied; AC: decide send).
 2. Single request from a file and from stdin reaches `send_on` unchanged; one `ResultLine` with `session_id` and `position` (AC: decide send).
 3. Each TypeSafe request example (openapi.json) through the real runner + SystemOneBackend, transport answering the documented response (AC: REQ-SAG-0501 AC1).
-4. Batch of 3 on a fake `Decision` finishing out of order and failing one (AC: REQ-SAG-0701 output).
-5. 1,000-line batch, line 412 bad, real runner; the injected transport records zero calls (AC: REQ-SAG-0504).
-6. `--project "Phase B"`; no `--agent-name` flag (AC: REQ-SAG-0004).
-7. `0.123456789` printed unchanged (AC: REQ-SAG-0002).
-8. A result carrying `decision.http` -> `http.network` (AC: REQ-SAG-0002).
+4. Each openapi.json example that uses `assets[].part` is sent with `--image NAME=FILE` (and as a batch wrapper line), and each long-context example with `--long-context`, through the real runner: the transport sees multipart parts named as the assets and the `TypeSafe-Danger-Zone-Long-Context: true` header (AC: REQ-SAG-0501 images).
+5. Batch of 3 on a fake `Decision` finishing out of order and failing one (AC: REQ-SAG-0701 output).
+6. 1,000-line batch, line 412 bad, real runner; the injected transport records zero calls (AC: REQ-SAG-0504).
+7. `Slug::new` rejects `"Phase B"` at the edge; no `--agent-name` flag (AC: REQ-SAG-0004).
+8. `0.123456789` printed unchanged; a result carrying `decision.http` -> `http.network` prints both ids and messages (AC: REQ-SAG-0002).
 9. `models` with an injected transport (AC: REQ-SAG-0501 AC2).
-10. `doctor` with an injected transport and fake provider lists (AC: REQ-SAG-0503).
+10. `doctor` with an injected transport and fake provider lists; `missing` and `ties` as named structs (AC: REQ-SAG-0503).
 11. `select::backend` provider choice cases (AC: REQ-SAG-0103).
 12. A LocalBackend and a SystemOneBackend run batches in parallel through two real runners over injected transports (AC: decide send, owner-local-decision-crate).
 13. Broken stdout during a batch cancels the token and returns `decide.write` (AC: REQ-SAG-0701 output).
-14. A run writes `<log_root>/logs/decide.log.jsonl` (AC: REQ-SAG-0003).
+14. A run with `config_dir` whose default.json sets `log_root` to a tempdir writes `<log_root>/logs/decide.log.jsonl` and the session row under `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl` (AC: REQ-SAG-0003, ADR-SAG-0002).
 15. 40-request `send_batch` over a `BlockingTransport`: 8 sends in flight at once with the default workers, 1 with workers 1 (AC: REQ-SAG-0701 parallel).
-16. Busy end to end: transport answers 529 with `Retry-After: 0` every time -> 5 sends and `http.provider_busy` (reason `sends`, 5 attempts) in the result; `SC_AGENT__MAX_SENDS=2` -> 2 sends (AC: REQ-SAG-0601).
+16. Busy end to end: transport answers 529 (no Retry-After) every time -> 5 sends and `http.provider_busy` (reason `sends`, 5 attempts); `SC_AGENT__MAX_SENDS=2` in `environment` -> 2 sends (AC: REQ-SAG-0601).
 17. Plain `send` calls `decide`, `send --batch` with one line calls `decide_stream` (fake `Decision` counting calls; AC: CRIT-M3 dispatch).
-18. `MemoryLog::new()?` injected (`general: Some(log.general())` in all three options, `session: Some(log.session(identity))` in SendOptions); one send, models and doctor; `log.records()?` contains `MemoryRecord`s whose `action` is `decide.send`, `decide.models`, `decide.doctor` and `http.send`, and no record's `fields` holds a key value (AC: ANC-007).
-19. `grep -rn 'thread::spawn' crates/decide/src` finds nothing (AC: REQ-SAG-0701 output).
-20. `send` over a `BlockingTransport` held by the test; cancel the token; the `decision.cancelled` result returns within 100 ms; releasing the transport yields no further result (AC: REQ-SAG-0104 AC2, the Rust half).
+18. MemoryLog injected; one send, models and doctor; `log.records()?` holds `decide.send`, `decide.models`, `decide.doctor` and `http.send` actions; no record's `fields` holds a key value (AC: ANC-007).
+19. `grep -rn 'thread::spawn' crates/decide/src` finds nothing; the ctrlc handler thread is ctrlc's, not decide's (AC: REQ-SAG-0701 output).
+20. `send` over a `BlockingTransport` held by the test; cancel the token; the `decision.cancelled` result arrives on a channel within the 2 s bound; releasing the transport yields no further result (AC: REQ-SAG-0104 AC2).
+21. `--model haiku` through a tempdir default.json with a later-dated `haiku` model: the transport sees that model; without it, the built-in (AC: REQ-SAG-0101, REQ-SAG-0102).
+22. Anthropic 429 with the quota body: one send, result `http.quota_exhausted` with the remote message and its recovery (AC: REQ-SAG-0602).
+23. A tempdir default.json `local_runners.laya` (host 127.0.0.1, port 9000): `--model laya` builds a LocalBackend and the transport sees `http://127.0.0.1:9000` (AC: REQ-SAG-0801).
+24. Two parallel requests to one provider through `decide::send_batch` (default workers); the `ScriptedTransport` answers 429 `Retry-After: 1` to the first send and 200 after; the transport's recorded send times show no later send to that host (the other request's included) before the pause ends, because the pause lives in the one `HttpClient` the runner shares; with `Retry-After: 0` the pause still lasts at least the 250 ms floor. Real clock, recorded send times: the runner's clock seam is crate-private to sc-decision-runner (its tests use `sc_agent_http::testing::ManualClock`), so decide cannot supply a ManualClock; the test waits about 1.25 s (AC: REQ-SAG-0012).
+25. default.json with `workers: 0`, `max_sends: 11`, a runner `port: 0`, and `key_env` on `http://10.0.0.5`: each -> `decide.config` (cause `config.invalid` naming the key path, or `config.key_on_plain_http`) and no send (AC: REQ-SAG-0013).
+26. Limits: a 9 MiB single request, a 10,001-line batch, a line past 8 MiB, a 21 MiB image, 21 images -> `decide.limit_exceeded` / `decide.request_invalid` (cause `decision.limits`) naming the limit; nothing sent (AC: REQ-SAG-0014).
+27. Unit: `on_interrupt` during a `send_batch` over a `BlockingTransport` cancels the token; every unfinished result is `decision.cancelled` and the session rows are flushed (MemoryLog has one row per started request). Process (Unix CI): a `decide send --batch` child against a loopback runner that never answers, sent SIGINT and, in a second run, SIGTERM (`kill -INT` / `kill -TERM`): every line printed is `decision.cancelled`, the rows are in sessions.jsonl, exit code 130 both times (AC: REQ-SAG-0011 decide).
+28. Workspace searches: `rg -n 'Uuid|uuid::|uuid =' crates/` and `rg -n 'round\(|\{:\.[0-9]+\}' crates/ -g '*.rs'` (outside tests) find nothing (AC: REQ-SAG-0001 AC2, REQ-SAG-0007).
 
-sc-agent-py (`tests/test_api.py`, pytest over the maturin build; no transport, no network):
+sc-agent-py (Rust unit tests in `src/lib.rs`):
+29. The string sc-agent-py returns for a DecisionResult holding probability `0.123456789` contains `0.123456789` (AC: REQ-SAG-0007).
+
+sc-agent-py (`tests/test_api.py`, pytest over the maturin build; `HOME` a tempdir with a default.json naming a loopback runner; no external network):
 1. Lists the decide subcommands from `decide --help` (send, models, doctor, plus `send --batch`) and asserts each has its Python function (AC: ANC-006).
-2. A `CancelToken` created and cancelled from Python, passed to `send` and to `send_batch` (fake TypeSafe key in the test environment, `HOME` a tempdir), ends every request with `decision.cancelled` and starts no send, so no network is touched (AC: REQ-SAG-0104 AC2). In-flight cancel is decide test 20.
-3. `project="Phase B"` raises `SagError` with id `decide.log` (cause `log.invalid_slug`) and writes no row; valid project/agent_role pass the same `SessionIdentity::new` check as the CLI (AC: REQ-SAG-0004).
+2. A `CancelToken` created and cancelled from Python, passed to `send` and `send_batch`, ends every request with `decision.cancelled` and starts no send (AC: REQ-SAG-0104 AC2).
+3. `project="Phase B"` raises `SagError` with id `decide.log` (cause `log.invalid_slug`) and writes no row (AC: REQ-SAG-0004).
+4. One `decide send` subprocess and one `sc_agent.send` with the same project and agent_role against a loopback runner that answers a fixed error: both session rows carry equal `project` and `agent_role` (AC: REQ-SAG-0004 AC3).
+5. `general_log=records.append`, `session_log=rows.append` on one send: `records` holds a dict with action `decide.send`, `rows` holds the session row; no file is written under the log root for the injected logs (AC: REQ-SAG-0008 Python).
+6. `send_batch` against a loopback runner that never answers; a second Python thread calls `_thread.interrupt_main()`; `KeyboardInterrupt` is raised within 2 s, every result was `decision.cancelled`, and the session rows are on disk; an `on_result` that raises `ValueError` cancels, drains and re-raises it (AC: REQ-SAG-0011 Python).
+7. `send(request, images={"img1": png_bytes}, long_context=True)` against the loopback runner reaches the transport as multipart with the long-context header (the loopback server records the request) (AC: REQ-SAG-0501 images).
 
 ## Required validation
 
 - `cargo build -p decide -p sc-agent-py`; `maturin build -m crates/sc-agent-py/Cargo.toml`.
 - `cargo clippy -p decide -p sc-agent-py --all-targets -- -D warnings` with the A-1 workspace denies and clippy.toml (sleep disallowed).
-- `cargo test -p decide`; `pytest crates/sc-agent-py/tests`.
+- `cargo test -p decide -p sc-agent-py`; `pytest crates/sc-agent-py/tests`.
 - `cargo tree -p decide -e normal` and `cargo tree -p sc-agent-py -e normal`: no tokio.
 - `cargo tree -i decide` for each lower sc-agent crate: not listed (ADR-SAG-0004).
-- `grep -rnE 'thread::sleep|time::sleep|sleep_until|thread::spawn' crates/decide/src crates/sc-agent-py/src` finds nothing.
+- `grep -rnE 'thread::sleep|time::sleep|sleep_until' crates/decide/src crates/sc-agent-py/src` finds nothing; no `thread::spawn` in crates/decide/src.
+- `rg -n 'Uuid|uuid::|uuid =' crates/` and the rounding search (test 28) find nothing.
 
 ## 8. Dependencies on other sprints
 
-A-6 and A-7 (backends incl. `with_log`, models list, LLM client); A-9 (`DecisionRunner`, `RunnerConfig`, `RunnerError`); through them A-1, A-2, A-4, A-5, A-8 (names in section 3.2).
+A-6 and A-7 (backends incl. `with_log`, models list, LLM client, `LlmProvider`); A-9 (`DecisionRunner`, `RunnerConfig`, `RunnerError`); through them A-1, A-2 (`DecisionRequest::new`, image limits), A-4 (config bounds, `RunnerKind`, `KeySource`), A-5 (`Timeouts::probe`, provider pause, `testing`), A-8 (`Slug`, `injected` loggers, `testing::MemoryLog`) (names in section 3.2).
 
 ## Acceptance criteria
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-10.sh` (sc-agent-ref@dce239a, 9 copy steps), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] decide send: one request from a file or stdin, or a JSONL batch (--batch), with --model, --project and --agent-role (required; no --agent-name) and an optional --provider override; a configured local runner is selected by name (REQ-SAG-0401, REQ-SAG-0801); runs through the Decision trait only, over DecisionRunner (ADR-SAG-0001).
+- [ ] REQ-SAG-0501 images: `decide send --image NAME=FILE` (repeatable) and `--long-context`, batch wrapper lines `{"request", "images", "long_context"}`, and sc-agent-py `send(..., images=, long_context=)` / batch tuples build every request with DecisionRequest::new; each openapi.json example that uses assets.part or long context is sent through the real runner and the transport sees the multipart parts and the long-context header (ADR-SAG-0001: DecisionRequest is the one request form).
 - [ ] CRIT-M3 dispatch: plain `decide send` always calls Decision::decide; `decide send --batch` always calls Decision::decide_stream with an owned 'static iterator (Box::new(requests.into_iter())), even for a one-line batch.
-- [ ] REQ-SAG-0103: without --provider, decide picks the first provider in Provider::ranking(line) with a detected key (process env, repo-root .env, keyring); `--model haiku` with Anthropic and OpenRouter keys goes to Anthropic, with only OpenRouter to OpenRouter as `anthropic/claude-haiku-5.5`, `--provider openrouter` overrides, `--model jev` with no TypeSafe key is decide.no_provider_key.
+- [ ] REQ-SAG-0103: without --provider, decide picks the first provider in Provider::ranking(line) with a detected key (process env, repo-root .env, keyring); `--model haiku` with Anthropic and OpenRouter keys goes to Anthropic, with only OpenRouter to OpenRouter as `anthropic/claude-haiku-5.5`, `--provider openrouter` overrides, `--model jev` with no TypeSafe key is decide.no_provider_key (with a recovery text).
+- [ ] REQ-SAG-0101 / REQ-SAG-0102: `decide send --model haiku` resolves through the config-built catalog; with a tempdir default.json adding a later-dated haiku model, the transport receives that model id; without it, the built-in.
+- [ ] REQ-SAG-0801: a `local_runners.laya` entry in a tempdir default.json (Context.config_dir) makes `--model laya` build a LocalBackend that sends to the configured host and port.
 - [ ] REQ-SAG-0504: a 1,000-line batch whose line 412 has a `score` question without `criteria` stops decide with decide.request_invalid naming line 412, `criteria` and the reason, and the injected transport is never called.
+- [ ] REQ-SAG-0014: a single request over 8 MiB, a batch over 10,000 lines or 256 MiB, a line over 8 MiB, an image over 20 MiB and a request with 21 images each end with a typed error naming the limit (decide.limit_exceeded, or decide.request_invalid with cause decision.limits) and nothing is sent.
 - [ ] REQ-SAG-0701 parallel: decide --batch hands the whole batch to DecisionRunner; a 40-request batch over a BlockingTransport has 8 sends in flight at once with the default workers and 1 with workers set to 1.
-- [ ] REQ-SAG-0701 output: decide starts no thread of its own (a test greps crates/decide for thread::spawn); decide prints JSON for one request and JSONL for a batch, fastest first, each line tagged with its session ULID and input position; a failed request is printed in its result as an ErrorDetail chain and the rest of the batch continues; a stdout write failure cancels the batch and returns decide.write.
-- [ ] REQ-SAG-0601: end to end through decide send and the real DecisionRunner, a request whose injected transport answers busy (529, Retry-After: 0) every time is sent 5 times and its result is http.provider_busy with reason sends and 5 attempts; with SC_AGENT__MAX_SENDS=2 it is sent 2 times.
-- [ ] Each TypeSafe request example can be sent through decide send and returns the API's response (REQ-SAG-0501 AC1; ScriptedTransport injected through SendOptions, real runner).
-- [ ] The TypeSafe models list is returned by decide models (REQ-SAG-0501 AC2; transport injected through ModelsOptions).
-- [ ] decide doctor warns naming provider and model for every provider model in neither the built-in list nor the global configuration, prints no warning when all are present, warns when a config model has the release date of a built-in of its line, and lists every detected provider key (source, never the value) in the order it would be used (REQ-SAG-0503).
+- [ ] REQ-SAG-0701 output: decide starts no thread of its own (a test greps crates/decide/src for thread::spawn and finds none; the only extra thread is the interrupt handler thread the ctrlc crate starts and owns); decide prints JSON for one request and JSONL for a batch, fastest first, each line tagged with its session ULID and input position; a failed request is printed in its result as an ErrorDetail chain and the rest of the batch continues; a stdout write failure cancels the batch and returns decide.write.
+- [ ] REQ-SAG-0601: end to end through decide send and the real DecisionRunner, a request whose injected transport answers busy (529) every time is sent 5 times and its result is http.provider_busy with reason sends and 5 attempts; with SC_AGENT__MAX_SENDS=2 in Context.environment it is sent 2 times.
+- [ ] REQ-SAG-0012: end to end through decide send --batch, a 429 with Retry-After: 1 on the first of two parallel requests to one provider pauses every later send to that host (the other request's too) until the not-before time; Retry-After: 0 still waits the 250 ms floor.
+- [ ] REQ-SAG-0602: an Anthropic 429 with the quota body ends the decide result with http.quota_exhausted after exactly one send, with the remote message and its recovery text.
+- [ ] REQ-SAG-0013: decide with a tempdir default.json holding workers 0, max_sends 11, a runner port 0, or a key_env on a plain-http non-loopback host fails before any send with decide.config, cause config.invalid naming the key path (or config.key_on_plain_http).
+- [ ] REQ-SAG-0011 decide: SIGINT or SIGTERM during `decide send --batch` (and Ctrl-C/Ctrl-Break on Windows) cancels the token through decide::signal (ctrlc with feature termination, no tokio); every unfinished request ends decision.cancelled and is printed, the session log is flushed (one row per started request), and decide exits 130 for any interrupt (ctrlc does not report which signal fired).
+- [ ] REQ-SAG-0011 Python: KeyboardInterrupt during sc-agent-py send/send_batch is seen within one 100 ms timed wait (py.check_signals with the GIL), cancels the token, drains the results, flushes the session rows and re-raises; an exception raised by on_result does the same.
+- [ ] Each TypeSafe request example can be sent through decide send and returns the API's response (REQ-SAG-0501 AC1; ScriptedTransport injected through the Context, real runner).
+- [ ] The TypeSafe models list is returned by decide models (REQ-SAG-0501 AC2; transport injected through the Context; Timeouts::probe()).
+- [ ] decide doctor warns naming provider and model for every provider model in neither the built-in list nor the global configuration, prints no warning when all are present, warns when a config model has the release date of a built-in of its line ({config, builtin}), and lists every detected provider key (KeySource, never the value) in the order it would be used (REQ-SAG-0503).
 - [ ] ANC-006: crates/sc-agent-py (module sc_agent) offers send, send_batch, models and doctor, one per decide operation (send, send --batch, models, doctor), checked by a pytest that lists the decide subcommands from `decide --help` and the module's functions.
-- [ ] REQ-SAG-0104 AC2: a CancelToken created and cancelled from Python stops the sc-agent-py send and send_batch it is passed to (decision.cancelled, no send); in decide, cancelling a send whose transport is blocked returns decision.cancelled within 100 ms and no later result.
-- [ ] REQ-SAG-0004: an invalid --project or --agent-role (e.g. 'Phase B') is rejected as decide.log with cause log.invalid_slug and nothing is sent or logged; sc-agent-py validates project and agent_role through the same SessionIdentity::new and raises SagError decide.log for 'Phase B'.
+- [ ] REQ-SAG-0104 AC2: a CancelToken created and cancelled from Python stops the sc-agent-py send and send_batch it is passed to (decision.cancelled, no send); in decide, cancelling a send whose transport is blocked returns decision.cancelled within the 2 s channel bound and no later result.
+- [ ] REQ-SAG-0004: an invalid --project or --agent-role (e.g. 'Phase B') is rejected as decide.log with cause log.invalid_slug and nothing is sent or logged; sc-agent-py parses project and agent_role with the same Slug::new and raises SagError decide.log for 'Phase B'; AC3: a decide CLI send and an sc-agent-py send with the same project and agent_role write session rows with equal project and agent_role fields.
+- [ ] REQ-SAG-0008 Python: sc-agent-py send/send_batch accept general_log and session_log callables (Callable[[dict], None]) and models/doctor accept general_log; a pytest receives the decide.send record and the session row through them, and the injected logs write no file.
 - [ ] REQ-SAG-0003: decide writes <log_root>/logs/decide.log.jsonl, its own general log file (tsq's is A-3).
+- [ ] ADR-SAG-0002: a decide send with a tempdir log_root writes its session row to <log_root>/<repo>/<agent_role>/<project>/sessions.jsonl with session_id, repo, project and agent_role first in fields.
+- [ ] REQ-SAG-0001 AC2: `rg -n 'Uuid|uuid::|uuid =' crates/` over the finished workspace finds no hit.
+- [ ] REQ-SAG-0007: a probability 0.123456789 is printed unchanged by decide and returned unchanged in sc-agent-py's result string; `rg -n 'round\(|\{:\.[0-9]+\}' crates/ -g '*.rs'` finds no rounding of returned values outside tests.
 - [ ] REQ-SAG-0002: the error type DecideError (decide.* ids, implements ErrorId) is the return type of every public function of the decide library, and SagError is the error returned to Python by sc-agent-py; each wraps the real lower error unchanged and carries its id and message (AgentConfigError, TypesError, SecretsError, LogError, LocalError, DecisionError, HttpError, LlmError, RunnerError); a lowest-layer error (http.network) appears with its id and message in decide output; values are not rounded (REQ-SAG-0007).
 - [ ] ADR-SAG-0004: every dependency in crates/decide/Cargo.toml points down the layer order (types; config, secrets, log; http; decision schema; decision backends; runner): decide is the top layer, above sc-decision-runner, and depends on sc-agent-types, sc-agent-config, sc-agent-secrets, sc-agent-log, sc-agent-http, sc-decision-schema, sc-decision-systemone, sc-decision-local, sc-decision-llm and sc-decision-runner; crates/sc-agent-py depends on decide; no lower-layer sc-agent library crate lists decide, tsq or sc-agent-py as a dependency, so none depends on a higher layer, checked by `cargo tree` for each lower crate.
 - [ ] REQ-SAG-0009: Cargo.toml dependencies: neither decide nor sc-agent-py adds a tokio dependency, and no low-level sc-agent crate gains tokio with default features through them; `cargo tree -p decide -e normal` and `cargo tree -p sc-agent-py -e normal` list no tokio crate.
 - [ ] REQ-SAG-0010: decide and sc-agent-py source call no sleep function, enforced by the workspace clippy disallowed-methods rule; clippy passes with the workspace denies (REQ-SAG-0002).
-- [ ] ANC-007: the decide library writes one decide.send, decide.models and decide.doctor record per operation (never a key) to the GeneralLogger in its options (injected, or the default for its service) and passes that same logger into HttpClient::new, DecisionRunner::new, LocalBackend::with_log, LlmClient::with_log and LlmDecisionBackend::with_log; a test injects sc_agent_log::testing::MemoryLog (general: Some(log.general()), session: Some(log.session(identity))), runs one send, models and doctor over a ScriptedTransport and finds those actions and http.send in log.records(); sc-agent-py calls the decide library with the default loggers (service sc-agent-py), so its operations write the same records.
+- [ ] ANC-007: the decide library writes one decide.send, decide.models and decide.doctor record per operation (never a key) to the GeneralLogger in its Context (injected, or the default for its service) and passes that same logger into HttpClient::new, DecisionRunner::new, LocalBackend::with_log, LlmClient::with_log and LlmDecisionBackend::with_log; a test injects sc_agent_log::testing::MemoryLog (general: Some(log.general()), session: Some(log.session(identity))), runs one send, models and doctor over a ScriptedTransport and finds those actions and http.send in log.records(); sc-agent-py calls the same decide library (default loggers, service sc-agent-py, or the Python callables), so its operations write the same records.
 
 ## Notes
 
@@ -433,4 +548,4 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 4. ANC-006 (replaces ANC-002): sc-agent-py in this sprint.
 Also: a bad batch line stops decide before any send (owner 'fail fast on first', REQ-SAG-0504); each CLI writes its own general log (REQ-SAG-0003).
 Hardening round 1 (2026-11-09): tsq (binary, copy rows, tests, REQ-SAG-0303) moved to A-3 and the A-3 dependency was dropped (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); injection seams in SendOptions/ModelsOptions/DoctorOptions (PLAN-CRIT-006); send vs send_batch dispatch (CRIT-M3); this sprint owns the end-to-end REQ criteria the boundary sprints list in does_not_close.
-Open owner question (not blocking this sprint's text): ADR-SAG-0004 amendment, see does_not_close.
+Round 2 (2026-11-09): ADR-SAG-0004 amendment approved by the owner (open-question lines removed, ARCH-002); ADR-SAG-0002 added; images/long-context input, REQ-SAG-0101/0102/0602/0001 AC2/0007/0004 AC3/0801 tests, Context seams, Python logger callables, signals (REQ-SAG-0011), REQ-SAG-0012/0013/0014 end to end, typed options (RBP-F010), cause -> cause_detail.

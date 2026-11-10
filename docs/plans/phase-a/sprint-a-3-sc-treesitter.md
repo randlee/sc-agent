@@ -24,9 +24,10 @@ sprint:
       artifact: workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (test allowances, disallowed-methods sleep rule)
       trigger: dev-push
   requirements: [REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0003, REQ-SAG-0002, REQ-SAG-0001, REQ-SAG-0009, REQ-SAG-0010]
-  adrs: [ADR-SAG-0004]
+  adrs: [ADR-SAG-0004, ADR-SAG-0005]
   does_not_close:
-    - "REQ-SAG-0302 second wave (C# csharp, Go): a later sprint adds table rows, queries and samples with no API change."
+    - "REQ-SAG-0302 AC2 for C# (csharp) and Go is the second release and is outside phase A (recorded in plan.md); the AC stays unchecked in the record. Adding them is table rows, queries and samples with no API change."
+    - "REQ-SAG-0011: tsq installs no signal handler; it runs one short synchronous query and the default SIGINT/SIGTERM exit loses nothing (it writes no session log)."
     - "REQ-SAG-0003 rotation/retention acceptance criteria: sc-observability's built-in policy, checked for the sc-agent logs in a-8; this sprint closes only 'tsq writes its own general log file'."
 ```
 
@@ -34,9 +35,9 @@ sprint:
 
 Copy script: `docs/plans/phase-a/copy/a-3.sh` (dry run 2026-11-09 after the tsq rows moved in from a-10.sh: 34 copy steps, 10 files, 751 lines before trimming).
 Source: sc-agent-ref @ dce239a, `crates/sc-treesitter`. Target: `crates/sc-treesitter/`.
-Governing records: REQ-SAG-0301, REQ-SAG-0302 (as amended: Python + Rust first release, C# `csharp` + Go second release), REQ-SAG-0303 (PyO3 bindings and `tsq`, the CLI a subset of PyO3), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0009 (no tokio), REQ-SAG-0010 (no sleep), REQ-SAG-0002 (now also denies `indexing_slicing`), REQ-SAG-0001, ADR-SAG-0004 (sc-treesitter stands alone).
+Governing records: ADR-SAG-0005 (sc-treesitter-py, the `python`/`cli` feature gates, the tsq bin inside sc-treesitter), REQ-SAG-0301, REQ-SAG-0302 (as amended: Python + Rust first release, C# `csharp` + Go second release), REQ-SAG-0303 (PyO3 bindings and `tsq`, the CLI a subset of PyO3), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0009 (no tokio), REQ-SAG-0010 (no sleep), REQ-SAG-0002 (now also denies `indexing_slicing`), REQ-SAG-0001, ADR-SAG-0004 (sc-treesitter stands alone).
 Error convention: the workspace id rule (A-1) is `"<crate-prefix>.<variant_snake>"` with an id, a message and a cause chain. sc-treesitter MUST NOT depend on sc-agent-types (REQ-SAG-0301), so it does not implement A-1's `ErrorId` trait; it follows the same convention with inherent `id()`/`message()` and serializes as the same `{"id","message"}` shape as `ErrorDetail`. Ids use the prefix `treesitter`. Owner memories: owner-sc-treesitter, owner-treesitter-grammars, owner-error-contract, owner-errors-settled, owner-no-sleep, owner-lowlevel-no-tokio.
-Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and Rust grammars and queries; C#/Go are the second wave; use the owner's 17-variant error list plus `Write` and `Log` for the `tsq` binary (the owner: missing errors are added in the plan); no sc-agent deps, no git; PyO3 support types behind a `python` feature, built into the extension module by `crates/sc-treesitter-py` (section 3a).
+Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and Rust grammars and queries; C#/Go are the second wave; use the owner's 17-variant error list less `PositionOverflow` (unreachable, round 2 RBP-F006) plus `Write` and `Log` for the `tsq` binary, 18 variants (the owner: missing errors are added in the plan); no sc-agent deps, no git; PyO3 support types behind a `python` feature, built into the extension module by `crates/sc-treesitter-py` (section 3a).
 
 Scope: this sprint is the library, its output types, error ids, JSON encoder and file reader, the PyO3 support types, `crates/sc-treesitter-py`, and the `tsq` binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, sc-observability, the non-default `cli` feature, section 3b). It is the single owner of `crates/sc-treesitter/Cargo.toml`; no other sprint edits this crate. Install: `cargo install sc-treesitter --features cli`.
 
@@ -87,7 +88,7 @@ Not copied: `src/git_io.rs`, the rest of `src/cli/` and `src/main.rs` (`extract`
 - All files: delete every `sc_agent_types` import and use; replace `JevError` with `crate::Error` variants (section 4); delete doc text about sc/subjects/1, `query_sha256`, "Phase A", git, producers; add module docs (`//!`) to each file.
 - `src/grammar.rs`: features renamed `python` -> `grammar-python`, `rust` -> `grammar-rust` (the `python` feature is PyO3). Remove `LanguageInfo` (the hand-copied `grammar`/`grammar_version` strings are no longer output) and the public `language()`; `Grammar` keeps `id`, `load`, `queries`. `languages()` returns ids. Add `KNOWN_LANGUAGES` (every id this crate version can be built with, compiled or not) so `lookup` returns `GrammarUnavailable` for a known id whose feature is off and `UnknownLanguage` otherwise. Rewrite the doctest without `LanguageInfo`.
 - `src/query.rs`: `QueryInfo` derives `Serialize` and skips `source` in serde; delete the `query_sha256` paragraphs (copied lines 12-15 and 50-54 of the target); `query_not_found` -> `Error::UnknownQuery { language, name }`.
-- `src/run.rs`: rename `extract` to `run_query` with the signature in section 3; delete `ExtractInput`, `path`/`rev`/`blob_sha` locals, `PRODUCER_*`, the empty-query special case (an empty query compiles to zero patterns and returns `NoMatches`). Before UTF-8: `source.len() > MAX_SOURCE_BYTES` -> `InputTooLarge`. `from_utf8` error -> `NotUtf8 { byte_offset: e.valid_up_to() }`. `set_language` error -> `GrammarLoad { detail: e.to_string() }`. `Query::new` error -> `QueryCompile` keeping `offset,row,column,kind (Debug of QueryErrorKind),message`. After compiling, each name in `captures` must be in `query.capture_names()` else `QueryCaptureInvalid`. `parse` `None` -> `ParseFailed`. Replace `capture_names[index]` with `.get(index)` (no index; a missing name is unreachable by tree-sitter contract, so skip it with `continue`, no panic) and delete both `debug_assert!`. `found.is_empty()` -> `NoMatches { language, query }`. `error_line_inside` returns the node `(row, column, kind)` of the earliest ERROR/MISSING node (no `unwrap_or(u32::MAX)`), giving `SyntaxError { row, column, node_kind }`. `inclusive_lines` returns `Result<(usize, usize), Error>` with `checked_add(1)` -> `PositionOverflow { row }`; no u32 narrowing. The copied text lookup (lines 273-280) maps to `Capture` construction; a `None` slice cannot occur for UTF-8 node boundaries, but return `Error::NotUtf8 { byte_offset: start_byte }` rather than panic. Remove `drop(matches)` comment noise.
+- `src/run.rs`: rename `extract` to `run_query` with the signature in section 3; delete `ExtractInput`, `path`/`rev`/`blob_sha` locals, `PRODUCER_*`, the empty-query special case (an empty query compiles to zero patterns and returns `NoMatches`). Before UTF-8: `source.len() > MAX_SOURCE_BYTES` -> `InputTooLarge`. `from_utf8` error -> `NotUtf8 { byte_offset: e.valid_up_to() }`. `set_language` error -> `GrammarLoad { detail: e.to_string() }`. `Query::new` error -> `QueryCompile` keeping `offset,row,column,kind (Debug of QueryErrorKind),message`. After compiling, each name in `captures` must be in `query.capture_names()` else `QueryCaptureInvalid`. `parse` `None` -> `ParseFailed`. Replace `capture_names[index]` with `.get(index)` (no index; a missing name is unreachable by tree-sitter contract, so skip it with `continue`, no panic) and delete both `debug_assert!`. `found.is_empty()` -> `NoMatches { language, query }`. `error_line_inside` returns the node `(row, column, kind)` of the earliest ERROR/MISSING node (no `unwrap_or(u32::MAX)`), giving `SyntaxError { row, column, node_kind }`. `inclusive_lines` returns `(usize, usize)` computed with `row.saturating_add(1)`: the source is at most `MAX_SOURCE_BYTES` (8 MiB), so a row is below 8 Mi and the add cannot saturate; no u32 narrowing, no error. The copied text lookup (lines 273-280) maps to `Capture` construction; `source.get(start..end)` on the already-validated UTF-8 text cannot be `None` at tree-sitter node boundaries, so a `None` skips that capture with `continue` (no panic, no error variant). Remove `drop(matches)` comment noise.
 - `src/run.rs` tests: port to `run_query`; assert `Error` variants (`matches!`) and `id()` (e.g. `"treesitter.no_matches"`), not `.code()`; replace python tests that used the cross-impl `hook.py` fixture with inline sources; in the determinism test drop the subject-id asserts and keep `once == twice` and same-line byte ordering; gate tests with `grammar-python`/`grammar-rust`.
 - `src/lib.rs`: modules `error`, `grammar`, `query`, `run`, `source`, `#[cfg(feature = "python")] python`; re-exports as in section 3; `#![warn(missing_docs)]`. Fold `render.rs` as generic `to_json_bytes`; encode error -> `Error::Encode { detail }`.
 - `assets/queries/python/branches.scm`: remove the sentence about `@_fn` from the comment (there is no helper capture now).
@@ -271,9 +272,9 @@ fn emit(error: &sc_treesitter::Error) -> std::process::ExitCode;
 fn general_log() -> Result<sc_observability::Logger, sc_treesitter::Error>;
 ```
 
-Output: stdout JSON + `\n`, exit 0. Failure: one stderr line `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Errors: the 19-variant `Error` (section 4): `Usage` for argv, `Encode` for JSON, `Write` for a failed stdout/stderr write, `Log` when the general log cannot start. Synchronous: no tokio, no threads, no sleep.
+Output: stdout JSON + `\n`, exit 0. Failure: one stderr line `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Errors: the 18-variant `Error` (section 4): `Usage` for argv, `Encode` for JSON, `Write` for a failed stdout/stderr write, `Log` when the general log cannot start. Synchronous: no tokio, no threads, no sleep.
 
-## 4. Error enum (19 variants; `src/error.rs`, new)
+## 4. Error enum (18 variants; `src/error.rs`, new)
 
 Lower errors here are external (tree-sitter, std::io, std::str, serde_json, clap (tsq), pyo3, sc-observability (tsq)); each variant keeps the lower error's kind and message in its fields. No sc-agent error is wrapped. Hand-written `Display` (`"<id>: <message>"`), no thiserror, no serde tag.
 
@@ -304,8 +305,6 @@ pub enum Error {
     ParseFailed { language: String },                                          // "treesitter.parse_failed"
     /// ERROR or MISSING node inside a matched span; 0-based row/column.
     SyntaxError { path: Option<std::path::PathBuf>, row: usize, column: usize, node_kind: String }, // "treesitter.syntax_error"
-    /// A 1-based line does not fit usize.
-    PositionOverflow { path: Option<std::path::PathBuf>, row: usize },         // "treesitter.position_overflow"
     /// The query ran and matched nothing (after helper/allow-list filtering).
     NoMatches { language: String, query: String },                             // "treesitter.no_matches"
     /// serde_json error Display.
@@ -397,11 +396,11 @@ New (library, `src/*` unit tests):
 1. `python_and_rust_through_the_same_call` (AC: REQ-SAG-0302 same call).
 2. `every_loaded_language_runs_through_run_query` (AC: REQ-SAG-0302 every id); per-id sample table, so a new grammar adds a row and a sample.
 3. Helper capture `@_x` never returned; undefined allow-list capture -> `QueryCaptureInvalid` (AC: REQ-SAG-0002 errors).
-4. `NotUtf8` byte_offset, `InputTooLarge` bytes/limit, `PositionOverflow` at `usize::MAX` (AC: positions, REQ-SAG-0002 errors).
+4. `NotUtf8` byte_offset, `InputTooLarge` bytes/limit; a capture on the last line of a multi-line source reports 1-based inclusive lines (AC: Positions, REQ-SAG-0002 errors).
 5. `GrammarUnavailable` built without `grammar-rust` (AC: REQ-SAG-0302 every id; CI `--no-default-features --features grammar-python`).
 6. `read_source`: missing file -> `FileNotFound`; a directory -> `FileRead` with kind (AC: REQ-SAG-0002 errors).
 7. `queries(None)` / `queries(Some("cobol"))` / unknown `query_source` (AC: REQ-SAG-0303 listings).
-8. All 19 ids distinct, `^treesitter\.[a-z_]+$`, serialized id = `id()`; `to_json_bytes` ends with `\n` (AC: REQ-SAG-0002 errors).
+8. All 18 ids distinct, `^treesitter\.[a-z_]+$`, serialized id = `id()`; `to_json_bytes` ends with `\n` (AC: REQ-SAG-0002 errors).
 PyO3 (`crates/sc-treesitter-py/tests/test_query.py`, pytest over the maturin build):
 9. Caller-written query returns `Capture` objects; non-UTF-8 `bytes` raises `TreesitterError(treesitter.not_utf8, message)` (AC: REQ-SAG-0303 PyO3, REQ-SAG-0002 lowest-layer PyO3).
 tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
@@ -434,15 +433,16 @@ tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
 - [ ] REQ-SAG-0303 PyO3: a caller-written query runs through crates/sc-treesitter-py (module sc_treesitter, feature python) and returns its matches as Capture objects.
 - [ ] REQ-SAG-0303 tsq listings: `tsq languages` prints `["python","rust"]` and `tsq queries --language python` lists `branches`.
 - [ ] tsq query: `tsq query <language> <query> <file>` runs a predefined query and prints its captures as JSON (exit 0); every failure prints one stderr line {id, message} with a treesitter.* id, exit 1, empty stdout.
-- [ ] REQ-SAG-0002 errors: all 19 sc-treesitter Error variants (the owner's 17 plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message.
+- [ ] REQ-SAG-0002 errors: all 18 sc-treesitter Error variants (the owner's 17 less the unreachable PositionOverflow, plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message.
 - [ ] REQ-SAG-0002 lowest-layer PyO3: an injected non-UTF-8 source reaches the sc-treesitter-py entry point as TreesitterError with id treesitter.not_utf8 and its message.
 - [ ] REQ-SAG-0002 lowest-layer tsq: a non-UTF-8 file reaches tsq's stderr as treesitter.not_utf8 with its message; a failed stdout write is treesitter.write.
 - [ ] REQ-SAG-0002 clippy: `cargo clippy -p sc-treesitter -p sc-treesitter-py --all-features --all-targets -- -D warnings` passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code.
-- [ ] Positions: no git, no sc-sha; no u32 clamping of positions (PositionOverflow instead).
+- [ ] Positions: no git, no sc-sha; no u32 clamping; 1-based lines are `row.saturating_add(1)` under the documented 8 MiB MAX_SOURCE_BYTES bound, so there is no position error variant.
 - [ ] REQ-SAG-0003 tsq.log: a tsq run writes its own general log `~/.sc-agent/logs/tsq.log.jsonl` (one `tsq.command` event per command), a file separate from decide's.
 - [ ] Stand-alone library: the sc-treesitter library writes no log (REQ-SAG-0301); `cli` is not a default feature and `[[bin]] tsq` has `required-features = ["cli"]`, so `cargo tree -p sc-treesitter -e normal` (default features) lists no sc-observability and no clap.
 - [ ] REQ-SAG-0009: `cargo tree -p sc-treesitter -e normal` and `cargo tree -p sc-treesitter --features cli -e normal` list no tokio crate.
 - [ ] REQ-SAG-0010: sc-treesitter (library and tsq) and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
+- [ ] ADR-SAG-0005: crates/sc-treesitter-py is the only crate with the `#[pymodule]`, sc-treesitter's `python` and `cli` features are both off by default, and the `tsq` bin lives in sc-treesitter behind `required-features = ["cli"]`, checked by `cargo metadata` (features, bin targets) in CI.
 
 ## Notes
 
@@ -454,4 +454,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); each decision is r
 5. tsq write failure: new variant Write (treesitter.write); Log added for tsq's general log.
 6. Tree-sitter CLI binary name: tsq (owner); it runs predefined queries only (REQ-SAG-0303).
 7. Hardening round 1 (2026-11-09): the tsq binary, its copy rows, tests and acceptance moved here from A-10 (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); `cli` is a non-default feature; this sprint is the single owner of crates/sc-treesitter/Cargo.toml; must_follow A-1 (workspace root, PLAN-CRIT-004).
+Round 2 (2026-11-09): ADR-SAG-0005 cited; PositionOverflow deleted (18 variants), impossible slice skipped (RBP-F006); C#/Go outside phase A (REQ-QA-008); tsq needs no signal handling (REQ-SAG-0011).
 No open questions.

@@ -1,0 +1,775 @@
+{
+  "status": "FAIL",
+  "reviewed_branch": "main",
+  "reviewed_commit": "2e0fed6",
+  "errors": [],
+  "scope": {
+    "phase": "a",
+    "sprint": "phase-a-plan"
+  },
+  "baselines_read": [
+    ".claude/project/quality-policy.md",
+    "docs/plans/phase-a/plan.md",
+    "docs/plans/phase-a/intent.md",
+    "docs/plans/phase-a/anchors.md",
+    "docs/requirements/REQ-SAG-0001..0010.md",
+    "docs/nfr/NFR-SAG-0001.md",
+    "docs/adr/ADR-SAG-0002.md",
+    "docs/adr/ADR-SAG-0004.md",
+    "docs/<crate>/requirements/*.md (all 20 crate records, ACs and MUSTs)"
+  ],
+  "phase_or_sprint_docs_read": [
+    "docs/plans/phase-a/plan.md",
+    "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+    "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+    "docs/plans/phase-a/sprint-a-3-sc-treesitter.md",
+    "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+    "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+    "docs/plans/phase-a/sprint-a-6-decision-backends.md",
+    "docs/plans/phase-a/sprint-a-7-llm-provider.md",
+    "docs/plans/phase-a/sprint-a-8-sc-agent-log.md",
+    "docs/plans/phase-a/sprint-a-9-decision-runner.md",
+    "docs/plans/phase-a/sprint-a-10-clis-python.md"
+  ],
+  "requirement_checks": [
+    {
+      "id": "REQ-SAG-0001",
+      "source": "docs/requirements/REQ-SAG-0001.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-1:293 (SessionId only)",
+        "sprint-a-8:290 (A8-10)",
+        "no owner for AC2 UUID search"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0002",
+      "source": "docs/requirements/REQ-SAG-0002.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:294-295",
+        "sprint-a-10:421"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0003",
+      "source": "docs/requirements/REQ-SAG-0003.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-8:282-284",
+        "sprint-a-3:442",
+        "sprint-a-10:420"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0004",
+      "source": "docs/requirements/REQ-SAG-0004.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-8:285-288",
+        "sprint-a-10:419 (AC3 row equality CLI vs PyO3 unproven)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0005",
+      "source": "docs/requirements/REQ-SAG-0005.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-8:289"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0006",
+      "source": "docs/requirements/REQ-SAG-0006.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:296",
+        "sprint-a-2:352"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0007",
+      "source": "docs/requirements/REQ-SAG-0007.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-2:354",
+        "sprint-a-7:335",
+        "sprint-a-10:421 (no PyO3 test, no workspace-wide search)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0008",
+      "source": "docs/requirements/REQ-SAG-0008.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-8:292",
+        "sprint-a-10:425 (Python injection conflict, see REQ-QA-013)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0009",
+      "source": "docs/requirements/REQ-SAG-0009.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "every sprint has a cargo tree AC"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0010",
+      "source": "docs/requirements/REQ-SAG-0010.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:259,299 (clippy.toml)",
+        "each sprint grep AC"
+      ]
+    },
+    {
+      "id": "NFR-SAG-0001",
+      "source": "docs/nfr/NFR-SAG-0001.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-8:291",
+        "sprint-a-9:247"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0101",
+      "source": "docs/sc-agent-types/requirements/REQ-SAG-0101.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:286-287 (library level; decide e2e deferred to a-10 with no a-10 owner, REQ-QA-002)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0102",
+      "source": "docs/sc-agent-types/requirements/REQ-SAG-0102.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:288-289",
+        "sprint-a-4:261-262"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0103",
+      "source": "docs/sc-agent-types/requirements/REQ-SAG-0103.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-1:290",
+        "sprint-a-7:325",
+        "sprint-a-10:409"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0104",
+      "source": "docs/sc-agent-types/requirements/REQ-SAG-0104.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-1:291 (AC1 proven only inside sc-agent-types; record AC1 needs a different crate)",
+        "sprint-a-10:418 (AC2)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0201",
+      "source": "docs/sc-decision-schema/requirements/REQ-SAG-0201.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-2:348-350",
+        "sprint-a-6:234-238",
+        "sprint-a-9:255"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0202",
+      "source": "docs/sc-decision-schema/requirements/REQ-SAG-0202.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-2:353",
+        "sprint-a-9:248"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0301",
+      "source": "docs/sc-treesitter/requirements/REQ-SAG-0301.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-3:430,443"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0302",
+      "source": "docs/sc-treesitter/requirements/REQ-SAG-0302.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-3:431-432 (AC1/AC3)",
+        "sprint-a-3:29 (AC2 csharp/go deferred to a sprint that does not exist)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0303",
+      "source": "docs/sc-treesitter/requirements/REQ-SAG-0303.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-3:433-435"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0401",
+      "source": "docs/sc-agent-secrets/requirements/REQ-SAG-0401.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-4:266-267 (tests/vars_gate.rs)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0501",
+      "source": "docs/decide/requirements/REQ-SAG-0501.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "violated",
+      "evidence_refs": [
+        "sprint-a-10:234 (DecisionRequest::from, no image_parts or long_context input path)",
+        "sprint-a-2:192-196"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0502",
+      "source": "docs/sc-llm-provider/requirements/REQ-SAG-0502.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-7:326"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0503",
+      "source": "docs/decide/requirements/REQ-SAG-0503.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-10:416",
+        "sprint-a-7:333"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0504",
+      "source": "docs/decide/requirements/REQ-SAG-0504.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-10:410",
+        "sprint-a-2:349"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0601",
+      "source": "docs/sc-agent-http/requirements/REQ-SAG-0601.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-5:373-378",
+        "sprint-a-9:241-242",
+        "sprint-a-10:413"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0602",
+      "source": "docs/sc-agent-http/requirements/REQ-SAG-0602.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-5:379 (Anthropic body only; OpenAI shape untested, REQ-QA-017)",
+        "sprint-a-5:32 (a-10 e2e owner missing, REQ-QA-002)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0701",
+      "source": "docs/sc-decision-runner/requirements/REQ-SAG-0701.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-9:235-238",
+        "sprint-a-10:411-412"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0801",
+      "source": "docs/sc-decision-local/requirements/REQ-SAG-0801.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-4:265",
+        "sprint-a-6:239-240",
+        "sprint-a-10:407 (AC1 selected by name from a config file: no test)"
+      ]
+    },
+    {
+      "id": "REQ-SAG-0901",
+      "source": "docs/sc-decision-llm/requirements/REQ-SAG-0901.md:11",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-7:328-332",
+        "sprint-a-9:244-245"
+      ]
+    },
+    {
+      "id": "ADR-SAG-0001",
+      "source": "docs/adr/ADR-SAG-0001.md:12",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-2:359",
+        "sprint-a-6:247",
+        "sprint-a-9:249"
+      ]
+    },
+    {
+      "id": "ADR-SAG-0002",
+      "source": "docs/adr/ADR-SAG-0002.md:12",
+      "listed_in_sprint_doc": true,
+      "result": "upheld",
+      "evidence_refs": [
+        "sprint-a-8:289-290",
+        "sprint-a-9:247"
+      ]
+    },
+    {
+      "id": "ADR-SAG-0003",
+      "source": "docs/adr/ADR-SAG-0003.md:12",
+      "listed_in_sprint_doc": false,
+      "result": "not-applicable",
+      "evidence_refs": [
+        "process ADR (records format); no code deliverable"
+      ]
+    },
+    {
+      "id": "ADR-SAG-0004",
+      "source": "docs/adr/ADR-SAG-0004.md:12",
+      "listed_in_sprint_doc": true,
+      "result": "not-verifiable",
+      "evidence_refs": [
+        "sprint-a-10:422 and 36 (decide above runner) vs docs/plans/phase-a/anchors.md ADR-SAG-0004 (pass fixture: no crate depends on sc-decision-runner)"
+      ]
+    }
+  ],
+  "deliverable_checks": [
+    {
+      "item": "a-1 sc-agent-types + workspace root Cargo.toml/clippy.toml",
+      "status": "partially-present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-1:282-301"
+      ],
+      "notes": "All a-1 ACs are testable. REQ-SAG-0104 AC1 (cross-crate) and REQ-SAG-0001 AC2 (UUID search) are not satisfied by any sprint AC."
+    },
+    {
+      "item": "a-2 sc-decision-schema",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-2:345-361"
+      ],
+      "notes": "ACs testable. requirements list omits 0701/0104 that its Decision doc contract cites."
+    },
+    {
+      "item": "a-3 sc-treesitter, tsq, sc-treesitter-py",
+      "status": "partially-present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-3:427-445"
+      ],
+      "notes": "REQ-SAG-0302 AC2 (csharp, go) has no sprint."
+    },
+    {
+      "item": "a-4 sc-agent-config + sc-agent-secrets",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-4:258-273"
+      ],
+      "notes": "ACs testable."
+    },
+    {
+      "item": "a-5 sc-agent-http",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-5:370-390"
+      ],
+      "notes": "ACs A5-01..19 testable; OpenAI-shaped quota body not named in a test."
+    },
+    {
+      "item": "a-6 systemone + local",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-6:231-249"
+      ],
+      "notes": "ACs testable; requirements list incomplete."
+    },
+    {
+      "item": "a-7 llm-provider + decision-llm",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-7:322-341"
+      ],
+      "notes": "ACs testable; requirements list omits REQ-SAG-0008."
+    },
+    {
+      "item": "a-8 sc-agent-log",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-8:279-299"
+      ],
+      "notes": "ACs A8-01..19 testable."
+    },
+    {
+      "item": "a-9 sc-decision-runner",
+      "status": "present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-9:232-256"
+      ],
+      "notes": "ACs testable; requirements list omits REQ-SAG-0104; OPEN note conflicts with a-5."
+    },
+    {
+      "item": "a-10 decide + sc-agent-py",
+      "status": "partially-present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "sprint-a-10:404-425"
+      ],
+      "notes": "Owns deferred e2e items from a-1, a-4, a-5, a-8 without ACs; cannot send multipart/long-context requests; PyO3 half of REQ-SAG-0007 and REQ-SAG-0004 AC3 unproven."
+    },
+    {
+      "item": "Record coverage: REQ/NFR/ADR with every record AC owned by a testable sprint AC",
+      "status": "partially-present",
+      "closure_state": "open",
+      "evidence_refs": [
+        "docs/requirements/",
+        "docs/nfr/",
+        "docs/adr/",
+        "docs/<crate>/requirements/"
+      ],
+      "notes": "26/33 applicable records fully owned (78.8%); 7 partial: REQ-SAG-0001, 0004, 0007, 0104, 0302, 0501, 0801. ADR-SAG-0003 not applicable. AC level: 63/71 record ACs owned and testable (88.7%)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "REQ-QA-001",
+      "severity": "Blocking",
+      "category": "requirement-violated",
+      "source_refs": [
+        "docs/decide/requirements/REQ-SAG-0501.md (MUST: decide MUST be able to send any request the TypeSafe API accepts)",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:234,342-344"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:192-196",
+        "docs/plans/phase-a/sprint-a-6-decision-backends.md:104-108"
+      ],
+      "issue": "a-10 builds every request with DecisionRequest::from(SystemOneRequest), so image_parts is empty and long_context is false. Neither the CLI nor the Python API can supply multipart image bytes or the TypeSafe-Danger-Zone-Long-Context header. Any example with Asset.part therefore fails DecisionRequest::validate (a part with no ImagePart). a-10 test 3 and its AC 'each TypeSafe request example can be sent' cannot hold for those examples.",
+      "required_correction": "Add a documented way to supply image parts (for example a --image NAME=FILE flag and a Python images argument) and long_context (--long-context / argument) to send and send_batch, including per-line batch input. Add a test that sends each openapi.json example that uses assets.part or long context through the real runner, and list it in the a-10 acceptance.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-002",
+      "severity": "Blocking",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/plans/phase-a/sprint-a-1-sc-agent-types.md:26-27",
+        "docs/plans/phase-a/sprint-a-4-config-secrets.md:29",
+        "docs/plans/phase-a/sprint-a-5-sc-agent-http.md:31-32"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:32,404-425"
+      ],
+      "issue": "a-1, a-4 and a-5 defer to a-10 the end-to-end closure of REQ-SAG-0101 (decide --model short name through the catalog), REQ-SAG-0102 (a model added to ~/.sc-agent/default.json is resolved by decide) and REQ-SAG-0602 (decide reports http.quota_exhausted). a-10's requirements list names none of the three and a-10 has no acceptance line or test for any of them. The deferrals have no owner.",
+      "required_correction": "Add REQ-SAG-0101, 0102 and 0602 to a-10's requirements list. Add acceptance criteria and named tests: (1) decide send --model haiku resolves through the config-built catalog, with a default.json model dated later winning; (2) a 429 with the Anthropic quota body ends decide with http.quota_exhausted after one send. Otherwise remove the deferral from a-1/a-4/a-5 and prove them where they are.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-003",
+      "severity": "Blocking",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/requirements/REQ-SAG-0001.md (AC2: workspace search finds UUID generation only at call sites that build a request for an external API that defines a UUID; MUST NOT generate a UUID for an id no external API defines)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-1-sc-agent-types.md:293",
+        "docs/plans/phase-a/sprint-a-8-sc-agent-log.md:290"
+      ],
+      "issue": "REQ-SAG-0001 AC2 has no owning sprint acceptance line. a-1 checks only that SessionId rejects a UUID. No sprint has a workspace search for uuid generation.",
+      "required_correction": "Add an AC to a-10 (the last sprint, workspace complete) with a command such as rg -n 'Uuid|uuid::|uuid =' crates/ that finds no hit, or that lists exactly the external-API call sites. Name it in plan.md as the REQ-SAG-0001 AC2 owner.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-004",
+      "severity": "Blocking",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/requirements/REQ-SAG-0007.md (AC1: 0.123456789 returned unchanged by the Rust API, the CLI and the PyO3 bindings; AC2: workspace search finds no rounding)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:343,354",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:387-389,421"
+      ],
+      "issue": "Rounding is checked by test only in sc-decision-schema (a-2), sc-decision-llm (a-7) and the CLI (a-10 test 7). The PyO3 half has no test: the three sc-agent-py tests cover only the function list, cancel and the slug. The AC2 rg is limited to crates/sc-decision-schema and is not a workspace search.",
+      "required_correction": "Add a sc-agent-py pytest, or a Rust test of the string path sc-agent-py returns, that shows 0.123456789 unchanged through the Python result. Add a workspace-wide rg for round( / format precision on returned values to a-10's acceptance.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-005",
+      "severity": "Blocking",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/requirements/REQ-SAG-0004.md (AC3: a CLI call and a PyO3 call with the same project and agent_role write rows with the same values in those fields)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:389,419",
+        "docs/plans/phase-a/sprint-a-8-sc-agent-log.md:287"
+      ],
+      "issue": "a-8 defers AC3 to a-10. a-10 only proves that 'Phase B' is rejected by both entry points and that valid values 'pass the same check'. No test compares the project and agent_role fields of rows written through decide and through sc-agent-py.",
+      "required_correction": "Add an a-10 test that makes one decide::send call and one sc-agent-py send with the same project and agent_role (HOME as a tempdir, no network) and asserts equal project and agent_role in the session rows. Cite it as REQ-SAG-0004 AC3.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-006",
+      "severity": "Blocking",
+      "category": "requirement-not-listed",
+      "source_refs": [
+        "docs/plans/phase-a/sprint-a-6-decision-backends.md:32,43,192,198",
+        "docs/plans/phase-a/sprint-a-7-llm-provider.md:35,341",
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:34,51,241",
+        "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:25,31,220",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:32,248"
+      ],
+      "target_refs": [
+        "docs/requirements/REQ-SAG-0001.md",
+        "docs/requirements/REQ-SAG-0007.md",
+        "docs/requirements/REQ-SAG-0008.md",
+        "docs/sc-agent-types/requirements/REQ-SAG-0104.md",
+        "docs/sc-decision-runner/requirements/REQ-SAG-0701.md"
+      ],
+      "issue": "Sprint requirements lists are incomplete against the sprints' own deliverables. a-6: omits REQ-SAG-0001 (generates a ULID multipart boundary), REQ-SAG-0007 (its own prose says binding; it decodes probabilities) and REQ-SAG-0008 (LocalBackend::with_log, local.discover, ANC-007 AC). a-7: omits REQ-SAG-0008 (with_log, llm.usage and llm.schema_mismatch). a-9: omits REQ-SAG-0104 (it hooks CancelToken::on_cancel; it is the only sprint that can prove cross-crate cancel). a-2: omits REQ-SAG-0701 and REQ-SAG-0104 (the Decision cancel contract cites them in does_not_close and the trait doc). a-10: omits REQ-SAG-0001 (prints session ULIDs) and the deferred 0101/0102/0602 (REQ-QA-002).",
+      "required_correction": "Add the missing ids to each sprint's yaml requirements list and add an acceptance line for each id that carries a deliverable (a-6 and a-7 REQ-SAG-0008 can cite their existing ANC-007 ACs).",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-007",
+      "severity": "Blocking",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/sc-agent-types/requirements/REQ-SAG-0104.md (AC1: a cancel token created in one crate stops an operation in another crate when cancelled)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-1-sc-agent-types.md:291",
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:238-242"
+      ],
+      "issue": "a-1 claims to close AC1 with tests/cancel.rs, which runs entirely inside sc-agent-types. The record requires an operation in a different crate to be stopped. The only cross-crate proofs are in a-9 and a-10, and neither cites REQ-SAG-0104 AC1.",
+      "required_correction": "Move AC1 closure to a-9 (add REQ-SAG-0104 to its list and cite cancel_running_batch and cancel_in_flight_send as AC1 proof, token created in the test crate, operation in sc-decision-runner), or add a cross-crate test to a-1 or a-5. Update a-1's does_not_close.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-008",
+      "severity": "Important",
+      "category": "deliverable-missing",
+      "source_refs": [
+        "docs/sc-treesitter/requirements/REQ-SAG-0302.md (AC2: after the second release the same call runs a query against csharp and Go)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-3-sc-treesitter.md:29,380,449-455"
+      ],
+      "issue": "a-3 defers C# and Go to 'a later sprint' that exists nowhere in the plan. The phase claims docs/** and REQ-SAG-0302 is unowned for AC2. The record time-gates the AC to the second release, but the plan does not say the AC is out of phase A.",
+      "required_correction": "Either add the second-wave sprint to the plan, or record in plan.md that REQ-SAG-0302 AC2 is explicitly outside phase A (second release) and keep the AC unchecked in the record.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-009",
+      "severity": "Important",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/sc-decision-local/requirements/REQ-SAG-0801.md (AC1: a runner added to the global configuration is selected by its name with no rebuild)",
+        "docs/sc-agent-http/requirements/REQ-SAG-0601.md",
+        "docs/requirements/REQ-SAG-0003.md"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:155-165,173-178,378-380,407"
+      ],
+      "issue": "a-10 test 12 runs LocalBackend batches but never selects a runner by its default.json name. SendOptions, ModelsOptions and DoctorOptions have no config-directory or environment seam; the config always loads from default_dir() (home directory). Tests 14 (default log files), 16 (SC_AGENT__MAX_SENDS=2) and the REQ-SAG-0801 AC1 check depend on that seam. a-4 forbids mutating the process env in tests, but a-10 does not say how its tests redirect HOME or the SC_AGENT__ variables.",
+      "required_correction": "Add config_dir and environment (or a loaded AgentConfig) fields to SendOptions/ModelsOptions/DoctorOptions, or state the HOME/env mechanism. Add a named test that puts a local_runners entry in a tempdir default.json and sends --model <name> through it, citing REQ-SAG-0801 AC1.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-010",
+      "severity": "Important",
+      "category": "plan",
+      "source_refs": [
+        "docs/plans/phase-a/plan.md:9,51-64"
+      ],
+      "target_refs": [
+        "docs/requirements/",
+        "docs/nfr/",
+        "docs/adr/"
+      ],
+      "issue": "plan.md has no phase-level table mapping each REQ/NFR/ADR to the one sprint that owns its acceptance. Ownership is spread across boundary sprints: REQ-SAG-0002 appears in all ten sprints and REQ-SAG-0601 in a-4, a-5, a-9 and a-10, each with partial closure. Only a-10 is an integration sprint, so 'exactly one sprint owns each id' cannot be checked from the plan.",
+      "required_correction": "Add a requirement-ownership table to plan.md (id, owning sprint, req:<ID> root in an integration sprint, boundary sprints that contribute). It must cover the orphaned items in REQ-QA-002/003/004/005/007/008.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-011",
+      "severity": "Important",
+      "category": "cross-doc-conflict",
+      "source_refs": [
+        "docs/plans/phase-a/anchors.md:132-151 (ADR-SAG-0004 v3 locked; pass fixture: no crate depends on sc-decision-runner)",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:36,422"
+      ],
+      "target_refs": [
+        "docs/adr/ADR-SAG-0004.md:34-42"
+      ],
+      "issue": "The locked anchor lists the layers up to runner and its pass fixture says no crate depends on sc-decision-runner. a-10 makes decide depend on the runner and puts sc-agent-py above decide. The ADR record on disk already contains decide and sc-agent-py above the runner and the ErrorId/ErrorDetail convention. a-10 still calls this an 'open owner question; records unchanged', so the three documents disagree.",
+      "required_correction": "Resolve with the owner: update the anchor text and fixtures to the ADR on disk (re-lock), and remove the 'open owner question' line from a-10 and the stale 'amendment' wording in a-1.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-012",
+      "severity": "Important",
+      "category": "cross-doc-conflict",
+      "source_refs": [
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:38,265",
+        "docs/plans/phase-a/sprint-a-5-sc-agent-http.md:228-229,377,401-403"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-5-sc-agent-http.md:375-377"
+      ],
+      "issue": "a-9 says the budget-vs-timeout rule (PLAN-CRIT-003) is an OPEN owner question owned by a-5. a-5 records the owner answer, defines Attempts::may_start and the timeout rule (A5-04, A5-06) and shows no open question.",
+      "required_correction": "Delete the OPEN item from a-9 does_not_close and its notes, or point it to the closed a-5 criteria A5-04/A5-06.",
+      "compliance_result": "non-compliant"
+    },
+    {
+      "id": "REQ-QA-013",
+      "severity": "Important",
+      "category": "cross-doc-conflict",
+      "source_refs": [
+        "docs/plans/phase-a/sprint-a-8-sc-agent-log.md:31",
+        "docs/requirements/REQ-SAG-0008.md (a caller MUST be able to inject the general logger, the session logger, or both)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:351,425"
+      ],
+      "issue": "a-8 assigns REQ-SAG-0008 injection through decide's options and sc-agent-py to a-10. a-10 says no record supports a Python logger argument and passes None for all loggers in sc-agent-py. A Python caller cannot inject, which leaves the a-8 deferral without an owner and the MUST unmet for Python.",
+      "required_correction": "Either give sc-agent-py optional logger arguments with a test, or amend a-8's deferral and state in the plan that REQ-SAG-0008 injection is a Rust-library capability only (needs an owner decision on the requirement).",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-014",
+      "severity": "Important",
+      "category": "plan",
+      "source_refs": [
+        "docs/plans/phase-a/plan.md:35-46,53-64"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-6-decision-backends.md:22-31",
+        "docs/plans/phase-a/sprint-a-7-llm-provider.md:22-34",
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:21-34"
+      ],
+      "issue": "plan.md gives 'Depends on: a-2' for a-6, a-7 and a-9, and wave 5 'Starts on a-2 Backend/Decision/...'. Each sprint doc also has dev-push edges to a-5 (HttpClient, Attempts, testing::ScriptedTransport/BlockingTransport), a-8 (MemoryLog) and for a-7/a-9 a-4. a-2 starts as soon as a-5 pushes only request.rs and error.rs, so a-2's push does not imply a-5's later resend.rs/testing.rs or a-8's testing module exist. The wave start condition is not sufficient.",
+      "required_correction": "List every must_follow edge in the plan table and wave table, or state in each sprint what artifact on a-2's push guarantees the a-5/a-8 artifacts. Restate waves 5-6 start conditions accordingly.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-015",
+      "severity": "Important",
+      "category": "plan",
+      "source_refs": [
+        ".claude/project/quality-policy.md:12-13,82-86"
+      ],
+      "target_refs": [
+        "docs/requirements.md",
+        "docs/architecture.md",
+        "docs/project-plan.md",
+        "docs/design.md"
+      ],
+      "issue": "The policy lists docs/requirements.md and docs/architecture.md (every review), docs/project-plan.md (active phase) and docs/design.md. None exists; the repo uses per-record files under docs/requirements, docs/nfr, docs/adr and docs/<crate>/requirements. The review used the records named in the assignment, so design and architecture compliance could only be checked against ADRs. All 34 records are Status: Draft, not Active or Approved.",
+      "required_correction": "Update the quality policy to name the record directories as the baseline, or add the index docs. Move the records to Approved before development starts, since reviewers treat only Active/Approved records as binding.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-016",
+      "severity": "Minor",
+      "category": "cross-doc-conflict",
+      "source_refs": [
+        "docs/plans/phase-a/anchors.md:344 (ANC-007 exclusion for agt-4p2.3: tsq logging planned in A-10)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-3-sc-treesitter.md:41,442",
+        "docs/plans/phase-a/anchors.md:52-72 (retired ANC-002 text still names A-10)"
+      ],
+      "issue": "The ANC-007 exclusion text says tsq logging is planned in A-10. tsq and its log moved to A-3.",
+      "required_correction": "Update the exclusion text to A-3 and re-render anchors.md.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-017",
+      "severity": "Minor",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/sc-agent-http/requirements/REQ-SAG-0602.md (definition: quota exhaustion in the documented Anthropic and OpenAI shapes)"
+      ],
+      "target_refs": [
+        "docs/plans/phase-a/sprint-a-5-sc-agent-http.md:335,379"
+      ],
+      "issue": "The test list names the Anthropic quota body only (quota_429_is_final, C8 documented-shape test). An OpenAI-shaped quota body is part of the record definition and has no named test.",
+      "required_correction": "Add an OpenAI-shaped quota test to tests/resend.rs and cite it in A5-08.",
+      "compliance_result": "partially-compliant"
+    },
+    {
+      "id": "REQ-QA-018",
+      "severity": "Minor",
+      "category": "acceptance-gap",
+      "source_refs": [
+        "docs/plans/phase-a/sprint-a-9-decision-runner.md:239,199",
+        "docs/plans/phase-a/sprint-a-10-clis-python.md:384",
+        "docs/plans/phase-a/sprint-a-5-sc-agent-http.md:381 (REQ-SAG-0201 AC2 has no workspace check)"
+      ],
+      "target_refs": [
+        "docs/sc-decision-schema/requirements/REQ-SAG-0201.md (AC2)",
+        "docs/adr/ADR-SAG-0003.md"
+      ],
+      "issue": "Three small points. (1) 'within 100 ms' wall-clock assertions can be flaky on loaded CI. (2) REQ-SAG-0201 AC2 ('no crate other than sc-decision-schema defines a Jev-mapped type') is checked per crate; sc-llm-provider::Usage {input_tokens, output_tokens} has the same shape as the Jev Usage and no sprint says whether it counts. (3) ADR-SAG-0003 has no owner or statement that it is process-only.",
+      "required_correction": "Use a generous bound or a channel-based check for (1). Add a workspace-level check or a note excluding provider usage types for (2). State ADR-SAG-0003 as not-applicable to code in plan.md for (3).",
+      "compliance_result": "partially-compliant"
+    }
+  ],
+  "summary": {
+    "total_findings": 18,
+    "blocking_findings": 7,
+    "overall_compliance": "non-compliant",
+    "deliverables_total": 33,
+    "deliverables_complete": 26,
+    "deliverables_incomplete": 7,
+    "deliverable_completion_percent": 78.8
+  },
+  "gate_reason": "FAIL. Seven Blocking findings: (1) a-10 cannot send multipart image parts or the long-context header, so REQ-SAG-0501 'any request' is unmet; (2) a-1/a-4/a-5 defer REQ-SAG-0101/0102/0602 end to end to a-10, which has no id, criterion or test for them; (3) REQ-SAG-0001 AC2 (UUID search) has no owner; (4) REQ-SAG-0007 has no PyO3 test and no workspace-wide search; (5) REQ-SAG-0004 AC3 (CLI vs PyO3 rows) is not proven; (6) sprint requirements lists are incomplete for a-2, a-6, a-7, a-9 and a-10; (7) REQ-SAG-0104 AC1 is claimed by a-1 with a same-crate test only. Cross-document conflicts remain: the locked ADR-SAG-0004 anchor against a-10 (REQ-QA-011), a-9 against a-5 on PLAN-CRIT-003 (REQ-QA-012), a-8 against a-10 on Python logger injection (REQ-QA-013), and the plan dependency tables (REQ-QA-014). Coverage of the records: 26 of 33 applicable records (78.8%) and 63 of 71 record acceptance criteria (88.7%) are owned by a testable sprint criterion; the 7 incomplete records are REQ-SAG-0001, 0004, 0007, 0104, 0302, 0501 and 0801. ADR-SAG-0003 is process-only. Sprint-level acceptance criteria are otherwise concrete and testable, and every sprint has a requirements list, a copy-first criterion, cargo tree/sleep checks and named tests. The review is docs-only at commit 2e0fed6 (HEAD is refs/heads/main = 2e0fed61292d7f964b763aae79b50a07af1cb0aa). No code was run or checked. The records are all Draft; I treated them as binding because the assignment names them as the plan's records."
+}

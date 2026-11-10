@@ -1,0 +1,17 @@
+{
+  "scope": {
+    "phase": "a",
+    "sprint": "phase-a-plan"  },
+  "phase_or_sprint_docs": ["docs/plans/phase-a/intent.md", "docs/plans/phase-a/anchors.md", "docs/requirements/", "docs/nfr/", "docs/adr/", "docs/sc-agent-types/requirements/", "docs/sc-agent-secrets/requirements/", "docs/sc-agent-http/requirements/", "docs/sc-decision-schema/requirements/", "docs/sc-decision-runner/requirements/", "docs/sc-decision-local/requirements/", "docs/sc-decision-llm/requirements/", "docs/sc-llm-provider/requirements/", "docs/sc-treesitter/requirements/", "docs/decide/requirements/"],
+  "phase_sprint_documents": ["docs/plans/phase-a/intent.md", "docs/plans/phase-a/anchors.md", "docs/requirements/", "docs/nfr/", "docs/adr/", "docs/sc-agent-types/requirements/", "docs/sc-agent-secrets/requirements/", "docs/sc-agent-http/requirements/", "docs/sc-decision-schema/requirements/", "docs/sc-decision-runner/requirements/", "docs/sc-decision-local/requirements/", "docs/sc-decision-llm/requirements/", "docs/sc-llm-provider/requirements/", "docs/sc-treesitter/requirements/", "docs/decide/requirements/"],
+  "authoritative_sprint_doc": "docs/plans/phase-a/plan.md",
+  "worktree_path": "/Volumes/Extreme Pro/github/sc-agent",
+  "branch": "main",
+  "commit": "2e0fed6",
+  "review_targets": ["docs/plans/phase-a/plan.md", "docs/plans/phase-a/sprint-a-1-sc-agent-types.md", "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md", "docs/plans/phase-a/sprint-a-3-sc-treesitter.md", "docs/plans/phase-a/sprint-a-4-config-secrets.md", "docs/plans/phase-a/sprint-a-5-sc-agent-http.md", "docs/plans/phase-a/sprint-a-6-decision-backends.md", "docs/plans/phase-a/sprint-a-7-llm-provider.md", "docs/plans/phase-a/sprint-a-8-sc-agent-log.md", "docs/plans/phase-a/sprint-a-9-decision-runner.md", "docs/plans/phase-a/sprint-a-10-clis-python.md"],
+  "round_limit": false,
+  "changed_files": [],
+  "triage_records": [],
+  "carry_forward_findings": [],
+  "notes": "Docs-only phase plan review (review_mode plan) at commit 2e0fed6 on main. The plan's source of truth is beads agt-4p2 (epic) and agt-4p2.1..10; the docs listed are exported copies. No code exists yet: review the plan's deliverables, acceptance criteria, exact Rust and ADR/REQ compliance."
+}

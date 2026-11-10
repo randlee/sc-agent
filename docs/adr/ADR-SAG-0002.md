@@ -1,6 +1,6 @@
 # Decision: Session logs are JSONL first, then SQLite with server sync
 
-**Status:** Draft  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-09  
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0002: Session logs are JSONL first, then SQLite with server sync
 
-**Status:** Draft  
+**Status:** Approved  
 
 ### Related Documents
 

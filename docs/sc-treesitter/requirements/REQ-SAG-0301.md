@@ -1,6 +1,6 @@
 # Requirement: sc-treesitter is a stand-alone library
 
-**Status:** Draft  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-09  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0301: sc-treesitter is a stand-alone library
 
-**Status:** Draft  
+**Status:** Approved  
 
 ### Requirement Statement
 

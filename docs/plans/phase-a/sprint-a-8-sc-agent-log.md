@@ -47,10 +47,10 @@ Two separate loggers, both `sc-observability` 1.5.0 v2 `Logger`s. `GeneralLogger
 | # | Source path:lines | Target | What | Required edits after copying |
 |---|---|---|---|---|
 | C1 | `crates/sc-jev-host/LICENSE` | `LICENSE` | MIT | none |
-| C2 | `crates/sc-jev-host/src/obs.rs:107-209` | `src/writer.rs` | `LoggerInner`: owns `Arc<Logger>`, `flush`, `take_lost_rows`, Drop = flush + shutdown | Rename `Writer`. Delete `pid`, `is_local`, the fork `blocking` helper, the leak branch of Drop, `logs_dir`/`file_name`/`harden_log_files`. Add `owned: bool` (Drop flushes and shuts down only an owned logger) and `refused: Mutex<Refused { count: u64, last: Option<ErrorDetail> }>` (rows `write` returned Err for). `flush` -> `LogError::Flush`, then `LogError::RowsLost` when refused + lost rows > 0 (reported once). `JevError` gone. |
+| C2 | `crates/sc-jev-host/src/obs.rs:107-209` | `src/writer.rs` | `LoggerInner`: owns `Arc<Logger>`, `flush`, `take_lost_rows`, Drop = flush + shutdown | Rename `Writer`. Delete `pid`, `is_local`, the fork `blocking` helper, the leak branch of Drop, `logs_dir`/`file_name`/`harden_log_files`. Add `owned: bool` (Drop flushes and shuts down only an owned logger) and one `accounting: Mutex<Accounting>` holding all lost-row state (RBP-F015). `flush` -> `LogError::Flush`, then `LogError::RowsLost` when refused + newly lost rows > 0, read and reset under that one lock (reported once). `JevError` gone. |
 | C3 | `crates/sc-jev-host/src/obs.rs:418-455` | `src/writer.rs` | `logger_config`, `start_logger` | `logger_config(service, log_root, file_sink: bool)`; delete the serde `LevelFilter` hack. `start_logger(config, extra: Option<SinkRegistration>)` -> `LogError::Start`. Delete the hint text and the `prepare_log_files` call. |
 | C4 | `crates/sc-jev-host/src/obs.rs:486-528` | `src/general.rs` | `prepare_log_files`: one startup `JsonlFileSink::open(active, policy)` so a short CLI still rotates | Keep only that call; error -> `LogError::OpenSink`. Delete `create_private_dirs`, 0600 creation, `harden_log_files`. Not rotation code (REQ-SAG-0003). |
-| C5 | `crates/sc-jev-host/src/obs.rs:310-349` | `src/writer.rs` | `log_event`: builds the v2 `LogEvent` | Private `Writer::event(level, target, action, fields) -> Result<LogEvent, LogError>`, shared by both loggers. `message: None`, `request_id`/`correlation_id: None` (delete `envelope_id!` and its `debug_assert`). Name errors -> `LogError::InvalidName`. Delete `impl SessionLog`, `level_of`, `action_name`, `Operation`, the registry, every `GeneralLogAdapter` item. |
+| C5 | `crates/sc-jev-host/src/obs.rs:310-349` | `src/writer.rs` | `log_event`: builds the v2 `LogEvent` | Private `Writer::event(level, target, action, fields) -> Result<LogEvent, LogError>`, shared by both loggers. `message: None`, `request_id: None`, `correlation_id` = the LogContext's session_id (`CorrelationId::new(&session_id.to_string())`), else None (delete `envelope_id!` and its `debug_assert`). Name errors -> `LogError::InvalidName`. Delete `impl SessionLog`, `level_of`, `action_name`, `Operation`, the registry, every `GeneralLogAdapter` item. |
 | C6 | `crates/sc-agent-types/src/ids.rs:1164-1245` | `src/slug.rs` | `ProjectLabel(Arc<str>)` | Rename `Slug`; rule = REQ-SAG-0004 (non-empty, only `a-z 0-9 . _ -`); error `InvalidSlug { field, value }`; delete `MAX_BYTES`, `FromStr`, serde, doc example; `new(field: &'static str, text: &str)`. |
 | C7 | `crates/sc-agent-types/src/git.rs:88-109` | `src/repo.rs` | `git(dir)`: argv-only `git --no-pager -C <dir>`, `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`, repo-redirect vars removed, stdin null | `#[expect]` reason "the one git spawn of sc-agent-log"; run with `Command::output()` (the old `wait_bounded` slept, REQ-SAG-0010). |
 | T1 | `crates/sc-jev-host/tests/obs.rs:202-283` | `tests/writer.rs` | `make_unwritable`; lost rows reported once; healthy writer loses nothing; oversized general log rotates at start | Port to the new loggers; `flush()` returning `Err(RowsLost{count: 2, ..})` once replaces `take_lost_rows()`; the rotation test targets `GeneralLogger::open_default`; write the missing helpers. |
@@ -62,7 +62,8 @@ Not copied: the `SessionLog`/`GeneralLog` ports and `NoopSessionLog` (REQ-SAG-00
 ```rust
 // src/lib.rs
 #![forbid(unsafe_code)]
-mod error; mod general; mod loggers; mod repo; mod session; mod slug; mod writer;
+mod context; mod error; mod general; mod loggers; mod repo; mod session; mod slug; mod writer;
+pub use context::LogContext;
 pub use error::LogError;
 pub use general::GeneralLogger;
 pub use loggers::Loggers;
@@ -82,6 +83,7 @@ impl Slug {
     pub fn as_str(&self) -> &str;
 }
 impl fmt::Display for Slug {}
+impl AsRef<str> for Slug {}                                  // RBP-F017; no Deref
 
 // src/repo.rs
 /// `<host>/<owner>/<repo>` from the git origin URL, else `local/<host>/<folder-name>` (REQ-SAG-0004).
@@ -100,6 +102,7 @@ impl Repo {
     pub fn as_str(&self) -> &str;
 }
 impl fmt::Display for Repo {}
+impl AsRef<str> for Repo {}                                  // RBP-F017; no Deref
 
 // src/session.rs
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,9 +130,14 @@ impl SessionLogger {
     pub fn injected(logger: Arc<Logger>, identity: SessionIdentity) -> Self;
     pub fn identity(&self) -> &SessionIdentity;
     pub fn path(&self) -> Option<&Path>;                   // None when injected
-    /// One row: identity fields, then `payload` in its order. Blocks while the writer queue is full.
-    /// An Err is also counted, so a caller that must not act on it loses nothing: flush() reports it.
+    /// One row: identity fields, then `payload` in its order; the event correlation id is `session_id`.
+    /// Blocks while the sc-observability writer queue is full (until the writer thread drains a slot; bounded by
+    /// disk throughput, not by a timer). An Err is also counted, so a caller that must not act on it loses nothing:
+    /// flush() reports it.
     pub fn write(&self, session_id: SessionId, payload: serde_json::Map<String, serde_json::Value>) -> Result<(), LogError>;
+    /// Same row, never blocks (`Logger::try_log`): a full queue is an Err counted as a lost row. For the cancel
+    /// and result paths (a-9) where a stalled disk must not delay a result (RSH-010).
+    pub fn try_write(&self, session_id: SessionId, payload: serde_json::Map<String, serde_json::Value>) -> Result<(), LogError>;
     /// Flush barrier; then RowsLost if any row since the last flush was refused or not written.
     pub fn flush(&self) -> Result<(), LogError>;
 }
@@ -145,10 +153,30 @@ impl GeneralLogger {
     /// one file per CLI, REQ-SAG-0003), RetainedLogPolicy::default(), default level, console off, one startup retention pass (C4).
     pub fn open_default(log_root: &Path, service: &'static str) -> Result<Self, LogError>;
     pub fn injected(logger: Arc<Logger>) -> Self;
+    /// Written first in an event that has a context; a payload may not use them (LogError::ReservedField).
+    pub const CONTEXT_KEYS: [&'static str; 2] = ["session_id", "position"];
     /// One event. `target` names the calling crate ("sc_agent_http", "sc_decision_runner"); `action`
-    /// e.g. "http.busy". Never a body, header value or key (callers' rule). Errs are counted like SessionLogger::write.
-    pub fn write(&self, level: Level, target: &'static str, action: &'static str, fields: serde_json::Map<String, serde_json::Value>) -> Result<(), LogError>;
+    /// e.g. "http.busy". `ctx` (RSH-009): its session_id becomes `LogEvent.correlation_id` and the first field
+    /// `session_id`, its position the field `position`; `LogContext::NONE` adds neither. Never a body, header
+    /// value or key (callers' rule). Blocks like SessionLogger::write; Errs are counted the same way.
+    pub fn write(&self, level: Level, target: &'static str, action: &'static str, ctx: LogContext, fields: serde_json::Map<String, serde_json::Value>) -> Result<(), LogError>;
+    /// Same event, never blocks (Logger::try_log); a full queue is counted as a lost row (RSH-010).
+    pub fn try_write(&self, level: Level, target: &'static str, action: &'static str, ctx: LogContext, fields: serde_json::Map<String, serde_json::Value>) -> Result<(), LogError>;
     pub fn flush(&self) -> Result<(), LogError>;
+}
+
+// src/context.rs
+/// Which request a general event belongs to (RSH-009). Passed by value to GeneralLogger::write and to
+/// sc_agent_http::HttpClient::send_once; local.*, llm.* and runner.* events use the same type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct LogContext {
+    pub session_id: Option<SessionId>,
+    /// 0-based position of the request in its batch or stream; None for a single request.
+    pub position: Option<u64>,
+}
+impl LogContext {
+    pub const NONE: Self = Self { session_id: None, position: None };
+    pub const fn request(session_id: SessionId, position: Option<u64>) -> Self;
 }
 
 // src/loggers.rs
@@ -159,7 +187,18 @@ impl Loggers {
 }
 
 // src/writer.rs (crate-private)
-pub(crate) struct Writer { logger: Arc<Logger>, owned: bool, reported_lost: AtomicU64, refused: Mutex<Refused>, log: &'static str }
+pub(crate) struct Writer { logger: Arc<Logger>, owned: bool, accounting: Mutex<Accounting>, log: &'static str }
+/// All lost-row state under one lock (RBP-F015): flush reads and resets it in one critical section.
+struct Accounting {
+    refused: u64,                 // rows write/try_write returned Err for since the last report
+    writer_lost_seen: u64,        // sc-observability's lost-row total already reported
+    last: Option<ErrorDetail>,    // latest failure, taken by the report
+}
+```
+
+Lock and poison rationale (RBP-F015): `Writer.accounting` is mutated only by a counter add or one assignment per critical section, and no call leaves the crate while it is held (the `Logger` call happens before the lock is taken), so after a panic elsewhere the state is still a valid count and `PoisonError::into_inner` is safe. `MemoryLog`'s event Vec is only pushed to or cloned under its lock, so `into_inner` is safe there too.
+
+```rust
 ```
 
 `SessionId` is `sc_agent_types::SessionId`; `ErrorDetail`/`ErrorId` are A-1's.
@@ -189,9 +228,9 @@ impl MemoryLog {
 pub struct MemoryRecord { pub level: Level, pub target: String, pub action: String, pub fields: serde_json::Map<String, serde_json::Value> }
 impl sc_observability::v2::LogSink for MemorySink {}
 ```
-Consumers (a-5, a-6, a-7, a-9, a-10 ANC-007 tests) take `sc-agent-log = { path = .., features = ["testing"] }` as a dev-dependency. The poisoned-mutex case recovers with `into_inner` (no unwrap).
+Consumers (a-5, a-6, a-7, a-9, a-10 ANC-007 tests) take `sc-agent-log = { path = .., features = ["testing"] }` as a dev-dependency. The poisoned-mutex case recovers with `into_inner` (no unwrap; rationale above).
 
-## 3. Error union (full list; ErrorId, Display = detail(), source() = the wrapped error)
+## 3. Error union (full list; ErrorId, Display = `id: message` only (RBP-F013), source() = the wrapped error)
 
 ```rust
 #[derive(Debug)]
@@ -212,7 +251,7 @@ pub enum LogError {
     InvalidName { what: &'static str, value: String, cause: ErrorDetail },     // "log.invalid_name"
     OpenSink { path: PathBuf, source: sc_observability::v2::InitError },      // "log.open_sink"
     Start { log: &'static str, source: sc_observability::v2::InitError },     // "log.start"
-    /// A payload key is one of SessionLogger::IDENTITY_KEYS.
+    /// A payload key is one of SessionLogger::IDENTITY_KEYS or GeneralLogger::CONTEXT_KEYS.
     ReservedField { key: String },                                            // "log.reserved_field"
     /// Logger::log refused the row.
     Rejected { log: &'static str, source: sc_observability::v2::EventError }, // "log.rejected"
@@ -220,7 +259,8 @@ pub enum LogError {
     /// `count` rows since the last flush were refused or not written; `last` is the latest failure.
     RowsLost { log: &'static str, count: u64, last: Option<ErrorDetail> },     // "log.rows_lost"
 }
-impl ErrorId for LogError {}   // foreign sources become ErrorDetail::foreign causes
+impl ErrorId for LogError {}   // cause_detail() (a-1 rename, RBP-F001): foreign sources become ErrorDetail::foreign causes; recovery() None
+                               // (no LogError is on the RBP-F005 list)
 ```
 
 13 variants.
@@ -251,8 +291,10 @@ Each test names the acceptance line (A8-nn) it proves; the assertion itself is i
 | `session_file_never_rotates`, `old_session_log_survives` | A8-04 |
 | `general_rotates_at_start` (T1 port) | A8-02 |
 | `general_write_generic` | A8-13 |
+| `context_on_general_events` (two LogContexts -> different correlation_id and session_id fields; NONE adds neither; a payload `session_id` key -> log.reserved_field) | A8-20 |
+| `try_write_never_blocks` (a full queue -> Err, counted, reported once by flush) | A8-21 |
 | `defaults_write_both`, `injected_session_only`, `injected_general_only`, `injected_logger_not_shut_down` | A8-12 |
-| `reserved_field_refused_and_counted`, `rows_lost_reported_once` (unix), `healthy_writer_loses_nothing` | A8-14 |
+| `reserved_field_refused_and_counted`, `rows_lost_reported_once` (unix), `healthy_writer_loses_nothing`, `concurrent_refusals_counted_once` (threads refuse while another flushes; reported total = refusals) | A8-14 |
 | `log_error_keeps_lower_layer_cause` | A8-15 |
 | `ids` | A8-16 |
 | `memory_log_records` (feature `testing`: GeneralLogger and SessionLogger from MemoryLog; records() returns level, target, action, fields in order; no file under any root) | A8-19 |
@@ -270,7 +312,8 @@ Not proved by a test here: A8-01 (commit history), A8-17/A8-18 (Required validat
 ## 6. Dependencies
 
 - `sc-agent-types` (path, A-1): `SessionId`, `ErrorId`, `ErrorDetail`.
-- `sc-observability = "=1.5.0"` (ref-src pin): v2 `Logger`, `LoggerBuilder`, `LoggerConfig`, `JsonlFileSink`, `SinkRegistration`, `RetainedLogPolicy`, names, `Level`, `LogEvent`.
+- `sc-observability = "=1.5.0"` (ref-src pin): v2 `Logger`, `LoggerBuilder`, `LoggerConfig`, `JsonlFileSink`, `SinkRegistration`, `RetainedLogPolicy`, names, `Level`, `LogEvent`, `Logger::log` (blocking) and `Logger::try_log` (non-blocking).
+- `sc-observability-types = "=1.5.0"`: `CorrelationId` (not re-exported by sc-observability).
 - `serde_json = "1"` (lock 1.0.154), `hostname = "0.4.2"` (new).
 - dev: `tempfile = "3"`; self dev-dependency `sc-agent-log = { path = ".", features = ["testing"] }`.
 - Feature `testing` (not default): enables `src/testing.rs` (`MemoryLog`); no extra dependencies.
@@ -297,6 +340,8 @@ Not proved by a test here: A8-01 (commit history), A8-17/A8-18 (Required validat
 - [ ] A8-17 REQ-SAG-0009/0010: cargo tree -p sc-agent-log shows no tokio; no sleep call (git runs via Command::output()).
 - [ ] A8-18 REQ-SAG-0010: sc-agent-log source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
 - [ ] A8-19 sc-agent-log: feature `testing` (not default) exposes sc_agent_log::testing::MemoryLog, a sc_observability::v2::LogSink registered through SinkRegistration::typed with file and console sinks off; GeneralLogger and SessionLogger built from it write no file, and records() (after its flush) returns each event's level, target, action and fields in write order.
+- [ ] A8-20 sc-agent-log: GeneralLogger::write takes a LogContext; its session_id is the event's correlation_id and first field, its position the field position; LogContext::NONE adds neither; two contexts give records with different session_ids.
+- [ ] A8-21 sc-agent-log: GeneralLogger::try_write and SessionLogger::try_write never block; a row they cannot queue is counted and returned once by flush() as log.rows_lost (all lost-row accounting under one Mutex).
 
 ## Notes
 
@@ -307,3 +352,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 No open questions.
 
 Plan hardening round 1 (2026-11-10): added sc_agent_log::testing::MemoryLog behind feature `testing` (PLAN-CRIT-010). Checked sc-observability 1.5.0 source (cargo registry): no public in-memory sink exists (RecordingEventSink is #[cfg(test)]-private), so MemoryLog implements sc_observability::v2::LogSink and is registered with v2::LoggerBuilder::register_sink(SinkRegistration::typed(..)).
+
+Plan review round 2: LogContext { session_id, position } in sc-agent-log (RSH-009), carried by GeneralLogger::write/try_write as LogEvent.correlation_id + fields; try_write for cancel/result paths (RSH-010); lost-row accounting under one Mutex with poison rationale (RBP-F015); AsRef<str> on Slug/Repo (RBP-F017); cause -> cause_detail; Display = id: message. The C2/C5 copy rows' edit column was updated; source and target columns untouched.

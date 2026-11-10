@@ -1,0 +1,133 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T043246Z-fixture_ADR-SAG-0004_fail_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T04:32:46+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:ADR-SAG-0004:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 92,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "ADR-SAG-0004",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0004",
+      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.",
+      "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record ADR-SAG-0004",
+      "anchor_version": 4,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "3d4e7ddb340f6d020c37b51d5f38fba9ced0a95d7e01c07bb8ff6a58ade52607",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "Doing the item leaves every sc-agent crate dependency untouched and states none; talking about the layers does not count.",
+            "unclear": "It cannot be told from the text whether the item touches sc-agent crate dependencies.",
+            "yes": "Doing the item adds, changes or states a dependency on an sc-agent crate in a Cargo.toml."
+          },
+          "instructions": "`anchor.statement` restricts which sc-agent crates a crate's Cargo.toml may depend on, and `anchor.scope` says it governs adding or changing a crate dependency. Read `item.text`: will doing this item put a dependency on an sc-agent crate into some Cargo.toml, change one, or state which sc-agent crates a crate depends on? Do not judge whether the dependency is allowed.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item text does not contain the directive's specific content, whether or not what it does is allowed.",
+            "unclear": "The item text alludes to the directive but it is not possible to tell whether the directive itself is included.",
+            "yes": "The item contains the directive's specific content as a constraint, a closed dependency list or an explicit exclusion."
+          },
+          "instructions": "Does `item.text` explicitly carry out or preserve the directive in `anchor.statement`, by including its specific content as a stated constraint, such as \"depends only on\" lower-layer crates or \"no crate depends on\" a higher-layer crate? A generic mention of the topic, or a dependency change that merely happens to comply, does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Every dependency the item plans is on the same or a lower layer, or the item plans no dependency.",
+            "unclear": "The item plans a dependency but the crates or their layers cannot be determined from the text.",
+            "yes": "The item makes some sc-agent crate depend on an sc-agent crate in a higher layer."
+          },
+          "instructions": "Using the layer order in `anchor.statement` (bottom to top), does `item.text` plan for an sc-agent crate to depend, in any Cargo.toml dependency section, on an sc-agent crate in a higher layer than its own? Dependencies on the same or a lower layer are not conflicts. Calling a dependency temporary or an exception does not remove a conflict. Silence about dependencies is not a conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1023,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 92,
+      "item_shortened": false,
+      "request_bytes": 2974
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ADR-SAG-0004"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": false
+  }
+}

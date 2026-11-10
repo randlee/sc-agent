@@ -1,0 +1,220 @@
+{
+  "success": true,
+  "data": {
+    "status": "findings",
+    "reviewed_branch": "main",
+    "reviewed_commit": "2e0fed6",
+    "review_mode": "doc_review",
+    "practice_mode": "all",
+    "practices_reviewed": [
+      "RBP-001",
+      "RBP-002",
+      "RBP-003",
+      "RBP-004",
+      "RBP-005",
+      "RBP-006",
+      "RBP-007",
+      "RBP-008",
+      "RBP-009",
+      "RBP-010"
+    ],
+    "findings": [
+      {
+        "id": "RBP-F001",
+        "practice_id": "RBP-008",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 120,
+        "issue": "ErrorId declares `fn cause(&self) -> Option<ErrorDetail>` while its supertrait std::error::Error already has a (deprecated) `fn cause(&self) -> Option<&dyn Error>`. On any `T: ErrorId` or `dyn ErrorId`, and on any concrete type with both traits in scope, `x.cause()` is ambiguous (E0034). Every crate has to import Error to call source(), so every caller hits this. The same name is also used in A-2:310, A-4:205 and A-5:313.",
+        "recommendation": "Rename the method before the trait is locked in, e.g. `cause_detail()`. Add a compile test that calls it through `&dyn ErrorId` with `std::error::Error` in scope.",
+        "evidence": "A-1 section 3: `pub trait ErrorId: std::error::Error { ... fn cause(&self) -> Option<ErrorDetail>; ... }`."
+      },
+      {
+        "id": "RBP-F002",
+        "practice_id": "RBP-004",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+        "line": 192,
+        "issue": "DecisionRequest has public fields (`body`, `image_parts`, `long_context`) and an invariant that is checked at runtime. `validate()` requires that every Asset.part names exactly one ImagePart, no two ImageParts share a name, and none is unreferenced. A-2 does not call it. Each backend (a-6 SystemOneBackend, a-7 LlmDecisionBackend, LocalBackend) has to remember to call it as its first line. An invalid request can be built and passed around freely. The runner computes digests on it before any validation.",
+        "recommendation": "Make validation part of construction. Use a private-field `DecisionRequest::new(body, image_parts, long_context) -> Result<Self, DecisionError>` (or a `ValidatedRequest` newtype) that runs the image-part check once. Then `Backend::encode` receives a request that cannot be invalid, and the per-backend `validate()?` calls and their duplicated acceptance lines go away. Keep `From<SystemOneRequest>` only for requests without assets.",
+        "evidence": "A-2 `does_not_close`: 'DecisionRequest::validate is called before encoding by a-6 and a-7 (their acceptance), not by a-2'. The same first-line `validate()?` rule is repeated in a-6:109 and a-7:192."
+      },
+      {
+        "id": "RBP-F003",
+        "practice_id": "RBP-010",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-9-decision-runner.md",
+        "line": 128,
+        "issue": "The runner's central invariant is 'exactly one result and one session row per request'. It rests on a `Claim(AtomicBool)` whose `win()` winner 'alone writes the row and the result'. Three separate code paths must each call `win()` and then write: the worker after send_once, the result iterator for orphans, and the skipped fn for Cancelled. Nothing in the types stops a fourth path, or a forgotten check, from writing a second row or result.",
+        "recommendation": "Make the proof a value. Use `Claim::win(&self) -> Option<Finish>`, where `Finish` is a non-Clone, non-Copy token. Make the row writer and the result push take `Finish` by value, so a result or row cannot be produced without winning the claim and cannot be produced twice. A `PhantomData` marker tying `Finish` to its job is enough.",
+        "evidence": "A-9 'Shape in one paragraph' and the `struct Claim(AtomicBool); // win(): compare_exchange(false, true); the winner alone writes the row and the result` comment. Tests only cover this by behaviour (`one_row_per_result`)."
+      },
+      {
+        "id": "RBP-F004",
+        "practice_id": "RBP-007",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 248,
+        "issue": "`TypesError::LineHasNoModel` is documented as 'cannot happen with the built-in rows; returned instead of a panic'. It is a dead error variant. It makes `Catalog::resolve` fallible for `Latest` when the catalog can be built so that every ShortName has a model by construction. Every caller (config, decide, tests) then carries an error arm that can never run.",
+        "recommendation": "Store latest as a total structure, for example an array or struct with one slot per ShortName, seeded from the built-in rows. Then `resolve` returns `ModelId` directly (`Latest` picks the slot, `Version` returns itself) and `LineHasNoModel` is deleted. The enum is also meant to have 7 variants, so removing one is cheap now. Alternatively keep `Result` only where `with_config_model` can actually fail (ModelOnTwoLines).",
+        "evidence": "A-1 section 4 doc comment on LineHasNoModel; `Catalog { latest: BTreeMap<ShortName, (ModelId, ReleaseDate)>, .. }` in section 3."
+      },
+      {
+        "id": "RBP-F005",
+        "practice_id": "RBP-001",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 126,
+        "issue": "The workspace error contract (ErrorId and ErrorDetail) has a stable id, a message and a cause chain, but no recovery step and no docs reference. The enforcement-strategy minimum contract is code, message, cause, recovery steps, and a docs link where useful. A-4 says KeyMissing's 'recovery text names the process environment, the repo-root .env and the keyring', but the ErrorDetail shape that CLIs, PyO3 and session rows print has nowhere to carry it. Most variants (ProviderBusy, QuotaExhausted, ModelNotServed, NoProviderKey, config errors) are exactly where the caller needs to know what to do next.",
+        "recommendation": "Add `fn recovery(&self) -> Option<&'static str>` (or `Cow<'static, str>`) to ErrorId and an optional `recovery` field (and optional `docs`) to ErrorDetail, with `skip_serializing_if`. Add a test that the high-traffic variants (key_missing, provider_busy, quota_exhausted, model_not_served, no_provider_key, request_parse) return non-empty recovery text. If the owner has deliberately settled on 'id, message, cause' only, record that as an explicit deviation from RBP-001.",
+        "evidence": "ErrorDetail { id, message, cause } in A-1:126-132. The A-4 'recovery text' sentence has no field to land in. 'owner-errors-settled' is cited but the plan never says recovery was waived."
+      },
+      {
+        "id": "RBP-F006",
+        "practice_id": "RBP-007",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-3-sc-treesitter.md",
+        "line": 308,
+        "issue": "Two error paths in sc-treesitter are structurally unreachable and are kept as fake failure modes. (1) `PositionOverflow`: a 1-based line is `row + 1`, and the source is capped at MAX_SOURCE_BYTES (8 MiB), so row cannot approach usize::MAX. The test needs an artificial usize::MAX to hit it. (2) The 'None slice cannot occur for UTF-8 node boundaries, but return NotUtf8' path misreports an internal impossibility as a user input error.",
+        "recommendation": "Compute lines infallibly (`row.saturating_add(1)`, or document the 8 MiB bound) and delete PositionOverflow. That reduces the enum to 18 variants, and the 19-id acceptance counts and the 'no u32 clamping' line need updating. For the text slice, skip the capture or use `String::from_utf8_lossy` over a slice proved valid by the earlier from_utf8 check. Do not reuse NotUtf8.",
+        "evidence": "A-3 section 2 `inclusive_lines ... checked_add(1) -> PositionOverflow` and 'return Error::NotUtf8 { byte_offset: start_byte } rather than panic'; test 4 `PositionOverflow at usize::MAX`."
+      },
+      {
+        "id": "RBP-F007",
+        "practice_id": "RBP-007",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-7-llm-provider.md",
+        "line": 140,
+        "issue": "`LlmClient::new(provider: Provider, ..)` accepts `Provider::TypeSafe` and then returns `LlmError::UnsupportedProvider`. `Wire::of(provider) -> Option<Self>` has the same shape. The only caller (A-10 `backend()`) has already branched on TypeSafe, so the error arm is dead in production. Every `LlmError` variant also carries `provider: Provider` that can never be TypeSafe. It is a runtime check for something the types could express.",
+        "recommendation": "Add an `LlmProvider` enum (Anthropic, OpenAi, OpenRouter, Together, Nous) with `From<LlmProvider> for Provider` and `TryFrom<Provider>`, and use it in `LlmClient::new`, `Wire::of`, `provider_model_id` and the LlmError fields. Convert once in decide's `backend()`. Then `UnsupportedProvider` disappears (LlmError becomes 8 variants) and `Wire::of` becomes total.",
+        "evidence": "A-7 section 3 (`pub const fn of(provider: Provider) -> Option<Self>; // TypeSafe -> None`) and section 4 `UnsupportedProvider`."
+      },
+      {
+        "id": "RBP-F008",
+        "practice_id": "RBP-007",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+        "line": 291,
+        "issue": "`DecisionError::Digest(sc_sha::ShaError)` and `QuestionDigest::of_text -> Result` replace a copied `unreachable!()`, which says the original author judged that arm structurally impossible for `&str` input. The plan turns it into a public, id'd error variant. `DecisionResult.digests` is also documented as 'empty only when the digest failed', which makes an impossible state observable.",
+        "recommendation": "Check sc-sha's contract for UTF-8 `&str` input. If it cannot fail, return `QuestionDigest` directly (and `question_digests` becomes infallible except for JSON encoding), then drop the variant and the 'empty digests' state. If it can fail (for example an input-size limit), document the actual condition in the variant doc and add a test that triggers it.",
+        "evidence": "A-2 section 2 digest.rs edit ('delete `unreachable!()`; `Err(error) => Err(DecisionError::Digest(error))`') and the DecisionResult field comment."
+      },
+      {
+        "id": "RBP-F009",
+        "practice_id": "RBP-002",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-9-decision-runner.md",
+        "line": 142,
+        "issue": "Two lifecycle protocols are enforced at runtime instead of in types. (1) A-9 `Job` has `digests` ('computed on the first attempt') and `http: Option<HttpRequest>` ('encoded once'), so every worker step has to handle an unprepared job. With unwrap and expect denied, the 'None after prepare' case needs an error arm that can never run. (2) A-5 `send_once` has a step-1 fallback for 'a caller resending after a Done', which returns `ProviderBusy { last: None }`. That is a wrong-named error for a caller state bug. `Attempts` is a `&mut` runtime state machine (first_send/sends/last), and `may_start` is called twice (by the runner and again in send_once).",
+        "recommendation": "(1) Split Job into `Fresh` and `Prepared`. `prepare(self) -> Result<Prepared, DecisionError>` computes digests and encodes, and only `Prepared` can be sent or held. (2) Have `send_once` consume the attempt state and return `Next::ResendAt { at, attempts }` or `Next::Done`, so a finished request has no `Attempts` to resend with. Have `may_start` return a `SendPermit` that `send_once` takes, which removes the `last: None` fallback and `ProviderBusy.last` becoming `Option`.",
+        "evidence": "A-9 `struct Job { digests, http: Option<HttpRequest>, .. }`. A-5 send_once step 1: 'none (only a caller resending after a Done ...) -> Err(ProviderBusy { .., last: None })'."
+      },
+      {
+        "id": "RBP-F010",
+        "practice_id": "RBP-004",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-10-clis-python.md",
+        "line": 156,
+        "issue": "The decide library's public API takes raw strings for values that already have validated types. `SendOptions { model: String, provider: Option<String>, project: String, agent_role: String }` re-parses in the library what clap and PyO3 could parse once into `Slug` and `Provider`. Result types use `&'static str` where an enum exists: `DetectedKey.source: &'static str` (KeySource is in A-4), `Availability.daemon: &'static str` and `ProbeStatus.daemon` (DaemonKind is in A-6), `DecisionError::{Backend,SchemaMismatch}.backend: &'static str`. `DoctorReport.ties: Vec<(ModelId, ModelId)>` has two same-typed fields whose meaning (config vs built-in) is positional.",
+        "recommendation": "Use `Option<Provider>`, `Slug` (or `SessionIdentity` inputs) and an enum for the model selector (short name, version id, or local runner name) in SendOptions. Use `KeySource` in DetectedKey and `DaemonKind` in Availability/ProbeStatus. Use a small named struct for ties (`{ config: ModelId, builtin: ModelId }`). Use a `BackendName` enum or newtype for the backend label. Python and CLI keep taking strings and parse at the edge.",
+        "evidence": "A-10 `SendOptions`/`DoctorReport`/`DetectedKey`; A-6 `Availability { daemon: &'static str, .. }`; A-2 DecisionError `backend: &'static str`."
+      },
+      {
+        "id": "RBP-F011",
+        "practice_id": "RBP-004",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+        "line": 153,
+        "issue": "`LocalRunner.kind: String` is parsed later by sc-decision-local's DaemonKind, so a typo in `~/.sc-agent/default.json` loads fine and fails only when a runner is built (`local.unknown_daemon`). `key_env: Option<String>` is an environment-variable name, not distinguished from other strings. `ModelMetadata.release_date: String` (A-2) and `LocalBackend::new(.., model: &str)` / `LocalDaemon::availability(.., model: &str)` / `LocalBackend.model: String` (A-6) hold values that have types (ReleaseDate, ModelId) available in lower crates, and `LocalRunner.model` is already a `ModelId`.",
+        "recommendation": "Move `DaemonKind` (a closed four-variant enum with FromStr and serde) down into sc-agent-types, or a config-level enum, so config load rejects an unknown kind with the key path. Use `ModelId` in the A-6 signatures. Parse `ModelMetadata.release_date` into `ReleaseDate` (lenient to the API format if needed). Give `key_env` a validated variable-name newtype shared with `resolve_var`.",
+        "evidence": "A-4 LocalRunner struct and the closing sentence of section 3 ('An unknown `kind` is caught by sc-decision-local when the runner is built'); A-6 section 4 signatures; A-2 `ModelMetadata`."
+      },
+      {
+        "id": "RBP-F012",
+        "practice_id": "RBP-004",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+        "line": 252,
+        "issue": "`QuestionDigest(String)` is documented as 64 lowercase hex characters, but it derives `Deserialize` with `#[serde(transparent)]`. Any JSON string deserializes into it, so the invariant holds only for values built by `of_text`. (ReleaseDate accepts 2026-02-31 because day is only checked 1..=31. This does not break ordering but is the same class of gap.)",
+        "recommendation": "Replace the derived Deserialize with a validating one (or `TryFrom<String>` via `#[serde(try_from)]`). Better, store `[u8; 32]` and serialize as hex. For ReleaseDate, either validate days per month or document that it is an ordering key only.",
+        "evidence": "A-2 section 3 digest.rs derive list; A-1 `ReleaseDate` doc 'month 1..=12, day 1..=31'."
+      },
+      {
+        "id": "RBP-F013",
+        "practice_id": "RBP-001",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 141,
+        "issue": "Three structure-loss points in the error design. (1) The rule 'Display writes self.detail() (id: message: cause...) and source() returns the wrapped lower error' prints the cause chain twice for any reporter that walks source() (anyhow `{:#}`, eyre, log chains). (2) sc-treesitter's Error keeps lower kinds as `kind: String` (Debug of io::ErrorKind, clap ErrorKind, QueryErrorKind), and A-4/A-10 `Usage`/`Write`/`FileRead` do the same. Callers cannot match on them and Debug text is not a stable format. (3) Invalid config values (workers 0, bad date, unknown short name) all surface as CFG.DESERIALIZE with only a serde message, so the field path and the fix are missing. A-2 uses serde_path_to_error for requests, but A-4 does not for config.",
+        "recommendation": "(1) Have Display print id and message only and leave the chain to source() and detail(), or keep the current rule and document that reporters must not also walk source(). (2) Store a small stable `kind` enum or a stable string table instead of Debug output, or document the string as display-only. (3) Wrap config deserialization with serde_path_to_error (or have AgentConfigError add the key path) and give a recovery hint per field.",
+        "evidence": "A-1 lines 141-142; A-3 section 4 (QueryCompile/FileRead/Usage/Write `kind: String`); A-4 'Invalid values ... fail inside sc-config as CFG.DESERIALIZE'."
+      },
+      {
+        "id": "RBP-F014",
+        "practice_id": "RBP-003",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-6-decision-backends.md",
+        "line": 132,
+        "issue": "The plan introduces about eight public traits (ErrorId, Backend, Decision, Transport, EnvSource, KeyringSource, LocalDaemon, MemoryLog's LogSink use) and never states for each whether it is intentionally open or sealed. Open is clearly intended for Backend, Decision, Transport, EnvSource and KeyringSource (test doubles and ADR-SAG-0001). `LocalDaemon` is different. The implementor set is the four crate-provided kinds, `DaemonKind` is `#[non_exhaustive]` and dispatches to them, and the notes say a later daemon 'adds one' inside the crate. Yet the trait and the four unit structs are public. `ErrorId` has a provided `detail()` that downstream implementors can override, which would break the id/message/cause consistency the workspace relies on.",
+        "recommendation": "Add one 'open or sealed' line per public trait in the designs. Seal `LocalDaemon` with the private-supertrait pattern and keep `DaemonKind::daemon()` as the extension path, unless external daemons are a goal. For `ErrorId`, document that it is open to workspace crates only and that `detail()` must not be overridden. Put `detail()` in a sealed extension trait or an inherent helper on `dyn ErrorId` so it cannot be.",
+        "evidence": "A-6 section 4 `pub trait LocalDaemon` plus `pub struct Strands/Laya/Mapika/Generic`; A-1 `fn detail(&self) -> ErrorDetail; // Provided`."
+      },
+      {
+        "id": "RBP-F015",
+        "practice_id": "RBP-006",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-8-sc-agent-log.md",
+        "line": 162,
+        "issue": "Interior-mutability design lacks the stated rationale for two things. (1) `Writer` tracks lost rows with two separately synchronized pieces, `reported_lost: AtomicU64` and `refused: Mutex<Refused>`. 'reported once' needs a consistent read-and-reset across both, and the plan does not say how flush guarantees it. (2) Poison recovery with `PoisonError::into_inner` is specified for CancelToken, BoundedQueue, JobQueue, Writer and the test doubles with no argument that the protected state is consistent after a panic. A-9 catches backend panics with `catch_unwind` and keeps running, so a panic while holding one of these locks is possible.",
+        "recommendation": "Put all lost-row accounting under the one Mutex (or one atomic) so take-and-reset is atomic. State per lock why into_inner is safe: hooks run outside the lock, queue mutations are single-step, and so on. Where that does not hold, return `Shutdown` instead of continuing on possibly torn state. Keep the AtomicBool in CancelToken, which the plan already justifies by lock-free is_cancelled.",
+        "evidence": "A-8 `Writer { logger, owned, reported_lost: AtomicU64, refused: Mutex<Refused>, log }`; A-1 'Recover a poisoned lock with PoisonError::into_inner'; A-5/A-8 test doubles."
+      },
+      {
+        "id": "RBP-F016",
+        "practice_id": "RBP-010",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-4-config-secrets.md",
+        "line": 100,
+        "issue": "The invariant 'the key is read only at sc-agent-http's ureq_transport' is enforced by a clippy `disallowed-methods` entry plus `#[expect]` at the one site. This is a lint-level capability, not a type-level one. Any crate or test can add its own `#[expect(clippy::disallowed_methods)]`. The plan itself notes the entry is silently skipped in any crate that does not depend on sc-agent-secrets, and that a path that resolves to a missing item only warns.",
+        "recommendation": "Keep the lint, and also make reading require a value that proves where it happens. For example, `ApiKey::expose(&self, _: &Reveal) -> &str`, where `Reveal` is a ZST minted by a documented constructor that only the transport module calls (a `PhantomData<fn() -> Transport>` marker makes the intent explicit), or `ApiKey::with_secret(|s| ...)` which keeps the borrow scoped. Alternatively state in the A-4 design that a lint is the accepted enforcement and why a type-level token was rejected.",
+        "evidence": "A-4 section 2 api_key.rs bullet and A-1 'Shared files' paragraph on clippy 0.1.99 behaviour."
+      },
+      {
+        "id": "RBP-F017",
+        "practice_id": "RBP-005",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 170,
+        "issue": "The string newtypes (ModelId, Slug, Repo, QuestionDigest) expose only an inherent `as_str()`, with no `AsRef<str>` or `Borrow<str>`. `Catalog::line_of(&ModelId)` is used by decide doctor on ids the providers return as plain strings. Those have to be parsed into a ModelId first, which can fail on empty or control-character text, just to ask whether the catalog knows them. The BTreeMap<ModelId, ShortName> cannot be queried by &str.",
+        "recommendation": "Implement `AsRef<str>` on all four, and `Borrow<str>` on ModelId (derived Eq/Ord/Hash on Cow<str> already agree with str). Add `Catalog::line_of_str(&str)` or generic `line_of<Q: ?Sized>(&self, m: &Q) where ModelId: Borrow<Q>`. Do not add Deref to any of them (explicit validated meaning), and do not add Deref or AsRef<str> to ApiKey. Say so in the docs.",
+        "evidence": "A-1 section 3 ModelId impl block; A-10 doctor step (2) 'each id mapped back with catalog_model_id, one warning per id catalog.line_of does not know'."
+      },
+      {
+        "id": "RBP-F018",
+        "practice_id": "RBP-009",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-7-llm-provider.md",
+        "line": 100,
+        "issue": "Several request-building paths allocate owned Strings for values that are almost always static. `LlmRequest.system: Option<String>` is filled from the `SYSTEM_PROMPT` const on every decision. `HttpRequest::with_header(name: impl Into<String>, value: ..)` is used for constant header names and values (content-type, anthropic-version, TypeSafe-Danger-Zone-*). `Output::Json.name: String` is typically a fixed label. `ErrorId::message(&self) -> String` and `cause() -> Option<ErrorDetail>` rebuild the full owned chain on every call, and Display calls them. In a 40-request parallel batch with resend this is a per-send cost, though a small one.",
+        "recommendation": "Use `Cow<'static, str>` for `LlmRequest.system`, `Output::Json.name` and header names/values (ModelId already uses this pattern). Let `ErrorId::message` return `Cow<'static, str>` so static messages do not allocate. This is low priority, so measure first if the plan sets a performance target.",
+        "evidence": "A-7 `LlmRequest`/`SYSTEM_PROMPT`; A-5 `with_header(self, name: impl Into<String>, value: impl Into<String>)`; A-1 ErrorId."
+      }
+    ],
+    "summary": {
+      "total_findings": 18,
+      "by_severity": {
+        "critical": 0,
+        "important": 5,
+        "minor": 13
+      }
+    },
+    "notes": [
+      "The worktree HEAD could not be checked with git commands (no shell tool in this session). refs/heads/main resolves to 2e0fed61292d7f964b763aae79b50a07af1cb0aa and .git/HEAD points at refs/heads/main, so the assigned commit matches. Note that git status shows uncommitted changes under .claude/skills/plan-anchoring only. They do not touch the reviewed docs.",
+      "Scope: all ten sprint design files were read in full (A-1 to A-10). docs/plans/phase-a/plan.md was not read. The per-pattern plan docs under .claude/skills/rust-best-practices/patterns were not loaded; judgments follow practice-inventory.md and enforcement-strategy.md. The guidelines.txt file was only read to line 1470 of 2428.",
+      "Practices with no finding: the Decision, Backend, Transport, EnvSource, KeyringSource and LocalDaemon traits are object-safe as written (no generic methods, no Self returns). The `decide_stream` signature with a `'static` boxed input iterator and a `+ 'a` result is sound. Not finding: CancelToken's Mutex/Condvar/AtomicBool combination (justified in the design). Sleep-free waits and tokio-free layering match the owner rules.",
+      "The owner-settled items (ErrorId/ErrorDetail shape, closed Provider enum, per-crate unions) are flagged only where they conflict with RBP-001 minimum contract or with trait-method resolution (F001, F005). If the owner has waived recovery text, F005 can be closed by recording the waiver.",
+      "Sprint-level observations from the review that fall outside the RBP scope: A-5 and A-9 still carry the open owner question on the budget-versus-timeout rule (PLAN-CRIT-003). A-3's PyO3 `Capture` uses `pyclass(frozen, get_all)` on a `#[non_exhaustive]` struct that also derives Serialize, which is fine, but the module name must match the pymodule. Neither is reported as a finding."
+    ]
+  },
+  "error": null
+}
