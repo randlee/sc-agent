@@ -231,8 +231,7 @@ mod tests {
         let error = send_batch(&options, requests, &cancel, &mut |_| {
             calls += 1;
             Err(DecideError::Write {
-                kind: "BrokenPipe".into(),
-                detail: "broken pipe".into(),
+                source: std::io::Error::new(std::io::ErrorKind::BrokenPipe, "broken pipe"),
             })
         })
         .expect_err("write failed");

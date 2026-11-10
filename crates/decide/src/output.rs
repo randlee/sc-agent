@@ -49,5 +49,23 @@ impl<'a> ResultLine<'a> {
 ///
 /// [`DecideError::Encode`] when serde_json refuses a value.
 pub fn result_line(result: &DecisionResult) -> Result<Vec<u8>, DecideError> {
-    serde_json::to_vec(&ResultLine::new(result)).map_err(|error| DecideError::encode(&error))
+    Ok(serde_json::to_vec(&ResultLine::new(result))?)
+}
+
+/// `result` as one compact JSON string (the form sc-agent-py returns).
+///
+/// # Errors
+///
+/// [`DecideError::Encode`] when serde_json refuses a value.
+pub fn result_text(result: &DecisionResult) -> Result<String, DecideError> {
+    to_json(&ResultLine::new(result))
+}
+
+/// Any printed value (a models list, a doctor report) as one compact JSON string.
+///
+/// # Errors
+///
+/// [`DecideError::Encode`] when serde_json refuses a value.
+pub fn to_json<T: serde::Serialize + ?Sized>(value: &T) -> Result<String, DecideError> {
+    Ok(serde_json::to_string(value)?)
 }

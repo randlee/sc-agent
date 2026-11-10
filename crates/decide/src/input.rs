@@ -10,8 +10,8 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use sc_decision_schema::{
-    DecisionError, DecisionRequest, ImageFormat, ImagePart, LimitKind, MAX_IMAGES, OrderedMap,
-    SystemOneRequest,
+    DecisionError, DecisionRequest, ImageFormat, ImagePart, LimitKind as SchemaLimit, MAX_IMAGES,
+    OrderedMap, SystemOneRequest,
 };
 use serde_json::value::RawValue;
 
@@ -25,6 +25,39 @@ pub const MAX_BATCH_LINES: u64 = 10_000;
 pub const MAX_BATCH_BYTES: u64 = 256 * 1024 * 1024;
 /// The most bytes of one image (20 MiB); also enforced by `DecisionRequest::new` (A-2).
 pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+
+/// Which REQ-SAG-0014 input limit a [`DecideError::LimitExceeded`] names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// One request, or one batch line, over [`MAX_REQUEST_BYTES`].
+    RequestBytes,
+    /// A batch over [`MAX_BATCH_LINES`] physical lines.
+    BatchLines,
+    /// A batch over [`MAX_BATCH_BYTES`] (every byte read, plus image bytes).
+    BatchBytes,
+    /// One image over [`MAX_IMAGE_BYTES`].
+    ImageBytes,
+}
+
+impl LimitKind {
+    /// `"request_bytes"`, `"batch_lines"`, `"batch_bytes"` or `"image_bytes"`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RequestBytes => "request_bytes",
+            Self::BatchLines => "batch_lines",
+            Self::BatchBytes => "batch_bytes",
+            Self::ImageBytes => "image_bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
 
 /// `usize` -> `u64` for limits and sizes (lossless on every supported target).
 fn to_u64(value: usize) -> u64 {
@@ -47,15 +80,15 @@ pub fn request_bytes(spec: &str, stdin: &mut dyn Read) -> Result<Vec<u8>, Decide
         stdin
             .take(cap)
             .read_to_end(&mut bytes)
-            .map_err(|error| DecideError::input("stdin", &error))?;
+            .map_err(|error| DecideError::input("stdin", error))?;
     } else {
         File::open(spec)
             .and_then(|file| file.take(cap).read_to_end(&mut bytes))
-            .map_err(|error| DecideError::input(spec, &error))?;
+            .map_err(|error| DecideError::input(spec, error))?;
     }
     if bytes.len() > MAX_REQUEST_BYTES {
         return Err(DecideError::LimitExceeded {
-            what: "request_bytes",
+            what: LimitKind::RequestBytes,
             line: None,
             max: to_u64(MAX_REQUEST_BYTES),
         });
@@ -75,7 +108,7 @@ pub fn open_lines(
     if spec == "-" {
         return Ok(stdin);
     }
-    let file = File::open(spec).map_err(|error| DecideError::input(spec, &error))?;
+    let file = File::open(spec).map_err(|error| DecideError::input(spec, error))?;
     Ok(Box::new(BufReader::new(file)))
 }
 
@@ -93,14 +126,13 @@ pub fn read_image(name: &str, path: &Path) -> Result<ImagePart, DecideError> {
 }
 
 fn read_image_at(name: &str, path: &Path, line: Option<u64>) -> Result<ImagePart, DecideError> {
-    let image_error = |error: &std::io::Error| DecideError::ImageRead {
+    let image_error = |source: std::io::Error| DecideError::ImageRead {
         name: name.to_owned(),
         path: path.to_path_buf(),
-        kind: format!("{:?}", error.kind()),
-        detail: error.to_string(),
+        source,
     };
     let too_large = || DecideError::LimitExceeded {
-        what: "image_bytes",
+        what: LimitKind::ImageBytes,
         line,
         max: MAX_IMAGE_BYTES,
     };
@@ -108,7 +140,7 @@ fn read_image_at(name: &str, path: &Path, line: Option<u64>) -> Result<ImagePart
         name: name.to_owned(),
         path: path.to_path_buf(),
     })?;
-    let metadata = std::fs::metadata(path).map_err(|error| image_error(&error))?;
+    let metadata = std::fs::metadata(path).map_err(image_error)?;
     if metadata.len() > MAX_IMAGE_BYTES {
         return Err(too_large());
     }
@@ -118,7 +150,7 @@ fn read_image_at(name: &str, path: &Path, line: Option<u64>) -> Result<ImagePart
             file.take(MAX_IMAGE_BYTES.saturating_add(1))
                 .read_to_end(&mut bytes)
         })
-        .map_err(|error| image_error(&error))?;
+        .map_err(image_error)?;
     // The file may have grown between the metadata check and the read.
     if to_u64(bytes.len()) > MAX_IMAGE_BYTES {
         return Err(too_large());
@@ -153,7 +185,7 @@ fn check_image_count(count: usize, line: Option<u64>) -> Result<(), DecideError>
         return Err(DecideError::request_invalid(
             line,
             DecisionError::Limits {
-                what: LimitKind::Images,
+                what: SchemaLimit::Images,
                 max: to_u64(MAX_IMAGES),
             },
         ));
@@ -165,7 +197,7 @@ fn check_image_count(count: usize, line: Option<u64>) -> Result<(), DecideError>
 fn parse_body(json: &[u8], line: Option<u64>) -> Result<SystemOneRequest, DecideError> {
     if json.len() > MAX_REQUEST_BYTES {
         return Err(DecideError::LimitExceeded {
-            what: "request_bytes",
+            what: LimitKind::RequestBytes,
             line,
             max: to_u64(MAX_REQUEST_BYTES),
         });
@@ -243,7 +275,7 @@ pub fn build_request_bytes(
         .map(|(name, bytes)| {
             if to_u64(bytes.len()) > MAX_IMAGE_BYTES {
                 return Err(DecideError::LimitExceeded {
-                    what: "image_bytes",
+                    what: LimitKind::ImageBytes,
                     line,
                     max: MAX_IMAGE_BYTES,
                 });
@@ -269,7 +301,7 @@ pub struct BatchInput {
     pub long_context: bool,
 }
 
-/// Counts requests and bytes of a batch against [`MAX_BATCH_LINES`] and [`MAX_BATCH_BYTES`].
+/// Counts physical lines and bytes of a batch against [`MAX_BATCH_LINES`] and [`MAX_BATCH_BYTES`].
 #[derive(Default)]
 struct BatchBudget {
     requests: u64,
@@ -277,12 +309,12 @@ struct BatchBudget {
 }
 
 impl BatchBudget {
-    /// Adds one request of `bytes` bytes at `line`.
+    /// Adds one line (or in-memory item) of `bytes` bytes at `line`.
     fn add(&mut self, bytes: u64, line: u64) -> Result<(), DecideError> {
         self.requests = self.requests.saturating_add(1);
         if self.requests > MAX_BATCH_LINES {
             return Err(DecideError::LimitExceeded {
-                what: "batch_lines",
+                what: LimitKind::BatchLines,
                 line: Some(line),
                 max: MAX_BATCH_LINES,
             });
@@ -295,13 +327,22 @@ impl BatchBudget {
         self.bytes = self.bytes.saturating_add(bytes);
         if self.bytes > MAX_BATCH_BYTES {
             return Err(DecideError::LimitExceeded {
-                what: "batch_bytes",
+                what: LimitKind::BatchBytes,
                 line: Some(line),
                 max: MAX_BATCH_BYTES,
             });
         }
         Ok(())
     }
+}
+
+/// The batch caps over item sizes (JSON plus image bytes), in input order; item `n` is line `n`.
+fn check_batch_sizes(sizes: impl Iterator<Item = u64>) -> Result<(), DecideError> {
+    let mut budget = BatchBudget::default();
+    for (line, bytes) in (1_u64..).zip(sizes) {
+        budget.add(bytes, line)?;
+    }
+    Ok(())
 }
 
 /// The in-memory batch path (sc-agent-py), with the limits of [`read_batch`].
@@ -315,12 +356,10 @@ impl BatchBudget {
 /// [`DecideError::LimitExceeded`] (`batch_lines`, `batch_bytes`) or the first item's error of
 /// [`build_request_bytes`].
 pub fn build_batch(items: Vec<BatchInput>) -> Result<Vec<DecisionRequest>, DecideError> {
-    let mut budget = BatchBudget::default();
-    for (index, item) in items.iter().enumerate() {
-        let line = to_u64(index).saturating_add(1);
+    check_batch_sizes(items.iter().map(|item| {
         let images: usize = item.images.iter().map(|(_, bytes)| bytes.len()).sum();
-        budget.add(to_u64(item.json.len()).saturating_add(to_u64(images)), line)?;
-    }
+        to_u64(item.json.len()).saturating_add(to_u64(images))
+    }))?;
     items
         .into_iter()
         .enumerate()
@@ -434,25 +473,28 @@ fn batch_request(
         })
         .unwrap_or_default();
     check_image_count(images.len(), Some(line))?;
-    for (_, path) in &images {
-        // A missing file is reported by build_request with its name; size counts when known.
-        if let Ok(metadata) = std::fs::metadata(path) {
-            budget.add_bytes(metadata.len(), line)?;
-        }
-    }
-    build_request(
+    let request = build_request(
         wrapper.request.get().as_bytes(),
         &images,
         wrapper.long_context,
         Some(line),
-    )
+    )?;
+    // The bytes actually read count, not the metadata length checked before the read (RSH-003).
+    let read: usize = request
+        .image_parts()
+        .iter()
+        .map(|part| part.bytes.len())
+        .sum();
+    budget.add_bytes(to_u64(read), line)?;
+    Ok(request)
 }
 
 /// Reads and validates a whole JSONL batch before anything is sent (REQ-SAG-0504, REQ-SAG-0014).
 ///
 /// Each non-blank line is a bare Jev request or `{"request": {..}, "images": {"NAME": "path"},
 /// "long_context": true}` (paths relative to the working directory). Blank lines and a
-/// leading UTF-8 BOM are skipped; line numbers count every physical line from 1.
+/// leading UTF-8 BOM are skipped, but every physical line and byte read counts against
+/// [`MAX_BATCH_LINES`] and [`MAX_BATCH_BYTES`]; line numbers count every physical line from 1.
 ///
 /// # Errors
 ///
@@ -467,19 +509,21 @@ pub fn read_batch(reader: &mut dyn BufRead) -> Result<Vec<DecisionRequest>, Deci
     let mut line: u64 = 0;
     loop {
         let read = read_line_bounded(reader, MAX_REQUEST_BYTES, &mut buffer)
-            .map_err(|error| DecideError::input("batch", &error))?;
+            .map_err(|error| DecideError::input("batch", error))?;
         line = line.saturating_add(1);
         match read {
             LineRead::End => return Ok(requests),
             LineRead::TooLong => {
                 return Err(DecideError::LimitExceeded {
-                    what: "request_bytes",
+                    what: LimitKind::RequestBytes,
                     line: Some(line),
                     max: to_u64(MAX_REQUEST_BYTES),
                 });
             }
             LineRead::Line => {}
         }
+        // Every physical line and byte read counts, blank lines and the BOM included (RSH-002).
+        budget.add(to_u64(buffer.len()), line)?;
         let mut bytes = buffer.as_slice();
         if line == 1 {
             bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
@@ -492,7 +536,6 @@ pub fn read_batch(reader: &mut dyn BufRead) -> Result<Vec<DecisionRequest>, Deci
         if text.is_empty() {
             continue;
         }
-        budget.add(to_u64(buffer.len()), line)?;
         requests.push(batch_request(text, line, &mut budget)?);
     }
 }

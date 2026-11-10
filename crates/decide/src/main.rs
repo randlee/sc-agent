@@ -3,6 +3,12 @@
 //! Argument parsing and output only; all behaviour lives in the decide library. Exit codes:
 //! 0 when the command ran and every result succeeded, 1 otherwise, 130 after an interrupt
 //! (REQ-SAG-0011).
+//!
+//! The binary opens its general and session loggers itself and closes them explicitly before
+//! it returns. Worker threads of the runner are never joined, so the last logger handle may
+//! outlive `main`; the explicit close is the flush barrier that puts every record and row on
+//! disk. A close failure (lost rows) is reported as one `decide.log` line on stderr and does
+//! not change the exit code.
 
 #![forbid(unsafe_code)]
 
@@ -11,18 +17,16 @@ mod cli;
 use std::io::{self, BufReader, Read, Write};
 use std::process::ExitCode;
 
-use cli::{Command, Parsed};
+use cli::{Command, Parsed, SendArgs};
 use decide::input::{build_request, read_batch, request_bytes};
+use decide::signal::{EXIT_INTERRUPTED, SignalWatch};
 use decide::{
     Context, DecideError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, doctor,
-    load_config, models, send, send_batch,
+    general_logger, load_config, models, send, send_batch, session_logger,
 };
-use sc_agent_log::Slug;
+use sc_agent_log::{GeneralLogger, LogError, Slug};
 use sc_agent_types::{CancelToken, ErrorId, Provider};
-use sc_decision_schema::DecisionResult;
-
-/// The exit code after any interrupt (SIGINT, SIGTERM, Ctrl-C, Ctrl-Break).
-const EXIT_INTERRUPTED: u8 = 130;
+use sc_decision_schema::{DecisionRequest, DecisionResult};
 
 /// The general-log service of the binary.
 const SERVICE: &str = "decide";
@@ -37,12 +41,13 @@ fn main() -> ExitCode {
         Ok(parsed) => {
             let mut stdin = io::stdin();
             let mut stdout = io::stdout();
-            run(parsed, &cancel, &mut stdin, &mut stdout).unwrap_or_else(|error| emit(&error))
+            run(parsed, &cancel, &watch, &mut stdin, &mut stdout)
+                .unwrap_or_else(|error| emit(&error))
         }
         Err(error) => emit(&error),
     };
     if watch.interrupted() {
-        ExitCode::from(EXIT_INTERRUPTED)
+        ExitCode::from(u8::try_from(EXIT_INTERRUPTED).unwrap_or(u8::MAX))
     } else {
         code
     }
@@ -52,6 +57,7 @@ fn main() -> ExitCode {
 fn run(
     parsed: Parsed,
     cancel: &CancelToken,
+    watch: &SignalWatch,
     stdin: &mut dyn Read,
     stdout: &mut dyn Write,
 ) -> Result<ExitCode, DecideError> {
@@ -60,81 +66,129 @@ fn run(
         Parsed::Run(cli) => cli,
     };
     match cli.command {
-        Command::Send(args) => {
-            let project = Slug::new("project", &args.project).map_err(DecideError::from)?;
-            let agent_role =
-                Slug::new("agent_role", &args.agent_role).map_err(DecideError::from)?;
-            let context = Context::new(SERVICE);
-            let config = load_config(&context)?;
-            let model = ModelSelector::parse(&args.model, &config)?;
-            let provider = args
-                .provider
-                .as_deref()
-                .map(str::parse::<Provider>)
-                .transpose()
-                .map_err(DecideError::Types)?;
-            let options = SendOptions {
-                model,
-                provider,
-                project,
-                agent_role,
-                context,
-                session: None,
-            };
-            if args.batch {
-                let requests = if args.input == "-" {
-                    read_batch(&mut BufReader::new(stdin))?
-                } else {
-                    let file = std::fs::File::open(&args.input)
-                        .map_err(|error| input_error(&args.input, &error))?;
-                    read_batch(&mut BufReader::new(file))?
-                };
-                let mut all_ok = true;
-                send_batch(&options, requests, cancel, &mut |result| {
-                    all_ok &= result.outcome.is_ok();
-                    write_result(stdout, &result)
-                })?;
-                Ok(exit(all_ok))
-            } else {
-                let bytes = request_bytes(&args.input, stdin)?;
-                let request = build_request(&bytes, &args.images, args.long_context, None)?;
-                let result = send(&options, request, cancel)?;
-                write_result(stdout, &result)?;
-                Ok(exit(result.outcome.is_ok()))
-            }
-        }
+        Command::Send(args) => run_send(args, cancel, watch, stdin, stdout),
         Command::Models(args) => {
+            let (context, general) = context_with_general()?;
             let options = ModelsOptions {
                 runner: args.runner,
-                context: Context::new(SERVICE),
+                context,
             };
-            let list = models(&options, cancel)?;
-            write_json(stdout, &list)?;
+            let list = models(&options, cancel);
+            drop(options);
+            close_general(general);
+            write_json(stdout, &list?)?;
             Ok(ExitCode::SUCCESS)
         }
         Command::Doctor => {
-            let options = DoctorOptions {
-                context: Context::new(SERVICE),
-            };
-            let report = doctor(&options, cancel)?;
-            write_json(stdout, &report)?;
+            let (context, general) = context_with_general()?;
+            let options = DoctorOptions { context };
+            let report = doctor(&options, cancel);
+            drop(options);
+            close_general(general);
+            write_json(stdout, &report?)?;
             Ok(ExitCode::SUCCESS)
         }
     }
 }
 
-/// `InputNotFound` / `InputRead` for a batch file that cannot be opened.
-fn input_error(input: &str, error: &io::Error) -> DecideError {
-    if error.kind() == io::ErrorKind::NotFound {
-        DecideError::InputNotFound {
-            input: input.to_owned(),
-        }
+/// What `decide send` read: one request or a batch.
+enum Input {
+    One(Box<DecisionRequest>),
+    Batch(Vec<DecisionRequest>),
+}
+
+fn run_send(
+    args: SendArgs,
+    cancel: &CancelToken,
+    watch: &SignalWatch,
+    stdin: &mut dyn Read,
+    stdout: &mut dyn Write,
+) -> Result<ExitCode, DecideError> {
+    // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
+    let project = Slug::new("project", &args.project)?;
+    let agent_role = Slug::new("agent_role", &args.agent_role)?;
+    let config = load_config(&Context::new(SERVICE))?;
+    let model = ModelSelector::parse(&args.model, &config)?;
+    let provider = args
+        .provider
+        .as_deref()
+        .map(str::parse::<Provider>)
+        .transpose()?;
+    // The whole input is read and checked before anything is sent (REQ-SAG-0504); until
+    // `start_run` an interrupt exits at once, so a blocked stdin or FIFO read cannot swallow it.
+    let input = if args.batch {
+        Input::Batch(if args.input == "-" {
+            read_batch(&mut BufReader::new(stdin))?
+        } else {
+            let file = std::fs::File::open(&args.input)
+                .map_err(|error| DecideError::input(&args.input, error))?;
+            read_batch(&mut BufReader::new(file))?
+        })
     } else {
-        DecideError::InputRead {
-            input: input.to_owned(),
-            kind: format!("{:?}", error.kind()),
-            detail: error.to_string(),
+        let bytes = request_bytes(&args.input, stdin)?;
+        Input::One(Box::new(build_request(
+            &bytes,
+            &args.images,
+            args.long_context,
+            None,
+        )?))
+    };
+    let (context, general) = context_with_general()?;
+    let mut options = SendOptions {
+        model,
+        provider,
+        project,
+        agent_role,
+        context,
+        session: None,
+    };
+    let session = match session_logger(&options) {
+        Ok(session) => session,
+        Err(error) => {
+            drop(options);
+            close_general(general);
+            return Err(error);
         }
+    };
+    options.session = Some(session.clone());
+    watch.start_run();
+    let outcome = match input {
+        Input::Batch(requests) => {
+            let mut all_ok = true;
+            send_batch(&options, requests, cancel, &mut |result| {
+                all_ok &= result.outcome.is_ok();
+                write_result(stdout, &result)
+            })
+            .map(|()| all_ok)
+        }
+        Input::One(request) => send(&options, *request, cancel).and_then(|result| {
+            write_result(stdout, &result)?;
+            Ok(result.outcome.is_ok())
+        }),
+    };
+    drop(options);
+    report_close(session.close());
+    close_general(general);
+    outcome.map(exit)
+}
+
+/// The binary's context with its general logger opened (and kept, to close it later).
+fn context_with_general() -> Result<(Context, GeneralLogger), DecideError> {
+    let mut context = Context::new(SERVICE);
+    let general = general_logger(&context)?;
+    context.general = Some(general.clone());
+    Ok((context, general))
+}
+
+fn close_general(general: GeneralLogger) {
+    report_close(general.close());
+}
+
+/// One `decide.log` stderr line for a logger that lost rows or could not be flushed; the
+/// exit code is not changed.
+fn report_close(closed: Result<(), LogError>) {
+    if let Err(error) = closed {
+        report(&DecideError::from(error));
     }
 }
 
@@ -154,39 +208,36 @@ fn write_result(stdout: &mut dyn Write, result: &DecisionResult) -> Result<(), D
 }
 
 fn write_json<T: serde::Serialize>(stdout: &mut dyn Write, value: &T) -> Result<(), DecideError> {
-    let mut bytes = serde_json::to_vec(value).map_err(|error| DecideError::Encode {
-        detail: error.to_string(),
-    })?;
-    bytes.push(b'\n');
-    write_bytes(stdout, &bytes)
+    let mut text = decide::output::to_json(value)?;
+    text.push('\n');
+    write_bytes(stdout, text.as_bytes())
 }
 
 fn write_bytes(stdout: &mut dyn Write, bytes: &[u8]) -> Result<(), DecideError> {
     stdout
         .write_all(bytes)
         .and_then(|()| stdout.flush())
-        .map_err(|error| DecideError::Write {
-            kind: format!("{:?}", error.kind()),
-            detail: error.to_string(),
-        })
+        .map_err(|source| DecideError::Write { source })
 }
 
 fn print_stdout(bytes: &[u8]) -> ExitCode {
     match io::stdout().write_all(bytes) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => emit(&DecideError::Write {
-            kind: format!("{:?}", error.kind()),
-            detail: error.to_string(),
-        }),
+        Err(source) => emit(&DecideError::Write { source }),
     }
 }
 
-/// One stderr line: `error.detail()` as JSON (`recovery` included when present); exit 1.
-fn emit(error: &DecideError) -> ExitCode {
+/// One stderr line: `error.detail()` as JSON (`recovery` included when present).
+fn report(error: &DecideError) {
     let line = serde_json::to_string(&error.detail()).unwrap_or_else(|_| {
         r#"{"id":"decide.encode","message":"the error could not be encoded as JSON"}"#.to_owned()
     });
     // Best effort: a closed stderr leaves nowhere to report the failure.
     let _ = writeln!(io::stderr(), "{line}");
+}
+
+/// [`report`], then exit 1.
+fn emit(error: &DecideError) -> ExitCode {
+    report(error);
     ExitCode::FAILURE
 }

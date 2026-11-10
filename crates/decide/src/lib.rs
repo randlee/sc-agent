@@ -34,6 +34,6 @@ pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, do
 pub use error::DecideError;
 #[doc(inline)]
 pub use select::{
-    Context, ModelSelector, ModelsOptions, SendOptions, load_config, models, send, send_batch,
-    send_batch_on, send_on, session_identity,
+    Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,
+    send_batch, send_batch_on, send_on, session_identity, session_logger,
 };

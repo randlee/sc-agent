@@ -1,72 +1,125 @@
-//! The interrupt hook (REQ-SAG-0011): SIGINT and SIGTERM (Ctrl-C and Ctrl-Break on Windows)
-//! cancel the run's token.
+//! The interrupt hook (REQ-SAG-0011): SIGINT and SIGTERM (Ctrl-C and Ctrl-Break on Windows).
 //!
 //! The `ctrlc` crate (feature `termination`) installs the handler and starts and owns the one
 //! handler thread; decide's source starts no thread, uses no tokio and no `unsafe`.
+//!
+//! Two phases. Before [`SignalWatch::start_run`] decide is reading its input (a file, stdin or
+//! a FIFO, where a read can block forever) and nothing has been sent, so an interrupt exits
+//! the process at once with [`EXIT_INTERRUPTED`] (RSH-001). After it, the first interrupt
+//! cancels the run's token: unfinished requests end `decision.cancelled`, are printed, and the
+//! session log is flushed before `main` exits 130. A second interrupt exits at once.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use sc_agent_types::CancelToken;
 
 use crate::DecideError;
 
+/// The exit code after any interrupt. ctrlc does not report which signal fired, so SIGINT,
+/// SIGTERM, Ctrl-C and Ctrl-Break all exit 130 (no 143).
+pub const EXIT_INTERRUPTED: i32 = 130;
+
+/// What the interrupts so far mean for the process.
+#[derive(Debug, Default)]
+struct State {
+    /// Interrupts received.
+    interrupts: AtomicU32,
+    /// Whether requests may be in flight (`start_run` was called).
+    running: AtomicBool,
+}
+
+/// What the handler does with one interrupt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Action {
+    /// Cancel the token and let `main` drain, flush and exit 130.
+    Cancel,
+    /// Exit the process now with 130.
+    Exit,
+}
+
 /// Whether an interrupt arrived; returned by [`install`].
 #[derive(Debug, Clone)]
 pub struct SignalWatch {
-    interrupted: Arc<AtomicBool>,
+    state: Arc<State>,
 }
 
 impl SignalWatch {
     /// True once any interrupt was received; `decide` then exits 130.
-    ///
-    /// ctrlc does not report which signal fired, so SIGINT, SIGTERM, Ctrl-C and Ctrl-Break all
-    /// exit 130 (no 143).
     #[must_use]
     pub fn interrupted(&self) -> bool {
-        self.interrupted.load(Ordering::Acquire)
+        self.state.interrupts.load(Ordering::Acquire) > 0
+    }
+
+    /// The input is read and the run starts: from now on the first interrupt cancels and
+    /// drains instead of exiting.
+    pub fn start_run(&self) {
+        self.state.running.store(true, Ordering::Release);
     }
 }
 
-/// Registers the process interrupt handler: each interrupt cancels `cancel`.
+/// Registers the process interrupt handler for `cancel`.
 ///
 /// # Errors
 ///
-/// [`DecideError::Signal`] when a handler is already set or the handler cannot be installed.
+/// [`DecideError::Signal`] when a handler is already set or cannot be installed.
 pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
-    let interrupted = Arc::new(AtomicBool::new(false));
+    let state = Arc::new(State::default());
     let watch = SignalWatch {
-        interrupted: Arc::clone(&interrupted),
+        state: Arc::clone(&state),
     };
     let cancel = cancel.clone();
-    ctrlc::set_handler(move || on_interrupt(&cancel, &interrupted)).map_err(|error| {
-        DecideError::Signal {
-            detail: error.to_string(),
+    ctrlc::set_handler(move || {
+        if on_interrupt(&cancel, &state) == Action::Exit {
+            std::process::exit(EXIT_INTERRUPTED);
         }
-    })?;
+    })
+    .map_err(|source| DecideError::Signal { source })?;
     Ok(watch)
 }
 
-/// What the handler does: record the interrupt, then cancel the token.
-fn on_interrupt(cancel: &CancelToken, interrupted: &AtomicBool) {
-    interrupted.store(true, Ordering::Release);
+/// What the handler does: count the interrupt, cancel the token, and say whether to exit now.
+fn on_interrupt(cancel: &CancelToken, state: &State) -> Action {
+    let count = state
+        .interrupts
+        .fetch_add(1, Ordering::AcqRel)
+        .saturating_add(1);
     cancel.cancel();
+    if state.running.load(Ordering::Acquire) && count == 1 {
+        Action::Cancel
+    } else {
+        Action::Exit
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// RSH-001: while the input is read, an interrupt exits at once.
     #[test]
-    fn an_interrupt_cancels_the_token_and_is_recorded() {
+    fn an_interrupt_while_reading_exits_at_once() {
         let cancel = CancelToken::new();
         let watch = SignalWatch {
-            interrupted: Arc::new(AtomicBool::new(false)),
+            state: Arc::new(State::default()),
         };
         assert!(!watch.interrupted());
-        on_interrupt(&cancel, &watch.interrupted);
+        assert_eq!(on_interrupt(&cancel, &watch.state), Action::Exit);
         assert!(cancel.is_cancelled());
         assert!(watch.interrupted());
+    }
+
+    /// The first interrupt of a run cancels; a second one exits at once.
+    #[test]
+    fn a_second_interrupt_of_a_run_exits() {
+        let cancel = CancelToken::new();
+        let watch = SignalWatch {
+            state: Arc::new(State::default()),
+        };
+        watch.start_run();
+        assert_eq!(on_interrupt(&cancel, &watch.state), Action::Cancel);
+        assert!(cancel.is_cancelled());
+        assert_eq!(on_interrupt(&cancel, &watch.state), Action::Exit);
     }
 
     /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. `on_interrupt` during a `send_batch` over a
@@ -80,9 +133,43 @@ mod tests {
         use sc_agent_log::{Repo, SessionIdentity, Slug};
         use sc_decision_schema::DecisionError;
 
+        // The interrupt arrives while 8 sends are blocked: the 8th send runs the handler on
+        // its worker thread (no thread of this test's own), then blocks like the others.
+        struct InterruptAt {
+            sends: std::sync::atomic::AtomicUsize,
+            cancel: CancelToken,
+            state: Arc<State>,
+            action: std::sync::Mutex<Option<Action>>,
+            inner: BlockingTransport,
+        }
+        impl sc_agent_http::Transport for InterruptAt {
+            fn send(
+                &self,
+                request: &sc_agent_http::HttpRequest,
+            ) -> Result<HttpResponse, sc_agent_http::HttpError> {
+                if self.sends.fetch_add(1, Ordering::SeqCst) + 1 == 8 {
+                    let action = on_interrupt(&self.cancel, &self.state);
+                    *self.action.lock().expect("lock") = Some(action);
+                }
+                self.inner.send(request)
+            }
+        }
+
         let dir = tempfile::tempdir().expect("dir");
         let transport = BlockingTransport::new(Ok(HttpResponse::new(200, Vec::new(), Vec::new())));
         let log = MemoryLog::new().expect("log");
+        let cancel = CancelToken::new();
+        let watch = SignalWatch {
+            state: Arc::new(State::default()),
+        };
+        watch.start_run();
+        let interrupting = Arc::new(InterruptAt {
+            sends: std::sync::atomic::AtomicUsize::new(0),
+            cancel: cancel.clone(),
+            state: Arc::clone(&watch.state),
+            action: std::sync::Mutex::new(None),
+            inner: transport.clone(),
+        });
         let context = crate::Context {
             service: "decide",
             config_dir: Some(dir.path().to_path_buf()),
@@ -91,7 +178,7 @@ mod tests {
                 "ts-signal-test".into(),
             )]),
             keyring: None,
-            transport: Some(Arc::new(transport.clone())),
+            transport: Some(interrupting.clone()),
             general: Some(log.general()),
         };
         let identity =
@@ -109,34 +196,6 @@ mod tests {
         let requests = (0..12)
             .map(|_| crate::input::build_request(json, &[], false, None).expect("request"))
             .collect();
-        let cancel = CancelToken::new();
-        let interrupted = Arc::new(AtomicBool::new(false));
-        // The interrupt arrives while 8 sends are blocked: the 8th send runs the handler on
-        // its worker thread (no thread of this test's own), then blocks like the others.
-        struct InterruptAt {
-            sends: std::sync::atomic::AtomicUsize,
-            cancel: CancelToken,
-            interrupted: Arc<AtomicBool>,
-            inner: BlockingTransport,
-        }
-        impl sc_agent_http::Transport for InterruptAt {
-            fn send(
-                &self,
-                request: &sc_agent_http::HttpRequest,
-            ) -> Result<HttpResponse, sc_agent_http::HttpError> {
-                if self.sends.fetch_add(1, Ordering::SeqCst) + 1 == 8 {
-                    on_interrupt(&self.cancel, &self.interrupted);
-                }
-                self.inner.send(request)
-            }
-        }
-        let mut options = options;
-        options.context.transport = Some(Arc::new(InterruptAt {
-            sends: std::sync::atomic::AtomicUsize::new(0),
-            cancel: cancel.clone(),
-            interrupted: Arc::clone(&interrupted),
-            inner: transport.clone(),
-        }));
         let mut results = Vec::new();
         crate::send_batch(&options, requests, &cancel, &mut |result| {
             results.push(result);
@@ -144,7 +203,11 @@ mod tests {
         })
         .expect("batch");
         transport.release();
-        assert!(interrupted.load(Ordering::Acquire));
+        assert!(watch.interrupted());
+        assert_eq!(
+            *interrupting.action.lock().expect("lock"),
+            Some(Action::Cancel)
+        );
         assert_eq!(results.len(), 12);
         assert!(
             results

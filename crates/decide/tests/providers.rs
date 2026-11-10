@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn input_limits_are_typed_errors() {
         let limit = |error: DecideError| match error {
-            DecideError::LimitExceeded { what, .. } => what.to_owned(),
+            DecideError::LimitExceeded { what, .. } => what.as_str().to_owned(),
             DecideError::RequestInvalid { source, .. } => source.id().to_owned(),
             other => panic!("unexpected {other:?}"),
         };
@@ -366,7 +366,7 @@ mod tests {
         assert!(matches!(
             error,
             DecideError::LimitExceeded {
-                what: "request_bytes",
+                what: decide::input::LimitKind::RequestBytes,
                 line: Some(1),
                 ..
             }

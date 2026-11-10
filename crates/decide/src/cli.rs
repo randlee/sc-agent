@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use clap::error::ErrorKind;
 use decide::DecideError;
+use sc_agent_config::RunnerName;
 
 /// `decide`: send TypeSafe (Jev) decision requests.
 #[derive(Debug, clap::Parser)]
@@ -63,8 +64,8 @@ pub(crate) struct SendArgs {
 #[derive(Debug, clap::Args)]
 pub(crate) struct ModelsArgs {
     /// A configured local runner; TypeSafe when absent.
-    #[arg(long, value_name = "NAME", value_parser = non_empty_text)]
-    pub(crate) runner: Option<String>,
+    #[arg(long, value_name = "NAME", value_parser = parse_runner_name)]
+    pub(crate) runner: Option<RunnerName>,
 }
 
 /// Outcome of [`parse`].
@@ -96,11 +97,14 @@ where
         {
             Ok(Parsed::Print(error.render().to_string()))
         }
-        Err(error) => Err(DecideError::Usage {
-            kind: format!("{:?}", error.kind()),
-            detail: error.render().to_string(),
-        }),
+        Err(error) => Err(DecideError::from(error)),
     }
+}
+
+/// A runner name, parsed once at the edge (`RunnerName`: non-empty, not a short name).
+fn parse_runner_name(value: &str) -> Result<RunnerName, String> {
+    RunnerName::try_from(value.to_owned())
+        .map_err(|reason| format!("{reason}: {value:?}. See decide --help."))
 }
 
 fn non_empty_text(value: &str) -> Result<String, String> {

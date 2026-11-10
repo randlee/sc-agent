@@ -264,7 +264,7 @@ mod tests {
             r#"{"local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"jev-latest"}}}"#,
         );
         let options = ModelsOptions {
-            runner: Some("laya".into()),
+            runner: Some(sc_agent_config::RunnerName::try_from("laya".to_owned()).expect("name")),
             context: context(dir.path(), &[], Arc::new(transport.clone()), &log),
         };
         let list = models(&options, &CancelToken::new()).expect("models");
@@ -277,7 +277,7 @@ mod tests {
         assert!(sent[0].secret().is_none());
 
         let unknown = ModelsOptions {
-            runner: Some("nope".into()),
+            runner: Some(sc_agent_config::RunnerName::try_from("nope".to_owned()).expect("name")),
             context: context(dir.path(), &[], Arc::new(transport.clone()), &log),
         };
         let error = models(&unknown, &CancelToken::new()).expect_err("unknown runner");

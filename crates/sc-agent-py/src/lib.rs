@@ -18,12 +18,13 @@ use std::time::Duration;
 
 use decide::input::{BatchInput, build_batch, build_request_bytes};
 use decide::{
-    Context, DecideError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, load_config,
-    session_identity,
+    Context, DecideError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, general_logger,
+    load_config, session_identity, session_logger,
 };
-use pyo3::exceptions::{PyException, PyRuntimeError};
+use pyo3::exceptions::{PyException, PyRuntimeWarning};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
+use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
 use sc_agent_types::{ErrorId, Provider};
 use sc_decision_schema::DecisionResult;
@@ -192,16 +193,38 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
     builder.build().map(Arc::new).map_err(start)
 }
 
+/// What a worker's call gives back: its result, and any logger that failed to close.
+type Outcome<T> = (Result<T, DecideError>, Vec<DecideError>);
+
 /// What the worker sends the Python thread.
 enum Message<T> {
     /// One result line, as it finished.
     Line(String),
-    /// The decide call returned.
-    Done(Result<T, DecideError>),
+    /// The decide call returned and its loggers were closed.
+    Done(Outcome<T>),
 }
 
 /// The callback a decide call reports each result to.
 type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecideError>;
+
+/// The stable id of a worker that panicked or ended without a result (RBP-F003).
+const WORKER_PANICKED: &str = "sc_agent_py.worker_panicked";
+
+/// `SagError(sc_agent_py.worker_panicked, message, detail)`.
+fn worker_panicked(message: String) -> PyErr {
+    let detail = sc_agent_types::ErrorDetail::new(WORKER_PANICKED, message.clone(), None);
+    let detail = decide::output::to_json(&detail).unwrap_or_else(|_| "{}".to_owned());
+    SagError::new_err((WORKER_PANICKED, message, detail))
+}
+
+/// The text of a panic payload (`&str` or `String`), else a fixed note.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "the worker panicked with a non-text payload".to_owned())
+}
 
 /// Runs `work` on a scoped worker thread while the Python thread waits for its results.
 ///
@@ -209,23 +232,24 @@ type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecideError>
 /// exception (`KeyboardInterrupt`) or an `on_result` exception cancels `cancel`, drains the
 /// remaining results, joins the worker and is re-raised (REQ-SAG-0011). After a signal the
 /// drained results are still passed to `on_result`; after an `on_result` exception they are
-/// not.
+/// not. A logger that failed to close is reported as a `RuntimeWarning`; it never changes the
+/// result (REQ-SAG-0008). A worker panic raises `SagError` `sc_agent_py.worker_panicked`.
 fn run_interruptible<T: Send>(
     py: Python<'_>,
     cancel: &sc_agent_types::CancelToken,
     on_result: Option<&Py<PyAny>>,
-    work: impl FnOnce(OnResult<'_>) -> Result<T, DecideError> + Send,
+    work: impl FnOnce(OnResult<'_>) -> Outcome<T> + Send,
 ) -> PyResult<(T, Vec<String>)> {
     let (sender, receiver) = mpsc::channel::<Message<T>>();
+    // `py.detach` runs its closure without the GIL and requires it to be `Send` (pyo3's
+    // `Ungil`). `Receiver` is `Send` but not `Sync`, so `&Receiver` is not `Send`; the Mutex
+    // makes the shared reference `Send`. Only this thread ever locks it, so it never contends.
     let receiver = Mutex::new(receiver);
     std::thread::scope(|scope| {
         let worker = scope.spawn(move || {
             let lines = sender.clone();
             let mut forward = |result: DecisionResult| {
-                let line = decide::output::result_line(&result)?;
-                let text = String::from_utf8(line).map_err(|error| DecideError::Encode {
-                    detail: error.to_string(),
-                })?;
+                let text = decide::output::result_text(&result)?;
                 // The receiver lives until the worker is joined, so a send cannot fail.
                 let _ = lines.send(Message::Line(text));
                 Ok(())
@@ -267,29 +291,40 @@ fn run_interruptible<T: Send>(
             }
         };
         let joined = py.detach(move || worker.join());
+        if let Err(payload) = &joined {
+            return Err(worker_panicked(panic_message(&**payload)));
+        }
+        let Some((result, closed)) = outcome else {
+            return Err(worker_panicked(
+                "the worker ended without a result".to_owned(),
+            ));
+        };
+        for error in &closed {
+            let message = std::ffi::CString::new(error.to_string()).unwrap_or_default();
+            PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
+        }
         if let Some(error) = raised {
             return Err(error);
         }
-        match (outcome, joined) {
-            (Some(Ok(value)), Ok(())) => Ok((value, lines)),
-            (Some(Err(error)), _) => Err(sag_error(&error)),
-            _ => Err(PyRuntimeError::new_err(
-                "the sc-agent worker thread stopped without a result",
-            )),
-        }
+        result
+            .map(|value| (value, lines))
+            .map_err(|error| sag_error(&error))
     })
 }
 
-/// A context for sc-agent-py with an optional general-log callable.
+/// A context for sc-agent-py: the general-log callable, else the default general log.
 fn context(general_log: Option<Py<PyAny>>) -> Result<Context, DecideError> {
     let mut context = Context::new(SERVICE);
-    if let Some(callable) = general_log {
-        context.general = Some(GeneralLogger::injected(callable_logger(callable, SERVICE)?));
-    }
+    let general = match general_log {
+        Some(callable) => GeneralLogger::injected(callable_logger(callable, SERVICE)?),
+        None => general_logger(&context)?,
+    };
+    context.general = Some(general);
     Ok(context)
 }
 
-/// Builds the send options: slugs first (REQ-SAG-0004), then config, model and provider.
+/// Builds the send options: slugs first (REQ-SAG-0004), then config, model, provider and the
+/// loggers (the callables, else the defaults).
 fn send_options(
     model: &str,
     project: &str,
@@ -300,13 +335,10 @@ fn send_options(
 ) -> Result<SendOptions, DecideError> {
     let project = Slug::new("project", project)?;
     let agent_role = Slug::new("agent_role", agent_role)?;
-    let context = context(general_log)?;
-    let config = load_config(&context)?;
+    let config = load_config(&Context::new(SERVICE))?;
     let model = ModelSelector::parse(model, &config)?;
-    let provider = provider
-        .map(str::parse::<Provider>)
-        .transpose()
-        .map_err(DecideError::Types)?;
+    let provider = provider.map(str::parse::<Provider>).transpose()?;
+    let context = context(general_log)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
             callable_logger(callable, SessionLogger::SERVICE)?,
@@ -314,36 +346,41 @@ fn send_options(
         )),
         None => None,
     };
-    Ok(SendOptions {
+    let mut options = SendOptions {
         model,
         provider,
         project,
         agent_role,
         context,
         session,
-    })
+    };
+    if options.session.is_none() {
+        options.session = Some(session_logger(&options)?);
+    }
+    Ok(options)
 }
 
-/// Flushes an injected general logger before the call returns, so every record of the
-/// operation has reached the Python callable, then drops it on this (worker) thread.
+/// Closes the loggers of an operation on the worker thread, after the operation, so every
+/// record and row is written (or with its callable) before the call returns.
 ///
-/// A callable that raised made its writes refused writes; `flush` reports them as lost rows.
-/// That never changes the decision result (REQ-SAG-0008), so the report is not raised.
-fn flush_general(general: Option<GeneralLogger>) {
-    if let Some(general) = general {
-        let _ = general.flush();
+/// A callable that raised made its writes refused writes, which `close` reports as lost rows;
+/// they are returned as warnings and never change the result (REQ-SAG-0008).
+fn close_loggers(
+    general: Option<GeneralLogger>,
+    session: Option<SessionLogger>,
+) -> Vec<DecideError> {
+    let mut failed = Vec::new();
+    if let Some(Err(error)) = session.map(SessionLogger::close) {
+        failed.push(DecideError::from(error));
     }
+    if let Some(Err(error)) = general.map(GeneralLogger::close) {
+        failed.push(DecideError::from(error));
+    }
+    failed
 }
 
 fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
     cancel.map_or_else(sc_agent_types::CancelToken::new, |token| token.0.clone())
-}
-
-/// The string sc-agent-py returns for `result`: its `decide` result line.
-fn result_string(result: &DecisionResult) -> Result<String, DecideError> {
-    String::from_utf8(decide::output::result_line(result)?).map_err(|error| DecideError::Encode {
-        detail: error.to_string(),
-    })
 }
 
 /// `decide send`: one request, always `Decision::decide`; returns its result line (JSON).
@@ -369,6 +406,10 @@ fn send(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
 ) -> PyResult<String> {
+    // The request is checked before any logger opens, so a refused one writes no file.
+    let images = images.unwrap_or_default().into_iter().collect();
+    let request = build_request_bytes(request.as_bytes(), images, long_context, None)
+        .map_err(|error| sag_error(&error))?;
     let options = send_options(
         model,
         project,
@@ -378,16 +419,18 @@ fn send(
         session_log,
     )
     .map_err(|error| sag_error(&error))?;
-    let images = images.unwrap_or_default().into_iter().collect();
-    let request = build_request_bytes(request.as_bytes(), images, long_context, None)
-        .map_err(|error| sag_error(&error))?;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
+        let mut options = options;
         let result = decide::send(&options, request, &worker_cancel);
-        flush_general(options.context.general.clone());
+        let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
-        result_string(&result?)
+        let closed = close_loggers(general, session);
+        (
+            result.and_then(|result| decide::output::result_text(&result)),
+            closed,
+        )
     })?;
     Ok(line)
 }
@@ -412,6 +455,8 @@ fn send_batch(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
 ) -> PyResult<Vec<String>> {
+    let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
+        .map_err(|error| sag_error(&error))?;
     let options = send_options(
         model,
         project,
@@ -421,15 +466,14 @@ fn send_batch(
         session_log,
     )
     .map_err(|error| sag_error(&error))?;
-    let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
-        .map_err(|error| sag_error(&error))?;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let ((), lines) = run_interruptible(py, &cancel, on_result.as_ref(), move |forward| {
+        let mut options = options;
         let outcome = decide::send_batch(&options, requests, &worker_cancel, forward);
-        flush_general(options.context.general.clone());
+        let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
-        outcome
+        (outcome, close_loggers(general, session))
     })?;
     Ok(lines)
 }
@@ -443,22 +487,37 @@ fn models(
     cancel: Option<&CancelToken>,
     general_log: Option<Py<PyAny>>,
 ) -> PyResult<String> {
+    let runner = runner
+        .map(runner_name)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
     let options = ModelsOptions {
-        runner: runner.map(str::to_owned),
+        runner,
         context: context(general_log).map_err(|error| sag_error(&error))?,
     };
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let (text, _) = run_interruptible(py, &cancel, None, move |_| {
+        let mut options = options;
         let list = decide::models(&options, &worker_cancel);
-        flush_general(options.context.general.clone());
+        let general = options.context.general.take();
         drop(options);
-        let list = list?;
-        serde_json::to_string(&list).map_err(|error| DecideError::Encode {
-            detail: error.to_string(),
-        })
+        let closed = close_loggers(general, None);
+        (list.and_then(|list| decide::output::to_json(&list)), closed)
     })?;
     Ok(text)
+}
+
+/// `runner` as a `RunnerName`, parsed once at the edge; a name that cannot be a runner name
+/// is no configured runner either (`decide.unknown_runner`).
+fn runner_name(runner: &str) -> Result<RunnerName, DecideError> {
+    RunnerName::try_from(runner.to_owned()).or_else(|_| {
+        let config = load_config(&Context::new(SERVICE))?;
+        Err(DecideError::UnknownRunner {
+            name: runner.to_owned(),
+            known: config.local_runners.keys().cloned().collect(),
+        })
+    })
 }
 
 /// `decide doctor`: detected keys, missing provider models and config ties (JSON).
@@ -475,13 +534,15 @@ fn doctor(
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let (text, _) = run_interruptible(py, &cancel, None, move |_| {
+        let mut options = options;
         let report = decide::doctor(&options, &worker_cancel);
-        flush_general(options.context.general.clone());
+        let general = options.context.general.take();
         drop(options);
-        let report = report?;
-        serde_json::to_string(&report).map_err(|error| DecideError::Encode {
-            detail: error.to_string(),
-        })
+        let closed = close_loggers(general, None);
+        (
+            report.and_then(|report| decide::output::to_json(&report)),
+            closed,
+        )
     })?;
     Ok(text)
 }
@@ -521,7 +582,7 @@ mod tests {
             request.digests().clone(),
             Ok(response),
         );
-        let text = result_string(&result).expect("string");
+        let text = decide::output::result_text(&result).expect("string");
         assert!(text.contains("\"noul\":0.123456789"), "{text}");
     }
 }

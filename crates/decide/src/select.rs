@@ -5,13 +5,14 @@
 //! `DecisionRunner`, and run the requests through the `Decision` trait. [`models`] lists the
 //! TypeSafe or runner models. Every seam of [`Context`] is optional (REQ-SAG-0008).
 
-use std::ffi::OsString;
+use std::borrow::Cow;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use sc_agent_config::{AgentConfig, LocalRunner};
+use sc_agent_config::{AgentConfig, LocalRunner, RunnerName};
 use sc_agent_http::{
     Attempts, HttpClient, HttpError, HttpRequest, HttpResponse, LogContext, Next, Pending,
     ResendPolicy, Start, Timeouts, Transport, UreqTransport,
@@ -71,10 +72,12 @@ impl Context {
         }
     }
 
-    fn environment(&self) -> Vec<(OsString, OsString)> {
-        self.environment
-            .clone()
-            .unwrap_or_else(|| std::env::vars_os().collect())
+    /// The environment: the injected one borrowed, else the process environment read once.
+    fn environment(&self) -> Cow<'_, [(OsString, OsString)]> {
+        match &self.environment {
+            Some(vars) => Cow::Borrowed(vars.as_slice()),
+            None => Cow::Owned(std::env::vars_os().collect()),
+        }
     }
 }
 
@@ -100,7 +103,7 @@ pub enum ModelSelector {
     /// One model id, used as given.
     Version(ModelId),
     /// A key of `config.local_runners`.
-    Runner(String),
+    Runner(RunnerName),
 }
 
 impl ModelSelector {
@@ -113,12 +116,12 @@ impl ModelSelector {
         if let Ok(short) = text.parse::<ShortName>() {
             return Ok(Self::Short(short));
         }
-        if config.local_runners.contains_key(text) {
-            return Ok(Self::Runner(text.to_owned()));
+        if let Some((name, _)) = config.local_runners.get_key_value(text) {
+            return Ok(Self::Runner(name.clone()));
         }
         text.parse::<ModelId>()
             .map(Self::Version)
-            .map_err(DecideError::Types)
+            .map_err(DecideError::from)
     }
 }
 
@@ -127,7 +130,7 @@ impl fmt::Display for ModelSelector {
         match self {
             Self::Short(short) => fmt::Display::fmt(short, formatter),
             Self::Version(model) => fmt::Display::fmt(model, formatter),
-            Self::Runner(name) => formatter.write_str(name),
+            Self::Runner(name) => formatter.write_str(name.as_str()),
         }
     }
 }
@@ -167,7 +170,7 @@ impl fmt::Debug for SendOptions {
 #[derive(Clone, Debug)]
 pub struct ModelsOptions {
     /// A configured local runner; TypeSafe when `None`.
-    pub runner: Option<String>,
+    pub runner: Option<RunnerName>,
     /// The shared seams.
     pub context: Context,
 }
@@ -180,9 +183,13 @@ pub struct ModelsOptions {
 pub fn load_config(context: &Context) -> Result<AgentConfig, DecideError> {
     let dir = match &context.config_dir {
         Some(dir) => dir.clone(),
-        None => sc_agent_config::default_dir().map_err(DecideError::Config)?,
+        None => sc_agent_config::default_dir()?,
     };
-    sc_agent_config::load(dir, context.environment()).map_err(DecideError::Config)
+    // `load` takes the environment by value (A-4), so this is the one copy.
+    Ok(sc_agent_config::load(
+        dir,
+        context.environment().into_owned(),
+    )?)
 }
 
 /// The session identity of the working folder: `Repo::detect(cwd)`, `project`, `agent_role`.
@@ -204,32 +211,52 @@ fn working_dir() -> Result<PathBuf, DecideError> {
     })
 }
 
-/// The caller's environment as an [`EnvSource`].
-struct VarsEnv(Vec<(OsString, OsString)>);
+/// The caller's environment as an [`EnvSource`]; the last setting of a name wins.
+struct VarsEnv<'c>(Cow<'c, [(OsString, OsString)]>);
 
-impl EnvSource for VarsEnv {
-    fn var(&self, name: &str) -> Option<String> {
+impl VarsEnv<'_> {
+    fn raw(&self, name: &str) -> Option<&OsStr> {
         self.0
             .iter()
             .rev()
             .find(|(key, _)| key.as_os_str() == name)
-            .map(|(_, value)| value.clone().into_string().unwrap_or_default())
+            .map(|(_, value)| value.as_os_str())
+    }
+
+    /// A set variable whose value is not UTF-8 is a malformed key, never an empty one.
+    fn check_utf8(&self, name: &str) -> Result<(), DecideError> {
+        match self.raw(name) {
+            Some(value) if value.to_str().is_none() => {
+                Err(DecideError::from(SecretsError::KeyMalformed {
+                    var: name.to_owned(),
+                    reason: "the value is not UTF-8",
+                }))
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl EnvSource for VarsEnv<'_> {
+    fn var(&self, name: &str) -> Option<String> {
+        // Non-UTF-8 values are refused by `check_utf8` before any lookup.
+        self.raw(name).and_then(OsStr::to_str).map(str::to_owned)
     }
 }
 
 /// Key lookup sources of one operation: environment, repo-root `.env`, keyring (REQ-SAG-0401).
-struct Keys {
-    env: VarsEnv,
+struct Keys<'c> {
+    env: VarsEnv<'c>,
     repo_root: Option<PathBuf>,
     keyring: Arc<dyn KeyringSource + Send + Sync>,
 }
 
-impl Keys {
-    fn new(context: &Context) -> Result<Self, DecideError> {
+impl<'c> Keys<'c> {
+    fn new(context: &'c Context) -> Result<Self, DecideError> {
         let cwd = working_dir()?;
         Ok(Self {
             env: VarsEnv(context.environment()),
-            repo_root: Repo::work_tree_root(&cwd).map_err(DecideError::from)?,
+            repo_root: Repo::work_tree_root(&cwd)?,
             keyring: context
                 .keyring
                 .clone()
@@ -247,11 +274,24 @@ impl Keys {
 
     /// The key of `provider`; `Ok(None)` when no source has one.
     fn find(&self, provider: Provider) -> Result<Option<ResolvedKey>, DecideError> {
+        self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
         match resolve(provider, &self.sources()) {
             Ok(key) => Ok(Some(key)),
             Err(SecretsError::KeyMissing { .. }) => Ok(None),
-            Err(error) => Err(DecideError::Secrets(error)),
+            Err(error) => Err(DecideError::from(error)),
         }
+    }
+
+    /// The key of `provider`, which must exist.
+    fn require(&self, provider: Provider) -> Result<ResolvedKey, DecideError> {
+        self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
+        Ok(resolve(provider, &self.sources())?)
+    }
+
+    /// The key held by variable `var` (a runner's `key_env`).
+    fn require_var(&self, var: &sc_agent_types::VarName) -> Result<ResolvedKey, DecideError> {
+        self.env.check_utf8(var.as_str())?;
+        Ok(resolve_var(var, &self.sources())?)
     }
 }
 
@@ -260,12 +300,11 @@ impl Keys {
 fn choose_provider(
     choice: Option<Provider>,
     line: Option<ShortName>,
-    model: &str,
-    keys: &Keys,
+    model: &ModelSelector,
+    keys: &Keys<'_>,
 ) -> Result<(Provider, ResolvedKey), DecideError> {
     if let Some(provider) = choice {
-        let key = resolve(provider, &keys.sources()).map_err(DecideError::Secrets)?;
-        return Ok((provider, key));
+        return Ok((provider, keys.require(provider)?));
     }
     let ranking = Provider::ranking(line);
     for provider in ranking {
@@ -274,18 +313,55 @@ fn choose_provider(
         }
     }
     Err(DecideError::NoProviderKey {
-        model: model.to_owned(),
+        model: model.clone(),
         tried: ranking.to_vec(),
     })
 }
 
 /// The general logger of `context`, or the default one for its service.
-fn general_logger(context: &Context, config: &AgentConfig) -> Result<GeneralLogger, DecideError> {
+fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger, DecideError> {
     match &context.general {
         Some(general) => Ok(general.clone()),
         None => {
-            let root = config.log_root().map_err(DecideError::Config)?;
-            GeneralLogger::open_default(&root, context.service).map_err(DecideError::from)
+            let root = config.log_root()?;
+            Ok(GeneralLogger::open_default(&root, context.service)?)
+        }
+    }
+}
+
+/// The general logger an operation over `context` writes to: the injected one, else
+/// `<log_root>/logs/<service>.log.jsonl`.
+///
+/// Callers that own the process (the `decide` binary, sc-agent-py) open it here, put it in
+/// `context.general`, and close it after the operation, so every record is written (or with
+/// the callable) before they return and a lost row is reported, not dropped.
+///
+/// # Errors
+///
+/// `Config` (the configuration or its log root) or `Log` (the logger cannot open).
+pub fn general_logger(context: &Context) -> Result<GeneralLogger, DecideError> {
+    general_for(context, &load_config(context)?)
+}
+
+/// The session logger of `options`: the injected one, else
+/// `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl` (ADR-SAG-0002).
+///
+/// As [`general_logger`]: open it, put it in `options.session`, close it after the send.
+///
+/// # Errors
+///
+/// `Config` or `Log` (the repo, the identity or the logger).
+pub fn session_logger(options: &SendOptions) -> Result<SessionLogger, DecideError> {
+    session_for(options, &load_config(&options.context)?)
+}
+
+fn session_for(options: &SendOptions, config: &AgentConfig) -> Result<SessionLogger, DecideError> {
+    match &options.session {
+        Some(session) => Ok(session.clone()),
+        None => {
+            let identity = session_identity(&options.project, &options.agent_role)?;
+            let root = config.log_root()?;
+            Ok(SessionLogger::open_default(&root, identity)?)
         }
     }
 }
@@ -297,11 +373,7 @@ fn local_runner<'c>(config: &'c AgentConfig, name: &str) -> Result<&'c LocalRunn
         .get(name)
         .ok_or_else(|| DecideError::UnknownRunner {
             name: name.to_owned(),
-            known: config
-                .local_runners
-                .keys()
-                .map(|key| key.as_str().to_owned())
-                .collect(),
+            known: config.local_runners.keys().cloned().collect(),
         })
 }
 
@@ -314,8 +386,7 @@ fn runner_key(
         return Ok(None);
     };
     let keys = Keys::new(context)?;
-    let key = resolve_var(var, &keys.sources()).map_err(DecideError::Secrets)?;
-    Ok(Some(key.key))
+    Ok(Some(keys.require_var(var)?.key))
 }
 
 /// A `LocalBackend` for `runner`, with its REQ-SAG-0015 timeouts and the general log.
@@ -345,7 +416,7 @@ fn local_backend(
 enum Chosen {
     /// A configured local runner.
     Local {
-        name: String,
+        name: RunnerName,
         runner: LocalRunner,
         backend: Arc<LocalBackend>,
     },
@@ -371,7 +442,7 @@ impl Chosen {
             Self::Local { name, runner, .. } => (
                 "local".to_owned(),
                 runner.model.as_str().to_owned(),
-                Some(name.clone()),
+                Some(name.as_str().to_owned()),
             ),
             Self::Remote {
                 provider, model, ..
@@ -396,7 +467,7 @@ fn backend(
 ) -> Result<Chosen, DecideError> {
     let (model, line) = match &options.model {
         ModelSelector::Runner(name) => {
-            let runner = local_runner(config, name)?;
+            let runner = local_runner(config, name.as_str())?;
             let backend = local_backend(runner, &options.context, general)?;
             return Ok(Chosen::Local {
                 name: name.clone(),
@@ -405,24 +476,23 @@ fn backend(
             });
         }
         ModelSelector::Short(short) => {
-            let catalog = config.catalog().map_err(DecideError::Config)?;
+            let catalog = config.catalog().map_err(DecideError::from)?;
             (catalog.resolve(&ModelChoice::Latest(*short)), Some(*short))
         }
         ModelSelector::Version(model) => {
-            let catalog = config.catalog().map_err(DecideError::Config)?;
+            let catalog = config.catalog().map_err(DecideError::from)?;
             (model.clone(), catalog.line_of(model))
         }
     };
     let keys = Keys::new(&options.context)?;
-    let (provider, key) =
-        choose_provider(options.provider, line, &options.model.to_string(), &keys)?;
+    let (provider, key) = choose_provider(options.provider, line, &options.model, &keys)?;
     let backend: Arc<dyn Backend> = match LlmProvider::from_provider(provider) {
         None => Arc::new(
             SystemOneBackend::new(TYPESAFE_BASE_URL, Some(key.key)).map_err(DecideError::from)?,
         ),
         Some(llm) => {
             let client = LlmClient::new(llm, key.key)
-                .map_err(DecideError::Llm)?
+                .map_err(DecideError::from)?
                 .with_log(general.clone());
             Arc::new(LlmDecisionBackend::new(client, model.clone()).with_log(general.clone()))
         }
@@ -434,21 +504,34 @@ fn backend(
     })
 }
 
-/// The decision transport: the context's, else one `UreqTransport` per local runner with the
-/// runner's request timeout (REQ-SAG-0015), else the default timeouts.
-fn decision_transport(context: &Context, runner: Option<&LocalRunner>) -> Arc<dyn Transport> {
-    if let Some(transport) = &context.transport {
-        return Arc::clone(transport);
-    }
-    Arc::new(UreqTransport::new(decision_timeouts(runner)))
+/// Which transport a run sends decisions over.
+#[derive(Clone)]
+enum TransportChoice {
+    /// The context's injected transport.
+    Injected(Arc<dyn Transport>),
+    /// A `UreqTransport` with these timeouts.
+    Ureq(Timeouts),
 }
 
-/// `Timeouts::default()`, with a local runner's own request timeout (REQ-SAG-0015).
-fn decision_timeouts(runner: Option<&LocalRunner>) -> Timeouts {
-    match runner {
+impl TransportChoice {
+    fn build(self) -> Arc<dyn Transport> {
+        match self {
+            Self::Injected(transport) => transport,
+            Self::Ureq(timeouts) => Arc::new(UreqTransport::new(timeouts)),
+        }
+    }
+}
+
+/// The decision transport: the context's, else one `UreqTransport` per local runner with the
+/// runner's request timeout (REQ-SAG-0015), else `Timeouts::default()`.
+fn decision_transport(context: &Context, runner: Option<&LocalRunner>) -> TransportChoice {
+    if let Some(transport) = &context.transport {
+        return TransportChoice::Injected(Arc::clone(transport));
+    }
+    TransportChoice::Ureq(match runner {
         Some(runner) => Timeouts::default().with_request(runner.request_timeout()),
         None => Timeouts::default(),
-    }
+    })
 }
 
 /// The probe transport (models, doctor, load probes): the context's, else `Timeouts::probe()`.
@@ -503,21 +586,14 @@ impl Prepared {
     fn new(options: &SendOptions) -> Result<Self, DecideError> {
         let context = &options.context;
         let config = load_config(context)?;
-        let general = general_logger(context, &config)?;
+        let general = general_for(context, &config)?;
         let chosen = backend(options, &config, &general)?;
-        let session = match &options.session {
-            Some(session) => session.clone(),
-            None => {
-                let identity = session_identity(&options.project, &options.agent_role)?;
-                let root = config.log_root().map_err(DecideError::Config)?;
-                SessionLogger::open_default(&root, identity).map_err(DecideError::from)?
-            }
-        };
+        let session = session_for(options, &config)?;
         let local = match &chosen {
             Chosen::Local { runner, .. } => Some(runner),
             Chosen::Remote { .. } => None,
         };
-        let transport = decision_transport(context, local);
+        let transport = decision_transport(context, local).build();
         let runner = runner(
             &config,
             transport,
@@ -773,7 +849,7 @@ fn send_probe(
                     continue;
                 }
                 Err(reason) => {
-                    return Err(DecideError::Http(HttpError::invalid_request(format!(
+                    return Err(DecideError::from(HttpError::invalid_request(format!(
                         "the send was refused before it started ({})",
                         reason.as_str()
                     ))));
@@ -787,12 +863,12 @@ fn send_probe(
                     wait(cancel, at, sends)?;
                     continue;
                 }
-                Err(error) => return Err(DecideError::Http(error)),
+                Err(error) => return Err(DecideError::from(error)),
             },
         };
         match http
             .send_once(request, permit, LogContext::NONE, &Instant::now)
-            .map_err(DecideError::Http)?
+            .map_err(DecideError::from)?
         {
             Next::Done { response, .. } => return Ok(response),
             Next::ResendAt { at, pending: held } => {
@@ -856,7 +932,7 @@ pub(crate) fn detected_keys(
 /// The general logger and config of a probe-class operation.
 pub(crate) fn probe_setup(context: &Context) -> Result<(AgentConfig, GeneralLogger), DecideError> {
     let config = load_config(context)?;
-    let general = general_logger(context, &config)?;
+    let general = general_for(context, &config)?;
     Ok((config, general))
 }
 
@@ -877,7 +953,11 @@ pub fn models(
     fields.insert("service".into(), options.context.service.into());
     fields.insert(
         "runner".into(),
-        options.runner.as_deref().unwrap_or("typesafe").into(),
+        options
+            .runner
+            .as_ref()
+            .map_or("typesafe", RunnerName::as_str)
+            .into(),
     );
     fields.insert(
         "models".into(),
@@ -910,7 +990,7 @@ fn list_models(
 ) -> Result<ModelMetadataList, DecideError> {
     let backend = match &options.runner {
         Some(name) => {
-            let runner = local_runner(config, name)?;
+            let runner = local_runner(config, name.as_str())?;
             let key = runner_key(runner, &options.context)?;
             let base = LocalBackend::new(
                 DaemonKind::from(runner.kind),
@@ -926,7 +1006,7 @@ fn list_models(
         }
         None => {
             let keys = Keys::new(&options.context)?;
-            let key = resolve(Provider::TypeSafe, &keys.sources()).map_err(DecideError::Secrets)?;
+            let key = resolve(Provider::TypeSafe, &keys.sources()).map_err(DecideError::from)?;
             typesafe_backend(key)?
         }
     };
@@ -934,12 +1014,6 @@ fn list_models(
     let http = probe_client(&options.context, config, general);
     let response = probe(&http, &request, cancel)?;
     backend.decode_models(response).map_err(DecideError::from)
-}
-
-/// The local-runner request timeout decide gives the runner's transport (REQ-SAG-0015).
-#[cfg(test)]
-pub(crate) fn runner_request_timeout(runner: &LocalRunner) -> std::time::Duration {
-    decision_timeouts(Some(runner)).request
 }
 
 #[cfg(test)]
@@ -954,13 +1028,13 @@ mod tests {
         }
     }
 
-    fn keys(vars: &[(&str, &str)]) -> Keys {
+    fn keys(vars: &[(&str, &str)]) -> Keys<'static> {
         Keys {
-            env: VarsEnv(
+            env: VarsEnv(Cow::Owned(
                 vars.iter()
                     .map(|(name, value)| (OsString::from(name), OsString::from(value)))
                     .collect(),
-            ),
+            )),
             repo_root: None,
             keyring: Arc::new(NoKeyring),
         }
@@ -974,18 +1048,37 @@ mod tests {
             (sc_agent_secrets::OPENROUTER_API_KEY, "sk-o"),
         ]);
         let haiku = Some(ShortName::Haiku);
-        let (provider, _) = choose_provider(None, haiku, "haiku", &both).expect("anthropic");
+        let (provider, _) =
+            choose_provider(None, haiku, &ModelSelector::Short(ShortName::Haiku), &both)
+                .expect("anthropic");
         assert_eq!(provider, Provider::Anthropic);
 
         let reseller = keys(&[(sc_agent_secrets::OPENROUTER_API_KEY, "sk-o")]);
-        let (provider, _) = choose_provider(None, haiku, "haiku", &reseller).expect("openrouter");
+        let (provider, _) = choose_provider(
+            None,
+            haiku,
+            &ModelSelector::Short(ShortName::Haiku),
+            &reseller,
+        )
+        .expect("openrouter");
         assert_eq!(provider, Provider::OpenRouter);
 
-        let (provider, _) =
-            choose_provider(Some(Provider::OpenRouter), haiku, "haiku", &both).expect("override");
+        let (provider, _) = choose_provider(
+            Some(Provider::OpenRouter),
+            haiku,
+            &ModelSelector::Short(ShortName::Haiku),
+            &both,
+        )
+        .expect("override");
         assert_eq!(provider, Provider::OpenRouter);
 
-        let error = choose_provider(None, Some(ShortName::Jev), "jev", &both).expect_err("no key");
+        let error = choose_provider(
+            None,
+            Some(ShortName::Jev),
+            &ModelSelector::Short(ShortName::Jev),
+            &both,
+        )
+        .expect_err("no key");
         assert_eq!(error.id(), "decide.no_provider_key");
         assert!(error.recovery().is_some());
         assert!(matches!(
@@ -997,12 +1090,39 @@ mod tests {
     #[test]
     fn an_override_without_its_key_is_a_secrets_error() {
         let none = keys(&[]);
-        let error = choose_provider(Some(Provider::OpenAi), Some(ShortName::Luna), "luna", &none)
-            .expect_err("no key");
+        let error = choose_provider(
+            Some(Provider::OpenAi),
+            Some(ShortName::Luna),
+            &ModelSelector::Short(ShortName::Luna),
+            &none,
+        )
+        .expect_err("no key");
         assert_eq!(error.id(), "decide.secrets");
         assert_eq!(
             error.cause_detail().map(|cause| cause.id),
             Some("secrets.key_missing".to_owned())
+        );
+    }
+
+    /// RBP-F008: a key variable that is set to a non-UTF-8 value is a malformed key, not an
+    /// empty one.
+    #[cfg(unix)]
+    #[test]
+    fn a_non_utf8_key_value_is_an_error() {
+        use std::os::unix::ffi::OsStringExt;
+        let keys = Keys {
+            env: VarsEnv(Cow::Owned(vec![(
+                OsString::from(sc_agent_secrets::TYPESAFE_API_KEY),
+                OsString::from_vec(vec![0x74, 0xff, 0x73]),
+            )])),
+            repo_root: None,
+            keyring: Arc::new(NoKeyring),
+        };
+        let error = keys.find(Provider::TypeSafe).expect_err("not UTF-8");
+        assert_eq!(error.id(), "decide.secrets");
+        assert_eq!(
+            error.cause_detail().map(|cause| cause.id),
+            Some("secrets.key_malformed".to_owned())
         );
     }
 
@@ -1027,8 +1147,17 @@ mod tests {
         );
     }
 
+    /// The timeouts of the UreqTransport `decision_transport` would build, if it builds one.
+    fn ureq_timeouts(choice: TransportChoice) -> Option<Timeouts> {
+        match choice {
+            TransportChoice::Ureq(timeouts) => Some(timeouts),
+            TransportChoice::Injected(_) => None,
+        }
+    }
+
     /// AC: REQ-SAG-0015 (one transport per local runner with the runner's request timeout;
-    /// 300 s when the entry does not set one).
+    /// 300 s when the entry does not set one). Asserts what the real `decision_transport`
+    /// builds.
     #[test]
     fn a_local_runner_transport_uses_the_runner_request_timeout() {
         let dir = tempfile::tempdir().expect("dir");
@@ -1041,13 +1170,29 @@ mod tests {
         )
         .expect("write");
         let config = sc_agent_config::load(dir.path().to_path_buf(), Vec::new()).expect("config");
+        let context = Context::new("decide");
         let laya = local_runner(&config, "laya").expect("laya");
-        assert_eq!(runner_request_timeout(laya).as_secs(), 300);
+        assert_eq!(
+            ureq_timeouts(decision_transport(&context, Some(laya))),
+            Some(Timeouts::default().with_request(std::time::Duration::from_secs(300)))
+        );
         assert_eq!(laya.load_timeout().as_secs(), 600);
         let slow = local_runner(&config, "slow").expect("slow");
-        assert_eq!(runner_request_timeout(slow).as_secs(), 900);
+        assert_eq!(
+            ureq_timeouts(decision_transport(&context, Some(slow))),
+            Some(Timeouts::default().with_request(std::time::Duration::from_secs(900)))
+        );
         assert_eq!(slow.load_timeout().as_secs(), 1200);
-        assert_eq!(decision_timeouts(None), Timeouts::default());
+        assert_eq!(
+            ureq_timeouts(decision_transport(&context, None)),
+            Some(Timeouts::default())
+        );
+        let mut injected = Context::new("decide");
+        injected.transport = Some(Arc::new(UreqTransport::new(Timeouts::probe())));
+        assert_eq!(
+            ureq_timeouts(decision_transport(&injected, Some(laya))),
+            None
+        );
         let error = local_runner(&config, "nope").expect_err("unknown");
         assert_eq!(error.id(), "decide.unknown_runner");
     }

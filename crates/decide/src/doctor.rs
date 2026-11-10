@@ -111,7 +111,7 @@ fn examine(
     general: &GeneralLogger,
     cancel: &CancelToken,
 ) -> Result<DoctorReport, DecideError> {
-    let catalog = config.catalog().map_err(DecideError::Config)?;
+    let catalog = config.catalog().map_err(DecideError::from)?;
     let found = detected_keys(context)?;
     let http = probe_client(context, config, general);
     let mut missing = Vec::new();
@@ -169,11 +169,11 @@ fn provider_models(
         }
         Some(llm) => {
             let client = LlmClient::new(llm, key.key)
-                .map_err(DecideError::Llm)?
+                .map_err(DecideError::from)?
                 .with_log(general.clone());
-            let request = client.models_request().map_err(DecideError::Llm)?;
+            let request = client.models_request().map_err(DecideError::from)?;
             let response = probe(http, &request, cancel)?;
-            let ids = client.decode_models(response).map_err(DecideError::Llm)?;
+            let ids = client.decode_models(response).map_err(DecideError::from)?;
             Ok(ids
                 .into_iter()
                 .map(|id| Listed {

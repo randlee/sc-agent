@@ -1545,6 +1545,7 @@ dependencies = [
  "decide",
  "pyo3",
  "pyo3-build-config",
+ "sc-agent-config",
  "sc-agent-log",
  "sc-agent-types",
  "sc-decision-schema",
