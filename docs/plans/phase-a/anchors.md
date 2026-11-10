@@ -7,9 +7,9 @@ Intent: `docs/plans/phase-a/intent.md`
 | ID | Status | Summary | Stated |
 | --- | --- | --- | --- |
 | ANC-001 | locked | sc-decision-schema holds only minimum decision-API code | 2026-11-09T07:40:40Z |
-| ANC-002 | locked | Python API offers every sc-ai CLI operation | 2026-11-08T21:07:35Z |
+| ANC-002 | retired | Python API offers every sc-ai CLI operation | 2026-11-08T21:07:35Z |
 | ANC-003 | proposed | No requirements sourced from plan-anchor or judge-jev | 2026-11-09T07:24:54Z |
-| ANC-004 | proposed | Library code logs through injected sc-observability logger | 2026-11-09T00:26:57Z |
+| ANC-004 | retired | Library code logs through injected sc-observability logger | 2026-11-09T00:26:57Z |
 | ANC-005 | retired | One batch of Jev requests runs in parallel | 2026-11-08T21:07:35Z |
 | ADR-SAG-0001 | locked | Every decision backend implements Backend; callers use Decision | 2026-11-09 |
 | ADR-SAG-0004 | locked | No crate depends on a crate above it in the layering | 2026-11-09 |
@@ -20,6 +20,7 @@ Intent: `docs/plans/phase-a/intent.md`
 | REQ-SAG-0201 | locked | Jev API types defined only in sc-decision-schema, built from the spec | 2026-11-09 |
 | REQ-SAG-0601 | locked | Busy resend: configurable sends, holdoff in the queue | 2026-11-09 |
 | REQ-SAG-0701 | locked | Batches run in parallel, fastest first, failures returned | 2026-11-09 |
+| ANC-006 | locked | Python API offers every decide CLI operation | 2026-11-08T21:07:35Z |
 
 ## ANC-001
 
@@ -35,6 +36,11 @@ Scope: adds or changes code in crates/sc-decision-schema
 
 Deterministic check to pair with the development gate: every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.5`: ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.
+- `agt-4p2.6`: ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.
+- `agt-4p2.7`: ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.
+
 Beads: anchor `agt-e49`, plan questions `agt-e49.1`, dev questions `agt-e49.2`
 
 ## ANC-002
@@ -43,13 +49,20 @@ Anchor: Every operation available in the sc-ai CLI must also be available in the
 
 > I expect the python api may allow more flexibility than cli, NOT less.
 
-Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: locked. Version 1.
+Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: retired. Version 2.
 
 Summary: Python API offers every sc-ai CLI operation
 
 Scope: adds or changes an sc-ai command or the sc-agent Python API
 
 Deterministic check to pair with the development gate: each sc-ai subcommand has a matching Python API function, checked by a test that lists both
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.3`: A-3 builds the sc-treesitter library and adds no CLI command; the tree-sitter CLI and its Python parity are sprint A-10.
+- `agt-4p2.1`: sc-agent-types defines data types only; it adds no CLI command and no Python API function.
+- `agt-4p2.4`: A-4 builds config and secrets crates; it adds no CLI command and no Python API function.
+- `agt-4p2.5`: A-5 builds the HTTP transport crate; it adds no CLI command and no Python API function.
+- `agt-4p2.6`: A-6 builds decision backends; it adds no CLI command and no Python API function.
 
 Beads: anchor `agt-ug0`, plan questions `agt-ug0.1`, dev questions `agt-ug0.2`
 
@@ -71,7 +84,7 @@ Anchor: sc-agent library code must log through an injected sc-observability logg
 
 > You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.
 
-Said by Rand Lee, planning session, 2026-11-09T00:26:57Z. Status: proposed. Version 1.
+Said by Rand Lee, planning session, 2026-11-09T00:26:57Z. Status: retired. Version 2.
 
 Summary: Library code logs through injected sc-observability logger
 
@@ -100,6 +113,9 @@ Said by Rand Lee, record ADR-SAG-0001, 2026-11-09. Status: locked. Version 1.
 Summary: Every decision backend implements Backend; callers use Decision
 
 Scope: adds or changes a decision backend, the Backend or Decision trait, or sc-decision-runner
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.5`: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
 
 Beads: anchor `agt-7mi`, plan questions `agt-7mi.1`, dev questions `agt-7mi.2`
 
@@ -143,6 +159,10 @@ Summary: No consumer-app or Jev-mock types in shared crates
 
 Scope: adds or changes a type in sc-agent-types or sc-decision-schema
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.5`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).
+- `agt-4p2.6`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.
+
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
 ## REQ-SAG-0009
@@ -156,6 +176,9 @@ Said by Rand Lee, record REQ-SAG-0009, 2026-11-09. Status: locked. Version 1.
 Summary: Low-level crates build and run without tokio
 
 Scope: adds or changes dependencies of a low-level sc-agent crate
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.3`: sc-treesitter is not in REQ-SAG-0009's list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.
 
 Beads: anchor `agt-wth`, plan questions `agt-wth.1`, dev questions `agt-wth.2`
 
@@ -185,6 +208,9 @@ Summary: Jev API types defined only in sc-decision-schema, built from the spec
 
 Scope: adds or changes a type that maps to a TypeSafe API field
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.1`: sc-agent-types defines no type that maps to a TypeSafe API field; those are sprint A-2 (sc-decision-schema).
+
 Beads: anchor `agt-gc6`, plan questions `agt-gc6.1`, dev questions `agt-gc6.2`
 
 ## REQ-SAG-0601
@@ -198,6 +224,10 @@ Said by Rand Lee, record REQ-SAG-0601, 2026-11-09. Status: locked. Version 1.
 Summary: Busy resend: configurable sends, holdoff in the queue
 
 Scope: adds or changes busy-response handling, resend, holdoff or the runner queue
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.4`: A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.
+- `agt-4p2.7`: A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.
 
 Beads: anchor `agt-ebd`, plan questions `agt-ebd.1`, dev questions `agt-ebd.2`
 
@@ -213,4 +243,23 @@ Summary: Batches run in parallel, fastest first, failures returned
 
 Scope: adds or changes batch handling in sc-decision-runner or decide
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.4`: A-4 delivers only the workers setting; the parallel batch run is built in A-9.
+
 Beads: anchor `agt-ocy`, plan questions `agt-ocy.1`, dev questions `agt-ocy.2`
+
+## ANC-006
+
+Anchor: Every operation available in the decide CLI must also be available in the sc-agent Python API.
+
+> I expect the python api may allow more flexibility than cli, NOT less.
+
+Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: locked. Version 1.
+
+Summary: Python API offers every decide CLI operation
+
+Scope: adds or changes a decide subcommand or a function in the sc-agent Python bindings
+
+Deterministic check to pair with the development gate: each decide subcommand has a matching Python API function, checked by a test that lists both
+
+Beads: anchor `agt-frw`, plan questions `agt-frw.1`, dev questions `agt-frw.2`

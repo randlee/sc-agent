@@ -1,0 +1,19 @@
+# Sprint A-6: sc-decision-systemone and sc-decision-local
+
+## Description
+
+Jev backend (encode/decode POST /v1/systemone). sc-decision-local: stub reusing the Jev encode/decode for any Jev-compatible local daemon from config (host and port in config); LocalDaemon trait whose main task is discovering whether a model is available/loaded. Records: REQ-SAG-0201, ADR-SAG-0001.
+
+## Acceptance criteria
+
+- [ ] SystemOneBackend encodes every DecisionRequest (JSON and multipart with image parts, images and long-context headers, Bearer when a key is set) to POST {base}/v1/systemone and decodes 200/400/422/other final replies into SystemOneResponse or the matching DecisionError, covering 100% of the request and response (REQ-SAG-0201).
+- [ ] GET /v1/models is encoded and decoded into ModelMetadataList (REQ-SAG-0201).
+- [ ] The same SystemOneRequest is sent unchanged to Jev, Decider and Laya; no backend-specific request type exists (ADR-SAG-0001).
+- [ ] Both crates import SystemOneRequest, SystemOneResponse, ModelMetadataList and the Jev error types from sc-decision-schema and redefine none of them; daemon health shapes are private (REQ-SAG-0201).
+- [ ] REQ-SAG-0801: discovery reports Loaded / LoadsOnDemand / Unlisted or local.model_not_served for Decider (GET /health), Laya (GET /health, optional Bearer) and a generic daemon (GET /v1/models); a daemon that is not listening is reported down as local.http with cause http.network; a runner up without its model is reported up with the model not loaded.
+- [ ] REQ-SAG-0801: LocalBackend is built from a config local_runners entry (kind, host, port, model, key_env) passed in by the caller; no host or port literal for a runner outside tests (grep).
+- [ ] LocalBackend and SystemOneBackend implement the A-2 Backend trait (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest)) and are usable as Arc<dyn Backend> by sc-decision-runner (owner-local-decision-crate).
+- [ ] REQ-SAG-0401: credential variable names (TYPESAFE_API_KEY, LAYA_API_KEY) come from sc-agent-secrets; no test or log prints a key.
+- [ ] REQ-SAG-0002: LocalError implements ErrorId with 6 distinct local.* ids; wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.
+- [ ] ADR-SAG-0004: neither crate depends on sc-llm-provider, sc-decision-llm, sc-decision-runner or decide (cargo tree). No live API calls in tests.
+- [ ] REQ-SAG-0002: a test makes the transport fail and asserts the returned LocalError and SystemOne DecisionError chains carry the lower HttpError's id and message.

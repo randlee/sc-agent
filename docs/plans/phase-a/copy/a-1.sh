@@ -5,7 +5,7 @@
 # This script only copies text. It does NOT do any of the following; the developer does them
 # (see the bead design for the exact target code):
 #   - write Cargo.toml, README.md, src/lib.rs, src/error.rs (TypesError) or the workspace [workspace.lints];
-#   - rewrite CancelToken onto Arc<Inner{cancelled, lock, wake}> and add wait_until/Wait (no sleep);
+#   - rewrite CancelToken onto Arc<Inner{cancelled, state(hooks), wake}> and add wait_until/Wait and on_cancel/CancelHook (no sleep);
 #   - turn UnknownModel into ModelId(Cow<'static, str>), delete the ModelId variant enum, known(), family(),
 #     ModelFamily, ModelDescriptor::model() (expect), the family column and the old doc text;
 #   - rename ModelAliases to Catalog, re-key it by ShortName, drop Entry.source, ModelSource, ResolvedModel,

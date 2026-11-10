@@ -1,0 +1,22 @@
+# Sprint A-9: sc-decision-runner
+
+## Description
+
+Implements Decision for any Arc<dyn Backend> over an HttpClient: queue, workers, holdoff in the queue, cancellation via CancelToken hooks, schema-mismatch resend, one session row per result, results fastest first, failed requests returned while the stream continues. Records: REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0202, REQ-SAG-0901, ADR-SAG-0001.
+
+## Acceptance criteria
+
+- [ ] REQ-SAG-0701 AC1: a batch of 40 requests against a test transport that answers each after a delay finishes in about one eighth of the serial time with the default 8 workers (8 transport calls observed in flight at once).
+- [ ] REQ-SAG-0701 AC2: with workers = 1 the same batch runs one request at a time; workers come from AgentConfig.workers, default 8.
+- [ ] REQ-SAG-0701 AC3: a batch with one failing request returns that error tagged with its session ULID and returns every other result; results come back in finish order.
+- [ ] REQ-SAG-0701 AC4: cancelling a running batch returns decision.cancelled for every unfinished request; one result per request, always.
+- [ ] REQ-SAG-0601: a held-off request waits in the JobQueue, not in a worker (with 1 worker a second request is answered during the first one's holdoff); the wait is a Condvar timed wait woken by a CancelToken::on_cancel hook; no sleep.
+- [ ] REQ-SAG-0601 AC4: cancelling a held-off request ends its wait at once and returns decision.cancelled (decide_stream and decide).
+- [ ] REQ-SAG-0601/0602: the runner resends only on Next::ResendAt, sends the same encoded bytes each time, and returns http.provider_busy / http.quota_exhausted / http.network unchanged inside decision.http.
+- [ ] REQ-SAG-0901 AC2: a backend that first returns decision.schema_mismatch (a reply missing probabilities) and then a valid answer yields the valid answer after one resend; resends stop at once on cancel.
+- [ ] NFR-SAG-0001 / ADR-SAG-0002: exactly one session row per result (ok, failed and cancelled), each with its session ULID and the identity fields session_id, repo, project, agent_role; error rows carry the DecisionError ErrorDetail chain.
+- [ ] REQ-SAG-0202: each ok row records one sc-sha question digest per question with the response (three questions -> three digests).
+- [ ] ADR-SAG-0001 / ADR-SAG-0004: DecisionRunner implements the one Decision trait (no associated error) over any Arc<dyn Backend> and an HttpClient; no backend crate is a dependency; decisions only.
+- [ ] REQ-SAG-0002: results carry DecisionError with runner-level failures as decision.cancelled and decision.shutdown (a backend panic becomes decision.shutdown); a session-log write failure never replaces the decision result and is reported by flush_session_log as runner.session_log with the LogError kept; no thread::spawn (Builder::spawn only); clippy with the workspace denies passes.
+- [ ] Dropping the result iterator never cancels the caller's CancelToken.
+- [ ] REQ-SAG-0009/0010: cargo tree shows no tokio; a search of non-test source finds no sleep call.

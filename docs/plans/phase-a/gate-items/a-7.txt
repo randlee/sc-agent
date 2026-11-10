@@ -1,0 +1,19 @@
+# Sprint A-7: sc-llm-provider and sc-decision-llm
+
+## Description
+
+Anthropic Messages and OpenAI-compatible providers with JSON-schema output (LlmError); Haiku and Luna decision backends that translate the Jev request to a prompt and required schema, self-report probabilities and confidence, and signal a schema mismatch for resend. Records: REQ-SAG-0103, REQ-SAG-0502, REQ-SAG-0901, ADR-SAG-0001.
+
+## Acceptance criteria
+
+- [ ] REQ-SAG-0103: a caller gives Provider and ModelId separately; the same model id is sent through two providers (OpenAI and OpenRouter) unchanged; the OpenAI provider is named openai.
+- [ ] REQ-SAG-0502: sc-llm-provider encodes/decodes a request to a non-decision LLM on any configured provider (Anthropic Messages; Chat Completions for openai, OpenRouter, Together, Nous); a test sends a non-decision request for a model selected by short name through HttpClient over a scripted transport and returns its response.
+- [ ] JSON-schema output: Output::Json is sent as Anthropic output_config.format json_schema and as Chat Completions response_format json_schema (strict), and the reply text is returned parsed.
+- [ ] REQ-SAG-0901 AC1: Haiku/Luna answers to choice, score, noul and box questions are self-reported values that parse as the Jev answer type for each question (probabilities and confidence where Jev returns them).
+- [ ] REQ-SAG-0901: a reply that does not match the required schema (not JSON, truncated, ids differ, a required field missing or mistyped) is returned from decode as decision.schema_mismatch carrying the decision_llm/llm chain, so the runner sends it again; other failures are decision.backend and are not resent.
+- [ ] ADR-SAG-0001: LlmDecisionBackend implements the A-2 Backend trait (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.
+- [ ] REQ-SAG-0007: a model probability of 0.123456789 is returned as 0.123456789; no rounding, normalizing or clamping.
+- [ ] REQ-SAG-0002: LlmError (9 llm.* ids) wraps HttpError; DecisionLlmError (4 decision_llm.* ids) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
+- [ ] ADR-SAG-0004: cargo tree -p sc-llm-provider lists no sc-decision-* crate; sc-decision-schema does not depend on sc-llm-provider.
+- [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.
+- [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio or ureq; no sleep call.

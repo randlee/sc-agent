@@ -1,0 +1,21 @@
+# Sprint A-5: sc-agent-http
+
+## Description
+
+Sync ureq transport, HttpRequest/HttpResponse, busy resend and holdoff schedule (no sleep), quota detection, secret redaction, HttpError. Records: REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0002.
+
+## Acceptance criteria
+
+- [ ] REQ-SAG-0601: default config, a request answered busy (429/502/529) every time is sent 5 times and ends http.provider_busy with reason sends and 5 attempts; with max_sends = 2 it is sent 2 times (no hard cap).
+- [ ] REQ-SAG-0601: Retry-After: 3 holds off exactly 3 s; Retry-After: 99 holds off 30 s; Retry-After: abc (and absent) falls back to 1, 2, 4, 8 s (then doubling, capped 30 s) each with at most 250 ms jitter; Retry-After is valid only as 1-32 ASCII digits with an optional fraction.
+- [ ] REQ-SAG-0601: no attempt starts after the 90 s budget (reason budget); ProviderBusy carries reason, attempts and the last retry_after_seconds unrounded (REQ-SAG-0007); a busy request is resent unchanged (same body bytes).
+- [ ] REQ-SAG-0601: holdoff is returned as a not-before Instant (Next::ResendAt); sc-agent-http never waits and takes no CancelToken (the queue that waits owns cancellation, A-9).
+- [ ] REQ-SAG-0601: a connect failure returns http.network, retryable, after one send (real refused-connection test over UreqTransport); network errors are never resent.
+- [ ] REQ-SAG-0602: a 429 with the documented Anthropic quota-exhausted body returns http.quota_exhausted after one send; a 429 with an unrecognized body is resent.
+- [ ] Every final reply that is neither busy nor quota (e.g. 400, 422, 503) is returned as Next::Done with the response unchanged, so the backend decodes it.
+- [ ] HttpRequest carries a byte body (Arc<[u8]>) so multipart bodies can be sent; HttpRequest/HttpResponse/ResendPolicy are defined here and used unchanged by sc-decision-schema, the backends and the runner.
+- [ ] REQ-SAG-0002: HttpError implements ErrorId with 6 distinct http.* ids; no assert!/unreachable!/panic in non-test code; clippy with the workspace denies passes.
+- [ ] Secrets: no error text, Debug output or log event contains the API key (test with the key in a transport error and a reply message); ApiKey::as_str is called only in ureq_transport (clippy disallowed-methods).
+- [ ] REQ-SAG-0008 / ANC-004: send, response, busy, exhaustion, quota and transport-failure events go to the GeneralLogger passed to HttpClient::new; no body, header value or key is logged; a log failure never changes a send result.
+- [ ] ADR-SAG-0004 / REQ-SAG-0009 / REQ-SAG-0010: no ureq type in a public signature; cargo tree -p sc-agent-http lists no tokio and no sc-decision-* or sc-llm-provider crate; no sleep call.
+- [ ] REQ-SAG-0002: a test makes the transport fail with a lower-layer (ureq) error and asserts the returned HttpError's ErrorDetail chain carries that cause's id and message.

@@ -1,0 +1,1161 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261109T232308Z-agt-4p2.6",
+  "gate": "plan",
+  "created_at": "2026-11-09T23:23:08+00:00",
+  "anchors_path": "/Volumes/Extreme Pro/github/sc-agent/docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "agt-4p2.6",
+    "title": "Sprint A-6: sc-decision-systemone and sc-decision-local",
+    "source": "/Volumes/Extreme Pro/github/sc-agent/docs/plans/phase-a/gate-items/a-6.txt",
+    "chars": 2315,
+    "truncated": false,
+    "chars_before_reduction": 2315,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Volumes/Extreme Pro/github/sc-agent/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "crates/sc-decision-schema must contain only the code necessary to send and receive 100% of the decision API, with nothing beyond that minimum.",
+      "quote": "Has the absolute minimum code that is necessary to send/receive 100% of the decision api",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T07:40:40Z",
+      "context": "planning session",
+      "anchor_version": 1,
+      "deterministic_check": "every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.46,
+          "probabilities": {
+            "yes": 0.35,
+            "no": 0.64,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.76,
+          "probabilities": {
+            "yes": 0.1,
+            "no": 0.84,
+            "unclear": 0.06
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.76,
+          "probabilities": {
+            "yes": 0.12,
+            "no": 0.84,
+            "unclear": 0.04
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "yes": 0.12,
+            "no": 0.83,
+            "unclear": 0.05
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.98,
+            "unclear": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.98,
+            "unclear": 0.0
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "yes": 0.06,
+            "no": 0.92,
+            "unclear": 0.02
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "yes": 0.47,
+            "no": 0.52,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.46,
+      "explanation": "Jev was not confident (min confidence 0.46); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1706,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.46
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5330
+    },
+    {
+      "anchor_id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every operation available in the sc-ai CLI must also be available in the sc-agent Python API.",
+      "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-08T21:07:35Z",
+      "context": "planning session",
+      "anchor_version": 1,
+      "deterministic_check": "each sc-ai subcommand has a matching Python API function, checked by a test that lists both",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "yes": 0.29,
+            "no": 0.7,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 0.98,
+            "unclear": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.98,
+            "unclear": 0.01
+          }
+        }
+      },
+      "verdict_first": "not_applicable",
+      "verdict_second": "underspecified",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.61,
+          "probabilities": {
+            "yes": 0.25,
+            "no": 0.74,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 0.99,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.98,
+            "unclear": 0.01
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.96,
+            "unclear": 0.02
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "yes": 0.16,
+            "no": 0.83,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.55,
+      "explanation": "Jev was not confident (min confidence 0.55); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1694,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "second",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.55
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5291
+    },
+    {
+      "anchor_id": "REQ-SAG-0002",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0002",
+      "statement": "Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.",
+      "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0002",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.96,
+          "probabilities": {
+            "yes": 0.97,
+            "no": 0.03,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.28,
+          "probabilities": {
+            "yes": 0.52,
+            "no": 0.2,
+            "unclear": 0.28
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.22,
+          "probabilities": {
+            "yes": 0.47,
+            "no": 0.48,
+            "unclear": 0.05
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.7,
+          "probabilities": {
+            "yes": 0.8,
+            "no": 0.19,
+            "unclear": 0.01
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.98,
+            "unclear": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "yes": 0.28,
+            "no": 0.7,
+            "unclear": 0.02
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.52,
+          "probabilities": {
+            "yes": 0.21,
+            "no": 0.68,
+            "unclear": 0.11
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.91,
+          "probabilities": {
+            "yes": 0.94,
+            "no": 0.06,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.22,
+      "explanation": "Jev was not confident (min confidence 0.22); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1702,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.28
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.22
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5330
+    },
+    {
+      "anchor_id": "REQ-SAG-0006",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0006",
+      "statement": "No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.",
+      "quote": "`sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0006",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "yes": 0.48,
+            "no": 0.51,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.61,
+          "probabilities": {
+            "yes": 0.74,
+            "no": 0.24,
+            "unclear": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.8,
+          "probabilities": {
+            "yes": 0.12,
+            "no": 0.87,
+            "unclear": 0.01
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.25,
+          "probabilities": {
+            "yes": 0.5,
+            "no": 0.49,
+            "unclear": 0.01
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.05,
+            "no": 0.93,
+            "unclear": 0.02
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.37,
+          "probabilities": {
+            "yes": 0.58,
+            "no": 0.41,
+            "unclear": 0.01
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.37,
+          "probabilities": {
+            "yes": 0.58,
+            "no": 0.32,
+            "unclear": 0.1
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.7,
+          "probabilities": {
+            "yes": 0.8,
+            "no": 0.19,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.26,
+      "explanation": "Jev was not confident (min confidence 0.26); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1716,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.26
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5368
+    },
+    {
+      "anchor_id": "REQ-SAG-0201",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0201",
+      "statement": "Every Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models) must be defined in the sc-decision-schema crate.",
+      "quote": "Every type that maps to the Jev API MUST be defined in `sc-decision-schema`.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0201",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.42,
+          "probabilities": {
+            "yes": 0.61,
+            "no": 0.31,
+            "unclear": 0.08
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.33,
+          "probabilities": {
+            "yes": 0.55,
+            "no": 0.43,
+            "unclear": 0.02
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.62,
+          "probabilities": {
+            "yes": 0.24,
+            "no": 0.75,
+            "unclear": 0.01
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.77,
+          "probabilities": {
+            "yes": 0.14,
+            "no": 0.85,
+            "unclear": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.34,
+          "probabilities": {
+            "yes": 0.43,
+            "no": 0.56,
+            "unclear": 0.01
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "yes": 0.42,
+            "no": 0.52,
+            "unclear": 0.06
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.76,
+          "probabilities": {
+            "yes": 0.84,
+            "no": 0.15,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.33,
+      "explanation": "Jev was not confident (min confidence 0.33); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1722,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.42
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "yes",
+          "confidence": 0.33
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5346
+    },
+    {
+      "anchor_id": "ADR-SAG-0001",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0001",
+      "statement": "Every sc-agent decision backend must implement the Backend trait defined in the sc-decision-schema crate.",
+      "quote": "Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record ADR-SAG-0001",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.82,
+          "probabilities": {
+            "yes": 0.1,
+            "no": 0.88,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.82,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1706,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5337
+    },
+    {
+      "anchor_id": "ADR-SAG-0004",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0004",
+      "statement": "No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.",
+      "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record ADR-SAG-0004",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.96,
+          "probabilities": {
+            "yes": 0.97,
+            "no": 0.02,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1721,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5386
+    },
+    {
+      "anchor_id": "REQ-SAG-0009",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0009",
+      "statement": "No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.",
+      "quote": "A program that does not use tokio MUST be able to use every low-level crate.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0009",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.7,
+          "probabilities": {
+            "yes": 0.8,
+            "no": 0.17,
+            "unclear": 0.03
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.96,
+            "unclear": 0.03
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.97,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.7,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1712,
+        "output_tokens": 117
+      },
+      "attempts": 2,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5357
+    },
+    {
+      "anchor_id": "REQ-SAG-0010",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0010",
+      "statement": "sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.",
+      "quote": "sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0010",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.76,
+          "probabilities": {
+            "yes": 0.84,
+            "no": 0.15,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.86,
+          "probabilities": {
+            "yes": 0.91,
+            "no": 0.06,
+            "unclear": 0.03
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.76,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1700,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5294
+    },
+    {
+      "anchor_id": "REQ-SAG-0601",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0601",
+      "statement": "A request that receives an HTTP 429, 502 or 529 response must be resent until a configurable maximum number of sends, 5 by default, is reached.",
+      "quote": "A request that receives a busy response MUST be resent unchanged.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0601",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.77,
+          "probabilities": {
+            "yes": 0.14,
+            "no": 0.85,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 0.99,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.98,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.77,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1720,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5362
+    },
+    {
+      "anchor_id": "REQ-SAG-0701",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0701",
+      "statement": "sc-decision-runner must send the requests of one batch in parallel across a configurable number of worker threads, 8 by default.",
+      "quote": "`sc-decision-runner` MUST run the requests of one batch in parallel across workers.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0701",
+      "anchor_version": 1,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "not_applicable",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.67,
+          "probabilities": {
+            "yes": 0.21,
+            "no": 0.78,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 0.99,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.67,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1709,
+        "output_tokens": 117
+      },
+      "attempts": 2,
+      "item_chars_sent": 2315,
+      "item_shortened": false,
+      "request_bytes": 5334
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 5,
+      "satisfied": 4,
+      "not_applicable": 2
+    },
+    "failing": [
+      "ANC-001",
+      "ANC-002",
+      "REQ-SAG-0002",
+      "REQ-SAG-0006",
+      "REQ-SAG-0201"
+    ],
+    "leaning_counts": {
+      "contradicted": 1,
+      "not_applicable": 5,
+      "satisfied": 5
+    },
+    "unstable": [
+      "ANC-002"
+    ],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": false
+  }
+}

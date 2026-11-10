@@ -7,7 +7,7 @@
 # This script only copies text. It does NOT do any of the following; the developer does them
 # (see the bead design for the exact target code):
 #   - write either crate's Cargo.toml, README.md, src/lib.rs or src/error.rs (SecretsError, AgentConfigError);
-#   - write sc-agent-config's AgentConfig/ExtraModel/LocalDaemon types, load() and catalog();
+#   - write sc-agent-config's AgentConfig/ExtraModel/LocalRunner types, load() and catalog();
 #   - add the OPENROUTER/TOGETHER/NOUS variable constants and env_var(Provider);
 #   - rename ResolvedApiKey to ApiKey; change try_new(BackendKeyId, String) to try_new(&str var, String);
 #     drop redact_error() and JevError::map_detail; replace JevError with SecretsError::{KeyMissing, KeyMalformed};

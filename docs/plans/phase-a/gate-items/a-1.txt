@@ -1,0 +1,22 @@
+# Sprint A-1: sc-agent-types
+
+## Description
+
+Build sc-agent-types. Governing records: REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0101..0104. Code to copy from sc-agent-ref: see design.
+
+## Acceptance criteria
+
+- [ ] REQ-SAG-0101 AC1: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) returns the newest model of its line across built-in and config rows (test).
+- [ ] REQ-SAG-0101 AC2: a specific catalog version id parses as ModelChoice::Version and resolves to itself (test).
+- [ ] REQ-SAG-0102 AC1/AC2: with_config_model adding a haiku model dated later than every built-in haiku makes haiku resolve to it with no rebuild; an earlier date changes nothing (tests). sc-agent-types reads no files (no std::fs use).
+- [ ] REQ-SAG-0103: Provider and ModelId are separate types; the same ModelId is used with two Providers unchanged (test); Provider::OpenAi is spelled openai.
+- [ ] REQ-SAG-0104 AC1: a CancelToken cancelled on another thread ends wait_until with Wait::Cancelled at once (well before the deadline) and runs every registered on_cancel hook once (at once if registered after cancel; never after its CancelHook is dropped); clones share it; CancelToken is Send + Sync (tests; no sleep).
+- [ ] REQ-SAG-0104 AC2 (Python): CancelToken is Send + Sync so the PyO3 crate can wrap it; the Python test lives in the PyO3 crate.
+- [ ] REQ-SAG-0001: SessionId::new() is a ULID; FromStr accepts only the canonical 26-char form and rejects a UUID with types.invalid_session_id (test).
+- [ ] REQ-SAG-0002: ErrorId (id, message, cause, detail) and ErrorDetail {id, message, cause} exist in sc-agent-types; every TypesError variant has a distinct id types.<variant_snake>; Display equals detail(); ErrorDetail round-trips through serde with its cause chain (tests).
+- [ ] REQ-SAG-0002 AC2: the workspace root Cargo.toml denies clippy panic, unwrap_used, expect_used and indexing_slicing for every member; clippy.toml allows them only in tests and disallows std::thread::sleep/sleep_until; cargo clippy --workspace -- -D warnings passes.
+- [ ] REQ-SAG-0006: no type, field or constant names plan-anchor, judge-jev or a mock backend (review).
+- [ ] REQ-SAG-0401: no credential env-var name appears in sc-agent-types (grep).
+- [ ] REQ-SAG-0009/0010: cargo tree -p sc-agent-types lists no tokio crate (deps: serde, ulid; dev serde_json); no sleep call in non-test source.
+- [ ] ADR-SAG-0004: sc-agent-types is the bottom layer and depends on no other sc-agent crate; `cargo tree -p sc-agent-types` lists no sc-agent crate (check).
+- [ ] REQ-SAG-0002: a test wraps a lower-layer error two levels deep and asserts the outermost error's ErrorDetail chain carries the id and message of every cause at every level.

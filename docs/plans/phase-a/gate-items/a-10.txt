@@ -1,0 +1,19 @@
+# Sprint A-10: decide and tree-sitter CLIs
+
+## Description
+
+Two thin binaries: decide (send one request or a JSONL batch with --provider, --model, --project, --agent-role; models; doctor) and the tree-sitter CLI (name TBD; languages, queries, query). Argument parsing, backend choice and output only. Records: REQ-SAG-0303, REQ-SAG-0501, REQ-SAG-0503 (docs/decide), REQ-SAG-0004, REQ-SAG-0103, REQ-SAG-0801.
+
+## Acceptance criteria
+
+- [ ] Tree-sitter CLI: languages lists the loaded grammars and queries lists the predefined queries (REQ-SAG-0303).
+- [ ] Tree-sitter CLI: query <language> <query> <file> runs a predefined query and prints its captures as JSON; failures print one stderr line {id, message} with the treesitter.* id, exit 1.
+- [ ] Tree-sitter CLI: a non-UTF-8 file (lowest-layer failure) reaches stderr as treesitter.not_utf8 with its message (REQ-SAG-0002).
+- [ ] decide send: one request from a file or stdin, or a JSONL batch (--batch), with --provider, --model, --project and --agent-role (no --agent-name); --provider is required unless --model names a configured local runner (REQ-SAG-0103, REQ-SAG-0801); runs through the Decision trait only, over DecisionRunner (ADR-SAG-0001).
+- [ ] decide prints JSON for one request and JSONL for a batch, fastest first, each line tagged with its session ULID and input position; a failed request is printed in its result as an ErrorDetail chain and the batch continues (REQ-SAG-0701).
+- [ ] Each TypeSafe request example can be sent through decide send and returns the API's response (REQ-SAG-0501 AC1; test transport).
+- [ ] The TypeSafe models list is returned by decide models (REQ-SAG-0501 AC2).
+- [ ] decide doctor warns naming provider and model for every provider model in neither the built-in list nor the global configuration, and prints no warning when all are present (REQ-SAG-0503).
+- [ ] An invalid --project or --agent-role (e.g. 'Phase B') is rejected as decide.log with cause log.invalid_slug and nothing is sent or logged (REQ-SAG-0004).
+- [ ] REQ-SAG-0002: DecideError implements ErrorId (decide.* ids) and wraps the real lower errors (AgentConfigError, TypesError, SecretsError, LogError, LocalError, DecisionError, HttpError, LlmError, RunnerError) unchanged; a lowest-layer error (http.network) appears with its id and message in decide output; values are not rounded (REQ-SAG-0007).
+- [ ] ADR-SAG-0004: decide is the only crate that chooses a backend and depends on the backend crates; neither binary uses tokio or sleep(); clippy passes with the workspace denies (REQ-SAG-0002, REQ-SAG-0009, REQ-SAG-0010).
