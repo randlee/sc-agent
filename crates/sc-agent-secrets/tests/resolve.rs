@@ -121,6 +121,7 @@ impl KeyringSource for FailingKeyring {
         Err(SecretsError::KeyringRead {
             kind: "platform_failure",
             cause: "platform keystore returned an error",
+            source: None,
         })
     }
 }
@@ -426,10 +427,12 @@ fn secrets_errors_follow_the_error_contract() {
         SecretsError::DotenvRead {
             kind: "PermissionDenied".to_owned(),
             cause: "permission denied",
+            source: None,
         },
         SecretsError::KeyringRead {
             kind: "platform_failure",
             cause: "platform keystore returned an error",
+            source: None,
         },
         SecretsError::KeyringTimeout,
     ];

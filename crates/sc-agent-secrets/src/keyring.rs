@@ -170,6 +170,7 @@ fn keyring_read_failed() -> SecretsError {
     SecretsError::KeyringRead {
         kind: "thread",
         cause: "the read thread failed",
+        source: None,
     }
 }
 
@@ -221,11 +222,17 @@ fn sanitized_keyring_cause(error: &keyring::Error) -> &'static str {
     }
 }
 
-/// The sanitized error for a keyring failure; the keyring's text is never kept.
+/// The error for a keyring failure: this layer's label, and the keyring error whole
+/// (`keyring.<kind>`; its text never renders the stored value, `BadEncoding` included).
 fn keyring_unavailable(error: &keyring::Error) -> SecretsError {
+    let kind = keyring_kind(error);
     SecretsError::KeyringRead {
-        kind: keyring_kind(error),
+        kind,
         cause: sanitized_keyring_cause(error),
+        source: Some(sc_agent_types::ErrorDetail::foreign(
+            format!("keyring.{kind}"),
+            error,
+        )),
     }
 }
 
@@ -254,51 +261,59 @@ mod tests {
 
     use super::*;
 
+    /// REQ-SAG-0002 0.2.0: a keyring failure keeps the keyring's own error whole as its
+    /// cause (`keyring.<kind>` and the keyring's message); this layer only adds its label.
+    /// (Before 0.2.0 this test required the inner text to be dropped; 0.2.0 forbids
+    /// replacing a lower-layer message, and a keyring read has no attached key to redact.)
+    /// `BadEncoding` never renders the stored bytes, so the value does not appear.
     #[test]
-    fn keyring_errors_drop_secret_bytes() {
-        let secret = "super-secret-value";
+    fn keyring_errors_keep_the_lower_error_whole() {
+        let inner = "keystore daemon refused the request";
         let cases = [
             (
-                keyring::Error::BadEncoding(secret.as_bytes().to_vec()),
-                "stored value was not valid UTF-8",
-            ),
-            (
-                keyring::Error::PlatformFailure(Box::new(std::io::Error::other(secret))),
+                keyring::Error::PlatformFailure(Box::new(std::io::Error::other(inner))),
                 "platform keystore returned an error",
+                "keyring.platform_failure",
             ),
             (
-                keyring::Error::NoStorageAccess(Box::new(std::io::Error::other(secret))),
+                keyring::Error::NoStorageAccess(Box::new(std::io::Error::other(inner))),
                 "keystore access was denied",
+                "keyring.no_storage_access",
             ),
             (
-                keyring::Error::TooLong(secret.to_owned(), 8),
+                keyring::Error::TooLong(inner.to_owned(), 8),
                 "keystore rejected an attribute length",
+                "keyring.too_long",
             ),
             (
-                keyring::Error::Invalid("password".to_owned(), secret.to_owned()),
+                keyring::Error::Invalid("password".to_owned(), inner.to_owned()),
                 "keystore rejected the service or account",
+                "keyring.invalid",
             ),
         ];
-        for (error, cause) in cases {
+        for (error, label, id) in cases {
+            let rendered = error.to_string();
             let err = classify_keyring(Err(error)).expect_err("keyring failure");
             assert_eq!(err.id(), "secrets.keyring_read");
-            let message = err.message();
-            assert!(
-                message.contains("platform keyring could not be read"),
-                "{message}"
-            );
-            assert!(message.contains(cause), "{message}");
-            assert_secret_absent(&err, secret);
+            assert!(err.message().contains(label), "{}", err.message());
+            let cause = err.cause_detail().expect("the keyring error is the cause");
+            assert_eq!(cause.id, id);
+            assert_eq!(cause.message, rendered, "kept whole");
+            assert!(rendered.contains(inner), "{rendered}");
         }
+        let stored = "stored-value-that-is-not-utf8";
+        let bad = keyring::Error::BadEncoding(stored.as_bytes().to_vec());
+        let rendered_bad = bad.to_string();
+        let err = classify_keyring(Err(bad)).expect_err("bad encoding");
+        let cause = err.cause_detail().expect("cause");
+        assert_eq!(cause.id, "keyring.bad_encoding");
+        assert_eq!(cause.message, rendered_bad, "kept whole");
+        let rendered = format!("{err} {err:?} {:?}", err.detail());
+        assert!(!rendered.contains(stored), "{rendered}");
         assert_eq!(
             classify_keyring(Err(keyring::Error::NoEntry)).unwrap(),
             None
         );
-    }
-
-    fn assert_secret_absent(error: &SecretsError, secret: &str) {
-        let rendered = format!("{error} {error:?} {:?}", error.detail());
-        assert!(!rendered.contains(secret), "{rendered}");
     }
 
     use std::sync::mpsc;

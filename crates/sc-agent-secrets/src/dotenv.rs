@@ -41,7 +41,7 @@ pub(crate) const MAX_DOTENV_BYTES: u64 = 1024 * 1024;
 ///
 /// Returns [`SecretsError::DotenvRead`] when the file exists and cannot be
 /// read, is not a regular file, or is larger than [`MAX_DOTENV_BYTES`]. The
-/// error holds a sanitized label, never the OS message.
+/// error holds this layer's label and, for an io failure, the io error whole.
 pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, SecretsError> {
     let path = repo_root.join(".env");
     // Check the kind before opening: Windows refuses to open a directory
@@ -80,6 +80,7 @@ fn not_a_file() -> SecretsError {
     SecretsError::DotenvRead {
         kind: "NotAFile".to_owned(),
         cause: "path is not a regular file",
+        source: None,
     }
 }
 
@@ -87,14 +88,19 @@ fn too_large() -> SecretsError {
     SecretsError::DotenvRead {
         kind: "FileTooLarge".to_owned(),
         cause: "file is larger than 1 MiB",
+        source: None,
     }
 }
 
-/// The sanitized error for an unreadable `.env`.
+/// The error for an unreadable `.env`: this layer's label, and the io error whole.
 fn dotenv_read_error(error: &io::Error) -> SecretsError {
     SecretsError::DotenvRead {
         kind: format!("{:?}", error.kind()),
         cause: sanitized_io_cause(error),
+        source: Some(sc_agent_types::ErrorDetail::foreign(
+            format!("io.{:?}", error.kind()),
+            error,
+        )),
     }
 }
 
@@ -300,16 +306,47 @@ mod tests {
         );
     }
 
+    /// This layer's message is its own label; the io error's text is not repeated in it but
+    /// kept whole as the cause (REQ-SAG-0002 0.2.0: a lower-layer message is never dropped).
     #[test]
-    fn unreadable_cause_omits_raw_error_text() {
+    fn unreadable_message_is_a_label_and_the_io_text_is_the_cause() {
         use sc_agent_types::ErrorId;
 
-        let secret = "super-secret-value";
-        let error = io::Error::new(io::ErrorKind::PermissionDenied, secret);
+        let raw = "raw os text";
+        let error = io::Error::new(io::ErrorKind::PermissionDenied, raw);
         let rendered = dotenv_read_error(&error);
         assert_eq!(rendered.id(), "secrets.dotenv_read");
-        let text = format!("{rendered} {rendered:?} {}", rendered.message());
+        let text = format!("{rendered} {}", rendered.message());
         assert!(text.contains("permission denied"), "{text}");
-        assert!(!text.contains(secret), "{text}");
+        assert!(
+            !text.contains(raw),
+            "this layer does not repeat the cause: {text}"
+        );
+        let cause = rendered.cause_detail().expect("cause");
+        assert_eq!(cause.id, "io.PermissionDenied");
+        assert_eq!(cause.message, raw);
+    }
+
+    /// REQ-SAG-0002 0.2.0: an unreadable `.env` keeps the io error whole as its cause
+    /// (`io.<ErrorKind>` and the io message); this layer adds only its label.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_dotenv_keeps_the_io_error_whole() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().expect("dir");
+        let path = root.path().join(".env");
+        fs::write(&path, "TYPESAFE_API_KEY=x\n").expect("write");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).expect("chmod");
+        let direct = fs::File::open(&path);
+        let error = load_dotenv(root.path());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("chmod");
+        let Err(io) = direct else {
+            panic!("run this test as a non-root user: root can read a mode-000 file");
+        };
+        let error = error.expect_err("unreadable");
+        let cause = sc_agent_types::ErrorId::cause_detail(&error).expect("io cause");
+        assert_eq!(cause.id, "io.PermissionDenied");
+        assert_eq!(cause.message, io.to_string());
+        assert!(std::error::Error::source(&error).is_some());
     }
 }

@@ -3,10 +3,6 @@
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
 #[cfg(test)]
-#[allow(
-    dead_code,
-    reason = "shared with decode.rs; this binary uses every helper today, but a helper added for decode.rs alone must not fail this build"
-)]
 mod support;
 
 #[cfg(test)]

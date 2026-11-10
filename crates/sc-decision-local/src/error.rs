@@ -155,7 +155,7 @@ impl ErrorId for LocalError {
 /// A serde_json message can quote a value from the reply body. When the probe carried the
 /// runner's key, the cause is stored as [`ParseCause::Redacted`]: the same id
 /// (`serde_json.<category>`) and message with every copy of the key replaced by
-/// `[redacted]` (REQ-SAG-0401). Otherwise the serde_json error is kept unchanged.
+/// `[redacted]` (REQ-SAG-0002 0.2.0, the attached-key exception). Otherwise the serde_json error is kept unchanged.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ParseCause {

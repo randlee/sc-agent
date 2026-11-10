@@ -3,10 +3,6 @@
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
 #[cfg(test)]
-#[allow(
-    dead_code,
-    reason = "shared with log.rs and load_wait.rs; this binary uses every helper today, but a helper added for another binary alone must not fail this build"
-)]
 mod support;
 
 #[cfg(test)]
@@ -228,7 +224,7 @@ mod tests {
         }
     }
 
-    /// REQ-SAG-0002, REQ-SAG-0401: a ProbeStatus body is kept whole, with the attached key
+    /// REQ-SAG-0002 0.2.0 (the attached-key exception): a ProbeStatus body is kept whole, with the attached key
     /// redacted wherever the daemon echoes it.
     #[test]
     fn test_probe_status_body_whole_and_key_redacted() {
@@ -301,7 +297,7 @@ mod tests {
         assert!(matches!(result, Err(LocalError::ProbeStatus { ref body, .. }) if *body == bytes));
     }
 
-    /// REQ-SAG-0401: a health field that echoes the attached key reaches no error text; the
+    /// REQ-SAG-0002 0.2.0 (the attached-key exception): a health field that echoes the attached key reaches no error text; the
     /// ProbeParse cause keeps its id and the redacted serde_json message (REQ-SAG-0002).
     #[test]
     fn test_probe_parse_cause_redacts_attached_key() {
