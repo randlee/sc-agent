@@ -13,8 +13,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// The trait is open to workspace crates only: every sc-agent error enum implements it, and it
 /// is not an extension point for outside crates. [`Self::recovery`] and [`Self::detail`] are
-/// provided. Do not override [`Self::detail`]: it is what keeps id, message, cause and recovery
-/// consistent across the workspace.
+/// provided.
+///
+/// Implementors must not override [`Self::detail`]; workspace review rejects an override. It
+/// is the one place that assembles id, message, recovery and cause, which keeps every printed
+/// error, session row and Python exception consistent with `id()`, `message()`, `recovery()`
+/// and `cause_detail()`. Rust cannot seal a provided method, so each crate's tests check that
+/// `detail()` equals the value built from those four.
 ///
 /// The cause method is `cause_detail`, not `cause`: the deprecated `std::error::Error::cause`
 /// on the supertrait has that name, and `x.cause()` would be ambiguous (E0034) wherever
@@ -52,7 +57,9 @@ pub trait ErrorId: Error {
         None
     }
 
-    /// This error as data: id, message, recovery and the cause chain. Do not override.
+    /// This error as data: id, message, recovery and the cause chain.
+    ///
+    /// Must not be overridden (see the trait docs); workspace review rejects an override.
     fn detail(&self) -> ErrorDetail {
         ErrorDetail {
             id: self.id().to_owned(),
