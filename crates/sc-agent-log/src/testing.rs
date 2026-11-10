@@ -33,19 +33,25 @@ use sc_observability::v2::{
 use sc_observability::{Level, ServiceName, SinkHealth, SinkHealthState, SinkName};
 use serde_json::{Map, Value};
 
-use crate::writer::start_logger;
-use crate::{GeneralLogger, LogError, SessionIdentity, SessionLogger};
+use crate::writer::{Ledger, QUEUE_CAPACITY, start_logger};
+use crate::{GeneralLogger, LogError, LogKind, SessionIdentity, SessionLogger};
 
 /// The service name of the `MemoryLog` logger.
 const SERVICE: &str = "sc-agent-test";
-/// The `log` label of `MemoryLog` errors.
-const LOG: &str = "memory";
+/// The kind of `MemoryLog` errors.
+const LOG: LogKind = LogKind::Memory;
+/// The sink name reported by `MemorySink::health`.
+const SINK: &str = "memory";
 
 /// In-memory log for tests: loggers built from it write events here, never to a file.
+///
+/// Every logger built from one `MemoryLog` shares its lost-row account, so each lost row is
+/// reported by exactly one flush.
 #[derive(Clone)]
 pub struct MemoryLog {
     sink: Arc<MemorySink>,
     logger: Arc<Logger>,
+    ledger: Arc<Ledger>,
 }
 
 /// The sink: every written event, in write order.
@@ -90,30 +96,37 @@ impl MemoryLog {
         let mut config = LoggerConfig::default_for(service, PathBuf::new());
         config.enable_file_sink = false;
         config.enable_console_sink = false;
+        config.queue_capacity = QUEUE_CAPACITY;
         let name =
-            SinkName::new(LOG).map_err(|error| LogError::invalid_name("sink", LOG, &error))?;
+            SinkName::new(SINK).map_err(|error| LogError::invalid_name("sink", SINK, &error))?;
         let sink = Arc::new(MemorySink {
             events: Mutex::new(Vec::new()),
             name,
         });
         let registration = SinkRegistration::typed(Arc::clone(&sink) as Arc<dyn LogSink>);
         let logger = start_logger(config, LOG, Some(registration))?;
+        let ledger = Ledger::new(&logger);
         Ok(Self {
             sink,
             logger: Arc::new(logger),
+            ledger,
         })
     }
 
     /// A [`GeneralLogger`] writing into this log ([`GeneralLogger::injected`]).
     #[must_use]
     pub fn general(&self) -> GeneralLogger {
-        GeneralLogger::injected(Arc::clone(&self.logger))
+        GeneralLogger::injected_in(Arc::clone(&self.logger), Some(Arc::clone(&self.ledger)))
     }
 
     /// A [`SessionLogger`] writing into this log ([`SessionLogger::injected`]).
     #[must_use]
     pub fn session(&self, identity: SessionIdentity) -> SessionLogger {
-        SessionLogger::injected(Arc::clone(&self.logger), identity)
+        SessionLogger::injected_in(
+            Arc::clone(&self.logger),
+            Some(Arc::clone(&self.ledger)),
+            identity,
+        )
     }
 
     /// The logger itself, for [`Loggers::open`](crate::Loggers::open) injection.

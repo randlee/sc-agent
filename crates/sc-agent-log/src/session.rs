@@ -14,11 +14,11 @@ use sc_observability::v2::{JsonlFileSink, Logger, RetainedLogPolicy, SinkRegistr
 use sc_observability::{ByteCount, FileCount, Level, RetentionMaxAge};
 use serde_json::{Map, Value};
 
-use crate::writer::{Mode, Writer, logger_config, start_logger};
-use crate::{LogError, Repo, Slug};
+use crate::writer::{Ledger, Mode, Writer, logger_config, start_logger};
+use crate::{LogError, LogKind, Repo, Slug};
 
-/// The `log` label of the session logger in errors.
-const LOG: &str = "session";
+/// The kind of the session logger in errors.
+const LOG: LogKind = LogKind::Session;
 
 /// Who wrote a session row: repo, project and agent role (REQ-SAG-0004).
 ///
@@ -134,8 +134,18 @@ impl SessionLogger {
     /// down here.
     #[must_use]
     pub fn injected(logger: Arc<Logger>, identity: SessionIdentity) -> Self {
+        Self::injected_in(logger, None, identity)
+    }
+
+    /// A session logger on `logger` sharing `ledger`, the lost-row accounting of other writers
+    /// on the same logger.
+    pub(crate) fn injected_in(
+        logger: Arc<Logger>,
+        ledger: Option<Arc<Ledger>>,
+        identity: SessionIdentity,
+    ) -> Self {
         Self {
-            writer: Arc::new(Writer::injected(logger, LOG)),
+            writer: Arc::new(Writer::injected(logger, ledger, LOG)),
             identity: Arc::new(identity),
             path: None,
         }
@@ -157,10 +167,13 @@ impl SessionLogger {
     ///
     /// The row's correlation id is `session_id`. Blocks while the sc-observability writer queue
     /// is full, until the writer thread drains a slot (bounded by disk throughput, not a timer).
+    /// Async callers use [`Self::try_write`], or run `write` on a blocking thread (see the
+    /// crate docs).
     ///
     /// # Errors
     ///
     /// [`LogError::ReservedField`] when `payload` uses a [`Self::IDENTITY_KEYS`] key,
+    /// [`LogError::RowTooLarge`] when the row is over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES),
     /// [`LogError::Rejected`] when sc-observability refuses the row. Every Err is also counted
     /// and reported once by [`Self::flush`], so a caller that must not act on it loses nothing.
     pub fn write(
@@ -194,6 +207,24 @@ impl SessionLogger {
     /// latest failure when any row since the last report was lost (each reported once).
     pub fn flush(&self) -> Result<(), LogError> {
         self.writer.flush()
+    }
+
+    /// Flushes, shuts the default logger down, and returns what was lost (RSH-001).
+    ///
+    /// Use this instead of dropping the logger where lost rows must be returned to the caller.
+    /// When other clones of this logger are alive, it only flushes and reports; the last clone
+    /// to go shuts the logger down. An injected logger is flushed, never shut down. Dropping a
+    /// logger without `close` does the same work best-effort and writes one last-resort line to
+    /// stderr if rows were lost.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::flush`]: [`LogError::Flush`] or [`LogError::RowsLost`].
+    pub fn close(self) -> Result<(), LogError> {
+        match Arc::try_unwrap(self.writer) {
+            Ok(writer) => writer.close(),
+            Err(shared) => shared.flush(),
+        }
     }
 
     fn write_in(

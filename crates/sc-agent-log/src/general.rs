@@ -9,11 +9,11 @@ use sc_observability::constants::{DEFAULT_LOG_DIR_NAME, DEFAULT_LOG_FILE_SUFFIX}
 use sc_observability::v2::{JsonlFileSink, Logger, LoggerConfig};
 use serde_json::{Map, Value};
 
-use crate::writer::{Mode, Writer, logger_config, start_logger};
-use crate::{LogContext, LogError};
+use crate::writer::{Ledger, Mode, Writer, logger_config, start_logger};
+use crate::{LogContext, LogError, LogKind};
 
-/// The `log` label of the general logger in errors.
-const LOG: &str = "general";
+/// The kind of the general logger in errors.
+const LOG: LogKind = LogKind::General;
 
 /// The general (diagnostic) log. Clones share one writer.
 ///
@@ -71,8 +71,14 @@ impl GeneralLogger {
     /// down here.
     #[must_use]
     pub fn injected(logger: Arc<Logger>) -> Self {
+        Self::injected_in(logger, None)
+    }
+
+    /// A general logger on `logger` sharing `ledger`, the lost-row accounting of other writers
+    /// on the same logger.
+    pub(crate) fn injected_in(logger: Arc<Logger>, ledger: Option<Arc<Ledger>>) -> Self {
         Self {
-            writer: Arc::new(Writer::injected(logger, LOG)),
+            writer: Arc::new(Writer::injected(logger, ledger, LOG)),
         }
     }
 
@@ -84,10 +90,13 @@ impl GeneralLogger {
     /// [`LogContext::NONE`] adds neither. Callers never pass a body, header value or key.
     ///
     /// The wait for a queue slot is bounded by the writer thread's disk throughput, not a timer.
+    /// Async callers use [`Self::try_write`], or run `write` on a blocking thread (see the
+    /// crate docs).
     ///
     /// # Errors
     ///
     /// [`LogError::ReservedField`] when `fields` uses a [`Self::CONTEXT_KEYS`] key,
+    /// [`LogError::RowTooLarge`] when the fields are over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES),
     /// [`LogError::InvalidName`] for a bad `target` or `action`, [`LogError::Rejected`] when
     /// sc-observability refuses the event. Every Err is also counted and reported once by
     /// [`Self::flush`], so a caller that must not act on it loses nothing.
@@ -142,6 +151,24 @@ impl GeneralLogger {
     /// latest failure when any row since the last report was lost (each reported once).
     pub fn flush(&self) -> Result<(), LogError> {
         self.writer.flush()
+    }
+
+    /// Flushes, shuts the default logger down, and returns what was lost (RSH-001).
+    ///
+    /// Use this instead of dropping the logger where lost rows must be returned to the caller.
+    /// When other clones of this logger are alive, it only flushes and reports; the last clone
+    /// to go shuts the logger down. An injected logger is flushed, never shut down. Dropping a
+    /// logger without `close` does the same work best-effort and writes one last-resort line to
+    /// stderr if rows were lost.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::flush`]: [`LogError::Flush`] or [`LogError::RowsLost`].
+    pub fn close(self) -> Result<(), LogError> {
+        match Arc::try_unwrap(self.writer) {
+            Ok(writer) => writer.close(),
+            Err(shared) => shared.flush(),
+        }
     }
 }
 

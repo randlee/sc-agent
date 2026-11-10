@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use sc_agent_types::{ErrorDetail, ErrorId};
 use sc_observability::v2::{EventError, FlushError, InitError};
 
+use crate::LogKind;
+
 /// Every error a public sc-agent-log function returns.
 ///
 /// `Display` writes `"<id>: <message>"` only. A wrapped lower-layer error (an io error or an
@@ -78,8 +80,8 @@ pub enum LogError {
     },
     /// The logger could not start.
     Start {
-        /// `"general"`, `"session"` or `"memory"`.
-        log: &'static str,
+        /// Which logger.
+        log: LogKind,
         /// sc-observability's failure.
         source: InitError,
     },
@@ -90,22 +92,32 @@ pub enum LogError {
     },
     /// `Logger::log` or `Logger::try_log` refused the row.
     Rejected {
-        /// `"general"`, `"session"` or `"memory"`.
-        log: &'static str,
+        /// Which logger.
+        log: LogKind,
         /// sc-observability's failure.
         source: EventError,
     },
     /// The flush barrier failed.
     Flush {
-        /// `"general"`, `"session"` or `"memory"`.
-        log: &'static str,
+        /// Which logger.
+        log: LogKind,
         /// sc-observability's failure.
         source: FlushError,
     },
+    /// A row's serialized fields are over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES); it is not
+    /// written and is counted as a lost row.
+    RowTooLarge {
+        /// Which logger.
+        log: LogKind,
+        /// The serialized size of the row's fields.
+        bytes: usize,
+        /// The cap, [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES).
+        max: usize,
+    },
     /// `count` rows since the last flush were refused or not written; `last` is the latest failure.
     RowsLost {
-        /// `"general"` or `"session"`.
-        log: &'static str,
+        /// Which logger.
+        log: LogKind,
         /// Rows refused at write plus rows the writer could not write.
         count: u64,
         /// The latest failure, if known.
@@ -148,6 +160,7 @@ impl ErrorId for LogError {
             Self::ReservedField { .. } => "log.reserved_field",
             Self::Rejected { .. } => "log.rejected",
             Self::Flush { .. } => "log.flush",
+            Self::RowTooLarge { .. } => "log.row_too_large",
             Self::RowsLost { .. } => "log.rows_lost",
         }
     }
@@ -180,6 +193,11 @@ impl ErrorId for LogError {
             }
             Self::Rejected { log, .. } => format!("the {log} logger refused the row"),
             Self::Flush { log, .. } => format!("the {log} logger could not flush"),
+            Self::RowTooLarge { log, bytes, max } => {
+                format!(
+                    "a {log} row of {bytes} bytes is over the {max}-byte cap and was not written"
+                )
+            }
             Self::RowsLost { log, count, .. } => {
                 format!("{count} {log} row(s) were refused or not written since the last flush")
             }
@@ -210,7 +228,8 @@ impl ErrorId for LogError {
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }
             | Self::FolderUnknown { .. }
-            | Self::ReservedField { .. } => None,
+            | Self::ReservedField { .. }
+            | Self::RowTooLarge { .. } => None,
         }
     }
 }
@@ -238,7 +257,8 @@ impl Error for LogError {
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }
             | Self::FolderUnknown { .. }
-            | Self::ReservedField { .. } => None,
+            | Self::ReservedField { .. }
+            | Self::RowTooLarge { .. } => None,
         }
     }
 }

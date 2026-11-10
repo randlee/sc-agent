@@ -11,11 +11,14 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use crate::LogError;
+use crate::name::is_path_safe;
 
 /// `<host>/<owner>/<repo>` from the git origin URL, else `local/<host>/<folder-name>` (REQ-SAG-0004).
 ///
-/// Every `/`-separated segment is non-empty, is not `.` or `..`, and has no `\` or control
-/// character, so the value is also a relative path under the log root (REQ-SAG-0005).
+/// Every `/`-separated segment is a path-safe directory name: non-empty, at most
+/// [`MAX_SEGMENT_BYTES`](crate::MAX_SEGMENT_BYTES) bytes, not `.` or `..`, no `\`, `:`, `<`,
+/// `>`, `"`, `|`, `?`, `*` or control character, no trailing `.` or space, not a Windows device
+/// name. The value is a relative path under the log root on every platform (REQ-SAG-0005).
 ///
 /// # Examples
 ///
@@ -81,19 +84,20 @@ impl Repo {
     ///
     /// Accepts `scheme://[user[:pass]@]host[:port]/path` and scp `[user@]host:path`. Drops the
     /// scheme, userinfo and port; strips one trailing `/`, then one `.git`. The host's case is
-    /// kept. At least one path segment is required.
+    /// kept. A bracketed IPv6 host becomes path-safe: brackets dropped, each `:` written as `-`
+    /// (`[2001:db8::1]` -> `2001-db8--1`). At least one path segment is required.
     ///
     /// # Errors
     ///
     /// [`LogError::InvalidRepo`] for a local path or `file://` URL, a missing host or path, or a
-    /// segment that is empty, `.`, `..`, or has a `\` or control character. The reported value
-    /// never contains the userinfo.
+    /// segment that is not path-safe (see [`Repo`]). The reported value never contains the
+    /// userinfo.
     pub fn from_origin_url(url: &str) -> Result<Self, LogError> {
         let (authority, path) = match classify(url) {
             Origin::Url { authority, path } | Origin::Scp { authority, path } => (authority, path),
             Origin::Local => {
                 return Err(LogError::InvalidRepo {
-                    value: url.to_owned(),
+                    value: without_userinfo(url),
                     reason: "the origin is a local path, not a remote URL",
                 });
             }
@@ -101,7 +105,7 @@ impl Repo {
         let host_port = authority
             .rsplit_once('@')
             .map_or(authority, |(_, host)| host);
-        let host = strip_port(host_port);
+        let host = path_safe_host(host_port);
         let path = path.strip_suffix('/').unwrap_or(path);
         let path = path.strip_suffix(".git").unwrap_or(path);
         let value = format!("{host}/{path}");
@@ -111,10 +115,10 @@ impl Repo {
                 reason: "the origin has no host or no path",
             });
         }
-        if !value.split('/').all(valid_segment) {
+        if !value.split('/').all(is_path_safe) {
             return Err(LogError::InvalidRepo {
                 value,
-                reason: "a segment is empty, '.', '..', or has a '\\' or control character",
+                reason: "a segment is not a path-safe directory name",
             });
         }
         Ok(Self(Arc::from(value)))
@@ -124,17 +128,14 @@ impl Repo {
     ///
     /// # Errors
     ///
-    /// [`LogError::InvalidRepo`] when `host` or `folder` is empty, `.`, `..`, or has a `/`, `\`
-    /// or control character.
+    /// [`LogError::InvalidRepo`] when `host` or `folder` is not one path-safe directory name
+    /// (see [`Repo`]).
     pub fn local(host: &str, folder: &str) -> Result<Self, LogError> {
         let value = format!("local/{host}/{folder}");
-        if !(valid_segment(host) && valid_segment(folder))
-            || host.contains('/')
-            || folder.contains('/')
-        {
+        if !(is_path_safe(host) && is_path_safe(folder)) {
             return Err(LogError::InvalidRepo {
                 value,
-                reason: "the host and folder must each be one non-empty name",
+                reason: "the host and folder must each be one path-safe directory name",
             });
         }
         Ok(Self(Arc::from(value)))
@@ -167,6 +168,17 @@ fn classify(url: &str) -> Origin<'_> {
         let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
         return Origin::Url { authority, path };
     }
+    // scp form with a bracketed IPv6 host: `[user@][address]:path`.
+    let host_and_path = match url.split_once('@') {
+        Some((user, rest)) if !user.contains(['/', ':', '[']) => rest,
+        _ => url,
+    };
+    if let Some(rest) = host_and_path.strip_prefix('[')
+        && let Some((_, path)) = rest.split_once("]:")
+        && let Some(authority) = url.get(..url.len() - path.len() - 1)
+    {
+        return Origin::Scp { authority, path };
+    }
     // git's rule: scp form has a ':' before any '/'. A one-letter prefix is a Windows drive.
     match url.split_once(':') {
         Some((authority, path)) if !authority.contains('/') && authority.len() > 1 => {
@@ -176,24 +188,34 @@ fn classify(url: &str) -> Origin<'_> {
     }
 }
 
-/// `host:port` -> `host`; a bracketed IPv6 host keeps its brackets.
-fn strip_port(host_port: &str) -> &str {
-    if host_port.starts_with('[') {
-        return host_port
-            .find(']')
-            .and_then(|end| host_port.get(..=end))
-            .unwrap_or(host_port);
+/// `host:port` -> `host`; a bracketed IPv6 host `[a:b::c]:port` -> `a-b--c`.
+fn path_safe_host(host_port: &str) -> String {
+    if let Some(rest) = host_port.strip_prefix('[') {
+        let address = rest.split_once(']').map_or(rest, |(address, _)| address);
+        return address.replace(':', "-");
     }
     host_port
         .split_once(':')
         .map_or(host_port, |(host, _)| host)
+        .to_owned()
 }
 
-fn valid_segment(segment: &str) -> bool {
-    !segment.is_empty()
-        && segment != "."
-        && segment != ".."
-        && !segment.chars().any(|ch| ch == '\\' || ch.is_control())
+/// `url` with the userinfo of a `scheme://user[:pass]@host/...` URL removed.
+fn without_userinfo(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let (authority, path) = match rest.split_once('/') {
+        Some((authority, path)) => (authority, Some(path)),
+        None => (rest, None),
+    };
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    match path {
+        Some(path) => format!("{scheme}://{host}/{path}"),
+        None => format!("{scheme}://{host}"),
+    }
 }
 
 /// The machine's host name before its first `.` (`m5.local` -> `m5`).

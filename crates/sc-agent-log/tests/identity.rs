@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use common::events;
-use sc_agent_log::{LogError, Repo, SessionIdentity, SessionLogger, Slug};
+use sc_agent_log::{
+    LogError, LogKind, MAX_ROW_BYTES, MAX_SEGMENT_BYTES, Repo, SessionIdentity, SessionLogger, Slug,
+};
 use sc_agent_types::{ErrorDetail, ErrorId, SessionId};
 use sc_observability::v2::{EventError, FlushError, InitError};
 use sc_observability::{ErrorCode, ErrorContext, Remediation};
@@ -27,6 +29,32 @@ fn slug_rules() {
             matches!(&error, LogError::InvalidSlug { field: "agent_role", value } if value == bad),
             "{error}"
         );
+    }
+}
+
+/// RSH-002 / QA-003: a slug is one path-safe directory name: at most MAX_SEGMENT_BYTES bytes,
+/// no trailing '.', not a Windows device name.
+#[test]
+fn slug_path_safety_and_cap() {
+    let longest = "a".repeat(MAX_SEGMENT_BYTES);
+    assert_eq!(
+        Slug::new("project", &longest).expect("128 bytes").as_str(),
+        longest
+    );
+    let over = "a".repeat(MAX_SEGMENT_BYTES + 1);
+    assert_eq!(
+        Slug::new("project", &over).expect_err("129").id(),
+        "log.invalid_slug"
+    );
+    for bad in ["con", "nul", "aux", "com1", "lpt9", "con.txt", "phase-b."] {
+        assert_eq!(
+            Slug::new("project", bad).expect_err(bad).id(),
+            "log.invalid_slug",
+            "{bad}"
+        );
+    }
+    for ok in ["console", "com10", "null", "a.b"] {
+        Slug::new("project", ok).expect(ok);
     }
 }
 
@@ -82,13 +110,79 @@ fn origin_forms() {
         "file:///srv/git/repo.git",
         "../repo",
         "C:\\repos\\x",
+        // QA-003: characters Windows refuses, device names, trailing dots.
+        "https://h/a:b/x",
+        "https://h/a<b/x",
+        "https://h/a>b/x",
+        "https://h/a\"b/x",
+        "https://h/a|b/x",
+        "https://h/a?b/x",
+        "https://h/a*b/x",
+        "https://h/CON/x",
+        "https://h/owner/nul.git",
+        "https://h/owner./x",
+        "git@h:a\u{1}b",
     ] {
         let error = Repo::from_origin_url(bad).expect_err(bad);
         assert_eq!(error.id(), "log.invalid_repo", "{bad}");
     }
-    let error = Repo::from_origin_url("https://user:s3cret@h/../x").expect_err("refused");
-    assert!(!error.to_string().contains("s3cret"), "{error}");
-    assert!(!format!("{error:?}").contains("s3cret"), "{error:?}");
+    // QA-002: userinfo never appears in a refusal, local (file://) or remote.
+    for url in [
+        "https://user:s3cret@h/../x",
+        "file://user:s3cret@h/srv/x.git",
+        "file://s3cret@h",
+    ] {
+        let error = Repo::from_origin_url(url).expect_err(url);
+        assert_eq!(error.id(), "log.invalid_repo");
+        assert!(!error.to_string().contains("s3cret"), "{error}");
+        assert!(!format!("{error:?}").contains("s3cret"), "{error:?}");
+        assert!(!error.detail().message.contains("s3cret"));
+    }
+    let error = Repo::from_origin_url("file://user:s3cret@h/srv/x.git").expect_err("local");
+    assert!(
+        matches!(&error, LogError::InvalidRepo { value, .. } if value == "file://h/srv/x.git"),
+        "{error:?}"
+    );
+}
+
+/// QA-003: a bracketed IPv6 host becomes a path-safe segment (brackets dropped, ':' -> '-').
+#[test]
+fn ipv6_origin_is_path_safe() {
+    for url in [
+        "ssh://git@[2001:db8::1]:22/owner/repo.git",
+        "https://[2001:db8::1]/owner/repo",
+        "git@[2001:db8::1]:owner/repo.git",
+        "[2001:db8::1]:owner/repo.git",
+    ] {
+        let repo = Repo::from_origin_url(url).expect(url);
+        assert_eq!(repo.as_str(), "2001-db8--1/owner/repo", "{url}");
+        assert!(!repo.as_str().contains([':', '[', ']']));
+    }
+}
+
+/// RSH-002: each repo segment is at most MAX_SEGMENT_BYTES bytes.
+#[test]
+fn repo_segment_cap() {
+    let longest = "r".repeat(MAX_SEGMENT_BYTES);
+    let url = format!("https://h/owner/{longest}");
+    assert_eq!(
+        Repo::from_origin_url(&url).expect("128").as_str(),
+        format!("h/owner/{longest}")
+    );
+    let over = "r".repeat(MAX_SEGMENT_BYTES + 1);
+    let url = format!("https://h/owner/{over}");
+    assert_eq!(
+        Repo::from_origin_url(&url).expect_err("129").id(),
+        "log.invalid_repo"
+    );
+    assert_eq!(
+        Repo::local("m5", &over).expect_err("129").id(),
+        "log.invalid_repo"
+    );
+    assert_eq!(
+        Repo::local("m5", "a:b").expect_err("colon").id(),
+        "log.invalid_repo"
+    );
 }
 
 /// `git <args>` in `dir`, with the test process's repository overrides removed.
@@ -267,7 +361,7 @@ fn context() -> Box<ErrorContext> {
     ))
 }
 
-/// A8-16: 13 distinct log.* ids; Display is "<id>: <message>" only.
+/// A8-16: 14 distinct log.* ids (13 + log.row_too_large, RSH-003); Display is "<id>: <message>" only.
 #[test]
 fn ids() {
     let detail = ErrorDetail::new("x.y", "lower", None);
@@ -298,26 +392,31 @@ fn ids() {
             source: InitError::Runtime { context: context() },
         },
         LogError::Start {
-            log: "general",
+            log: LogKind::General,
             source: InitError::Configuration { context: context() },
         },
         LogError::ReservedField { key: "repo".into() },
         LogError::Rejected {
-            log: "session",
+            log: LogKind::Session,
             source: EventError::Validation { context: context() },
         },
         LogError::Flush {
-            log: "session",
+            log: LogKind::Session,
             source: FlushError::Drain { context: context() },
         },
+        LogError::RowTooLarge {
+            log: LogKind::Session,
+            bytes: MAX_ROW_BYTES + 1,
+            max: MAX_ROW_BYTES,
+        },
         LogError::RowsLost {
-            log: "session",
+            log: LogKind::Memory,
             count: 2,
             last: Some(detail),
         },
     ];
     let ids: HashSet<_> = errors.iter().map(ErrorId::id).collect();
-    assert_eq!(ids.len(), 13);
+    assert_eq!(ids.len(), 14);
     for error in &errors {
         assert!(error.id().starts_with("log."), "{}", error.id());
         assert_eq!(
