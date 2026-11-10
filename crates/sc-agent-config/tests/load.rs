@@ -396,7 +396,7 @@ fn config_errors_follow_the_error_contract() {
     }
     // Every variant says what to do next, and the advice fits the failure.
     let expected = [
-        ["HOME", "log_root", "config_dir"],
+        ["HOME", "USERPROFILE on Windows", "config_dir"],
         ["1 MiB", "shrink", "config file"],
         ["rename", "runner", "rename the runner"],
         ["fix the value", "SC_AGENT__", "local.json"],

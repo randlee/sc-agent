@@ -108,7 +108,7 @@ impl ErrorId for AgentConfigError {
                 "keep the model under the line its id already has, or choose a different id",
             )),
             Self::HomeUnknown => Some(
-                "set HOME, or set log_root in the config and pass an explicit config_dir to load",
+                "set HOME (USERPROFILE on Windows), or set log_root in the config and pass an explicit config_dir to load",
             ),
             Self::FileTooLarge { .. } => {
                 Some("shrink the config file below 1 MiB; a real config is a few kilobytes")
