@@ -375,7 +375,8 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n '\bsha2\b|Sha256::' crates/` (word-bounded: the digest-input key `sha256` is not a match) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
 
 // LimitKind (error.rs): #[non_exhaustive] pub enum LimitKind { Images, ImageBytes } with as_str() and Display.
-// Question, Answer, State, LocItem, AssetKind and ImageFormat are #[non_exhaustive].// SystemOneRequest, SystemOneResponse and ModelMetadataList implement PartialEq by hand (ignoring key_order) and use serde(remote) for the derived wire shape; the derive lines above show the wire fields only.
+// Question, Answer, State, LocItem, AssetKind and ImageFormat are #[non_exhaustive].
+// SystemOneRequest, SystemOneResponse and ModelMetadataList implement PartialEq by hand (ignoring key_order) and use serde(remote) for the derived wire shape; the derive lines above show the wire fields only.
 
 ## Acceptance criteria
 
