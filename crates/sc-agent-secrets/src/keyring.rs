@@ -1,36 +1,38 @@
+//! Platform keyring access with a read deadline.
+
+use crate::error::SecretsError;
+
 /// Reads one keyring entry.
 ///
-/// `Ok(None)` means the entry is absent. The trait is an open extension point
-/// (ADR-SAG-0020) so tests can inject a store. It is intentionally not sealed.
-/// Implementations must not put secret material in errors. A store that cannot
-/// be read returns [`JevError::io_failed_with`] (`IO_FAILED`) with a
-/// sanitized cause in `what`.
+/// `Ok(None)` means the entry is absent. The trait is open so callers and
+/// tests can inject a store. Implementations must not put secret material in
+/// errors.
 pub trait KeyringSource: Send + Sync {
     /// Returns the secret for `service` and `account`.
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::IoFailed`] when the store cannot be read.
-    /// The error must not include secret bytes or passwords.
-    fn password(&self, service: &str, account: &str) -> Result<Option<String>, JevError>;
+    /// Returns [`SecretsError::KeyringRead`] when the store cannot be read and
+    /// [`SecretsError::KeyringTimeout`] when it does not answer in time. The
+    /// error must not include secret bytes or passwords.
+    fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError>;
 }
+
 /// Reads secrets from the platform keyring.
 ///
-/// On macOS and iOS this is the Keychain. On Windows it is Credential Manager.
-/// On Linux and BSD it is the Secret Service. Other targets have no keystore
-/// and lookups miss.
+/// The service is the variable name and the account is the OS user. On macOS
+/// and iOS this is the Keychain, on Windows Credential Manager, and on Linux
+/// and BSD the Secret Service. Other targets have no keystore and lookups
+/// miss.
 ///
 /// The read runs on its own thread with a 15 s deadline
 /// (`KEYRING_READ_TIMEOUT`); a keystore that waits for a prompt it cannot
-/// show gives an `IO_FAILED` (`other`, not retryable: the blocked read does
-/// not clear until the user unlocks the keystore) instead of hanging. Once a
-/// read has timed out, every later read in the same process returns that error
-/// at once, without another 15 s wait, until the stuck read finishes; so
-/// several backends cost one wait, and at most one thread is stranded. A
-/// reader thread that fails or panics is the same non-retryable `IO_FAILED`.
-/// This method does not panic: the reader runs on its own thread, so a panic
-/// there (such as a poisoned process-global keyring builder lock) is reported
-/// as that `IO_FAILED`, not propagated.
+/// show gives [`SecretsError::KeyringTimeout`] instead of hanging. Once a read
+/// has timed out, every later read in the same process returns that error at
+/// once, without another 15 s wait, until the stuck read finishes; so several
+/// providers cost one wait, and at most one thread is stranded. A reader
+/// thread that fails or panics is [`SecretsError::KeyringRead`]; the panic is
+/// not propagated.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PlatformKeyring;
 
@@ -39,7 +41,7 @@ pub struct PlatformKeyring;
 /// A keystore that waits for the user (a locked macOS Keychain with no way to
 /// show its prompt, a Secret Service with no agent) can block a read forever.
 /// A headless run must not hang on it, so the read gets a deadline and a
-/// typed, non-retryable error (`IO_FAILED`, `other`).
+/// typed error ([`SecretsError::KeyringTimeout`]).
 pub(crate) const KEYRING_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// Why a bounded read returned nothing.
@@ -148,60 +150,40 @@ impl ReadGate {
 /// The process-wide gate of [`PlatformKeyring`].
 static GATE: std::sync::LazyLock<ReadGate> = std::sync::LazyLock::new(ReadGate::new);
 
-/// A keyring read that could not run to an answer and did not time out:
-/// not retryable, since repeating it fails the same way.
-fn keyring_read_failed() -> JevError {
-    JevError::io_failed_with(
-        format!("{KEYRING_UNREADABLE} (the read thread failed)"),
-        std::io::ErrorKind::Other,
-        Some(KEYRING_RECOVERY.to_owned()),
-    )
-}
-
-fn keyring_timed_out() -> JevError {
-    // `other`, not `timed_out`: an identical retry meets the same stuck
-    // keystore, so this is not retryable until the user unlocks it.
-    JevError::io_failed_with(
-        format!("{KEYRING_UNREADABLE} (it did not answer in time)"),
-        std::io::ErrorKind::Other,
-        Some("Unlock or allow the platform keystore for this OS user, then run again (a retry blocks again until the keystore is reachable), or provide the key in the process environment or the repo-root .env file instead.".to_owned()),
-    )
+/// A keyring read that could not run to an answer and did not time out.
+fn keyring_read_failed() -> SecretsError {
+    SecretsError::KeyringRead {
+        kind: "thread".to_owned(),
+        cause: "the read thread failed",
+    }
 }
 
 impl KeyringSource for PlatformKeyring {
-    fn password(&self, service: &str, account: &str) -> Result<Option<String>, JevError> {
+    fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError> {
         let (service, account) = (service.to_owned(), account.to_owned());
         match GATE.run(KEYRING_READ_TIMEOUT, move || read_entry(&service, &account)) {
             Ok(result) => result,
-            Err(DeadlineMiss::TimedOut) => Err(keyring_timed_out()),
+            Err(DeadlineMiss::TimedOut) => Err(SecretsError::KeyringTimeout),
             Err(DeadlineMiss::Failed) => Err(keyring_read_failed()),
         }
     }
 }
 
-fn read_entry(service: &str, account: &str) -> Result<Option<String>, JevError> {
+fn read_entry(service: &str, account: &str) -> Result<Option<String>, SecretsError> {
     let entry = match keyring::Entry::new(service, account) {
         Ok(entry) => entry,
-        Err(error) => {
-            return Err(keyring_unavailable(
-                sanitized_keyring_cause(&error),
-                keyring_io_kind(&error),
-            ));
-        }
+        Err(error) => return Err(keyring_unavailable(&error)),
     };
     classify_keyring(entry.get_password())
 }
 
 pub(crate) fn classify_keyring(
     result: Result<String, keyring::Error>,
-) -> Result<Option<String>, JevError> {
+) -> Result<Option<String>, SecretsError> {
     match result {
         Ok(secret) => Ok(Some(secret)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(keyring_unavailable(
-            sanitized_keyring_cause(&error),
-            keyring_io_kind(&error),
-        )),
+        Err(error) => Err(keyring_unavailable(&error)),
     }
 }
 
@@ -222,21 +204,25 @@ fn sanitized_keyring_cause(error: &keyring::Error) -> &'static str {
     }
 }
 
-fn keyring_unavailable(cause: &str, kind: std::io::ErrorKind) -> JevError {
-    JevError::io_failed_with(
-        format!("{KEYRING_UNREADABLE} ({cause})"),
-        kind,
-        Some(KEYRING_RECOVERY.to_owned()),
-    )
+/// The sanitized error for a keyring failure; the keyring's text is never kept.
+fn keyring_unavailable(error: &keyring::Error) -> SecretsError {
+    SecretsError::KeyringRead {
+        kind: keyring_kind(error).to_owned(),
+        cause: sanitized_keyring_cause(error),
+    }
 }
 
-/// The I/O class a keyring failure is reported as; the platform message is
-/// never kept.
-fn keyring_io_kind(error: &keyring::Error) -> std::io::ErrorKind {
+/// The keyring error variant as display-only text.
+fn keyring_kind(error: &keyring::Error) -> &'static str {
     match error {
-        keyring::Error::NoStorageAccess(_) => std::io::ErrorKind::PermissionDenied,
-        keyring::Error::BadEncoding(_) => std::io::ErrorKind::InvalidData,
-        _ => std::io::ErrorKind::Other,
+        keyring::Error::PlatformFailure(_) => "platform_failure",
+        keyring::Error::NoStorageAccess(_) => "no_storage_access",
+        keyring::Error::NoEntry => "no_entry",
+        keyring::Error::BadEncoding(_) => "bad_encoding",
+        keyring::Error::TooLong(_, _) => "too_long",
+        keyring::Error::Invalid(_, _) => "invalid",
+        keyring::Error::Ambiguous(_) => "ambiguous",
+        _ => "unrecognized",
     }
 }
 
@@ -248,6 +234,8 @@ pub(crate) fn current_account() -> String {
 
 #[cfg(test)]
 mod tests {
+    use sc_agent_types::ErrorId;
+
     use super::*;
 
     #[test]
@@ -277,13 +265,13 @@ mod tests {
         ];
         for (error, cause) in cases {
             let err = classify_keyring(Err(error)).expect_err("keyring failure");
-            assert_eq!(err.code(), "IO_FAILED");
+            assert_eq!(err.id(), "secrets.keyring_read");
             let message = err.message();
-            assert!(message.contains(KEYRING_UNREADABLE), "{message}");
+            assert!(
+                message.contains("platform keyring could not be read"),
+                "{message}"
+            );
             assert!(message.contains(cause), "{message}");
-            let action = err.suggested_action();
-            assert!(action.contains(KEYRING_RECOVERY), "{action}");
-            assert!(!action.contains("check.toml"), "{action}");
             assert_secret_absent(&err, secret);
         }
         assert_eq!(
@@ -292,8 +280,8 @@ mod tests {
         );
     }
 
-    fn assert_secret_absent(error: &JevError, secret: &str) {
-        let rendered = format!("{error} {error:?} {}", error.message());
+    fn assert_secret_absent(error: &SecretsError, secret: &str) {
+        let rendered = format!("{error} {error:?} {:?}", error.detail());
         assert!(!rendered.contains(secret), "{rendered}");
     }
 
@@ -315,7 +303,7 @@ mod tests {
         }
     }
 
-    /// A read that never answers returns a typed, non-retryable error at the
+    /// A read that never answers returns a typed error at the
     /// deadline instead of hanging. The blocked reader waits on a channel, so
     /// the test depends on no sleep: it ends when the test releases the gate.
     #[test]
@@ -340,15 +328,10 @@ mod tests {
         drop(release);
         wait_until_unstuck(&gate);
         assert_eq!(gate.run(LONG, || 7_u8), Ok(7));
-        let error = keyring_timed_out();
-        assert_eq!(error.code(), "IO_FAILED");
-        assert!(!error.retryable(), "a retry meets the same stuck keystore");
-        assert!(error.suggested_action().contains("process environment"));
-        assert!(error.suggested_action().contains("blocks again"));
     }
 
-    /// A reader that panics before answering is not a timeout, is not
-    /// retryable, and leaves the gate usable.
+    /// A reader that panics before answering is not a timeout and leaves the
+    /// gate usable.
     #[test]
     fn a_panicking_keyring_read_is_not_a_timeout_and_the_next_read_works() {
         let gate = ReadGate::new();
@@ -359,8 +342,7 @@ mod tests {
         assert!(!gate.is_stuck());
         assert_eq!(gate.run(LONG, || 3_u8), Ok(3));
         let error = keyring_read_failed();
-        assert_eq!(error.code(), "IO_FAILED");
-        assert!(!error.retryable());
+        assert_eq!(error.id(), "secrets.keyring_read");
     }
 
     /// A quick read that was already running when an older one was declared
@@ -372,13 +354,16 @@ mod tests {
         let (finish_quick, quick_held) = mpsc::channel::<()>();
         let quick_gate = std::sync::Arc::clone(&gate);
         // The quick read starts first and waits to be told to finish.
-        let quick = std::thread::spawn(move || {
-            quick_gate.run(LONG, move || {
-                let _ = started_tx.send(());
-                let _ = quick_held.recv();
-                5_u8
+        let quick = std::thread::Builder::new()
+            .name("quick-read".to_owned())
+            .spawn(move || {
+                quick_gate.run(LONG, move || {
+                    let _ = started_tx.send(());
+                    let _ = quick_held.recv();
+                    5_u8
+                })
             })
-        });
+            .expect("spawn the quick read");
         started_rx.recv().expect("the quick read started");
         // Another read, started later, times out and is stuck.
         let (release_stuck, stuck_held) = mpsc::channel::<()>();

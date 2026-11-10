@@ -23,22 +23,28 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use sc_agent_types::JevError;
+use crate::error::SecretsError;
 
-pub(crate) const DOTENV_UNREADABLE: &str = "repo-root .env could not be read";
-
-pub(crate) const DOTENV_RECOVERY: &str = "Make the repo-root .env file readable by this user, or remove it, then retry. Do not paste secret values into logs or this message.";
-
-pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, JevError> {
+/// Reads `<repo_root>/.env`; a missing file yields no variables.
+///
+/// # Errors
+///
+/// Returns [`SecretsError::DotenvRead`] when the file exists and cannot be
+/// read. The error holds a sanitized label, never the OS message.
+pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, SecretsError> {
     let path = repo_root.join(".env");
     match fs::read_to_string(&path) {
         Ok(text) => Ok(parse_dotenv(&text)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(BTreeMap::new()),
-        Err(error) => Err(JevError::io_failed_with(
-            format!("{DOTENV_UNREADABLE} ({})", sanitized_io_cause(&error)),
-            error.kind(),
-            Some(DOTENV_RECOVERY.to_owned()),
-        )),
+        Err(error) => Err(dotenv_read_error(&error)),
+    }
+}
+
+/// The sanitized error for an unreadable `.env`.
+fn dotenv_read_error(error: &io::Error) -> SecretsError {
+    SecretsError::DotenvRead {
+        kind: format!("{:?}", error.kind()),
+        cause: sanitized_io_cause(error),
     }
 }
 
@@ -108,7 +114,7 @@ fn quoted_value(value: &str) -> Option<String> {
         .chars()
         .next()
         .filter(|ch| *ch == '"' || *ch == '\'')?;
-    let body = &value[1..];
+    let body = value.get(quote.len_utf8()..)?;
     let mut escaped = false;
     let close = body.char_indices().find_map(|(index, ch)| {
         if quote == '"' && escaped {
@@ -121,11 +127,11 @@ fn quoted_value(value: &str) -> Option<String> {
         }
         (ch == quote).then_some(index)
     })?;
-    let rest = body[close + 1..].trim_start();
+    let rest = body.get(close + quote.len_utf8()..)?.trim_start();
     if !(rest.is_empty() || rest.starts_with('#')) {
         return None;
     }
-    let inner = &body[..close];
+    let inner = body.get(..close)?;
     Some(if quote == '"' {
         unescape_double(inner)
     } else {
@@ -138,7 +144,8 @@ fn strip_inline_comment(raw: &str) -> &str {
     let mut previous_is_space = false;
     for (index, ch) in raw.char_indices() {
         if ch == '#' && previous_is_space {
-            return &raw[..index];
+            // `index` is the byte offset of a `#`, so it is a char boundary.
+            return raw.get(..index).unwrap_or(raw);
         }
         previous_is_space = ch.is_whitespace();
     }
@@ -215,27 +222,21 @@ mod tests {
 
     #[test]
     fn missing_file_is_empty() {
-        let repo = crate::test_support::TempRepo::new(None);
+        let repo = tempfile::tempdir().unwrap();
         let loaded = load_dotenv(repo.path()).unwrap();
         assert!(loaded.is_empty());
     }
 
     #[test]
     fn unreadable_cause_omits_raw_error_text() {
+        use sc_agent_types::ErrorId;
+
         let secret = "super-secret-value";
         let error = io::Error::new(io::ErrorKind::PermissionDenied, secret);
-        let rendered = JevError::io_failed_with(
-            format!(
-                "{DOTENV_UNREADABLE} ({})",
-                super::sanitized_io_cause(&error)
-            ),
-            error.kind(),
-            Some(DOTENV_RECOVERY.to_owned()),
-        );
-        let text = format!("{rendered} {rendered:?} {}", rendered.suggested_action());
-        assert!(text.contains("(permission denied)"), "{text}");
-        assert!(text.contains(DOTENV_RECOVERY), "{text}");
+        let rendered = dotenv_read_error(&error);
+        assert_eq!(rendered.id(), "secrets.dotenv_read");
+        let text = format!("{rendered} {rendered:?} {}", rendered.message());
+        assert!(text.contains("permission denied"), "{text}");
         assert!(!text.contains(secret), "{text}");
-        assert!(!rendered.suggested_action().contains("check.toml"));
     }
 }

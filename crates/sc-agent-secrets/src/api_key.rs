@@ -1,72 +1,77 @@
+//! The sealed API key type.
+
 use std::fmt;
 use std::sync::Arc;
 
-use crate::error::JevError;
-use crate::ids::BackendKeyId;
+use crate::error::SecretsError;
 
-/// Recovery text for a key that fails [`ResolvedApiKey::try_new`].
-const MALFORMED_KEY_RECOVERY: &str = "Store the key again in the process environment, the repo-root .env file, or the keyring without spaces, line breaks, control characters, or non-ASCII characters, then retry.";
-
-/// API key accepted by a sending transport.
+/// An API key accepted by a sending transport.
 ///
 /// The secret is held as `Arc<str>`, so clones share one allocation.
 /// [`Debug`](fmt::Debug) and [`Display`](fmt::Display) print `[redacted]` and
-/// never the secret bytes.
+/// never the secret bytes. The only way to build one is
+/// [`resolve`](crate::resolve) or [`resolve_var`](crate::resolve_var).
 ///
 /// # Examples
 ///
 /// ```
-/// use sc_agent_types::{BackendKeyId, ResolvedApiKey};
+/// use sc_agent_secrets::{resolve_var, EnvSource, KeySources, KeyringSource, SecretsError};
+/// use sc_agent_types::VarName;
 ///
-/// let key = ResolvedApiKey::try_new(BackendKeyId::OpenAi, " test-key\n".to_owned())
-///     .expect("well-formed key");
-/// assert_eq!(format!("{key:?}"), "ResolvedApiKey([redacted])");
+/// struct OneVar;
+/// impl EnvSource for OneVar {
+///     fn var(&self, name: &str) -> Option<String> {
+///         (name == "MY_RUNNER_TOKEN").then(|| " test-key\n".to_owned())
+///     }
+/// }
+/// struct NoKeyring;
+/// impl KeyringSource for NoKeyring {
+///     fn password(&self, _: &str, _: &str) -> Result<Option<String>, SecretsError> {
+///         Ok(None)
+///     }
+/// }
+///
+/// let var: VarName = "MY_RUNNER_TOKEN".parse()?;
+/// let sources = KeySources { env: &OneVar, repo_root: None, keyring: &NoKeyring };
+/// let key = resolve_var(&var, &sources)?.key;
+/// assert_eq!(format!("{key:?}"), "ApiKey([redacted])");
 /// assert_eq!(key.to_string(), "[redacted]");
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[must_use = "read the secret with as_str only at the transport that sends it"]
 #[derive(Clone, PartialEq, Eq)]
-pub struct ResolvedApiKey(Arc<str>);
+pub struct ApiKey(Arc<str>);
 
-impl ResolvedApiKey {
-    /// Normalizes and seals a raw credential for backend `id`.
+impl ApiKey {
+    /// Normalizes and seals a raw credential read from variable `var`.
     ///
-    /// This is the one rule set for every backend and the only constructor.
+    /// This is the one rule set for every key and the only constructor.
     /// Surrounding whitespace is trimmed. The trimmed key must be non-empty
-    /// and must not contain whitespace or control characters, because no
-    /// provider issues keys with them and a stray space or newline is a
-    /// copy-paste error.
+    /// and consist of visible ASCII only, because no provider issues keys
+    /// with whitespace or control characters and a stray space or newline is
+    /// a copy-paste error.
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::KeyMissing`] when the trimmed key is empty.
-    /// Returns [`JevError::CredentialStoreInvalid`] (`CONFIG_INVALID`) when
-    /// the key contains interior whitespace or a control character. Neither
-    /// error contains key bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sc_agent_types::{BackendKeyId, ResolvedApiKey};
-    ///
-    /// let missing = ResolvedApiKey::try_new(BackendKeyId::TypeSafe, "  ".to_owned());
-    /// assert_eq!(missing.unwrap_err().code(), "KEY_MISSING");
-    /// let spaced = ResolvedApiKey::try_new(BackendKeyId::Anthropic, "sk ant".to_owned());
-    /// assert_eq!(spaced.unwrap_err().code(), "CONFIG_INVALID");
-    /// ```
-    pub fn try_new(id: BackendKeyId, raw: String) -> Result<Self, JevError> {
+    /// Returns [`SecretsError::KeyMissing`] when the trimmed key is empty and
+    /// [`SecretsError::KeyMalformed`] when it contains whitespace, a control
+    /// character or a character outside visible ASCII. Neither error contains
+    /// key bytes.
+    pub(crate) fn try_new(var: &str, raw: String) -> Result<Self, SecretsError> {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
-            return Err(JevError::key_missing(id));
+            return Err(SecretsError::KeyMissing {
+                var: var.to_owned(),
+            });
         }
         if trimmed
             .chars()
             .any(|ch| ch.is_whitespace() || ch.is_control())
         {
-            return Err(JevError::credential_store_invalid(
-                format!("the {id} API key"),
-                "key contains whitespace or a control character",
-                MALFORMED_KEY_RECOVERY,
-            ));
+            return Err(SecretsError::KeyMalformed {
+                var: var.to_owned(),
+                reason: "key contains whitespace or a control character",
+            });
         }
         // The key travels as an HTTP header value, which `http` accepts for
         // any byte but controls (so it takes a non-ASCII character).
@@ -74,11 +79,10 @@ impl ResolvedApiKey {
         // key outside visible ASCII is refused here, and no later layer has a
         // failing header value to handle.
         if !trimmed.chars().all(|ch| ch.is_ascii_graphic()) {
-            return Err(JevError::credential_store_invalid(
-                format!("the {id} API key"),
-                "key contains a character outside visible ASCII",
-                MALFORMED_KEY_RECOVERY,
-            ));
+            return Err(SecretsError::KeyMalformed {
+                var: var.to_owned(),
+                reason: "key contains a character outside visible ASCII",
+            });
         }
         Ok(Self(Arc::from(trimmed)))
     }
@@ -86,8 +90,9 @@ impl ResolvedApiKey {
     /// Returns the secret.
     ///
     /// This is the only read of the secret bytes. Only the transport that
-    /// sends the key may call it. Do not log the result, store it in an
-    /// error, or place it in [`Debug`](fmt::Debug) output.
+    /// sends the key may call it (the workspace `clippy.toml` disallows every
+    /// other call). Do not log the result, store it in an error, or place it
+    /// in [`Debug`](fmt::Debug) output.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -102,51 +107,61 @@ impl ResolvedApiKey {
     pub fn redact_text(&self, text: &str) -> String {
         text.replace(&*self.0, "[redacted]")
     }
-
-    /// Replaces the secret with `[redacted]` in every text field of `error`.
-    ///
-    /// Built on [`JevError::map_detail`], so a new variant with a text field
-    /// is redacted without changing this method.
-    #[must_use]
-    pub fn redact_error(&self, error: JevError) -> JevError {
-        error.map_detail(|detail| self.redact_text(detail))
-    }
 }
 
-impl fmt::Debug for ResolvedApiKey {
+impl fmt::Debug for ApiKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ResolvedApiKey([redacted])")
+        formatter.write_str("ApiKey([redacted])")
     }
 }
 
-impl fmt::Display for ResolvedApiKey {
+impl fmt::Display for ApiKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("[redacted]")
     }
 }
+
 #[cfg(test)]
 mod tests {
+    use sc_agent_types::{ErrorId, Provider};
+
     use super::*;
+    use crate::{ALL_VARS, env_var};
 
     const SECRET: &str = "sk-test-secret";
 
-    fn key(text: &str) -> ResolvedApiKey {
-        ResolvedApiKey::try_new(BackendKeyId::TypeSafe, text.to_owned()).expect("key")
+    fn key(text: &str) -> ApiKey {
+        ApiKey::try_new(env_var(Provider::TypeSafe), text.to_owned()).expect("key")
     }
 
     #[test]
     fn try_new_trims_and_keeps_the_key() {
         assert_eq!(key(&format!("  {SECRET}\r\n")), key(SECRET));
-        let exact = ResolvedApiKey::try_new(BackendKeyId::OpenAi, SECRET.to_owned()).unwrap();
+        let exact = ApiKey::try_new(env_var(Provider::OpenAi), SECRET.to_owned()).unwrap();
         assert_eq!(exact, key(SECRET));
     }
 
     #[test]
-    fn try_new_has_one_rule_set_for_every_backend() {
-        for id in BackendKeyId::ALL.iter().copied() {
+    #[expect(clippy::disallowed_methods, reason = "test reads the key it built")]
+    fn as_str_returns_the_trimmed_secret() {
+        assert_eq!(key(&format!(" {SECRET}\n")).as_str(), SECRET);
+    }
+
+    #[test]
+    fn try_new_has_one_rule_set_for_every_variable() {
+        let vars = Provider::ALL
+            .iter()
+            .map(|provider| env_var(*provider))
+            .chain(ALL_VARS.iter().copied());
+        for var in vars {
             for blank in ["", "   ", "\n\t"] {
-                let error = ResolvedApiKey::try_new(id, blank.to_owned()).unwrap_err();
-                assert_eq!(error, JevError::key_missing(id));
+                let error = ApiKey::try_new(var, blank.to_owned()).unwrap_err();
+                assert_eq!(
+                    error,
+                    SecretsError::KeyMissing {
+                        var: var.to_owned()
+                    }
+                );
             }
             for bad in [
                 format!("{SECRET} tail"),
@@ -156,12 +171,11 @@ mod tests {
                 format!("{SECRET}\u{a0}x"),
                 format!("{SECRET}\u{7f}"),
             ] {
-                let error = ResolvedApiKey::try_new(id, bad.clone()).unwrap_err();
-                assert_eq!(error.code(), "CONFIG_INVALID", "{id} {bad:?}");
+                let error = ApiKey::try_new(var, bad.clone()).unwrap_err();
+                assert_eq!(error.id(), "secrets.key_malformed", "{var} {bad:?}");
                 let hint = error.message();
-                assert!(hint.contains(&id.to_string()), "{hint}");
+                assert!(hint.contains(var), "{hint}");
                 assert!(hint.contains("whitespace or a control character"), "{hint}");
-                assert!(!hint.contains("check.toml"), "{hint}");
                 let rendered = format!("{error} {error:?} {hint}");
                 assert!(!rendered.contains(SECRET), "{rendered}");
             }
@@ -169,17 +183,31 @@ mod tests {
     }
 
     /// The one header-value rule is here: a key outside visible ASCII is
-    /// refused, with the credential recovery text and no key bytes.
+    /// refused, with recovery text and no key bytes.
     #[test]
     fn try_new_refuses_non_ascii_keys() {
-        for id in BackendKeyId::ALL.iter().copied() {
+        for provider in Provider::ALL.iter().copied() {
+            let var = env_var(provider);
             for bad in [format!("{SECRET}é"), format!("日本{SECRET}")] {
-                let error = ResolvedApiKey::try_new(id, bad.clone()).unwrap_err();
-                assert_eq!(error.code(), "CONFIG_INVALID", "{id} {bad:?}");
+                let error = ApiKey::try_new(var, bad.clone()).unwrap_err();
+                assert_eq!(error.id(), "secrets.key_malformed", "{var} {bad:?}");
                 assert!(error.message().contains("outside visible ASCII"));
-                assert!(error.suggested_action().contains("non-ASCII"));
-                let rendered = format!("{error} {error:?} {}", error.suggested_action());
+                let recovery = error.recovery().unwrap_or_default();
+                assert!(recovery.contains("whitespace"), "{recovery}");
+                let rendered = format!("{error} {error:?} {recovery}");
                 assert!(!rendered.contains(SECRET), "{rendered}");
             }
         }
     }
+
+    #[test]
+    fn debug_display_and_redact_text_hide_the_secret() {
+        let key = key(SECRET);
+        assert_eq!(format!("{key:?}"), "ApiKey([redacted])");
+        assert_eq!(key.to_string(), "[redacted]");
+        assert_eq!(
+            key.redact_text(&format!("auth: Bearer {SECRET}; again {SECRET}")),
+            "auth: Bearer [redacted]; again [redacted]"
+        );
+    }
+}

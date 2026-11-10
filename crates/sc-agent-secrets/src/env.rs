@@ -1,17 +1,20 @@
+//! Environment-variable sources.
+
 /// Reads named variables.
 ///
 /// `None` means unset. `Some` means set, including an empty string. The trait
-/// is an open extension point (ADR-SAG-0020) so tests can inject values
-/// without changing the process environment. It is intentionally not sealed.
+/// is open so callers and tests can inject values without changing the
+/// process environment.
 pub trait EnvSource: Send + Sync {
     /// Returns the variable named `name` when it is set.
     fn var(&self, name: &str) -> Option<String>;
 }
+
 /// Reads variables from the process environment.
 ///
-/// A missing variable is `None`. A present empty string is `Some("")`, so
-/// repo-root `.env` does not override it. Non-Unicode values are treated as
-/// present and empty.
+/// A missing variable is `None`. A present empty string is `Some("")`, so the
+/// repo-root `.env` does not override it (the keyring is tried next).
+/// Non-Unicode values are treated as present and empty.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProcessEnv;
 
