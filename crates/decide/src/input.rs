@@ -635,4 +635,96 @@ mod tests {
         .expect_err("unknown magic");
         assert!(matches!(error, DecideError::ImageFormat { .. }));
     }
+
+    /// Blank lines of `width` spaces each, generated on demand: a batch of any size with a
+    /// 64 KiB buffer, never held whole.
+    struct BlankLines {
+        width: usize,
+        remaining: u64,
+        column: usize,
+    }
+
+    impl Read for BlankLines {
+        fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+            if self.remaining == 0 || out.is_empty() {
+                return Ok(0);
+            }
+            if self.column == self.width {
+                self.column = 0;
+                self.remaining -= 1;
+                out[0] = b'\n';
+                return Ok(1);
+            }
+            let spaces = (self.width - self.column).min(out.len());
+            out[..spaces].fill(b' ');
+            self.column += spaces;
+            Ok(spaces)
+        }
+    }
+
+    fn blank_lines(width: usize, lines: u64) -> std::io::BufReader<BlankLines> {
+        std::io::BufReader::with_capacity(
+            64 * 1024,
+            BlankLines {
+                width,
+                remaining: lines,
+                column: 0,
+            },
+        )
+    }
+
+    /// REQ-QA-002, RSH-002: a batch past 256 MiB is `batch_bytes` at the first line over the
+    /// cap, blank lines counted, without the batch ever being held in memory.
+    #[test]
+    fn a_batch_over_256_mib_is_batch_bytes() {
+        // Lines of 1 MiB plus a newline: line 256 passes 256 MiB because the newlines count.
+        let error = read_batch(&mut blank_lines(1024 * 1024, 300)).expect_err("too big");
+        assert!(
+            matches!(
+                error,
+                DecideError::LimitExceeded {
+                    what: LimitKind::BatchBytes,
+                    line: Some(256),
+                    max: MAX_BATCH_BYTES,
+                }
+            ),
+            "{error:?}"
+        );
+    }
+
+    /// RSH-002: blank lines count against the line cap too.
+    #[test]
+    fn blank_lines_count_against_batch_lines() {
+        let error = read_batch(&mut blank_lines(0, MAX_BATCH_LINES + 5)).expect_err("too many");
+        assert!(
+            matches!(
+                error,
+                DecideError::LimitExceeded {
+                    what: LimitKind::BatchLines,
+                    line: Some(10_001),
+                    ..
+                }
+            ),
+            "{error:?}"
+        );
+        let requests = read_batch(&mut blank_lines(0, MAX_BATCH_LINES)).expect("at the cap");
+        assert!(requests.is_empty());
+    }
+
+    /// REQ-QA-002: the in-memory batch applies the same byte cap to item sizes (JSON plus
+    /// image bytes) before any item is built; counted from sizes, so no 256 MiB is allocated.
+    #[test]
+    fn in_memory_item_sizes_over_256_mib_are_batch_bytes() {
+        let mib = 1024 * 1024;
+        let error = check_batch_sizes([200 * mib, 56 * mib, 1].into_iter()).expect_err("over");
+        assert!(matches!(
+            error,
+            DecideError::LimitExceeded {
+                what: LimitKind::BatchBytes,
+                line: Some(3),
+                ..
+            }
+        ));
+        check_batch_sizes([200 * mib, 56 * mib].into_iter()).expect("exactly 256 MiB");
+    }
 }

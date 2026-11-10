@@ -288,6 +288,95 @@ mod tests {
         }
     }
 
+    /// Send 0 answers the 429 and marks when it returned; send 1 is held until then (so its
+    /// worker stays busy past the 429); every later send answers 200. Send start times are
+    /// recorded.
+    #[derive(Clone)]
+    struct Gated {
+        retry_after: &'static str,
+        state: Arc<(std::sync::Mutex<GatedState>, std::sync::Condvar)>,
+    }
+
+    #[derive(Default)]
+    struct GatedState {
+        starts: Vec<std::time::Instant>,
+        busy_returned: Option<std::time::Instant>,
+    }
+
+    impl sc_agent_http::Transport for Gated {
+        fn send(
+            &self,
+            _request: &sc_agent_http::HttpRequest,
+        ) -> Result<HttpResponse, sc_agent_http::HttpError> {
+            let (lock, condvar) = &*self.state;
+            let mut state = lock.lock().expect("lock");
+            let index = state.starts.len();
+            state.starts.push(std::time::Instant::now());
+            match index {
+                0 => {
+                    state.busy_returned = Some(std::time::Instant::now());
+                    condvar.notify_all();
+                    Ok(retry_after(self.retry_after))
+                }
+                1 => {
+                    while state.busy_returned.is_none() {
+                        state = condvar.wait(state).expect("wait");
+                    }
+                    Ok(ok_noul())
+                }
+                _ => Ok(ok_noul()),
+            }
+        }
+    }
+
+    /// AC: REQ-SAG-0012 with `workers: 2` (REQ-QA-004). Two workers take the first two
+    /// requests; the second one's send is held until the 429 has returned, so the third
+    /// request can only be admitted after the 429. Its first send, and the resend, both wait
+    /// out the pause the 429 set on the shared client.
+    #[test]
+    fn with_two_workers_a_request_admitted_after_the_429_waits_the_pause() {
+        for (seconds, floor) in [
+            ("1", Duration::from_secs(1)),
+            ("0", Duration::from_millis(250)),
+        ] {
+            let transport = Gated {
+                retry_after: seconds,
+                state: Arc::default(),
+            };
+            let log = MemoryLog::new().expect("log");
+            let dir = config_dir(r#"{"workers":2}"#);
+            let ctx = context(
+                dir.path(),
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+                Arc::new(transport.clone()),
+                &log,
+            );
+            let options = options("jev", None, ctx, &log);
+            let requests: Vec<DecisionRequest> = (0..3).map(|_| request(NOUL)).collect();
+            let mut ok = 0;
+            send_batch(&options, requests, &CancelToken::new(), &mut |result| {
+                ok += usize::from(result.outcome.is_ok());
+                Ok(())
+            })
+            .expect("batch");
+            assert_eq!(ok, 3);
+            let state = transport.state.0.lock().expect("lock");
+            let busy = state.busy_returned.expect("the 429 was sent");
+            assert_eq!(
+                state.starts.len(),
+                4,
+                "the 429, two first sends, the resend"
+            );
+            for start in &state.starts[2..] {
+                let since = start.duration_since(busy);
+                assert!(
+                    since >= floor,
+                    "a send {since:?} after the 429 ignored the {floor:?} pause"
+                );
+            }
+        }
+    }
+
     /// AC: REQ-SAG-0013. Bound violations fail before any send with `decide.config`.
     #[test]
     fn config_bounds_fail_before_any_send() {
@@ -419,6 +508,51 @@ mod tests {
         assert_eq!(limit(error), "image_bytes");
     }
 
+    /// AC: REQ-SAG-0014 (REQ-QA-002). Past 256 MiB a batch is `batch_bytes` and nothing is
+    /// sent: from a file (generated, never held) through `read_batch`, and in memory through
+    /// `build_batch` (10,001 items, the line cap; the byte cap over item sizes is unit-tested
+    /// in `input.rs` without allocating 256 MiB).
+    #[test]
+    fn an_oversized_batch_sends_nothing() {
+        let transport = ScriptedTransport::responses(vec![ok_noul()]);
+        let log = MemoryLog::new().expect("log");
+        let dir = empty_config_dir();
+        let ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport.clone()),
+            &log,
+        );
+        let options = options("jev", None, ctx, &log);
+        let outcome = read_batch(&mut crate::common::BlankLines::new(1024 * 1024, 300)).and_then(
+            |requests| send_batch(&options, requests, &CancelToken::new(), &mut |_| Ok(())),
+        );
+        assert!(matches!(
+            outcome,
+            Err(DecideError::LimitExceeded {
+                what: decide::input::LimitKind::BatchBytes,
+                ..
+            })
+        ));
+        let items: Vec<BatchInput> = (0..10_001)
+            .map(|_| BatchInput {
+                json: NOUL.to_owned(),
+                ..BatchInput::default()
+            })
+            .collect();
+        let outcome = build_batch(items).and_then(|requests| {
+            send_batch(&options, requests, &CancelToken::new(), &mut |_| Ok(()))
+        });
+        assert!(matches!(
+            outcome,
+            Err(DecideError::LimitExceeded {
+                what: decide::input::LimitKind::BatchLines,
+                ..
+            })
+        ));
+        assert_eq!(transport.sends(), 0);
+    }
+
     /// AC: REQ-SAG-0801. `local_runners.laya` (127.0.0.1:9000) makes `--model laya` build a
     /// LocalBackend that sends to the configured host and port.
     #[test]
@@ -535,6 +669,46 @@ mod tests {
             blocking.sends(),
             1,
             "only the blocked probe; no decision send"
+        );
+    }
+
+    /// AC: REQ-SAG-0015 (REQ-QA-005b). A model that is still not loaded after the runner's
+    /// `load_timeout_secs` (10, the minimum) ends the send with `local.load_timeout` naming the
+    /// runner, and no decision is sent. Real clock: `wait_until_loaded` (A-6) has no clock
+    /// seam, so this waits the 10 s.
+    #[test]
+    fn a_model_that_does_not_load_in_time_is_local_load_timeout() {
+        let dir = config_dir(
+            r#"{"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","load_timeout_secs":10}}}"#,
+        );
+        let transport = TimedTransport::new(vec![Ok(json_response(200, r#"{"ok":false}"#))]);
+        let log = MemoryLog::new().expect("log");
+        let ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
+        let started = std::time::Instant::now();
+        let error = send(
+            &options("dec", None, ctx, &log),
+            request(NOUL),
+            &CancelToken::new(),
+        )
+        .expect_err("load timeout");
+        assert!(started.elapsed() >= Duration::from_secs(10));
+        assert_eq!(error.id(), "decide.decision");
+        let backend = error.cause_detail().expect("cause");
+        assert_eq!(backend.id, "decision.backend");
+        let local = backend.cause.expect("local cause");
+        assert_eq!(local.id, "local.load_timeout");
+        assert!(
+            local.message.contains("127.0.0.1:9100"),
+            "{}",
+            local.message
+        );
+        let sends = transport.sends();
+        assert!(sends.len() >= 10, "one probe per second");
+        assert!(
+            sends
+                .iter()
+                .all(|(_, sent)| sent.endpoint().as_str() == "http://127.0.0.1:9100/health"),
+            "no decision was sent"
         );
     }
 

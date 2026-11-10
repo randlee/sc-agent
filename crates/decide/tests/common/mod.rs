@@ -207,3 +207,41 @@ pub fn records_text(log: &MemoryLog) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+/// `lines` lines of `width` spaces each, generated on demand (a batch of any size, never held).
+pub struct BlankLines {
+    width: usize,
+    remaining: u64,
+    column: usize,
+}
+
+impl BlankLines {
+    pub fn new(width: usize, lines: u64) -> std::io::BufReader<Self> {
+        std::io::BufReader::with_capacity(
+            64 * 1024,
+            Self {
+                width,
+                remaining: lines,
+                column: 0,
+            },
+        )
+    }
+}
+
+impl std::io::Read for BlankLines {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        if self.remaining == 0 || out.is_empty() {
+            return Ok(0);
+        }
+        if self.column == self.width {
+            self.column = 0;
+            self.remaining -= 1;
+            out[0] = b'\n';
+            return Ok(1);
+        }
+        let spaces = (self.width - self.column).min(out.len());
+        out[..spaces].fill(b' ');
+        self.column += spaces;
+        Ok(spaces)
+    }
+}

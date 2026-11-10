@@ -31,49 +31,49 @@ mod tests {
         out
     }
 
-    /// AC: REQ-SAG-0001 AC2. No crate depends on the UUID crate, and the crates of this
-    /// sprint (decide, sc-agent-py) contain none of the three searched texts at all.
-    ///
-    /// The AC's literal workspace search also matches two upstream lines in sc-agent-types
-    /// (a local variable named after the refused format, in a refusal test and a doc
-    /// example); they are reported to the orchestrator, not hidden here. The needles are
-    /// built at run time so this file does not match itself.
+    /// Every text file under `dir` (UTF-8 files; build output and caches skipped), as `rg` sees it.
+    fn text_files(dir: &Path, out: &mut Vec<(PathBuf, String)>) {
+        for entry in std::fs::read_dir(dir).expect("dir").flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            if path.is_dir() {
+                if !matches!(
+                    name.to_str(),
+                    Some("target" | ".venv" | "__pycache__" | ".git")
+                ) {
+                    text_files(&path, out);
+                }
+            } else if let Ok(text) = std::fs::read_to_string(&path) {
+                out.push((path, text));
+            }
+        }
+    }
+
+    /// AC: REQ-SAG-0001 AC2. The AC's literal workspace search finds nothing: no text file
+    /// anywhere under `crates/` contains any of the three needles. The needles are built at
+    /// run time so this file does not match itself.
     #[test]
-    fn no_uuid_dependency_or_text() {
+    fn no_uuid_text_anywhere_in_crates() {
         let crate_name = ["uu", "id"].concat();
         let needles = [
             ["Uu", "id"].concat(),
             format!("{crate_name}::"),
             format!("{crate_name} ="),
         ];
-        let mut manifests = Vec::new();
-        files(&crates_dir(), "toml", &mut manifests);
-        for manifest in manifests.iter().filter(|path| path.ends_with("Cargo.toml")) {
-            let text = std::fs::read_to_string(manifest).expect("read");
-            for line in text.lines() {
-                let line = line.trim_start();
+        let mut files = Vec::new();
+        text_files(&crates_dir(), &mut files);
+        assert!(
+            files.len() > 100,
+            "the search saw the workspace ({} files)",
+            files.len()
+        );
+        for (path, text) in files {
+            for needle in &needles {
                 assert!(
-                    !line.starts_with(&format!("{crate_name} "))
-                        && !line.starts_with(&format!("{crate_name}=")),
-                    "{} depends on the UUID crate",
-                    manifest.display()
+                    !text.contains(needle.as_str()),
+                    "{} contains {needle}",
+                    path.display()
                 );
-            }
-        }
-        for krate in ["decide", "sc-agent-py"] {
-            let mut sources = Vec::new();
-            for extension in ["rs", "toml", "py"] {
-                files(&crates_dir().join(krate), extension, &mut sources);
-            }
-            for path in sources {
-                let text = std::fs::read_to_string(&path).expect("read");
-                for needle in &needles {
-                    assert!(
-                        !text.contains(needle.as_str()),
-                        "{} contains {needle}",
-                        path.display()
-                    );
-                }
             }
         }
     }

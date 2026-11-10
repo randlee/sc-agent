@@ -398,4 +398,76 @@ mod tests {
             );
         }
     }
+
+    /// AC: REQ-SAG-0011 decide (RSH-001). SIGTERM while decide blocks reading a held-open
+    /// stdin exits 130 at once, with nothing printed or sent.
+    ///
+    /// Synchronised without a sleep: `default.json` is a FIFO, so the test's open of its write
+    /// end returns only once decide (past `signal::install`, the first thing `main` does) has
+    /// opened it to load the configuration. Decide then blocks on stdin, which the test keeps
+    /// open and never writes.
+    #[test]
+    fn sigterm_while_stdin_blocks_exits_130() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let port = listener.local_addr().expect("addr").port();
+        let home = tempfile::tempdir().expect("home");
+        let config = home.path().join(".sc-agent");
+        std::fs::create_dir_all(&config).expect("config dir");
+        let fifo = config.join("default.json");
+        let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
+        assert!(made.success());
+        let mut child = decide(
+            home.path(),
+            &[
+                "send",
+                "--batch",
+                "--model",
+                "dec",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                "-",
+            ],
+        )
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+        let held_stdin = child.stdin.take().expect("stdin");
+        let mut writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&fifo)
+            .expect("fifo");
+        write!(
+            writer,
+            r#"{{"local_runners":{{"dec":{{"kind":"mapika","host":"127.0.0.1","port":{port},"model":"jev-latest"}}}}}}"#
+        )
+        .expect("config");
+        drop(writer);
+        let status = Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status()
+            .expect("kill");
+        assert!(status.success());
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = sender.send(child.wait_with_output());
+        });
+        let output = receiver
+            .recv_timeout(Duration::from_secs(10))
+            .expect("decide exits on SIGTERM while stdin is open")
+            .expect("wait");
+        drop(held_stdin);
+        assert_eq!(
+            output.status.code(),
+            Some(130),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stdout.is_empty());
+        assert!(listener.accept().is_err(), "nothing was sent");
+    }
 }
