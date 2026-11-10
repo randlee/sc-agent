@@ -163,7 +163,9 @@ fn shared_logger_reports_once() {
     loggers.close().expect("nothing left to report");
 }
 
-/// QA-001: loggers built from one MemoryLog share one account; a refusal is reported once.
+/// QA-001 / QA-004: loggers built from one MemoryLog share one account. A row refused by the
+/// session logger is reported by the general logger's flush (called first), and the session
+/// logger's flush then has nothing left to report.
 #[test]
 fn memory_log_reports_once() {
     let memory = MemoryLog::new().expect("memory");
@@ -172,12 +174,13 @@ fn memory_log_reports_once() {
     session
         .write(SessionId::new(), payload(&[("repo", json!("x"))]))
         .expect_err("reserved");
-    let reports: Vec<_> = [general.flush(), session.flush()]
-        .into_iter()
-        .filter_map(Result::err)
-        .collect();
-    assert_eq!(reports.len(), 1);
-    assert!(matches!(reports[0], LogError::RowsLost { count: 1, .. }));
+    let LogError::RowsLost { count, last, .. } = general.flush().expect_err("shared account")
+    else {
+        panic!("expected rows_lost from the general logger");
+    };
+    assert_eq!(count, 1);
+    assert_eq!(last.expect("last").id, "log.reserved_field");
+    session.flush().expect("already reported");
 }
 
 /// RSH-003: a row whose fields serialize over MAX_ROW_BYTES is not written; the write returns
