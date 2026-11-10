@@ -1,0 +1,1 @@
+{"model":"jev-latest","state":{"door":"a3f1c2e8-door"},"questions":{"person_present":{"type":"noul","instructions":"Is there a person in `door`?"}},"assets":{"a3f1c2e8-door":{"type":"image","part":"door-photo"}}}
