@@ -2,7 +2,8 @@
 //!
 //! Output: JSON plus a newline on stdout, exit 0. Failure: one stderr line
 //! `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Each run records
-//! one `tsq.command` event in its own general log, `~/.sc-agent/logs/tsq.log.jsonl`.
+//! one `tsq.command` event in its own general log, `~/.sc-agent/logs/tsq.log.jsonl`, or
+//! `<PATH>/logs/tsq.log.jsonl` with `--log-root <PATH>`.
 #![forbid(unsafe_code)]
 
 mod cli;
@@ -38,11 +39,16 @@ struct CommandFields {
 
 fn main() -> ExitCode {
     let started = Instant::now();
-    let logger = match general_log() {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    let parsed = cli::parse(args.clone());
+    let flag = match &parsed {
+        Ok(Parsed::Run(cli)) => cli.log_root.clone(),
+        Ok(Parsed::Print(_)) | Err(_) => cli::log_root_arg(&args),
+    };
+    let logger = match general_log(flag) {
         Ok(logger) => logger,
         Err(error) => return emit(&error),
     };
-    let parsed = cli::parse(std::env::args_os());
     let mut fields = CommandFields {
         subcommand: match &parsed {
             Ok(Parsed::Run(cli)) => cli.command.name(),
@@ -134,27 +140,33 @@ fn emit(error: &Error) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// sc-observability logger, service `tsq`, log root `home_dir()/.sc-agent`.
+/// sc-observability logger, service `tsq`, log root `log_root` (`--log-root`), else
+/// `home_dir()/.sc-agent`.
 ///
 /// # Errors
 ///
-/// [`Error::Log`] when the home directory is unknown or the logger cannot start.
-fn general_log() -> Result<Logger, Error> {
-    let home = std::env::home_dir()
-        .filter(|home| !home.as_os_str().is_empty())
-        .ok_or_else(|| Error::Log {
-            detail: "the home directory is unknown".to_owned(),
-        })?;
+/// [`Error::Log`] when no log root is given and the home directory is unknown, or the logger
+/// cannot start.
+fn general_log(log_root: Option<PathBuf>) -> Result<Logger, Error> {
+    let root = match log_root {
+        Some(root) => root,
+        None => std::env::home_dir()
+            .filter(|home| !home.as_os_str().is_empty())
+            .map(default_log_root)
+            .ok_or_else(|| Error::Log {
+                detail: "the home directory is unknown".to_owned(),
+            })?,
+    };
     let service = ServiceName::new(SERVICE).map_err(|error| Error::Log {
         detail: error.to_string(),
     })?;
-    let config = LoggerConfig::default_for(service, log_root(home));
+    let config = LoggerConfig::default_for(service, root);
     Logger::new(config).map_err(|error| Error::Log {
         detail: format!("{}: {}", error.code(), error.diagnostic().message),
     })
 }
 
-fn log_root(home: PathBuf) -> PathBuf {
+fn default_log_root(home: PathBuf) -> PathBuf {
     home.join(".sc-agent")
 }
 

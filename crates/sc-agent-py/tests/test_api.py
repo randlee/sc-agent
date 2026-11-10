@@ -23,6 +23,7 @@ import pytest
 
 import sc_agent
 from conftest import HANG_GUARD
+from loopback import FIXED_ERROR
 
 NOUL = json.dumps({"model": "jev-latest", "state": "s", "questions": {"q": {"type": "noul"}}})
 PART = json.dumps(
@@ -115,6 +116,13 @@ def test_an_invalid_project_is_refused(env, args):
     assert session_files(log_root) == []
 
 
+def assert_lowest_503(error: dict) -> None:
+    """The loopback's 503 as the lowest-layer error: its id and its message with the body."""
+    assert error["id"] == "decision.api_status"
+    assert "cause" not in error, error
+    assert error["message"] == "the API answered HTTP 503: " + json.dumps(FIXED_ERROR), error
+
+
 def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, args, config_dir):
     """AC: REQ-SAG-0004 AC3."""
     loopback, log_root = env
@@ -139,9 +147,10 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, 
         timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
-    assert json.loads(child.stdout)["error"]["id"] == "decision.api_status"
-    line = json.loads(sc_agent.send(NOUL, **args))
-    assert line["error"]["id"] == "decision.api_status"
+    # REQ-SAG-0002 AC1 at both entry points: the 503 is the lowest-layer failure, so it is the
+    # error itself (no cause below it), and its message carries the provider's body whole.
+    for error in (json.loads(child.stdout)["error"], json.loads(sc_agent.send(NOUL, **args))["error"]):
+        assert_lowest_503(error)
     rows = session_rows(log_root)
     assert len(rows) == 2
     identities = {(row["fields"]["project"], row["fields"]["agent_role"]) for row in rows}

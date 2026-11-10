@@ -423,6 +423,12 @@ mod tests {
     /// `#[cfg(test)]` module (sc-agent-testkit, which holds the bounded forms, is skipped). The
     /// scanner is proven on a positive control that has every banned form, and the scan must
     /// see the whole test code of the workspace, so it cannot pass vacuously.
+    ///
+    /// Consumer: CI (`cargo test --workspace --all-features`), enforcing the owner's
+    /// zero-tolerance rule on flaky tests. Defect class: the 13 nondeterministic tests found at
+    /// the phase-A end review (real-time bounds, unbounded waits, repeat-race loops, freed
+    /// ports). Delete it if Rust gains a lint that enforces the same, or the owner drops the
+    /// rule.
     #[test]
     fn tests_are_deterministic() {
         let control: Vec<String> = [
