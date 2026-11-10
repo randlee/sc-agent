@@ -349,7 +349,14 @@ pub(crate) struct BoundedQueue<T> {
     not_empty: Condvar,
     not_full: Condvar,
     capacity: usize,
+    /// Test seam (QA-004): runs inside the `producer_done` that closes the queue.
+    #[cfg(test)]
+    on_close: Mutex<Option<OnClose>>,
 }
+
+/// The `on_close` test seam.
+#[cfg(test)]
+type OnClose = Box<dyn Fn() + Send + Sync>;
 
 impl<T> BoundedQueue<T> {
     /// An empty queue of `capacity` items (at least one) fed by `producers` producers.
@@ -367,6 +374,8 @@ impl<T> BoundedQueue<T> {
             not_empty: Condvar::new(),
             not_full: Condvar::new(),
             capacity: capacity.max(1),
+            #[cfg(test)]
+            on_close: Mutex::new(None),
         }
     }
 
@@ -446,13 +455,21 @@ impl<T> BoundedQueue<T> {
 
     /// One producer is done; the last one closes the queue.
     pub(crate) fn producer_done(&self) {
-        {
+        let closes = {
             let mut state = self.lock();
             state.producers = state.producers.saturating_sub(1);
+            let closes = state.producers == 0 && !state.closed;
             if state.producers == 0 {
                 state.closed = true;
             }
+            closes
+        };
+        #[cfg(test)]
+        if closes && let Some(seam) = lock(&self.on_close).as_ref() {
+            seam();
         }
+        #[cfg(not(test))]
+        let _ = closes;
         self.not_empty.notify_all();
         self.not_full.notify_all();
     }
@@ -512,3 +529,25 @@ impl<T> BoundedQueue<T> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+impl<T> BoundedQueue<T> {
+    /// Sets the `on_close` seam.
+    pub(crate) fn on_close(&self, seam: OnClose) {
+        *lock(&self.on_close) = Some(seam);
+    }
+
+    /// Waits (bounded) until at most `count` producers are left; the number left then.
+    /// `producer_done` notifies `not_full`, so this wakes on every producer's exit.
+    pub(crate) fn wait_producers_at_most(
+        &self,
+        count: usize,
+        failsafe: std::time::Duration,
+    ) -> usize {
+        let (state, _) = self
+            .not_full
+            .wait_timeout_while(self.lock(), failsafe, |state| state.producers > count)
+            .unwrap_or_else(PoisonError::into_inner);
+        state.producers
+    }
+}

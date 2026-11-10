@@ -318,3 +318,130 @@ fn provider_pause_holds_other_jobs_until_exactly_its_end() {
         .expect("B's send");
     assert_eq!(b_first, at, "B's first send is at exactly A's pause end");
 }
+
+/// QA-004 (QA-R2-006): every runner thread is uncounted before the last producer closes the
+/// result queue. The crate-private `live_at_close` seam reads `live_threads` inside that
+/// `producer_done` itself, so the check does not depend on when the consumer wakes: with the
+/// decrement after `producer_done` (in a worker's `Exit` or in the feeder's `FeedEnd`) the
+/// closing producer still counts itself and the seam reads 1.
+#[test]
+fn every_runner_thread_is_uncounted_when_the_results_close() {
+    let ok = || {
+        HttpResponse::new(
+            200,
+            vec![],
+            br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#
+                .to_vec(),
+        )
+    };
+    for workers in [1, 2, 4] {
+        let transport = ScriptedTransport::responses((0..6).map(|_| ok()).collect());
+        let log = MemoryLog::new().expect("log");
+        let http = HttpClient::new(Arc::new(transport), ResendPolicy::default(), log.general());
+        let identity =
+            SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
+                .expect("identity");
+        let runner = DecisionRunner::new(
+            Arc::new(OneHost),
+            http,
+            log.session(identity),
+            log.general(),
+            RunnerConfig::new(workers).expect("workers"),
+        );
+        let results: Vec<DecisionResult> = runner
+            .decide_stream(Box::new((0..6).map(|_| request())), &CancelToken::new())
+            .collect();
+        assert_eq!(results.len(), 6);
+        assert!(results.iter().all(|result| result.outcome.is_ok()));
+        let seen = runner.shared.live_at_close.lock().expect("lock").clone();
+        assert_eq!(
+            seen,
+            vec![0],
+            "{workers} workers: live threads when the results closed"
+        );
+    }
+}
+
+/// QA-004, the feeder's side (M10c): the feeder is forced to be the last producer. The
+/// stream is abandoned while the feeder is blocked in the input iterator; the workers exit
+/// (the test waits until only the feeder is left as a producer); then the input ends and the
+/// feeder's `FeedEnd` closes the queue. The seam reads `live_threads` inside that last
+/// `producer_done`: 0 when the feeder uncounts itself first.
+#[test]
+fn the_feeder_is_uncounted_when_it_closes_the_results() {
+    struct Gated {
+        left: Vec<DecisionRequest>,
+        blocked: std::sync::mpsc::Sender<()>,
+        open: std::sync::mpsc::Receiver<()>,
+    }
+    impl Iterator for Gated {
+        type Item = DecisionRequest;
+        fn next(&mut self) -> Option<DecisionRequest> {
+            if self.left.is_empty() {
+                let _ = self.blocked.send(());
+                let _ = self.open.recv_timeout(Duration::from_secs(60));
+                return None;
+            }
+            self.left.pop()
+        }
+    }
+    let failsafe = Duration::from_secs(60);
+    let ok = HttpResponse::new(
+        200,
+        vec![],
+        br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#
+            .to_vec(),
+    );
+    let transport = ScriptedTransport::responses(vec![ok.clone(), ok]);
+    let log = MemoryLog::new().expect("log");
+    let http = HttpClient::new(Arc::new(transport), ResendPolicy::default(), log.general());
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
+            .expect("identity");
+    let runner = DecisionRunner::new(
+        Arc::new(OneHost),
+        http,
+        log.session(identity),
+        log.general(),
+        RunnerConfig::new(2).expect("two workers"),
+    );
+    let (blocked_to, blocked) = std::sync::mpsc::channel();
+    let (open, open_from) = std::sync::mpsc::channel();
+    let input = Gated {
+        left: vec![request(), request()],
+        blocked: blocked_to,
+        open: open_from,
+    };
+    let mut stream = runner.decide_stream(Box::new(input), &CancelToken::new());
+    assert!(stream.next().is_some_and(|result| result.outcome.is_ok()));
+    assert!(stream.next().is_some_and(|result| result.outcome.is_ok()));
+    blocked
+        .recv_timeout(failsafe)
+        .expect("the feeder waits for more input");
+    drop(stream);
+    let results = runner
+        .shared
+        .last_results
+        .lock()
+        .expect("lock")
+        .clone()
+        .expect("the run's result queue");
+    assert_eq!(
+        results.wait_producers_at_most(1, failsafe),
+        1,
+        "both workers exited; the feeder is the last producer"
+    );
+    assert!(runner.shared.live_at_close.lock().expect("lock").is_empty());
+    let _ = open.send(());
+    assert_eq!(
+        results.wait_producers_at_most(0, failsafe),
+        0,
+        "the feeder exited"
+    );
+    let seen = runner.shared.live_at_close.lock().expect("lock").clone();
+    assert_eq!(
+        seen,
+        vec![0],
+        "live threads when the feeder closed the results"
+    );
+}

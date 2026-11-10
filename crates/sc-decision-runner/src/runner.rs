@@ -129,6 +129,13 @@ struct Shared {
     /// `(position, not_before)`.
     #[cfg(test)]
     paused: Mutex<Option<std::sync::mpsc::Sender<(u64, Instant)>>>,
+    /// Test seam (QA-004): `live_threads` read inside the last `producer_done` of each run,
+    /// the moment the result queue closes.
+    #[cfg(test)]
+    live_at_close: Arc<Mutex<Vec<usize>>>,
+    /// Test seam (QA-004): the result queue of the latest run, to wait on its producers.
+    #[cfg(test)]
+    last_results: Mutex<Option<Arc<Results>>>,
 }
 
 /// The `after_hook` test seam.
@@ -159,14 +166,21 @@ impl DecisionRunner {
         )
     }
 
-    /// [`Self::new`] with an explicit clock (crate-private test seam).
-    pub(crate) fn with_clock(
+    /// [`Self::new`] with an explicit clock: `now` is read for every admission, holdoff and
+    /// send instead of `Instant::now` (passed to `may_start`, `may_resend` and `send_once`).
+    ///
+    /// A seam for callers' tests (decide's `Context.clock`, `sc_agent_http::testing::
+    /// ManualClock`): with a clock only the test moves, a holdoff or provider pause cannot
+    /// elapse on its own, so ordering is forced without real waiting. Production uses
+    /// [`Self::new`].
+    #[must_use]
+    pub fn with_clock(
         backend: Arc<dyn Backend>,
         http: HttpClient,
         session: SessionLogger,
         general: GeneralLogger,
         config: RunnerConfig,
-        now: Clock,
+        now: Arc<dyn Fn() -> Instant + Send + Sync>,
     ) -> Self {
         Self {
             shared: Arc::new(Shared {
@@ -180,6 +194,10 @@ impl DecisionRunner {
                 after_hook: Mutex::new(None),
                 #[cfg(test)]
                 paused: Mutex::new(None),
+                #[cfg(test)]
+                live_at_close: Arc::new(Mutex::new(Vec::new())),
+                #[cfg(test)]
+                last_results: Mutex::new(None),
             }),
             config,
         }
@@ -217,27 +235,19 @@ impl DecisionRunner {
         let jobs = Arc::new(RunnerJobs::new(capacity, Arc::clone(&shared.now)));
         // Producers: every worker and the feeder.
         let results = Arc::new(Results::new(capacity, workers.get().saturating_add(1)));
-        let hook = {
-            let jobs = Arc::clone(&jobs);
-            let results = Arc::clone(&results);
-            // Only flips state and notifies: never blocks, never does I/O. Runs at once
-            // when the token is already cancelled.
-            cancel.on_cancel(Arc::new(move || {
-                jobs.cancel();
-                results.interrupt();
-            }))
-        };
         #[cfg(test)]
         {
-            let seam = shared
-                .after_hook
+            let live = Arc::clone(&shared.live_threads);
+            let seen = Arc::clone(&shared.live_at_close);
+            results.on_close(Box::new(move || {
+                lock_seen(&seen).push(live.load(Ordering::Acquire));
+            }));
+            *shared
+                .last_results
                 .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .take();
-            if let Some(seam) = seam {
-                seam(shared.live_threads.load(Ordering::Acquire));
-            }
+                .unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&results));
         }
+        let hook = register_cancel_hook(&shared, cancel, &jobs, &results);
         let feed = Arc::new(Feed::default());
         let work = Arc::new(RunnerWork {
             shared: Arc::clone(&shared),
@@ -410,6 +420,49 @@ impl Shared {
             }
         }
     }
+}
+
+/// Registers the run's cancel hook: it cancels the job queue and interrupts the result
+/// queue. Only flips state and notifies: never blocks, never does I/O. Runs at once when the
+/// token is already cancelled.
+///
+/// The `after_hook` test seam runs here, right after `on_cancel` returns, so the seam cannot
+/// be moved apart from the registration (QA-005): wherever the hook is registered, the seam
+/// reports the runner threads alive at that moment.
+fn register_cancel_hook(
+    shared: &Shared,
+    cancel: &CancelToken,
+    jobs: &Arc<RunnerJobs>,
+    results: &Arc<Results>,
+) -> sc_agent_types::CancelHook {
+    let hook = {
+        let jobs = Arc::clone(jobs);
+        let results = Arc::clone(results);
+        cancel.on_cancel(Arc::new(move || {
+            jobs.cancel();
+            results.interrupt();
+        }))
+    };
+    #[cfg(test)]
+    {
+        let seam = shared
+            .after_hook
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(seam) = seam {
+            seam(shared.live_threads.load(Ordering::Acquire));
+        }
+    }
+    #[cfg(not(test))]
+    let _ = shared;
+    hook
+}
+
+/// The `live_at_close` record, a poisoned lock recovered.
+#[cfg(test)]
+fn lock_seen(seen: &Mutex<Vec<usize>>) -> std::sync::MutexGuard<'_, Vec<usize>> {
+    seen.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// `decision.shutdown` reason for a thread that could not start.
