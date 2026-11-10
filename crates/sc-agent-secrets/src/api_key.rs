@@ -1,5 +1,6 @@
 //! The sealed API key type.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 
@@ -57,31 +58,31 @@ impl ApiKey {
     /// [`SecretsError::KeyMalformed`] when it contains whitespace, a control
     /// character or a character outside visible ASCII. Neither error contains
     /// key bytes.
-    pub(crate) fn try_new(var: &str, raw: String) -> Result<Self, SecretsError> {
+    pub(crate) fn try_new(var: &str, raw: &str) -> Result<Self, SecretsError> {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
             return Err(SecretsError::KeyMissing {
                 var: var.to_owned(),
             });
         }
-        if trimmed
-            .chars()
-            .any(|ch| ch.is_whitespace() || ch.is_control())
-        {
+        // One rule, one scan: the key travels as an HTTP header value, and
+        // providers issue visible-ASCII keys only, so anything else is refused
+        // here and no later layer has a failing header value to handle. Only
+        // the error path looks again, to name the likelier mistake: a stray
+        // space, newline or control character (copy-paste) before a
+        // non-ASCII character.
+        if !trimmed.bytes().all(|byte| byte.is_ascii_graphic()) {
+            let reason = if trimmed
+                .chars()
+                .any(|ch| ch.is_whitespace() || ch.is_control())
+            {
+                "key contains whitespace or a control character"
+            } else {
+                "key contains a character outside visible ASCII"
+            };
             return Err(SecretsError::KeyMalformed {
                 var: var.to_owned(),
-                reason: "key contains whitespace or a control character",
-            });
-        }
-        // The key travels as an HTTP header value, which `http` accepts for
-        // any byte but controls (so it takes a non-ASCII character).
-        // Providers issue visible-ASCII keys only, so this is the one rule: a
-        // key outside visible ASCII is refused here, and no later layer has a
-        // failing header value to handle.
-        if !trimmed.chars().all(|ch| ch.is_ascii_graphic()) {
-            return Err(SecretsError::KeyMalformed {
-                var: var.to_owned(),
-                reason: "key contains a character outside visible ASCII",
+                reason,
             });
         }
         Ok(Self(Arc::from(trimmed)))
@@ -103,9 +104,15 @@ impl ApiKey {
     /// Use it on text that is about to be cut to a length bound: redacting
     /// after the cut could leave the front half of a key that straddles the
     /// cut.
+    ///
+    /// Borrows `text` when it does not contain the secret.
     #[must_use]
-    pub fn redact_text(&self, text: &str) -> String {
-        text.replace(&*self.0, "[redacted]")
+    pub fn redact_text<'t>(&self, text: &'t str) -> Cow<'t, str> {
+        if text.contains(&*self.0) {
+            Cow::Owned(text.replace(&*self.0, "[redacted]"))
+        } else {
+            Cow::Borrowed(text)
+        }
     }
 }
 
@@ -131,13 +138,13 @@ mod tests {
     const SECRET: &str = "sk-test-secret";
 
     fn key(text: &str) -> ApiKey {
-        ApiKey::try_new(env_var(Provider::TypeSafe), text.to_owned()).expect("key")
+        ApiKey::try_new(env_var(Provider::TypeSafe), text).expect("key")
     }
 
     #[test]
     fn try_new_trims_and_keeps_the_key() {
         assert_eq!(key(&format!("  {SECRET}\r\n")), key(SECRET));
-        let exact = ApiKey::try_new(env_var(Provider::OpenAi), SECRET.to_owned()).unwrap();
+        let exact = ApiKey::try_new(env_var(Provider::OpenAi), SECRET).unwrap();
         assert_eq!(exact, key(SECRET));
     }
 
@@ -155,7 +162,7 @@ mod tests {
             .chain(ALL_VARS.iter().copied());
         for var in vars {
             for blank in ["", "   ", "\n\t"] {
-                let error = ApiKey::try_new(var, blank.to_owned()).unwrap_err();
+                let error = ApiKey::try_new(var, blank).unwrap_err();
                 assert_eq!(
                     error,
                     SecretsError::KeyMissing {
@@ -171,7 +178,7 @@ mod tests {
                 format!("{SECRET}\u{a0}x"),
                 format!("{SECRET}\u{7f}"),
             ] {
-                let error = ApiKey::try_new(var, bad.clone()).unwrap_err();
+                let error = ApiKey::try_new(var, &bad).unwrap_err();
                 assert_eq!(error.id(), "secrets.key_malformed", "{var} {bad:?}");
                 let hint = error.message();
                 assert!(hint.contains(var), "{hint}");
@@ -189,11 +196,11 @@ mod tests {
         for provider in Provider::ALL.iter().copied() {
             let var = env_var(provider);
             for bad in [format!("{SECRET}é"), format!("日本{SECRET}")] {
-                let error = ApiKey::try_new(var, bad.clone()).unwrap_err();
+                let error = ApiKey::try_new(var, &bad).unwrap_err();
                 assert_eq!(error.id(), "secrets.key_malformed", "{var} {bad:?}");
                 assert!(error.message().contains("outside visible ASCII"));
                 let recovery = error.recovery().unwrap_or_default();
-                assert!(recovery.contains("whitespace"), "{recovery}");
+                assert!(recovery.contains("visible ASCII"), "{recovery}");
                 let rendered = format!("{error} {error:?} {recovery}");
                 assert!(!rendered.contains(SECRET), "{rendered}");
             }
@@ -209,5 +216,7 @@ mod tests {
             key.redact_text(&format!("auth: Bearer {SECRET}; again {SECRET}")),
             "auth: Bearer [redacted]; again [redacted]"
         );
+        let clean = "no secret here";
+        assert!(matches!(key.redact_text(clean), Cow::Borrowed(text) if text == clean));
     }
 }

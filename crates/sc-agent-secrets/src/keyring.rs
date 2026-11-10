@@ -68,6 +68,12 @@ pub(crate) enum DeadlineMiss {
 pub(crate) struct ReadGate {
     stuck: std::sync::Arc<std::sync::atomic::AtomicU64>,
     next_id: std::sync::atomic::AtomicU64,
+    /// Held for the whole of one read (start to answer or deadline), so reads
+    /// run one at a time: a second caller waits for the first read's answer
+    /// or deadline, then sees the stuck mark and returns at once. Without it,
+    /// two concurrent callers could both pass the stuck check and strand two
+    /// threads.
+    in_flight: std::sync::Mutex<()>,
 }
 
 /// Clears the gate's stuck mark if (and only if) it names this reader.
@@ -92,6 +98,7 @@ impl ReadGate {
         Self {
             stuck: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             next_id: std::sync::atomic::AtomicU64::new(1),
+            in_flight: std::sync::Mutex::new(()),
         }
     }
 
@@ -101,6 +108,9 @@ impl ReadGate {
     }
 
     /// Runs `read` on its own thread and waits at most `timeout`.
+    ///
+    /// Reads are serialized (see `in_flight`), so a caller may wait for an
+    /// earlier read's deadline before its own read starts.
     ///
     /// On timeout the thread is left to finish (or stay blocked) on its own;
     /// it only reads the keystore and holds no state, so abandoning it is
@@ -112,6 +122,11 @@ impl ReadGate {
         read: impl FnOnce() -> T + Send + 'static,
     ) -> Result<T, DeadlineMiss> {
         use std::sync::atomic::{AtomicBool, Ordering};
+        // The guard holds no data, so a poisoned lock is still a valid one.
+        let _one_at_a_time = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if self.is_stuck() {
             return Err(DeadlineMiss::TimedOut);
         }
@@ -153,7 +168,7 @@ static GATE: std::sync::LazyLock<ReadGate> = std::sync::LazyLock::new(ReadGate::
 /// A keyring read that could not run to an answer and did not time out.
 fn keyring_read_failed() -> SecretsError {
     SecretsError::KeyringRead {
-        kind: "thread".to_owned(),
+        kind: "thread",
         cause: "the read thread failed",
     }
 }
@@ -189,13 +204,15 @@ pub(crate) fn classify_keyring(
 
 /// Labels a keyring failure without formatting the error.
 ///
+/// Callers pass only failures: `NoEntry` is an absent entry, handled before
+/// this, and falls in the catch-all arm if it ever arrives.
+///
 /// `keyring::Error`'s `Display` and `Debug` can include secret bytes
 /// (`BadEncoding`) or the inner platform message (`PlatformFailure`).
 fn sanitized_keyring_cause(error: &keyring::Error) -> &'static str {
     match error {
         keyring::Error::PlatformFailure(_) => "platform keystore returned an error",
         keyring::Error::NoStorageAccess(_) => "keystore access was denied",
-        keyring::Error::NoEntry => "entry is absent",
         keyring::Error::BadEncoding(_) => "stored value was not valid UTF-8",
         keyring::Error::TooLong(_, _) => "keystore rejected an attribute length",
         keyring::Error::Invalid(_, _) => "keystore rejected the service or account",
@@ -207,17 +224,16 @@ fn sanitized_keyring_cause(error: &keyring::Error) -> &'static str {
 /// The sanitized error for a keyring failure; the keyring's text is never kept.
 fn keyring_unavailable(error: &keyring::Error) -> SecretsError {
     SecretsError::KeyringRead {
-        kind: keyring_kind(error).to_owned(),
+        kind: keyring_kind(error),
         cause: sanitized_keyring_cause(error),
     }
 }
 
-/// The keyring error variant as display-only text.
+/// The keyring error variant as display-only text (`NoEntry` never arrives here).
 fn keyring_kind(error: &keyring::Error) -> &'static str {
     match error {
         keyring::Error::PlatformFailure(_) => "platform_failure",
         keyring::Error::NoStorageAccess(_) => "no_storage_access",
-        keyring::Error::NoEntry => "no_entry",
         keyring::Error::BadEncoding(_) => "bad_encoding",
         keyring::Error::TooLong(_, _) => "too_long",
         keyring::Error::Invalid(_, _) => "invalid",
@@ -330,6 +346,48 @@ mod tests {
         assert_eq!(gate.run(LONG, || 7_u8), Ok(7));
     }
 
+    /// Two callers whose reads would both block start one reader thread
+    /// between them: both get `TimedOut` and at most one thread is stranded.
+    #[test]
+    fn two_concurrent_blocked_reads_strand_one_thread() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{Arc, Barrier, Mutex};
+
+        let gate = Arc::new(ReadGate::new());
+        let started = Arc::new(AtomicUsize::new(0));
+        let (release, held) = mpsc::channel::<()>();
+        let held = Arc::new(Mutex::new(held));
+        let barrier = Arc::new(Barrier::new(2));
+        let callers: Vec<_> = (0..2)
+            .map(|index| {
+                let (gate, started, held, barrier) = (
+                    Arc::clone(&gate),
+                    Arc::clone(&started),
+                    Arc::clone(&held),
+                    Arc::clone(&barrier),
+                );
+                std::thread::Builder::new()
+                    .name(format!("caller-{index}"))
+                    .spawn(move || {
+                        barrier.wait();
+                        gate.run(SHORT, move || {
+                            started.fetch_add(1, Ordering::SeqCst);
+                            let _ = held.lock().map(|receiver| receiver.recv());
+                        })
+                    })
+                    .expect("spawn a caller")
+            })
+            .collect();
+        for caller in callers {
+            assert_eq!(caller.join().expect("caller"), Err(DeadlineMiss::TimedOut));
+        }
+        assert_eq!(started.load(Ordering::SeqCst), 1, "one reader thread only");
+        assert!(gate.is_stuck());
+        drop(release);
+        wait_until_unstuck(&gate);
+        assert_eq!(gate.run(LONG, || 9_u8), Ok(9));
+    }
+
     /// A reader that panics before answering is not a timeout and leaves the
     /// gate usable.
     #[test]
@@ -343,40 +401,5 @@ mod tests {
         assert_eq!(gate.run(LONG, || 3_u8), Ok(3));
         let error = keyring_read_failed();
         assert_eq!(error.id(), "secrets.keyring_read");
-    }
-
-    /// A quick read that was already running when an older one was declared
-    /// stuck does not clear the older one's mark when it finishes.
-    #[test]
-    fn a_quick_read_finishing_does_not_clear_an_older_stuck_one() {
-        let gate = std::sync::Arc::new(ReadGate::new());
-        let (started_tx, started_rx) = mpsc::channel::<()>();
-        let (finish_quick, quick_held) = mpsc::channel::<()>();
-        let quick_gate = std::sync::Arc::clone(&gate);
-        // The quick read starts first and waits to be told to finish.
-        let quick = std::thread::Builder::new()
-            .name("quick-read".to_owned())
-            .spawn(move || {
-                quick_gate.run(LONG, move || {
-                    let _ = started_tx.send(());
-                    let _ = quick_held.recv();
-                    5_u8
-                })
-            })
-            .expect("spawn the quick read");
-        started_rx.recv().expect("the quick read started");
-        // Another read, started later, times out and is stuck.
-        let (release_stuck, stuck_held) = mpsc::channel::<()>();
-        let stuck = gate.run(SHORT, move || {
-            let _ = stuck_held.recv();
-        });
-        assert_eq!(stuck, Err(DeadlineMiss::TimedOut));
-        assert!(gate.is_stuck());
-        // The quick read finishes now; the stuck mark is not its to clear.
-        finish_quick.send(()).expect("release the quick read");
-        assert_eq!(quick.join().expect("quick thread"), Ok(5));
-        assert!(gate.is_stuck(), "the stuck read's mark must survive");
-        drop(release_stuck);
-        wait_until_unstuck(&gate);
     }
 }

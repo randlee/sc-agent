@@ -119,7 +119,7 @@ struct FailingKeyring;
 impl KeyringSource for FailingKeyring {
     fn password(&self, _service: &str, _account: &str) -> Result<Option<String>, SecretsError> {
         Err(SecretsError::KeyringRead {
-            kind: "platform_failure".to_owned(),
+            kind: "platform_failure",
             cause: "platform keystore returned an error",
         })
     }
@@ -255,15 +255,30 @@ fn blank_env_value_skips_dotenv_and_reads_keyring() {
     assert_eq!(error.id(), "secrets.key_missing");
 }
 
-/// `repo_root: None` reads no `.env`.
+/// `repo_root: None` reads no `.env`: the same sources with the repo find the key in `.env`.
 #[test]
 fn no_repo_root_reads_no_dotenv() {
     let var = env_var(Provider::TypeSafe);
-    let _repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
+    let repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
     let env = MapEnv::default();
-    let keyring = MapKeyring::default();
-    let error = resolve(Provider::TypeSafe, &sources(&env, None, &keyring)).unwrap_err();
-    assert_eq!(error.id(), "secrets.key_missing");
+
+    let keyring = MapKeyring::new([(var, SECRET)]);
+    let with_repo = resolve(
+        Provider::TypeSafe,
+        &sources(&env, Some(repo.path()), &keyring),
+    )
+    .unwrap();
+    assert_found(&with_repo, OTHER, KeySource::DotEnv);
+    assert!(keyring.asked().is_empty());
+
+    let without = resolve(Provider::TypeSafe, &sources(&env, None, &keyring)).unwrap();
+    assert_found(&without, SECRET, KeySource::Keyring);
+    let asked = keyring.asked();
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(
+        asked.first().map(|(service, _)| service.as_str()),
+        Some(var)
+    );
 }
 
 /// An unreadable `.env` (here a directory) -> secrets.dotenv_read.
@@ -275,7 +290,7 @@ fn unreadable_dotenv_is_dotenv_read() {
     let keyring = MapKeyring::default();
     let error = resolve(Provider::Nous, &sources(&env, Some(repo.path()), &keyring)).unwrap_err();
     assert_eq!(error.id(), "secrets.dotenv_read");
-    assert!(error.recovery().is_none());
+    assert!(error.recovery().is_some_and(|text| text.contains(".env")));
     assert!(
         keyring.asked().is_empty(),
         "a .env failure stops resolution"
@@ -328,6 +343,15 @@ fn all_vars_holds_every_provider_variable_and_laya() {
     assert_eq!(ALL_VARS.len(), 7);
     let distinct: std::collections::BTreeSet<_> = ALL_VARS.iter().collect();
     assert_eq!(distinct.len(), ALL_VARS.len());
+}
+
+/// Provider names meet configured names at `&str` inside resolve; each would parse as a VarName.
+#[test]
+fn every_credential_name_is_a_var_name() {
+    for name in ALL_VARS {
+        let parsed: VarName = name.parse().unwrap();
+        assert_eq!(parsed.as_str(), *name);
+    }
 }
 
 #[test]
@@ -404,7 +428,7 @@ fn secrets_errors_follow_the_error_contract() {
             cause: "permission denied",
         },
         SecretsError::KeyringRead {
-            kind: "platform_failure".to_owned(),
+            kind: "platform_failure",
             cause: "platform keystore returned an error",
         },
         SecretsError::KeyringTimeout,
@@ -431,22 +455,20 @@ fn secrets_errors_follow_the_error_contract() {
         assert_eq!(detail.id, error.id());
         assert_eq!(detail.message, error.message());
     }
-    assert!(
-        errors
-            .first()
-            .unwrap()
-            .recovery()
-            .is_some_and(|text| !text.is_empty())
-    );
-    assert!(
-        errors
-            .get(1)
-            .unwrap()
-            .recovery()
-            .is_some_and(|text| !text.is_empty())
-    );
-    for error in errors.iter().skip(2) {
-        assert!(error.recovery().is_none());
+    // Every variant says what to do next, and the advice fits the failure.
+    let expected = [
+        ["process environment", ".env", "keyring"],
+        ["visible ASCII", "non-ASCII", "control characters"],
+        [".env", "regular file", "process environment"],
+        ["keystore", "process environment", ".env"],
+        ["keystore", "process environment", ".env"],
+    ];
+    for (error, words) in errors.iter().zip(expected) {
+        let recovery = error.recovery().unwrap_or_default();
+        for word in words {
+            assert!(recovery.contains(word), "{}: {recovery}", error.id());
+        }
+        assert_eq!(error.detail().recovery.as_deref(), Some(recovery));
     }
 }
 

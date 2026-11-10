@@ -20,23 +20,59 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::Path;
 
 use crate::error::SecretsError;
 
+/// Largest `.env` read: 1 MiB.
+///
+/// A credential file is a few hundred bytes; the cap only stops a repository
+/// from making every key lookup read (and hold) an arbitrarily large file.
+pub(crate) const MAX_DOTENV_BYTES: u64 = 1024 * 1024;
+
 /// Reads `<repo_root>/.env`; a missing file yields no variables.
+///
+/// The path must be a regular file (after following symlinks) of at most
+/// [`MAX_DOTENV_BYTES`]; the read itself is bounded too, so a file that grows
+/// after the size check is still refused.
 ///
 /// # Errors
 ///
 /// Returns [`SecretsError::DotenvRead`] when the file exists and cannot be
-/// read. The error holds a sanitized label, never the OS message.
+/// read, is not a regular file, or is larger than [`MAX_DOTENV_BYTES`]. The
+/// error holds a sanitized label, never the OS message.
 pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, SecretsError> {
     let path = repo_root.join(".env");
-    match fs::read_to_string(&path) {
-        Ok(text) => Ok(parse_dotenv(&text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(BTreeMap::new()),
-        Err(error) => Err(dotenv_read_error(&error)),
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(error) => return Err(dotenv_read_error(&error)),
+    };
+    let metadata = file.metadata().map_err(|error| dotenv_read_error(&error))?;
+    if !metadata.is_file() {
+        return Err(SecretsError::DotenvRead {
+            kind: "NotAFile".to_owned(),
+            cause: "path is not a regular file",
+        });
+    }
+    if metadata.len() > MAX_DOTENV_BYTES {
+        return Err(too_large());
+    }
+    let mut text = String::new();
+    file.take(MAX_DOTENV_BYTES.saturating_add(1))
+        .read_to_string(&mut text)
+        .map_err(|error| dotenv_read_error(&error))?;
+    if u64::try_from(text.len()).map_or(true, |len| len > MAX_DOTENV_BYTES) {
+        return Err(too_large());
+    }
+    Ok(parse_dotenv(&text))
+}
+
+fn too_large() -> SecretsError {
+    SecretsError::DotenvRead {
+        kind: "FileTooLarge".to_owned(),
+        cause: "file is larger than 1 MiB",
     }
 }
 
@@ -225,6 +261,29 @@ mod tests {
         let repo = tempfile::tempdir().unwrap();
         let loaded = load_dotenv(repo.path()).unwrap();
         assert!(loaded.is_empty());
+    }
+
+    #[test]
+    fn a_directory_or_an_oversized_file_is_refused() {
+        use sc_agent_types::ErrorId;
+
+        let repo = tempfile::tempdir().unwrap();
+        fs::create_dir(repo.path().join(".env")).unwrap();
+        let error = load_dotenv(repo.path()).unwrap_err();
+        assert_eq!(error.id(), "secrets.dotenv_read");
+        assert!(error.message().contains("not a regular file"), "{error}");
+
+        let repo = tempfile::tempdir().unwrap();
+        let at_cap = "#".repeat(usize::try_from(MAX_DOTENV_BYTES).unwrap());
+        fs::write(repo.path().join(".env"), format!("{at_cap}\n")).unwrap();
+        let error = load_dotenv(repo.path()).unwrap_err();
+        assert!(error.message().contains("larger than 1 MiB"), "{error}");
+
+        fs::write(repo.path().join(".env"), &at_cap).unwrap();
+        assert!(
+            load_dotenv(repo.path()).unwrap().is_empty(),
+            "exactly 1 MiB loads"
+        );
     }
 
     #[test]

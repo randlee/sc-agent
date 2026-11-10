@@ -102,13 +102,19 @@ pub fn resolve(provider: Provider, sources: &KeySources<'_>) -> Result<ResolvedK
 ///
 /// As [`resolve`].
 pub fn resolve_var(var: &VarName, sources: &KeySources<'_>) -> Result<ResolvedKey, SecretsError> {
+    // Both entry points meet at a `&str`: provider names are `&'static str`
+    // constants (A-1's VarName has no const constructor, so they cannot be
+    // VarName values without a parse whose error cannot happen); the test
+    // `every_credential_name_is_a_var_name` proves each constant would parse.
     resolve_name(var.as_str(), sources)
 }
 
 fn resolve_name(name: &str, sources: &KeySources<'_>) -> Result<ResolvedKey, SecretsError> {
+    // Each candidate is sealed from a borrow; ApiKey::try_new makes the one
+    // copy of the key that is kept.
     let process_value = sources.env.var(name);
     if let Some(raw) = process_value.as_deref().filter(|value| is_present(value)) {
-        return seal(name, raw.to_owned(), KeySource::Env);
+        return seal(name, raw, KeySource::Env);
     }
 
     if process_value.is_none()
@@ -116,7 +122,7 @@ fn resolve_name(name: &str, sources: &KeySources<'_>) -> Result<ResolvedKey, Sec
     {
         let dotenv = load_dotenv(repo_root)?;
         if let Some(raw) = dotenv.get(name).filter(|value| is_present(value)) {
-            return seal(name, raw.clone(), KeySource::DotEnv);
+            return seal(name, raw, KeySource::DotEnv);
         }
     }
 
@@ -125,12 +131,12 @@ fn resolve_name(name: &str, sources: &KeySources<'_>) -> Result<ResolvedKey, Sec
         return Err(missing(name));
     }
     match sources.keyring.password(name, &account)? {
-        Some(raw) if is_present(&raw) => seal(name, raw, KeySource::Keyring),
+        Some(raw) if is_present(&raw) => seal(name, &raw, KeySource::Keyring),
         _ => Err(missing(name)),
     }
 }
 
-fn seal(name: &str, raw: String, source: KeySource) -> Result<ResolvedKey, SecretsError> {
+fn seal(name: &str, raw: &str, source: KeySource) -> Result<ResolvedKey, SecretsError> {
     ApiKey::try_new(name, raw).map(|key| ResolvedKey { key, source })
 }
 
