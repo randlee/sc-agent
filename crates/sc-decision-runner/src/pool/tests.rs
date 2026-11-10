@@ -1,18 +1,17 @@
-//! Pool mechanics with plain closures: no Jev, no network.
+//! Pool mechanics with plain closures: no backend, no network.
 //!
-//! No test asserts on elapsed time. Every wait that could hang has a
-//! generous failsafe deadline that turns a deadlock into a failure.
+//! No test asserts on elapsed time and nothing sleeps. Every wait that could hang has a
+//! failsafe deadline that turns a deadlock into a failure.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
-use std::thread;
 use std::time::{Duration, Instant};
 
 use super::*;
 
 /// Failsafe for waits that must finish; never a measurement.
-const FAILSAFE: Duration = Duration::from_secs(60);
+const FAILSAFE: Duration = Duration::from_secs(2);
 
 /// A barrier that gives up instead of hanging: `arrive` is true only when
 /// `parties` threads were inside it at the same moment.
@@ -46,39 +45,70 @@ impl Rendezvous {
     }
 }
 
-fn pool_of<J: Send + 'static, A: Default + Send + 'static>(
+type RunFn<A> = dyn Fn(usize) -> Step<usize, A> + Send + Sync;
+type SkipFn<A> = dyn Fn(usize, Skipped) -> A + Send + Sync;
+
+/// A [`Work`] of closures over `usize` jobs.
+struct Closures<A> {
+    run: Box<RunFn<A>>,
+    skipped: Box<SkipFn<A>>,
+}
+
+impl<A: Send + 'static> Work for Closures<A> {
+    type Job = usize;
+    type Answer = A;
+    type InFlight = ();
+    type Receipt = usize;
+
+    fn receipt(&self, job: &usize) -> usize {
+        *job
+    }
+
+    fn run(&self, job: usize) -> Step<usize, A> {
+        (self.run)(job)
+    }
+
+    fn skipped(&self, receipt: usize, why: Skipped) -> Option<A> {
+        Some((self.skipped)(receipt, why))
+    }
+}
+
+fn pool_of<A: Send + 'static>(
     workers: usize,
     queue: usize,
-    cancel: &CancelToken,
-    run: impl Fn(&J) -> A + Send + Sync + 'static,
-    skipped: impl Fn(&J, Skipped) -> A + Send + Sync + 'static,
-) -> WorkerPool<J, A> {
-    WorkerPool::start(
-        workers,
-        queue,
-        cancel.clone(),
-        Arc::new(run),
-        Arc::new(skipped),
-        Arc::new(|_| A::default()),
-    )
+    run: impl Fn(usize) -> Step<usize, A> + Send + Sync + 'static,
+    skipped: impl Fn(usize, Skipped) -> A + Send + Sync + 'static,
+) -> Pool<Closures<A>> {
+    let workers = NonZeroUsize::new(workers).expect("workers");
+    let jobs = Arc::new(JobQueue::new(queue, Arc::new(Instant::now)));
+    let results = Arc::new(BoundedQueue::new(queue, workers.get()));
+    let work = Arc::new(Closures {
+        run: Box::new(run),
+        skipped: Box::new(skipped),
+    });
+    Pool::start(workers, jobs, results, work).expect("workers start")
 }
 
-/// The next answer, failing clearly if none arrives within `FAILSAFE`.
-fn next<J: Send + 'static, A: Send + 'static>(pool: &WorkerPool<J, A>) -> Option<A> {
-    match pool.recv_within(Some(FAILSAFE)) {
-        Popped::Item(answer) => Some(answer),
-        Popped::Finished => None,
-        Popped::Empty => panic!("no answer within the failsafe"),
-    }
-}
-
-fn drain<J: Send + 'static, A: Send + 'static>(pool: &WorkerPool<J, A>) -> Vec<A> {
-    let mut all = Vec::new();
-    while let Some(answer) = next(pool) {
-        all.push(answer);
-    }
+/// Every answer until the pool finishes; the failsafe turns a hang into a failure.
+fn drain<A: Send + 'static>(pool: Pool<Closures<A>>) -> Vec<A> {
+    let (send, receive) = mpsc::channel();
+    let collector = thread::Builder::new()
+        .spawn(move || {
+            let mut all = Vec::new();
+            while let Some(answer) = pool.recv() {
+                all.push(answer);
+            }
+            pool.join();
+            let _ = send.send(all);
+        })
+        .expect("collector");
+    let all = receive
+        .recv_timeout(FAILSAFE)
+        .expect("the pool finished within the failsafe");
+    collector.join().expect("collector joined");
     all
 }
+
 /// N jobs finish only if N workers are inside the run function at once.
 #[test]
 fn workers_run_jobs_in_parallel_not_in_turn() {
@@ -88,57 +118,52 @@ fn workers_run_jobs_in_parallel_not_in_turn() {
         let pool = pool_of(
             workers,
             workers,
-            &CancelToken::new(),
-            move |job: &usize| (*job, gate.arrive()),
-            |job, _| (*job, false),
+            move |job| Step::Done((job, gate.arrive())),
+            |job, _| (job, false),
         );
         for job in 0..workers {
-            assert!(pool.submit(job, Some(FAILSAFE)).is_ok());
+            assert!(pool.submit(job).is_ok());
         }
         pool.close_input();
-        let mut answers = drain(&pool);
-        join(&pool);
+        let mut answers = drain(pool);
         answers.sort_unstable();
         let expected: Vec<(usize, bool)> = (0..workers).map(|job| (job, true)).collect();
         assert_eq!(answers, expected, "{workers} workers must overlap");
-        assert_eq!(pool.alive(), 0);
     }
 }
 
-/// Memory is bounded: with a consumer that is not reading, the producer is
-/// Cancel stops new work: the running job finishes, queued jobs are
-/// answered as `Cancelled` without running, and later submits are refused.
+/// Cancel stops new work: the running job finishes, queued jobs are answered as
+/// `Cancelled` without running, and later submits are refused.
 #[test]
 fn cancel_skips_queued_jobs_and_refuses_new_ones() {
-    let cancel = CancelToken::new();
     let hold = Arc::new(Rendezvous::new(2));
     let gate = Arc::clone(&hold);
     let ran = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&ran);
+    let (started, on_start) = mpsc::channel();
+    let started = Mutex::new(started);
     let pool = pool_of(
         1,
         8,
-        &cancel,
-        move |job: &usize| {
+        move |job| {
             counted.fetch_add(1, Ordering::AcqRel);
+            let _ = started
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .send(job);
             gate.arrive();
-            (*job, None)
+            Step::Done((job, None))
         },
-        |job, why| (*job, Some(why)),
+        |job, why| (job, Some(why)),
     );
     for job in 0..4 {
-        assert!(pool.submit(job, Some(FAILSAFE)).is_ok());
+        assert!(pool.submit(job).is_ok());
     }
-    wait_until("a worker to start", || pool.running() > 0);
+    assert_eq!(on_start.recv_timeout(FAILSAFE), Ok(0), "a worker started");
     pool.cancel();
-    assert!(cancel.is_cancelled(), "the engine's token is the pool's");
-    assert!(matches!(
-        pool.submit(9, Some(FAILSAFE)),
-        Err(PushError::Closed(9))
-    ));
+    assert_eq!(pool.submit(9), Err(9), "submits are refused after cancel");
     assert!(hold.arrive());
-    let mut answers = drain(&pool);
-    join(&pool);
+    let mut answers = drain(pool);
     answers.sort_by_key(|(job, _)| *job);
     assert_eq!(
         answers,
@@ -158,22 +183,57 @@ fn a_panicking_job_is_answered_and_the_worker_survives() {
     let pool = pool_of(
         1,
         4,
-        &CancelToken::new(),
-        |job: &usize| {
-            assert_ne!(*job, 1, "boom");
-            (*job, None)
+        |job| {
+            assert_ne!(job, 1, "boom");
+            Step::Done((job, None))
         },
-        |job, why| (*job, Some(why)),
+        |job, why| (job, Some(why)),
     );
     for job in 0..3 {
-        assert!(pool.submit(job, Some(FAILSAFE)).is_ok());
+        assert!(pool.submit(job).is_ok());
     }
     pool.close_input();
-    let answers = drain(&pool);
-    join(&pool);
-    assert_eq!(
-        answers,
-        vec![(0, None), (1, Some(Skipped::Panicked)), (2, None)]
-    );
+    let answers = drain(pool);
+    assert_eq!(answers.len(), 3);
+    assert_eq!(answers.first(), Some(&(0, None)));
+    assert!(matches!(
+        answers.get(1),
+        Some((1, Some(Skipped::Panicked(text)))) if text.contains("boom")
+    ));
+    assert_eq!(answers.get(2), Some(&(2, None)));
 }
 
+/// A held job waits in the queue, not in the worker: the worker runs the next job first.
+#[test]
+fn a_held_job_frees_its_worker() {
+    let (release, on_release) = mpsc::channel::<()>();
+    let on_release = Mutex::new(on_release);
+    let pool = pool_of(
+        1,
+        4,
+        move |job| match job {
+            // Held until a far instant; answered only after job 1 ran.
+            0 => Step::HoldOff {
+                until: Instant::now() + Duration::from_secs(3600),
+                job: 100,
+            },
+            100 => Step::Done(job),
+            other => {
+                let _ = on_release
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .recv_timeout(FAILSAFE);
+                Step::Done(other)
+            }
+        },
+        |job, _| job + 1000,
+    );
+    assert!(pool.submit(0).is_ok());
+    assert!(pool.submit(1).is_ok());
+    release.send(()).expect("release");
+    let first = pool.recv();
+    assert_eq!(first, Some(1), "job 1 ran while job 0 was held");
+    pool.cancel();
+    let rest = drain(pool);
+    assert_eq!(rest, vec![1100], "the held job is answered as cancelled");
+}

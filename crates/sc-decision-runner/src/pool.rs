@@ -1,177 +1,269 @@
-/// Counters that are not tied to a queue lock.
-struct Counters {
-    /// Workers currently running a job.
-    running: AtomicUsize,
-    /// Workers still alive.
-    alive: AtomicUsize,
+//! [`Pool`]: a fixed set of named worker threads draining one [`JobQueue`] into one
+//! result [`BoundedQueue`].
+//!
+//! A worker takes a job, runs one [`Step`] of it and either pushes the answer, holds the
+//! job back in the queue until an instant, or drops it (its result was given elsewhere).
+//! A worker never waits on a holdoff itself, and the pool never joins its threads on
+//! drop: a worker blocked in a send exits on its own once the send returns.
+
+use std::io;
+use std::num::NonZeroUsize;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::thread::{self, JoinHandle};
+use std::time::Instant;
+
+use crate::queue::{BoundedQueue, JobQueue, Skipped, Taken};
+
+/// What one run of a job gave.
+#[derive(Debug)]
+pub(crate) enum Step<J, A> {
+    /// The job is finished with this answer.
+    Done(A),
+    /// Hold the job until `until`, then run it again (a schema resend is `until: now`).
+    HoldOff {
+        /// Not before this instant.
+        until: Instant,
+        /// The job, with its state.
+        job: J,
+    },
+    /// The job's result was already given elsewhere (a cancelled in-flight send): no answer.
+    Discarded,
 }
 
-type RunFn<J, A> = dyn Fn(&J) -> A + Send + Sync;
-type SkipFn<J, A> = dyn Fn(&J, Skipped) -> A + Send + Sync;
-type LostFn<J, A> = dyn Fn(&J) -> A + Send + Sync;
+/// Why a worker stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Stopped {
+    /// The input ended and the queue drained.
+    InputEnded,
+    /// The queue was cancelled.
+    Cancelled,
+}
 
-/// A fixed set of worker threads draining a bounded job queue.
-pub(crate) struct WorkerPool<J, A> {
-    jobs: Arc<BoundedQueue<J>>,
-    answers: Arc<BoundedQueue<A>>,
+impl Stopped {
+    /// The `reason` field of `runner.worker.stopped`.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::InputEnded => "input_ended",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+/// The work a pool does: how to run, skip and answer a job.
+pub(crate) trait Work: Send + Sync + 'static {
+    /// A queued job.
+    type Job: Send + 'static;
+    /// What a finished job gives.
+    type Answer: Send + 'static;
+    /// What a job's send registers while it is in flight.
+    type InFlight: Send + 'static;
+    /// What is kept of a job while it runs, to answer it if the run panics.
+    type Receipt;
+
+    /// The receipt of `job`, taken before it runs or is skipped.
+    fn receipt(&self, job: &Self::Job) -> Self::Receipt;
+
+    /// Runs one step of `job`.
+    fn run(&self, job: Self::Job) -> Step<Self::Job, Self::Answer>;
+
+    /// The answer for a job that is not run to the end; `None` when it was given elsewhere.
+    fn skipped(&self, receipt: Self::Receipt, why: Skipped) -> Option<Self::Answer>;
+
+    /// A worker is about to exit.
+    fn stopped(&self, _why: Stopped) {}
+}
+
+/// The job queue type of a [`Work`].
+pub(crate) type Jobs<W> = JobQueue<<W as Work>::Job, <W as Work>::InFlight>;
+
+/// A fixed set of worker threads named `sc-decision-worker`.
+pub(crate) struct Pool<W: Work> {
+    jobs: Arc<Jobs<W>>,
+    results: Arc<BoundedQueue<W::Answer>>,
     handles: Mutex<Vec<JoinHandle<()>>>,
-    cancel: CancelToken,
-    counters: Arc<Counters>,
-    workers: usize,
-    queue_capacity: usize,
 }
 
-impl<J: Send + 'static, A: Send + 'static> WorkerPool<J, A> {
-    /// Starts `workers` threads (at least one). Each queue holds
-    /// `queue_capacity` items (at least one). `run` turns a job into its
-    /// answer; `skipped` does so for a job that is not run. `lost` is the
-    /// last resort when `skipped` itself panics: it must not panic, so every
-    /// accepted job gets exactly one answer.
+impl<W: Work> Pool<W> {
+    /// Starts `workers` threads draining `jobs` into `results`.
+    ///
+    /// Each worker is one producer of `results` (counted in its `new`) and reports
+    /// [`BoundedQueue::producer_done`] when it exits.
+    ///
+    /// # Errors
+    ///
+    /// The spawn error when a thread cannot start. The queue is then cancelled, the
+    /// threads already started exit, and every worker that did not start is reported done.
     pub(crate) fn start(
-        workers: usize,
-        queue_capacity: usize,
-        cancel: CancelToken,
-        run: Arc<RunFn<J, A>>,
-        skipped: Arc<SkipFn<J, A>>,
-        lost: Arc<LostFn<J, A>>,
-    ) -> Self {
-        let workers = workers.max(1);
-        let queue_capacity = queue_capacity.max(1);
-        let jobs = Arc::new(BoundedQueue::new(queue_capacity));
-        let answers = Arc::new(BoundedQueue::new(queue_capacity));
-        let counters = Arc::new(Counters {
-            running: AtomicUsize::new(0),
-            alive: AtomicUsize::new(workers),
-        });
-        let handles = (0..workers)
-            .map(|_| {
-                let worker = Worker {
-                    jobs: Arc::clone(&jobs),
-                    answers: Arc::clone(&answers),
-                    counters: Arc::clone(&counters),
-                    cancel: cancel.clone(),
-                    run: Arc::clone(&run),
-                    skipped: Arc::clone(&skipped),
-                    lost: Arc::clone(&lost),
-                };
-                thread::spawn(move || worker.work())
-            })
-            .collect();
-        Self {
+        workers: NonZeroUsize,
+        jobs: Arc<Jobs<W>>,
+        results: Arc<BoundedQueue<W::Answer>>,
+        work: Arc<W>,
+    ) -> Result<Self, io::Error> {
+        let mut handles = Vec::with_capacity(workers.get());
+        for started in 0..workers.get() {
+            let worker = Worker {
+                jobs: Arc::clone(&jobs),
+                results: Arc::clone(&results),
+                work: Arc::clone(&work),
+            };
+            let spawned = thread::Builder::new()
+                .name("sc-decision-worker".to_owned())
+                .spawn(move || worker.work());
+            match spawned {
+                Ok(handle) => handles.push(handle),
+                Err(error) => {
+                    jobs.cancel();
+                    for _ in started..workers.get() {
+                        results.producer_done();
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self {
             jobs,
-            answers,
+            results,
             handles: Mutex::new(handles),
-            cancel,
-            counters,
-            workers,
-            queue_capacity,
-        }
+        })
     }
 
-    /// Submits `job`, waiting at most `wait` (forever when `None`) for room.
-    pub(crate) fn submit(&self, job: J, wait: Option<Duration>) -> Result<(), PushError<J>> {
-        if self.cancel.is_cancelled() {
-            return Err(PushError::Closed(job));
-        }
-        self.jobs.push(job, wait)
+    /// Submits `job`, blocking while the job queue is full.
+    ///
+    /// # Errors
+    ///
+    /// The job back once the queue is closed or cancelled.
+    #[cfg(test)]
+    pub(crate) fn submit(&self, job: W::Job) -> Result<(), W::Job> {
+        self.jobs.submit(job)
     }
 
-    /// No more jobs will be submitted; the pool finishes when it drains.
+    /// No more jobs; the workers exit when the queue drains.
+    #[cfg(test)]
     pub(crate) fn close_input(&self) {
         self.jobs.close();
     }
 
-    /// Stops new work: see the module documentation.
+    /// Cancels the job queue (never a caller's token).
+    #[cfg(test)]
     pub(crate) fn cancel(&self) {
-        self.cancel.cancel();
-        self.jobs.close();
+        self.jobs.cancel();
     }
 
-    /// Waits for the next answer; `None` once the pool is finished.
-    pub(crate) fn recv(&self) -> Option<A> {
-        match self.recv_within(None) {
-            Popped::Item(answer) => Some(answer),
-            Popped::Empty | Popped::Finished => None,
+    /// The next answer; `None` once every worker exited and the results drained.
+    #[cfg(test)]
+    pub(crate) fn recv(&self) -> Option<W::Answer> {
+        loop {
+            let seen = self.results.generation();
+            match self.results.pop(seen) {
+                crate::queue::Popped::Item(answer) => return Some(answer),
+                crate::queue::Popped::Interrupted => {}
+                crate::queue::Popped::Finished => return None,
+            }
         }
     }
-    /// Joins the worker threads. Call after [`Self::recv`] returned `None`,
-    /// or after [`Self::abandon`]; the workers have exited or are about to.
+
+    /// Joins the worker threads. Call after [`Self::recv`] returned `None`.
+    #[cfg(test)]
     pub(crate) fn join(&self) {
         let handles =
             std::mem::take(&mut *self.handles.lock().unwrap_or_else(PoisonError::into_inner));
         for handle in handles {
-            // A worker catches its job's panic, so a join error is a bug in
-            // the worker loop itself; there is nobody left to tell.
+            // A worker catches its job's panic, so a join error is a bug in the worker
+            // loop itself; the test then sees missing answers.
             let _ = handle.join();
         }
     }
 
-    /// Stops everything and drops unreceived answers, so no worker can stay
-    /// blocked on a consumer that is gone. Does not wait for the workers.
+    /// Stops everything without joining: results are discarded, the queue is cancelled.
     pub(crate) fn abandon(&self) {
-        self.cancel();
-        self.answers.discard();
+        self.results.discard();
+        self.jobs.cancel();
     }
 }
 
-impl<J, A> Drop for WorkerPool<J, A> {
+impl<W: Work> Drop for Pool<W> {
     fn drop(&mut self) {
-        // The workers finish on their own; they are not joined here because
-        // a running job may be an in-flight request.
-        self.cancel.cancel();
-        self.jobs.close();
-        self.answers.discard();
+        // Not joined: a running job may be an in-flight send. Handles are detached.
+        self.abandon();
+        self.handles
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
     }
 }
 
-struct Worker<J, A> {
-    jobs: Arc<BoundedQueue<J>>,
-    answers: Arc<BoundedQueue<A>>,
-    counters: Arc<Counters>,
-    cancel: CancelToken,
-    run: Arc<RunFn<J, A>>,
-    skipped: Arc<SkipFn<J, A>>,
-    lost: Arc<LostFn<J, A>>,
+struct Worker<W: Work> {
+    jobs: Arc<Jobs<W>>,
+    results: Arc<BoundedQueue<W::Answer>>,
+    work: Arc<W>,
 }
 
-/// Runs on every exit of a worker, a panic included: the last worker out
-/// closes the answer queue, so the stream cannot hang on a dead worker.
+/// Runs on every exit of a worker, a panic included: the last producer out closes the
+/// result queue, so the consumer cannot hang on a dead worker.
 struct Exit<A> {
-    counters: Arc<Counters>,
-    answers: Arc<BoundedQueue<A>>,
+    results: Arc<BoundedQueue<A>>,
 }
 
 impl<A> Drop for Exit<A> {
     fn drop(&mut self) {
-        if self.counters.alive.fetch_sub(1, Ordering::AcqRel) == 1 {
-            self.answers.close();
-        }
+        self.results.producer_done();
     }
 }
 
-impl<J, A> Worker<J, A> {
+impl<W: Work> Worker<W> {
     fn work(self) {
         let _exit = Exit {
-            counters: Arc::clone(&self.counters),
-            answers: Arc::clone(&self.answers),
+            results: Arc::clone(&self.results),
         };
-        while let Popped::Item(job) = self.jobs.pop(None) {
-            let answer = if self.cancel.is_cancelled() {
-                self.skip(&job, Skipped::Cancelled)
-            } else {
-                self.counters.running.fetch_add(1, Ordering::AcqRel);
-                let outcome = catch_unwind(AssertUnwindSafe(|| (self.run)(&job)));
-                self.counters.running.fetch_sub(1, Ordering::AcqRel);
-                outcome.unwrap_or_else(|_| self.skip(&job, Skipped::Panicked))
-            };
-            // A refused push means the consumer is gone: drop the answer.
-            let _ = self.answers.push(answer, None);
+        let mut why = Stopped::InputEnded;
+        loop {
+            match self.jobs.take() {
+                Taken::Finished => break,
+                Taken::Cancelled(job) => {
+                    why = Stopped::Cancelled;
+                    let receipt = self.work.receipt(&job);
+                    drop(job);
+                    self.answer(self.work.skipped(receipt, Skipped::Cancelled));
+                }
+                Taken::Run(job) => {
+                    let receipt = self.work.receipt(&job);
+                    match catch_unwind(AssertUnwindSafe(|| self.work.run(job))) {
+                        Ok(Step::Done(answer)) => self.answer(Some(answer)),
+                        Ok(Step::HoldOff { until, job }) => self.jobs.hold(job, until),
+                        Ok(Step::Discarded) => {}
+                        Err(payload) => {
+                            let text = panic_text(payload.as_ref());
+                            self.answer(self.work.skipped(receipt, Skipped::Panicked(text)));
+                        }
+                    }
+                }
+            }
+            self.jobs.done();
         }
+        if self.jobs.is_cancelled() {
+            why = Stopped::Cancelled;
+        }
+        self.work.stopped(why);
     }
 
-    /// The answer for a job that was not run; `skipped` may panic (it logs).
-    fn skip(&self, job: &J, why: Skipped) -> A {
-        catch_unwind(AssertUnwindSafe(|| (self.skipped)(job, why)))
-            .unwrap_or_else(|_| (self.lost)(job))
+    /// Pushes `answer`, blocking while the result queue is full. A refused push means the
+    /// consumer is gone: the answer is dropped (its row is already written).
+    fn answer(&self, answer: Option<W::Answer>) {
+        if let Some(answer) = answer {
+            let _consumer_gone = self.results.push(answer);
+        }
     }
 }
+
+/// The text of a panic payload (`&str` or `String`), else a fixed note.
+pub(crate) fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|text| (*text).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "a panic with a non-text payload".to_owned())
+}
+
+#[cfg(test)]
+mod tests;

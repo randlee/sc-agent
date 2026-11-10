@@ -1481,6 +1481,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-decision-runner"
+version = "0.1.0"
+dependencies = [
+ "sc-agent-config",
+ "sc-agent-http",
+ "sc-agent-log",
+ "sc-agent-types",
+ "sc-decision-schema",
+ "serde_json",
+]
+
+[[package]]
 name = "sc-decision-schema"
 version = "0.1.0"
 dependencies = [
