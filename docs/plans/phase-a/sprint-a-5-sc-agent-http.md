@@ -304,7 +304,7 @@ How the runner (A-9) uses it, no sleep (one-off calls: see Decisions): take job 
 
 ```rust
 // src/testing.rs (feature "testing"; copied C13 + new BlockingTransport)
-/// Answers from a script, first entry first; records every request; exhausted -> Network { Connect, "script exhausted" }. Clones share state.
+/// Answers from a script, first entry first; records every request; exhausted -> HttpError::network(Connect, 1, "script exhausted"). Clones share state.
 #[derive(Clone, Default)]
 pub struct ScriptedTransport { inner: Arc<Mutex<Script>> }
 impl ScriptedTransport {
@@ -382,22 +382,25 @@ pub enum HttpError {
     /// Busy status whose body marks quota, credit or spend exhaustion (REQ-SAG-0602).
     QuotaExhausted { attempts: u32, reply: Box<ProviderReply> },        // "http.quota_exhausted"
     /// Transport failure. Timeout: resent under max_sends and the start budget, returned when either runs out; Connect (incl. DNS), Tls, Other: returned after one send.
-    Network { kind: NetworkKind, attempts: u32, message: String }, // "http.network"
+    #[non_exhaustive] Network { kind: NetworkKind, attempts: u32, message: String, cause: Option<Box<ErrorDetail>> }, // "http.network"
     /// The body exceeded the 8 MiB read cap.
     ResponseTooLarge { status: u16, limit_bytes: u64 },            // "http.response_too_large"
     /// The URL does not parse, has no host, or its scheme is refused (`parse`: https; `parse_local`: http or https).
     InvalidEndpoint { url: String, reason: String },               // "http.invalid_endpoint"
     /// A header name or value the HTTP builder refuses.
-    InvalidRequest { message: String },                            // "http.invalid_request"
+    #[non_exhaustive] InvalidRequest { message: String, cause: Option<Box<ErrorDetail>> }, // "http.invalid_request"
     /// A key was attached to a plain-http endpoint whose host is not loopback (REQ-SAG-0013). `host` only, never the key.
     KeyOnPlainHttp { host: String },                               // "http.key_on_plain_http"
 }
 impl HttpError {
-    pub(crate) fn map_text(self, map: &impl Fn(&str) -> String) -> Self;
+    pub fn network(kind: NetworkKind, attempts: u32, message: impl Into<String>) -> Self;
+    pub fn invalid_request(message: impl Into<String>) -> Self;
+    pub fn with_cause(self, cause: ErrorDetail) -> Self;
+    pub(crate) fn map_text(self, map: &impl Fn(String) -> String) -> Self; // every text field and every cause level
 }
 impl ErrorId for HttpError {}   // cause_detail() (a-1 rename, RBP-F001): Network/InvalidRequest carry an explicit `cause: Option<Box<ErrorDetail>>` (built with ErrorDetail::foreign), are #[non_exhaustive], and are built with HttpError::network / invalid_request / with_cause; message() is this layer's text only; cause_detail() and source() return the cause (RBP-F001)
                                 // recovery() (RBP-F005): provider_busy -> "the provider is busy; try again later or lower workers"; quota_exhausted -> "the provider account is out of quota or credit; add credit or use another key"; key_on_plain_http -> "use an https endpoint or a loopback host (localhost, 127.0.0.0/8, ::1) for a runner that needs a key"; others None
-impl std::error::Error for HttpError {}
+impl std::error::Error for HttpError { /* source() returns the cause */ }
 ```
 
 7 variants. Cancellation is not an HTTP error: the queue that waits owns it (DecisionError::Cancelled, A-2).
