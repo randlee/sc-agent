@@ -253,7 +253,7 @@ Anthropic structured outputs accept no numeric min/max, so ranges are not in the
 
 How decode maps failures (the runner resends on `SchemaMismatch` up to max_sends, then returns it, A-9; backend name `"llm"`):
 - `DecisionError::SchemaMismatch { backend: "llm", detail }`: `LlmError::OutputNotJson`, `LlmError::Truncated`, `LlmError::NoText`, `DecisionLlmError::AnswerIds`, `DecisionLlmError::AnswerInvalid` (e.g. a choice answer missing `probabilities`). `detail` = `DecisionLlmError::detail()`, which carries the LlmError chain.
-- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Encode`, `Http`) and `DecisionLlmError::Encode`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
+- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Http`) and `DecisionLlmError::Encode` (incl. an unsupported question type and an asset with no image), `InvalidMaxTokens` and `Invariant`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
 
 Log records (ANC-007), via `GeneralLogger::write(Level::Info, target, action, ctx, fields)` (session_id/position travel in `ctx`, not in `fields`); never a prompt, body, header value or key; a log write error is ignored (counted by sc-agent-log) and never changes a decode result:
 - `llm.usage`, target `"sc_llm_provider"`: `provider`, `model` (as the provider reports it), `input_tokens`, `output_tokens`; ctx = the caller's LogContext.
@@ -271,7 +271,6 @@ pub enum LlmError {
     Http { provider: LlmProvider, source: HttpError },                 // "llm.http"
     /// A non-2xx final reply, in the provider's own words (redacted).
     ApiStatus { provider: LlmProvider, reply: Box<ProviderReply> },         // "llm.api_status"
-    /// The request body could not be serialized.
     /// The 2xx body is not JSON or not the provider's envelope (serde message, never body bytes).
     ReplyInvalid { provider: LlmProvider, message: String },           // "llm.reply_invalid"
     /// The reply has no text content.
@@ -304,7 +303,7 @@ impl ErrorId for DecisionLlmError {}
 impl From<LlmError> for DecisionLlmError {}
 ```
 
-LlmError 8 variants, DecisionLlmError 4 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
+LlmError 7 variants, DecisionLlmError 6 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
 
 ## 5. Config keys
 
