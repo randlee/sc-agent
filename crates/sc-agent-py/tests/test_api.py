@@ -1,7 +1,9 @@
 """The sc-agent Python API over the maturin build, against a loopback runner.
 
-SC_AGENT_CONFIG_DIR (never HOME) is a tempdir whose default.json names the loopback runner
-`dec`; no test reaches an external network. Each test names the acceptance line it proves.
+Each call passes `config_dir=` (a tempdir whose default.json names the loopback runner `dec`
+and sets the log root); no environment variable and no HOME is set for sc_agent. Only the one
+`decide` CLI child gets HOME, because the CLI has no config-dir flag. No test reaches an
+external network. Each test names the acceptance line it proves.
 Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
 depends on elapsed time.
 """
@@ -33,7 +35,6 @@ PART = json.dumps(
     }
 )
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
-ARGS = dict(model="dec", project="proj", agent_role="role")
 
 
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
@@ -67,12 +68,12 @@ def test_every_decide_operation_has_its_python_function(decide_bin):
 
 
 @pytest.mark.mode("ok")
-def test_send_and_send_batch_return_the_decided_response(env):
+def test_send_and_send_batch_return_the_decided_response(env, args):
     """REQ-SAG-0501 (successful path), REQ-SAG-0007: a runner that answers gives send() one
     result line with the response, its session ULID and position 0, the probability
     unrounded; send_batch() gives one such line per request, positions 0..n-1."""
     loopback, log_root = env
-    text = sc_agent.send(NOUL, **ARGS)
+    text = sc_agent.send(NOUL, **args)
     line = json.loads(text)
     assert "error" not in line
     assert line["position"] == 0
@@ -80,7 +81,7 @@ def test_send_and_send_batch_return_the_decided_response(env):
     assert line["response"]["answers"]["q"] == {"type": "noul", "noul": 0.123456789}
     assert '"noul":0.123456789' in text
     assert set(line["digests"]) == {"q"}
-    lines = [json.loads(item) for item in sc_agent.send_batch([NOUL] * 3, **ARGS)]
+    lines = [json.loads(item) for item in sc_agent.send_batch([NOUL] * 3, **args)]
     assert sorted(item["position"] for item in lines) == [0, 1, 2]
     assert all(item["response"]["answers"]["q"]["noul"] == 0.123456789 for item in lines)
     assert len(loopback.requests) == 4
@@ -89,24 +90,24 @@ def test_send_and_send_batch_return_the_decided_response(env):
     assert all(row["fields"]["outcome"] == "ok" for row in rows), rows
 
 
-def test_a_cancelled_token_stops_send_and_send_batch(env):
+def test_a_cancelled_token_stops_send_and_send_batch(env, args):
     """AC: REQ-SAG-0104 AC2."""
     loopback, _log_root = env
     token = sc_agent.CancelToken()
     token.cancel()
     assert token.is_cancelled()
-    line = json.loads(sc_agent.send(NOUL, cancel=token, **ARGS))
+    line = json.loads(sc_agent.send(NOUL, cancel=token, **args))
     assert line["error"]["id"] == "decision.cancelled"
-    lines = sc_agent.send_batch([NOUL, NOUL], cancel=token, **ARGS)
+    lines = sc_agent.send_batch([NOUL, NOUL], cancel=token, **args)
     assert [json.loads(item)["error"]["id"] for item in lines] == ["decision.cancelled"] * 2
     assert loopback.requests == []
 
 
-def test_an_invalid_project_is_refused(env):
+def test_an_invalid_project_is_refused(env, args):
     """AC: REQ-SAG-0004."""
     loopback, log_root = env
     with pytest.raises(sc_agent.SagError) as info:
-        sc_agent.send(NOUL, model="dec", project="Phase B", agent_role="role")
+        sc_agent.send(NOUL, **{**args, "project": "Phase B"})
     ident, detail = error_of(info)
     assert ident == "decide.log"
     assert detail["cause"]["id"] == "log.invalid_slug"
@@ -114,7 +115,8 @@ def test_an_invalid_project_is_refused(env):
     assert session_files(log_root) == []
 
 
-def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path):
+@pytest.mark.skipif(os.name == "nt", reason="the decide child gets its config through HOME")
+def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, args):
     """AC: REQ-SAG-0004 AC3."""
     loopback, log_root = env
     request = tmp_path / "request.json"
@@ -123,12 +125,15 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path):
         [decide_bin, "send", "--model", "dec", "--project", "proj", "--agent-role", "role", str(request)],
         capture_output=True,
         text=True,
-        env=dict(os.environ),  # carries SC_AGENT_CONFIG_DIR from the fixture
+        # The decide CLI has no config-dir flag: it reads ~/.sc-agent, so the child alone gets
+        # HOME = tmp_path (where the fixture wrote .sc-agent). POSIX only: on Windows the home
+        # directory does not come from HOME.
+        env=dict(os.environ, HOME=str(tmp_path)),
         timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
     assert json.loads(child.stdout)["error"]["id"] == "decision.api_status"
-    line = json.loads(sc_agent.send(NOUL, **ARGS))
+    line = json.loads(sc_agent.send(NOUL, **args))
     assert line["error"]["id"] == "decision.api_status"
     rows = session_rows(log_root)
     assert len(rows) == 2
@@ -137,12 +142,12 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path):
     assert len(loopback.requests) == 2
 
 
-def test_injected_loggers_receive_the_records_and_write_no_file(env):
+def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
     """AC: REQ-SAG-0008 Python."""
     _loopback, log_root = env
     records: list[dict] = []
     rows: list[dict] = []
-    sc_agent.send(NOUL, general_log=records.append, session_log=rows.append, **ARGS)
+    sc_agent.send(NOUL, general_log=records.append, session_log=rows.append, **args)
     assert "decide.send" in [record["action"] for record in records]
     assert "http.send" in [record["action"] for record in records]
     assert len(rows) == 1 and rows[0]["action"] == "session.row"
@@ -150,16 +155,18 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env):
     assert not (log_root / "logs" / "sc-agent-py.log.jsonl").exists()
     assert session_files(log_root) == []
     models: list[dict] = []
-    listed = json.loads(sc_agent.models(runner="dec", general_log=models.append))
+    listed = json.loads(
+        sc_agent.models(runner="dec", general_log=models.append, config_dir=args["config_dir"])
+    )
     assert listed["models"][0]["name"] == "jev-latest"
     assert "decide.models" in [record["action"] for record in models]
 
 
-def test_only_a_session_log_callable_keeps_the_default_general_log(env):
+def test_only_a_session_log_callable_keeps_the_default_general_log(env, args):
     """AC: REQ-SAG-0008 AC4."""
     _loopback, log_root = env
     rows: list[dict] = []
-    sc_agent.send(NOUL, session_log=rows.append, **ARGS)
+    sc_agent.send(NOUL, session_log=rows.append, **args)
     assert len(rows) == 1
     general = log_root / "logs" / "sc-agent-py.log.jsonl"
     assert general.exists()
@@ -167,11 +174,11 @@ def test_only_a_session_log_callable_keeps_the_default_general_log(env):
     assert session_files(log_root) == []
 
 
-def test_only_a_general_log_callable_keeps_the_default_session_log(env):
+def test_only_a_general_log_callable_keeps_the_default_session_log(env, args):
     """AC: REQ-SAG-0008 AC5."""
     _loopback, log_root = env
     records: list[dict] = []
-    sc_agent.send(NOUL, general_log=records.append, **ARGS)
+    sc_agent.send(NOUL, general_log=records.append, **args)
     assert "decide.send" in [record["action"] for record in records]
     files = session_files(log_root)
     assert len(files) == 1
@@ -180,7 +187,7 @@ def test_only_a_general_log_callable_keeps_the_default_session_log(env):
 
 
 @pytest.mark.mode("hang")
-def test_keyboard_interrupt_cancels_drains_and_reraises(env):
+def test_keyboard_interrupt_cancels_drains_and_reraises(env, args):
     """AC: REQ-SAG-0011 Python.
 
     The interrupt is raised once the runner holds a request it never answers, so the drained
@@ -206,7 +213,7 @@ def test_keyboard_interrupt_cancels_drains_and_reraises(env):
     thread.start()
     try:
         with pytest.raises(KeyboardInterrupt):
-            sc_agent.send_batch([NOUL] * 3, cancel=token, on_result=lines.append, **ARGS)
+            sc_agent.send_batch([NOUL] * 3, cancel=token, on_result=lines.append, **args)
     finally:
         returned.set()
         thread.join(HANG_GUARD)
@@ -218,7 +225,7 @@ def test_keyboard_interrupt_cancels_drains_and_reraises(env):
     assert len(session_rows(log_root)) == 3
 
 
-def test_a_raising_log_callable_never_changes_the_result(env):
+def test_a_raising_log_callable_never_changes_the_result(env, args):
     """AC: REQ-SAG-0008 (QA-003). A general_log or session_log callable that raises makes its
     writes refused writes: the send returns its normal result, and the lost rows are reported
     (as a RuntimeWarning naming log.rows_lost) instead of being dropped silently."""
@@ -227,19 +234,19 @@ def test_a_raising_log_callable_never_changes_the_result(env):
         raise ValueError("this callable refuses every record")
 
     with pytest.warns(RuntimeWarning, match="log.rows_lost"):
-        line = json.loads(sc_agent.send(NOUL, general_log=refuse, **ARGS))
+        line = json.loads(sc_agent.send(NOUL, general_log=refuse, **args))
     assert line["error"]["id"] == "decision.api_status"  # the loopback's fixed error, as always
 
     with pytest.warns(RuntimeWarning, match="log.rows_lost"):
-        line = json.loads(sc_agent.send(NOUL, session_log=refuse, **ARGS))
+        line = json.loads(sc_agent.send(NOUL, session_log=refuse, **args))
     assert line["error"]["id"] == "decision.api_status"
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # a callable that accepts every record warns nothing
-        sc_agent.send(NOUL, general_log=lambda _record: None, session_log=lambda _record: None, **ARGS)
+        sc_agent.send(NOUL, general_log=lambda _record: None, session_log=lambda _record: None, **args)
 
 
-def test_an_on_result_exception_cancels_drains_and_reraises(env):
+def test_an_on_result_exception_cancels_drains_and_reraises(env, args):
     """AC: REQ-SAG-0011 Python (on_result)."""
     seen: list[str] = []
 
@@ -249,33 +256,33 @@ def test_an_on_result_exception_cancels_drains_and_reraises(env):
 
     token = sc_agent.CancelToken()
     with pytest.raises(ValueError, match="stop here"):
-        sc_agent.send_batch([NOUL] * 5, cancel=token, on_result=explode, **ARGS)
+        sc_agent.send_batch([NOUL] * 5, cancel=token, on_result=explode, **args)
     assert token.is_cancelled()
     assert len(seen) == 1
 
 
-def test_images_and_long_context_reach_the_runner(env):
+def test_images_and_long_context_reach_the_runner(env, args):
     """AC: REQ-SAG-0501 images."""
     loopback, _log_root = env
-    sc_agent.send(PART, images={"img1": PNG}, long_context=True, **ARGS)
+    sc_agent.send(PART, images={"img1": PNG}, long_context=True, **args)
     (request,) = loopback.requests
     assert request["headers"]["content-type"].startswith("multipart/form-data; boundary=")
     assert request["headers"]["typesafe-danger-zone-long-context"] == "true"
     assert b'name="img1"' in request["body"]
     assert PNG in request["body"]
-    sc_agent.send_batch([(PART, {"img1": PNG}, True)], **ARGS)
+    sc_agent.send_batch([(PART, {"img1": PNG}, True)], **args)
     assert b'name="img1"' in loopback.requests[1]["body"]
 
 
-def test_input_limits_raise_before_any_send(env):
+def test_input_limits_raise_before_any_send(env, args):
     """AC: REQ-SAG-0014."""
     loopback, _log_root = env
     with pytest.raises(sc_agent.SagError) as info:
-        sc_agent.send_batch([NOUL] * 10_001, **ARGS)
+        sc_agent.send_batch([NOUL] * 10_001, **args)
     ident, detail = error_of(info)
     assert ident == "decide.limit_exceeded" and "batch_lines" in detail["message"]
     with pytest.raises(sc_agent.SagError) as info:
-        sc_agent.send(" " * (9 * 1024 * 1024), **ARGS)
+        sc_agent.send(" " * (9 * 1024 * 1024), **args)
     ident, detail = error_of(info)
     assert ident == "decide.limit_exceeded" and "request_bytes" in detail["message"]
     assert loopback.requests == []

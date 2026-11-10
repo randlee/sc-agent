@@ -8,7 +8,8 @@
 //! The decide call runs on a scoped worker thread; the Python thread waits on its result
 //! channel with a 100 ms timed wait outside the GIL and calls `check_signals` between waits,
 //! so `KeyboardInterrupt` cancels the run, drains it and is re-raised (REQ-SAG-0011).
-//! `general_log` and `session_log` take `Callable[[dict], None]` (REQ-SAG-0008).
+//! `general_log` and `session_log` take `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
+//! (a path) names the configuration directory; absent, it is `~/.sc-agent`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -316,9 +317,14 @@ fn run_interruptible<T: Send>(
     })
 }
 
-/// A context for sc-agent-py: the general-log callable, else the default general log.
-fn context(general_log: Option<Py<PyAny>>) -> Result<Context, DecideError> {
+/// A context for sc-agent-py: `config_dir` (else `~/.sc-agent`), and the general-log
+/// callable, else the default general log.
+fn context(
+    general_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
+) -> Result<Context, DecideError> {
     let mut context = Context::new(SERVICE);
+    context.config_dir = config_dir;
     let general = match general_log {
         Some(callable) => GeneralLogger::injected(callable_logger(callable, SERVICE)?),
         None => general_logger(&context)?,
@@ -336,13 +342,16 @@ fn send_options(
     provider: Option<&str>,
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
 ) -> Result<SendOptions, DecideError> {
     let project = Slug::new("project", project)?;
     let agent_role = Slug::new("agent_role", agent_role)?;
-    let config = load_config(&Context::new(SERVICE))?;
+    let mut probe = Context::new(SERVICE);
+    probe.config_dir = config_dir.clone();
+    let config = load_config(&probe)?;
     let model = ModelSelector::parse(model, &config)?;
     let provider = provider.map(str::parse::<Provider>).transpose()?;
-    let context = context(general_log)?;
+    let context = context(general_log, config_dir)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
             callable_logger(callable, SessionLogger::SERVICE)?,
@@ -392,7 +401,7 @@ fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
 #[pyfunction]
-#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None))]
+#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decide send flag (ANC-006)"
@@ -409,6 +418,7 @@ fn send(
     cancel: Option<&CancelToken>,
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
 ) -> PyResult<String> {
     // The request is checked before any logger opens, so a refused one writes no file.
     let images = images.unwrap_or_default().into_iter().collect();
@@ -421,6 +431,7 @@ fn send(
         provider,
         general_log,
         session_log,
+        config_dir,
     )
     .map_err(|error| sag_error(&error))?;
     let cancel = token(cancel);
@@ -460,7 +471,7 @@ fn send(
 /// `decide send --batch`: always `Decision::decide_stream`; returns the result lines in
 /// finish order and passes each to `on_result` as it arrives.
 #[pyfunction]
-#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None))]
+#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decide send flag (ANC-006)"
@@ -476,6 +487,7 @@ fn send_batch(
     on_result: Option<Py<PyAny>>,
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
 ) -> PyResult<Vec<String>> {
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
@@ -486,6 +498,7 @@ fn send_batch(
         provider,
         general_log,
         session_log,
+        config_dir,
     )
     .map_err(|error| sag_error(&error))?;
     let cancel = token(cancel);
@@ -502,20 +515,21 @@ fn send_batch(
 
 /// `decide models`: the TypeSafe models list, or a configured runner's (JSON).
 #[pyfunction]
-#[pyo3(signature = (runner = None, cancel = None, general_log = None))]
+#[pyo3(signature = (runner = None, cancel = None, general_log = None, config_dir = None))]
 fn models(
     py: Python<'_>,
     runner: Option<&str>,
     cancel: Option<&CancelToken>,
     general_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
 ) -> PyResult<String> {
     let runner = runner
-        .map(runner_name)
+        .map(|runner| runner_name(runner, config_dir.clone()))
         .transpose()
         .map_err(|error| sag_error(&error))?;
     let options = ModelsOptions {
         runner,
-        context: context(general_log).map_err(|error| sag_error(&error))?,
+        context: context(general_log, config_dir).map_err(|error| sag_error(&error))?,
     };
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
@@ -532,9 +546,11 @@ fn models(
 
 /// `runner` as a `RunnerName`, parsed once at the edge; a name that cannot be a runner name
 /// is no configured runner either (`decide.unknown_runner`).
-fn runner_name(runner: &str) -> Result<RunnerName, DecideError> {
+fn runner_name(runner: &str, config_dir: Option<PathBuf>) -> Result<RunnerName, DecideError> {
     RunnerName::try_from(runner.to_owned()).or_else(|_| {
-        let config = load_config(&Context::new(SERVICE))?;
+        let mut probe = Context::new(SERVICE);
+        probe.config_dir = config_dir;
+        let config = load_config(&probe)?;
         Err(DecideError::UnknownRunner {
             name: runner.to_owned(),
             known: config.local_runners.keys().cloned().collect(),
@@ -544,14 +560,15 @@ fn runner_name(runner: &str) -> Result<RunnerName, DecideError> {
 
 /// `decide doctor`: detected keys, missing provider models and config ties (JSON).
 #[pyfunction]
-#[pyo3(signature = (cancel = None, general_log = None))]
+#[pyo3(signature = (cancel = None, general_log = None, config_dir = None))]
 fn doctor(
     py: Python<'_>,
     cancel: Option<&CancelToken>,
     general_log: Option<Py<PyAny>>,
+    config_dir: Option<PathBuf>,
 ) -> PyResult<String> {
     let options = DoctorOptions {
-        context: context(general_log).map_err(|error| sag_error(&error))?,
+        context: context(general_log, config_dir).map_err(|error| sag_error(&error))?,
     };
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();

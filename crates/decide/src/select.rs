@@ -46,8 +46,7 @@ pub(crate) const LOG_TARGET: &str = "decide";
 pub struct Context {
     /// The general-log service: `"decide"` or `"sc-agent-py"`.
     pub service: &'static str,
-    /// The configuration directory; `None` is [`CONFIG_DIR_VAR`] from the environment when
-    /// set, else `sc_agent_config::default_dir()` (`~/.sc-agent`).
+    /// The configuration directory; `None` is `sc_agent_config::default_dir()` (`~/.sc-agent`).
     pub config_dir: Option<PathBuf>,
     /// The git work-tree top whose `.env` is read for keys (REQ-SAG-0401); `None` is
     /// `Repo::work_tree_root(cwd)`. Tests point it at a tempdir so no real `.env` is read.
@@ -187,42 +186,15 @@ pub struct ModelsOptions {
 ///
 /// [`DecideError::Config`] with the `AgentConfigError` (key path in `config.invalid`).
 pub fn load_config(context: &Context) -> Result<AgentConfig, DecideError> {
-    let dir = config_dir(context)?;
+    let dir = match &context.config_dir {
+        Some(dir) => dir.clone(),
+        None => sc_agent_config::default_dir()?,
+    };
     // `load` takes the environment by value (A-4), so this is the one copy.
     Ok(sc_agent_config::load(
         dir,
         context.environment().into_owned(),
     )?)
-}
-
-/// The variable naming a project-specific configuration directory (instead of
-/// `~/.sc-agent`); also the default log root when the configuration sets no `log_root`.
-pub const CONFIG_DIR_VAR: &str = "SC_AGENT_CONFIG_DIR";
-
-/// The configuration directory of `context`: the seam, else [`CONFIG_DIR_VAR`], else
-/// `~/.sc-agent`.
-fn config_dir(context: &Context) -> Result<PathBuf, DecideError> {
-    if let Some(dir) = &context.config_dir {
-        return Ok(dir.clone());
-    }
-    match context
-        .environment()
-        .iter()
-        .rev()
-        .find(|(name, _)| name.as_os_str() == CONFIG_DIR_VAR)
-    {
-        Some((_, dir)) if !dir.is_empty() => Ok(PathBuf::from(dir)),
-        _ => Ok(sc_agent_config::default_dir()?),
-    }
-}
-
-/// The log root: the configured `log_root`, else the [`CONFIG_DIR_VAR`] directory when set,
-/// else `~/.sc-agent` (REQ-SAG-0003).
-fn log_root(context: &Context, config: &AgentConfig) -> Result<PathBuf, DecideError> {
-    if config.log_root.is_some() || context.config_dir.is_some() {
-        return Ok(config.log_root()?);
-    }
-    config_dir(context)
 }
 
 /// The session identity of the working folder: `Repo::detect(cwd)`, `project`, `agent_role`.
@@ -359,7 +331,7 @@ fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger,
     match &context.general {
         Some(general) => Ok(general.clone()),
         None => {
-            let root = log_root(context, config)?;
+            let root = config.log_root()?;
             Ok(GeneralLogger::open_default(&root, context.service)?)
         }
     }
@@ -396,7 +368,7 @@ fn session_for(options: &SendOptions, config: &AgentConfig) -> Result<SessionLog
         Some(session) => Ok(session.clone()),
         None => {
             let identity = session_identity(&options.project, &options.agent_role)?;
-            let root = log_root(&options.context, config)?;
+            let root = config.log_root()?;
             Ok(SessionLogger::open_default(&root, identity)?)
         }
     }
