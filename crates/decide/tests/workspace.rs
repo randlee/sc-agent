@@ -415,14 +415,18 @@ mod tests {
     }
 
     /// Exceptions to `tests_are_deterministic`, as `(path suffix, text on the line, why)`.
-    /// Kept empty: every test waits through a bounded primitive and reads only a manual clock.
+    /// Kept empty: no test code uses a banned form.
     const ALLOWED: [(&str, &str, &str); 0] = [];
 
-    /// Owner rule: no flaky test, by design. No test reads real time, waits without a deadline,
-    /// spins, loops a race, or binds a port outside `serve_once`, in `crates/*/tests/` or in any
-    /// `#[cfg(test)]` module (sc-agent-testkit, which holds the bounded forms, is skipped). The
-    /// scanner is proven on a positive control that has every banned form, and the scan must
-    /// see the whole test code of the workspace, so it cannot pass vacuously.
+    /// Owner rule: no flaky test, by design. This scan checks one thing: no non-comment line of
+    /// `crates/*/tests/` or of any `#[cfg(test)]` module (sc-agent-testkit is skipped) uses a
+    /// banned form listed in `rules()` and `LOOP_NAMES` (`Instant::now`, `.elapsed()`,
+    /// `SystemTime::now`, `.recv()`, `.join()`, `.accept()`, `.wait(`, `.wait_while(`,
+    /// `yield_now`, a `for _ in 0..` loop bounded by a RACES/WAITS/ITER name), and no such line
+    /// binds `127.0.0.1:0` in a file without `serve_once`. It is a text match: it does not prove
+    /// that a test cannot hang or race by other means. The scanner is proven on a positive
+    /// control that has every banned form, and the scan must see the whole test code of the
+    /// workspace, so it cannot pass vacuously.
     ///
     /// Consumer: CI (`cargo test --workspace --all-features`), enforcing the owner's
     /// zero-tolerance rule on flaky tests. Defect class: the 13 nondeterministic tests found at

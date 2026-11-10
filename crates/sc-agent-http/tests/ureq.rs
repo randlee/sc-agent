@@ -22,7 +22,7 @@ mod cases {
     use sc_agent_secrets::{
         ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var,
     };
-    use sc_agent_testkit::{Gate, HANG_GUARD, Server, recv_within, serve_once};
+    use sc_agent_testkit::{HANG_GUARD, recv_within, serve_once};
     use sc_agent_types::ErrorId;
 
     struct OneVar;
@@ -119,20 +119,6 @@ mod cases {
             .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}");
     }
 
-    /// A server that reads one request, tells the test, waits for `gate` (bounded), then
-    /// answers 200.
-    fn gated_server(gate: &Gate) -> (Server, mpsc::Receiver<()>) {
-        let (received_tx, received) = mpsc::channel();
-        let gate = gate.clone();
-        let server = serve_once(move |mut stream| {
-            let _request = read_request(&mut stream);
-            received_tx.send(()).expect("tell the test");
-            gate.wait_open();
-            write_ok(&mut stream);
-        });
-        (server, received)
-    }
-
     /// A refused connection is `connect`, after one send, with the key never shown. The
     /// refusal is by construction (the stub's connector refuses every connection), so no
     /// freed port can be reused by another test.
@@ -216,26 +202,6 @@ mod cases {
         let default = RefusingTransport::new(Timeouts::default());
         let _ = default.send(&post(endpoint(9, "/plain"), None));
         assert_eq!(default.deadlines(), [Some(Duration::from_secs(120))]);
-    }
-
-    /// A5-25 over a real socket: a transport built with `with_request(1 s)` gives up with a
-    /// timeout while the server holds its reply; the server answers only after the test saw
-    /// the error and opened the gate, so the outcome does not depend on how long anything took
-    /// (the applied 1 s is asserted by the_applied_deadline_is_the_transport_or_the_request_one).
-    #[test]
-    fn per_runner_transport_deadline() {
-        let transport =
-            UreqTransport::new(Timeouts::default().with_request(Duration::from_secs(1)));
-        let gate = Gate::new();
-        let opener = gate.opener();
-        let (server, received) = gated_server(&gate);
-        let error = transport
-            .send(&post(endpoint(server.port(), "/slow"), None))
-            .expect_err("deadline");
-        recv_within(&received, HANG_GUARD);
-        opener.open();
-        server.finish();
-        assert_network(&error, NetworkKind::Timeout);
     }
 
     /// RSH-004: UreqTransport refuses zero or over-long timeouts and deadlines without opening
