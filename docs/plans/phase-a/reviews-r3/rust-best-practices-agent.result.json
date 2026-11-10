@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "status": "pass",
+    "reviewed_branch": "main",
+    "reviewed_commit": "23408cc",
+    "review_mode": "doc_review",
+    "practice_mode": "selected",
+    "practices_reviewed": ["RBP-004", "RBP-007"],
+    "findings": [
+      {
+        "id": "RBP-F019",
+        "practice_id": "RBP-007",
+        "status": "fixed",
+        "severity": "important",
+        "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+        "line": 57,
+        "issue": "Copied unreachable!() arm in digest.rs.",
+        "recommendation": "None, fixed.",
+        "evidence": "Line 57 says the copied `unreachable!()` arm is deleted and replaced by `Err(error) => Err(error)`, with 'no panic path, no #[allow]'. `of_text` returns Result<Self, sc_sha::ShaError>. The error is mapped to DecisionError::Encode through question_digests, so DecisionRequest::new stays fallible and total. AC line 385 repeats: 'digest.rs has no unreachable!/panic arm'."
+      },
+      {
+        "id": "RBP-F020",
+        "practice_id": "RBP-004",
+        "status": "fixed",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 224,
+        "issue": "ReleaseDate ordering-key documentation, and display-only notes on kind: String fields.",
+        "recommendation": "None, fixed.",
+        "evidence": "A-1 lines 224-225 doc ReleaseDate as 'an ordering key for newest release wins, not a calendar date', with day 1..=31 accepted for every month. A-1 line 162 states that a `kind: String` is display-only text, not a stable value. A-3 lines 293, 298, 312 and 316 mark kind as display only; line 293 adds 'not a stable value to match on'. A-10 lines 316, 340, 345 and 354 mark kind as display only."
+      }
+    ],
+    "summary": {
+      "total_findings": 0,
+      "by_severity": {"critical": 0, "important": 0, "minor": 0}
+    },
+    "notes": [
+      "Verification-only run. RBP-F019 and RBP-F020 are both fixed; no findings remain open.",
+      "I did not run a fresh review.",
+      "The `findings` entries carry a `status` field because the dispatch asked for fixed or still open per finding. The `by_severity` counts are zero because both are fixed."
+    ]
+  },
+  "error": null
+}
