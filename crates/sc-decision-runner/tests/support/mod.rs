@@ -1,7 +1,8 @@
 //! Shared test support: requests, replies, transports, a runner harness, failsafe waits.
 //!
-//! Nothing here sleeps. A delay is a `Condvar` timed wait; every wait that could hang
-//! has the 2 s failsafe.
+//! Nothing here sleeps or delays, and no helper measures time: every wait is on a forced
+//! ordering event (a gate, a channel, a `Condvar`) and is bounded by [`FAILSAFE`], which
+//! turns a hang into a failure and is never an assertion.
 
 pub mod scripted_backend;
 
@@ -10,7 +11,7 @@ use std::num::NonZeroU32;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use sc_agent_http::{HttpClient, HttpError, HttpRequest, HttpResponse, ResendPolicy, Transport};
 use sc_agent_log::testing::{MemoryLog, MemoryRecord};
@@ -79,24 +80,6 @@ pub fn busy(retry_after: &str) -> HttpResponse {
         vec![("retry-after".to_owned(), retry_after.to_owned())],
         br#"{"type":"error","error":{"type":"overloaded_error","message":"busy"}}"#.to_vec(),
     )
-}
-
-/// Waits `delay` on a condition variable nobody signals (a delay without a sleep call).
-pub fn delay(delay: Duration) {
-    let pair = (Mutex::new(()), Condvar::new());
-    let deadline = Instant::now() + delay;
-    let mut guard = lock(&pair.0);
-    loop {
-        let left = deadline.saturating_duration_since(Instant::now());
-        if left.is_zero() {
-            return;
-        }
-        guard = pair
-            .1
-            .wait_timeout(guard, left)
-            .unwrap_or_else(PoisonError::into_inner)
-            .0;
-    }
 }
 
 type SendFn = dyn Fn(&HttpRequest) -> Result<HttpResponse, HttpError> + Send + Sync;
@@ -349,4 +332,81 @@ pub fn rows_by_session(rows: &[MemoryRecord]) -> HashMap<String, Vec<&MemoryReco
 /// The `&dyn Decision` view (compile check of object use).
 pub fn as_decision(runner: &DecisionRunner) -> &dyn Decision {
     runner
+}
+
+/// An input iterator that yields its first `ready` requests, then reports on a channel that
+/// it is blocked and waits (bounded) for the test's signal before yielding the rest. While
+/// it waits, the feeder thread is certainly alive and every earlier request was submitted.
+pub struct GatedInput {
+    requests: std::vec::IntoIter<DecisionRequest>,
+    ready: usize,
+    pulled: usize,
+    blocked: Sender<()>,
+    open: Receiver<()>,
+}
+
+impl GatedInput {
+    /// The iterator, the "blocked" receiver and the "go on" sender.
+    pub fn new(requests: Vec<DecisionRequest>, ready: usize) -> (Self, Receiver<()>, Sender<()>) {
+        let (blocked_to, blocked) = mpsc::channel();
+        let (open, open_from) = mpsc::channel();
+        (
+            Self {
+                requests: requests.into_iter(),
+                ready,
+                pulled: 0,
+                blocked: blocked_to,
+                open: open_from,
+            },
+            blocked,
+            open,
+        )
+    }
+}
+
+impl Iterator for GatedInput {
+    type Item = DecisionRequest;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pulled == self.ready {
+            let _ = self.blocked.send(());
+            let _ = self.open.recv_timeout(FAILSAFE * 30);
+        }
+        self.pulled += 1;
+        self.requests.next()
+    }
+}
+
+/// An input iterator that reports on a channel when it has returned `None` (the input
+/// ended): every request is then with the runner.
+pub struct EndSignal {
+    requests: std::vec::IntoIter<DecisionRequest>,
+    ended: Option<Sender<()>>,
+}
+
+impl EndSignal {
+    pub fn new(requests: Vec<DecisionRequest>) -> (Self, Receiver<()>) {
+        let (ended, on_end) = mpsc::channel();
+        (
+            Self {
+                requests: requests.into_iter(),
+                ended: Some(ended),
+            },
+            on_end,
+        )
+    }
+}
+
+impl Iterator for EndSignal {
+    type Item = DecisionRequest;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.requests.next();
+        if next.is_none()
+            && let Some(ended) = self.ended.take()
+        {
+            let _ = ended.send(());
+        }
+        next
+    }
 }

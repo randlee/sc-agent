@@ -4,7 +4,6 @@
 use std::collections::BTreeSet;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
-use std::time::{Duration, Instant};
 
 use sc_agent_config::AgentConfig;
 use sc_agent_http::HttpResponse;
@@ -20,6 +19,8 @@ struct InFlight {
     parties: usize,
     /// (in flight now, most at once, calls so far, first `parties` calls that met).
     state: Mutex<(usize, usize, usize, usize)>,
+    /// Calls in flight at each call's entry, in entry order (that call included).
+    at_entry: Mutex<Vec<usize>>,
     changed: Condvar,
 }
 
@@ -28,6 +29,7 @@ impl InFlight {
         Self {
             parties,
             state: Mutex::new((0, 0, 0, 0)),
+            at_entry: Mutex::new(Vec::new()),
             changed: Condvar::new(),
         }
     }
@@ -37,6 +39,7 @@ impl InFlight {
         state.0 += 1;
         state.1 = state.1.max(state.0);
         state.2 += 1;
+        lock(&self.at_entry).push(state.0);
         if state.2 > self.parties {
             return;
         }
@@ -62,16 +65,20 @@ impl InFlight {
         let state = lock(&self.state);
         (state.1, state.3)
     }
+
+    /// Calls in flight at each entry.
+    fn at_entry(&self) -> Vec<usize> {
+        lock(&self.at_entry).clone()
+    }
 }
 
-/// Runs 40 requests answered after `each`, the first `parties` calls at a barrier;
-/// returns (elapsed, most in flight, how many of the first calls met).
-fn forty(config: RunnerConfig, parties: usize, each: Duration) -> (Duration, usize, usize) {
+/// Runs 40 requests, the first `parties` transport calls at a barrier; returns the counter.
+/// No delay and no clock: concurrency is shown by who was inside together.
+fn forty(config: RunnerConfig, parties: usize) -> Arc<InFlight> {
     let in_flight = Arc::new(InFlight::new(parties));
     let counted = Arc::clone(&in_flight);
     let (transport, _dropped) = FnTransport::new(move |_| {
         counted.enter();
-        delay(each);
         counted.leave();
         Ok(ok())
     });
@@ -81,44 +88,37 @@ fn forty(config: RunnerConfig, parties: usize, each: Duration) -> (Duration, usi
         config,
         5,
     );
-    let started = Instant::now();
     let results: Vec<_> = harness
         .runner
         .decide_stream(Box::new(requests(40).into_iter()), &CancelToken::new())
         .collect();
-    let elapsed = started.elapsed();
     assert_eq!(results.len(), 40);
     assert!(results.iter().all(|result| result.outcome.is_ok()));
     let positions: BTreeSet<u64> = results.iter().map(|result| result.position).collect();
     assert_eq!(positions, (0..40).collect());
-    let (most, met) = in_flight.seen();
-    (elapsed, most, met)
+    in_flight
 }
 
 /// REQ-SAG-0701 AC1: 40 requests with the default 8 workers: the first 8 transport calls
-/// meet at a Rendezvous(8) barrier, so 8 are in flight at once (deterministic), and the
-/// run takes well under the serial time.
+/// meet at a Rendezvous(8) barrier, so 8 are in flight at once, and never more.
 #[test]
 fn forty_requests_parallel() {
-    let each = Duration::from_millis(50);
-    let (elapsed, most, met) = forty(RunnerConfig::default(), 8, each);
+    let in_flight = forty(RunnerConfig::default(), 8);
+    let (most, met) = in_flight.seen();
     assert_eq!(met, 8, "the first 8 calls were in flight together");
     assert_eq!(most, 8, "never more than 8 at once");
-    let serial = each * 40;
-    // About serial / 8 (5 rounds); the loose bound only rules out a serial run.
-    assert!(
-        elapsed < serial * 3 / 4,
-        "parallel run took {elapsed:?}, serial would be {serial:?}"
-    );
 }
 
-/// REQ-SAG-0701 AC2: one worker runs one request at a time.
+/// REQ-SAG-0701 AC2: one worker runs one request at a time: every call finds itself alone.
 #[test]
 fn one_worker_is_serial() {
-    let each = Duration::from_millis(10);
-    let (elapsed, most, _) = forty(config(1), 1, each);
-    assert_eq!(most, 1, "one worker: one call at a time");
-    assert!(elapsed >= each * 40, "serial run took {elapsed:?}");
+    let in_flight = forty(config(1), 1);
+    let at_entry = in_flight.at_entry();
+    assert_eq!(at_entry.len(), 40);
+    assert!(
+        at_entry.iter().all(|count| *count == 1),
+        "one worker: one call in flight at each entry ({at_entry:?})"
+    );
 }
 
 /// REQ-SAG-0701 AC2 / REQ-SAG-0013: workers from AgentConfig.workers (default 8),

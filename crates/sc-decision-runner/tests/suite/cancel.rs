@@ -69,7 +69,7 @@ fn cancel_in_flight_send() {
     let harness = Harness::of(Arc::new(transport));
     let cancel = CancelToken::new();
     let results = harness.stream(vec![request("m0")], &cancel);
-    blocking.wait_started(1);
+    assert!(blocking.wait_started(1), "sends started");
     cancel.cancel();
     let result = results
         .recv_timeout(FAILSAFE)
@@ -101,7 +101,7 @@ fn decide_cancel_in_flight_send() {
     let harness = Harness::of(Arc::new(transport));
     let cancel = CancelToken::new();
     let result = harness.decide(request("m0"), &cancel);
-    blocking.wait_started(1);
+    assert!(blocking.wait_started(1), "sends started");
     cancel.cancel();
     let result = result.recv_timeout(FAILSAFE).expect("cancelled within 2 s");
     assert!(
@@ -150,41 +150,40 @@ fn dropping_the_stream_does_not_cancel_the_token() {
 }
 
 /// QA-002: a token cancelled before the run: every request is answered cancelled and the
-/// transport is never called (the hook is registered before any thread starts), for
-/// decide_stream and decide.
+/// transport is never called, for decide_stream and decide. One deterministic run: the
+/// ordering (hook registered before any runner thread starts) is proven by the crate-private
+/// seam test `the_cancel_hook_is_registered_before_any_thread_starts`, not by repetition.
 #[test]
 fn cancelled_before_start_sends_nothing() {
-    for _ in 0..50 {
-        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let counted = Arc::clone(&calls);
-        let (transport, dropped) = FnTransport::new(move |_| {
-            counted.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
-            Ok(ok())
-        });
-        let harness = Harness::of(Arc::new(transport));
-        let cancel = CancelToken::new();
-        cancel.cancel();
-        let results: Vec<_> = harness
-            .runner
-            .decide_stream(Box::new(requests(40).into_iter()), &cancel)
-            .collect();
-        assert_eq!(results.len(), 40);
-        assert!(
-            results
-                .iter()
-                .all(|result| matches!(result.outcome, Err(DecisionError::Cancelled { sends: 0 })))
-        );
-        let decided = harness.runner.decide(request("m99"), &cancel);
-        assert!(matches!(
-            decided.outcome,
-            Err(DecisionError::Cancelled { sends: 0 })
-        ));
-        let log = harness.finish(&dropped);
-        assert_eq!(
-            calls.load(std::sync::atomic::Ordering::Acquire),
-            0,
-            "nothing was sent"
-        );
-        assert_eq!(rows_of(&log).len(), 41);
-    }
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = Arc::clone(&calls);
+    let (transport, dropped) = FnTransport::new(move |_| {
+        counted.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        Ok(ok())
+    });
+    let harness = Harness::of(Arc::new(transport));
+    let cancel = CancelToken::new();
+    cancel.cancel();
+    let results: Vec<_> = harness
+        .runner
+        .decide_stream(Box::new(requests(40).into_iter()), &cancel)
+        .collect();
+    assert_eq!(results.len(), 40);
+    assert!(
+        results
+            .iter()
+            .all(|result| matches!(result.outcome, Err(DecisionError::Cancelled { sends: 0 })))
+    );
+    let decided = harness.runner.decide(request("m99"), &cancel);
+    assert!(matches!(
+        decided.outcome,
+        Err(DecisionError::Cancelled { sends: 0 })
+    ));
+    let log = harness.finish(&dropped);
+    assert_eq!(
+        calls.load(std::sync::atomic::Ordering::Acquire),
+        0,
+        "nothing was sent"
+    );
+    assert_eq!(rows_of(&log).len(), 41);
 }

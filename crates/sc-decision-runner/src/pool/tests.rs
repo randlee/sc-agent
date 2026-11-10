@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use super::*;
 
 /// Failsafe for waits that must finish; never a measurement.
-const FAILSAFE: Duration = Duration::from_secs(2);
+const FAILSAFE: Duration = Duration::from_secs(60);
 
 /// A barrier that gives up instead of hanging: `arrive` is true only when
 /// `parties` threads were inside it at the same moment.
@@ -274,23 +274,38 @@ fn a_held_job_frees_its_worker() {
     assert_eq!(rest, vec![1100], "the held job is answered as cancelled");
 }
 
-/// QA-001: a pool whose input ended and drained stops with `input_ended`, even when it is
-/// dropped while its workers are still deciding to exit (the stop reason is read under the
-/// queue lock, and dropping a pool never cancels its queue).
+/// QA-001 / QA-R2-001 (b): dropping a pool never cancels its job queue, so a pool whose
+/// input ended and drained stops with `input_ended`. Forced order: the test holds the queue,
+/// drains every answer, drops the pool, and reads the queue state directly (no loop).
 #[test]
-fn drained_pool_stops_with_input_ended_even_when_dropped() {
-    for _ in 0..200 {
-        let (pool, stopped) = pool_with_stops(4, 8, Step::Done, |job, _| job);
-        for job in 0..4 {
-            assert!(pool.submit(job).is_ok());
-        }
-        pool.close_input();
-        for _ in 0..4 {
-            assert!(pool.recv().is_some());
-        }
-        drop(pool);
-        assert_eq!(stops(&stopped, 4), vec![Stopped::InputEnded; 4]);
+fn dropping_a_pool_never_cancels_its_queue() {
+    let (stops_to, stopped) = mpsc::channel();
+    let workers = NonZeroUsize::new(4).expect("workers");
+    let jobs = Arc::new(JobQueue::new(8, Arc::new(Instant::now)));
+    let results = Arc::new(BoundedQueue::new(8, workers.get()));
+    let work = Arc::new(Closures {
+        run: Box::new(Step::Done),
+        skipped: Box::new(|job, _| job),
+        stops: Mutex::new(stops_to),
+    });
+    let pool = Pool::start(
+        workers,
+        Arc::clone(&jobs),
+        results,
+        work,
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .expect("workers start");
+    for job in 0..4 {
+        assert!(pool.submit(job).is_ok());
     }
+    pool.close_input();
+    for _ in 0..4 {
+        assert!(pool.recv().is_some());
+    }
+    drop(pool);
+    assert!(!jobs.is_cancelled(), "Pool::drop must not cancel the queue");
+    assert_eq!(stops(&stopped, 4), vec![Stopped::InputEnded; 4]);
 }
 
 /// A cancelled pool stops with `cancelled`.

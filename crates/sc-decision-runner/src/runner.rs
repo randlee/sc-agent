@@ -125,6 +125,10 @@ struct Shared {
     /// the number of runner threads alive at that moment.
     #[cfg(test)]
     after_hook: Mutex<Option<AfterHook>>,
+    /// Test seam (QA-R2-002): each fresh admission refused by a provider pause, as
+    /// `(position, not_before)`.
+    #[cfg(test)]
+    paused: Mutex<Option<std::sync::mpsc::Sender<(u64, Instant)>>>,
 }
 
 /// The `after_hook` test seam.
@@ -174,6 +178,8 @@ impl DecisionRunner {
                 live_threads: Arc::new(AtomicUsize::new(0)),
                 #[cfg(test)]
                 after_hook: Mutex::new(None),
+                #[cfg(test)]
+                paused: Mutex::new(None),
             }),
             config,
         }
@@ -682,7 +688,19 @@ impl RunnerWork {
                         self.finish(&core.identity, Err(error))
                     }
                     Ok(Start::Wait { at, state }) => Step::HoldOff {
-                        until: at,
+                        until: {
+                            #[cfg(test)]
+                            if let Some(paused) = self
+                                .shared
+                                .paused
+                                .lock()
+                                .unwrap_or_else(PoisonError::into_inner)
+                                .as_ref()
+                            {
+                                let _ = paused.send((core.identity.position, at));
+                            }
+                            at
+                        },
                         job: Job::prepared(
                             core,
                             SendState::Start {
@@ -851,8 +869,9 @@ impl Drop for FeedEnd<'_> {
         feeder.feed.done.store(true, Ordering::Release);
         feeder.jobs.close();
         feeder.results.interrupt();
-        feeder.results.producer_done();
+        // Down before `producer_done` (QA-R2-006), as in the worker's `Exit`.
         feeder.shared.live_threads.fetch_sub(1, Ordering::AcqRel);
+        feeder.results.producer_done();
     }
 }
 
@@ -936,7 +955,11 @@ impl Running {
             if !self.ready.is_empty() {
                 continue;
             }
-            if self.feed.finished_total() == Some(self.counts.results) {
+            // Every result is out. After a cancel, end now: workers may still be blocked in
+            // sends whose replies are discarded. Otherwise every job was answered by a
+            // worker, which then exits; wait for the result queue to close (the last
+            // producer out), so `runner.stream.end` counts no exited thread (QA-R2-006).
+            if self.feed.finished_total() == Some(self.counts.results) && self.jobs.is_cancelled() {
                 self.end();
                 return None;
             }

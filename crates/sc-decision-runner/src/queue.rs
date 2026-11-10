@@ -93,6 +93,9 @@ struct JobState<J, F> {
     cancelled: bool,
     /// Next held sequence number and in-flight key.
     seq: u64,
+    /// Submitters blocked at capacity (test seam, QA-R2-005; read under the lock).
+    #[cfg(test)]
+    waiting_submitters: usize,
 }
 
 /// The job queue of one run: ready FIFO, held min-heap, in-flight and orphan lists.
@@ -119,6 +122,8 @@ impl<J, F> JobQueue<J, F> {
                 closed: false,
                 cancelled: false,
                 seq: 0,
+                #[cfg(test)]
+                waiting_submitters: 0,
             }),
             changed: Condvar::new(),
             capacity: capacity.max(1),
@@ -147,10 +152,19 @@ impl<J, F> JobQueue<J, F> {
                 self.changed.notify_all();
                 return Ok(());
             }
+            #[cfg(test)]
+            {
+                state.waiting_submitters += 1;
+                self.changed.notify_all();
+            }
             state = self
                 .changed
                 .wait(state)
                 .unwrap_or_else(PoisonError::into_inner);
+            #[cfg(test)]
+            {
+                state.waiting_submitters -= 1;
+            }
         }
     }
 
@@ -313,6 +327,9 @@ struct QueueState<T> {
     discarded: bool,
     /// Bumped by `interrupt`: a waiting pop returns `Interrupted`.
     generation: u64,
+    /// Pushers blocked on a full queue (test seam, QA-R2-005; read under the lock).
+    #[cfg(test)]
+    waiting_pushers: usize,
 }
 
 /// What [`BoundedQueue::pop`] found.
@@ -344,6 +361,8 @@ impl<T> BoundedQueue<T> {
                 closed: producers == 0,
                 discarded: false,
                 generation: 0,
+                #[cfg(test)]
+                waiting_pushers: 0,
             }),
             not_empty: Condvar::new(),
             not_full: Condvar::new(),
@@ -372,10 +391,19 @@ impl<T> BoundedQueue<T> {
                 self.not_empty.notify_all();
                 return Ok(());
             }
+            #[cfg(test)]
+            {
+                state.waiting_pushers += 1;
+                self.not_empty.notify_all();
+            }
             state = self
                 .not_full
                 .wait(state)
                 .unwrap_or_else(PoisonError::into_inner);
+            #[cfg(test)]
+            {
+                state.waiting_pushers -= 1;
+            }
         }
     }
 
@@ -447,3 +475,40 @@ impl<T> BoundedQueue<T> {
         self.lock().discarded
     }
 }
+
+#[cfg(test)]
+impl<J, F> JobQueue<J, F> {
+    /// Waits (bounded) until `count` submitters are blocked at capacity; their count then.
+    pub(crate) fn wait_for_waiting_submitters(
+        &self,
+        count: usize,
+        failsafe: std::time::Duration,
+    ) -> usize {
+        let (state, _) = self
+            .changed
+            .wait_timeout_while(self.lock(), failsafe, |state| {
+                state.waiting_submitters < count
+            })
+            .unwrap_or_else(PoisonError::into_inner);
+        state.waiting_submitters
+    }
+}
+
+#[cfg(test)]
+impl<T> BoundedQueue<T> {
+    /// Waits (bounded) until `count` pushers are blocked on a full queue; their count then.
+    pub(crate) fn wait_for_waiting_pushers(
+        &self,
+        count: usize,
+        failsafe: std::time::Duration,
+    ) -> usize {
+        let (state, _) = self
+            .not_empty
+            .wait_timeout_while(self.lock(), failsafe, |state| state.waiting_pushers < count)
+            .unwrap_or_else(PoisonError::into_inner);
+        state.waiting_pushers
+    }
+}
+
+#[cfg(test)]
+mod tests;

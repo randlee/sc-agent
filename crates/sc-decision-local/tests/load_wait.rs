@@ -244,7 +244,7 @@ mod tests {
             cancel.clone(),
             Duration::from_secs(30),
         );
-        transport.wait_started(1);
+        assert!(transport.wait_started(1), "sends started");
         transport.release();
         cancel.cancel();
         let (result, elapsed) = receiver.recv_timeout(BOUND)?;

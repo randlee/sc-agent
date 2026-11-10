@@ -91,7 +91,7 @@ mod cases {
                 })
             })
             .collect();
-        blocking.wait_started(2);
+        assert!(blocking.wait_started(2), "sends started");
         assert_eq!(blocking.sends(), 2);
         // Both are inside send() and neither has returned.
         assert!(done_rx.try_recv().is_err());

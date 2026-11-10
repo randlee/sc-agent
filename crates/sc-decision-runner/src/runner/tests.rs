@@ -170,3 +170,151 @@ fn the_cancel_hook_is_registered_before_any_thread_starts() {
     );
     assert_eq!(transport.sends(), 0, "nothing is sent");
 }
+
+/// Encodes every request to one host (so one provider pause covers both) and decodes the
+/// reply as a SystemOneResponse.
+#[derive(Debug)]
+struct OneHost;
+
+impl Backend for OneHost {
+    fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError> {
+        let endpoint = Endpoint::parse("https://one-host.test/v1/systemone")?;
+        Ok(HttpRequest::new(
+            Method::Post,
+            endpoint,
+            request.body().to_json()?.into_bytes(),
+        ))
+    }
+
+    fn decode(
+        &self,
+        response: sc_agent_http::HttpResponse,
+        _request: &DecisionRequest,
+        _ctx: &LogContext,
+    ) -> Result<SystemOneResponse, DecisionError> {
+        SystemOneResponse::from_json(response.status(), response.body())
+    }
+}
+
+/// Records each send with the manual clock's reading; request `m0`'s first send is a 529
+/// with `Retry-After: 1`, every other send a 200.
+struct ClockedTransport {
+    clock: ManualClock,
+    sends: Mutex<Vec<(String, Instant)>>,
+}
+
+impl sc_agent_http::Transport for ClockedTransport {
+    fn send(
+        &self,
+        request: &HttpRequest,
+    ) -> Result<sc_agent_http::HttpResponse, sc_agent_http::HttpError> {
+        let body: serde_json::Value = serde_json::from_slice(request.body()).expect("json");
+        let model = body["model"].as_str().expect("model").to_owned();
+        let mut sends = self.sends.lock().expect("lock");
+        let first = !sends.iter().any(|(seen, _)| *seen == model);
+        sends.push((model.clone(), self.clock.now()));
+        Ok(if model == "m0" && first {
+            HttpResponse::new(
+                529,
+                vec![("retry-after".to_owned(), "1".to_owned())],
+                br#"{"type":"error","error":{"type":"overloaded_error","message":"busy"}}"#
+                    .to_vec(),
+            )
+        } else {
+            HttpResponse::new(
+                200,
+                vec![],
+                br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#
+                    .to_vec(),
+            )
+        })
+    }
+}
+
+/// QA-R2-002 (REQ-SAG-0012, runner side): A's 529 `Retry-After: 1` pauses the host on the
+/// one shared HttpClient; B, admitted while the pause holds, is held until exactly A's pause
+/// end. Deterministic: a ManualClock that only the test moves; one worker; the
+/// crate-private `paused` seam reports B's refused admission before the clock moves, and the
+/// clock then jumps to exactly the client's `not_before`. No real sleep; no wall-clock value
+/// is asserted (the real waits only bound how long the worker naps between clock reads).
+#[test]
+fn provider_pause_holds_other_jobs_until_exactly_its_end() {
+    let clock = ManualClock::new(Instant::now());
+    let transport = Arc::new(ClockedTransport {
+        clock: clock.clone(),
+        sends: Mutex::new(Vec::new()),
+    });
+    let log = MemoryLog::new().expect("log");
+    let http = HttpClient::new(
+        Arc::clone(&transport) as Arc<dyn sc_agent_http::Transport>,
+        ResendPolicy::default(),
+        log.general(),
+    );
+    let pause = http.clone();
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
+            .expect("identity");
+    let reading = clock.clone();
+    let runner = DecisionRunner::with_clock(
+        Arc::new(OneHost),
+        http,
+        log.session(identity),
+        log.general(),
+        RunnerConfig::new(1).expect("one worker"),
+        Arc::new(move || reading.now()),
+    );
+    let (paused_to, paused) = std::sync::mpsc::channel();
+    *runner.shared.paused.lock().expect("lock") = Some(paused_to);
+    let model = |name: &str| {
+        let body = SystemOneRequest::from_json(&format!(
+            r#"{{"model":"{name}","state":"s","questions":{{"q":{{"type":"noul"}}}}}}"#
+        ))
+        .expect("body");
+        DecisionRequest::try_from(body).expect("request")
+    };
+    let runner = Arc::new(runner);
+    let (results_to, results) = std::sync::mpsc::channel();
+    let consumer = {
+        let runner = Arc::clone(&runner);
+        let requests = vec![model("m0"), model("m1")];
+        std::thread::spawn(move || {
+            for result in runner.decide_stream(Box::new(requests.into_iter()), &CancelToken::new())
+            {
+                let _ = results_to.send(result);
+            }
+        })
+    };
+    let failsafe = Duration::from_secs(60);
+    let (position, at) = paused
+        .recv_timeout(failsafe)
+        .expect("B's admission is refused by A's pause");
+    assert_eq!(position, 1, "B, not A, is refused admission");
+    assert_eq!(
+        pause.pause().not_before("one-host.test"),
+        Some(at),
+        "B is held until the client's not-before"
+    );
+    let busy_at = clock.now();
+    assert!(
+        at >= busy_at + Duration::from_secs(1),
+        "Retry-After: 1 (plus jitter)"
+    );
+    assert_eq!(
+        transport.sends.lock().expect("lock").len(),
+        1,
+        "only A's 529 so far: B waits while the clock stands still"
+    );
+    clock.advance(at - busy_at);
+    let all: Vec<DecisionResult> = (0..2)
+        .map(|_| results.recv_timeout(failsafe).expect("a result"))
+        .collect();
+    consumer.join().expect("consumer");
+    assert!(all.iter().all(|result| result.outcome.is_ok()), "{all:?}");
+    let sends = transport.sends.lock().expect("lock");
+    let b_first = sends
+        .iter()
+        .find(|(model, _)| model == "m1")
+        .map(|(_, at)| *at)
+        .expect("B's send");
+    assert_eq!(b_first, at, "B's first send is at exactly A's pause end");
+}

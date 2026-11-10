@@ -217,8 +217,10 @@ struct Exit<A> {
 
 impl<A> Drop for Exit<A> {
     fn drop(&mut self) {
-        self.results.producer_done();
+        // Down before `producer_done`: once the last producer closes the result queue, every
+        // exited thread is already uncounted, so `runner.stream.end` sees 0 (QA-R2-006).
         self.live.fetch_sub(1, Ordering::AcqRel);
+        self.results.producer_done();
     }
 }
 

@@ -344,7 +344,7 @@ mod cases {
             })
             .collect();
         // Both sends are in flight at once before either may return.
-        gate.wait_started(2);
+        assert!(gate.wait_started(2), "sends started");
         gate.release();
         for worker in workers {
             assert!(

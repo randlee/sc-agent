@@ -4,7 +4,6 @@
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use sc_agent_http::testing::ScriptedTransport;
 use sc_agent_http::{HttpError, HttpResponse, NetworkKind};
@@ -75,17 +74,31 @@ fn busy_every_time_stops_at_max_sends() {
 }
 
 /// REQ-SAG-0601: a held-off request waits in the queue, not in a worker: with one
-/// worker, a second request is answered during the first one's holdoff.
+/// worker, a second request is answered during the first one's holdoff. Forced order
+/// (QA-R2-008): request 0's busy reply is held until the input iterator returned `None`, so
+/// request 1 is certainly queued when request 0 is held off.
 #[test]
 fn holdoff_frees_the_worker() {
+    let (input, input_ended) = EndSignal::new(requests(2));
+    let input_ended = Mutex::new(input_ended);
     let order = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&order);
     let (transport, _dropped) = FnTransport::new(move |request| {
         let index = index_of(request);
-        let mut order = lock(&seen);
-        let first = !order.contains(&index);
-        order.push(index);
-        Ok(if index == 0 && first { busy("1") } else { ok() })
+        let first = {
+            let mut order = lock(&seen);
+            let first = !order.contains(&index);
+            order.push(index);
+            first
+        };
+        Ok(if index == 0 && first {
+            lock(&input_ended)
+                .recv_timeout(FAILSAFE)
+                .expect("the input ended before request 0 is held off");
+            busy("1")
+        } else {
+            ok()
+        })
     });
     let harness = Harness::new(
         Arc::new(host_per_request()),
@@ -93,7 +106,13 @@ fn holdoff_frees_the_worker() {
         config(1),
         5,
     );
-    let results = harness.stream(requests(2), &CancelToken::new());
+    let runner = Arc::clone(&harness.runner);
+    let (results_to, results) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for result in runner.decide_stream(Box::new(input), &CancelToken::new()) {
+            let _ = results_to.send(result);
+        }
+    });
     let all = take(&results, 2);
     assert_eq!(all[0].position, 1, "answered during the holdoff");
     assert_eq!(all[1].position, 0);
@@ -124,10 +143,12 @@ fn cancel_ends_holdoff_at_once() {
     let cancel = CancelToken::new();
     let results = harness.stream(requests(2), &cancel);
     gate.wait_inside(1);
-    let cancelled_at = Instant::now();
     cancel.cancel();
+    // Both results arrive while the gate is still closed: request 1's send is blocked in
+    // the transport and request 0's 30 s holdoff has not passed, so only the cancel can
+    // have answered them (QA-R2-007; the clock-free holdoff case is a JobQueue unit test).
     let all = take(&results, 2);
-    assert!(cancelled_at.elapsed() < FAILSAFE);
+    assert_eq!(gate.inside(), 1, "the gate is still closed");
     for result in &all {
         assert!(
             matches!(result.outcome, Err(DecisionError::Cancelled { sends: 1 })),
@@ -220,74 +241,6 @@ fn busy_quota_network_passed_through() {
     assert_eq!(sends[&2], 1, "a connect failure is not resent");
 }
 
-/// REQ-SAG-0012 (runner side): A's 529 Retry-After: 1 pauses the host for every job of
-/// the one HttpClient; B's next send reaches the transport no earlier than A's pause end.
-#[test]
-fn provider_pause_holds_other_jobs() {
-    #[derive(Default)]
-    struct Calls {
-        /// (index, entered, returned) per call.
-        log: Vec<(usize, Instant, Instant)>,
-        a_entered: bool,
-    }
-    let calls = Arc::new((Mutex::new(Calls::default()), std::sync::Condvar::new()));
-    let recorded = Arc::clone(&calls);
-    let (transport, _dropped) = FnTransport::new(move |request| {
-        let index = index_of(request);
-        let entered = Instant::now();
-        let (mutex, condvar) = &*recorded;
-        let mut state = lock(mutex);
-        let first = !state.log.iter().any(|(seen, _, _)| *seen == index);
-        let reply = match (index, first) {
-            (0, true) => {
-                state.a_entered = true;
-                condvar.notify_all();
-                busy("1")
-            }
-            (1, true) => {
-                // B's first send returns only after A's has started.
-                let (waited, _) = condvar
-                    .wait_timeout_while(state, FAILSAFE, |calls| !calls.a_entered)
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                state = waited;
-                busy("0")
-            }
-            _ => ok(),
-        };
-        state.log.push((index, entered, Instant::now()));
-        Ok(reply)
-    });
-    let harness = Harness::new(
-        Arc::new(ScriptedBackend::new()),
-        Arc::new(transport),
-        config(2),
-        5,
-    );
-    let results: Vec<_> = harness
-        .runner
-        .decide_stream(Box::new(requests(2).into_iter()), &CancelToken::new())
-        .collect();
-    assert!(
-        results.iter().all(|result| result.outcome.is_ok()),
-        "{results:?}"
-    );
-    let state = lock(&calls.0);
-    let a_busy_returned = state
-        .log
-        .iter()
-        .find(|(index, _, _)| *index == 0)
-        .map(|(_, _, returned)| *returned)
-        .expect("A's first call");
-    let b_second = state
-        .log
-        .iter()
-        .filter(|(index, _, _)| *index == 1)
-        .nth(1)
-        .map(|(_, entered, _)| *entered)
-        .expect("B's second call");
-    assert!(
-        b_second >= a_busy_returned + Duration::from_secs(1),
-        "B resent {:?} after A's busy reply, before A's 1 s pause ended",
-        b_second.saturating_duration_since(a_busy_returned)
-    );
-}
+// REQ-SAG-0012 (runner side), formerly `provider_pause_holds_other_jobs` here, raced on when
+// A's pause was set. It is now `provider_pause_holds_other_jobs_until_exactly_its_end` in
+// src/runner/tests.rs: a ManualClock, one worker, and a crate-private seam (QA-R2-002).

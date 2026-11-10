@@ -115,7 +115,10 @@ fn runner_general_records() {
     assert_eq!(end[0].fields["run_id"], run_id.as_str());
     assert_eq!(end[0].fields["results"], 3);
     assert_eq!(end[0].fields["failed"], 1);
-    assert!(end[0].fields["live_threads"].is_u64());
+    assert_eq!(
+        end[0].fields["live_threads"], 0,
+        "every runner thread is uncounted before the last producer closes the results"
+    );
     assert!(end[0].fields.get("abandoned").is_none());
     let stopped = of("runner.worker.stopped");
     assert_eq!(stopped.len(), 2, "one per worker");
@@ -134,8 +137,9 @@ fn runner_general_records() {
     assert_eq!(log_failed[0].fields["position"], 2);
 }
 
-/// RSH-003: an abandoned run's runner.stream.end says so and counts the runner threads
-/// still alive (here the 2 workers blocked in sends, plus at most the feeder).
+/// RSH-003, QA-R2-006: an abandoned run's runner.stream.end says so and counts the runner
+/// threads still alive: exactly 3, the 2 workers blocked in sends and the feeder blocked in
+/// the gated input iterator.
 #[test]
 fn abandon_record_counts_live_threads() {
     let gate = Gate::default();
@@ -150,10 +154,14 @@ fn abandon_record_counts_live_threads() {
         config(2),
         5,
     );
+    let (input, blocked, open) = GatedInput::new(requests(4), 2);
     let stream = harness
         .runner
-        .decide_stream(Box::new(requests(4).into_iter()), &CancelToken::new());
+        .decide_stream(Box::new(input), &CancelToken::new());
     gate.wait_inside(2);
+    blocked
+        .recv_timeout(FAILSAFE)
+        .expect("the feeder waits in the input iterator");
     drop(stream);
     let end: Vec<_> = harness
         .records_of("sc_decision_runner")
@@ -162,13 +170,11 @@ fn abandon_record_counts_live_threads() {
         .collect();
     assert_eq!(end.len(), 1);
     assert_eq!(end[0].fields["abandoned"], true);
-    let live = end[0].fields["live_threads"]
-        .as_u64()
-        .expect("live_threads");
-    assert!(
-        (2..=3).contains(&live),
-        "2 blocked workers (+ the feeder): {live}"
+    assert_eq!(
+        end[0].fields["live_threads"], 3,
+        "2 workers blocked in sends and the feeder blocked in the input"
     );
+    let _ = open.send(());
     gate.open();
     harness.finish(&dropped);
 }
