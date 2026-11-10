@@ -269,6 +269,28 @@ mod tests {
             matches!(result, Err(LocalError::ProbeStatus { ref body, .. }) if body.len() == long.len())
         );
 
+        // A body that is not UTF-8 and holds the key: only the key is rewritten; every
+        // invalid byte stays as it was (REQ-SAG-0002).
+        let mut raw = vec![0xFF, b'a', 0xC3];
+        raw.extend_from_slice(SECRET.as_bytes());
+        raw.extend_from_slice(&[0xE2, 0x82, b'z', 0x80]);
+        raw.extend_from_slice(SECRET.as_bytes());
+        raw.push(0xFE);
+        let (result, _) = discover(
+            DaemonKind::Laya,
+            Some(key()),
+            Ok(sc_agent_http::HttpResponse::new(401, vec![], raw)),
+        );
+        let mut expected = vec![0xFF, b'a', 0xC3];
+        expected.extend_from_slice(b"[redacted]");
+        expected.extend_from_slice(&[0xE2, 0x82, b'z', 0x80]);
+        expected.extend_from_slice(b"[redacted]");
+        expected.push(0xFE);
+        assert!(
+            matches!(result, Err(LocalError::ProbeStatus { ref body, .. }) if *body == expected),
+            "{result:?}"
+        );
+
         // Without an attached key the body is unchanged byte for byte (not even made UTF-8).
         let bytes = vec![0xFF, 0xFE, b'x'];
         let (result, _) = discover(
