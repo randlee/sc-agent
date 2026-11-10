@@ -420,6 +420,8 @@ mod cases {
             holdoffs.iter().all(|holdoff| *holdoff <= secs(0.25)),
             "{holdoffs:?}"
         );
+        // The exact `ended + jitter()` is checked in resend.rs's unit tests
+        // (timeout_resend_adds_the_jitter) through a fixed-jitter seam.
         assert_eq!(client.pause().not_before("api.example.test"), None);
     }
 
