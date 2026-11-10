@@ -8,9 +8,10 @@
 #     serde::{Deserialize, Deserializer, Serialize, Serializer}); change try_from_pairs to return
 #     DecisionError::DuplicateKey { key } instead of JevError::input_invalid; drop keys() and
 #     is_empty() unless used; fix the doc-test path (sc_decision_schema::OrderedMap).
-#   - src/digest.rs: the copied of_text body is a fragment. Rewrite it as
-#     QuestionDigest::of_text(&str) -> Result<QuestionDigest, DecisionError>; delete the
-#     unreachable!() (REQ-SAG-0002: no panics) and map ShaError to DecisionError::Digest.
+#   - src/digest.rs: the copied of_text body is a fragment. Rewrite it as crate-private
+#     QuestionDigest::of_text(&str) -> Result<QuestionDigest, sc_sha::ShaError>; delete the
+#     unreachable!() (REQ-SAG-0002: no panics). question_digests maps ShaError to
+#     DecisionError::Encode; there is no DecisionError::Digest variant.
 #   - Write everything else new: Cargo.toml, lib.rs, request.rs, response.rs, models.rs,
 #     api_error.rs, decision.rs, backend.rs, error.rs, tests. No other old file is copied:
 #     the old Jev types disagree with openapi.json and the canonical payload is rejected by

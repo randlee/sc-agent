@@ -101,6 +101,9 @@ fn media_type(format: ImageFormat) -> &'static str {
     match format {
         ImageFormat::Png => "image/png",
         ImageFormat::Jpg | ImageFormat::Jpeg => "image/jpeg",
+        // ImageFormat is #[non_exhaustive]: a format added later is sent as raw bytes and a
+        // provider that rejects it returns its own error (REQ-SAG-0901).
+        _ => "application/octet-stream",
     }
 }
 

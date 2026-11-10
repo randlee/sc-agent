@@ -107,16 +107,16 @@ pub(crate) fn answers(
             .ok_or_else(|| invalid(id, "the answer is not an object"))?;
         typed.push((id.clone(), answer(id, question, item)?));
     }
-    Ok(SystemOneResponse {
-        model: reply.model.clone(),
-        answers: ordered("", typed)?,
-        usage: Usage {
+    Ok(SystemOneResponse::new(
+        reply.model.clone(),
+        ordered("", typed)?,
+        Usage {
             input_tokens: reply.usage.input_tokens,
             output_tokens: reply.usage.output_tokens,
             extra: Map::new(),
         },
-        extra: Map::new(),
-    })
+        Map::new(),
+    ))
 }
 
 /// `pairs` as an [`OrderedMap`]; keys come from the request or the criteria, so a duplicate
@@ -273,5 +273,8 @@ fn answer(
             }
             _ => Err(invalid(id, "unexpected field count")),
         },
+        // Question is #[non_exhaustive]: a question type this backend does not know is an
+        // invalid answer rather than a guess.
+        _ => Err(invalid(id, "unsupported question type")),
     }
 }

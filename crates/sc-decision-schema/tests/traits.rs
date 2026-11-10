@@ -46,12 +46,12 @@ mod tests {
 
     impl Decision for CancelledDecision {
         fn decide(&self, request: DecisionRequest, _cancel: &CancelToken) -> DecisionResult {
-            DecisionResult {
-                session_id: SessionId::new(),
-                position: 0,
-                digests: request.digests().clone(),
-                outcome: Err(DecisionError::Cancelled { sends: 0 }),
-            }
+            DecisionResult::new(
+                SessionId::new(),
+                0,
+                request.digests().clone(),
+                Err(DecisionError::Cancelled { sends: 0 }),
+            )
         }
 
         fn decide_stream<'a>(
@@ -59,11 +59,13 @@ mod tests {
             requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>,
             _cancel: &CancelToken,
         ) -> Box<dyn Iterator<Item = DecisionResult> + Send + 'a> {
-            Box::new(requests.zip(0..).map(|(request, position)| DecisionResult {
-                session_id: SessionId::new(),
-                position,
-                digests: request.digests().clone(),
-                outcome: Err(DecisionError::Cancelled { sends: 0 }),
+            Box::new(requests.zip(0..).map(|(request, position)| {
+                DecisionResult::new(
+                    SessionId::new(),
+                    position,
+                    request.digests().clone(),
+                    Err(DecisionError::Cancelled { sends: 0 }),
+                )
             }))
         }
     }
@@ -121,7 +123,7 @@ mod tests {
 
     /// Every public item, by name. The crate's modules are private, so its public surface is
     /// exactly the `pub use` lines of lib.rs.
-    const PUBLIC_ITEMS: [&str; 27] = [
+    const PUBLIC_ITEMS: [&str; 28] = [
         // TypeSafe request types (POST /v1/systemone).
         "Asset",
         "AssetKind",
@@ -155,15 +157,17 @@ mod tests {
         // The question digest and the error type.
         "QuestionDigest",
         "DecisionError",
+        "LimitKind",
     ];
 
-    const SOURCES: [(&str, &str); 10] = [
+    const SOURCES: [(&str, &str); 11] = [
         ("lib.rs", include_str!("../src/lib.rs")),
         ("api_error.rs", include_str!("../src/api_error.rs")),
         ("backend.rs", include_str!("../src/backend.rs")),
         ("decision.rs", include_str!("../src/decision.rs")),
         ("digest.rs", include_str!("../src/digest.rs")),
         ("error.rs", include_str!("../src/error.rs")),
+        ("key_order.rs", include_str!("../src/key_order.rs")),
         ("map.rs", include_str!("../src/map.rs")),
         ("models.rs", include_str!("../src/models.rs")),
         ("request.rs", include_str!("../src/request.rs")),
@@ -209,7 +213,7 @@ mod tests {
         let expected: BTreeSet<String> =
             PUBLIC_ITEMS.iter().map(|name| (*name).to_owned()).collect();
         assert_eq!(reexported_names(lib), expected);
-        assert_eq!(expected.len(), 27);
+        assert_eq!(expected.len(), 28);
 
         // Every module is private and lib.rs defines no item of its own.
         for line in lib.lines().map(str::trim) {

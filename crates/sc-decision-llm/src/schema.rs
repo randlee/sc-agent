@@ -91,6 +91,9 @@ fn question_schema(question: &Question) -> Value {
                 json!({ "type": ["number", "null"] }),
             );
         }
+        // Question is #[non_exhaustive]: an unknown type gets no fields here, and decode
+        // refuses its answer as `decision_llm.answer_invalid`.
+        _ => {}
     }
     object(fields)
 }

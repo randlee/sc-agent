@@ -16,7 +16,7 @@
 //! computes SHA-256 in this crate.
 
 use std::collections::BTreeMap;
-use std::fmt::{self, Write as _};
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -147,7 +147,7 @@ pub(crate) fn question_digests(
             Ok(PartDigest {
                 name: &part.name,
                 format: part.format,
-                sha256: digest_text(&lowercase_hex(&part.bytes)?)?.into(),
+                sha256: digest_text(&lowercase_hex(&part.bytes))?.into(),
             })
         })
         .collect::<Result<Vec<_>, DecisionError>>()?;
@@ -181,12 +181,21 @@ fn digest_text(text: &str) -> Result<QuestionDigest, DecisionError> {
     })
 }
 
-fn lowercase_hex(bytes: &[u8]) -> Result<String, DecisionError> {
+/// The lowercase hex digit of the low four bits of `nibble`.
+fn hex_digit(nibble: u8) -> char {
+    let value = nibble & 0x0f;
+    char::from(if value < 10 {
+        b'0' + value
+    } else {
+        b'a' + (value - 10)
+    })
+}
+
+fn lowercase_hex(bytes: &[u8]) -> String {
     let mut hex = String::with_capacity(bytes.len().saturating_mul(2));
     for byte in bytes {
-        write!(hex, "{byte:02x}").map_err(|error| DecisionError::Encode {
-            message: format!("an image part does not hex-encode: {error}"),
-        })?;
+        hex.push(hex_digit(byte >> 4));
+        hex.push(hex_digit(*byte));
     }
-    Ok(hex)
+    hex
 }

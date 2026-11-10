@@ -345,11 +345,11 @@ fn image_request() -> DecisionRequest {
         r#"{"model":"haiku","state":"compare the images","questions":{"q":{"type":"box"}},"assets":{"inline":{"type":"image","format":"png","data_base64":"iVBORw0KGgoAAAA="},"upload":{"type":"image","part":"img1"}}}"#,
     )
     .expect("body");
-    let part = ImagePart {
-        name: "img1".to_owned(),
-        format: ImageFormat::Jpeg,
-        bytes: vec![0xff, 0xd8, 0xff, 0xe0, 0x01],
-    };
+    let part = ImagePart::new(
+        "img1",
+        ImageFormat::Jpeg,
+        vec![0xff, 0xd8, 0xff, 0xe0, 0x01],
+    );
     DecisionRequest::new(body, vec![part], false).expect("valid by construction")
 }
 
