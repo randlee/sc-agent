@@ -32,7 +32,7 @@ sprint:
     - "REQ-SAG-0801 using a local runner (discovery library a-6; selection by name in decide a-10)"
     - "REQ-SAG-0003/0005 log files written under log_root: a-8 (sc-agent-log) and a-10 (decide)"
     - "REQ-SAG-0401 the key is read only at the transport (the single ApiKey::as_str site): a-5"
-    - "ADR-SAG-0002 the <repo>/<agent_role>/<project>/ session-log layout under log_root: a-8; a-4 supplies only the root"
+    - "ADR-SAG-0002 the <repo>/<agent_role>/<project>/ session-log layout under <log_root>/logs/: a-8; a-4 supplies only the root"
     - "REQ-SAG-0015 applying the runner timeouts to local sends and model loads: a-6 (sc-decision-local)"
     - "REQ-SAG-0013 runner-config use (a-6 maps RunnerKind to DaemonKind and builds http://host:port; a-9 sizes its queue from workers with checked arithmetic)"
 ```
@@ -202,7 +202,7 @@ impl TryFrom<String> for RunnerHost { type Error = &'static str; }   // the reas
 impl AsRef<str> for RunnerHost {}
 impl Default for AgentConfig {}
 
-/// `~/.sc-agent`: the config directory and sc-observability's standard default log root for app sc-agent
+/// `~/.sc-agent`: the config directory and the sc-agent default log root, `~/.sc-agent`
 /// (`~/.<app>`); std::env::home_dir(); none -> HomeUnknown.
 pub fn default_dir() -> Result<PathBuf, AgentConfigError>;
 
@@ -322,7 +322,7 @@ Error causes that can hold key bytes (REQ-SAG-0002 / REQ-SAG-0401): SecretsError
 - [ ] REQ-SAG-0801 (config part): sc-agent-config: each local_runners entry carries name (map key), kind (RunnerKind), host (RunnerHost), port, model and optional key_env (VarName) from the config file; a runner added to default.json is returned by load() with no rebuild; no runner host or port literal outside tests (grep).
 - [ ] REQ-SAG-0401: sc-agent-secrets: TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_API_KEY, NOUS_API_KEY and LAYA_API_KEY appear as string literals only in crates/sc-agent-secrets (automated check, tests/vars_gate.rs).
 - [ ] REQ-SAG-0401: sc-agent-secrets: resolve(p, sources) and resolve_var(&VarName, sources) look in the process environment, then the repo-root .env, then the platform keyring, and report which source supplied the key; each of the six Providers uses env_var(p); none -> secrets.key_missing naming the variable, with non-empty recovery() text naming the process environment, the repo-root .env and the keyring; malformed -> secrets.key_malformed (MapEnv/MapKeyring/tempdir tests; process env never mutated).
-- [ ] REQ-SAG-0003: sc-agent-config: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (sc-observability's default for app sc-agent); the config directory decide passes is default_dir().
+- [ ] REQ-SAG-0003: sc-agent-config: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (`<home>/.sc-agent` on every platform; owner decision 2026-11-10, REQ-SAG-0003 0.2.0); the config directory decide passes is default_dir().
 - [ ] sc-agent-config: a missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set or a local.json is present (then config.load with cause CFG.MISSING_DEFAULT, so an override is never silently ignored); a local runner named like a short name is config.runner_name with path local_runners.<name> (tests).
 - [ ] sc-agent-secrets: never log or print a key: ApiKey Debug/Display print [redacted]; no SecretsError Display/Debug contains key bytes, including keyring failures (test).
 - [ ] REQ-SAG-0002: sc-agent-secrets and sc-agent-config: SecretsError and AgentConfigError implement ErrorId (cause_detail, recovery) with ids secrets.* and config.*, Display "<id>: <message>" only; bad JSON gives config.load whose cause has id CFG.PARSE and the sc-config message with the path; a model on two lines gives config.catalog whose cause is types.model_on_two_lines (tests); cargo clippy --workspace --all-targets -- -D warnings with a-1's workspace denies and clippy.toml passes.
@@ -330,7 +330,7 @@ Error causes that can hold key bytes (REQ-SAG-0002 / REQ-SAG-0401): SecretsError
 - [ ] ADR-SAG-0004: sc-agent-secrets and sc-agent-config sit directly above sc-agent-types: cargo tree for each lists sc-agent-types as its only sc-agent crate.
 - [ ] REQ-SAG-0013: sc-agent-config: load() rejects workers outside 1..=64, max_sends outside 1..=10, a runner host that is not a hostname or IP (a path, '@', ':', whitespace, empty), an unknown kind, port 0 and a key_env not matching ^[A-Z_][A-Z0-9_]{0,127}$, each as config.invalid whose path names the key (e.g. local_runners.laya.host) (tempdir tests, one per bound).
 - [ ] REQ-SAG-0013: sc-agent-config: a runner with key_env whose host is not loopback (127.0.0.0/8, ::1, localhost) is config.key_on_plain_http at load, path local_runners.<name>.key_env; the same runner on 127.0.0.1 loads (tests).
-- [ ] ADR-SAG-0002: sc-agent-config: AgentConfig::log_root() is the <log_root> of the ADR-SAG-0002 layout (configured value, else ~/.sc-agent) (test); the <repo>/<agent_role>/<project>/ directories under it are a-8's.
+- [ ] ADR-SAG-0002: sc-agent-config: AgentConfig::log_root() is the <log_root> of the ADR-SAG-0002 layout (configured value, else ~/.sc-agent) (test); the logs/<repo>/<agent_role>/<project>/ directories under it are a-8's.
 - [ ] REQ-SAG-0015: sc-agent-config: a local_runners entry without request_timeout_secs or load_timeout_secs gives LocalRunner::request_timeout() = 300 s and load_timeout() = 600 s (test).
 - [ ] REQ-SAG-0015: sc-agent-config: request_timeout_secs/load_timeout_secs set on one runner change only that runner's request_timeout()/load_timeout(); a second runner in the same file keeps 300 s/600 s (test).
 - [ ] REQ-SAG-0015: sc-agent-config: request_timeout_secs outside 10..=3600 (9, 3601) and load_timeout_secs outside 10..=7200 (9, 7201) are config.invalid at load with path local_runners.<name>.request_timeout_secs / .load_timeout_secs; the bounds themselves (10, 3600, 7200) load (tests).

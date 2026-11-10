@@ -1,10 +1,11 @@
 # Requirement: Log retention
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-10  
 **Owner:** Rand Lee  
+**Revision:** 0.2.0 (2026-11-10, owner): <log_root> defaults to ~/.sc-agent on every platform, and every log is written under <log_root>/logs/.  
 
 ---
 
@@ -20,7 +21,8 @@ Definitions: The general log is the application diagnostic log. A session log is
 
 - The general log MUST use the rotation and retention built into sc-observability.
 - Session logs MUST be kept indefinitely.
-- <log_root> MUST default to sc-observability's default log location for the application name `sc-agent`.
+- <log_root> MUST default to `~/.sc-agent`, the user's home directory joined with `.sc-agent` on every platform.
+- Every log MUST be written under `<log_root>/logs/`: the general log at `<log_root>/logs/<cli>.log.jsonl` and session logs at `<log_root>/logs/<repo>/<agent_role>/<project>/`.
 - Each CLI MUST write its own general log file.
 
 **MUST NOT statements:**
@@ -38,6 +40,7 @@ sc-observability already rotates and prunes the general log. Session logs are th
 
 - [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
 - [ ] A session log written more than the sc-observability retention age ago is still present after a new session runs.
+- [ ] With no log_root configured, decide writes its general log and session logs under `<home>/.sc-agent/logs/`.
 
 ### Dependencies
 

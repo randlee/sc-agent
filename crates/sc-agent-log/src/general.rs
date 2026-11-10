@@ -35,7 +35,7 @@ const LOG: LogKind = LogKind::General;
 /// let ctx = LogContext::request(SessionId::new(), Some(0));
 /// log.write(Level::Info, "sc_agent_http", "http.response", ctx, fields)?;
 /// log.flush()?;
-/// assert!(root.path().join("logs/decide.log.jsonl").exists());
+/// assert!(root.path().join("logs").join("decide.log.jsonl").exists());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]

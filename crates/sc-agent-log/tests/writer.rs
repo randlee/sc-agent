@@ -412,12 +412,29 @@ fn log_error_keeps_io_cause() {
     let io = io.expect("the io error is in the source chain");
     assert_eq!(io.kind(), std::io::ErrorKind::PermissionDenied);
 
-    // The same io message is in the ErrorDetail chain.
+    // The same io error is a level of the ErrorDetail chain, by id and whole message: a
+    // foreign source level (`ErrorDetail::foreign` names nested sources `foreign.source`).
     let mut detail = error.detail().cause;
-    let mut found = false;
+    let mut io_level = None;
     while let Some(current) = detail {
-        found |= current.message.contains(&io.to_string());
+        if current.message == io.to_string() {
+            io_level = Some((current.id.clone(), current.message.clone()));
+        }
         detail = current.cause;
     }
-    assert!(found, "io message {io} in the ErrorDetail chain");
+    let (id, message) = io_level.expect("the io error is a level of the ErrorDetail chain");
+    assert_eq!(id, "foreign.source");
+    assert_eq!(message, io.to_string());
+}
+
+/// A8-15: a LogError that wraps an io error directly names it `io.<ErrorKind>` in its
+/// ErrorDetail, with the io message whole.
+#[test]
+fn a_direct_io_cause_is_named_by_its_kind() {
+    let error = sc_agent_log::LogError::GitUnavailable {
+        source: std::io::Error::new(std::io::ErrorKind::NotFound, "git: command not found"),
+    };
+    let cause = error.cause_detail().expect("io cause");
+    assert_eq!(cause.id, "io.NotFound");
+    assert_eq!(cause.message, "git: command not found");
 }

@@ -21,10 +21,12 @@ const KEYRING_TIMEOUT_RECOVERY: &str = "unlock the platform keystore for this OS
 
 /// A key could not be resolved.
 ///
-/// No variant holds key bytes: causes are fixed, sanitized labels, and `kind`
-/// fields are display-only text (an `io::ErrorKind` or keyring error kind),
-/// not a stable format to match on. [`Display`](fmt::Display) writes
-/// `"<id>: <message>"`.
+/// No variant holds key bytes. `cause` and `kind` are this layer's summary
+/// (display-only text, not a stable format to match on); the lower-layer error
+/// is kept whole as `source` (its id and message, REQ-SAG-0002 0.2.0) and is
+/// reachable through [`ErrorId::cause_detail`] and `Error::source`. Neither an
+/// io error nor a keyring error renders the stored value, so nothing in them
+/// needs redacting. [`Display`](fmt::Display) writes `"<id>: <message>"`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SecretsError {
@@ -42,23 +44,29 @@ pub enum SecretsError {
     },
     /// The repo-root `.env` exists and cannot be read, is not a regular file or is too large.
     ///
-    /// The cause is a sanitized label, never the OS message, which can echo
-    /// path or payload bytes (decision recorded in bead agt-4p2.4).
+    /// `cause` labels the failure in this layer's words; `source` is the io
+    /// error whole (`io.<ErrorKind>` and its message), `None` for a refusal of
+    /// this layer's own (not a regular file, too large).
     DotenvRead {
         /// The I/O error kind (display-only).
         kind: String,
-        /// A sanitized label of the failure.
+        /// This layer's label of the failure.
         cause: &'static str,
+        /// The io error, id and message whole.
+        source: Option<ErrorDetail>,
     },
     /// The platform keyring could not be read.
     ///
-    /// The cause is a sanitized label, never the keyring's own text, which can
-    /// carry secret bytes (decision recorded in bead agt-4p2.4).
+    /// `cause` labels the failure in this layer's words; `source` is the
+    /// keyring error whole (`keyring.<kind>` and its message, which never
+    /// renders the stored value), `None` when the read thread itself failed.
     KeyringRead {
         /// The keyring error kind (display-only).
         kind: &'static str,
-        /// A sanitized label of the failure (never the keyring's own text).
+        /// This layer's label of the failure.
         cause: &'static str,
+        /// The keyring error, id and message whole.
+        source: Option<ErrorDetail>,
     },
     /// The keyring did not answer within 15 s, or an earlier read is still stuck.
     KeyringTimeout,
@@ -83,10 +91,10 @@ impl ErrorId for SecretsError {
             Self::KeyMalformed { var, reason } => {
                 format!("the key in {var} is malformed: {reason}")
             }
-            Self::DotenvRead { kind, cause } => {
+            Self::DotenvRead { kind, cause, .. } => {
                 format!("the repo-root .env file could not be read ({cause}; {kind})")
             }
-            Self::KeyringRead { kind, cause } => {
+            Self::KeyringRead { kind, cause, .. } => {
                 format!("the platform keyring could not be read ({cause}; {kind})")
             }
             Self::KeyringTimeout => {
@@ -97,7 +105,10 @@ impl ErrorId for SecretsError {
     }
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
-        None
+        match self {
+            Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source.clone(),
+            Self::KeyMissing { .. } | Self::KeyMalformed { .. } | Self::KeyringTimeout => None,
+        }
     }
 
     fn recovery(&self) -> Option<&'static str> {
@@ -117,4 +128,13 @@ impl fmt::Display for SecretsError {
     }
 }
 
-impl std::error::Error for SecretsError {}
+impl std::error::Error for SecretsError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source
+                .as_ref()
+                .map(|source| source as &(dyn std::error::Error + 'static)),
+            Self::KeyMissing { .. } | Self::KeyMalformed { .. } | Self::KeyringTimeout => None,
+        }
+    }
+}

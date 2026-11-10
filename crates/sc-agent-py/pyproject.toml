@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "sc-agent"
+version = "0.1.0"
+description = "The sc-agent Python API: send TypeSafe (Jev) decision requests, list models, run doctor."
+requires-python = ">=3.10"
+license = "MIT"
+
+[tool.maturin]
+module-name = "sc_agent"

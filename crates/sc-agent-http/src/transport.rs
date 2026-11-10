@@ -28,17 +28,38 @@ pub trait Transport: Send + Sync {
     /// exceeds the transport cap, [`HttpError::InvalidRequest`] when a header
     /// cannot be built.
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError>;
+
+    /// Checks that this transport can send at all (for example, that its timeouts are in
+    /// bounds), before anything is logged or counted.
+    /// [`HttpClient::send_once`](crate::HttpClient::send_once) calls it first, so a transport
+    /// that would refuse every send never logs `http.send` or uses up an attempt. The
+    /// provided body accepts.
+    ///
+    /// # Errors
+    ///
+    /// [`HttpError::InvalidRequest`] when the transport cannot send.
+    fn ready(&self) -> Result<(), HttpError> {
+        Ok(())
+    }
 }
 
 impl<T: Transport + ?Sized> Transport for &T {
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         (**self).send(request)
     }
+
+    fn ready(&self) -> Result<(), HttpError> {
+        (**self).ready()
+    }
 }
 
 impl<T: Transport + ?Sized> Transport for Arc<T> {
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         (**self).send(request)
+    }
+
+    fn ready(&self) -> Result<(), HttpError> {
+        (**self).ready()
     }
 }
 

@@ -149,6 +149,11 @@ impl Default for UreqTransport {
 }
 
 impl Transport for UreqTransport {
+    /// The timeouts are in bounds ([`Timeouts::validate`]).
+    fn ready(&self) -> Result<(), HttpError> {
+        self.timeouts.validate().map(drop)
+    }
+
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         self.timeouts.validate()?;
         if let Some(deadline) = request.deadline() {

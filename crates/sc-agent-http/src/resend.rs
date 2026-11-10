@@ -499,9 +499,10 @@ impl HttpClient {
     ///
     /// # Errors
     ///
-    /// - [`HttpError::InvalidRequest`] before any send when the request's
-    ///   deadline is zero or over
-    ///   [`Timeouts::DEADLINE_MAX`](crate::Timeouts::DEADLINE_MAX);
+    /// - [`HttpError::InvalidRequest`] before any send (nothing logged, no attempt
+    ///   counted) when the request's deadline is zero or over
+    ///   [`Timeouts::DEADLINE_MAX`](crate::Timeouts::DEADLINE_MAX), or when the transport
+    ///   is not [`ready`](crate::Transport::ready) (its timeouts out of bounds);
     /// - [`HttpError::QuotaExhausted`] for a busy status whose body marks
     ///   quota exhaustion, after this send (REQ-SAG-0602);
     /// - [`HttpError::ProviderBusy`] for a busy reply on the last allowed
@@ -522,6 +523,9 @@ impl HttpClient {
                 crate::Timeouts::DEADLINE_MAX,
             )?;
         }
+        // A transport that cannot send (timeouts out of bounds) is refused here, before
+        // `http.send` is logged or an attempt is counted.
+        self.transport.ready()?;
         let SendPermit { mut attempts, last } = permit;
         let max_sends = self.policy.max_sends();
         let attempt = attempts.sends.saturating_add(1);

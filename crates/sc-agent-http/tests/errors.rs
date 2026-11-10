@@ -261,9 +261,15 @@ mod cases {
             cause.id.starts_with("io.") || cause.id.starts_with("ureq."),
             "{cause:?}"
         );
-        assert!(!cause.message.is_empty());
+        // The cause is the transport's own error, id and message whole (A5-17).
+        assert_eq!(Some(cause.clone()), direct.detail().cause);
         if cfg!(unix) {
             assert_eq!(cause.id, "io.ConnectionRefused");
+            // The message is the refused connect's own text, unchanged: the same io error,
+            // made directly, rendered as ureq renders it.
+            let refused =
+                std::net::TcpStream::connect(("127.0.0.1", port)).expect_err("the port is closed");
+            assert_eq!(cause.message, ureq::Error::Io(refused).to_string());
         }
         // This layer's message does not repeat the cause; the chain carries it.
         assert!(!error.message().contains(&cause.message), "{error}");

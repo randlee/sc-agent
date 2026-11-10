@@ -196,9 +196,12 @@ impl<T> fmt::Debug for RecordingTransport<T> {
 }
 
 /// A send that blocks on a `Condvar` until the test releases it
-/// (PLAN-CRIT-002 cancel tests). No sleep, no timeout.
+/// (PLAN-CRIT-002 cancel tests). No sleep.
 ///
-/// Clones share one gate.
+/// Every wait is bounded by [`BlockingTransport::FAILSAFE`] so a broken ordering fails the
+/// test instead of hanging it: [`Self::wait_started`] returns `false` (after releasing every send),
+/// and a send that is never released returns a network error. The failsafe is a guard,
+/// never a measurement. Clones share one gate.
 ///
 /// # Examples
 ///
@@ -212,7 +215,7 @@ impl<T> fmt::Debug for RecordingTransport<T> {
 /// let sender = transport.clone();
 /// let request = HttpRequest::new(Method::Get, Endpoint::parse("https://h.test/")?, Vec::new());
 /// let worker = thread::spawn(move || sender.send(&request).map(|r| r.status()));
-/// transport.wait_started(1);
+/// assert!(transport.wait_started(1));
 /// transport.release();
 /// assert_eq!(worker.join().ok(), Some(Ok(200)));
 /// # Ok::<(), sc_agent_http::HttpError>(())
@@ -229,6 +232,9 @@ struct Gate {
 }
 
 impl BlockingTransport {
+    /// The longest any wait of this transport lasts before it gives up.
+    pub const FAILSAFE: Duration = Duration::from_secs(60);
+
     /// A transport whose every released send returns a clone of `reply`.
     #[must_use]
     pub fn new(reply: Result<HttpResponse, HttpError>) -> Self {
@@ -244,13 +250,23 @@ impl BlockingTransport {
         }
     }
 
-    /// Blocks until `sends` sends have entered `send()`.
-    pub fn wait_started(&self, sends: usize) {
+    /// Blocks until `sends` sends have entered `send()`; `true` when they did.
+    ///
+    /// `false` when fewer than `sends` sends started within [`Self::FAILSAFE`]; every blocked
+    /// send is then released, so the run can end. Callers assert the result.
+    #[must_use]
+    pub fn wait_started(&self, sends: usize) -> bool {
         let (mutex, condvar) = &*self.gate;
-        let mut gate = lock(mutex);
-        while gate.started < sends {
-            gate = condvar.wait(gate).unwrap_or_else(PoisonError::into_inner);
+        let (mut gate, timeout) = condvar
+            .wait_timeout_while(lock(mutex), Self::FAILSAFE, |gate| gate.started < sends)
+            .unwrap_or_else(PoisonError::into_inner);
+        if timeout.timed_out() {
+            gate.released = true;
+            drop(gate);
+            condvar.notify_all();
+            return false;
         }
+        true
     }
 
     /// Lets every blocked and later send return.
@@ -273,8 +289,15 @@ impl Transport for BlockingTransport {
         let mut gate = lock(mutex);
         gate.started += 1;
         condvar.notify_all();
-        while !gate.released {
-            gate = condvar.wait(gate).unwrap_or_else(PoisonError::into_inner);
+        let (gate, timeout) = condvar
+            .wait_timeout_while(gate, Self::FAILSAFE, |gate| !gate.released)
+            .unwrap_or_else(PoisonError::into_inner);
+        if timeout.timed_out() {
+            return Err(HttpError::network(
+                NetworkKind::Timeout,
+                1,
+                "BlockingTransport was never released (test failsafe)",
+            ));
         }
         gate.reply.clone()
     }
