@@ -110,13 +110,12 @@ struct Shared {
     http: HttpClient,
     session: SessionLogger,
     general: GeneralLogger,
-    now: Clock,          // Instant::now unless with_clock; test seam (sc_agent_http::testing::ManualClock), passed to may_start/may_resend/send_once
+    clock: Clock,        // sc_agent_types::Clock: Clock::system() unless with_clock; test seam (sc_agent_types::testing::ManualClock::clock(), also re-exported by sc_agent_http::testing); read for may_start/may_resend/send_once, and the JobQueue's holdoff waits park on it
 }
-type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 impl DecisionRunner {
     pub fn new(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig) -> Self;
-    /// `new` with an explicit clock `now`, read for every admission, holdoff and send instead of Instant::now. A seam for callers' tests (decide's `Context.clock`, ManualClock): with a clock only the test moves, a holdoff or provider pause cannot elapse on its own.
-    pub fn with_clock(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig, now: Arc<dyn Fn() -> Instant + Send + Sync>) -> Self;
+    /// `new` with an explicit clock: `clock` is read for every admission, holdoff and send (passed to may_start, may_resend and send_once), and the job queue parks on it for a holdoff. A seam for callers' tests (decide's `Context.clock`, ManualClock): with a clock only the test moves, a holdoff or provider pause cannot elapse on its own.
+    pub fn with_clock(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig, clock: Clock) -> Self;
     /// Flushes the session log; RunnerError::SessionLog(log.rows_lost | log.flush) when any row was refused or lost.
     pub fn flush_session_log(&self) -> Result<(), RunnerError>;
 }
@@ -131,7 +130,7 @@ impl Decision for DecisionRunner {
 
 // crate-private
 pub(crate) enum Step<J, A> { Done(A), HoldOff { until: Instant, job: J }, Discarded }   // Discarded: win() returned None after a cancelled in-flight send; nothing written   // a schema resend is HoldOff { until: now }
-pub(crate) struct JobQueue<J> { state: Mutex<JobState<J>>, changed: Condvar, capacity: usize }
+pub(crate) struct JobQueue<J, F> { state: Arc<Mutex<JobState<J, F>>>, changed: Arc<Condvar>, capacity: usize, clock: Clock }   // Arc: shared with the clock's waker of a parked take; held jobs fall due by `clock` (sc_agent_types::Clock)
 struct JobState<J> { ready: VecDeque<J>, held: BinaryHeap<Held<J>>, running: usize, in_flight: Vec<InFlight>, orphans: Vec<InFlight>, closed: bool, cancelled: bool, seq: u64 }
 struct InFlight { key: u64, session_id: SessionId, position: u64, model: String, digests: OrderedMap<String, QuestionDigest>, sends: u32 /* sends including this one, taken from SendState before the permit */, claim: Arc<Claim> }
 struct Claim(AtomicBool);
@@ -149,7 +148,7 @@ pub(crate) enum Taken<J> { Run(J), Cancelled(J), Finished }
 impl<J> JobQueue<J> {
     fn submit(&self, job: J) -> Result<(), J>;  // blocks while ready+held+running >= capacity; Err(job) once closed or cancelled
     fn hold(&self, job: J, until: Instant);     // never blocks
-    fn take(&self) -> Taken<J>;                 // ready first; due held jobs move to ready; else wait_timeout(earliest - now) or wait()
+    fn take(&self) -> Taken<J>;                 // ready first; due held jobs (by clock.now()) move to ready; else parks on the Clock until the earliest holdoff (`Clock::park(&changed, state, earliest)` with a `Clock::on_advance` waker registered, so a ManualClock advance wakes it; cancel and submit wake it through `changed`) or `wait()` when nothing is held
     fn done(&self);                             // running -= 1; notify_all
     fn close(&self);                            // input ended
     fn cancel(&self);                           // take() now yields Cancelled(job) for every ready and held job; in_flight -> orphans; notify_all
@@ -216,7 +215,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 - N5 `tests/support/scripted_backend.rs` (~50 lines, private to a-9's tests; `mod support;` in each test file): `ScriptedBackend { encode: EncodeFn, decode: DecodeFn, encodes: AtomicU32, decodes: AtomicU32 }` implementing `sc_decision_schema::Backend`; `new()` (encode: POST https://scripted.test/v1/systemone with `request.body().to_json()`; decode: `SystemOneResponse::from_json`), `with_encode(Fn(&DecisionRequest) -> Result<HttpRequest, DecisionError>)`, `with_decode(Fn(u32 /*0-based decode index*/, HttpResponse, &DecisionRequest, &LogContext) -> Result<SystemOneResponse, DecisionError>)`, `encodes()`, `decodes()`.
 - Config keys used (A-4): `workers`, `max_sends` (through the caller's `ResendPolicy` in `HttpClient`). No new keys.
 
-## 6. Tests (in-process; `ScriptedBackend` (a-9's own, `tests/support/scripted_backend.rs`), `ScriptedTransport` / `BlockingTransport` (A-5) and `MemoryLog` (A-8) as dev-dependencies with feature `testing`; delays wait on a Condvar, never sleep). Each test names the acceptance line it proves.
+## 6. Tests (in-process; `ScriptedBackend` (a-9's own, `tests/support/scripted_backend.rs`), `ScriptedTransport` / `BlockingTransport` (A-5) and `MemoryLog` (A-8) as dev-dependencies with feature `testing` (ManualClock comes from sc_agent_types::testing, a-1) and the dev-only sc-agent-testkit (bounded waits: `join_within`, hang guard); delays park on the Clock, never sleep). Each test names the acceptance line it proves.
 
 | Test | Acceptance line |
 |---|---|
@@ -292,7 +291,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 - [ ] REQ-SAG-0002: every error returned by a public sc-decision-runner function (decide, the decide_stream results, flush_session_log) carries the error id and message of each lower-layer error that caused it: HttpError inside decision.http, LogError inside runner.session_log, and the backend's own error. Test: inject a failure in the transport, in the session log and in backend decode, and assert that failure's id and message are in the returned DecisionError chain. RunnerError uses cause_detail() and Display `id: message`. Runner-level failures are decision.cancelled and decision.shutdown (a backend panic becomes decision.shutdown); a session-log write failure never replaces the decision result; no thread::spawn (Builder::spawn only); clippy with the workspace denies passes.
 - [ ] Token ownership: dropping sc-decision-runner's result iterator never cancels the caller's CancelToken.
 - [ ] REQ-SAG-0009/0010: `cargo tree -p sc-decision-runner` shows no tokio; a search of sc-decision-runner non-test source finds no sleep call.
-- [ ] REQ-SAG-0010: sc-decision-runner waits out holdoffs and idle workers with Condvar timed waits woken by CancelToken::on_cancel, never a sleep function; enforced by the workspace clippy disallowed-methods rule.
+- [ ] REQ-SAG-0010: sc-decision-runner waits out holdoffs by parking the JobQueue on the runner's Clock (Clock::park with a Clock::on_advance waker, so a ManualClock advance wakes it) and idle workers on a Condvar, both woken by CancelToken::on_cancel, never a sleep function; enforced by the workspace clippy disallowed-methods rule.
 - [ ] REQ-SAG-0201: sc-decision-runner defines no Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models); every such type it uses (Request, Response, Backend, Decision, DecisionError) is imported from sc-decision-schema. Check: a search of crates/sc-decision-runner/src finds no serde type for an API field.
 - [ ] ANC-007: sc-decision-runner writes runner.stream.start, runner.stream.end, runner.worker.stopped and runner.session_log_failed to the GeneralLogger passed to DecisionRunner::new; a test passes `sc_agent_log::testing::MemoryLog::general()` as that GeneralLogger, runs a stream with one failing request and finds those actions (target sc_decision_runner) in `MemoryLog::records()`.
 

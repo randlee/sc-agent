@@ -46,7 +46,7 @@ Decisions (2026-11-09; the crate set, the `python`/`cli` features and the tsq pl
 - Output shape: flat captures sorted by (start_byte, name, end_byte), as copied; each capture is one part of a match.
 - Logging: the library logs nothing (stand-alone, REQ-SAG-0301); the `tsq` binary writes its own general log (REQ-SAG-0003, section 3b).
 - tsq (owner named it `tsq`): subcommands `languages`, `queries`, `query`; runs predefined queries only (REQ-SAG-0303: the CLI is a subset of PyO3). Exit 0 on success, 1 on any error.
-- tsq's general log: sc-observability directly (sc-treesitter may not depend on sc-agent crates), service `tsq`, root `~/.sc-agent` (sc-observability's standard default for app sc-agent), file `~/.sc-agent/logs/tsq.log.jsonl`, one event per command; tsq reads no sc-agent config.
+- tsq's general log: sc-observability directly (sc-treesitter may not depend on sc-agent crates), service `tsq`, root `~/.sc-agent` (sc-observability's standard default for app sc-agent), file `~/.sc-agent/logs/tsq.log.jsonl`, one event per command; the global flag `--log-root <PATH>` (before or after the subcommand; also read without clap when the arguments fail to parse) moves the root, so the file is `<PATH>/logs/tsq.log.jsonl`; tsq reads no sc-agent config.
 - `cli` is not a default feature, so a library consumer (and sc-treesitter-py) never builds clap or sc-observability; `[[bin]] tsq` has `required-features = ["cli"]`.
 - Second wave (C# `csharp`, Go) is a later sprint, one predefined query each (proposed: csharp `switch-sections`, go `switch-cases`); each grammar is one table row, one `.scm` file and one test sample.
 
@@ -94,7 +94,7 @@ Not copied: `src/git_io.rs`, the rest of `src/cli/` and `src/main.rs` (`extract`
 - `assets/queries/python/branches.scm`: remove the sentence about `@_fn` from the comment (there is no helper capture now).
 - tsq `src/cli.rs`: `#[command(name = "tsq", bin_name = "tsq", version, about = "Run predefined tree-sitter queries.")]`; delete `NOTES`/`after_help`, `PATH_VALUE_NAME` comment, `bin_name` comments. `Command::Extract(ExtractArgs)` -> `Command::Query(QueryArgs)` with positional `language`, `query`, `file: PathBuf` and `--captures`; drop `--rev`. `parse()` maps every non-help/version clap error to `sc_treesitter::Error::Usage { kind: format!("{:?}", e.kind()), detail: e.render().to_string() }` (id `treesitter.usage`); delete `value_parser_error`, `usage_error`, `message`, `parse_rev`. `parse_captures` returns `Result<Captures, String>` (clap carries its text into `Usage.detail`). Remove `sc_agent_types` import.
 - tsq `src/main.rs`: remove mimalloc, `git_io`, `JevError`, `ScAgentErrorResponse`. `query` command: `query_source` -> `read_source(&file)` -> `run_query(&language, text, &bytes, Some(&file), captures)` -> `to_json_bytes`. `json_line` generic over `Serialize`; listings print `languages()` ids and `queries()` (`QueryInfo` serializes as `{"language","query"}`). New `emit` (section 3b) with no `.expect`/`unwrap`; a failed stdout write is `Error::Write`. The general log (Decisions) starts before the command runs (`Error::Log` if it cannot) and records one `tsq.command` event (subcommand, outcome, error id); a log write failure never changes the result.
-- tsq `tests/cli.rs`: `env!("CARGO_BIN_EXE_tsq")`, `HOME` set to a tempdir; `run()` = `Command::new(binary()).args(args).current_dir(cwd).output()` (no git isolation, no deadline helper); `error_json` expects exit 1 and the `{"id","message"}` line; listing test asserts `["python","rust"]` and `branches`; gate with `grammar-python`/`grammar-rust`.
+- tsq `tests/cli.rs`: `env!("CARGO_BIN_EXE_tsq")`, each run passes the global flag `--log-root <tempdir>/.sc-agent` and no test sets `HOME` or `USERPROFILE`; `run()` = `Command::new(binary()).args(args).current_dir(cwd).output()` (no git isolation, no deadline helper); `error_json` expects exit 1 and the `{"id","message"}` line; listing test asserts `["python","rust"]` and `branches`; gate with `grammar-python`/`grammar-rust`.
 
 ## 3. Public API (exact Rust; bodies elided)
 
@@ -215,6 +215,10 @@ fn sc_treesitter(module: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyRes
 #[derive(Debug, clap::Parser)]
 #[command(name = "tsq", bin_name = "tsq", version, about = "Run predefined tree-sitter queries.")]
 pub(crate) struct Cli {
+    /// The log root: the general log is written to `<PATH>/logs/tsq.log.jsonl` instead of
+    /// `~/.sc-agent/logs/tsq.log.jsonl` (for tests and operators).
+    #[arg(long, value_name = "PATH", global = true)]
+    pub(crate) log_root: Option<std::path::PathBuf>,
     #[command(subcommand)]
     pub(crate) command: Command,
 }
@@ -268,8 +272,10 @@ fn run(parsed: Parsed) -> Result<Vec<u8>, sc_treesitter::Error>;
 fn json_line<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, sc_treesitter::Error>;
 /// One stderr line: the serialized Error `{"id": ..., "message": ...}`; exit 1.
 fn emit(error: &sc_treesitter::Error) -> std::process::ExitCode;
-/// sc_observability Logger, service "tsq", log_root = home_dir()/.sc-agent; Err -> Error::Log.
-fn general_log() -> Result<sc_observability::Logger, sc_treesitter::Error>;
+/// sc_observability Logger, service "tsq", log root = `log_root` (the --log-root flag), else home_dir()/.sc-agent (default_log_root); Err -> Error::Log (no log root and no home directory, or the logger cannot start).
+fn general_log(log_root: Option<std::path::PathBuf>) -> Result<sc_observability::v2::Logger, sc_treesitter::Error>;
+// cli.rs: the --log-root value of the arguments (`--log-root PATH` or `--log-root=PATH`), read without clap so a run whose arguments fail to parse still logs where it was told to.
+pub(crate) fn log_root_arg(args: &[std::ffi::OsString]) -> Option<std::path::PathBuf>;
 ```
 
 Output: stdout JSON + `\n`, exit 0. Failure: one stderr line `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Errors: the 18-variant `Error` (section 4): `Usage` for argv, `Encode` for JSON, `Write` for a failed stdout/stderr write, `Log` when the general log cannot start. Synchronous: no tokio, no threads, no sleep.
@@ -408,7 +414,7 @@ tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
 11. `languages` / `queries --language python` (AC: REQ-SAG-0303 tsq listings).
 12. `query rust match-arms tests/fixtures/match.rs` equals the golden JSON; unknown language -> `treesitter.unknown_language`, exit 1, empty stdout; missing positional -> `treesitter.usage` (AC: tsq query).
 13. Non-UTF-8 fixture -> stderr `treesitter.not_utf8`; closed stdout -> `treesitter.write` (AC: REQ-SAG-0002 lowest-layer tsq).
-14. A run writes `$HOME/.sc-agent/logs/tsq.log.jsonl` with one `tsq.command` event (AC: REQ-SAG-0003 tsq.log).
+14. A run with `--log-root <tempdir>/.sc-agent` writes `<tempdir>/.sc-agent/logs/tsq.log.jsonl` with one `tsq.command` event, a separate file (AC: REQ-SAG-0003 tsq.log); `the_log_root_flag_is_read_with_or_without_clap` (`src/cli.rs` unit: `--log-root` read by clap, and by `log_root_arg` before or after the subcommand, `--log-root=PATH` included).
 
 ## Required validation
 
@@ -438,7 +444,7 @@ tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
 - [ ] REQ-SAG-0002 lowest-layer tsq: a non-UTF-8 file reaches tsq's stderr as treesitter.not_utf8 with its message; a failed stdout write is treesitter.write.
 - [ ] REQ-SAG-0002 clippy: `cargo clippy -p sc-treesitter -p sc-treesitter-py --all-features --all-targets -- -D warnings` passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code.
 - [ ] Positions: no git, no sc-sha; no u32 clamping; 1-based lines are `row.saturating_add(1)` under the documented 8 MiB MAX_SOURCE_BYTES bound, so there is no position error variant.
-- [ ] REQ-SAG-0003 tsq.log: a tsq run writes its own general log `~/.sc-agent/logs/tsq.log.jsonl` (one `tsq.command` event per command), a file separate from decide's.
+- [ ] REQ-SAG-0003 tsq.log: a tsq run writes its own general log `~/.sc-agent/logs/tsq.log.jsonl` (one `tsq.command` event per command), a file separate from decide's; the global `--log-root <PATH>` flag moves the root to `<PATH>/logs/tsq.log.jsonl`, and the tests pass it and set no HOME or USERPROFILE.
 - [ ] Stand-alone library: the sc-treesitter library writes no log (REQ-SAG-0301); `cli` is not a default feature and `[[bin]] tsq` has `required-features = ["cli"]`, so `cargo tree -p sc-treesitter -e normal` (default features) lists no sc-observability and no clap.
 - [ ] REQ-SAG-0009: `cargo tree -p sc-treesitter -e normal` and `cargo tree -p sc-treesitter --features cli -e normal` list no tokio crate.
 - [ ] REQ-SAG-0010: sc-treesitter (library and tsq) and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.

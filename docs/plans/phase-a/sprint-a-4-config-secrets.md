@@ -263,6 +263,8 @@ pub enum AgentConfigError {
     Catalog(sc_agent_types::TypesError),                // "config.catalog"
     /// No home directory for default_dir().
     HomeUnknown,                                        // "config.home_unknown"
+    /// default.json or local.json exists but is not a regular file (a FIFO, a device, a directory): refused from its metadata before any read, which could block forever (RSH-002).
+    NotAFile { file: PathBuf },                         // "config.not_a_file"
     /// A local runner is named like a built-in short name (assistant decision); path = "local_runners.<name>".
     RunnerName { name: String, path: String },          // "config.runner_name"
     /// A value failed its type or bound (REQ-SAG-0013); path from serde_path_to_error, message = serde/TypesError text.
@@ -271,7 +273,7 @@ pub enum AgentConfigError {
     KeyOnPlainHttp { path: String, host: String },      // "config.key_on_plain_http"
 }
 impl ErrorId for AgentConfigError {}   // recovery(): Invalid -> "fix the value at <path> in default.json/local.json or its SC_AGENT__ variable";
-                                       // KeyOnPlainHttp -> "use a loopback host or remove key_env"; RunnerName -> "rename the runner"; others None
+                                       // KeyOnPlainHttp -> "use a loopback host or remove key_env"; RunnerName -> "rename the runner"; NotAFile -> "replace the path with a regular JSON file, or remove it"; others None
 impl From<sc_config::ConfigError> for AgentConfigError {}
 impl From<sc_agent_types::TypesError> for AgentConfigError {}
 // source() = Some(inner) for Load and Catalog; Display = "<id>: <message>" (the message names the path)
@@ -323,7 +325,7 @@ Error causes that can hold key bytes (REQ-SAG-0002 / REQ-SAG-0401): SecretsError
 - [ ] REQ-SAG-0401: sc-agent-secrets: TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_API_KEY, NOUS_API_KEY and LAYA_API_KEY appear as string literals only in crates/sc-agent-secrets (automated check, tests/vars_gate.rs).
 - [ ] REQ-SAG-0401: sc-agent-secrets: resolve(p, sources) and resolve_var(&VarName, sources) look in the process environment, then the repo-root .env, then the platform keyring, and report which source supplied the key; each of the six Providers uses env_var(p); none -> secrets.key_missing naming the variable, with non-empty recovery() text naming the process environment, the repo-root .env and the keyring; malformed -> secrets.key_malformed (MapEnv/MapKeyring/tempdir tests; process env never mutated).
 - [ ] REQ-SAG-0003: sc-agent-config: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (`<home>/.sc-agent` on every platform; owner decision 2026-11-10, REQ-SAG-0003 0.2.0); the config directory decide passes is default_dir().
-- [ ] sc-agent-config: a missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set or a local.json is present (then config.load with cause CFG.MISSING_DEFAULT, so an override is never silently ignored); a local runner named like a short name is config.runner_name with path local_runners.<name> (tests).
+- [ ] sc-agent-config: a missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set or a local.json is present (then config.load with cause CFG.MISSING_DEFAULT, so an override is never silently ignored); a local runner named like a short name is config.runner_name with path local_runners.<name>; a default.json or local.json that exists but is not a regular file (a FIFO, a device, a directory) is refused as config.not_a_file from its metadata before any read, so a FIFO cannot block decide (RSH-002; test a_config_path_that_is_not_a_regular_file_is_refused_before_reading) (tests).
 - [ ] sc-agent-secrets: never log or print a key: ApiKey Debug/Display print [redacted]; no SecretsError Display/Debug contains key bytes, including keyring failures (test).
 - [ ] REQ-SAG-0002: sc-agent-secrets and sc-agent-config: SecretsError and AgentConfigError implement ErrorId (cause_detail, recovery) with ids secrets.* and config.*, Display "<id>: <message>" only; bad JSON gives config.load whose cause has id CFG.PARSE and the sc-config message with the path; a model on two lines gives config.catalog whose cause is types.model_on_two_lines (tests); cargo clippy --workspace --all-targets -- -D warnings with a-1's workspace denies and clippy.toml passes.
 - [ ] REQ-SAG-0009/0010: sc-agent-secrets and sc-agent-config: cargo tree -e normal for both crates lists no tokio crate; no sleep call (rg); dependencies limited to sc-agent-types, sc-config, serde, serde_json, serde_path_to_error, keyring, whoami (dev: tempfile).
