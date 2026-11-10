@@ -322,12 +322,12 @@ fn decision_result(
     identity: &Identity,
     outcome: Result<SystemOneResponse, DecisionError>,
 ) -> DecisionResult {
-    DecisionResult {
-        session_id: identity.session_id,
-        position: identity.position,
-        digests: identity.digests.clone(),
+    DecisionResult::new(
+        identity.session_id,
+        identity.position,
+        identity.digests.clone(),
         outcome,
-    }
+    )
 }
 
 /// Finishes the request of `identity` with `outcome`: wins its claim, writes its row,
