@@ -124,12 +124,72 @@ jobs:
       - name: Run workspace tests
         run: cargo test --workspace --all-features
 
+  # sc-treesitter (sprint a-3): ADR-SAG-0005 feature gates, the grammar feature matrix and
+  # the sc-treesitter-py wheel (REQ-QA-001, REQ-QA-002).
+  treesitter:
+    name: sc-treesitter features and wheel
+    needs: [detect, fmt]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-treesitter-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check ADR-SAG-0005 feature gates (cargo metadata)
+        run: |
+          cargo metadata --format-version 1 --no-deps > metadata.json
+          python3 - <<'PY'
+          import json, sys
+          packages = {p["name"]: p for p in json.load(open("metadata.json"))["packages"]}
+          lib = packages["sc-treesitter"]
+          default = lib["features"].get("default", [])
+          problems = [f"`{f}` is a default feature" for f in ("python", "cli") if f in default]
+          bins = {t["name"]: t for t in lib["targets"] if "bin" in t["kind"]}
+          if bins.get("tsq", {}).get("required-features") != ["cli"]:
+              problems.append("bin tsq must have required-features = [\"cli\"]")
+          if problems:
+              sys.exit("ADR-SAG-0005: " + "; ".join(problems))
+          print(f"default features {default}; tsq required-features {bins['tsq']['required-features']}")
+          PY
+
+      - name: Test with only the Python grammar
+        run: cargo test -p sc-treesitter --no-default-features --features grammar-python
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install maturin and pytest
+        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
+
+      - name: Build the sc-treesitter wheel
+        run: maturin build -m crates/sc-treesitter-py/Cargo.toml --out dist
+
+      - name: Run the sc-treesitter-py tests
+        run: |
+          python -m pip install --no-index --find-links dist sc-treesitter
+          python -m pytest crates/sc-treesitter-py/tests
+
   # The one required status check: it always reports, passes when every job
   # above succeeded or was skipped, and fails if any failed or was cancelled.
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test]
+    needs: [detect, fmt, clippy, test, treesitter]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results
