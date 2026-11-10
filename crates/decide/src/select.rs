@@ -1192,6 +1192,41 @@ mod tests {
         );
     }
 
+    /// QA-007: `--model` precedence is short name, then configured runner, then model id. A
+    /// runner cannot be named like a short name (`haiku`): the config refuses it, so `haiku`
+    /// always means the line. A runner named like a model id wins over the model id.
+    #[test]
+    fn a_runner_follows_the_documented_precedence() {
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::write(
+            dir.path().join("default.json"),
+            r#"{"local_runners":{"haiku":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}"#,
+        )
+        .expect("write");
+        let error = sc_agent_config::load(dir.path().to_path_buf(), Vec::new())
+            .expect_err("a runner named like a short name");
+        assert_eq!(error.id(), "config.runner_name");
+
+        std::fs::write(
+            dir.path().join("default.json"),
+            r#"{"local_runners":{"claude-haiku-5-5":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}"#,
+        )
+        .expect("write");
+        let config = sc_agent_config::load(dir.path().to_path_buf(), Vec::new()).expect("config");
+        assert!(matches!(
+            ModelSelector::parse("claude-haiku-5-5", &config),
+            Ok(ModelSelector::Runner(name)) if name.as_str() == "claude-haiku-5-5"
+        ));
+        assert_eq!(
+            ModelSelector::parse("haiku", &config).expect("short"),
+            ModelSelector::Short(ShortName::Haiku)
+        );
+        assert!(matches!(
+            ModelSelector::parse("claude-sonnet-5-5", &config),
+            Ok(ModelSelector::Version(_))
+        ));
+    }
+
     #[test]
     fn a_model_selector_prefers_short_names_then_runners() {
         let config: AgentConfig = sc_agent_config::load(

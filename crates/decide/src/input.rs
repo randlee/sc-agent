@@ -508,7 +508,8 @@ pub fn read_batch(reader: &mut dyn BufRead) -> Result<Vec<DecisionRequest>, Deci
     let mut buffer = Vec::new();
     let mut line: u64 = 0;
     loop {
-        let read = read_line_bounded(reader, MAX_REQUEST_BYTES, &mut buffer)
+        // The terminator (`\n` or `\r\n`) does not count against the cap (QA-005).
+        let read = read_line_bounded(reader, MAX_REQUEST_BYTES + 2, &mut buffer)
             .map_err(|error| DecideError::input("batch", error))?;
         line = line.saturating_add(1);
         match read {
@@ -524,6 +525,18 @@ pub fn read_batch(reader: &mut dyn BufRead) -> Result<Vec<DecisionRequest>, Deci
         }
         // Every physical line and byte read counts, blank lines and the BOM included (RSH-002).
         budget.add(to_u64(buffer.len()), line)?;
+        let content = buffer
+            .strip_suffix(b"\n")
+            .map_or(buffer.as_slice(), |line| {
+                line.strip_suffix(b"\r").unwrap_or(line)
+            });
+        if content.len() > MAX_REQUEST_BYTES {
+            return Err(DecideError::LimitExceeded {
+                what: LimitKind::RequestBytes,
+                line: Some(line),
+                max: to_u64(MAX_REQUEST_BYTES),
+            });
+        }
         let mut bytes = buffer.as_slice();
         if line == 1 {
             bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
@@ -726,5 +739,105 @@ mod tests {
             }
         ));
         check_batch_sizes([200 * mib, 56 * mib].into_iter()).expect("exactly 256 MiB");
+    }
+
+    /// A request padded with spaces to exactly `len` bytes.
+    fn padded(len: usize) -> Vec<u8> {
+        let mut bytes = NOUL.as_bytes().to_vec();
+        bytes.resize(len, b' ');
+        bytes
+    }
+
+    /// QA-005: a line of exactly MAX_REQUEST_BYTES plus its terminator is accepted; one byte
+    /// more is `request_bytes`. The terminator does not count.
+    #[test]
+    fn a_line_of_exactly_the_cap_is_accepted() {
+        for terminator in [&b"\n"[..], b"\r\n", b""] {
+            let mut line = padded(MAX_REQUEST_BYTES);
+            line.extend_from_slice(terminator);
+            let requests = read_batch(&mut Cursor::new(line)).expect("exactly the cap");
+            assert_eq!(requests.len(), 1);
+            let mut over = padded(MAX_REQUEST_BYTES + 1);
+            over.extend_from_slice(terminator);
+            let error = read_batch(&mut Cursor::new(over)).expect_err("one byte over");
+            assert!(matches!(
+                error,
+                DecideError::LimitExceeded {
+                    what: LimitKind::RequestBytes,
+                    line: Some(1),
+                    ..
+                }
+            ));
+        }
+        assert!(build_request(&padded(MAX_REQUEST_BYTES), &[], false, None).is_ok());
+        assert!(build_request(&padded(MAX_REQUEST_BYTES + 1), &[], false, None).is_err());
+    }
+
+    /// QA-002 (RSH-003): the image bytes a wrapper line actually read count toward the batch
+    /// budget; a budget one image short of the cap is pushed over by it.
+    #[test]
+    fn wrapper_line_image_bytes_count_toward_the_batch_budget() {
+        let dir = tempfile::tempdir().expect("dir");
+        let image = dir.path().join("i.png");
+        let png = [0x89_u8, b'P', b'N', b'G', 1, 2, 3, 4];
+        std::fs::write(&image, png).expect("image");
+        let line = format!(
+            r#"{{"request":{{"model":"m","state":{{"d":"a"}},"assets":{{"a":{{"type":"image","part":"p"}}}},"questions":{{"q":{{"type":"noul"}}}}}},"images":{{"p":{:?}}}}}"#,
+            image.display().to_string()
+        );
+        let image_len = to_u64(png.len());
+        // Room for the image minus one byte: the image's bytes are what pushes it over.
+        let mut budget = BatchBudget {
+            requests: 0,
+            bytes: MAX_BATCH_BYTES - image_len + 1,
+        };
+        let error = batch_request(&line, 7, &mut budget).expect_err("over by the image");
+        assert!(matches!(
+            error,
+            DecideError::LimitExceeded {
+                what: LimitKind::BatchBytes,
+                line: Some(7),
+                ..
+            }
+        ));
+        let mut budget = BatchBudget {
+            requests: 0,
+            bytes: MAX_BATCH_BYTES - image_len,
+        };
+        batch_request(&line, 7, &mut budget).expect("exactly at the cap");
+        assert_eq!(budget.bytes, MAX_BATCH_BYTES);
+    }
+
+    /// QA-008: an image's size is checked from metadata before it is read. The file is far
+    /// over the cap (sparse) and unreadable (mode 000): a read first would be `image_read`;
+    /// the metadata check gives `image_bytes`.
+    #[cfg(unix)]
+    #[test]
+    fn image_size_is_checked_before_the_file_is_read() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().expect("dir");
+        let image = dir.path().join("big.png");
+        let file = std::fs::File::create(&image).expect("create");
+        file.set_len(1024 * MAX_IMAGE_BYTES).expect("sparse length");
+        drop(file);
+        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+        if std::fs::File::open(&image).is_ok() {
+            // Running as root: mode 000 does not stop the read, so the order is not observable.
+            std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o600))
+                .expect("chmod");
+            panic!("run this test as a non-root user: root can read a mode-000 file");
+        }
+        let error = read_image("p", &image).expect_err("too large");
+        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+        assert!(
+            matches!(
+                error,
+                DecideError::LimitExceeded {
+                    what: LimitKind::ImageBytes,
+                    ..
+                }
+            ),
+            "{error:?}"
+        );
     }
 }
