@@ -91,6 +91,7 @@ pub enum DecisionError {
     /// wrapped unchanged.
     Http(HttpError),
     /// A backend crate above this one failed (e.g. an LLM provider error chain), carried whole.
+    /// Its recovery hint is the carried `detail().cause.recovery`; `recovery()` is `None` here.
     Backend {
         /// The backend's name.
         backend: &'static str,

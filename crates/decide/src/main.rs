@@ -5,7 +5,8 @@
 //! (REQ-SAG-0011).
 //!
 //! The binary opens its general and session loggers itself and closes them explicitly before
-//! it returns; once it starts opening them, every interrupt takes that close path. Worker threads of the runner are never joined, so the last logger handle may
+//! it returns; once the general logger has opened, an interrupt takes that close path (the
+//! third interrupt exits at once). Worker threads of the runner are never joined, so the last logger handle may
 //! outlive `main`; the explicit close is the flush barrier that puts every record and row on
 //! disk. A close failure (lost rows) is reported as one `decide.log` line on stderr and does
 //! not change the exit code.
@@ -69,8 +70,10 @@ fn run(
     match cli.command {
         Command::Send(args) => run_send(args, config_dir, cancel, watch, stdin, stdout),
         Command::Models(args) => {
-            watch.logs_opened();
+            // Configuration, keys and the logger open are exit-at-once; from here an
+            // interrupt drains and flushes (RSH-002).
             let (context, general) = context_with_general(config_dir.clone())?;
+            watch.logs_opened();
             let options = ModelsOptions {
                 runner: args.runner,
                 context,
@@ -82,8 +85,8 @@ fn run(
             Ok(ExitCode::SUCCESS)
         }
         Command::Doctor => {
-            watch.logs_opened();
             let (context, general) = context_with_general(config_dir.clone())?;
+            watch.logs_opened();
             let options = DoctorOptions { context };
             let report = doctor(&options, cancel);
             drop(options);
@@ -137,9 +140,10 @@ fn run_send(
             None,
         )?))
     };
-    // From here an interrupt cancels and the run drains, flushes and closes the logs.
-    watch.logs_opened();
+    // Once the general log has opened, an interrupt cancels and the run drains, flushes and
+    // closes the logs; the third interrupt exits at once (RSH-002, RSH-003).
     let (context, general) = context_with_general(config_dir)?;
+    watch.logs_opened();
     let mut options = SendOptions {
         model,
         provider,

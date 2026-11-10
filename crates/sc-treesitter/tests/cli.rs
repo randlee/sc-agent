@@ -1,5 +1,6 @@
-//! `tsq` end-to-end tests (feature `cli`): each runs the built binary with `HOME` set to a
-//! temporary directory, so the general log lands there.
+//! `tsq` end-to-end tests (feature `cli`): each runs the built binary with
+//! `--log-root <tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
+//! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -18,10 +19,10 @@ fn fixture(name: &str) -> PathBuf {
 fn command(home: &Path, args: &[&str]) -> Command {
     let mut command = Command::new(binary());
     command
+        .arg("--log-root")
+        .arg(home.join(".sc-agent"))
         .args(args)
         .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .env("HOME", home)
-        .env("USERPROFILE", home)
         .env_remove("SC_LOG_ROOT");
     command
 }

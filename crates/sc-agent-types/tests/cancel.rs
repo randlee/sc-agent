@@ -1,18 +1,22 @@
-//! CancelToken (REQ-SAG-0104 boundary part, REQ-SAG-0601 wake primitives). No test sleeps:
-//! waits use deadlines and channels.
+//! CancelToken (REQ-SAG-0104 boundary part, REQ-SAG-0601 wake primitives) and the Clock waits
+//! over it.
+//!
+//! Deterministic by design: time moves only through a ManualClock the test advances, each
+//! interleaving is forced once through the token's `testing` trace points, and every wait for
+//! another thread is bounded by the testkit's hang guard. No test reads real time.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use sc_agent_types::{CancelHook, CancelToken, Wait};
+use sc_agent_testkit::{Gate, HANG_GUARD, join_within, recv_within};
+use sc_agent_types::testing::{CancelEvent, ManualClock};
+use sc_agent_types::{CancelHook, CancelToken, Clock, Wait};
 
-/// Far enough away that reaching it means the cancel did not wake the waiter.
+/// A deadline far enough away that only an explicit advance reaches it.
 const LONG: Duration = Duration::from_secs(60);
-/// "At once": a woken waiter returns well inside this bound.
-const PROMPT: Duration = Duration::from_secs(10);
 
 fn counter() -> (Arc<AtomicUsize>, Arc<dyn Fn() + Send + Sync>) {
     let count = Arc::new(AtomicUsize::new(0));
@@ -29,57 +33,91 @@ fn test_cancel_token_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<CancelToken>();
     assert_send_sync::<CancelHook>();
+    assert_send_sync::<Clock>();
 }
 
-/// Iterations of the mid-wait cancel test, each with its own token.
-const WAITS: usize = 200;
-/// How long the cancelling side waits (on a token nobody cancels) before it cancels, so the
-/// waiter has almost certainly parked in `wait_until`. A deadline wait, not a sleep.
-const PARK_DELAY: Duration = Duration::from_millis(2);
-
-/// A token cancelled on another thread while `wait_until` is parked ends the wait with
-/// `Cancelled` well before the deadline.
+/// A token cancelled on another thread while the wait is parked (the waiter registers with
+/// the clock under the token's lock, and the cancel needs that lock, which the waiter releases
+/// only by parking) ends the wait with `Cancelled`; the clock never moved, so the deadline
+/// cannot be what ended it.
 #[test]
-fn test_cancel_from_another_thread_ends_wait_at_once() {
-    let delay = CancelToken::new();
-    for _ in 0..WAITS {
-        let token = CancelToken::new();
-        let waiter = token.clone();
-        let (started, wait_started) = mpsc::channel();
-        let handle = thread::spawn(move || {
-            let start = Instant::now();
-            started.send(()).expect("signal start");
-            (waiter.wait_until(start + LONG), start.elapsed())
-        });
-        wait_started.recv().expect("waiter started");
-        assert_eq!(
-            delay.wait_until(Instant::now() + PARK_DELAY),
-            Wait::DeadlineReached
-        );
-        token.cancel();
-        let (wait, elapsed) = handle.join().expect("waiter thread");
-        assert_eq!(wait, Wait::Cancelled);
-        assert!(elapsed < PROMPT, "took {elapsed:?}");
-    }
-}
-
-#[test]
-fn test_wait_until_returns_cancelled_at_once_when_already_cancelled() {
+fn test_cancel_from_another_thread_ends_a_parked_wait() {
+    let manual = ManualClock::new();
+    let clock = manual.clock();
     let token = CancelToken::new();
+    let waiter = token.clone();
+    let deadline = clock.now() + LONG;
+    let handle = thread::spawn(move || clock.wait_until(&waiter, deadline));
+    assert!(manual.wait_for_waiters(1), "the waiter parked");
     token.cancel();
-    let start = Instant::now();
-    assert_eq!(token.wait_until(Instant::now() + LONG), Wait::Cancelled);
-    assert!(start.elapsed() < PROMPT);
+    assert_eq!(
+        join_within(handle, HANG_GUARD).expect("waiter"),
+        Wait::Cancelled
+    );
+    assert_eq!(manual.waiters(), 0, "the wait deregistered from the clock");
+}
+
+/// A parked wait ends `DeadlineReached` when the clock is advanced to the deadline.
+#[test]
+fn test_wait_ends_when_the_clock_reaches_the_deadline() {
+    let manual = ManualClock::new();
+    let clock = manual.clock();
+    let deadline = clock.now() + LONG;
+    let handle = thread::spawn(move || clock.wait_until(&CancelToken::new(), deadline));
+    assert!(manual.wait_for_waiters(1), "the waiter parked");
+    manual.advance(LONG);
+    assert_eq!(
+        join_within(handle, HANG_GUARD).expect("waiter"),
+        Wait::DeadlineReached
+    );
+}
+
+/// A deadline 1 ms ahead of a clock that does not move is never reached: the waiter parks and
+/// only the cancel (sent once it is parked) ends the wait. Deterministic: the deadline check
+/// does not depend on when the test runs, only on the clock reading.
+#[test]
+fn test_a_deadline_just_ahead_is_not_reached_before_the_clock_gets_there() {
+    let manual = ManualClock::new();
+    let clock = manual.clock();
+    let token = CancelToken::new();
+    let waiter = token.clone();
+    let deadline = clock.now() + std::time::Duration::from_millis(1);
+    let handle = thread::spawn(move || clock.wait_until(&waiter, deadline));
+    assert!(manual.wait_for_waiters(1), "the waiter registered");
+    token.cancel();
+    assert_eq!(
+        join_within(handle, HANG_GUARD).expect("waiter"),
+        Wait::Cancelled,
+        "1 ms short of the deadline is not the deadline"
+    );
 }
 
 #[test]
-fn test_wait_until_reaches_deadline_with_no_cancel() {
+fn test_wait_returns_at_once_when_cancelled_or_past_the_deadline() {
+    let manual = ManualClock::new();
+    let clock = manual.clock();
     let token = CancelToken::new();
-    let deadline = Instant::now() + Duration::from_millis(20);
-    assert_eq!(token.wait_until(deadline), Wait::DeadlineReached);
-    assert!(Instant::now() >= deadline);
-    let past = Instant::now();
-    assert_eq!(token.wait_until(past), Wait::DeadlineReached);
+    assert_eq!(clock.wait_until(&token, clock.now()), Wait::DeadlineReached);
+    token.cancel();
+    assert_eq!(
+        clock.wait_until(&token, clock.now() + LONG),
+        Wait::Cancelled
+    );
+    assert_eq!(manual.waiters(), 0, "neither wait parked");
+}
+
+/// The real clock: an already-cancelled token and a past deadline return at once, without a
+/// real wait (nothing here takes time).
+#[test]
+fn test_system_clock_returns_at_once_when_cancelled_or_past_the_deadline() {
+    let clock = Clock::system();
+    let token = CancelToken::new();
+    assert_eq!(clock.wait_until(&token, clock.now()), Wait::DeadlineReached);
+    token.cancel();
+    assert_eq!(
+        clock.wait_until(&token, clock.now() + LONG),
+        Wait::Cancelled
+    );
 }
 
 /// Every registered hook runs once on cancel (cancel twice still runs it once); a hook
@@ -119,8 +157,8 @@ fn test_hook_wakes_a_channel_receiver() {
     }));
     let canceller = token.clone();
     let handle = thread::spawn(move || canceller.cancel());
-    woken.recv_timeout(PROMPT).expect("hook ran");
-    handle.join().expect("cancel thread");
+    recv_within(&woken, HANG_GUARD);
+    join_within(handle, HANG_GUARD).expect("cancel thread");
 }
 
 /// A hook that registers or drops another hook does not deadlock: hooks run outside the lock.
@@ -142,14 +180,8 @@ fn test_hook_that_registers_or_drops_hooks_does_not_deadlock() {
     }));
 
     let canceller = token.clone();
-    let (done, finished) = mpsc::channel();
-    thread::spawn(move || {
-        canceller.cancel();
-        done.send(()).expect("signal done");
-    });
-    finished
-        .recv_timeout(PROMPT)
-        .expect("cancel finished (no deadlock)");
+    let handle = thread::spawn(move || canceller.cancel());
+    join_within(handle, HANG_GUARD).expect("cancel finished (no deadlock)");
     // The inner hook was registered after cancel, so it ran at once.
     assert_eq!(inner_count.load(Ordering::SeqCst), 1);
     assert_eq!(registered.lock().expect("registered").len(), 1);
@@ -169,54 +201,74 @@ fn test_clones_share_the_flag() {
     clone.cancel();
     assert!(token.is_cancelled());
     assert!(!other.is_cancelled());
-    assert_eq!(token.wait_until(Instant::now() + LONG), Wait::Cancelled);
+    let clock = ManualClock::new().clock();
+    assert_eq!(
+        clock.wait_until(&token, clock.now() + LONG),
+        Wait::Cancelled
+    );
     assert!(format!("{token:?}").contains("cancelled: true"));
 }
 
-/// Iterations of the cancel-versus-drop race; each runs cancel and drop at the same moment.
-const RACES: usize = 2000;
-
-/// REQ-SAG-0104 "never after its CancelHook is dropped", under concurrency: `cancel()` on one
-/// thread races `drop(hook)` on another. Once drop returns, the hook has either finished or
-/// will never run, so its side effect never appears later.
+/// REQ-SAG-0104 "never after its CancelHook is dropped", the interleaving where the drop comes
+/// while `cancel` runs the hook on another thread, forced once: `cancel` is held right after it
+/// took the hook (trace `HookTaken`), the drop is started and reports that it waits for the
+/// running hook (trace `DropWaiting`), and only then is `cancel` let go. The drop returns only
+/// after the hook's side effect, so the effect never appears after the drop returned.
 #[test]
-fn test_hook_never_runs_after_its_drop_returns() {
-    let mut ran = 0;
-    let mut late = 0;
-    for _ in 0..RACES {
-        let token = CancelToken::new();
-        let effect = Arc::new(AtomicUsize::new(0));
-        let hook_effect = Arc::clone(&effect);
-        let hook = token.on_cancel(Arc::new(move || {
-            // Widen the window between "taken by cancel" and "side effect" (no sleep).
-            for _ in 0..64 {
-                thread::yield_now();
+fn test_a_drop_during_the_hook_waits_for_it_to_finish() {
+    let token = CancelToken::new();
+    let (events, seen) = mpsc::channel::<&'static str>();
+    let taken = Gate::new();
+    let release = Gate::new();
+    let opener = release.opener();
+    {
+        let events = Mutex::new(events.clone());
+        let (taken, release) = (taken.clone(), release.clone());
+        token.set_trace(Arc::new(move |event| match event {
+            CancelEvent::HookTaken => {
+                taken.open();
+                release.wait_open();
             }
-            hook_effect.store(1, Ordering::SeqCst);
+            CancelEvent::DropWaiting => {
+                let _ = events.lock().expect("events").send("drop waiting");
+            }
+            _ => {}
         }));
-        let start = Arc::new(Barrier::new(2));
-        let canceller_start = Arc::clone(&start);
-        let canceller_token = token.clone();
-        let canceller = thread::spawn(move || {
-            canceller_start.wait();
-            canceller_token.cancel();
-        });
-        start.wait();
-        drop(hook);
-        let seen_at_drop = effect.load(Ordering::SeqCst);
-        canceller.join().expect("canceller thread");
-        let seen_after = effect.load(Ordering::SeqCst);
-        if seen_after != seen_at_drop {
-            late += 1;
-        }
-        ran += seen_after;
     }
-    assert_eq!(
-        late, 0,
-        "{late} of {RACES} hooks ran after their drop returned"
-    );
-    // Not a requirement, only a sign the race was exercised: report how often the hook won.
-    eprintln!("hook ran before drop in {ran} of {RACES} races");
+    let effect = Arc::new(AtomicUsize::new(0));
+    let hook_effect = Arc::clone(&effect);
+    let hook_events = Mutex::new(events.clone());
+    let hook = token.on_cancel(Arc::new(move || {
+        hook_effect.store(1, Ordering::SeqCst);
+        let _ = hook_events.lock().expect("events").send("hook ran");
+    }));
+    let canceller_token = token.clone();
+    let canceller = thread::spawn(move || canceller_token.cancel());
+    taken.wait_open();
+    let dropper = thread::spawn(move || {
+        drop(hook);
+        let _ = events.send("drop returned");
+    });
+    assert_eq!(recv_within(&seen, HANG_GUARD), "drop waiting");
+    assert_eq!(effect.load(Ordering::SeqCst), 0, "the hook has not run yet");
+    opener.open();
+    assert_eq!(recv_within(&seen, HANG_GUARD), "hook ran");
+    assert_eq!(recv_within(&seen, HANG_GUARD), "drop returned");
+    join_within(dropper, HANG_GUARD).expect("dropper");
+    join_within(canceller, HANG_GUARD).expect("canceller");
+}
+
+/// The other interleaving, forced once: the drop returns before `cancel` takes the hook, so
+/// the hook never runs.
+#[test]
+fn test_a_drop_before_the_cancel_means_the_hook_never_runs() {
+    let token = CancelToken::new();
+    let (count, hook) = counter();
+    let handle = token.on_cancel(hook);
+    drop(handle);
+    let canceller = token.clone();
+    join_within(thread::spawn(move || canceller.cancel()), HANG_GUARD).expect("canceller");
+    assert_eq!(count.load(Ordering::SeqCst), 0);
 }
 
 /// A hook that drops its own `CancelHook` while it runs returns instead of waiting for itself.
@@ -233,13 +285,7 @@ fn test_hook_dropping_its_own_handle_does_not_deadlock() {
     *own.lock().expect("own handle") = Some(hook);
 
     let canceller = token.clone();
-    let (done, finished) = mpsc::channel();
-    thread::spawn(move || {
-        canceller.cancel();
-        done.send(()).expect("signal done");
-    });
-    finished
-        .recv_timeout(PROMPT)
+    join_within(thread::spawn(move || canceller.cancel()), HANG_GUARD)
         .expect("cancel finished (no self-deadlock)");
     assert_eq!(ran_count.load(Ordering::SeqCst), 1);
     assert!(own.lock().expect("own handle").is_none());
@@ -249,13 +295,8 @@ fn test_hook_dropping_its_own_handle_does_not_deadlock() {
 #[test]
 fn test_drop_after_a_panicking_hook_returns() {
     let token = CancelToken::new();
-    let hook = token.on_cancel(Arc::new(|| panic!("hook failed")));
+    let hook = token.on_cancel(Arc::new(|| panic!("hook failed (expected in this test)")));
     let canceller = token.clone();
-    assert!(thread::spawn(move || canceller.cancel()).join().is_err());
-    let (done, finished) = mpsc::channel();
-    thread::spawn(move || {
-        drop(hook);
-        done.send(()).expect("signal done");
-    });
-    finished.recv_timeout(PROMPT).expect("drop returned");
+    assert!(join_within(thread::spawn(move || canceller.cancel()), HANG_GUARD).is_err());
+    join_within(thread::spawn(move || drop(hook)), HANG_GUARD).expect("drop returned");
 }

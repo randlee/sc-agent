@@ -8,7 +8,6 @@
 mod cases {
 
     use std::sync::Arc;
-    use std::time::Instant;
 
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{
@@ -20,6 +19,11 @@ mod cases {
         ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var,
     };
     use sc_agent_types::ErrorId;
+
+    /// A manual clock for sends whose timing is not under test: it never moves.
+    fn test_clock() -> sc_agent_types::Clock {
+        sc_agent_http::testing::ManualClock::new().clock()
+    }
 
     struct OneVar;
     impl EnvSource for OneVar {
@@ -65,11 +69,11 @@ mod cases {
             ResendPolicy::default(),
             memory.general(),
         );
-        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), Instant::now())
+        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
         };
-        let next = client.send_once(request, permit, LogContext::NONE, &Instant::now);
+        let next = client.send_once(request, permit, LogContext::NONE, &test_clock());
         assert!(matches!(next, Ok(Next::Done { .. })), "{next:?}");
         transport.sends()
     }
@@ -95,11 +99,11 @@ mod cases {
                 .with_secret(SecretHeader::bearer(key()))
                 .map(|request| {
                     let Ok(Start::Go(permit)) =
-                        client.may_start(&request, Attempts::new(), Instant::now())
+                        client.may_start(&request, Attempts::new(), test_clock().now())
                     else {
                         panic!("fresh");
                     };
-                    client.send_once(&request, permit, LogContext::NONE, &Instant::now)
+                    client.send_once(&request, permit, LogContext::NONE, &test_clock())
                 });
             let Err(error) = sent else {
                 panic!("{url}: a key was attached to plain http");

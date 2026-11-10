@@ -23,6 +23,8 @@ keyring = { version = "3.6", default-features = false, features = ["windows-nati
 keyring = { version = "3.6", default-features = false, features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-types = { path = "../sc-agent-types", features = ["testing"] }
 tempfile = "3"
 
 [lints]

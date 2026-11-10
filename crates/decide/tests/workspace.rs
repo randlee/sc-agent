@@ -1,4 +1,5 @@
-//! Workspace searches (REQ-SAG-0001 AC2, REQ-SAG-0007, REQ-SAG-0201 AC2) over `crates/`.
+//! Workspace searches (REQ-SAG-0001 AC2, REQ-SAG-0007, REQ-SAG-0201 AC2) over `crates/`, and
+//! the determinism scan of every test (`tests_are_deterministic`).
 
 #[cfg(test)]
 mod tests {
@@ -207,5 +208,301 @@ mod tests {
                 path.display()
             );
         }
+    }
+
+    /// The test code of the workspace, as `(path, first line number, lines)`: every `.rs` file
+    /// under `crates/*/tests/`, and every `#[cfg(test)]` module of `crates/*/src/` (an inline
+    /// `mod name { .. }`, a `mod name;` file, or a file that starts with `#![cfg(test)]`).
+    /// `crates/sc-agent-testkit` is skipped: it is where the bounded forms live.
+    fn test_code(crates: &Path) -> Vec<(PathBuf, usize, Vec<String>)> {
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(crates).expect("crates").flatten() {
+            let crate_dir = entry.path();
+            if !crate_dir.is_dir() || entry.file_name() == "sc-agent-testkit" {
+                continue;
+            }
+            let tests = crate_dir.join("tests");
+            if tests.is_dir() {
+                for path in rust_files(&tests) {
+                    let text = std::fs::read_to_string(&path).expect("read");
+                    found.push((path, 1, text.lines().map(str::to_owned).collect()));
+                }
+            }
+            let src = crate_dir.join("src");
+            if src.is_dir() {
+                for path in rust_files(&src) {
+                    let text = std::fs::read_to_string(&path).expect("read");
+                    found.extend(cfg_test_regions(&path, &text));
+                }
+            }
+        }
+        found
+    }
+
+    /// The `#[cfg(test)]` modules of one source file (see [`test_code`]).
+    fn cfg_test_regions(path: &Path, text: &str) -> Vec<(PathBuf, usize, Vec<String>)> {
+        let lines: Vec<&str> = text.lines().collect();
+        let owned = |range: &[&str]| range.iter().map(|line| (*line).to_owned()).collect();
+        if lines
+            .iter()
+            .find(|line| !line.trim().is_empty() && !line.trim_start().starts_with("//"))
+            .is_some_and(|line| line.trim() == "#![cfg(test)]")
+        {
+            return vec![(path.to_path_buf(), 1, owned(&lines))];
+        }
+        let mut regions = Vec::new();
+        let mut index = 0;
+        while index < lines.len() {
+            if lines[index].trim() != "#[cfg(test)]" {
+                index += 1;
+                continue;
+            }
+            // Skip further attributes (one line or several) to the item.
+            let mut item = index + 1;
+            let mut depth = 0_i64;
+            while let Some(line) = lines.get(item) {
+                let trimmed = line.trim_start();
+                if depth == 0 && !trimmed.starts_with("#[") {
+                    break;
+                }
+                depth += line.matches('(').count() as i64 - line.matches(')').count() as i64;
+                item += 1;
+            }
+            let Some(line) = lines.get(item) else { break };
+            let declaration = line
+                .trim_start()
+                .trim_start_matches("pub(crate) ")
+                .trim_start_matches("pub ");
+            if let Some(rest) = declaration.strip_prefix("mod ") {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                if rest[name.len()..].trim_start().starts_with(';') {
+                    if let Some(file) = module_file(path, &name) {
+                        let text = std::fs::read_to_string(&file).expect("read");
+                        regions.push((file, 1, text.lines().map(str::to_owned).collect()));
+                    }
+                } else {
+                    let mut depth = 0_i64;
+                    let mut end = item;
+                    for (at, line) in lines.iter().enumerate().skip(item) {
+                        depth +=
+                            line.matches('{').count() as i64 - line.matches('}').count() as i64;
+                        end = at;
+                        if depth <= 0 && at > item {
+                            break;
+                        }
+                    }
+                    regions.push((path.to_path_buf(), item + 1, owned(&lines[item..=end])));
+                    index = end;
+                }
+            }
+            index += 1;
+        }
+        regions
+    }
+
+    /// The file of `mod name;` declared in `path`: `<dir>/name.rs` for `lib.rs`, `main.rs` and
+    /// `mod.rs`, else `<dir>/<stem>/name.rs`.
+    fn module_file(path: &Path, name: &str) -> Option<PathBuf> {
+        let dir = path.parent()?;
+        let stem = path.file_stem()?.to_str()?;
+        let base = if matches!(stem, "lib" | "main" | "mod") {
+            dir.to_path_buf()
+        } else {
+            dir.join(stem)
+        };
+        [
+            base.join(format!("{name}.rs")),
+            base.join(name).join("mod.rs"),
+        ]
+        .into_iter()
+        .find(|candidate| candidate.is_file())
+    }
+
+    /// A banned form found in test code.
+    #[derive(Debug, PartialEq, Eq)]
+    struct Finding {
+        path: String,
+        line: usize,
+        rule: &'static str,
+        text: String,
+    }
+
+    /// The forms a test may not use: each needle with why, built at run time so this file
+    /// does not match itself. Every one is a real clock read or a wait with no deadline; the
+    /// bounded forms are in sc-agent-testkit (and the manual clock in sc-agent-types).
+    fn rules() -> Vec<(String, &'static str)> {
+        vec![
+            (["Instant", "::now"].concat(), "reads the real clock"),
+            ([".elapsed", "()"].concat(), "measures real time"),
+            (["SystemTime", "::now"].concat(), "reads the wall clock"),
+            (
+                [".recv", "()"].concat(),
+                "receives with no deadline (use recv_within)",
+            ),
+            (
+                [".join", "()"].concat(),
+                "joins with no deadline (use join_within)",
+            ),
+            (
+                [".accept", "()"].concat(),
+                "accepts with no deadline (use serve_once)",
+            ),
+            (
+                [".wait", "("].concat(),
+                "a Condvar/Barrier/Child wait with no deadline",
+            ),
+            (
+                [".wait_while", "("].concat(),
+                "a Condvar wait with no deadline",
+            ),
+            (["yield", "_now"].concat(), "spins on the scheduler"),
+        ]
+    }
+
+    /// The repeat-race bound names: a `for _ in 0..` loop whose bound names one is a
+    /// probabilistic stress loop.
+    const LOOP_NAMES: [&str; 3] = ["RACES", "WAITS", "ITER"];
+
+    /// Every banned form in `lines` (a file or a test module starting at `first`), minus the
+    /// allowlist. Comment lines are skipped: they describe, they do not run.
+    fn scan(path: &str, first: usize, lines: &[String], serves_once: bool) -> Vec<Finding> {
+        let rules = rules();
+        let loop_head = ["for _ in ", "0.."].concat();
+        let bind_any = ["bind(\"127.0.0.1", ":0\")"].concat();
+        let mut findings = Vec::new();
+        for (offset, line) in lines.iter().enumerate() {
+            let code = line.trim_start();
+            if code.starts_with("//") {
+                continue;
+            }
+            let mut hit = |rule: &'static str| {
+                findings.push(Finding {
+                    path: path.to_owned(),
+                    line: first + offset,
+                    rule,
+                    text: code.to_owned(),
+                });
+            };
+            for (needle, why) in &rules {
+                if code.contains(needle.as_str()) {
+                    hit(why);
+                }
+            }
+            if let Some(at) = code.find(&loop_head) {
+                let bound: String = code[at + loop_head.len()..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                if LOOP_NAMES.iter().any(|name| bound.contains(name)) {
+                    hit("a repeat-race loop (drive the interleaving once instead)");
+                }
+            }
+            if code.contains(&bind_any) && !serves_once {
+                hit("binds a loopback port outside serve_once (a freed port can be reused)");
+            }
+        }
+        findings
+            .into_iter()
+            .filter(|finding| {
+                !ALLOWED.iter().any(|(path, needle, _)| {
+                    finding.path.ends_with(path) && finding.text.contains(needle)
+                })
+            })
+            .collect()
+    }
+
+    /// Exceptions to `tests_are_deterministic`, as `(path suffix, text on the line, why)`.
+    /// Kept empty: no test code uses a banned form.
+    const ALLOWED: [(&str, &str, &str); 0] = [];
+
+    /// Owner rule: no flaky test, by design. This scan checks one thing: no non-comment line of
+    /// `crates/*/tests/` or of any `#[cfg(test)]` module (sc-agent-testkit is skipped) uses a
+    /// banned form listed in `rules()` and `LOOP_NAMES` (`Instant::now`, `.elapsed()`,
+    /// `SystemTime::now`, `.recv()`, `.join()`, `.accept()`, `.wait(`, `.wait_while(`,
+    /// `yield_now`, a `for _ in 0..` loop bounded by a RACES/WAITS/ITER name), and no such line
+    /// binds `127.0.0.1:0` in a file without `serve_once`. It is a text match: it does not prove
+    /// that a test cannot hang or race by other means. The scanner is proven on a positive
+    /// control that has every banned form, and the scan must see the whole test code of the
+    /// workspace, so it cannot pass vacuously.
+    ///
+    /// Consumer: CI (`cargo test --workspace --all-features`), enforcing the owner's
+    /// zero-tolerance rule on flaky tests. Defect class: the 13 nondeterministic tests found at
+    /// the phase-A end review (real-time bounds, unbounded waits, repeat-race loops, freed
+    /// ports). Delete it if Rust gains a lint that enforces the same, or the owner drops the
+    /// rule.
+    #[test]
+    fn tests_are_deterministic() {
+        let control: Vec<String> = [
+            ["let t = Instant", "::now();"].concat(),
+            ["let e = t.elapsed", "();"].concat(),
+            ["let w = SystemTime", "::now();"].concat(),
+            ["let v = rx.recv", "();"].concat(),
+            ["handle.join", "().unwrap();"].concat(),
+            ["let (s, _) = listener.accept", "().unwrap();"].concat(),
+            ["let g = condvar.wait", "(g).unwrap();"].concat(),
+            ["let g = condvar.wait_while", "(g, |_| true).unwrap();"].concat(),
+            ["std::thread::yield", "_now();"].concat(),
+            ["for _ in ", "0..RACES {"].concat(),
+            ["let l = TcpListener::bind(\"127.0.0.1", ":0\").unwrap();"].concat(),
+            ["// a comment: Instant", "::now() is only described here"].concat(),
+            "let v = rx.recv_timeout(HANG_GUARD);".to_owned(),
+        ]
+        .into_iter()
+        .collect();
+        let caught = scan("control.rs", 1, &control, false);
+        let lines: Vec<usize> = caught.iter().map(|finding| finding.line).collect();
+        assert_eq!(
+            lines,
+            (1..=11).collect::<Vec<_>>(),
+            "the scanner catches each banned form once and skips comments and bounded forms: \
+             {caught:#?}"
+        );
+        assert!(
+            scan("control.rs", 1, &control[10..11], true).is_empty(),
+            "a bind beside serve_once is allowed"
+        );
+        let inline = "fn real() {}\n#[cfg(test)]\n#[cfg(unix)]\nmod tests {\n    fn t() {\n        x.JOIN;\n    }\n}\nfn after() { y.JOIN; }\n"
+            .replace("JOIN", &["jo", "in()"].concat());
+        let regions = cfg_test_regions(Path::new("src/control.rs"), &inline);
+        assert_eq!(regions.len(), 1, "one cfg(test) module");
+        assert_eq!(regions[0].1, 4, "it starts at its `mod` line");
+        assert_eq!(regions[0].2.len(), 5, "it ends at its closing brace");
+
+        let code = test_code(&crates_dir());
+        let files: std::collections::BTreeSet<&PathBuf> =
+            code.iter().map(|(path, _, _)| path).collect();
+        let lines: usize = code.iter().map(|(_, _, lines)| lines.len()).sum();
+        assert!(
+            files.len() >= 90 && lines >= 20_000,
+            "the scan saw the workspace's test code ({} files, {lines} lines)",
+            files.len()
+        );
+        let mut findings = Vec::new();
+        for (path, first, lines) in &code {
+            let whole = std::fs::read_to_string(path).expect("read");
+            let serves_once = whole.contains("serve_once");
+            let shown = path
+                .strip_prefix(crates_dir())
+                .unwrap_or(path)
+                .display()
+                .to_string();
+            findings.extend(scan(&shown, *first, lines, serves_once));
+        }
+        assert!(
+            findings.is_empty(),
+            "{} nondeterministic form(s) in tests:\n{}",
+            findings.len(),
+            findings
+                .iter()
+                .map(|finding| format!(
+                    "  {}:{}: {}: {}",
+                    finding.path, finding.line, finding.rule, finding.text
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
     }
 }

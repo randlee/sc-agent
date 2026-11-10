@@ -160,7 +160,7 @@ fn abandon_record_counts_live_threads() {
         .decide_stream(Box::new(input), &CancelToken::new());
     gate.wait_inside(2);
     blocked
-        .recv_timeout(FAILSAFE)
+        .recv_timeout(HANG_GUARD)
         .expect("the feeder waits in the input iterator");
     drop(stream);
     let end: Vec<_> = harness

@@ -9,19 +9,23 @@ mod cases {
 
     use std::collections::HashSet;
     use std::sync::Arc;
-    use std::time::Instant;
 
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{
         Attempts, BusyReason, Endpoint, HttpClient, HttpError, HttpRequest, HttpResponse,
         LogContext, Method, NetworkKind, Next, ProviderReply, ResendPolicy, SecretHeader, Start,
-        Timeouts, Transport, UreqTransport,
+        Transport,
     };
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_secrets::{
         ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var,
     };
     use sc_agent_types::{ErrorDetail, ErrorId};
+
+    /// A manual clock for sends whose timing is not under test: it never moves.
+    fn test_clock() -> sc_agent_types::Clock {
+        sc_agent_http::testing::ManualClock::new().clock()
+    }
 
     struct OneVar;
     impl EnvSource for OneVar {
@@ -85,11 +89,11 @@ mod cases {
     fn send_err(transport: Arc<dyn Transport>, request: &HttpRequest) -> HttpError {
         let memory = MemoryLog::new().expect("memory log");
         let client = HttpClient::new(transport, ResendPolicy::default(), memory.general());
-        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), Instant::now())
+        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
         };
-        match client.send_once(request, permit, LogContext::NONE, &Instant::now) {
+        match client.send_once(request, permit, LogContext::NONE, &test_clock()) {
             Err(error) => error,
             Ok(next) => panic!("expected an error: {next:?}"),
         }
@@ -203,11 +207,11 @@ mod cases {
             memory.general(),
         );
         let request = keyed_request();
-        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
         };
-        let error = match client.send_once(&request, permit, LogContext::NONE, &Instant::now) {
+        let error = match client.send_once(&request, permit, LogContext::NONE, &test_clock()) {
             Err(error) => error,
             Ok(next) => panic!("{next:?}"),
         };
@@ -240,37 +244,27 @@ mod cases {
         assert!(error.message().contains(&reply.message));
     }
 
-    /// A5-17: a ureq failure keeps its id and message in the ErrorDetail chain.
+    /// A5-17: a ureq failure keeps its id and message in the ErrorDetail chain. The refused
+    /// connection is the refusing stub's (by construction, no freed port): its io error is
+    /// `ConnectionRefused`, rendered as ureq renders it.
     #[test]
     fn lower_layer_cause_kept() {
-        let port = {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-            listener.local_addr().expect("addr").port()
-        };
         let request = HttpRequest::new(
             Method::Get,
-            Endpoint::parse_local(&format!("http://127.0.0.1:{port}/closed")).expect("local"),
+            Endpoint::parse_local("http://127.0.0.1:9/closed").expect("local"),
             Vec::new(),
         );
-        let transport = UreqTransport::new(Timeouts::probe());
-        let direct = transport.send(&request).expect_err("closed port");
+        let transport =
+            sc_agent_http::testing::RefusingTransport::new(sc_agent_http::Timeouts::probe());
+        let direct = transport.send(&request).expect_err("refused");
         let error = send_err(Arc::new(transport), &request);
         assert!(matches!(error, HttpError::Network { .. }), "{error:?}");
         let cause = error.detail().cause.expect("lower-layer cause");
-        assert!(
-            cause.id.starts_with("io.") || cause.id.starts_with("ureq."),
-            "{cause:?}"
-        );
         // The cause is the transport's own error, id and message whole (A5-17).
         assert_eq!(Some(cause.clone()), direct.detail().cause);
-        if cfg!(unix) {
-            assert_eq!(cause.id, "io.ConnectionRefused");
-            // The message is the refused connect's own text, unchanged: the same io error,
-            // made directly, rendered as ureq renders it.
-            let refused =
-                std::net::TcpStream::connect(("127.0.0.1", port)).expect_err("the port is closed");
-            assert_eq!(cause.message, ureq::Error::Io(refused).to_string());
-        }
+        assert_eq!(cause.id, "io.ConnectionRefused");
+        let refused = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        assert_eq!(cause.message, ureq::Error::Io(refused).to_string());
         // This layer's message does not repeat the cause; the chain carries it.
         assert!(!error.message().contains(&cause.message), "{error}");
         // source() exposes the same cause.
@@ -299,12 +293,13 @@ mod cases {
             memory.general(),
         );
         let request = keyed_request();
-        let now = Instant::now();
+        let clock = test_clock();
+        let now = clock.now();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
             panic!("fresh");
         };
         let Ok(Next::ResendAt { pending, .. }) =
-            client.send_once(&request, permit, LogContext::NONE, &|| now)
+            client.send_once(&request, permit, LogContext::NONE, &clock)
         else {
             panic!("timeout is held for resend");
         };

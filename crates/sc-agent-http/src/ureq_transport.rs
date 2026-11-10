@@ -53,6 +53,15 @@ impl AgentConfig {
     /// `timeout_global` one deadline over connect, headers and the whole body
     /// read. Every status is a response (`http_status_as_error(false)`).
     fn build(self) -> ureq::Agent {
+        self.build_with(DefaultConnector::default())
+    }
+
+    /// [`Self::build`] over `connector` (the default one in production; a
+    /// refusing one for the `testing` stub).
+    fn build_with(
+        self,
+        connector: impl ureq::unversioned::transport::Connector<()>,
+    ) -> ureq::Agent {
         let config = ureq::Agent::config_builder()
             .max_idle_connections(MAX_IDLE_CONNECTIONS)
             .max_idle_connections_per_host(MAX_IDLE_CONNECTIONS)
@@ -62,11 +71,7 @@ impl AgentConfig {
             .user_agent(self.user_agent)
             .http_status_as_error(false)
             .build();
-        ureq::Agent::with_parts(
-            config,
-            DefaultConnector::default(),
-            LookupResolver::default(),
-        )
+        ureq::Agent::with_parts(config, connector, LookupResolver::default())
     }
 }
 
@@ -137,6 +142,54 @@ impl UreqTransport {
         Self {
             agent: AgentConfig::production(timeouts).build(),
             timeouts,
+        }
+    }
+
+    /// The production transport with its connector replaced by one that refuses every
+    /// connection, recording the whole-send deadline ureq applies to each attempt
+    /// (`testing`: see [`crate::testing::RefusingTransport`]).
+    #[cfg(feature = "testing")]
+    pub(crate) fn refusing(timeouts: Timeouts, seen: refusing::Seen) -> Self {
+        Self {
+            agent: AgentConfig::production(timeouts).build_with(refusing::Refusing { seen }),
+            timeouts,
+        }
+    }
+}
+
+/// The refusing connector of the `testing` stub transport.
+#[cfg(feature = "testing")]
+pub(crate) mod refusing {
+    use std::sync::{Arc, Mutex, PoisonError};
+    use std::time::Duration;
+
+    use ureq::unversioned::transport::{ConnectionDetails, Connector, Transport};
+
+    /// The `timeout_global` of each connection attempt, in order.
+    pub(crate) type Seen = Arc<Mutex<Vec<Option<Duration>>>>;
+
+    /// Refuses every connection (`io::ErrorKind::ConnectionRefused`, as a closed port does),
+    /// after recording the whole-send deadline of the attempt's config.
+    #[derive(Debug)]
+    pub(crate) struct Refusing {
+        pub(crate) seen: Seen,
+    }
+
+    impl Connector<()> for Refusing {
+        type Out = Box<dyn Transport>;
+
+        fn connect(
+            &self,
+            details: &ConnectionDetails,
+            _chained: Option<()>,
+        ) -> Result<Option<Self::Out>, ureq::Error> {
+            self.seen
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(details.config.timeouts().global);
+            Err(ureq::Error::Io(std::io::Error::from(
+                std::io::ErrorKind::ConnectionRefused,
+            )))
         }
     }
 }

@@ -71,7 +71,7 @@ pub use loggers::Loggers;
 #[doc(inline)]
 pub use name::MAX_SEGMENT_BYTES;
 #[doc(inline)]
-pub use repo::Repo;
+pub use repo::{GIT_DEADLINE, Repo};
 pub use sc_observability::Level;
 pub use sc_observability::v2::Logger;
 #[doc(inline)]

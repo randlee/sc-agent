@@ -164,47 +164,6 @@ pub fn header<'r>(request: &'r HttpRequest, name: &str) -> Option<&'r str> {
         .map(|(_, value)| value.as_str())
 }
 
-/// A transport that records when each send started, then answers from `replies` in order
-/// (the last reply repeats).
-#[derive(Clone)]
-pub struct TimedTransport {
-    inner: Arc<Mutex<Timed>>,
-}
-
-struct Timed {
-    replies: Vec<Result<HttpResponse, HttpError>>,
-    sends: Vec<(Instant, HttpRequest)>,
-}
-
-impl TimedTransport {
-    pub fn new(replies: Vec<Result<HttpResponse, HttpError>>) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(Timed {
-                replies,
-                sends: Vec::new(),
-            })),
-        }
-    }
-
-    pub fn sends(&self) -> Vec<(Instant, HttpRequest)> {
-        self.inner.lock().expect("lock").sends.clone()
-    }
-}
-
-impl Transport for TimedTransport {
-    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
-        let mut timed = self.inner.lock().expect("lock");
-        timed.sends.push((Instant::now(), request.clone()));
-        let index = timed.sends.len() - 1;
-        timed
-            .replies
-            .get(index)
-            .or_else(|| timed.replies.last())
-            .cloned()
-            .expect("a scripted reply")
-    }
-}
-
 /// Every `MemoryLog` record's fields as text, for "no key value" checks.
 pub fn records_text(log: &MemoryLog) -> String {
     log.records()
@@ -269,9 +228,9 @@ pub fn send(
     Ok(delivered.expect("decide::send hands out one result"))
 }
 
-/// How long a test waits for a forced ordering event before it fails instead of hanging.
-/// A guard only: no assertion depends on how long anything took.
-pub const HANG_GUARD: std::time::Duration = std::time::Duration::from_secs(60);
+/// How long a test waits for a forced ordering event before it fails instead of hanging
+/// (sc-agent-testkit's guard). A guard only: no assertion depends on how long anything took.
+pub use sc_agent_testkit::HANG_GUARD;
 
 /// A transport whose sends block until the test releases them, with bounded waits.
 ///
@@ -343,31 +302,22 @@ impl Transport for Gate {
     }
 }
 
-/// Waits for `child` to exit, at most [`HANG_GUARD`]; past it the test fails (the waiting
-/// thread is left behind, so the test never hangs).
-pub fn finish(child: std::process::Child) -> std::process::Output {
-    let pid = child.id();
-    let (sender, receiver) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = sender.send(child.wait_with_output());
-    });
-    receiver
-        .recv_timeout(HANG_GUARD)
-        .unwrap_or_else(|_| panic!("child {pid} did not exit within the hang guard"))
-        .expect("wait")
+/// Waits for `child` to exit, at most [`HANG_GUARD`], and collects its piped output; past
+/// the guard the child is killed and reaped and the test fails (`ChildGuard`), so a failing
+/// test leaves no orphan process.
+pub fn finish(child: sc_agent_testkit::ChildGuard) -> std::process::Output {
+    child.wait_with_output(HANG_GUARD)
 }
 
 /// Runs `command` (stdin closed, output captured), bounded by [`HANG_GUARD`].
 pub fn run_bounded(command: &mut std::process::Command) -> std::process::Output {
     use std::process::Stdio;
-    finish(
+    finish(sc_agent_testkit::ChildGuard::spawn(
         command
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("spawn"),
-    )
+            .stderr(Stdio::piped()),
+    ))
 }
 
 /// Records seen by a [`notify_log`] general logger, with a condvar so a test can wait (bounded)

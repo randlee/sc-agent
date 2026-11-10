@@ -47,7 +47,7 @@ pub enum LocalError {
     /// The probe got an HTTP status the daemon kind does not answer when up.
     ///
     /// The body is kept whole (REQ-SAG-0002); when the probe carried the runner's key,
-    /// [`LocalBackend::discover`](crate::LocalBackend::discover) has replaced every copy of
+    /// [`LocalBackend::read_probe`](crate::LocalBackend::read_probe) has replaced every copy of
     /// it in the body with `[redacted]`.
     ProbeStatus {
         /// The daemon kind probed.

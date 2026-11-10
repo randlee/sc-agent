@@ -3,12 +3,18 @@
 
 mod common;
 
+use sc_agent_testkit::{HANG_GUARD, join_within};
 use std::error::Error as _;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, SystemTime};
+
+/// A fixed instant years before any test run (2020-01-01T00:00:00Z): older than every
+/// retention age, without reading the wall clock.
+fn long_ago() -> SystemTime {
+    SystemTime::UNIX_EPOCH + Duration::from_secs(1_577_836_800)
+}
 
 use common::{events, identity, payload};
 use sc_agent_log::testing::MemoryLog;
@@ -140,15 +146,15 @@ fn session_file_never_rotates() {
     assert!(std::fs::metadata(&file_path).expect("file").len() > OVERSIZED);
 }
 
-/// A8-04: session files older than sc-observability's 7-day retention age (mtime 8 days back)
-/// are still present after a new SessionLogger writes and flushes in the same directory.
+/// A8-04: session files older than sc-observability's 7-day retention age (mtime set to a
+/// fixed date years back) are still present after a new SessionLogger writes and flushes in
+/// the same directory.
 #[test]
 fn old_session_log_survives() {
     let root = TempDir::new().expect("temp");
     let identity = identity().expect("identity");
     let dir = identity.dir(root.path());
     std::fs::create_dir_all(&dir).expect("dir");
-    let eight_days_ago = SystemTime::now() - Duration::from_secs(8 * 86_400);
     let active = dir.join(SessionLogger::FILE);
     // `sessions.jsonl.1` is the name the default policy would delete by age.
     let numbered = dir.join(format!("{}.1", SessionLogger::FILE));
@@ -158,7 +164,7 @@ fn old_session_log_survives() {
             .write(true)
             .open(path)
             .expect("open");
-        file.set_modified(eight_days_ago).expect("mtime");
+        file.set_modified(long_ago()).expect("mtime");
     }
 
     let log = SessionLogger::open_default(root.path(), identity).expect("logger");
@@ -166,7 +172,7 @@ fn old_session_log_survives() {
     log.flush().expect("flush");
     drop(log);
 
-    assert!(numbered.exists(), "the 8-day-old numbered file survives");
+    assert!(numbered.exists(), "the years-old numbered file survives");
     let text = std::fs::read_to_string(&active).expect("active");
     assert_eq!(text.lines().count(), 2, "old row kept, new row appended");
 }
@@ -211,51 +217,48 @@ fn reserved_field_refused_and_counted() {
     );
 }
 
-/// A8-14: threads refuse rows while another thread flushes; every refusal is reported exactly
-/// once (all lost-row state is under one Mutex).
+/// A8-14: rows refused on several threads at once are each counted, and every refusal is
+/// reported exactly once (all lost-row state is under one Mutex). Deterministic: each round's
+/// refusers are joined before the test thread flushes, so each flush reports exactly that
+/// round's refusals and the next flush starts from zero; no stress loop, no spin.
 #[test]
 fn concurrent_refusals_counted_once() {
     const THREADS: u64 = 4;
-    const PER_THREAD: u64 = 500;
     let memory = MemoryLog::new().expect("memory");
     let general = memory.general();
-    let reported = AtomicU64::new(0);
-    let done = AtomicBool::new(false);
-    let add = |result: Result<(), LogError>| match result {
-        Ok(()) => {}
-        Err(LogError::RowsLost { count, .. }) => {
-            reported.fetch_add(count, Ordering::SeqCst);
-        }
-        Err(other) => panic!("unexpected {other}"),
-    };
-    std::thread::scope(|scope| {
+    let refuse_on_threads = || {
         let refusers: Vec<_> = (0..THREADS)
             .map(|_| {
                 let general = general.clone();
-                scope.spawn(move || {
-                    for _ in 0..PER_THREAD {
-                        let row = payload(&[("position", json!(0))]);
-                        assert!(
-                            general
-                                .write(Level::Info, "t", "a", LogContext::NONE, row)
-                                .is_err()
-                        );
-                    }
+                std::thread::spawn(move || {
+                    let row = payload(&[("position", json!(0))]);
+                    general
+                        .write(Level::Info, "t", "a", LogContext::NONE, row)
+                        .is_err()
                 })
             })
             .collect();
-        scope.spawn(|| {
-            while !done.load(Ordering::SeqCst) {
-                add(general.flush());
-            }
-        });
         for refuser in refusers {
-            refuser.join().expect("refuser");
+            assert!(
+                join_within(refuser, HANG_GUARD).expect("refuser"),
+                "a reserved key is refused"
+            );
         }
-        done.store(true, Ordering::SeqCst);
-    });
-    add(general.flush());
-    assert_eq!(reported.load(Ordering::SeqCst), THREADS * PER_THREAD);
+    };
+    let reported = |result: Result<(), LogError>| match result {
+        Err(LogError::RowsLost { count, .. }) => count,
+        other => panic!("expected rows_lost: {other:?}"),
+    };
+    refuse_on_threads();
+    assert_eq!(reported(general.flush()), THREADS, "the first round, once");
+    refuse_on_threads();
+    refuse_on_threads();
+    assert_eq!(
+        reported(general.flush()),
+        2 * THREADS,
+        "the next two rounds, not the first again"
+    );
+    general.flush().expect("nothing left to report");
 }
 
 /// A sink that blocks every write until its gate's sender is dropped.
@@ -266,12 +269,13 @@ struct GateSink {
 
 impl LogSink for GateSink {
     fn write(&self, _event: &LogEvent) -> Result<(), LogSinkError> {
-        // Returns when the sender is dropped; later writes return at once.
+        // Returns when the sender is dropped (later writes return at once), at the latest
+        // after the hang guard.
         let _ = self
             .gate
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .recv();
+            .recv_timeout(HANG_GUARD);
         Ok(())
     }
 

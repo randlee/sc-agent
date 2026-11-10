@@ -1,6 +1,11 @@
 //! Transport test doubles for consumers' tests (feature `testing`, not
 //! default; PLAN-CRIT-010).
 //!
+//! [`RefusingTransport`] is the production [`UreqTransport`](crate::UreqTransport)
+//! with a connector that refuses every connection by construction (no port is
+//! bound and freed), recording the whole-send deadline ureq applies to each
+//! attempt.
+//!
 //! Consumers take `sc-agent-http = { path = .., features = ["testing"] }` as
 //! a dev-dependency only. Nothing here sleeps: time moves only through
 //! [`ManualClock::advance`], and [`BlockingTransport`] waits on a `Condvar`
@@ -9,12 +14,12 @@
 //! # Examples
 //!
 //! ```
-//! use std::time::{Duration, Instant};
+//! use std::time::Duration;
 //!
 //! use sc_agent_http::testing::{ManualClock, ScriptedTransport};
 //! use sc_agent_http::{Endpoint, HttpRequest, HttpResponse, Method, Transport};
 //!
-//! let clock = ManualClock::new(Instant::now());
+//! let clock = ManualClock::new();
 //! let start = clock.now();
 //! let transport = ScriptedTransport::responses(vec![HttpResponse::new(200, vec![], Vec::new())])
 //!     .with_send_duration(clock.clone(), Duration::from_secs(2));
@@ -29,11 +34,12 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::error::{HttpError, NetworkKind};
 use crate::request::{HttpRequest, HttpResponse};
-use crate::transport::Transport;
+use crate::transport::{Timeouts, Transport};
+use crate::ureq_transport::{UreqTransport, refusing};
 
 /// Locks `mutex`, recovering a poisoned lock: every guarded value here is
 /// changed in single steps, so it is consistent after a panic elsewhere.
@@ -41,35 +47,9 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Explicit test clock shared with a transport: `now()` for `send_once`,
-/// advanced by sends ([`ScriptedTransport::with_send_duration`]) or by the
-/// test. Clones share one instant.
-#[derive(Debug, Clone)]
-pub struct ManualClock {
-    now: Arc<Mutex<Instant>>,
-}
-
-impl ManualClock {
-    /// A clock reading `start`.
-    #[must_use]
-    pub fn new(start: Instant) -> Self {
-        Self {
-            now: Arc::new(Mutex::new(start)),
-        }
-    }
-
-    /// The current reading.
-    #[must_use]
-    pub fn now(&self) -> Instant {
-        *lock(&self.now)
-    }
-
-    /// Moves the clock forward by `by`.
-    pub fn advance(&self, by: Duration) {
-        let mut now = lock(&self.now);
-        *now += by;
-    }
-}
+/// The manual clock of sc-agent-types, re-exported: `now()` for `send_once`, advanced by
+/// sends ([`ScriptedTransport::with_send_duration`]) or by the test.
+pub use sc_agent_types::testing::ManualClock;
 
 /// A transport that answers from a script, first entry first.
 ///
@@ -310,6 +290,72 @@ impl fmt::Debug for BlockingTransport {
             .debug_struct("BlockingTransport")
             .field("started", &gate.started)
             .field("released", &gate.released)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The production [`UreqTransport`] with a connector that refuses every connection
+/// (`io.ConnectionRefused`), so a refused connection needs no freed port.
+///
+/// Every send runs the real path (timeout validation, the per-request deadline, ureq, the
+/// error classification); only the socket connect is replaced. [`Self::deadlines`] reports
+/// the whole-send deadline ureq applied to each connection attempt: the transport's
+/// [`Timeouts::request`], or the request's own [`HttpRequest::deadline`].
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use sc_agent_http::testing::RefusingTransport;
+/// use sc_agent_http::{Endpoint, HttpRequest, Method, NetworkKind, Timeouts, Transport, HttpError};
+///
+/// let transport = RefusingTransport::new(Timeouts::default());
+/// let request = HttpRequest::new(Method::Get, Endpoint::parse_local("http://127.0.0.1:9/")?, Vec::new());
+/// let error = transport.send(&request).expect_err("refused");
+/// assert!(matches!(error, HttpError::Network { kind: NetworkKind::Connect, .. }));
+/// assert_eq!(transport.deadlines(), [Some(Duration::from_secs(120))]);
+/// # Ok::<(), sc_agent_http::HttpError>(())
+/// ```
+#[derive(Clone)]
+pub struct RefusingTransport {
+    inner: UreqTransport,
+    seen: refusing::Seen,
+}
+
+impl RefusingTransport {
+    /// A refusing transport with `timeouts`.
+    #[must_use]
+    pub fn new(timeouts: Timeouts) -> Self {
+        let seen = refusing::Seen::default();
+        Self {
+            inner: UreqTransport::refusing(timeouts, Arc::clone(&seen)),
+            seen,
+        }
+    }
+
+    /// The whole-send deadline (ureq `timeout_global`) of each connection attempt so far.
+    #[must_use]
+    pub fn deadlines(&self) -> Vec<Option<Duration>> {
+        lock(&self.seen).clone()
+    }
+}
+
+impl Transport for RefusingTransport {
+    fn ready(&self) -> Result<(), HttpError> {
+        self.inner.ready()
+    }
+
+    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+        self.inner.send(request)
+    }
+}
+
+impl fmt::Debug for RefusingTransport {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RefusingTransport")
+            .field("attempts", &lock(&self.seen).len())
             .finish_non_exhaustive()
     }
 }

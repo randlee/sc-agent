@@ -22,9 +22,8 @@ mod tests {
     use sc_decision_schema::DecisionError;
 
     use crate::common::{
-        ANTHROPIC_KEY, ClockedTransport, NOUL, OPENROUTER_KEY, TYPESAFE_KEY, TimedTransport,
-        anthropic_noul, body_json, config_dir, context, empty_config_dir, json_response, ok_noul,
-        options, request,
+        ANTHROPIC_KEY, ClockedTransport, NOUL, OPENROUTER_KEY, TYPESAFE_KEY, anthropic_noul,
+        body_json, config_dir, context, empty_config_dir, json_response, ok_noul, options, request,
     };
 
     fn haiku_send(
@@ -389,9 +388,27 @@ mod tests {
 
     /// AC: REQ-SAG-0601. A request answered 529 (no Retry-After) every time is sent 5 times
     /// and ends `http.provider_busy` (reason `sends`, 5 attempts); `SC_AGENT__MAX_SENDS=2` in
-    /// the context environment sends it twice. Real clock: the backoff is 1+2+4+8 s.
+    /// the context environment sends it twice. The run's clock is a ManualClock stepped by the
+    /// test (one worker): once send n is made and the held job is parked on the clock, the
+    /// clock moves past the n-th backoff (2^(n-1) s plus the 250 ms jitter ceiling). No real
+    /// time passes.
     #[test]
     fn a_busy_provider_is_resent_up_to_max_sends() {
+        /// Signals each send, then answers from the script.
+        struct Signalled {
+            inner: ScriptedTransport,
+            sent: sc_agent_testkit::Started,
+        }
+        impl sc_agent_http::Transport for Signalled {
+            fn send(
+                &self,
+                request: &sc_agent_http::HttpRequest,
+            ) -> Result<HttpResponse, sc_agent_http::HttpError> {
+                let reply = self.inner.send(request);
+                self.sent.signal();
+                reply
+            }
+        }
         for (vars, sends) in [
             (
                 vec![(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
@@ -406,16 +423,28 @@ mod tests {
             ),
         ] {
             let transport = ScriptedTransport::responses((0..10).map(|_| busy()).collect());
+            let sent = sc_agent_testkit::Started::new();
+            let signalled = Signalled {
+                inner: transport.clone(),
+                sent: sent.clone(),
+            };
+            let clock = sc_agent_http::testing::ManualClock::new();
             let log = MemoryLog::new().expect("log");
             // An override needs a default.json (A-4: an override is never silently ignored).
-            let dir = config_dir("{}");
-            let ctx = context(dir.path(), &vars, Arc::new(transport.clone()), &log);
-            let result = send(
-                &options("jev", None, ctx, &log),
-                request(NOUL),
-                &CancelToken::new(),
-            )
-            .expect("send");
+            let dir = config_dir(r#"{"workers":1}"#);
+            let mut ctx = context(dir.path(), &vars, Arc::new(signalled), &log);
+            ctx.clock = Some(clock.clock());
+            let busy_options = options("jev", None, ctx, &log);
+            let worker =
+                std::thread::spawn(move || send(&busy_options, request(NOUL), &CancelToken::new()));
+            for (step, backoff) in (1..sends).zip([1_u64, 2, 4, 8]) {
+                sent.wait_for(step);
+                assert!(clock.wait_for_waiters(1), "send {step} is held off");
+                clock.advance(Duration::from_secs(backoff) + Duration::from_millis(250));
+            }
+            let result = sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
+                .expect("worker")
+                .expect("send");
             assert_eq!(transport.sends(), sends);
             let error = result.outcome.expect_err("busy");
             assert_eq!(
@@ -467,7 +496,7 @@ mod tests {
         );
         ctx.general = Some(general);
         let reading = clock.clone();
-        ctx.clock = Some(Arc::new(move || reading.now()));
+        ctx.clock = Some(reading.clock());
         let options = options("jev", None, ctx, &log);
         let busy_at = clock.now();
         let worker = std::thread::spawn(move || {
@@ -489,13 +518,7 @@ mod tests {
             .expect("the 429 recorded a host pause");
         let not_before = busy_at + Duration::from_millis(paused_ms);
         clock.advance(not_before - busy_at);
-        let (done, finished) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = done.send(worker.join());
-        });
-        let ok = finished
-            .recv_timeout(crate::common::HANG_GUARD)
-            .expect("the batch finished within the hang guard")
+        let ok = sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
             .expect("batch")
             .expect("send_batch");
         assert_eq!(ok, requests);
@@ -523,7 +546,7 @@ mod tests {
             ("1", Duration::from_secs(1)),
             ("0", Duration::from_millis(250)),
         ] {
-            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let clock = sc_agent_http::testing::ManualClock::new();
             let transport =
                 ClockedTransport::new(clock.clone(), vec![retry_after(seconds), ok_noul()], None);
             let (general, notify) = crate::common::notify_log();
@@ -569,7 +592,7 @@ mod tests {
     #[test]
     fn with_two_workers_a_request_admitted_after_the_429_waits_the_pause() {
         for seconds in ["1", "0"] {
-            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let clock = sc_agent_http::testing::ManualClock::new();
             let (general, notify) = crate::common::notify_log();
             let gate = Arc::clone(&notify);
             let hold: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
@@ -610,7 +633,7 @@ mod tests {
     /// budget would not be touched and the request would be resent.
     #[test]
     fn the_context_clock_reaches_the_runner() {
-        let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+        let clock = sc_agent_http::testing::ManualClock::new();
         let transport = ScriptedTransport::responses(vec![retry_after("1"), ok_noul()])
             .with_send_duration(clock.clone(), Duration::from_secs(91));
         let log = MemoryLog::new().expect("log");
@@ -622,7 +645,7 @@ mod tests {
             &log,
         );
         let reading = clock.clone();
-        ctx.clock = Some(Arc::new(move || reading.now()));
+        ctx.clock = Some(reading.clock());
         let result = send(
             &options("jev", None, ctx, &log),
             request(NOUL),
@@ -849,31 +872,62 @@ mod tests {
     /// probes until loaded, then makes one send; the send carries no load deadline (its
     /// timeout is the runner transport's own, counted from the send, after the load). A
     /// cancel during the load wait ends it at once with `decision.cancelled` and no send.
+    ///
+    /// The load wait runs on the context's ManualClock, stepped by the test: once probe n is
+    /// sent and the wait is parked on the clock, the test moves the clock one poll interval.
+    /// No real time passes; the probes land exactly 1 s apart on the clock.
     #[test]
     fn decide_waits_for_the_local_model_to_load_before_sending() {
+        /// Signals each send, then answers from the script.
+        struct Signalled {
+            inner: ScriptedTransport,
+            sent: sc_agent_testkit::Started,
+        }
+        impl sc_agent_http::Transport for Signalled {
+            fn send(
+                &self,
+                request: &sc_agent_http::HttpRequest,
+            ) -> Result<HttpResponse, sc_agent_http::HttpError> {
+                let reply = self.inner.send(request);
+                self.sent.signal();
+                reply
+            }
+        }
         let dir = config_dir(
             r#"{"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest"}}}"#,
         );
-        let transport = TimedTransport::new(vec![
-            Ok(json_response(200, r#"{"ok":false}"#)),
-            Ok(json_response(200, r#"{"ok":false}"#)),
-            Ok(json_response(200, r#"{"ok":true,"model":"jev-latest"}"#)),
-            Ok(ok_noul()),
+        let clock = sc_agent_http::testing::ManualClock::new();
+        let start = clock.now();
+        let scripted = ScriptedTransport::responses(vec![
+            json_response(200, r#"{"ok":false}"#),
+            json_response(200, r#"{"ok":false}"#),
+            json_response(200, r#"{"ok":true,"model":"jev-latest"}"#),
+            ok_noul(),
         ]);
+        let sent = sc_agent_testkit::Started::new();
+        let transport = Signalled {
+            inner: scripted.clone(),
+            sent: sent.clone(),
+        };
         let log = MemoryLog::new().expect("log");
-        let ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
-        let result = send(
-            &options("dec", None, ctx, &log),
-            request(NOUL),
-            &CancelToken::new(),
-        )
-        .expect("send");
+        let mut ctx = context(dir.path(), &[], Arc::new(transport), &log);
+        ctx.clock = Some(clock.clock());
+        let loading = options("dec", None, ctx, &log);
+        let worker = std::thread::spawn(move || send(&loading, request(NOUL), &CancelToken::new()));
+        for probe in 1..=2 {
+            sent.wait_for(probe);
+            assert!(
+                clock.wait_for_waiters(1),
+                "the load wait parked after probe {probe}"
+            );
+            clock.advance(sc_decision_local::LOAD_POLL_INTERVAL);
+        }
+        let result = sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
+            .expect("worker")
+            .expect("send");
         assert!(result.outcome.is_ok(), "{:?}", result.outcome);
-        let sends = transport.sends();
-        let paths: Vec<&str> = sends
-            .iter()
-            .map(|(_, sent)| sent.endpoint().as_str())
-            .collect();
+        let sends = scripted.requests();
+        let paths: Vec<&str> = sends.iter().map(|sent| sent.endpoint().as_str()).collect();
         assert_eq!(
             paths,
             ["http://127.0.0.1:9100/health"; 3]
@@ -881,20 +935,30 @@ mod tests {
                 .chain(["http://127.0.0.1:9100/v1/systemone"])
                 .collect::<Vec<_>>()
         );
-        let (sent_at, sent) = &sends[3];
-        assert!(*sent_at >= sends[2].0, "the send follows the loaded probe");
         assert_eq!(
-            sent.deadline(),
+            sends[3].deadline(),
             None,
             "no load time is added to the send's own timeout"
         );
-        let load_wait = log
+        assert_eq!(
+            clock.now() - start,
+            2 * sc_decision_local::LOAD_POLL_INTERVAL,
+            "polls 1 s apart; the send followed the third probe at once"
+        );
+        let load_wait: Vec<_> = log
             .records()
             .expect("records")
             .into_iter()
             .filter(|record| record.action == "local.load_wait")
-            .count();
-        assert_eq!(load_wait, 4, "three probes and the end record");
+            .collect();
+        assert_eq!(load_wait.len(), 4, "three probes and the end record");
+        assert_eq!(
+            load_wait
+                .last()
+                .and_then(|end| end.fields.get("waited_ms").cloned()),
+            Some(serde_json::json!(2000)),
+            "the wait ended at the third probe, 2 s after the first"
+        );
 
         // Cancel while the probe blocks: the wait ends at once, nothing is sent.
         let blocking = crate::common::Gate::new(json_response(200, r#"{"ok":false}"#));
@@ -921,7 +985,8 @@ mod tests {
         blocking.wait_started(1);
         cancel.cancel();
         blocking.release();
-        let (outcome, results) = worker.join().expect("worker");
+        let (outcome, results) =
+            sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD).expect("worker");
         outcome.expect("batch");
         assert_eq!(results.len(), 2);
         assert!(
@@ -938,16 +1003,20 @@ mod tests {
 
     /// AC: REQ-SAG-0015 (REQ-QA-005b). A model that is still not loaded after the runner's
     /// `load_timeout_secs` (10, the minimum) ends the send with `local.load_timeout` naming the
-    /// runner, and no decision is sent. Real clock: `wait_until_loaded` (A-6) has no clock
-    /// seam, so this waits the 10 s.
+    /// runner, and no decision is sent. The load wait runs on the context's ManualClock and the
+    /// one scripted probe takes the whole 10 s on it, so the deadline has passed when the probe
+    /// returns: no real time passes.
     #[test]
     fn a_model_that_does_not_load_in_time_is_local_load_timeout() {
         let dir = config_dir(
             r#"{"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","load_timeout_secs":10}}}"#,
         );
-        let transport = TimedTransport::new(vec![Ok(json_response(200, r#"{"ok":false}"#))]);
+        let clock = sc_agent_http::testing::ManualClock::new();
+        let transport = ScriptedTransport::responses(vec![json_response(200, r#"{"ok":false}"#)])
+            .with_send_duration(clock.clone(), Duration::from_secs(10));
         let log = MemoryLog::new().expect("log");
-        let ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
+        let mut ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
+        ctx.clock = Some(clock.clock());
         let error = send(
             &options("dec", None, ctx, &log),
             request(NOUL),
@@ -964,12 +1033,12 @@ mod tests {
             "{}",
             local.message
         );
-        let sends = transport.sends();
-        assert!(!sends.is_empty(), "the load was probed");
-        assert!(
-            sends
-                .iter()
-                .all(|(_, sent)| sent.endpoint().as_str() == "http://127.0.0.1:9100/health"),
+        assert!(local.message.contains("10000 ms"), "{}", local.message);
+        let sends = transport.requests();
+        assert_eq!(sends.len(), 1, "one probe, at the deadline");
+        assert_eq!(
+            sends[0].endpoint().as_str(),
+            "http://127.0.0.1:9100/health",
             "no decision was sent"
         );
     }

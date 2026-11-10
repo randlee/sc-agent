@@ -8,7 +8,7 @@ mod cases {
 
     use std::sync::mpsc;
     use std::thread;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use sc_agent_http::testing::{
         BlockingTransport, ManualClock, RecordingTransport, ScriptedTransport,
@@ -32,7 +32,7 @@ mod cases {
     #[test]
     fn scripted_and_blocking_doubles() {
         // Script order, shared record, exhaustion error.
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let start = clock.now();
         let scripted = ScriptedTransport::new(vec![
             Ok(status(201)),
@@ -97,7 +97,11 @@ mod cases {
         assert!(done_rx.try_recv().is_err());
         blocking.release();
         for worker in workers {
-            assert_eq!(worker.join().expect("worker"), Ok(200));
+            assert_eq!(
+                sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
+                    .expect("worker"),
+                Ok(200)
+            );
         }
         assert_eq!(done_rx.iter().take(2).count(), 2);
         // After release, later sends return at once.

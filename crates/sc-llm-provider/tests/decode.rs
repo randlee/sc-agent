@@ -7,7 +7,6 @@
 mod common;
 
 use std::sync::Arc;
-use std::time::Instant;
 
 use common::{KEY, chat_message, haiku_message, key, response, text_response};
 use sc_agent_http::testing::{ManualClock, ScriptedTransport};
@@ -296,10 +295,10 @@ fn non_decision_request_through_http_client() {
         ResendPolicy::default(),
         memory.general(),
     );
-    let clock = ManualClock::new(Instant::now());
-    let now = || clock.now();
+    let clock = ManualClock::new();
+    let now = clock.clock();
     let Start::Go(permit) = client
-        .may_start(&http, Attempts::new(), now())
+        .may_start(&http, Attempts::new(), now.now())
         .expect("admitted")
     else {
         panic!("a fresh request to an unpaused host may start");

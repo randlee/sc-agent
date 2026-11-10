@@ -40,9 +40,8 @@ pub trait LocalDaemon: sealed::Sealed + Send + Sync + fmt::Debug {
     ///
     /// The result carries reply text as received (bodies, parse messages, model names); the
     /// key is redacted from all of it by
-    /// [`LocalBackend::discover`](crate::LocalBackend::discover) and
-    /// [`LocalBackend::wait_until_loaded`](crate::LocalBackend::wait_until_loaded), which know
-    /// it. A caller using this method directly redacts it itself.
+    /// [`LocalBackend::read_probe`](crate::LocalBackend::read_probe), which knows it. A caller
+    /// using this method directly redacts it itself.
     ///
     /// # Errors
     ///

@@ -1,8 +1,10 @@
-//! REQ-SAG-0015: LocalBackend::wait_until_loaded and the first-request load deadline.
+//! REQ-SAG-0015: LocalProbe::wait_until_loaded and the first-request load deadline.
 //!
-//! Real 1 s poll interval (CancelToken::wait_until, no sleep); each test finishes in under
-//! 5 s, and outcomes that must arrive in time are read through a channel bounded at 5 s.
-//! AC n = the nth acceptance line of the a-6 sprint doc.
+//! Deterministic by design: the wait runs on a ManualClock, so no poll interval elapses on
+//! its own. A test steps it: it waits until the probe of step n has been sent and the waiter is
+//! parked on the clock, then advances the clock to the next poll. Probe times and waited
+//! durations are then exact clock readings, and every wait for the waiter thread is bounded by
+//! the testkit's hang guard. AC n = the nth acceptance line of the a-6 sprint doc.
 
 #[cfg(test)]
 #[expect(
@@ -13,64 +15,139 @@ mod support;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::sync::mpsc;
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use sc_agent_http::testing::{BlockingTransport, ScriptedTransport};
-    use sc_agent_http::{HttpError, LogContext, NetworkKind, Transport};
+    use sc_agent_http::testing::ScriptedTransport;
+    use sc_agent_http::{HttpError, HttpRequest, HttpResponse, LogContext, NetworkKind, Transport};
     use sc_agent_log::testing::MemoryLog;
+    use sc_agent_testkit::{HANG_GUARD, Started, join_within, recv_within};
+    use sc_agent_types::testing::ManualClock;
     use sc_agent_types::{CancelToken, ErrorId};
-    use sc_decision_local::{DaemonKind, LOAD_POLL_INTERVAL, LocalBackend, LocalTimeouts};
+    use sc_decision_local::{
+        DaemonKind, LOAD_POLL_INTERVAL, LocalBackend, LocalProbe, LocalTimeouts,
+    };
     use sc_decision_schema::{Backend, DecisionError};
     use serde_json::json;
 
     use crate::support::{decided, decision_request, json, loopback};
 
-    const BOUND: Duration = Duration::from_secs(5);
     const NOT_READY: &str = r#"{"ok":false}"#;
     const READY: &str = r#"{"ok":true,"model":"jev-latest"}"#;
 
-    /// Runs `wait_until_loaded` on another thread; the result arrives on the channel.
-    fn spawn_wait(
-        backend: LocalBackend,
-        transport: Arc<dyn Transport>,
-        cancel: CancelToken,
-        load_timeout: Duration,
-    ) -> mpsc::Receiver<(Result<(), DecisionError>, Duration)> {
-        let (sender, receiver) = mpsc::channel();
-        thread::spawn(move || {
-            let start = Instant::now();
-            let result =
-                backend.wait_until_loaded(&*transport, &cancel, load_timeout, LogContext::NONE);
-            let _ = sender.send((result, start.elapsed()));
-        });
-        receiver
+    /// Answers each probe with the next scripted reply (the last repeats), stamps it with the
+    /// manual clock, and signals each send.
+    #[derive(Clone)]
+    struct Stamped {
+        clock: ManualClock,
+        replies: Arc<Vec<Result<HttpResponse, HttpError>>>,
+        stamps: Arc<Mutex<Vec<Instant>>>,
+        sent: Started,
     }
 
-    /// AC 21: not loaded for 2 polls, loaded on the 3rd -> Ok after 3 probes, 1 s apart;
-    /// local.load_wait records in order.
+    impl Stamped {
+        fn new(clock: &ManualClock, replies: Vec<Result<HttpResponse, HttpError>>) -> Self {
+            Self {
+                clock: clock.clone(),
+                replies: Arc::new(replies),
+                stamps: Arc::default(),
+                sent: Started::new(),
+            }
+        }
+
+        /// Each probe's clock reading, as milliseconds after `start`.
+        fn sent_at_ms(&self, start: Instant) -> Vec<u128> {
+            self.stamps
+                .lock()
+                .expect("stamps")
+                .iter()
+                .map(|at| at.duration_since(start).as_millis())
+                .collect()
+        }
+    }
+
+    impl Transport for Stamped {
+        fn send(&self, _request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+            let index = {
+                let mut stamps = self.stamps.lock().expect("stamps");
+                stamps.push(self.clock.now());
+                stamps.len() - 1
+            };
+            self.sent.signal();
+            self.replies
+                .get(index)
+                .or_else(|| self.replies.last())
+                .cloned()
+                .expect("a scripted reply")
+        }
+    }
+
+    /// Runs the load wait of `backend` on its own thread, on `clock`; the result arrives on
+    /// the returned channel.
+    fn spawn_wait(
+        backend: LocalBackend,
+        transport: Stamped,
+        log: Option<&MemoryLog>,
+        cancel: CancelToken,
+        load_timeout: Duration,
+    ) -> (
+        mpsc::Receiver<Result<(), DecisionError>>,
+        thread::JoinHandle<()>,
+    ) {
+        let (sender, receiver) = mpsc::channel();
+        let general = log.map(MemoryLog::general);
+        let handle = thread::spawn(move || {
+            let mut probe = LocalProbe::new(&backend, &transport, transport.clock.clock());
+            if let Some(general) = general {
+                probe = probe.with_log(general);
+            }
+            let _ = sender.send(probe.wait_until_loaded(&cancel, load_timeout, LogContext::NONE));
+        });
+        (receiver, handle)
+    }
+
+    /// Once probe `sends` has been sent and the waiter is parked on the clock, moves the clock
+    /// by `by`. The old registration is gone before the next probe is sent, so the parked
+    /// waiter seen here is the one waiting for the poll after probe `sends`.
+    fn step(clock: &ManualClock, transport: &Stamped, sends: usize, by: Duration) {
+        transport.sent.wait_for(sends);
+        assert!(
+            clock.wait_for_waiters(1),
+            "the waiter parked after probe {sends}"
+        );
+        clock.advance(by);
+    }
+
+    /// AC 21: not loaded for 2 polls, loaded on the 3rd -> Ok after 3 probes at exactly 0, 1
+    /// and 2 s of the clock; local.load_wait records in order, the end record waited 2000 ms.
     #[test]
     fn test_mapika_loaded_on_third_poll() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(LOAD_POLL_INTERVAL, Duration::from_secs(1));
+        let clock = ManualClock::new();
+        let start = clock.now();
         let log = MemoryLog::new()?;
-        let backend = loopback(DaemonKind::Mapika, None).with_log(log.general());
-        let transport = ScriptedTransport::responses(vec![
-            json(200, NOT_READY),
-            json(200, NOT_READY),
-            json(200, READY),
-        ]);
-        let receiver = spawn_wait(
-            backend,
-            Arc::new(transport.clone()),
+        let transport = Stamped::new(
+            &clock,
+            vec![
+                Ok(json(200, NOT_READY)),
+                Ok(json(200, NOT_READY)),
+                Ok(json(200, READY)),
+            ],
+        );
+        let (receiver, handle) = spawn_wait(
+            loopback(DaemonKind::Mapika, None),
+            transport.clone(),
+            Some(&log),
             CancelToken::new(),
             Duration::from_secs(30),
         );
-        let (result, elapsed) = receiver.recv_timeout(BOUND)?;
-        result?;
-        assert_eq!(transport.sends(), 3);
-        assert!(elapsed >= 2 * LOAD_POLL_INTERVAL, "{elapsed:?}");
+        step(&clock, &transport, 1, LOAD_POLL_INTERVAL);
+        step(&clock, &transport, 2, LOAD_POLL_INTERVAL);
+        recv_within(&receiver, HANG_GUARD)?;
+        join_within(handle, HANG_GUARD).expect("waiter");
+        assert_eq!(transport.sent_at_ms(start), [0, 1000, 2000]);
 
         let records = log.records()?;
         assert!(
@@ -86,6 +163,7 @@ mod tests {
                     record.fields.get("poll").cloned(),
                     record.fields.get("state").cloned(),
                     record.fields.get("outcome").cloned(),
+                    record.fields.get("waited_ms").cloned(),
                 )
             })
             .collect();
@@ -96,71 +174,96 @@ mod tests {
                     Some(json!("poll")),
                     Some(json!(1)),
                     Some(json!("not_ready")),
-                    None
+                    None,
+                    Some(json!(0))
                 ),
                 (
                     Some(json!("poll")),
                     Some(json!(2)),
                     Some(json!("not_ready")),
-                    None
+                    None,
+                    Some(json!(1000))
                 ),
                 (
                     Some(json!("poll")),
                     Some(json!(3)),
                     Some(json!("loaded")),
-                    None
+                    None,
+                    Some(json!(2000))
                 ),
-                (Some(json!("end")), None, None, Some(json!("loaded"))),
+                (
+                    Some(json!("end")),
+                    None,
+                    None,
+                    Some(json!("loaded")),
+                    Some(json!(2000))
+                ),
             ]
         );
         let last = records.last().expect("end record");
         assert_eq!(last.fields.get("polls"), Some(&json!(3)));
-        assert!(
-            last.fields
-                .get("waited_ms")
-                .and_then(serde_json::Value::as_u64)
-                >= Some(2000)
-        );
         Ok(())
     }
 
-    /// A connect failure (Strands Decider listens only after loading) means not loaded yet.
+    /// A connect failure (Strands Decider listens only after loading) means not loaded yet:
+    /// the next probe follows one poll later.
     #[test]
     fn test_strands_connect_failure_keeps_polling() -> Result<(), Box<dyn std::error::Error>> {
-        let transport = ScriptedTransport::new(vec![
-            Err(HttpError::network(
-                NetworkKind::Connect,
-                1,
-                "connection refused",
-            )),
-            Ok(json(200, r#"{"status":"ok","model":"jev-latest"}"#)),
-        ]);
-        let receiver = spawn_wait(
+        let clock = ManualClock::new();
+        let start = clock.now();
+        let transport = Stamped::new(
+            &clock,
+            vec![
+                Err(HttpError::network(
+                    NetworkKind::Connect,
+                    1,
+                    "connection refused",
+                )),
+                Ok(json(200, r#"{"status":"ok","model":"jev-latest"}"#)),
+            ],
+        );
+        let (receiver, handle) = spawn_wait(
             loopback(DaemonKind::Strands, None),
-            Arc::new(transport.clone()),
+            transport.clone(),
+            None,
             CancelToken::new(),
             Duration::from_secs(30),
         );
-        let (result, _) = receiver.recv_timeout(BOUND)?;
-        result?;
-        assert_eq!(transport.sends(), 2);
+        step(&clock, &transport, 1, LOAD_POLL_INTERVAL);
+        recv_within(&receiver, HANG_GUARD)?;
+        join_within(handle, HANG_GUARD).expect("waiter");
+        assert_eq!(transport.sent_at_ms(start), [0, 1000]);
         Ok(())
     }
 
+    /// The waited milliseconds a local.load_timeout message reports.
+    fn waited_ms(message: &str) -> u64 {
+        message
+            .split_whitespace()
+            .rev()
+            .nth(1)
+            .and_then(|ms| ms.parse().ok())
+            .expect("waited ms in message")
+    }
+
     /// AC 22: never ready with load_timeout 2 s -> decision.backend with cause
-    /// local.load_timeout, waited >= 2 s.
+    /// local.load_timeout after probes at exactly 0, 1 and 2 s; waited exactly 2000 ms.
     #[test]
     fn test_mapika_never_ready_times_out() -> Result<(), Box<dyn std::error::Error>> {
-        let transport = ScriptedTransport::responses(vec![json(200, NOT_READY); 5]);
-        let backend = loopback(DaemonKind::Mapika, None);
-        let receiver = spawn_wait(
-            backend,
-            Arc::new(transport.clone()),
+        let clock = ManualClock::new();
+        let start = clock.now();
+        let transport = Stamped::new(&clock, vec![Ok(json(200, NOT_READY))]);
+        let (receiver, handle) = spawn_wait(
+            loopback(DaemonKind::Mapika, None),
+            transport.clone(),
+            None,
             CancelToken::new(),
             Duration::from_secs(2),
         );
-        let (result, elapsed) = receiver.recv_timeout(BOUND)?;
-        let error = result.expect_err("timed out");
+        step(&clock, &transport, 1, LOAD_POLL_INTERVAL);
+        step(&clock, &transport, 2, LOAD_POLL_INTERVAL);
+        let error = recv_within(&receiver, HANG_GUARD).expect_err("timed out");
+        join_within(handle, HANG_GUARD).expect("waiter");
         assert_eq!(error.id(), "decision.backend");
         assert!(matches!(
             error,
@@ -176,41 +279,77 @@ mod tests {
             "{}",
             cause.message
         );
-        let waited_ms: u64 = cause
-            .message
-            .split_whitespace()
-            .rev()
-            .nth(1)
-            .and_then(|ms| ms.parse().ok())
-            .expect("waited ms in message");
-        assert!(waited_ms >= 2000, "{waited_ms}");
-        assert!(elapsed >= Duration::from_secs(2));
+        assert_eq!(waited_ms(&cause.message), 2000);
         assert!(cause.recovery.is_some());
-        assert_eq!(transport.sends(), 3, "probes at 0, 1 and 2 s");
+        assert_eq!(transport.sent_at_ms(start), [0, 1000, 2000]);
         Ok(())
     }
 
-    /// A timeout that is not a whole number of polls: the last probe is at the deadline
-    /// (0, 1 and 1.5 s), so the wait ends before 2 s after 3 probes.
+    /// A timeout that is not a whole number of polls: the last probe is at the deadline, so
+    /// probes go at exactly 0, 1 and 1.5 s and the wait ends at 1.5 s.
     #[test]
     fn test_timeout_between_polls_probes_at_deadline() -> Result<(), Box<dyn std::error::Error>> {
-        let transport = ScriptedTransport::responses(vec![json(200, NOT_READY); 5]);
-        let receiver = spawn_wait(
+        let clock = ManualClock::new();
+        let start = clock.now();
+        let transport = Stamped::new(&clock, vec![Ok(json(200, NOT_READY))]);
+        let (receiver, handle) = spawn_wait(
             loopback(DaemonKind::Mapika, None),
-            Arc::new(transport.clone()),
+            transport.clone(),
+            None,
             CancelToken::new(),
             Duration::from_millis(1500),
         );
-        let (result, elapsed) = receiver.recv_timeout(BOUND)?;
-        let error = result.expect_err("timed out");
-        assert_eq!(
-            error.detail().cause.map(|cause| cause.id),
-            Some("local.load_timeout".to_owned())
-        );
-        assert_eq!(transport.sends(), 3);
-        assert!(elapsed >= Duration::from_millis(1500), "{elapsed:?}");
-        assert!(elapsed < Duration::from_secs(2), "{elapsed:?}");
+        step(&clock, &transport, 1, LOAD_POLL_INTERVAL);
+        step(&clock, &transport, 2, Duration::from_millis(500));
+        let error = recv_within(&receiver, HANG_GUARD).expect_err("timed out");
+        join_within(handle, HANG_GUARD).expect("waiter");
+        let cause = error.detail().cause.expect("cause");
+        assert_eq!(cause.id, "local.load_timeout");
+        assert_eq!(waited_ms(&cause.message), 1500);
+        assert_eq!(transport.sent_at_ms(start), [0, 1000, 1500]);
         Ok(())
+    }
+
+    /// AC 23: a cancel while the waiter is parked after the first poll ends the wait with
+    /// decision.cancelled and no further probe. The clock never moves, so no poll can fire
+    /// between the first probe and the cancel.
+    #[test]
+    fn test_cancel_after_first_poll() {
+        let clock = ManualClock::new();
+        let transport = Stamped::new(&clock, vec![Ok(json(200, NOT_READY))]);
+        let cancel = CancelToken::new();
+        let (receiver, handle) = spawn_wait(
+            loopback(DaemonKind::Mapika, None),
+            transport.clone(),
+            None,
+            cancel.clone(),
+            Duration::from_secs(30),
+        );
+        transport.sent.wait_for(1);
+        assert!(clock.wait_for_waiters(1), "the waiter parked after probe 1");
+        cancel.cancel();
+        let result = recv_within(&receiver, HANG_GUARD);
+        join_within(handle, HANG_GUARD).expect("waiter");
+        assert!(
+            matches!(result, Err(DecisionError::Cancelled { sends: 0 })),
+            "{result:?}"
+        );
+        assert_eq!(transport.sent.count(), 1);
+    }
+
+    /// A probe of `backend` on `transport`, on a manual clock that never moves (each of the
+    /// tests below ends after its first probe).
+    fn wait_once(
+        backend: &LocalBackend,
+        transport: &ScriptedTransport,
+        cancel: &CancelToken,
+        load_timeout: Duration,
+    ) -> Result<(), DecisionError> {
+        LocalProbe::new(backend, transport, ManualClock::new().clock()).wait_until_loaded(
+            cancel,
+            load_timeout,
+            LogContext::NONE,
+        )
     }
 
     /// A load timeout of Duration::MAX does not overflow the deadline: the wait still ends
@@ -218,11 +357,11 @@ mod tests {
     #[test]
     fn test_huge_load_timeout_is_clamped() -> Result<(), Box<dyn std::error::Error>> {
         let transport = ScriptedTransport::responses(vec![json(200, READY)]);
-        loopback(DaemonKind::Mapika, None).wait_until_loaded(
+        wait_once(
+            &loopback(DaemonKind::Mapika, None),
             &transport,
             &CancelToken::new(),
             Duration::MAX,
-            LogContext::NONE,
         )?;
         assert_eq!(transport.sends(), 1);
         assert_eq!(
@@ -232,42 +371,17 @@ mod tests {
         Ok(())
     }
 
-    /// AC 23: cancel from another thread after the first poll -> decision.cancelled at once,
-    /// no further probe.
-    #[test]
-    fn test_cancel_after_first_poll() -> Result<(), Box<dyn std::error::Error>> {
-        let transport = BlockingTransport::new(Ok(json(200, NOT_READY)));
-        let cancel = CancelToken::new();
-        let receiver = spawn_wait(
-            loopback(DaemonKind::Mapika, None),
-            Arc::new(transport.clone()),
-            cancel.clone(),
-            Duration::from_secs(30),
-        );
-        assert!(transport.wait_started(1), "sends started");
-        transport.release();
-        cancel.cancel();
-        let (result, elapsed) = receiver.recv_timeout(BOUND)?;
-        assert!(
-            matches!(result, Err(DecisionError::Cancelled { sends: 0 })),
-            "{result:?}"
-        );
-        assert_eq!(transport.sends(), 1);
-        assert!(elapsed < LOAD_POLL_INTERVAL * 2, "{elapsed:?}");
-        Ok(())
-    }
-
     /// A token cancelled before the wait sends no probe.
     #[test]
     fn test_cancelled_before_wait_sends_nothing() {
         let transport = ScriptedTransport::new(Vec::new());
         let cancel = CancelToken::new();
         cancel.cancel();
-        let result = loopback(DaemonKind::Mapika, None).wait_until_loaded(
+        let result = wait_once(
+            &loopback(DaemonKind::Mapika, None),
             &transport,
             &cancel,
             Duration::from_secs(30),
-            LogContext::NONE,
         );
         assert!(matches!(result, Err(DecisionError::Cancelled { sends: 0 })));
         assert_eq!(transport.sends(), 0);
@@ -278,14 +392,13 @@ mod tests {
     fn test_model_not_served_ends_wait() {
         let transport =
             ScriptedTransport::responses(vec![json(200, r#"{"ok":true,"model":"other"}"#)]);
-        let error = loopback(DaemonKind::Mapika, None)
-            .wait_until_loaded(
-                &transport,
-                &CancelToken::new(),
-                Duration::from_secs(30),
-                LogContext::NONE,
-            )
-            .expect_err("not served");
+        let error = wait_once(
+            &loopback(DaemonKind::Mapika, None),
+            &transport,
+            &CancelToken::new(),
+            Duration::from_secs(30),
+        )
+        .expect_err("not served");
         assert_eq!(error.id(), "decision.backend");
         assert_eq!(
             error.detail().cause.map(|cause| cause.id),
@@ -298,14 +411,13 @@ mod tests {
     #[test]
     fn test_generic_unlisted_is_ok_at_once() {
         let transport = ScriptedTransport::responses(vec![json(404, "{}")]);
-        loopback(DaemonKind::Generic, None)
-            .wait_until_loaded(
-                &transport,
-                &CancelToken::new(),
-                Duration::from_secs(30),
-                LogContext::NONE,
-            )
-            .expect("unlisted is ok");
+        wait_once(
+            &loopback(DaemonKind::Generic, None),
+            &transport,
+            &CancelToken::new(),
+            Duration::from_secs(30),
+        )
+        .expect("unlisted is ok");
         assert_eq!(transport.sends(), 1);
     }
 
@@ -321,12 +433,7 @@ mod tests {
         let backend = loopback(DaemonKind::Laya, None).with_timeouts(timeouts);
         let transport =
             ScriptedTransport::responses(vec![json(200, r#"{"status":"ok","loaded":[]}"#)]);
-        backend.wait_until_loaded(
-            &transport,
-            &CancelToken::new(),
-            timeouts.load,
-            LogContext::NONE,
-        )?;
+        wait_once(&backend, &transport, &CancelToken::new(), timeouts.load)?;
         assert_eq!(transport.sends(), 1);
 
         let request = decision_request();

@@ -116,7 +116,7 @@ mod tests {
             Ok(())
         })
         .expect("batch");
-        canceller.join().expect("canceller");
+        sc_agent_testkit::join_within(canceller, sc_agent_testkit::HANG_GUARD).expect("canceller");
         drop(options);
         assert_eq!(count, 1);
         // The blocked worker still holds the runner's logger handles here.

@@ -18,17 +18,18 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 
 | Crate | Layer (ADR-SAG-0004) | Contract surface other sprints consume | Allowed sc-agent dependencies | Sprint |
 |---|---|---|---|---|
-| sc-agent-types | types | Provider, ModelId, ShortName, ReleaseDate, Catalog, ModelChoice, SessionId, CancelToken, ErrorId, ErrorDetail; workspace root Cargo.toml + clippy.toml | none | a-1 |
+| sc-agent-types | types | Provider, ModelId, ShortName, ReleaseDate, Catalog, ModelChoice, SessionId, CancelToken, Clock (system, or ManualClock under feature `testing`; `Clock::wait_until(&CancelToken, Instant)`), ErrorId, ErrorDetail; testing::{ManualClock, CancelEvent}; workspace root Cargo.toml + clippy.toml | none | a-1 |
 | sc-agent-config | config/secrets/log | AgentConfig, DEFAULT_WORKERS | types | a-4 |
 | sc-agent-secrets | config/secrets/log | ApiKey, KeySource, resolve | types | a-4 |
 | sc-agent-log | config/secrets/log | GeneralLogger, SessionLogger, Level, LogError; testing::MemoryLog | types | a-8 |
-| sc-agent-http | http | HttpRequest, HttpResponse, HttpError, Transport, HttpClient (may_start, may_resend, send_once), ResendPolicy; testing::{ScriptedTransport, BlockingTransport} | types, secrets, log | a-5 |
+| sc-agent-http | http | HttpRequest, HttpResponse, HttpError, Transport, HttpClient (may_start, may_resend, send_once, with_jitter), Jitter, ResendPolicy; testing::{ScriptedTransport, BlockingTransport, RefusingTransport, ManualClock} | types, secrets, log | a-5 |
 | sc-decision-schema | decision schema | Backend, Decision, DecisionRequest::new (validated; no public validate), DecisionResult, DecisionError, QuestionDigest | types, http | a-2 |
-| sc-decision-systemone, sc-decision-local (over sc-decision-systemone) | decision backends | SystemOneBackend, LocalBackend (+with_log, discover, wait_until_loaded) | systemone: types, secrets, http, schema; local: also config, log and sc-decision-systemone | a-6 |
+| sc-decision-systemone, sc-decision-local (over sc-decision-systemone) | decision backends | SystemOneBackend, LocalBackend (sans-IO: probe_request, read_probe, model), LocalProbe (Transport + Clock: discover, wait_until_loaded, with_log) | systemone: types, secrets, http, schema; local: also config, log and sc-decision-systemone | a-6 |
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
 | sc-decision-runner | runner | DecisionRunner, RunnerConfig, RunnerError | types, config, log, http, schema | a-9 |
 | decide, sc-agent-py | top (decide library = composition root) | decide library API, decide CLI, Python module | all of the above | a-10 |
 | sc-treesitter (tsq bin behind the non-default `cli` feature), sc-treesitter-py | stands alone (ADR-SAG-0005) | tsq CLI, Python query API | none (workspace root only) | a-3 |
+| sc-agent-testkit (dev-only, `publish = false`, never a normal dependency) | test support, not a layer | HANG_GUARD, recv_within, join_within, cancelled_within, Gate, Started, serve_once, serve_each, ChildGuard | types | none: added by the phase-end QA; the workspace scan `tests_are_deterministic` (crates/decide/tests/workspace.rs) refuses raw unbounded waits and clock reads in tests |
 
 ## Wave table
 
@@ -40,7 +41,7 @@ Every edge is `must_follow` with trigger **dev-push**: the child starts when the
 | 2 | a-3, a-4, a-8 | a-1 push of the workspace root + its types |
 | 3 | a-5 | a-4 ApiKey, a-8 GeneralLogger/Level |
 | 4 | a-2 | a-5 src/request.rs + src/error.rs (pushed first after a-5's copy commit) |
-| 5 | a-6, a-7, a-9 | a-2's contract plus the a-4, a-5 and a-8 artifacts each names (edge table below) |
+| 5 | a-6, a-7, a-9 | a-2's contract plus the a-4, a-5 and a-8 artifacts each names (each sprint's front matter) |
 | 6 | a-10 | a-6, a-7, a-9 named types |
 
 Sprint count 10; critical path 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
@@ -50,31 +51,31 @@ owned_paths are disjoint across all sprints; the workspace root Cargo.toml and c
 
 ## Every must_follow edge
 
-This table is authoritative for start conditions; the Sprints table's column lists the same sprints. A sprint starts when every artifact it lists has been pushed (dev-push).
+This table lists the edges. Each sprint's front matter (`must_follow`, with the `artifact` and the trigger dev-push) names the artifact the sprint waits for and is the single source: the artifacts are not restated here (REQ-QA-005). A sprint starts when every artifact its front matter names has been pushed (dev-push).
 
-| Sprint | must_follow | Artifact (dev-push) |
-|---|---|---|
-| a-2 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, LogContext (re-export of sc-agent-log's)} (crates/sc-agent-http/src/request.rs + src/error.rs + lib.rs re-export) |
-| a-3 | a-1 | workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (test allowances, disallowed-methods sleep rule) |
-| a-4 | a-1 | sc_agent_types::{Provider, ModelId, ShortName, ReleaseDate, Catalog, ModelChoice, VarName, TypesError, ErrorId, ErrorDetail} + workspace root Cargo.toml + clippy.toml |
-| a-5 | a-4 | sc_agent_secrets::ApiKey (crates/sc-agent-secrets) |
-| a-5 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} (crates/sc-agent-log) |
-| a-6 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, ModelMetadataList, DecisionError} (crates/sc-decision-schema/src/) |
-| a-6 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe, HttpRequest::with_secret, HttpRequest::with_deadline} and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
-| a-6 | a-4 | sc_agent_config::{RunnerKind (closed enum), RunnerHost} and sc_agent_secrets::ApiKey |
-| a-6 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`) |
-| a-7 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, Answer, DecisionError} (crates/sc-decision-schema/src/) |
-| a-7 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError} (src/request.rs, src/error.rs), plus Endpoint, SecretHeader, ProviderReply, Timeouts::probe, HttpClient::{may_start, send_once}, SendPermit and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
-| a-7 | a-4 | sc_agent_secrets::ApiKey |
-| a-7 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`) |
-| a-8 | a-1 | sc_agent_types::{SessionId, ErrorId, ErrorDetail} + workspace root Cargo.toml and clippy.toml |
-| a-9 | a-2 | sc_decision_schema::{Decision, Backend, DecisionRequest, DecisionResult, DecisionError} (DecisionRequest::new/digests) |
-| a-9 | a-5 | sc_agent_http::{HttpClient (may_start, may_resend, send_once), Start, SendPermit, Attempts, Pending, Next, LogContext (re-export), ResendPolicy, BusyReason, ProviderPause} + testing::{ScriptedTransport, BlockingTransport, ManualClock} (feature `testing`) |
-| a-9 | a-8 | sc_agent_log::{SessionLogger, GeneralLogger, Level, LogError} + testing::{MemoryLog, MemoryRecord} (feature `testing`) |
-| a-9 | a-4 | sc_agent_config::{AgentConfig, DEFAULT_WORKERS} |
-| a-10 | a-6 | sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL, models_request} and sc_decision_local::{LocalBackend (incl. with_log), DaemonKind} |
-| a-10 | a-7 | sc_llm_provider::{LlmClient (incl. with_log, models_request, decode_models), LlmProvider, catalog_model_id} and sc_decision_llm::LlmDecisionBackend (incl. with_log) |
-| a-10 | a-9 | sc_decision_runner::{DecisionRunner, RunnerConfig, RunnerError} |
+| Sprint | must_follow |
+|---|---|
+| a-2 | a-5 |
+| a-3 | a-1 |
+| a-4 | a-1 |
+| a-5 | a-4 |
+| a-5 | a-8 |
+| a-6 | a-2 |
+| a-6 | a-5 |
+| a-6 | a-4 |
+| a-6 | a-8 |
+| a-7 | a-2 |
+| a-7 | a-5 |
+| a-7 | a-4 |
+| a-7 | a-8 |
+| a-8 | a-1 |
+| a-9 | a-2 |
+| a-9 | a-5 |
+| a-9 | a-8 |
+| a-9 | a-4 |
+| a-10 | a-6 |
+| a-10 | a-7 |
+| a-10 | a-9 |
 
 ## Requirement ownership
 
@@ -136,8 +137,8 @@ The owner closes the record's acceptance; contributing sprints prove their bound
 | a-3 | [Sprint A-3: sc-treesitter, tsq and sc-treesitter-py](sprint-a-3-sc-treesitter.md) | `sprint/a-3-sc-treesitter` | a-1 | closed |
 | a-4 | [Sprint A-4: sc-agent-config and sc-agent-secrets](sprint-a-4-config-secrets.md) | `sprint/a-4-config-secrets` | a-1 | closed |
 | a-5 | [Sprint A-5: sc-agent-http](sprint-a-5-sc-agent-http.md) | `sprint/a-5-sc-agent-http` | a-4, a-8 | closed |
-| a-6 | [Sprint A-6: sc-decision-systemone and sc-decision-local](sprint-a-6-decision-backends.md) | `sprint/a-6-decision-backends` | a-2, a-4, a-5, a-8 | open |
-| a-7 | [Sprint A-7: sc-llm-provider and sc-decision-llm](sprint-a-7-llm-provider.md) | `sprint/a-7-llm-provider` | a-2, a-4, a-5, a-8 | open |
+| a-6 | [Sprint A-6: sc-decision-systemone and sc-decision-local](sprint-a-6-decision-backends.md) | `sprint/a-6-decision-backends` | a-2, a-4, a-5, a-8 | closed |
+| a-7 | [Sprint A-7: sc-llm-provider and sc-decision-llm](sprint-a-7-llm-provider.md) | `sprint/a-7-llm-provider` | a-2, a-4, a-5, a-8 | closed |
 | a-8 | [Sprint A-8: sc-agent-log](sprint-a-8-sc-agent-log.md) | `sprint/a-8-sc-agent-log` | a-1 | closed |
-| a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2, a-4, a-5, a-8 | open |
-| a-10 | [Sprint A-10: decide CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | open |
+| a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2, a-4, a-5, a-8 | closed |
+| a-10 | [Sprint A-10: decide CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | closed |

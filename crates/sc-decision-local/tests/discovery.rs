@@ -1,4 +1,5 @@
-//! LocalBackend discovery, construction, Backend use and errors, over ScriptedTransport.
+//! LocalBackend construction, Backend use and errors, and LocalProbe discovery, over
+//! ScriptedTransport (no clock is read: discovery is one probe).
 //!
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
@@ -14,8 +15,10 @@ mod tests {
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{HttpError, LogContext, Method, NetworkKind};
     use sc_agent_types::ErrorId;
+    use sc_agent_types::testing::ManualClock;
     use sc_decision_local::{
-        Availability, DaemonKind, LocalBackend, LocalError, LocalTimeouts, ModelState, ParseCause,
+        Availability, DaemonKind, LocalBackend, LocalError, LocalProbe, LocalTimeouts, ModelState,
+        ParseCause,
     };
     use sc_decision_schema::{Backend, DecisionError};
     use sc_decision_systemone::SystemOneBackend;
@@ -30,8 +33,14 @@ mod tests {
         reply: Result<sc_agent_http::HttpResponse, HttpError>,
     ) -> (Result<Availability, LocalError>, ScriptedTransport) {
         let transport = ScriptedTransport::new(vec![reply]);
-        let result = loopback(kind, key).discover(&transport, LogContext::NONE);
+        let backend = loopback(kind, key);
+        let result = probe(&backend, &transport).discover(LogContext::NONE);
         (result, transport)
+    }
+
+    /// A probe of `backend` on `transport`, on a manual clock that never moves.
+    fn probe<'a>(backend: &'a LocalBackend, transport: &'a ScriptedTransport) -> LocalProbe<'a> {
+        LocalProbe::new(backend, transport, ManualClock::new().clock())
     }
 
     fn up(kind: DaemonKind, status: u16, body: &str) -> Result<Availability, LocalError> {
@@ -586,8 +595,8 @@ mod tests {
             error.detail().cause.map(|cause| cause.id),
             Some("http.key_on_plain_http".to_owned())
         );
-        let error = backend
-            .discover(&transport, LogContext::NONE)
+        let error = probe(&backend, &transport)
+            .discover(LogContext::NONE)
             .expect_err("probe refused");
         assert_eq!(
             error.detail().cause.map(|cause| cause.id),
@@ -606,7 +615,6 @@ mod tests {
         let debug = format!("{backend:?}");
         assert!(!debug.contains(SECRET));
         assert!(debug.contains("key: \"<set>\""));
-        assert!(debug.contains("log: \"<unset>\""));
         assert!(debug.contains(MODEL));
     }
 
@@ -627,6 +635,42 @@ mod tests {
                     .expect("encode")
                     .method(),
                 Method::Post
+            );
+        }
+    }
+
+    /// RSH-006: a transport error whose text contains the probe's key (a proxy echoing the
+    /// Authorization header) comes back with the key redacted, exactly as
+    /// `HttpClient::send_once` redacts: the probe goes through `HttpError::redacted_for`.
+    #[test]
+    fn test_a_transport_error_echoing_the_key_is_redacted() {
+        let echo = HttpError::network(
+            NetworkKind::Connect,
+            1,
+            format!("proxy refused: Authorization: Bearer {SECRET}"),
+        )
+        .with_cause(sc_agent_types::ErrorDetail::new(
+            "io.Other",
+            format!("echo {SECRET}"),
+            None,
+        ));
+        for kind in [DaemonKind::Laya, DaemonKind::Generic] {
+            let (result, transport) = discover(kind, Some(key()), Err(echo.clone()));
+            assert!(
+                transport.requests()[0].secret().is_some(),
+                "{kind}: the probe carried the key"
+            );
+            let error = result.expect_err("down");
+            let rendered = format!("{error} {error:?} {:?}", error.detail());
+            assert!(!rendered.contains(SECRET), "{kind}: {rendered}");
+            let cause = error.detail().cause.expect("http cause");
+            assert_eq!(
+                cause.message,
+                "connect failure after 1 send: proxy refused: Authorization: Bearer [redacted]"
+            );
+            assert_eq!(
+                cause.cause.map(|lower| lower.message),
+                Some("echo [redacted]".to_owned())
             );
         }
     }

@@ -41,7 +41,7 @@ Governing: REQ-SAG-0601 (busy resend and holdoff), REQ-SAG-0602 (quota is not bu
 
 Copy script: `docs/plans/phase-a/copy/a-5.sh` (source sc-agent-ref@dce239a; dry run 2026-11-09, reconciliation: 26 copy steps, 13 files, 2075 lines; no `sleep(` in any copied line).
 
-What the crate is: a sync HTTP layer with no queue. It owns `HttpRequest`/`HttpResponse` (byte bodies, so multipart works), sends one request once (`Transport`), classifies the reply (busy / quota / final), and for a busy reply returns a not-before `Instant` for the resend under `ResendPolicy`; a busy reply also pauses every later send from the same `HttpClient` to that host (`ProviderPause`, REQ-SAG-0012). It never waits and takes no `CancelToken`: the holdoff wait and cancellation live in the caller's queue (the runner, A-9, uses `CancelToken::wait_until` and `on_cancel`). Every final reply that is neither busy nor quota is returned to the caller as `Next::Done { response, .. }`, whatever its status, so the backend decodes the API's own error bodies (Jev 400/422 are sc-decision-schema types; LLM providers' errors are read by sc-llm-provider with `ProviderReply::read`).
+What the crate is: a sync HTTP layer with no queue. It owns `HttpRequest`/`HttpResponse` (byte bodies, so multipart works), sends one request once (`Transport`), classifies the reply (busy / quota / final), and for a busy reply returns a not-before `Instant` for the resend under `ResendPolicy`; a busy reply also pauses every later send from the same `HttpClient` to that host (`ProviderPause`, REQ-SAG-0012). It never waits and takes no `CancelToken`: the holdoff wait and cancellation live in the caller's queue (the runner, A-9, uses `Clock::park` / `Clock::wait_until` (a-1) and `CancelToken::on_cancel`). Every final reply that is neither busy nor quota is returned to the caller as `Next::Done { response, .. }`, whatever its status, so the backend decodes the API's own error bodies (Jev 400/422 are sc-decision-schema types; LLM providers' errors are read by sc-llm-provider with `ProviderReply::read`).
 
 Main departures from the old crate:
 - Old `retry.rs:247-268` (`Hooks::wait`, `thread::sleep` slices) and `retry_loop` (507-626) are not copied; `send_once` returns `Next::ResendAt { at, .. }`.
@@ -56,7 +56,7 @@ Main departures from the old crate:
 
 Decisions (assistant, 2026-11-09):
 - Scheme: `Endpoint::parse` accepts only https; `Endpoint::parse_local` also accepts http and is called only by sc-decision-local with a host and port from a `local_runners` entry (runners on the user's machine or network often have no TLS).
-- One-off calls with no runner queue (decide models and doctor, a non-decision LLM call, REQ-SAG-0502) hold off on `CancelToken::wait_until(t)` on the calling thread: a queue of one, ended at once by cancel; no sleep.
+- One-off calls with no runner queue (decide models and doctor, a non-decision LLM call, REQ-SAG-0502) hold off on `Clock::wait_until(&cancel, t)` (a-1) on the calling thread: a queue of one, ended at once by cancel; no sleep.
 
 Push order (PLAN-SCOPE-002): the first pushes after the copy commit are `src/request.rs` + `src/error.rs` building (`HttpRequest`, `HttpResponse`, `HttpError` with the section 3/4 surface), so a-2 can start on its dev-push edge; `resend.rs`, `ureq_transport.rs` and the rest follow.
 
@@ -91,8 +91,8 @@ Push order (PLAN-SCOPE-002): the first pushes after the copy commit are `src/req
 - `quota.rs`: keep the "Documented body shapes" doc (21-53), drop the mapping table (7-19). `is_quota_reply(status, body)` is consulted only for 429/502/529 (REQ-SAG-0602); the 402 shortcut and the Anthropic usage-limit 400 message start are dropped: those replies are final, returned after one send with the remote id and message (REQ-SAG-0601). Port the test to `HttpError::QuotaExhausted`.
 - `reply.rs`: `ProviderFailure` -> `ProviderReply`: drop the `provider` label, `retry_after_seconds: Option<f64>`, drop `Eq`. `read_failure` -> `pub fn ProviderReply::read(response: &HttpResponse, secret: Option<&ApiKey>) -> Self` (scrub before bound, kept); public because sc-llm-provider reads non-2xx provider replies with it. Delete `PROVIDER_TEXT_MAX_BYTES` and `bound_provider_text`: text is redacted, never cut (REQ-SAG-0002).
 - `error.rs`: rename the two enums; drop serde derives, `FromStr`, `NetworkErrorKind::Cancelled` and the old `retryable()`; add `HttpError` (section 4).
-- `resend.rs`: drop `MAX_SENDS`, `WAIT_SLICE`; `Hooks::jitter` -> `fn jitter() -> Duration` (std `RandomState` hash `% 251` ms); remove `sends_are_bounded_to_one_through_five`; keep `backoff_doubles_to_the_cap`, `retry_after_parser`, `system_jitter_stays_in_range`, `default_delays_are_one_two_four_eight`, `busy_set_is_exactly_three_statuses`. Write `ResendPolicy`, `Attempts`, `Next`, `HttpClient` (section 3).
-- `tests/support/mod.rs` (C13, copied there unchanged in the copy commit): in a later commit move it to `src/testing.rs` behind `#[cfg(feature = "testing")]` and delete `tests/support/`; drop `FakeClock` uses; script exhaustion returns `Network { kind: Connect, .. }`; `lock` recovers a poisoned mutex (`into_inner`), no unwrap; add `BlockingTransport` (section 3). The crate's own tests enable the feature through a self dev-dependency (`sc-agent-http = { path = ".", features = ["testing"] }`).
+- `resend.rs`: drop `MAX_SENDS`, `WAIT_SLICE`; `Hooks::jitter` -> `Jitter` (`Jitter::system()`: std `RandomState` hash `% 251` ms; `Jitter::fixed(d)` for tests, clamped to 0..=250 ms); remove `sends_are_bounded_to_one_through_five`; keep `backoff_doubles_to_the_cap`, `retry_after_parser`, `the_jitter_spread_covers_exactly_zero_to_250_ms`, `default_delays_are_one_two_four_eight`, `busy_set_is_exactly_three_statuses`. Write `ResendPolicy`, `Attempts`, `Next`, `HttpClient` (section 3).
+- `tests/support/mod.rs` (C13, copied there unchanged in the copy commit): in a later commit move it to `src/testing.rs` behind `#[cfg(feature = "testing")]` and delete `tests/support/`; drop `FakeClock` uses; script exhaustion returns `Network { kind: Connect, .. }`; `lock` recovers a poisoned mutex (`into_inner`), no unwrap; add `BlockingTransport` and `RefusingTransport` (section 3); `ManualClock` is the re-export of sc_agent_types::testing::ManualClock (a-1). The crate's own tests enable the feature through a self dev-dependency (`sc-agent-http = { path = ".", features = ["testing"] }`).
 - `tests/ureq.rs`: `Endpoint::loopback_http(port, p)` -> `Endpoint::parse_local(&format!("http://127.0.0.1:{port}{p}"))`; `loopback_for_tests` -> `UreqTransport::new`.
 - `tests/resend.rs`: drop the `Hooks` struct; keep the four builders.
 
@@ -105,12 +105,12 @@ mod error; mod quota; mod redact; mod reply; mod request; mod resend; mod retry_
 pub use error::{BusyReason, HttpError, NetworkKind};
 pub use reply::ProviderReply;
 pub use request::{Endpoint, HttpRequest, HttpResponse, Method, SecretHeader};
-pub use resend::{Attempts, HttpClient, Next, Pending, ProviderPause, ResendPolicy, SendPermit, Start};
+pub use resend::{Attempts, HttpClient, Jitter, Next, Pending, ProviderPause, ResendPolicy, SendPermit, Start};
 pub use sc_agent_log::LogContext;   // re-exported: send_once takes it
 pub use transport::{Timeouts, Transport};
 pub use ureq_transport::UreqTransport;
 #[cfg(feature = "testing")]
-pub mod testing;   // ScriptedTransport, RecordingTransport, BlockingTransport (test doubles for consumers)
+pub mod testing;   // ScriptedTransport, RecordingTransport, BlockingTransport, RefusingTransport, ManualClock re-export (test doubles for consumers)
 
 // src/request.rs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -208,6 +208,18 @@ const BACKOFF_MAX: Duration = Duration::from_secs(30);
 const JITTER_MAX: Duration = Duration::from_millis(250);
 const BUDGET: Duration = Duration::from_secs(90);
 
+/// Where the 0-250 ms holdoff jitter comes from (REQ-SAG-0012, REQ-SAG-0601). Default is Jitter::system().
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Jitter(JitterSource);   // enum JitterSource { #[default] System, Fixed(Duration) }
+impl Jitter {
+    /// A random jitter in 0..=250 ms for each holdoff (a freshly keyed std RandomState; not a cryptographic source).
+    #[must_use] pub const fn system() -> Self;
+    /// Always `jitter`, clamped to 0..=250 ms: a test pins the exact holdoff at each edge of the range.
+    #[must_use] pub fn fixed(jitter: Duration) -> Self;
+    /// The largest jitter any source gives: 250 ms.
+    #[must_use] pub const fn max(self) -> Duration;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResendPolicy { max_sends: NonZeroU32 }
 impl ResendPolicy {
@@ -268,7 +280,9 @@ impl ProviderPause {
 pub struct HttpClient { transport: Arc<dyn Transport>, policy: ResendPolicy, pause: ProviderPause, log: GeneralLogger }
 impl HttpClient {
     /// `log` is the caller's GeneralLogger, default or injected (REQ-SAG-0008; sc-agent-log is below this crate).
-    pub fn new(transport: Arc<dyn Transport>, policy: ResendPolicy, log: GeneralLogger) -> Self;
+    pub fn new(transport: Arc<dyn Transport>, policy: ResendPolicy, log: GeneralLogger) -> Self;   // jitter: Jitter::system()
+    /// This client with its holdoff jitter taken from `jitter` (a test fixes it at an edge of the 0-250 ms range to check the exact holdoff).
+    #[must_use] pub fn with_jitter(self, jitter: Jitter) -> Self;
     pub fn policy(&self) -> ResendPolicy;
     pub fn pause(&self) -> &ProviderPause;
     pub fn transport(&self) -> &Arc<dyn Transport>;      // one-shot probes (A-6 discovery)
@@ -280,19 +294,19 @@ impl HttpClient {
     /// `ProviderBusy { reason, attempts, retry_after_seconds, last }`; last send timed out ->
     /// `Network { kind: Timeout, attempts, message }` (never ProviderBusy). Host paused -> `Wait`.
     pub fn may_resend(&self, request: &HttpRequest, pending: Pending, now: Instant) -> Result<Start<Pending>, HttpError>;
-    /// One send under `permit`. `now` is read after the send for the holdoff start. Never waits. Every Err is
+    /// One send under `permit`. `clock.now()` is read after the send for the holdoff start. Never waits. Every Err is
     /// redacted. Every http.* event carries `ctx` (session_id, position).
-    pub fn send_once(&self, request: &HttpRequest, permit: SendPermit, ctx: LogContext, now: &dyn Fn() -> Instant) -> Result<Next, HttpError>;
+    pub fn send_once(&self, request: &HttpRequest, permit: SendPermit, ctx: LogContext, clock: &Clock) -> Result<Next, HttpError>;
 }
 ```
 
 Admission (`may_start` / `may_resend`, each line one REQ rule): sends left and inside the 90 s start budget (REQ-SAG-0601), else refused as above; then `pause.not_before(request.endpoint().host())` later than `now` -> `Start::Wait { at, state }` (REQ-SAG-0012); else `Start::Go(permit)`.
 
 `send_once` order (each step is one REQ line):
-1. `transport.send(request)`; `sends += 1` (and `first_send` set on the first). `Err(Network { kind: Timeout })`: with `sends < max_sends` -> `Ok(ResendAt { at: now() + jitter(), pending: Last::Timeout })` (resent unchanged after 0-250 ms jitter, no host pause; `may_resend` re-checks the budget); else the timeout error. Every other `Err` (connect, DNS, TLS, other) is returned after this send (REQ-SAG-0601).
+1. `transport.send(request)`; `sends += 1` (and `first_send` set on the first). `Err(Network { kind: Timeout })`: with `sends < max_sends` -> `Ok(ResendAt { at: clock.now() + jitter, pending: Last::Timeout })` (resent unchanged after 0-250 ms jitter, no host pause; `may_resend` re-checks the budget); else the timeout error. Every other `Err` (connect, DNS, TLS, other) is returned after this send (REQ-SAG-0601).
 2. Status not in `BUSY_STATUSES` -> `Ok(Next::Done { response, attempts })`.
 3. Busy and `is_quota_reply` -> `Err(QuotaExhausted { attempts, reply })` at once (REQ-SAG-0602).
-4. Busy: `reply = ProviderReply::read(&response, request.secret().map(SecretHeader::key))`. Holdoff = valid `Retry-After` -> `RetryAfter::wait()` clamped to 250 ms-30 s, plus `jitter()` (REQ-SAG-0012); else `backoff(sends) + jitter()` (1, 2, 4, 8, 16, 30 ... s + 0-250 ms). `pause.hold_until(host, now() + holdoff)` FIRST, for every non-quota busy reply (REQ-SAG-0012). Then: if `sends >= max_sends` -> `Err(ProviderBusy { reason: Sends, attempts, retry_after_seconds, last: Box::new(reply) })`. `remaining = BUDGET - (now() - first_send)`; zero -> `ProviderBusy { reason: Budget, .. }`; else `Ok(ResendAt { at: now() + min(holdoff, remaining), pending: Last::Busy(reply) })`.
+4. Busy: `reply = ProviderReply::read(&response, request.secret().map(SecretHeader::key))`. Holdoff = valid `Retry-After` -> `RetryAfter::wait()` clamped to 250 ms-30 s, plus the client's jitter (REQ-SAG-0012); else `backoff(sends) + jitter` (1, 2, 4, 8, 16, 30 ... s + 0-250 ms). `pause.hold_until(host, clock.now() + holdoff)` FIRST, for every non-quota busy reply (REQ-SAG-0012). Then: if `sends >= max_sends` -> `Err(ProviderBusy { reason: Sends, attempts, retry_after_seconds, last: Box::new(reply) })`. `remaining = BUDGET - (clock.now() - first_send)`; zero -> `ProviderBusy { reason: Budget, .. }`; else `Ok(ResendAt { at: clock.now() + min(holdoff, remaining), pending: Last::Busy(reply) })`.
 
 The 90 s start budget starts at the first send (`Attempts.first_send`); a local daemon's model load waits happen before it (a-6), so load time never counts toward the budget, and a per-request deadline covers only that send (REQ-SAG-0015).
 
@@ -303,7 +317,7 @@ Logging (ANC-007, REQ-SAG-0008) through `log.write(level, "sc_agent_http", actio
 How the runner (A-9) uses it, no sleep (one-off calls: see Decisions): take job -> `may_start`/`may_resend` -> `Go(permit)` -> `send_once` -> `ResendAt { at, pending }` or `Wait { at, state }` puts the job back in its queue keyed by `at`; idle workers wait with `Condvar::wait_timeout` to the earliest `at`, and a `CancelToken::on_cancel` hook wakes them at once; a cancelled job is never sent again. The runner's workers share one HttpClient, so they share its ProviderPause.
 
 ```rust
-// src/testing.rs (feature "testing"; copied C13 + new BlockingTransport)
+// src/testing.rs (feature "testing" = ["sc-agent-types/testing"]; copied C13 + new BlockingTransport, RefusingTransport)
 /// Answers from a script, first entry first; records every request; exhausted -> HttpError::network(Connect, 1, "script exhausted"). Clones share state.
 #[derive(Clone, Default)]
 pub struct ScriptedTransport { inner: Arc<Mutex<Script>> }
@@ -318,10 +332,8 @@ impl Transport for ScriptedTransport {}
 pub struct RecordingTransport<T> { inner: T, requests: Arc<Mutex<Vec<HttpRequest>>> }
 impl<T: Transport> RecordingTransport<T> { pub fn new(inner: T) -> Self; pub fn requests(&self) -> Vec<HttpRequest>; }
 impl<T: Transport> Transport for RecordingTransport<T> {}
-/// Explicit test clock shared with a transport: `now()` for send_once, advanced by sends.
-#[derive(Debug, Clone)]
-pub struct ManualClock { now: Arc<Mutex<Instant>> }
-impl ManualClock { pub fn new(start: Instant) -> Self; pub fn now(&self) -> Instant; pub fn advance(&self, by: Duration); }
+/// The manual clock of sc-agent-types (a-1), re-exported: `ManualClock::new()`, `.clock()` for send_once, moved by the test or advanced by sends.
+pub use sc_agent_types::testing::ManualClock;
 impl ScriptedTransport {
     /// Every send advances `clock` by `per_send` before answering (a send that takes the full timeout).
     pub fn with_send_duration(self, clock: ManualClock, per_send: Duration) -> Self;
@@ -331,11 +343,22 @@ impl ScriptedTransport {
 pub struct BlockingTransport { gate: Arc<(Mutex<Gate>, Condvar)> }
 impl BlockingTransport {
     pub fn new(reply: Result<HttpResponse, HttpError>) -> Self;   // every released send returns a clone of `reply`
-    pub fn wait_started(&self, sends: usize);                     // blocks until `sends` sends have entered send()
+    pub const FAILSAFE: Duration = Duration::from_secs(60);       // bound of every wait: a guard, never a measurement
+    #[must_use] pub fn wait_started(&self, sends: usize) -> bool; // blocks until `sends` sends have entered send(); false when they did not within FAILSAFE (every blocked send is then released)
     pub fn release(&self);                                        // lets every blocked and later send return
     pub fn sends(&self) -> usize;
 }
 impl Transport for BlockingTransport {}
+/// The production UreqTransport with a connector that refuses every connection (`io.ConnectionRefused`), so a refused connection needs no freed port.
+/// Every send runs the real path (timeout validation, the per-request deadline, ureq, the error classification); only the socket connect is replaced.
+#[derive(Clone)]
+pub struct RefusingTransport { inner: UreqTransport, seen: refusing::Seen }
+impl RefusingTransport {
+    #[must_use] pub fn new(timeouts: Timeouts) -> Self;
+    /// The whole-send deadline ureq applied to each connection attempt: the transport's `Timeouts::request`, or the request's own `with_deadline`.
+    #[must_use] pub fn deadlines(&self) -> Vec<Option<Duration>>;
+}
+impl Transport for RefusingTransport {}
 ```
 
 Corrections after QA-1 (2026-11-10; code at 2671dc5 follows these):
@@ -419,7 +442,7 @@ Each test names the acceptance line (A5-nn) it proves; the assertion itself is i
 | `retry_after_jittered`, `retry_after_capped`, `retry_after_zero_floored`, `retry_after_invalid_falls_back` (tests/resend.rs; `retry_after_parser` unit) | A5-03 |
 | `budget_stops_next_start`, `may_start_after_done_refused` (Err(Sends) / Err(Budget) with no HttpError), `retry_after_unrounded`, `resend_same_bytes` (tests/resend.rs) | A5-04 |
 | `holdoff_is_resend_at` (tests/resend.rs) | A5-05 |
-| `timeout_resent_under_max_sends`, `timeout_then_budget_ends_with_timeout`, `default_timeouts_which_resend`, `connect_not_resent` (tests/resend.rs); `refused_connection_is_connect` (tests/ureq.rs, real socket) | A5-06 |
+| `timeout_resent_under_max_sends`, `timeout_then_budget_ends_with_timeout`, `default_timeouts_which_resend`, `connect_not_resent` (tests/resend.rs); `refused_connection_is_connect` (tests/ureq.rs over `RefusingTransport`: refused by construction, no freed port) | A5-06 |
 | `final_402_and_usage_400` (tests/resend.rs) | A5-07 |
 | `quota_429_is_final` (Anthropic body), `openai_quota_429_is_final` (OpenAI `insufficient_quota` body), `rate_limit_429_resends` (tests/resend.rs; documented-shape unit, C8) | A5-08 |
 | `final_replies_unchanged` (400, 402, 422, 503) | A5-09 |
@@ -432,8 +455,8 @@ Each test names the acceptance line (A5-nn) it proves; the assertion itself is i
 | `busy_pauses_host`, `pause_is_per_host`, `pause_shared_by_clones` (tests/resend.rs) | A5-21 |
 | `permit_consumed` (compile-fail doc test: a SendPermit cannot be used twice; no public constructor) | A5-22 |
 | `probe_timeouts`, `request_timeout_is_global` (unit: AgentConfig::build sets timeout_connect and timeout_global) | A5-23 |
-| `timeouts_with_request` (unit: connect kept, request replaced), `per_runner_transport_deadline` (tests/ureq.rs: UreqTransport built with `with_request(1 s)` against a `serve_once` that answers after the client gives up -> Network Timeout; the server waits on a Condvar the test releases, no sleep) | A5-25 |
-| `request_deadline_overrides_transport` (tests/ureq.rs: transport request 1 s, `with_deadline(30 s)` on one request -> that send succeeds when the server answers after the 1 s mark gated by the test; the next request without a deadline times out), `budget_starts_at_first_send` (tests/resend.rs: ManualClock advanced 600 s before the first send; may_start still Go) | A5-26 |
+| `timeouts_with_request` (unit: connect kept, request replaced), `per_runner_transport_deadline` (tests/ureq.rs: UreqTransport built with `with_request(1 s)` against a `serve_once` that answers only after the test saw the error and opened the gate -> Network Timeout; the applied 1 s is asserted by `the_applied_deadline_is_the_transport_or_the_request_one`; no sleep) | A5-25 |
+| `the_applied_deadline_is_the_transport_or_the_request_one` (tests/ureq.rs over `RefusingTransport::deadlines()`: transport request 1 s, `with_deadline(30 s)` on one request -> ureq is configured with 30 s for that send and with 1 s for the next send without a deadline; the default transport applies 120 s; asserted as the configured Duration, not elapsed time), `budget_starts_at_first_send` (tests/resend.rs: ManualClock advanced 600 s before the first send; may_start still Go) | A5-26 |
 | `key_refused_on_plain_http_remote` (http://10.0.0.5 + key -> http.key_on_plain_http, ScriptedTransport sends 0), `key_allowed_on_loopback` (http://127.0.0.1 and http://localhost + key), `key_allowed_on_https` (https://host + key), `plain_http_remote_without_key_allowed` (http://10.0.0.5, no key) (tests/request.rs) | A5-24 |
 | `lower_layer_cause_kept` (ureq error through `UreqTransport` to a closed port) | A5-17 |
 | `scripted_and_blocking_doubles` (feature `testing`: script order, exhaustion error, BlockingTransport released only by the test) | A5-19 |
@@ -441,7 +464,7 @@ Each test names the acceptance line (A5-nn) it proves; the assertion itself is i
 
 Not proved by a test here: A5-01 (commit history), A5-16/A5-18 (Required validation commands below).
 
-`timeout_then_budget_ends_with_timeout`: the scripted transport returns `Network { Timeout }` and advances the `ManualClock` by 120 s (the default request timeout) on that send; `may_resend` refuses the second send (budget) and returns the timeout error, not `http.provider_busy`.
+`timeout_then_budget_ends_with_timeout`: the scripted transport returns `Network { Timeout }` and advances the `ManualClock` (sc_agent_types::testing, re-exported by `testing`) by 120 s (the default request timeout) on that send; `may_resend` refuses the second send (budget) and returns the timeout error, not `http.provider_busy`.
 
 `default_timeouts_which_resend` (RSH-001, real `Timeouts::default()` values, ManualClock): a connect timeout taking `connect` (10 s) every time is sent 5 times and ends with the timeout error; a request timeout taking `request` (120 s) is sent once and ends with the timeout error.
 
@@ -461,7 +484,7 @@ Not proved by a test here: A5-01 (commit history), A5-16/A5-18 (Required validat
 - `sc-agent-types` (path; ErrorId, ErrorDetail), `sc-agent-secrets` (path; ApiKey), `sc-agent-log` (path; GeneralLogger, Level).
 - No thiserror, no serde derive, no tokio, no sc-observability directly.
 - `clippy.toml` is not edited here (a-1 owns it, PLAN-SCOPE-009); a-1's file carries the `sc_agent_secrets::ApiKey::as_str` disallowed-methods rule that A5-12 relies on.
-- Feature `testing` (not default): enables `src/testing.rs`; no extra dependencies.
+- Feature `testing` (not default): enables `src/testing.rs` and sc-agent-types' own `testing` feature (`testing = ["sc-agent-types/testing"]`, for ManualClock); no extra dependencies. Dev-dependencies add the dev-only sc-agent-testkit.
 
 Estimated size: about 620 lines of code, 350 of tests.
 
@@ -469,7 +492,7 @@ Estimated size: about 620 lines of code, 350 of tests.
 
 - [ ] A5-01 Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-5.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] A5-02 REQ-SAG-0601: sc-agent-http: with the default ResendPolicy, HttpClient::send_once over a ScriptedTransport answering busy (429/502/529) every time sends the request 5 times and ends with http.provider_busy, reason sends, 5 attempts; with max_sends = 2 it sends 2 times (no hard cap).
-- [ ] A5-03 REQ-SAG-0601: sc-agent-http: HttpClient::send_once returns ResendAt at t + 3 s to t + 3.25 s for Retry-After: 3 (REQ-SAG-0012 jitter), t + 30 s to 30.25 s for Retry-After: 99, and t + 250 ms to 500 ms for Retry-After: 0; for Retry-After: abc (and absent) the holdoffs are 1, 2, 4, 8 s (then doubling, capped 30 s) each with at most 250 ms jitter; Retry-After is valid only as 1-32 ASCII digits with an optional fraction.
+- [ ] A5-03 REQ-SAG-0601: sc-agent-http: HttpClient::send_once returns ResendAt at t + 3 s to t + 3.25 s for Retry-After: 3 (REQ-SAG-0012 jitter), t + 30 s to 30.25 s for Retry-After: 99, and t + 250 ms to 500 ms for Retry-After: 0; for Retry-After: abc (and absent) the holdoffs are 1, 2, 4, 8 s (then doubling, capped 30 s) each with at most 250 ms jitter (tests pin the jitter with HttpClient::with_jitter(Jitter::fixed(..)) at 0 ms and at 250 ms, so each edge of the range is asserted exactly); Retry-After is valid only as 1-32 ASCII digits with an optional fraction.
 - [ ] A5-04 REQ-SAG-0601: sc-agent-http: HttpClient::may_start / may_resend refuse a send once 90 s have passed since the first send (reason budget) or max_sends sends were made, so send_once never runs without a SendPermit; ProviderBusy carries reason, attempts and the last retry_after_seconds unrounded (REQ-SAG-0007); a busy request is resent unchanged (same body bytes).
 - [ ] A5-05 REQ-SAG-0601: sc-agent-http: the holdoff is returned as a not-before Instant (Next::ResendAt); sc-agent-http never waits and takes no CancelToken (the queue that waits owns cancellation, a-9).
 - [ ] A5-06 REQ-SAG-0601: sc-agent-http: a send that times out is resent unchanged by HttpClient::send_once and counts toward max_sends (a scripted transport timing out instantly every time is sent 5 times by default); no attempt starts after the 90-second budget, and a request whose last attempt timed out ends with the timeout error (http.network, kind timeout), never http.provider_busy (scripted clock: timeout taking 120 s -> no second send -> timeout error); a connect failure returns http.network after one send (real refused-connection test over UreqTransport); DNS and TLS failures are not resent.
@@ -498,7 +521,7 @@ Estimated size: about 620 lines of code, 350 of tests.
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in the design:
 - Q1 http://: only through Endpoint::parse_local for configured local runners; providers use https (assistant).
-- Q2 one-off calls hold off on CancelToken::wait_until on their own thread (assistant).
+- Q2 one-off calls hold off on Clock::wait_until (a-1) on their own thread (assistant).
 - Q3 402 and Anthropic's usage-limit 400 are final replies returned with the remote id and message after one send (owner: only timeouts are retried).
 - Q4 timeouts are resent under max_sends; connect/DNS/TLS/other are returned after one send (owner).
 - Q5 provider text is kept whole (REQ-SAG-0002).

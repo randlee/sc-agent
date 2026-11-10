@@ -523,6 +523,7 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-llm",
  "sc-decision-local",
@@ -1506,6 +1507,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 name = "sc-agent-config"
 version = "0.1.0"
 dependencies = [
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-config",
  "serde",
@@ -1521,6 +1523,7 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "serde_json",
  "ureq",
@@ -1532,6 +1535,7 @@ version = "0.1.0"
 dependencies = [
  "hostname",
  "sc-agent-log",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-observability",
  "sc-observability-types",
@@ -1560,15 +1564,25 @@ name = "sc-agent-secrets"
 version = "0.1.0"
 dependencies = [
  "keyring",
+ "sc-agent-testkit",
  "sc-agent-types",
  "tempfile",
  "whoami",
 ]
 
 [[package]]
+name = "sc-agent-testkit"
+version = "0.1.0"
+dependencies = [
+ "sc-agent-types",
+]
+
+[[package]]
 name = "sc-agent-types"
 version = "0.1.0"
 dependencies = [
+ "sc-agent-testkit",
+ "sc-agent-types",
  "serde",
  "serde_json",
  "ulid",
@@ -1592,6 +1606,7 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
  "sc-llm-provider",
@@ -1606,6 +1621,7 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
  "sc-decision-systemone",
@@ -1620,6 +1636,7 @@ dependencies = [
  "sc-agent-config",
  "sc-agent-http",
  "sc-agent-log",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
  "serde_json",
@@ -1630,6 +1647,7 @@ name = "sc-decision-schema"
 version = "0.1.0"
 dependencies = [
  "sc-agent-http",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-sha",
  "serde",
@@ -1643,6 +1661,7 @@ version = "0.1.0"
 dependencies = [
  "sc-agent-http",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
  "serde_json",
@@ -1677,6 +1696,7 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "serde_json",
 ]

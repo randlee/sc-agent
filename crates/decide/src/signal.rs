@@ -4,14 +4,18 @@
 //! handler thread; decide's source starts no thread, uses no tokio and no `unsafe`.
 //!
 //! Two phases. Before [`SignalWatch::logs_opened`] no logger is open: decide is parsing,
-//! loading its configuration or reading its input (a file, stdin or a FIFO, where a read can
-//! block forever), nothing has been sent and nothing logged, so an interrupt exits the process
-//! at once with [`EXIT_INTERRUPTED`] (RSH-001). From `logs_opened` on (just before `send`,
-//! `send --batch`, `models` or `doctor` opens its general log), every interrupt only cancels
-//! the token: unfinished requests end `decision.cancelled` and are printed, and the general and
-//! session logs are flushed and closed before `main` exits 130, so no record is lost
-//! (REQ-SAG-0011, NFR-SAG-0001). A second or later interrupt changes nothing more: the cancel
-//! is idempotent and every wait is bounded (models and doctor use the probe timeouts).
+//! loading its configuration, reading its input (a file, stdin or a FIFO, where a read can
+//! block forever) or opening its general log, nothing has been sent and nothing logged, so an
+//! interrupt exits the process at once with [`EXIT_INTERRUPTED`] (RSH-001, RSH-002). From
+//! `logs_opened` on (just after the general log has opened), an interrupt cancels the token:
+//! unfinished requests end `decision.cancelled` and are printed, and the general and session
+//! logs are flushed and closed before `main` exits 130, so no record is lost (REQ-SAG-0011,
+//! NFR-SAG-0001).
+//!
+//! A second interrupt changes nothing more: the cancel is idempotent. The third interrupt
+//! after the logs open ([`LAST_RESORT_INTERRUPT`]) exits 130 at once, whatever is still being
+//! written: the operator's escape from a drain stuck on a stalled stdout reader or log disk
+//! (RSH-003).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -23,6 +27,9 @@ use crate::DecideError;
 /// The exit code after any interrupt. ctrlc does not report which signal fired, so SIGINT,
 /// SIGTERM, Ctrl-C and Ctrl-Break all exit 130 (no 143).
 pub const EXIT_INTERRUPTED: i32 = 130;
+
+/// The interrupt that exits at once even while the drain runs: the third.
+pub const LAST_RESORT_INTERRUPT: u32 = 3;
 
 /// What the interrupts so far mean for the process.
 #[derive(Debug, Default)]
@@ -36,9 +43,9 @@ struct State {
 /// What the handler does with one interrupt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Action {
-    /// Cancel the token (again, for a later interrupt) and let `main` drain, flush and exit 130.
+    /// Cancel the token (again) and let `main` drain, flush and exit 130.
     Cancel,
-    /// Exit the process now with 130: only before any logger is open.
+    /// Exit the process now with 130: before any logger is open, or the last resort.
     Exit,
 }
 
@@ -55,8 +62,8 @@ impl SignalWatch {
         self.state.interrupts.load(Ordering::Acquire) > 0
     }
 
-    /// Called just before the first logger opens: from now on every interrupt cancels and lets
-    /// the operation drain, flush and close its logs; none exits at once.
+    /// Called just after the general logger has opened: from now on an interrupt cancels and
+    /// lets the operation drain, flush and close its logs (the third one still exits at once).
     pub fn logs_opened(&self) {
         self.state.logs_open.store(true, Ordering::Release);
     }
@@ -82,15 +89,18 @@ pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
     Ok(watch)
 }
 
-/// What the handler does: count the interrupt, cancel the token, and exit now only while no
-/// logger is open.
+/// What the handler does: count the interrupt, cancel the token; exit now while no logger is
+/// open, or on the last-resort interrupt.
 fn on_interrupt(cancel: &CancelToken, state: &State) -> Action {
-    state.interrupts.fetch_add(1, Ordering::AcqRel);
+    let interrupts = state
+        .interrupts
+        .fetch_add(1, Ordering::AcqRel)
+        .saturating_add(1);
     cancel.cancel();
-    if state.logs_open.load(Ordering::Acquire) {
-        Action::Cancel
-    } else {
+    if !state.logs_open.load(Ordering::Acquire) || interrupts >= LAST_RESORT_INTERRUPT {
         Action::Exit
+    } else {
+        Action::Cancel
     }
 }
 
@@ -291,5 +301,17 @@ mod tests {
             .expect("the general log was flushed");
         assert!(general.contains("decide.models"), "{general}");
         assert!(watch.interrupted());
+    }
+
+    /// RSH-003: after the logs open, the first and second interrupts only cancel; the third
+    /// exits at once (the last resort).
+    #[test]
+    fn the_third_interrupt_after_the_logs_open_exits_at_once() {
+        let cancel = CancelToken::new();
+        let state = State::default();
+        state.logs_open.store(true, Ordering::Release);
+        let actions: Vec<Action> = (0..3).map(|_| on_interrupt(&cancel, &state)).collect();
+        assert_eq!(actions, [Action::Cancel, Action::Cancel, Action::Exit]);
+        assert!(cancel.is_cancelled());
     }
 }

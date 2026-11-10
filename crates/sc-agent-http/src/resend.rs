@@ -18,11 +18,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::{BuildHasher, RandomState};
 use std::num::NonZeroU32;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use sc_agent_log::{GeneralLogger, Level, LogContext};
-use sc_agent_types::{ErrorDetail, ErrorId};
+use sc_agent_types::{Clock, ErrorDetail, ErrorId};
 use serde_json::{Map, Value};
 
 use crate::error::{BusyReason, HttpError, NetworkKind};
@@ -65,14 +66,68 @@ pub(crate) fn is_busy_status(status: u16) -> bool {
     BUSY_STATUSES.contains(&status)
 }
 
-/// Jitter in `0..=JITTER_MAX` (0-250 ms).
-///
-/// Hashes the current time with a fresh std `RandomState`: enough to
-/// de-synchronise clients, not a cryptographic source.
-fn jitter() -> Duration {
+/// The jitter of `sample`: `sample % 251` milliseconds, so every value of `0..=250 ms` is
+/// reachable and nothing above it.
+fn spread(sample: u64) -> Duration {
     let max = u64::try_from(JITTER_MAX.as_millis()).unwrap_or(u64::MAX);
-    let hash = RandomState::new().hash_one(Instant::now());
-    Duration::from_millis(hash % (max + 1))
+    Duration::from_millis(sample % (max + 1))
+}
+
+/// Where the 0-250 ms holdoff jitter comes from (REQ-SAG-0012, REQ-SAG-0601).
+///
+/// [`Jitter::system`] (the default) draws each holdoff's jitter from a freshly keyed std
+/// `RandomState`: enough to de-synchronise clients, not a cryptographic source. A test fixes
+/// it with [`Jitter::fixed`] and checks the exact holdoff at each edge of the range.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use sc_agent_http::Jitter;
+///
+/// assert_eq!(Jitter::fixed(Duration::from_secs(5)).max(), Duration::from_millis(250));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Jitter(JitterSource);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum JitterSource {
+    #[default]
+    System,
+    Fixed(Duration),
+}
+
+impl Jitter {
+    /// A random jitter in `0..=250 ms` for each holdoff.
+    #[must_use]
+    pub const fn system() -> Self {
+        Self(JitterSource::System)
+    }
+
+    /// Always `jitter`, clamped to `0..=250 ms`.
+    #[must_use]
+    pub fn fixed(jitter: Duration) -> Self {
+        Self(JitterSource::Fixed(jitter.min(JITTER_MAX)))
+    }
+
+    /// The largest jitter any source gives: 250 ms.
+    #[must_use]
+    pub const fn max(self) -> Duration {
+        JITTER_MAX
+    }
+
+    /// The jitter of one holdoff.
+    fn sample(self) -> Duration {
+        match self.0 {
+            JitterSource::System => {
+                static DRAWS: AtomicU64 = AtomicU64::new(0);
+                let draw = DRAWS.fetch_add(1, Ordering::Relaxed);
+                spread(RandomState::new().hash_one(draw))
+            }
+            JitterSource::Fixed(jitter) => jitter,
+        }
+    }
 }
 
 /// Backoff before the `nth` resend (1-based): 1, 2, 4, 8 … s, capped at 30 s.
@@ -87,13 +142,13 @@ fn backoff(nth: u32) -> Duration {
 /// A valid `Retry-After` is clamped to 250 ms-30 s and gets 0-250 ms jitter
 /// (REQ-SAG-0012); without one the backoff is 1, 2, 4, 8, 16, 30 … s plus
 /// 0-250 ms jitter (REQ-SAG-0601).
-fn holdoff(response: &HttpResponse, sends: u32, jitter: fn() -> Duration) -> (Duration, bool) {
+fn holdoff(response: &HttpResponse, sends: u32, jitter: Jitter) -> (Duration, bool) {
     match RetryAfter::parse(response.header("retry-after")) {
         Some(retry_after) => (
-            retry_after.wait().clamp(RETRY_AFTER_MIN, BACKOFF_MAX) + jitter(),
+            retry_after.wait().clamp(RETRY_AFTER_MIN, BACKOFF_MAX) + jitter.sample(),
             true,
         ),
-        None => (backoff(sends) + jitter(), false),
+        None => (backoff(sends) + jitter.sample(), false),
     }
 }
 
@@ -250,9 +305,9 @@ impl Pending {
 /// use sc_agent_http::{HttpClient, HttpRequest, LogContext, SendPermit};
 ///
 /// fn send_twice(client: &HttpClient, request: &HttpRequest, permit: SendPermit) {
-///     let now = std::time::Instant::now;
-///     let _ = client.send_once(request, permit, LogContext::NONE, &now);
-///     let _ = client.send_once(request, permit, LogContext::NONE, &now);
+///     let clock = sc_agent_types::Clock::system();
+///     let _ = client.send_once(request, permit, LogContext::NONE, &clock);
+///     let _ = client.send_once(request, permit, LogContext::NONE, &clock);
 /// }
 /// ```
 ///
@@ -356,7 +411,6 @@ impl ProviderPause {
 ///
 /// ```
 /// use std::sync::Arc;
-/// use std::time::Instant;
 ///
 /// use sc_agent_http::testing::ScriptedTransport;
 /// use sc_agent_http::{
@@ -364,17 +418,19 @@ impl ProviderPause {
 ///     ResendPolicy, Start,
 /// };
 /// use sc_agent_log::testing::MemoryLog;
+/// use sc_agent_types::Clock;
 ///
+/// let clock = Clock::system();
 /// let transport = ScriptedTransport::responses(vec![HttpResponse::new(200, vec![], b"{}".to_vec())]);
 /// let memory = MemoryLog::new()?;
 /// let client = HttpClient::new(Arc::new(transport), ResendPolicy::default(), memory.general());
 /// let request = HttpRequest::new(Method::Post, Endpoint::parse("https://api.example.test/v1")?, b"{}".as_slice());
 ///
-/// let start = client.may_start(&request, Attempts::new(), Instant::now()).map_err(|reason| reason.as_str())?;
+/// let start = client.may_start(&request, Attempts::new(), clock.now()).map_err(|reason| reason.as_str())?;
 /// let Start::Go(permit) = start else {
 ///     return Err("a fresh request to an unpaused host may start".into());
 /// };
-/// let Next::Done { response, .. } = client.send_once(&request, permit, LogContext::NONE, &Instant::now)? else {
+/// let Next::Done { response, .. } = client.send_once(&request, permit, LogContext::NONE, &clock)? else {
 ///     return Err("200 is a final reply".into());
 /// };
 /// assert_eq!(response.status(), 200);
@@ -386,9 +442,8 @@ pub struct HttpClient {
     policy: ResendPolicy,
     pause: ProviderPause,
     log: GeneralLogger,
-    /// Source of holdoff jitter: [`jitter`] in every build; unit tests
-    /// replace it with a fixed value to check the exact holdoff.
-    jitter: fn() -> Duration,
+    /// Source of holdoff jitter: [`Jitter::system`] unless [`Self::with_jitter`] fixed it.
+    jitter: Jitter,
 }
 
 impl fmt::Debug for HttpClient {
@@ -397,6 +452,7 @@ impl fmt::Debug for HttpClient {
             .debug_struct("HttpClient")
             .field("policy", &self.policy)
             .field("pause", &self.pause)
+            .field("jitter", &self.jitter)
             .finish_non_exhaustive()
     }
 }
@@ -411,8 +467,15 @@ impl HttpClient {
             policy,
             pause: ProviderPause::default(),
             log,
-            jitter,
+            jitter: Jitter::system(),
         }
+    }
+
+    /// This client with its holdoff jitter taken from `jitter` (a test fixes it at an edge
+    /// of the 0-250 ms range to check the exact holdoff).
+    #[must_use]
+    pub fn with_jitter(self, jitter: Jitter) -> Self {
+        Self { jitter, ..self }
     }
 
     /// The resend policy.
@@ -491,8 +554,9 @@ impl HttpClient {
 
     /// One send under `permit`. Never waits.
     ///
-    /// `now` is the caller's clock: read before the send (the first send
-    /// starts the 90 s budget) and after it (the holdoff start). Every
+    /// `clock` is the caller's clock: read before the send (the first send
+    /// starts the 90 s budget) and after it (the holdoff start and the
+    /// logged `elapsed_ms`). Every
     /// `http.*` event carries `ctx`. Every error is redacted of the request's
     /// key. Every busy reply that is not quota pauses the request's host
     /// ([`ProviderPause`], REQ-SAG-0012), the last allowed send's included.
@@ -514,7 +578,7 @@ impl HttpClient {
         request: &HttpRequest,
         permit: SendPermit,
         ctx: LogContext,
-        now: &dyn Fn() -> Instant,
+        clock: &Clock,
     ) -> Result<Next, HttpError> {
         if let Some(deadline) = request.deadline() {
             crate::transport::check_duration(
@@ -542,11 +606,10 @@ impl HttpClient {
                 ("after", last.as_ref().map(Last::as_str).into()),
             ]),
         );
-        let started = now();
-        let timer = Instant::now();
+        let started = clock.now();
         let result = self.transport.send(request);
-        let elapsed_ms = millis(timer.elapsed());
-        let ended = now();
+        let ended = clock.now();
+        let elapsed_ms = millis(ended.saturating_duration_since(started));
         attempts.sends = attempt;
         let first_send = *attempts.first_send.get_or_insert(started);
 
@@ -687,7 +750,7 @@ impl HttpClient {
                 cause,
                 ..
             } if attempt < self.policy.max_sends() => {
-                let holdoff = (self.jitter)();
+                let holdoff = self.jitter.sample();
                 self.event(
                     Level::Warn,
                     "http.timeout_resend",
@@ -800,6 +863,10 @@ mod tests {
         Duration::from_millis(137)
     }
 
+    fn clock() -> Clock {
+        sc_agent_types::testing::ManualClock::new().clock()
+    }
+
     /// Answers every send with `reply`.
     struct Always(Result<HttpResponse, HttpError>);
 
@@ -811,14 +878,12 @@ mod tests {
 
     fn client_with(reply: Result<HttpResponse, HttpError>) -> HttpClient {
         let memory = sc_agent_log::testing::MemoryLog::new().expect("memory log");
-        HttpClient {
-            jitter: fixed_jitter,
-            ..HttpClient::new(
-                Arc::new(Always(reply)),
-                ResendPolicy::default(),
-                memory.general(),
-            )
-        }
+        HttpClient::new(
+            Arc::new(Always(reply)),
+            ResendPolicy::default(),
+            memory.general(),
+        )
+        .with_jitter(Jitter::fixed(fixed_jitter()))
     }
 
     /// One send at a fixed clock; returns `(ended, at)` of the ResendAt.
@@ -828,11 +893,12 @@ mod tests {
             crate::Endpoint::parse("https://jitter.test/v1").expect("https"),
             Vec::new(),
         );
-        let now = Instant::now();
+        let clock = clock();
+        let now = clock.now();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
             panic!("fresh");
         };
-        match client.send_once(&request, permit, LogContext::NONE, &|| now) {
+        match client.send_once(&request, permit, LogContext::NONE, &clock) {
             Ok(Next::ResendAt { at, .. }) => (now, at),
             other => panic!("expected ResendAt: {other:?}"),
         }
@@ -867,11 +933,19 @@ mod tests {
         assert_eq!(at, ended + Duration::from_secs(3) + fixed_jitter());
     }
 
+    /// The jitter range at its edges: 0 and 250 ms are reached, 251 wraps to 0, and no
+    /// sample, the largest included, goes above 250 ms. Each edge once, no sampling.
     #[test]
-    fn system_jitter_stays_in_range() {
-        for _ in 0..64 {
-            assert!(jitter() <= JITTER_MAX);
-        }
+    fn the_jitter_spread_covers_exactly_zero_to_250_ms() {
+        assert_eq!(spread(0), Duration::ZERO);
+        assert_eq!(spread(250), JITTER_MAX);
+        assert_eq!(spread(251), Duration::ZERO);
+        assert_eq!(spread(251 * 7 + 250), JITTER_MAX);
+        assert_eq!(spread(u64::MAX), Duration::from_millis(u64::MAX % 251));
+        assert!(spread(u64::MAX) <= JITTER_MAX);
+        assert_eq!(Jitter::fixed(Duration::from_secs(9)).sample(), JITTER_MAX);
+        assert_eq!(Jitter::fixed(Duration::ZERO).sample(), Duration::ZERO);
+        assert_eq!(Jitter::default(), Jitter::system());
     }
 
     #[test]
@@ -894,7 +968,7 @@ mod tests {
     #[test]
     fn pause_keeps_the_later_instant() {
         let pause = ProviderPause::default();
-        let now = Instant::now();
+        let now = clock().now();
         pause.hold_until("h", now + Duration::from_secs(5));
         pause.hold_until("h", now + Duration::from_secs(1));
         assert_eq!(pause.not_before("h"), Some(now + Duration::from_secs(5)));

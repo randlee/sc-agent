@@ -1,7 +1,9 @@
 //! Secret redaction of errors.
 //!
 //! [`HttpClient::send_once`](crate::HttpClient::send_once) passes every error
-//! it returns through [`redact`] once, whichever transport produced it.
+//! it returns through [`redact`] once, whichever transport produced it; a
+//! caller that sends on a transport directly (a one-shot probe) uses the same
+//! redaction through [`HttpError::redacted_for`].
 
 use std::borrow::Cow;
 
@@ -23,6 +25,19 @@ pub(crate) fn redact(error: HttpError, request: &HttpRequest) -> HttpError {
             error.map_text(&|text: String| redact_owned(key, text))
         }
         None => error,
+    }
+}
+
+impl HttpError {
+    /// This error with `request`'s key removed from every text field: the redaction
+    /// [`HttpClient::send_once`](crate::HttpClient::send_once) applies to every error it
+    /// returns, for a caller that sends on a [`Transport`](crate::Transport) directly.
+    ///
+    /// Every occurrence of the key becomes `[redacted]`; a request without a secret returns
+    /// the error unchanged.
+    #[must_use]
+    pub fn redacted_for(self, request: &HttpRequest) -> Self {
+        redact(self, request)
     }
 }
 

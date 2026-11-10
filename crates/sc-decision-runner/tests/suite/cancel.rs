@@ -72,8 +72,8 @@ fn cancel_in_flight_send() {
     assert!(blocking.wait_started(1), "sends started");
     cancel.cancel();
     let result = results
-        .recv_timeout(FAILSAFE)
-        .expect("cancelled within 2 s");
+        .recv_timeout(HANG_GUARD)
+        .expect("the cancelled result (hang guard)");
     assert!(
         matches!(result.outcome, Err(DecisionError::Cancelled { sends: 1 })),
         "{result:?}"
@@ -81,7 +81,7 @@ fn cancel_in_flight_send() {
     assert_eq!(blocking.sends(), 1, "the transport is still blocked");
     blocking.release();
     assert_eq!(
-        results.recv_timeout(FAILSAFE).err(),
+        results.recv_timeout(HANG_GUARD).err(),
         Some(RecvTimeoutError::Disconnected),
         "no further result"
     );
@@ -103,7 +103,9 @@ fn decide_cancel_in_flight_send() {
     let result = harness.decide(request("m0"), &cancel);
     assert!(blocking.wait_started(1), "sends started");
     cancel.cancel();
-    let result = result.recv_timeout(FAILSAFE).expect("cancelled within 2 s");
+    let result = result
+        .recv_timeout(HANG_GUARD)
+        .expect("the cancelled result (hang guard)");
     assert!(
         matches!(result.outcome, Err(DecisionError::Cancelled { sends: 1 })),
         "{result:?}"

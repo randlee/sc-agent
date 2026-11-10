@@ -26,6 +26,12 @@ pub enum AgentConfigError {
         /// Its size in bytes.
         bytes: u64,
     },
+    /// `default.json` or `local.json` exists but is not a regular file (a FIFO, a device, a
+    /// directory): it is refused before any read, which could block forever.
+    NotAFile {
+        /// The path.
+        file: PathBuf,
+    },
     /// A local runner is named like a built-in short name.
     RunnerName {
         /// The runner name.
@@ -56,6 +62,7 @@ impl ErrorId for AgentConfigError {
             Self::Catalog(_) => "config.catalog",
             Self::HomeUnknown => "config.home_unknown",
             Self::FileTooLarge { .. } => "config.file_too_large",
+            Self::NotAFile { .. } => "config.not_a_file",
             Self::RunnerName { .. } => "config.runner_name",
             Self::Invalid { .. } => "config.invalid",
             Self::KeyOnPlainHttp { .. } => "config.key_on_plain_http",
@@ -71,6 +78,10 @@ impl ErrorId for AgentConfigError {
             }
             Self::FileTooLarge { file, bytes } => format!(
                 "{} is {bytes} bytes, more than the 1 MiB a config file may have",
+                file.display()
+            ),
+            Self::NotAFile { file } => format!(
+                "{} is not a regular file (a FIFO, device or directory is never read)",
                 file.display()
             ),
             Self::RunnerName { name, path } => {
@@ -89,6 +100,7 @@ impl ErrorId for AgentConfigError {
             Self::Catalog(inner) => Some(inner.detail()),
             Self::HomeUnknown
             | Self::FileTooLarge { .. }
+            | Self::NotAFile { .. }
             | Self::RunnerName { .. }
             | Self::Invalid { .. }
             | Self::KeyOnPlainHttp { .. } => None,
@@ -113,6 +125,9 @@ impl ErrorId for AgentConfigError {
             Self::FileTooLarge { .. } => {
                 Some("shrink the config file below 1 MiB; a real config is a few kilobytes")
             }
+            Self::NotAFile { .. } => {
+                Some("replace the path with a regular JSON file, or remove it")
+            }
         }
     }
 }
@@ -130,6 +145,7 @@ impl std::error::Error for AgentConfigError {
             Self::Catalog(inner) => Some(inner),
             Self::HomeUnknown
             | Self::FileTooLarge { .. }
+            | Self::NotAFile { .. }
             | Self::RunnerName { .. }
             | Self::Invalid { .. }
             | Self::KeyOnPlainHttp { .. } => None,

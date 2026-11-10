@@ -47,7 +47,7 @@ impl InFlight {
         self.changed.notify_all();
         let (mut state, timeout) = self
             .changed
-            .wait_timeout_while(state, FAILSAFE, |state| {
+            .wait_timeout_while(state, HANG_GUARD, |state| {
                 state.0 < self.parties && state.1 < self.parties
             })
             .unwrap_or_else(PoisonError::into_inner);

@@ -6,14 +6,19 @@
 //!   and how a caller picks a model ([`ModelChoice`]);
 //! - the providers that serve models ([`Provider`]), separate from model ids (REQ-SAG-0103);
 //! - session ids ([`SessionId`], a ULID) and environment-variable names ([`VarName`]);
-//! - cooperative cancellation with deadline waits and wake hooks ([`CancelToken`]);
+//! - cooperative cancellation with wake hooks ([`CancelToken`]);
+//! - the one source of time and of timed waits ([`Clock`], [`SystemClock`]);
 //! - the one error convention of the workspace ([`ErrorId`], [`ErrorDetail`]).
 //!
 //! It does no I/O, reads no files and depends on no runtime: only `serde` and `ulid`.
+//!
+//! Feature `testing` (not default) adds [`testing`]: a manual clock and cancel trace points
+//! for consumers' tests.
 #![forbid(unsafe_code)]
 
 mod cancel;
 mod catalog;
+mod clock;
 mod error;
 mod error_id;
 mod model;
@@ -27,6 +32,8 @@ mod var_name;
 pub use cancel::{CancelHook, CancelToken, Wait};
 #[doc(inline)]
 pub use catalog::{Catalog, ModelChoice};
+#[doc(inline)]
+pub use clock::{AdvanceHook, Clock, SystemClock, Waker};
 #[doc(inline)]
 pub use error::TypesError;
 #[doc(inline)]
@@ -43,3 +50,6 @@ pub use session_id::SessionId;
 pub use short_name::ShortName;
 #[doc(inline)]
 pub use var_name::VarName;
+
+#[cfg(feature = "testing")]
+pub mod testing;
