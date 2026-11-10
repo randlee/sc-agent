@@ -31,6 +31,7 @@ ctrlc = { version = "3", features = ["termination"] }   # sync; SIGINT/SIGTERM, 
 sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }   # ScriptedTransport, BlockingTransport
 sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }     # MemoryLog
 tempfile = "3"
+sc-observability = "=1.5.0"   # a notifying LogSink for ordering tests (tests/common)
 
 [lib]
 name = "decide"

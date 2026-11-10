@@ -19,11 +19,12 @@ mod tests {
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_types::{CancelToken, ErrorId, Provider};
-    use sc_decision_schema::{DecisionError, DecisionRequest};
+    use sc_decision_schema::DecisionError;
 
     use crate::common::{
-        ANTHROPIC_KEY, NOUL, OPENROUTER_KEY, TYPESAFE_KEY, TimedTransport, anthropic_noul,
-        body_json, config_dir, context, empty_config_dir, json_response, ok_noul, options, request,
+        ANTHROPIC_KEY, ClockedTransport, NOUL, OPENROUTER_KEY, TYPESAFE_KEY, TimedTransport,
+        anthropic_noul, body_json, config_dir, context, empty_config_dir, json_response, ok_noul,
+        options, request,
     };
 
     fn haiku_send(
@@ -260,6 +261,74 @@ mod tests {
         );
     }
 
+    /// REQ-SAG-0002 0.2.0 (QA-002): a 2xx reply whose mistyped field echoes the attached key is
+    /// `decision.response_parse`; serde quotes the value in its message, and the key there is
+    /// `[redacted]` with the rest of the message kept. The same for a models list
+    /// (`decode_models`), where the error is `decide.decision` with cause
+    /// `decision.response_parse`.
+    #[test]
+    fn an_echoed_key_is_redacted_from_a_parse_error() {
+        let body = format!(
+            r#"{{"model":"jev-latest","answers":"{TYPESAFE_KEY}","usage":{{"input_tokens":1,"output_tokens":1}}}}"#
+        );
+        let transport = ScriptedTransport::responses(vec![json_response(200, &body)]);
+        let log = MemoryLog::new().expect("log");
+        let dir = empty_config_dir();
+        let ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport),
+            &log,
+        );
+        let result = send(
+            &options("jev", None, ctx, &log),
+            request(NOUL),
+            &CancelToken::new(),
+        )
+        .expect("send");
+        let line =
+            String::from_utf8(decide::output::result_line(&result).expect("line")).expect("utf-8");
+        let error = result.outcome.expect_err("not a response");
+        assert_eq!(
+            sc_agent_types::ErrorId::id(&error),
+            "decision.response_parse"
+        );
+        assert!(!line.contains(TYPESAFE_KEY), "the key leaked: {line}");
+        let message = error.detail().message;
+        assert!(
+            message.contains(r#"invalid type: string "[redacted]""#),
+            "{message}"
+        );
+        assert!(message.contains("expected"), "the rest is kept: {message}");
+
+        let models_body = format!(r#"{{"models":"{TYPESAFE_KEY}"}}"#);
+        let transport = ScriptedTransport::responses(vec![json_response(200, &models_body)]);
+        let dir = empty_config_dir();
+        let options = decide::ModelsOptions {
+            runner: None,
+            context: context(
+                dir.path(),
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+                Arc::new(transport),
+                &log,
+            ),
+        };
+        let error = decide::models(&options, &CancelToken::new()).expect_err("not a list");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.decision");
+        let detail = error.detail();
+        let text = serde_json::to_string(&detail).expect("json");
+        assert!(!text.contains(TYPESAFE_KEY), "the key leaked: {text}");
+        let cause = detail.cause.expect("cause");
+        assert_eq!(cause.id, "decision.response_parse");
+        assert!(
+            cause
+                .message
+                .contains(r#"invalid type: string "[redacted]""#),
+            "{}",
+            cause.message
+        );
+    }
+
     /// AC: REQ-SAG-0602. An Anthropic 429 with the quota body ends with
     /// `http.quota_exhausted` after one send, with the remote message and its recovery.
     #[test]
@@ -367,27 +436,6 @@ mod tests {
         }
     }
 
-    /// Runs two requests as one batch over `transport`, with `config` as default.json.
-    fn paused_batch(transport: &TimedTransport, config: &str) {
-        let log = MemoryLog::new().expect("log");
-        let dir = config_dir(config);
-        let ctx = context(
-            dir.path(),
-            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
-            Arc::new(transport.clone()),
-            &log,
-        );
-        let options = options("jev", None, ctx, &log);
-        let requests: Vec<DecisionRequest> = (0..2).map(|_| request(NOUL)).collect();
-        let mut ok = 0;
-        send_batch(&options, requests, &CancelToken::new(), &mut |result| {
-            ok += usize::from(result.outcome.is_ok());
-            Ok(())
-        })
-        .expect("batch");
-        assert_eq!(ok, 2);
-    }
-
     fn retry_after(seconds: &str) -> HttpResponse {
         HttpResponse::new(
             429,
@@ -396,130 +444,140 @@ mod tests {
         )
     }
 
+    /// Runs `requests` requests as one batch over `transport` on a frozen ManualClock and a
+    /// notifying general log; once the `http.busy` record is written (after the pause is
+    /// recorded) it reads the exact pause end, moves the clock to exactly it, and returns
+    /// `(busy_at, not_before)`. No real time is read for any assertion.
+    fn paused_batch(
+        clock: &sc_agent_http::testing::ManualClock,
+        transport: ClockedTransport,
+        notify: &Arc<crate::common::Notify>,
+        general: sc_agent_log::GeneralLogger,
+        config: &str,
+        requests: usize,
+    ) -> (std::time::Instant, std::time::Instant) {
+        let log = MemoryLog::new().expect("log");
+        let dir = config_dir(config);
+        let mut ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport),
+            &log,
+        );
+        ctx.general = Some(general);
+        let reading = clock.clone();
+        ctx.clock = Some(Arc::new(move || reading.now()));
+        let options = options("jev", None, ctx, &log);
+        let busy_at = clock.now();
+        let worker = std::thread::spawn(move || {
+            let mut ok = 0;
+            send_batch(
+                &options,
+                (0..requests).map(|_| request(NOUL)).collect(),
+                &CancelToken::new(),
+                &mut |result| {
+                    ok += usize::from(result.outcome.is_ok());
+                    Ok(())
+                },
+            )
+            .map(|()| ok)
+        });
+        let busy = notify.wait_for("http.busy");
+        let paused_ms = busy["host_paused_until_ms"]
+            .as_u64()
+            .expect("the 429 recorded a host pause");
+        let not_before = busy_at + Duration::from_millis(paused_ms);
+        clock.advance(not_before - busy_at);
+        let ok = worker.join().expect("batch").expect("send_batch");
+        assert_eq!(ok, requests);
+        (busy_at, not_before)
+    }
+
     /// AC: REQ-SAG-0012 with `workers: 1`. A 429 with `Retry-After: 1` pauses every later send
     /// to that host, the other request's included, because the pause lives in the one
-    /// `HttpClient` the runner shares; `Retry-After: 0` still waits the 250 ms floor.
+    /// `HttpClient` the runner shares; `Retry-After: 0` still pauses for the 250 ms floor.
     ///
-    /// Ordering is forced by the single worker: the other request can only start after the
-    /// 429 returned, so the three sends are the 429, the other request's first send and the
-    /// resend, and both later ones must start at least the pause after the 429. The pause is
-    /// on the real clock (the runner's clock seam is crate-private to sc-decision-runner), so
-    /// the check is a monotonic lower bound the pause itself guarantees, never an upper bound.
-    /// The parallel case is `with_two_workers_a_request_admitted_after_the_429_waits_the_pause`.
+    /// Deterministic (QA-001, QA-003): decide's `Context.clock` is a ManualClock that only the
+    /// test moves, so nothing paused can be sent until the clock reaches the pause end. The
+    /// single worker admits the other request only after the 429 is handled. The test reads the
+    /// exact pause end from the `http.busy` record and moves the clock to exactly it: every
+    /// later send is stamped with exactly that instant.
     #[test]
     fn a_retry_after_pauses_every_send_to_the_host() {
         for (seconds, floor) in [
             ("1", Duration::from_secs(1)),
             ("0", Duration::from_millis(250)),
         ] {
-            let transport = TimedTransport::new(vec![Ok(retry_after(seconds)), Ok(ok_noul())]);
-            paused_batch(&transport, r#"{"workers":1}"#);
+            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let transport =
+                ClockedTransport::new(clock.clone(), vec![retry_after(seconds), ok_noul()], None);
+            let (general, notify) = crate::common::notify_log();
+            let (busy_at, not_before) = paused_batch(
+                &clock,
+                transport.clone(),
+                &notify,
+                general,
+                r#"{"workers":1}"#,
+                2,
+            );
+            assert!(
+                not_before - busy_at >= floor,
+                "Retry-After {seconds}: the pause is at least {floor:?}"
+            );
             let sends = transport.sends();
             assert_eq!(
                 sends.len(),
                 3,
                 "the 429, the other request's send, the resend"
             );
-            for (at, _) in &sends[1..] {
-                let since = at.duration_since(sends[0].0);
-                assert!(
-                    since >= floor,
-                    "a send {since:?} after the 429 ignored the {floor:?} pause"
-                );
-            }
-        }
-    }
-
-    /// Send 0 answers the 429 and marks when it returned; send 1 is held until then (so its
-    /// worker stays busy past the 429); every later send answers 200. Send start times are
-    /// recorded.
-    #[derive(Clone)]
-    struct Gated {
-        retry_after: &'static str,
-        state: Arc<(std::sync::Mutex<GatedState>, std::sync::Condvar)>,
-    }
-
-    #[derive(Default)]
-    struct GatedState {
-        starts: Vec<std::time::Instant>,
-        busy_returned: Option<std::time::Instant>,
-    }
-
-    impl sc_agent_http::Transport for Gated {
-        fn send(
-            &self,
-            _request: &sc_agent_http::HttpRequest,
-        ) -> Result<HttpResponse, sc_agent_http::HttpError> {
-            let (lock, condvar) = &*self.state;
-            let mut state = lock.lock().expect("lock");
-            let index = state.starts.len();
-            state.starts.push(std::time::Instant::now());
-            match index {
-                0 => {
-                    state.busy_returned = Some(std::time::Instant::now());
-                    condvar.notify_all();
-                    Ok(retry_after(self.retry_after))
-                }
-                1 => {
-                    let (state, timeout) = condvar
-                        .wait_timeout_while(state, crate::common::HANG_GUARD, |state| {
-                            state.busy_returned.is_none()
-                        })
-                        .expect("wait");
-                    assert!(!timeout.timed_out(), "the 429 never returned");
-                    drop(state);
-                    Ok(ok_noul())
-                }
-                _ => Ok(ok_noul()),
-            }
+            assert_eq!(sends[0], busy_at);
+            assert_eq!(
+                sends[1..],
+                [not_before, not_before],
+                "both held until exactly the pause end"
+            );
         }
     }
 
     /// AC: REQ-SAG-0012 with `workers: 2` (REQ-QA-004). Two workers take the first two
-    /// requests; the second one's send is held until the 429 has returned, so the third
-    /// request can only be admitted after the 429. Its first send, and the resend, both wait
-    /// out the pause the 429 set on the shared client.
+    /// requests; the second one's send is held until the `http.busy` record of the 429 is
+    /// written, which happens after the pause is recorded (QA-001). So the third request is
+    /// admitted only once the pause holds, and it and the resend are both sent at exactly the
+    /// pause end, on a ManualClock only the test moves.
     #[test]
     fn with_two_workers_a_request_admitted_after_the_429_waits_the_pause() {
-        for (seconds, floor) in [
-            ("1", Duration::from_secs(1)),
-            ("0", Duration::from_millis(250)),
-        ] {
-            let transport = Gated {
-                retry_after: seconds,
-                state: Arc::default(),
-            };
-            let log = MemoryLog::new().expect("log");
-            let dir = config_dir(r#"{"workers":2}"#);
-            let ctx = context(
-                dir.path(),
-                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
-                Arc::new(transport.clone()),
-                &log,
+        for seconds in ["1", "0"] {
+            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let (general, notify) = crate::common::notify_log();
+            let gate = Arc::clone(&notify);
+            let hold: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+                gate.wait_for("http.busy");
+            });
+            let transport = ClockedTransport::new(
+                clock.clone(),
+                vec![retry_after(seconds), ok_noul()],
+                Some(hold),
             );
-            let options = options("jev", None, ctx, &log);
-            let requests: Vec<DecisionRequest> = (0..3).map(|_| request(NOUL)).collect();
-            let mut ok = 0;
-            send_batch(&options, requests, &CancelToken::new(), &mut |result| {
-                ok += usize::from(result.outcome.is_ok());
-                Ok(())
-            })
-            .expect("batch");
-            assert_eq!(ok, 3);
-            let state = transport.state.0.lock().expect("lock");
-            let busy = state.busy_returned.expect("the 429 was sent");
+            let (busy_at, not_before) = paused_batch(
+                &clock,
+                transport.clone(),
+                &notify,
+                general,
+                r#"{"workers":2}"#,
+                3,
+            );
+            let sends = transport.sends();
+            assert_eq!(sends.len(), 4, "the 429, two first sends, the resend");
             assert_eq!(
-                state.starts.len(),
-                4,
-                "the 429, two first sends, the resend"
+                sends[..2],
+                [busy_at, busy_at],
+                "both first sends before the pause"
             );
-            for start in &state.starts[2..] {
-                let since = start.duration_since(busy);
-                assert!(
-                    since >= floor,
-                    "a send {since:?} after the 429 ignored the {floor:?} pause"
-                );
-            }
+            assert_eq!(
+                sends[2..],
+                [not_before, not_before],
+                "the third request and the resend wait for exactly the pause end"
+            );
         }
     }
 

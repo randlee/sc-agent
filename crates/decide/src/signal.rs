@@ -177,6 +177,7 @@ mod tests {
             keyring: None,
             transport: Some(interrupting.clone()),
             general: Some(log.general()),
+            clock: None,
         };
         let identity =
             SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "proj", "role")

@@ -77,6 +77,7 @@ pub fn context(
         keyring: Some(Arc::new(MapKeyring::default())),
         transport: Some(transport),
         general: Some(log.general()),
+        clock: None,
     }
 }
 
@@ -363,4 +364,135 @@ pub fn run_bounded(command: &mut std::process::Command) -> std::process::Output 
             .spawn()
             .expect("spawn"),
     )
+}
+
+/// Records seen by a [`notify_log`] general logger, with a condvar so a test can wait (bounded)
+/// for a record instead of polling or timing.
+#[derive(Default)]
+pub struct Notify {
+    records: Mutex<Vec<(String, serde_json::Map<String, Value>)>>,
+    changed: std::sync::Condvar,
+}
+
+impl Notify {
+    /// Waits until a record with `action` was written; its fields. Panics past [`HANG_GUARD`].
+    pub fn wait_for(&self, action: &str) -> serde_json::Map<String, Value> {
+        let records = self.records.lock().expect("lock");
+        let (records, timeout) = self
+            .changed
+            .wait_timeout_while(records, HANG_GUARD, |records| {
+                !records.iter().any(|(seen, _)| seen == action)
+            })
+            .expect("wait");
+        assert!(
+            !timeout.timed_out(),
+            "no {action} record within the hang guard"
+        );
+        records
+            .iter()
+            .find(|(seen, _)| seen == action)
+            .map(|(_, fields)| fields.clone())
+            .expect("found")
+    }
+}
+
+struct NotifySink {
+    notify: Arc<Notify>,
+    name: sc_observability::SinkName,
+}
+
+impl sc_observability::v2::LogSink for NotifySink {
+    fn write(
+        &self,
+        event: &sc_observability::v2::LogEvent,
+    ) -> Result<(), sc_observability::v2::LogSinkError> {
+        self.notify
+            .records
+            .lock()
+            .expect("lock")
+            .push((event.action.as_str().to_owned(), event.fields.clone()));
+        self.notify.changed.notify_all();
+        Ok(())
+    }
+
+    fn health(&self) -> sc_observability::SinkHealth {
+        sc_observability::SinkHealth {
+            name: self.name.clone(),
+            state: sc_observability::SinkHealthState::Healthy,
+            last_error: None,
+        }
+    }
+}
+
+/// A general logger whose records reach [`Notify`] (file and console sinks off).
+pub fn notify_log() -> (sc_agent_log::GeneralLogger, Arc<Notify>) {
+    let notify = Arc::new(Notify::default());
+    let service = sc_observability::v2::ServiceName::new("decide-test").expect("service");
+    let mut config = sc_observability::v2::LoggerConfig::default_for(service, PathBuf::new());
+    config.enable_file_sink = false;
+    config.enable_console_sink = false;
+    let sink = NotifySink {
+        notify: Arc::clone(&notify),
+        name: sc_observability::SinkName::new("notify").expect("sink"),
+    };
+    let mut builder = sc_observability::v2::LoggerBuilder::new(config).expect("builder");
+    builder.register_sink(sc_observability::v2::SinkRegistration::typed(Arc::new(
+        sink,
+    )));
+    let logger = builder.build().expect("logger");
+    (
+        sc_agent_log::GeneralLogger::injected(Arc::new(logger)),
+        notify,
+    )
+}
+
+/// A transport that stamps each send with the test's ManualClock and answers from `replies`
+/// (the last repeats). Send 1 can be held until `hold_second` returns.
+#[derive(Clone)]
+pub struct ClockedTransport {
+    clock: sc_agent_http::testing::ManualClock,
+    replies: Arc<Vec<HttpResponse>>,
+    sends: Arc<Mutex<Vec<Instant>>>,
+    hold_second: Option<Arc<dyn Fn() + Send + Sync>>,
+}
+
+impl ClockedTransport {
+    pub fn new(
+        clock: sc_agent_http::testing::ManualClock,
+        replies: Vec<HttpResponse>,
+        hold_second: Option<Arc<dyn Fn() + Send + Sync>>,
+    ) -> Self {
+        Self {
+            clock,
+            replies: Arc::new(replies),
+            sends: Arc::default(),
+            hold_second,
+        }
+    }
+
+    /// The manual-clock reading of every send, in send order.
+    pub fn sends(&self) -> Vec<Instant> {
+        self.sends.lock().expect("lock").clone()
+    }
+}
+
+impl Transport for ClockedTransport {
+    fn send(&self, _request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+        let index = {
+            let mut sends = self.sends.lock().expect("lock");
+            sends.push(self.clock.now());
+            sends.len() - 1
+        };
+        if index == 1
+            && let Some(hold) = &self.hold_second
+        {
+            hold();
+        }
+        Ok(self
+            .replies
+            .get(index)
+            .or_else(|| self.replies.last())
+            .cloned()
+            .expect("a scripted reply"))
+    }
 }

@@ -193,6 +193,38 @@ impl Harness {
         }
     }
 
+    /// [`Self::new`] over `clock` (`DecisionRunner::with_clock`): holdoffs and pauses fall due
+    /// only when the test moves the clock.
+    pub fn with_clock(
+        backend: Arc<dyn Backend>,
+        transport: Arc<dyn Transport>,
+        config: RunnerConfig,
+        max_sends: u32,
+        clock: sc_agent_http::testing::ManualClock,
+    ) -> Self {
+        let log = MemoryLog::new().expect("memory log");
+        let policy = ResendPolicy::new(NonZeroU32::new(max_sends).expect("max_sends"));
+        let http = HttpClient::new(transport, policy, log.general());
+        let identity = SessionIdentity::new(
+            Repo::local("test-host", "sc-agent").expect("repo"),
+            "phase-a",
+            "runner-test",
+        )
+        .expect("identity");
+        let runner = DecisionRunner::with_clock(
+            backend,
+            http,
+            log.session(identity),
+            log.general(),
+            config,
+            Arc::new(move || clock.now()),
+        );
+        Self {
+            log,
+            runner: Arc::new(runner),
+        }
+    }
+
     /// Default backend, default config, 5 sends.
     pub fn of(transport: Arc<dyn Transport>) -> Self {
         Self::new(

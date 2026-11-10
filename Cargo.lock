@@ -530,6 +530,7 @@ dependencies = [
  "sc-decision-schema",
  "sc-decision-systemone",
  "sc-llm-provider",
+ "sc-observability",
  "serde",
  "serde_json",
  "tempfile",

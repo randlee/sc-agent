@@ -160,7 +160,10 @@ fn cancel_ends_holdoff_at_once() {
     assert_eq!(rows_of(&log).len(), 2);
 }
 
-/// REQ-SAG-0601 AC4 (decide): cancel after a 30 s busy reply ends the decide at once.
+/// REQ-SAG-0601 AC4 (decide): cancel after a 30 s busy reply ends the decide at once. The
+/// runner's clock is a ManualClock the test never moves, so the 30 s holdoff cannot elapse:
+/// the Cancelled result can only come from the cancel (QA-007). The wait is bounded by a hang
+/// guard only; no assertion depends on elapsed time.
 #[test]
 fn decide_cancel_during_holdoff() {
     let (busy_sent, on_busy) = mpsc::channel();
@@ -169,7 +172,15 @@ fn decide_cancel_during_holdoff() {
         let _ = lock(&busy_sent).send(());
         Ok(busy("30"))
     });
-    let harness = Harness::of(Arc::new(transport));
+    let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+    let frozen = clock.now();
+    let harness = Harness::with_clock(
+        Arc::new(ScriptedBackend::new()),
+        Arc::new(transport),
+        sc_decision_runner::RunnerConfig::default(),
+        5,
+        clock.clone(),
+    );
     let cancel = CancelToken::new();
     let result = harness.decide(request("m0"), &cancel);
     on_busy
@@ -177,8 +188,13 @@ fn decide_cancel_during_holdoff() {
         .expect("the busy reply was sent");
     cancel.cancel();
     let result = result
-        .recv_timeout(FAILSAFE)
-        .expect("cancelled within 2 s, not 30 s");
+        .recv_timeout(FAILSAFE * 30)
+        .expect("the cancelled result (hang guard)");
+    assert_eq!(
+        clock.now(),
+        frozen,
+        "the clock never moved: the holdoff cannot have ended"
+    );
     assert!(
         matches!(result.outcome, Err(DecisionError::Cancelled { sends: 1 })),
         "{result:?}"

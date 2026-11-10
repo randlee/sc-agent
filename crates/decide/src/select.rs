@@ -59,6 +59,10 @@ pub struct Context {
     pub transport: Option<Arc<dyn Transport>>,
     /// The general log; `None` is `GeneralLogger::open_default(log_root, service)`.
     pub general: Option<GeneralLogger>,
+    /// The clock of every decision run (admissions, holdoffs, provider pauses, sends);
+    /// `None` is `Instant::now`. A test seam: with `sc_agent_http::testing::ManualClock`, a
+    /// holdoff or pause falls due only when the test moves the clock.
+    pub clock: Option<Arc<dyn Fn() -> Instant + Send + Sync>>,
 }
 
 impl Context {
@@ -73,6 +77,7 @@ impl Context {
             keyring: None,
             transport: None,
             general: None,
+            clock: None,
         }
     }
 
@@ -96,6 +101,7 @@ impl fmt::Debug for Context {
             .field("keyring", &self.keyring.is_some())
             .field("transport", &self.transport.is_some())
             .field("general", &self.general.is_some())
+            .field("clock", &self.clock.is_some())
             .finish()
     }
 }
@@ -553,6 +559,7 @@ fn probe_transport(context: &Context) -> Arc<dyn Transport> {
 /// One `HttpClient` (so the REQ-SAG-0012 provider pause is shared by every worker) and one
 /// `DecisionRunner` over `backend`.
 fn runner(
+    clock: Option<&Arc<dyn Fn() -> Instant + Send + Sync>>,
     config: &AgentConfig,
     transport: Arc<dyn Transport>,
     session: SessionLogger,
@@ -566,13 +573,17 @@ fn runner(
         ResendPolicy::new(config.max_sends),
         general.clone(),
     );
-    Ok(DecisionRunner::new(
-        backend,
-        http,
-        session,
-        general,
-        runner_config,
-    ))
+    Ok(match clock {
+        Some(clock) => DecisionRunner::with_clock(
+            backend,
+            http,
+            session,
+            general,
+            runner_config,
+            Arc::clone(clock),
+        ),
+        None => DecisionRunner::new(backend, http, session, general, runner_config),
+    })
 }
 
 /// Everything one send or batch needs, built before anything is sent.
@@ -605,6 +616,7 @@ impl Prepared {
         };
         let transport = decision_transport(context, local).build();
         let runner = runner(
+            context.clock.as_ref(),
             &config,
             transport,
             session,
@@ -630,7 +642,8 @@ impl Prepared {
         else {
             return Ok(Loaded::Ready);
         };
-        match backend.wait_until_loaded(
+        match wait_until_loaded(
+            backend,
             &*self.probe,
             cancel,
             runner.load_timeout(),
@@ -687,6 +700,29 @@ fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecideError> 
         general.flush()?;
     }
     Ok(())
+}
+
+/// `LocalBackend::wait_until_loaded` with the load timeout decide passes. In tests the timeout
+/// is also recorded on the calling thread (`LOAD_TIMEOUT_PASSED`), so a test can prove the
+/// runner's configured `load_timeout_secs` is what reaches the wait, without waiting it out
+/// (QA-006).
+fn wait_until_loaded(
+    backend: &LocalBackend,
+    probe: &dyn Transport,
+    cancel: &CancelToken,
+    load_timeout: std::time::Duration,
+    ctx: LogContext,
+) -> Result<(), DecisionError> {
+    #[cfg(test)]
+    LOAD_TIMEOUT_PASSED.with(|passed| passed.set(Some(load_timeout)));
+    backend.wait_until_loaded(probe, cancel, load_timeout, ctx)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The load timeout of the latest `wait_until_loaded` on this thread (test seam).
+    static LOAD_TIMEOUT_PASSED: std::cell::Cell<Option<std::time::Duration>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// Result counts of one operation.
@@ -1268,5 +1304,67 @@ mod tests {
         );
         let error = local_runner(&config, "nope").expect_err("unknown");
         assert_eq!(error.id(), "decide.unknown_runner");
+    }
+
+    /// REQ-SAG-0015 (QA-006): the runner's configured `load_timeout_secs` is the timeout that
+    /// reaches `LocalBackend::wait_until_loaded` (recorded by the crate-private seam); the
+    /// daemon reports the model loaded at once, so nothing waits.
+    #[test]
+    fn the_configured_load_timeout_reaches_the_load_wait() {
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::write(
+            dir.path().join("default.json"),
+            r#"{"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","load_timeout_secs":17}}}"#,
+        )
+        .expect("write");
+        let transport = sc_agent_http::testing::ScriptedTransport::responses(vec![
+            sc_agent_http::HttpResponse::new(200, vec![], br#"{"ok":true,"model":"jev-latest"}"#.to_vec()),
+            sc_agent_http::HttpResponse::new(
+                200,
+                vec![],
+                br#"{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#
+                    .to_vec(),
+            ),
+        ]);
+        let log = sc_agent_log::testing::MemoryLog::new().expect("log");
+        let mut context = Context::new("decide");
+        context.config_dir = Some(dir.path().to_path_buf());
+        context.repo_root = Some(dir.path().to_path_buf());
+        context.environment = Some(Vec::new());
+        context.transport = Some(Arc::new(transport));
+        context.general = Some(log.general());
+        let config = load_config(&context).expect("config");
+        let identity =
+            SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "proj", "role")
+                .expect("identity");
+        let options = SendOptions {
+            model: ModelSelector::parse("dec", &config).expect("runner"),
+            provider: None,
+            project: Slug::new("project", "proj").expect("slug"),
+            agent_role: Slug::new("agent_role", "role").expect("slug"),
+            context,
+            session: Some(log.session(identity)),
+        };
+        LOAD_TIMEOUT_PASSED.with(|passed| passed.set(None));
+        let request = crate::input::build_request(
+            br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#,
+            &[],
+            false,
+            None,
+        )
+        .expect("request");
+        let mut delivered = 0;
+        send(&options, request, &CancelToken::new(), &mut |result| {
+            assert!(result.outcome.is_ok(), "{:?}", result.outcome);
+            delivered += 1;
+            Ok(())
+        })
+        .expect("send");
+        assert_eq!(delivered, 1);
+        assert_eq!(
+            LOAD_TIMEOUT_PASSED.with(std::cell::Cell::get),
+            Some(std::time::Duration::from_secs(17)),
+            "the runner's load_timeout_secs reached the wait"
+        );
     }
 }
