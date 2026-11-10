@@ -311,4 +311,24 @@ mod cases {
         let error = loopback().send(&long).expect_err("over-long deadline");
         assert_eq!(error.id(), "http.invalid_request", "{error:?}");
     }
+
+    /// QA3-001 / REQ-SAG-0015: UreqTransport accepts a per-request deadline
+    /// up to Timeouts::DEADLINE_MAX (load + request timeout), above the
+    /// 3600 s cap of the transport's own timeouts.
+    #[test]
+    fn deadline_up_to_deadline_max_is_sent() {
+        let transport = loopback();
+        for deadline in [Duration::from_secs(4200), Timeouts::DEADLINE_MAX] {
+            let (port, server) = serve_once(|mut stream| {
+                let _request = read_request(&mut stream);
+                write_ok(&mut stream);
+            });
+            let request = post(endpoint(port, "/first"), None).with_deadline(deadline);
+            let response = transport
+                .send(&request)
+                .unwrap_or_else(|error| panic!("{deadline:?} refused: {error:?}"));
+            assert_eq!(response.status(), 200, "{deadline:?}");
+            server.join().expect("server");
+        }
+    }
 }
