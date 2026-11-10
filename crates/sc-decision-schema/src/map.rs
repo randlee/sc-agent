@@ -1,4 +1,22 @@
-fn duplicate_message(key: &dyn fmt::Display) -> String {
+//! [`OrderedMap`]: a JSON object kept in document order that refuses duplicate keys.
+//!
+//! Question ids, answer ids, choice criteria and probabilities are JSON objects whose key
+//! order is part of the wire form (the answers come back in request order). `OrderedMap`
+//! keeps that order through a round trip and refuses a key given twice, both when parsing
+//! and when built from pairs.
+
+use std::collections::BTreeSet;
+use std::fmt;
+use std::marker::PhantomData;
+
+use serde::de::{self, MapAccess, Visitor};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::DecisionError;
+
+/// The message of a refused duplicate key, shared by parsing and [`DecisionError::DuplicateKey`].
+pub(crate) fn duplicate_message(key: &dyn fmt::Display) -> String {
     format!("duplicate key `{key}`; give every key once")
 }
 
@@ -12,7 +30,7 @@ fn duplicate_message(key: &dyn fmt::Display) -> String {
 /// # Examples
 ///
 /// ```
-/// use sc_decision_schema::jev::v1::OrderedMap;
+/// use sc_decision_schema::OrderedMap;
 ///
 /// let map: OrderedMap<String, u8> = serde_json::from_str(r#"{"zeta":1,"alpha":2}"#)?;
 /// assert_eq!(serde_json::to_string(&map)?, r#"{"zeta":1,"alpha":2}"#);
@@ -27,10 +45,12 @@ impl<K: Ord + fmt::Display, V> OrderedMap<K, V> {
     ///
     /// # Errors
     ///
-    /// `INPUT_INVALID` when two pairs share a key; the fix hint names it.
-    pub fn try_from_pairs(pairs: Vec<(K, V)>) -> Result<Self, JevError> {
+    /// [`DecisionError::DuplicateKey`] naming the key when two pairs share it.
+    pub fn try_from_pairs(pairs: Vec<(K, V)>) -> Result<Self, DecisionError> {
         match duplicate_key(&pairs) {
-            Some(key) => Err(JevError::input_invalid(duplicate_message(key))),
+            Some(key) => Err(DecisionError::DuplicateKey {
+                key: key.to_string(),
+            }),
             None => Ok(Self(pairs)),
         }
     }
@@ -40,11 +60,6 @@ impl<K, V> OrderedMap<K, V> {
     /// The pairs, in order.
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> + '_ {
         self.0.iter().map(|(key, value)| (key, value))
-    }
-
-    /// The keys, in order.
-    pub fn keys(&self) -> impl Iterator<Item = &K> + '_ {
-        self.0.iter().map(|(key, _)| key)
     }
 
     /// The number of pairs.
@@ -88,8 +103,8 @@ impl<K: Serialize, V: Serialize> Serialize for OrderedMap<K, V> {
     }
 }
 
-/// A JSON object read in document order, with duplicates kept. Raw parse
-/// types hold it so their owners can refuse duplicates with a typed error.
+/// A JSON object read in document order, with duplicates kept, so the
+/// `OrderedMap` deserializer can name the duplicate it refuses.
 struct Pairs<K, V>(Vec<(K, V)>);
 
 struct PairsVisitor<K, V>(PhantomData<(K, V)>);
