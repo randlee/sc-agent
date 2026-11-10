@@ -9,16 +9,17 @@ use sc_decision_schema::{
     ModelMetadataList, SystemOneResponse,
 };
 
+use crate::base::BaseUrl;
 use crate::multipart;
 
 /// The base URL of the TypeSafe System One API.
 pub const TYPESAFE_BASE_URL: &str = "https://api.typesafe.ai";
 
 /// The decision path every System One server serves.
-const SYSTEMONE_PATH: &str = "/v1/systemone";
+pub const SYSTEMONE_PATH: &str = "/v1/systemone";
 
 /// The model-list path (TypeSafe, Mapika/decider, generic daemons).
-const MODELS_PATH: &str = "/v1/models";
+pub const MODELS_PATH: &str = "/v1/models";
 
 /// Set to `true` when the body has assets or a box question.
 const IMAGES_HEADER: &str = "TypeSafe-Danger-Zone-Images";
@@ -54,38 +55,39 @@ pub struct SystemOneBackend {
 impl SystemOneBackend {
     /// A backend for the https server at `base`, e.g. [`TYPESAFE_BASE_URL`].
     ///
-    /// `base` has no trailing path; one trailing `/` is dropped.
+    /// `base` has no trailing path; one trailing `/` is dropped ([`BaseUrl::https`]).
     ///
     /// # Errors
     ///
     /// [`DecisionError::Http`] carrying [`HttpError::InvalidEndpoint`] when `base` is not an
-    /// absolute `https://` URL with a host ([`Endpoint::parse`]).
+    /// absolute `https://` URL with a host, or has a query or fragment.
     pub fn new(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError> {
-        Self::build(base, key, Endpoint::parse)
+        Self::at(&BaseUrl::https(base)?, key)
     }
 
     /// A backend for a configured local runner's `base`, e.g. `http://{host}:{port}`.
     ///
-    /// Accepts http or https ([`Endpoint::parse_local`]). A key on a plain-http host that is
-    /// not loopback is refused later, at [`Backend::encode`] (REQ-SAG-0013).
+    /// Accepts http or https ([`BaseUrl::local`]). A key on a plain-http host that is not
+    /// loopback is refused later, at [`Backend::encode`] (REQ-SAG-0013).
     ///
     /// # Errors
     ///
     /// [`DecisionError::Http`] carrying [`HttpError::InvalidEndpoint`] when `base` is not an
-    /// absolute `http://` or `https://` URL with a host.
+    /// absolute `http://` or `https://` URL with a host, or has a query or fragment.
     pub fn local(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError> {
-        Self::build(base, key, Endpoint::parse_local)
+        Self::at(&BaseUrl::local(base)?, key)
     }
 
-    fn build(
-        base: &str,
-        key: Option<ApiKey>,
-        parse: fn(&str) -> Result<Endpoint, HttpError>,
-    ) -> Result<Self, DecisionError> {
-        let base = base.strip_suffix('/').unwrap_or(base);
+    /// A backend for the server at `base`, already parsed and checked.
+    ///
+    /// # Errors
+    ///
+    /// [`DecisionError::Http`] carrying [`HttpError::InvalidEndpoint`] when an endpoint path
+    /// cannot be joined onto `base` ([`BaseUrl::join`]).
+    pub fn at(base: &BaseUrl, key: Option<ApiKey>) -> Result<Self, DecisionError> {
         Ok(Self {
-            systemone: parse(&format!("{base}{SYSTEMONE_PATH}"))?,
-            models: parse(&format!("{base}{MODELS_PATH}"))?,
+            systemone: base.join(SYSTEMONE_PATH)?,
+            models: base.join(MODELS_PATH)?,
             key,
         })
     }

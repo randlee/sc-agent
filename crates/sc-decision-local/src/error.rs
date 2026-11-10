@@ -12,6 +12,7 @@ use crate::daemon::DaemonKind;
 
 const MODEL_NOT_SERVED_RECOVERY: &str =
     "load the configured model on the daemon, or set the runner's model to one it serves";
+const PROBE_RECOVERY: &str = "check that the runner's kind matches the daemon at its host and port";
 const LOAD_TIMEOUT_RECOVERY: &str =
     "raise the runner's load timeout or check that the daemon is loading the model";
 
@@ -42,6 +43,10 @@ pub enum LocalError {
     /// `SystemOneBackend::local` or the model-list decode failed; wrapped unchanged.
     Decision(DecisionError),
     /// The probe got an HTTP status the daemon kind does not answer when up.
+    ///
+    /// The body is kept whole (REQ-SAG-0002); when the probe carried the runner's key,
+    /// [`LocalBackend::discover`](crate::LocalBackend::discover) has replaced every copy of
+    /// it in the body with `[redacted]`.
     ProbeStatus {
         /// The daemon kind probed.
         daemon: DaemonKind,
@@ -49,7 +54,7 @@ pub enum LocalError {
         path: &'static str,
         /// The reply's HTTP status.
         status: u16,
-        /// The reply body, unchanged.
+        /// The reply body, whole, with the attached key redacted.
         body: Vec<u8>,
     },
     /// The probe reply body is not the daemon kind's documented shape.
@@ -58,8 +63,8 @@ pub enum LocalError {
         daemon: DaemonKind,
         /// The probed path.
         path: &'static str,
-        /// The full serde_json message.
-        message: String,
+        /// The serde_json error, unchanged; returned by `source()` and `cause_detail()`.
+        source: serde_json::Error,
     },
     /// The daemon is up but does not serve the configured model.
     ModelNotServed {
@@ -104,11 +109,9 @@ impl ErrorId for LocalError {
                 "the {daemon} daemon answered GET {path} with HTTP {status}: {}",
                 String::from_utf8_lossy(body)
             ),
-            Self::ProbeParse {
-                daemon,
-                path,
-                message,
-            } => format!("the {daemon} daemon's GET {path} body is not understood: {message}"),
+            Self::ProbeParse { daemon, path, .. } => {
+                format!("the {daemon} daemon's GET {path} body is not the shape that kind answers")
+            }
             Self::ModelNotServed {
                 daemon,
                 model,
@@ -128,10 +131,13 @@ impl ErrorId for LocalError {
         match self {
             Self::Http(error) => Some(error.detail()),
             Self::Decision(error) => Some(error.detail()),
-            Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. }
-            | Self::ModelNotServed { .. }
-            | Self::LoadTimeout { .. } => None,
+            Self::ProbeParse { source, .. } => Some(ErrorDetail::foreign(
+                format!("serde_json.{:?}", source.classify()).to_lowercase(),
+                source,
+            )),
+            Self::ProbeStatus { .. } | Self::ModelNotServed { .. } | Self::LoadTimeout { .. } => {
+                None
+            }
         }
     }
 
@@ -139,10 +145,8 @@ impl ErrorId for LocalError {
         match self {
             Self::ModelNotServed { .. } => Some(MODEL_NOT_SERVED_RECOVERY),
             Self::LoadTimeout { .. } => Some(LOAD_TIMEOUT_RECOVERY),
-            Self::Http(_)
-            | Self::Decision(_)
-            | Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. } => None,
+            Self::ProbeStatus { .. } | Self::ProbeParse { .. } => Some(PROBE_RECOVERY),
+            Self::Http(_) | Self::Decision(_) => None,
         }
     }
 }
@@ -170,10 +174,10 @@ impl Error for LocalError {
         match self {
             Self::Http(error) => Some(error),
             Self::Decision(error) => Some(error),
-            Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. }
-            | Self::ModelNotServed { .. }
-            | Self::LoadTimeout { .. } => None,
+            Self::ProbeParse { source, .. } => Some(source),
+            Self::ProbeStatus { .. } | Self::ModelNotServed { .. } | Self::LoadTimeout { .. } => {
+                None
+            }
         }
     }
 }

@@ -2,9 +2,11 @@
 //!
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
-// Each test binary uses part of the shared helpers.
 #[cfg(test)]
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "each test binary uses only part of the shared helpers"
+)]
 mod support;
 
 #[cfg(test)]
@@ -76,6 +78,18 @@ mod tests {
             serde_json::to_vec(&response).expect("encode"),
             laya.to_vec()
         );
+    }
+
+    /// AC 2: every 2xx is a success, not only 200.
+    #[test]
+    fn test_decode_201_is_success() {
+        let body = br#"{"model":"jev-latest","answers":{"billing":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
+        assert_eq!(decode(201, body).expect("decoded").model, "jev-latest");
+        let models = br#"{"models":[]}"#;
+        let list = backend()
+            .decode_models(HttpResponse::new(201, vec![], models.to_vec()))
+            .expect("models");
+        assert!(list.models.is_empty());
     }
 
     /// AC 18: a probability of 0.123456789 decodes unchanged.

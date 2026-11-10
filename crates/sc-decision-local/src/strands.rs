@@ -3,6 +3,7 @@
 use sc_agent_http::{HttpRequest, HttpResponse};
 use sc_agent_secrets::ApiKey;
 use sc_agent_types::ModelId;
+use sc_decision_systemone::BaseUrl;
 use serde::Deserialize;
 
 use crate::daemon::{
@@ -36,7 +37,7 @@ impl LocalDaemon for Strands {
     }
 
     /// `GET {base}/health`; Strands Decider has no auth, so `key` is not sent.
-    fn probe(&self, base: &str, _key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
+    fn probe(&self, base: &BaseUrl, _key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
         get(base, HEALTH_PATH, None)
     }
 

@@ -12,7 +12,7 @@ use sc_agent_log::{GeneralLogger, Level};
 use sc_agent_secrets::ApiKey;
 use sc_agent_types::{CancelToken, ErrorId, ModelId, Wait};
 use sc_decision_schema::{Backend, DecisionError, DecisionRequest, SystemOneResponse};
-use sc_decision_systemone::SystemOneBackend;
+use sc_decision_systemone::{BaseUrl, SystemOneBackend};
 use serde_json::{Map, Value};
 
 use crate::daemon::{Availability, DaemonKind, LocalDaemon, ModelState};
@@ -26,6 +26,11 @@ const BACKEND_NAME: &str = "local";
 
 /// How often [`LocalBackend::wait_until_loaded`] probes the daemon.
 pub const LOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The longest load wait: a larger `load_timeout` (up to `Duration::MAX`) is clamped to it, so
+/// the wait always has a finite deadline. One day, far above the largest configurable load
+/// timeout (7200 s).
+pub const MAX_LOAD_WAIT: Duration = Duration::from_secs(86_400);
 
 /// A runner's own timeouts (REQ-SAG-0015): local runners get longer ones than providers, and
 /// model loading does not count toward the request timeout.
@@ -67,12 +72,17 @@ pub struct LocalTimeouts {
 /// ```
 pub struct LocalBackend {
     daemon: Box<dyn LocalDaemon>,
-    base: String,
+    base: BaseUrl,
     model: ModelId,
     key: Option<ApiKey>,
     backend: SystemOneBackend,
     log: Option<GeneralLogger>,
     timeouts: Option<LocalTimeouts>,
+    /// Set by the first 2xx decode and never cleared: a one-way latch. An atomic because
+    /// [`Backend`] takes `&self` and the backend is shared as `Arc<dyn Backend>` across the
+    /// runner's workers. Acquire/Release is enough: nothing else is published through it, and
+    /// a stale `false` only gives one more request the larger load + request deadline, never
+    /// a shorter one.
     served_once: AtomicBool,
 }
 
@@ -108,7 +118,9 @@ impl LocalBackend {
     ///
     /// # Errors
     ///
-    /// [`LocalError::Decision`] when `SystemOneBackend::local` refuses the base URL.
+    /// [`LocalError::Http`] (`http.invalid_endpoint`) when `http://{host}:{port}` is not a
+    /// valid base URL ([`BaseUrl::local`]); [`LocalError::Decision`] when
+    /// [`SystemOneBackend::at`] cannot join its endpoints onto it.
     pub fn new(
         kind: DaemonKind,
         host: &RunnerHost,
@@ -117,12 +129,12 @@ impl LocalBackend {
         key: Option<ApiKey>,
     ) -> Result<Self, LocalError> {
         let host = host.as_str();
-        let base = if host.parse::<Ipv6Addr>().is_ok() {
+        let base = BaseUrl::local(&if host.parse::<Ipv6Addr>().is_ok() {
             format!("http://[{host}]:{port}")
         } else {
             format!("http://{host}:{port}")
-        };
-        let backend = SystemOneBackend::local(&base, key.clone())?;
+        })?;
+        let backend = SystemOneBackend::at(&base, key.clone())?;
         Ok(Self {
             daemon: kind.daemon(),
             base,
@@ -160,7 +172,7 @@ impl LocalBackend {
     /// The runner's base URL, `http://{host}:{port}`.
     #[must_use]
     pub fn base(&self) -> &str {
-        &self.base
+        self.base.as_str()
     }
 
     /// The daemon kind.
@@ -215,8 +227,13 @@ impl LocalBackend {
     /// and [`ModelState::Unlisted`] (the daemon cannot tell). A connect failure (Strands
     /// Decider listens only after loading) or [`ModelState::NotReady`] means not loaded yet:
     /// polling goes on. With a logger set, writes one `local.load_wait` record per probe
-    /// (`poll`, `waited_ms`, `state` or `error`) and one at the end (`outcome`, `polls`,
-    /// `waited_ms`).
+    /// (`phase: "poll"`, `poll`, `waited_ms`, `state` or `error`) and one at the end
+    /// (`phase: "end"`, `outcome`, `polls`, `waited_ms`).
+    ///
+    /// `load_timeout` is clamped to [`MAX_LOAD_WAIT`]. The deadline is checked after each
+    /// probe, and the last probe is sent at the deadline, so the wait can end later than
+    /// `load_timeout` by at most one probe's duration (bounded by the probe transport's
+    /// request timeout, 10 s for `Timeouts::probe()`).
     ///
     /// # Errors
     ///
@@ -235,7 +252,7 @@ impl LocalBackend {
         ctx: LogContext,
     ) -> Result<(), DecisionError> {
         let start = Instant::now();
-        let deadline = start.checked_add(load_timeout);
+        let deadline = load_deadline(start, load_timeout);
         let mut polls: u64 = 0;
         let outcome = loop {
             if cancel.is_cancelled() {
@@ -255,14 +272,15 @@ impl LocalBackend {
                 Err(error) => break LoadOutcome::Failed(error),
             }
             let now = Instant::now();
-            if deadline.is_some_and(|deadline| now >= deadline) {
+            if now >= deadline {
                 break LoadOutcome::Failed(LocalError::LoadTimeout {
-                    runner: self.base.clone(),
+                    runner: self.base.to_string(),
                     waited: now.duration_since(start),
                 });
             }
-            let next = now + LOAD_POLL_INTERVAL;
-            let next = deadline.map_or(next, |deadline| next.min(deadline));
+            let next = now
+                .checked_add(LOAD_POLL_INTERVAL)
+                .map_or(deadline, |next| next.min(deadline));
             if cancel.wait_until(next) == Wait::Cancelled {
                 break LoadOutcome::Cancelled;
             }
@@ -279,10 +297,31 @@ impl LocalBackend {
     }
 
     /// Builds the probe, sends it once and reads the reply.
+    ///
+    /// When the probe carried the key, a [`LocalError::ProbeStatus`] body has it redacted.
     fn probe_once(&self, transport: &dyn Transport) -> Result<Availability, LocalError> {
         let request = self.daemon.probe(&self.base, self.key.as_ref())?;
         let response = transport.send(&request)?;
-        self.daemon.availability(&response, &self.model)
+        let attached = self.key.as_ref().filter(|_| request.secret().is_some());
+        self.daemon
+            .availability(&response, &self.model)
+            .map_err(|error| match (error, attached) {
+                (
+                    LocalError::ProbeStatus {
+                        daemon,
+                        path,
+                        status,
+                        body,
+                    },
+                    Some(key),
+                ) => LocalError::ProbeStatus {
+                    daemon,
+                    path,
+                    status,
+                    body: redact_body(key, body),
+                },
+                (error, _) => error,
+            })
     }
 
     /// `daemon` and `model`, the first fields of every record.
@@ -302,6 +341,7 @@ impl LocalBackend {
     ) {
         let Some(log) = &self.log else { return };
         let mut fields = self.base_fields();
+        fields.insert("phase".into(), "poll".into());
         fields.insert("poll".into(), poll.into());
         fields.insert("waited_ms".into(), millis(waited).into());
         match probe {
@@ -324,10 +364,28 @@ impl LocalBackend {
             LoadOutcome::Cancelled => "cancelled",
             LoadOutcome::Failed(error) => error.id(),
         };
+        fields.insert("phase".into(), "end".into());
         fields.insert("outcome".into(), outcome.into());
         fields.insert("polls".into(), polls.into());
         fields.insert("waited_ms".into(), millis(waited).into());
         let _ = log.write(Level::Info, TARGET, "local.load_wait", ctx, fields);
+    }
+}
+
+/// The deadline of a load wait started at `start`: `load_timeout` clamped to
+/// [`MAX_LOAD_WAIT`], so it is always finite.
+fn load_deadline(start: Instant, load_timeout: Duration) -> Instant {
+    let bound = load_timeout.min(MAX_LOAD_WAIT);
+    // `start + MAX_LOAD_WAIT` fits on every supported platform; if it ever did not, the wait
+    // ends after one probe rather than never.
+    start.checked_add(bound).unwrap_or(start)
+}
+
+/// `body` with every copy of `key` replaced by `[redacted]`; unchanged bytes when it has none.
+fn redact_body(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
+    match key.redact_text(&String::from_utf8_lossy(&body)) {
+        std::borrow::Cow::Owned(redacted) => redacted.into_bytes(),
+        std::borrow::Cow::Borrowed(_) => body,
     }
 }
 
@@ -396,5 +454,24 @@ impl Backend for LocalBackend {
             self.served_once.store(true, Ordering::Release);
         }
         decoded
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_deadline_is_finite_for_huge_timeouts() {
+        let start = Instant::now();
+        assert_eq!(load_deadline(start, Duration::MAX) - start, MAX_LOAD_WAIT);
+        assert_eq!(
+            load_deadline(start, MAX_LOAD_WAIT + Duration::from_secs(1)) - start,
+            MAX_LOAD_WAIT
+        );
+        assert_eq!(
+            load_deadline(start, Duration::from_millis(1500)) - start,
+            Duration::from_millis(1500)
+        );
     }
 }

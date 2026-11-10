@@ -15,6 +15,7 @@
 //!   response or the matching [`DecisionError`](sc_decision_schema::DecisionError).
 //! - [`SystemOneBackend::models_request`] / [`SystemOneBackend::decode_models`]: `GET
 //!   {base}/v1/models`.
+//! - [`BaseUrl`]: a server's base URL, parsed and checked once, from which every endpoint is joined.
 //!
 //! The crate does no I/O and writes no log: the caller sends through sc-agent-http, which logs
 //! the send. Busy replies (429/502/529) are handled by sc-agent-http and the runner before
@@ -51,7 +52,10 @@
 #![warn(missing_docs)]
 
 mod backend;
+mod base;
 mod multipart;
 
 #[doc(inline)]
-pub use backend::{SystemOneBackend, TYPESAFE_BASE_URL};
+pub use backend::{MODELS_PATH, SYSTEMONE_PATH, SystemOneBackend, TYPESAFE_BASE_URL};
+#[doc(inline)]
+pub use base::BaseUrl;

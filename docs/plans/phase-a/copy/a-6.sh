@@ -8,7 +8,7 @@
 #     sleeping busy retry, all removed; the request it builds is 6 lines and is rewritten
 #     against the A-5 HttpRequest. The old repo has no local-daemon discovery code.
 #   - Write new: both Cargo.toml files, sc-decision-systemone/src/{lib.rs,backend.rs,multipart.rs},
-#     sc-decision-local/src/{lib.rs,daemon.rs,decider.rs,laya.rs,generic.rs,backend.rs,error.rs},
+#     sc-decision-local/src/{lib.rs,daemon.rs,strands.rs,laya.rs,mapika.rs,generic.rs,backend.rs,error.rs},
 #     and the tests listed in the design.
 #   - No renames, no Cargo or workspace edits.
 . "$(dirname "$0")/lib.sh"

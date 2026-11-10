@@ -44,7 +44,7 @@ mod mapika;
 mod strands;
 
 #[doc(inline)]
-pub use backend::{LOAD_POLL_INTERVAL, LocalBackend, LocalTimeouts};
+pub use backend::{LOAD_POLL_INTERVAL, LocalBackend, LocalTimeouts, MAX_LOAD_WAIT};
 #[doc(inline)]
 pub use daemon::{Availability, DaemonKind, LocalDaemon, ModelState};
 #[doc(inline)]
