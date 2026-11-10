@@ -467,19 +467,21 @@ fn runner(
     session: SessionLogger,
     general: GeneralLogger,
     backend: Arc<dyn Backend>,
-) -> DecisionRunner {
+) -> Result<DecisionRunner, DecideError> {
+    // `runner.invalid_config` (workers out of bounds) maps through `DecideError::Runner`.
+    let runner_config = RunnerConfig::from_config(config)?;
     let http = HttpClient::new(
         transport,
         ResendPolicy::new(config.max_sends),
         general.clone(),
     );
-    DecisionRunner::new(
+    Ok(DecisionRunner::new(
         backend,
         http,
         session,
         general,
-        RunnerConfig::from_config(config),
-    )
+        runner_config,
+    ))
 }
 
 /// Everything one send or batch needs, built before anything is sent.
@@ -522,7 +524,7 @@ impl Prepared {
             session,
             general.clone(),
             chosen.backend(),
-        );
+        )?;
         Ok(Self {
             runner,
             general,
