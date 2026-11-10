@@ -57,8 +57,8 @@ impl FromStr for SessionId {
     ///
     /// let id: SessionId = "01ARZ3NDEKTSV4RRFFQ69G5FAV".parse().unwrap();
     /// assert_eq!(id.to_string(), "01ARZ3NDEKTSV4RRFFQ69G5FAV");
-    /// let uuid = "00000000-0000-0000-0000-000000000000";
-    /// assert_eq!(uuid.parse::<SessionId>().unwrap_err().id(), "types.invalid_session_id");
+    /// let uuid_text = "00000000-0000-0000-0000-000000000000";
+    /// assert_eq!(uuid_text.parse::<SessionId>().unwrap_err().id(), "types.invalid_session_id");
     /// ```
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         parse_ulid(text)
