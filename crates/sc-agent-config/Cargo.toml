@@ -1,0 +1,20 @@
+[package]
+name = "sc-agent-config"
+version = "0.1.0"
+description = "Global sc-agent configuration (~/.sc-agent/default.json) loaded with sc-config."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+sc-config = "0.2.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_path_to_error = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
