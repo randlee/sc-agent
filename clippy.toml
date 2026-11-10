@@ -1,0 +1,12 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# REQ-SAG-0010 as a lint. The ApiKey::as_str entry is skipped silently in crates that do
+# not depend on sc-agent-secrets; the one allowed call site is sc-agent-http's ureq_transport (A-5).
+disallowed-methods = [
+    { path = "std::thread::sleep", reason = "no sleep: wait on a deadline or a CancelToken (REQ-SAG-0010)" },
+    { path = "std::thread::sleep_until", reason = "no sleep: wait on a deadline or a CancelToken (REQ-SAG-0010)" },
+    { path = "sc_agent_secrets::ApiKey::as_str", reason = "the key is read only at sc-agent-http's ureq_transport (A-5)" },
+]
