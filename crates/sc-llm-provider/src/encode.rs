@@ -5,7 +5,7 @@ use serde_json::{Map, Value, json};
 use crate::{LlmProvider, LlmRequest, Message, Output, Part, Wire, provider_model_id};
 
 /// The JSON body of `request` for `provider`.
-pub(crate) fn body(provider: LlmProvider, request: &LlmRequest) -> Value {
+pub(crate) fn body(provider: LlmProvider, request: &LlmRequest<'_>) -> Value {
     match Wire::of(provider) {
         Wire::AnthropicMessages => anthropic(provider, request),
         Wire::ChatCompletions => chat(provider, request),
@@ -13,7 +13,7 @@ pub(crate) fn body(provider: LlmProvider, request: &LlmRequest) -> Value {
 }
 
 /// `{"model","max_tokens","system"?,"messages","output_config"?}`.
-fn anthropic(provider: LlmProvider, request: &LlmRequest) -> Value {
+fn anthropic(provider: LlmProvider, request: &LlmRequest<'_>) -> Value {
     let mut body = Map::new();
     body.insert(
         "model".to_owned(),
@@ -42,7 +42,7 @@ fn anthropic(provider: LlmProvider, request: &LlmRequest) -> Value {
 
 /// `{"model","max_completion_tokens"|"max_tokens","messages","response_format"?}`; the system
 /// prompt is the first message.
-fn chat(provider: LlmProvider, request: &LlmRequest) -> Value {
+fn chat(provider: LlmProvider, request: &LlmRequest<'_>) -> Value {
     let mut body = Map::new();
     body.insert(
         "model".to_owned(),
@@ -92,7 +92,7 @@ fn anthropic_part(part: &Part) -> Value {
             data_base64,
         } => json!({
             "type": "image",
-            "source": { "type": "base64", "media_type": media_type, "data": data_base64 }
+            "source": { "type": "base64", "media_type": media_type.as_str(), "data": data_base64 }
         }),
     }
 }
@@ -105,7 +105,7 @@ fn chat_part(part: &Part) -> Value {
             data_base64,
         } => json!({
             "type": "image_url",
-            "image_url": { "url": format!("data:{media_type};base64,{data_base64}") }
+            "image_url": { "url": format!("data:{};base64,{data_base64}", media_type.as_str()) }
         }),
     }
 }

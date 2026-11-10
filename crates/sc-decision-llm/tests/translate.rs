@@ -159,6 +159,7 @@ fn schema_requires_every_id_and_field() {
         body(
             &haiku()
                 .with_max_tokens(900)
+                .expect("cap")
                 .encode(&request)
                 .expect("encode")
         )["max_tokens"],
@@ -415,4 +416,224 @@ fn backend_is_a_trait_object() {
     let haiku: LlmDecisionBackend = haiku();
     assert_eq!(haiku.model().as_str(), "claude-haiku-5-5");
     assert_eq!(LlmDecisionBackend::DEFAULT_MAX_TOKENS, 16_000);
+}
+
+/// The detail of a mismatch whose cause is `decision_llm.answer_invalid`.
+fn answer_invalid(backend: &LlmDecisionBackend, request: &DecisionRequest, text: &str) -> String {
+    let error = backend
+        .decode(
+            anthropic_reply(text, "end_turn"),
+            request,
+            &LogContext::NONE,
+        )
+        .expect_err("mismatch");
+    assert_eq!(error.id(), "decision.schema_mismatch", "{error:?}");
+    let detail = mismatch(&error);
+    assert_eq!(chain(detail), ["decision_llm.answer_invalid"]);
+    detail.message.clone()
+}
+
+/// QA-005: an extra probabilities key, an extra answer field and an extra box edge are each
+/// decision.schema_mismatch with cause decision_llm.answer_invalid.
+#[test]
+fn extra_keys_are_mismatches() {
+    let backend = haiku();
+    let choice = choice_request();
+    let message = answer_invalid(
+        &backend,
+        &choice,
+        &json!({ "answers": { "q": {
+            "choice": "no", "confidence": 0.7,
+            "probabilities": { "yes": 0.3, "no": 0.7, "maybe": 0.0 }
+        } } })
+        .to_string(),
+    );
+    assert!(message.contains("`maybe`"), "{message}");
+    let message = answer_invalid(
+        &backend,
+        &choice,
+        &json!({ "answers": { "q": {
+            "choice": "no", "confidence": 0.7,
+            "probabilities": { "yes": 0.3, "no": 0.7 }, "reason": "because"
+        } } })
+        .to_string(),
+    );
+    assert!(message.contains("unexpected field `reason`"), "{message}");
+
+    let boxed = DecisionRequest::new(
+        SystemOneRequest::from_json(
+            r#"{"model":"haiku","state":"find it","questions":{"b":{"type":"box"}}}"#,
+        )
+        .expect("body"),
+        Vec::new(),
+        false,
+    )
+    .expect("valid");
+    let message = answer_invalid(
+        &backend,
+        &boxed,
+        &json!({ "answers": { "b": {
+            "box": { "top": 0, "bottom": 1, "left": 0, "right": 1, "depth": 3 },
+            "confidence": 0.5
+        } } })
+        .to_string(),
+    );
+    assert!(message.contains("`depth`"), "{message}");
+}
+
+/// RSH-002: model-written names in our messages are cut to 64 bytes with an ellipsis, and
+/// extra ids are listed at most 8 times with the full count.
+#[test]
+fn model_written_text_in_messages_is_bounded() {
+    let backend = haiku();
+    let choice = choice_request();
+    let long_key = "k".repeat(5000);
+    let message = answer_invalid(
+        &backend,
+        &choice,
+        &json!({ "answers": { "q": {
+            "choice": "no", "confidence": 0.7,
+            "probabilities": { "yes": 0.3, "no": 0.7 }, long_key.clone(): 1
+        } } })
+        .to_string(),
+    );
+    assert!(
+        message.contains(&format!("{}…", "k".repeat(64))),
+        "{message}"
+    );
+    assert!(!message.contains(&"k".repeat(65)));
+    // A multi-byte choice is cut at a char boundary.
+    let long_choice = "é".repeat(1000);
+    let message = answer_invalid(
+        &backend,
+        &choice,
+        &json!({ "answers": { "q": {
+            "choice": long_choice, "confidence": 0.7,
+            "probabilities": { "yes": 0.3, "no": 0.7 }
+        } } })
+        .to_string(),
+    );
+    assert!(
+        message.contains(&format!("{}…", "é".repeat(32))),
+        "{message}"
+    );
+    assert!(message.len() < 200, "{}", message.len());
+
+    let mut answers = serde_json::Map::new();
+    for index in 0..50 {
+        answers.insert(format!("{}{index}", "x".repeat(100)), json!({}));
+    }
+    let error = backend
+        .decode(
+            anthropic_reply(&json!({ "answers": answers }).to_string(), "end_turn"),
+            &choice,
+            &LogContext::NONE,
+        )
+        .expect_err("ids");
+    let detail = mismatch(&error);
+    assert_eq!(chain(detail), ["decision_llm.answer_ids"]);
+    assert!(
+        detail.message.contains("missing: [q]"),
+        "{}",
+        detail.message
+    );
+    assert!(detail.message.contains("and 42 more"), "{}", detail.message);
+    assert_eq!(detail.message.matches('…').count(), 8, "{}", detail.message);
+}
+
+/// REQ-QA-001: inline data with no format gets its media type from its leading characters.
+#[test]
+fn inline_media_type_is_sniffed_without_a_format() {
+    let body = SystemOneRequest::from_json(
+        r#"{"model":"haiku","state":"s","questions":{"q":{"type":"box"}},"assets":{"png":{"type":"image","data_base64":"iVBORw0KGgoAAAA="},"jpeg":{"type":"image","data_base64":"/9j/4AAQ"},"other":{"type":"image","data_base64":"R0lGODlh"}}}"#,
+    )
+    .expect("body");
+    let request = DecisionRequest::new(body, Vec::new(), false).expect("valid");
+    let anthropic = body_of(&haiku(), &request);
+    let content = &anthropic["messages"][0]["content"];
+    let media: Vec<&str> = [2, 4, 6]
+        .iter()
+        .map(|index| {
+            content[*index]["source"]["media_type"]
+                .as_str()
+                .expect("media type")
+        })
+        .collect();
+    assert_eq!(
+        media,
+        ["image/png", "image/jpeg", "application/octet-stream"]
+    );
+    assert_eq!(content[6]["source"]["data"], "R0lGODlh");
+    let chat = body_of(&luna(), &request);
+    assert_eq!(
+        chat["messages"][1]["content"][6]["image_url"]["url"],
+        "data:application/octet-stream;base64,R0lGODlh"
+    );
+}
+
+fn body_of(backend: &LlmDecisionBackend, request: &DecisionRequest) -> Value {
+    body(&backend.encode(request).expect("encode"))
+}
+
+/// REQ-QA-003: an asset with neither data_base64 nor a part is refused at encode
+/// (decision.backend, cause decision_llm.encode), not dropped. An asset whose part is
+/// missing cannot reach encode: DecisionRequest::new refuses it (decision.image_parts).
+#[test]
+fn asset_without_an_image_is_refused() {
+    let body = SystemOneRequest::from_json(
+        r#"{"model":"haiku","state":"s","questions":{"q":{"type":"box"}},"assets":{"empty":{"type":"image","format":"png"}}}"#,
+    )
+    .expect("body");
+    let request = DecisionRequest::new(body, Vec::new(), false).expect("A-2 allows it");
+    for backend in [haiku(), luna()] {
+        let error = backend.encode(&request).expect_err("no image");
+        assert_eq!(error.id(), "decision.backend");
+        let detail = backend_failure(&error);
+        assert_eq!(chain(detail), ["decision_llm.encode"]);
+        assert!(detail.message.contains("`empty`"), "{}", detail.message);
+    }
+
+    let dangling = SystemOneRequest::from_json(
+        r#"{"model":"haiku","state":"s","questions":{"q":{"type":"box"}},"assets":{"a":{"type":"image","part":"nowhere"}}}"#,
+    )
+    .expect("body");
+    let refused = DecisionRequest::new(dangling, Vec::new(), false).expect_err("missing part");
+    assert_eq!(refused.id(), "decision.image_parts");
+}
+
+/// RSH-005: a token cap of 0 is refused with a typed error.
+#[test]
+fn zero_max_tokens_is_refused() {
+    let error = haiku().with_max_tokens(0).expect_err("zero");
+    assert_eq!(error.id(), "decision_llm.invalid_max_tokens");
+    assert_eq!(error.recovery(), Some("give a max_tokens of 1 or more"));
+    assert!(haiku().with_max_tokens(1).is_ok());
+}
+
+// QA-001: an unknown question type is refused at encode (decision_llm.encode, not a
+// mismatch) by prompt::check_question_types. No test can build one: Question is
+// #[non_exhaustive] and its serde form refuses an unknown `type` tag
+// (SystemOneRequest::from_json -> decision.request_parse), so every Question a caller can
+// hold today is one of the four known types. The check is the guard for a type A-2 adds later.
+#[test]
+fn unknown_question_type_cannot_be_built() {
+    let error = SystemOneRequest::from_json(
+        r#"{"model":"haiku","state":"s","questions":{"q":{"type":"rank"}}}"#,
+    )
+    .expect_err("unknown type");
+    assert_eq!(error.id(), "decision.request_parse");
+}
+
+/// RBP-F001: the mismatch causes carry static recovery hints.
+#[test]
+fn mismatch_causes_have_recovery() {
+    let error = haiku()
+        .decode(
+            anthropic_reply(r#"{"answers":{}}"#, "end_turn"),
+            &choice_request(),
+            &LogContext::NONE,
+        )
+        .expect_err("ids");
+    let detail = mismatch(&error);
+    assert!(detail.recovery.is_some(), "{detail:?}");
 }

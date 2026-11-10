@@ -5,12 +5,14 @@
 
 mod common;
 
+use std::borrow::Cow;
+
 use common::{KEY, key, response};
 use sc_agent_http::{Endpoint, HttpRequest, Method};
 use sc_agent_types::{ErrorId, MODELS, ModelId, Provider};
 use sc_llm_provider::{
-    LlmClient, LlmError, LlmProvider, LlmRequest, Message, Output, Part, Role, Wire,
-    catalog_model_id, provider_model_id,
+    ImageMediaType, LlmClient, LlmError, LlmProvider, LlmRequest, Message, Output, Part, Role,
+    Wire, catalog_model_id, provider_model_id,
 };
 use serde_json::{Value, json};
 
@@ -18,7 +20,7 @@ fn client(provider: LlmProvider) -> LlmClient {
     LlmClient::new(provider, key()).expect("client")
 }
 
-fn request(model: &str, output: Output) -> LlmRequest {
+fn request(model: &str, output: Output) -> LlmRequest<'static> {
     LlmRequest {
         model: model.parse().expect("model"),
         system: Some("be brief".to_owned()),
@@ -254,8 +256,8 @@ fn images_on_both_wires() {
         content: vec![
             Part::Text("look".to_owned()),
             Part::Image {
-                media_type: "image/png",
-                data_base64: "iVBORw0KGgo=".to_owned(),
+                media_type: ImageMediaType::Png,
+                data_base64: Cow::Borrowed("iVBORw0KGgo="),
             },
         ],
     }];

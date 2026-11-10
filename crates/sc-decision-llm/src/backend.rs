@@ -103,9 +103,21 @@ impl LlmDecisionBackend {
     }
 
     /// This backend with completion token cap `max_tokens`.
-    #[must_use]
-    pub fn with_max_tokens(self, max_tokens: u32) -> Self {
-        Self { max_tokens, ..self }
+    ///
+    /// This is the only input limit set here. Image count and size are enforced once, in
+    /// `sc_decision_schema::DecisionRequest::new` (A-2: `MAX_IMAGES` images,
+    /// `MAX_IMAGE_BYTES` per image), so every request this backend encodes is already within
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// [`DecisionLlmError::InvalidMaxTokens`] for 0: a provider would refuse it, or return
+    /// an empty, truncated reply.
+    pub fn with_max_tokens(self, max_tokens: u32) -> Result<Self, DecisionLlmError> {
+        if max_tokens == 0 {
+            return Err(DecisionLlmError::InvalidMaxTokens { max_tokens });
+        }
+        Ok(Self { max_tokens, ..self })
     }
 
     /// This backend and its [`LlmClient`] writing to `log`, so one decode writes `llm.usage`
@@ -163,7 +175,7 @@ impl LlmDecisionBackend {
 
     /// The request handed to [`LlmClient::decode`]: it reads only `output`, so the messages
     /// (and their images) are not rebuilt.
-    fn decode_request(&self, request: &DecisionRequest) -> LlmRequest {
+    fn decode_request(&self, request: &DecisionRequest) -> LlmRequest<'static> {
         LlmRequest {
             model: self.model.clone(),
             system: None,
@@ -182,7 +194,9 @@ fn is_mismatch(error: &DecisionLlmError) -> bool {
             inner,
             LlmError::OutputNotJson { .. } | LlmError::Truncated { .. } | LlmError::NoText { .. }
         ),
-        DecisionLlmError::Encode { .. } => false,
+        DecisionLlmError::Encode { .. }
+        | DecisionLlmError::InvalidMaxTokens { .. }
+        | DecisionLlmError::Invariant { .. } => false,
     }
 }
 
@@ -200,8 +214,10 @@ impl Backend for LlmDecisionBackend {
     ///
     /// # Errors
     ///
-    /// [`DecisionError::Backend`] (backend `"llm"`) carrying `decision_llm.encode` or the
-    /// `LlmError` chain (`llm.encode`, `llm.http`). No input is refused here: a provider that
+    /// [`DecisionError::Backend`] (backend `"llm"`, never resent) carrying
+    /// `decision_llm.encode` (a question type this backend does not know, an asset with no
+    /// image, or state/questions that do not serialize), `decision_llm.invariant`, or the
+    /// `LlmError` chain (`llm.http`). No supported input is refused here: a provider that
     /// rejects one returns its own error at decode.
     fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError> {
         let call = translate(request, &self.model, self.max_tokens)
@@ -233,7 +249,7 @@ impl Backend for LlmDecisionBackend {
             .llm
             .decode(&self.decode_request(request), response, ctx)
             .map_err(|error| self.decision_error(DecisionLlmError::Llm(error), ctx))?;
-        answers(request.body(), &reply).map_err(|error| self.decision_error(error, ctx))
+        answers(request.body(), reply).map_err(|error| self.decision_error(error, ctx))
     }
 }
 
@@ -294,6 +310,37 @@ mod tests {
                 .as_deref()
                 .is_some_and(|message| message.contains("connection refused by peer")),
             "{network_message:?}"
+        );
+    }
+
+    /// QA2-001 (mutant N3a): an invariant failure is decision.backend, never a schema
+    /// mismatch, so the runner does not resend a bug.
+    #[test]
+    fn invariant_is_a_backend_failure_not_a_mismatch() {
+        let sources = KeySources {
+            env: &OneVar,
+            repo_root: None,
+            keyring: &NoKeyring,
+        };
+        let key = resolve_var(&"UNIT_KEY".parse().unwrap(), &sources)
+            .unwrap()
+            .key;
+        let llm = LlmClient::new(LlmProvider::Anthropic, key).unwrap();
+        let backend = LlmDecisionBackend::new(llm, "claude-haiku-5-5".parse().unwrap());
+        let error = backend.decision_error(
+            DecisionLlmError::Invariant {
+                message: "a duplicate key".to_owned(),
+            },
+            LogContext::NONE,
+        );
+        assert_eq!(error.id(), "decision.backend");
+        assert!(matches!(
+            &error,
+            DecisionError::Backend { backend: "llm", .. }
+        ));
+        assert_eq!(
+            error.cause_detail().map(|detail| detail.id),
+            Some("decision_llm.invariant".to_owned())
         );
     }
 }

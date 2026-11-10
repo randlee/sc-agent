@@ -83,7 +83,7 @@ What the old code did, and why little is copied: old `sc-jev-backends` sent a co
 - `decode.rs`: `parse_vendor` -> `decode_anthropic` / `decode_chat` -> `LlmResponse`. Keep Anthropic text concatenation (drop `non_text_blocks`). Usage: provider's own counters (Chat `prompt_tokens`/`completion_tokens`); no cache sums. Truncation: `stop_reason == "max_tokens"`, Chat `finish_reason == "length"`. Refusal: Anthropic `stop_reason == "refusal"`, Chat `message.refusal` non-null. First choice via `.first()`. Negative counter -> `ReplyInvalid`.
 - `client.rs`: the fold becomes `LlmClient::encode`'s tail.
 - `tests/decode.rs`: port builders; add `chat_message(text, finish_reason)`; truncation asserts `LlmError::Truncated` on both wires.
-- `answers.rs`: `LlmOutput::parse` keeps the not-JSON / no-`answers` split (`DecisionLlmError::AnswerInvalid` / `AnswerIds`). Replace the choice-only check with one check per Jev question type (section 3). Delete `input_bytes`, `parse_output`, `id_set`, `QuestionAnswer`.
+- `answers.rs`: `LlmOutput::parse` is deleted (LlmClient::decode always returns parsed JSON for Output::Json; a missing reply.json is decision_llm.invariant). Replace the choice-only check with one check per Jev question type (section 3). Delete `input_bytes`, `parse_output`, `id_set`, `QuestionAnswer`.
 
 ## 3. New code (exact public surface; bodies elided)
 
@@ -100,14 +100,14 @@ pub use types::{LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
 
 // src/types.rs - any LLM call (REQ-SAG-0502), not only decisions
 #[derive(Debug, Clone, PartialEq)]
-pub struct LlmRequest { pub model: ModelId, pub system: Option<String>, pub messages: Vec<Message>, pub max_tokens: u32, pub output: Output }
+pub struct LlmRequest<'a> { pub model: ModelId, pub system: Option<String>, pub messages: Vec<Message<'a>>, pub max_tokens: u32, pub output: Output }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Message { pub role: Role, pub content: Vec<Part> }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Part {
     Text(String),
     /// Anthropic `{type:"image", source:{type:"base64", media_type, data}}`; Chat `{type:"image_url", image_url:{url:"data:<media_type>;base64,<data>"}}`.
-    Image { media_type: &'static str, data_base64: String },
+    Image { media_type: ImageMediaType, data_base64: Cow<'a, str> },   // ImageMediaType: #[non_exhaustive] { Png, Jpeg, OctetStream } with as_str()
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role { User, Assistant }
@@ -200,7 +200,7 @@ impl LlmDecisionBackend {
     /// Luna: LlmClient::new(LlmProvider::OpenAi, key) with catalog.resolve(Latest(Luna)).
     /// (Catalog::resolve is infallible, a-1: it returns the ModelId, no error arm.)
     pub fn new(llm: LlmClient, model: ModelId) -> Self;
-    pub fn with_max_tokens(self, max_tokens: u32) -> Self;
+    pub fn with_max_tokens(self, max_tokens: u32) -> Result<Self, DecisionLlmError>;   // 0 -> decision_llm.invalid_max_tokens
     /// Sets the logger on itself and on its LlmClient (`self.llm = self.llm.with_log(log.clone())`), so one
     /// decode writes `llm.usage` (LlmClient) and, on a mismatch, `llm.schema_mismatch` (this backend).
     pub fn with_log(self, log: GeneralLogger) -> Self;
@@ -253,7 +253,7 @@ Anthropic structured outputs accept no numeric min/max, so ranges are not in the
 
 How decode maps failures (the runner resends on `SchemaMismatch` up to max_sends, then returns it, A-9; backend name `"llm"`):
 - `DecisionError::SchemaMismatch { backend: "llm", detail }`: `LlmError::OutputNotJson`, `LlmError::Truncated`, `LlmError::NoText`, `DecisionLlmError::AnswerIds`, `DecisionLlmError::AnswerInvalid` (e.g. a choice answer missing `probabilities`). `detail` = `DecisionLlmError::detail()`, which carries the LlmError chain.
-- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Encode`, `Http`) and `DecisionLlmError::Encode`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
+- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Http`) and `DecisionLlmError::Encode` (incl. an unsupported question type and an asset with no image), `InvalidMaxTokens` and `Invariant`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
 
 Log records (ANC-007), via `GeneralLogger::write(Level::Info, target, action, ctx, fields)` (session_id/position travel in `ctx`, not in `fields`); never a prompt, body, header value or key; a log write error is ignored (counted by sc-agent-log) and never changes a decode result:
 - `llm.usage`, target `"sc_llm_provider"`: `provider`, `model` (as the provider reports it), `input_tokens`, `output_tokens`; ctx = the caller's LogContext.
@@ -270,9 +270,7 @@ pub enum LlmError {
     /// The send failed in sc-agent-http; the HttpError is kept whole.
     Http { provider: LlmProvider, source: HttpError },                 // "llm.http"
     /// A non-2xx final reply, in the provider's own words (redacted).
-    ApiStatus { provider: LlmProvider, reply: ProviderReply },         // "llm.api_status"
-    /// The request body could not be serialized.
-    Encode { message: String },                                     // "llm.encode"
+    ApiStatus { provider: LlmProvider, reply: Box<ProviderReply> },         // "llm.api_status"
     /// The 2xx body is not JSON or not the provider's envelope (serde message, never body bytes).
     ReplyInvalid { provider: LlmProvider, message: String },           // "llm.reply_invalid"
     /// The reply has no text content.
@@ -293,9 +291,11 @@ pub enum DecisionLlmError {
     /// Wraps LlmError (and through it HttpError), kept whole.
     Llm(LlmError),                                                   // "decision_llm.llm"
     /// State, questions or schema could not be serialized.
-    Encode { message: String },                                      // "decision_llm.encode"
+    Encode { message: String },                                      // "decision_llm.encode" (also: unsupported question type, asset with no image)
+    InvalidMaxTokens { max_tokens: u32 },                            // "decision_llm.invalid_max_tokens"
+    Invariant { message: String },                                   // "decision_llm.invariant" (never a mismatch)
     /// The model's answer ids differ from the question ids.
-    AnswerIds { missing: Vec<String>, extra: Vec<String> },          // "decision_llm.answer_ids"
+    AnswerIds { missing: Vec<String>, extra: Vec<String>, extra_count: usize },   // extra listed at most MAX_LISTED_IDS (8)          // "decision_llm.answer_ids"
     /// One answer lacks a required field, has a wrong type, or a choice outside the criteria.
     AnswerInvalid { question: String, message: String },             // "decision_llm.answer_invalid"
 }
@@ -303,7 +303,7 @@ impl ErrorId for DecisionLlmError {}
 impl From<LlmError> for DecisionLlmError {}
 ```
 
-LlmError 8 variants, DecisionLlmError 4 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
+LlmError 7 variants, DecisionLlmError 6 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
 
 ## 5. Config keys
 
@@ -349,7 +349,7 @@ Estimated size: sc-llm-provider about 350 lines of code, sc-decision-llm about 3
 - [ ] REQ-SAG-0503 support: LlmClient::models_request/decode_models return a provider's model ids (tests over canned replies).
 - [ ] ADR-SAG-0001: LlmDecisionBackend implements the Backend trait imported from sc-decision-schema (no crate defines its own Backend trait) (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest, &LogContext)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.
 - [ ] REQ-SAG-0007: a model probability of 0.123456789 is returned as 0.123456789; no rounding, normalizing or clamping.
-- [ ] REQ-SAG-0002: LlmError (8 llm.* ids; no unsupported-provider id, since LlmProvider cannot name TypeSafe) wraps HttpError; DecisionLlmError (4 decision_llm.* ids) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
+- [ ] REQ-SAG-0002: LlmError (7 llm.* ids, no llm.encode; no unsupported-provider id, since LlmProvider cannot name TypeSafe) wraps HttpError; DecisionLlmError (6 decision_llm.* ids, incl. invalid_max_tokens and invariant) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
 - [ ] ADR-SAG-0004: `cargo tree -p sc-llm-provider -e normal --depth 1` lists exactly sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http as sc-agent dependencies (the http layer, no decision types); `cargo tree -p sc-decision-llm -e normal --depth 1` lists exactly sc-decision-schema, sc-llm-provider, sc-agent-http, sc-agent-types and sc-agent-log (the decision-backend layer); the full `cargo tree -p sc-llm-provider -p sc-decision-llm` contains no sc-decision-runner or decide. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner.
 - [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.
 - [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio; neither crate depends directly on ureq (it arrives only through sc-agent-http, which owns the transport per ADR-SAG-0004); no sleep call.
@@ -377,3 +377,5 @@ Round 4: HttpRequest::with_secret(..)? at the secret attach in encode and models
 - Plan correction (2026-11-10, dev round 1): the 'no ureq in cargo tree' check contradicted the planned sc-agent-http dependency (sc-agent-http owns UreqTransport; ADR-SAG-0004). No REQ/ADR requires absence of ureq (REQ-SAG-0009 is tokio, REQ-SAG-0010 is sleep), so the check is now 'no direct ureq dependency'. Feature-gating ureq in sc-agent-http was considered and not taken in phase A.
 - LlmError::ApiStatus.reply is Box<ProviderReply> (clippy result_large_err), matching sc-agent-http.
 - LlmClient::decode takes ctx: LogContext by value (Copy), per the section 3 signature.
+- QA-1 fix round (code at abd2b24): LlmRequest<'a>/Message<'a>/Part<'a>; Part::Image {ImageMediaType, Cow}; encode/decode take &LlmRequest<'_>; llm.encode removed (Value Display is infallible); LlmClient::new keeps Result (unreachable, documented); decode reads only request.output; models URL = call endpoint with /messages or /chat/completions replaced by /models; a reply without `model` is llm.reply_invalid; inline media type sniffed from the base64 prefix (iVBORw0KGgo png, /9j/ jpeg, else octet-stream); the AC 13 chain test is a unit test in src/backend.rs (the HttpError injection point is private); model text in our messages capped at 64 bytes, extra ids at 8; llm.usage model capped at 128 bytes with model_truncated; refusal and ApiStatus text kept whole with the key scrubbed (REQ-SAG-0002).
+- Plan-hardening round-2 note 'LlmClient::decode takes &LogContext' is superseded: it takes LogContext by value (Copy), per section 3.

@@ -47,4 +47,4 @@ pub use ids::{catalog_model_id, provider_model_id};
 #[doc(inline)]
 pub use provider::LlmProvider;
 #[doc(inline)]
-pub use types::{LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
+pub use types::{ImageMediaType, LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};

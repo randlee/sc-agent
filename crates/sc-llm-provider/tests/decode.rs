@@ -23,7 +23,7 @@ fn client(provider: LlmProvider) -> LlmClient {
     LlmClient::new(provider, key()).expect("client")
 }
 
-fn request(model: &str, output: Output) -> LlmRequest {
+fn request(model: &str, output: Output) -> LlmRequest<'static> {
     LlmRequest {
         model: model.parse().expect("model"),
         system: None,
@@ -157,14 +157,22 @@ fn test_llm_stop_reason_truncation_is_truncated() {
 /// AC 13: refusal is llm.refused on both wires.
 #[test]
 fn refusals_are_refused() {
+    // Refusal text is provider-written: kept whole, with the key scrubbed (REQ-SAG-0002).
+    let echoed = format!("I can't help with that. You sent {KEY}, which I will not use.");
     let anthropic = decode(
         LlmProvider::Anthropic,
         json_output(),
-        haiku_message("I can't help with that.", "refusal", 3),
+        haiku_message(&echoed, "refusal", 3),
     )
     .expect_err("refusal");
     assert_eq!(anthropic.id(), "llm.refused");
-    assert!(anthropic.to_string().contains("I can't help with that."));
+    assert!(matches!(
+        &anthropic,
+        LlmError::Refused { message, .. }
+            if message == "I can't help with that. You sent [redacted], which I will not use."
+    ));
+    let rendered = format!("{anthropic} {anthropic:?} {:?}", anthropic.detail());
+    assert!(!rendered.contains(KEY), "{rendered}");
 
     let chat = response(
         200,

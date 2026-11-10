@@ -12,8 +12,10 @@ use crate::LlmProvider;
 ///
 /// `Display` writes `"<id>: <message>"` only. [`Self::Http`] keeps the [`HttpError`] whole:
 /// it is [`Error::source`] and its detail is [`ErrorId::cause_detail`]. No variant carries a
-/// key, a request body or reply body bytes; provider text is redacted of the key
-/// ([`ProviderReply::read`]).
+/// key or a request body. Provider-written text ([`Self::ApiStatus`]'s reply, read with
+/// [`ProviderReply::read`], and [`Self::Refused`]'s message) is redacted of the request's key
+/// and otherwise kept whole (REQ-SAG-0002); every other message is this crate's own or a
+/// serde_json message, never reply body bytes.
 ///
 /// # Examples
 ///
@@ -43,11 +45,6 @@ pub enum LlmError {
         /// error small on the `Ok` path, clippy `result_large_err`).
         reply: Box<ProviderReply>,
     },
-    /// The request body could not be serialized (`llm.encode`).
-    Encode {
-        /// The serde_json message.
-        message: String,
-    },
     /// The 2xx body is not JSON or not the provider's envelope (`llm.reply_invalid`).
     ReplyInvalid {
         /// The provider that answered.
@@ -72,7 +69,8 @@ pub enum LlmError {
     Refused {
         /// The provider that answered.
         provider: LlmProvider,
-        /// The model's refusal text, or a note naming the stop reason.
+        /// The model's refusal text, redacted of the key and otherwise whole, or a note
+        /// naming the stop reason when the model gave none.
         message: String,
     },
     /// [`Output::Json`](crate::Output::Json) was asked for and the text does not parse
@@ -90,7 +88,6 @@ impl ErrorId for LlmError {
         match self {
             Self::Http { .. } => "llm.http",
             Self::ApiStatus { .. } => "llm.api_status",
-            Self::Encode { .. } => "llm.encode",
             Self::ReplyInvalid { .. } => "llm.reply_invalid",
             Self::NoText { .. } => "llm.no_text",
             Self::Truncated { .. } => "llm.truncated",
@@ -105,7 +102,6 @@ impl ErrorId for LlmError {
                 format!("the {provider} send failed ({})", source.id())
             }
             Self::ApiStatus { provider, reply } => format!("{provider} answered {reply}"),
-            Self::Encode { message } => format!("the request body does not serialize: {message}"),
             Self::ReplyInvalid { provider, message } => {
                 format!("the {provider} reply is not its documented envelope: {message}")
             }
@@ -127,7 +123,6 @@ impl ErrorId for LlmError {
         match self {
             Self::Http { source, .. } => Some(source.detail()),
             Self::ApiStatus { .. }
-            | Self::Encode { .. }
             | Self::ReplyInvalid { .. }
             | Self::NoText { .. }
             | Self::Truncated { .. }
@@ -140,12 +135,17 @@ impl ErrorId for LlmError {
         match self {
             Self::Http { source, .. } => source.recovery(),
             Self::Truncated { .. } => Some("raise max_tokens or ask for a shorter reply"),
-            Self::ApiStatus { .. }
-            | Self::Encode { .. }
-            | Self::ReplyInvalid { .. }
-            | Self::NoText { .. }
-            | Self::Refused { .. }
-            | Self::OutputNotJson { .. } => None,
+            Self::ApiStatus { .. } => Some(
+                "read the provider's message: fix the key, model or request it names, or check the provider's status",
+            ),
+            Self::NoText { .. } => Some("send the request again; if it repeats, try another model"),
+            Self::Refused { .. } => {
+                Some("the model declined this request; rephrase it or use another model")
+            }
+            Self::OutputNotJson { .. } => Some(
+                "send the request again; if it repeats, use a model that supports structured output",
+            ),
+            Self::ReplyInvalid { .. } => None,
         }
     }
 }
@@ -178,8 +178,16 @@ mod tests {
                 provider: LlmProvider::Anthropic,
                 source: HttpError::network(NetworkKind::Connect, 1, "refused"),
             },
-            LlmError::Encode {
-                message: "m".to_owned(),
+            LlmError::ApiStatus {
+                provider: LlmProvider::Together,
+                reply: Box::new(ProviderReply::read(
+                    &sc_agent_http::HttpResponse::new(500, Vec::new(), b"down".to_vec()),
+                    None,
+                )),
+            },
+            LlmError::Refused {
+                provider: LlmProvider::Anthropic,
+                message: "no".to_owned(),
             },
             LlmError::NoText {
                 provider: LlmProvider::Nous,
