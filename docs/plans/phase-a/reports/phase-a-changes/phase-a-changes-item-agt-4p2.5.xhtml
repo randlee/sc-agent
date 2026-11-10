@@ -1,0 +1,273 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.5">
+  <div class="section-head">
+    <h2>agt-4p2.5 <span class="unit-title">Sprint A-5: sc-agent-http</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 3633,
+      &quot;before_chars&quot;: 2414,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    },
+    {
+      &quot;after_chars&quot;: 21049,
+      &quot;before_chars&quot;: 19278,
+      &quot;field&quot;: &quot;design&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+      &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+      &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+      &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-09T23:23:07+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-001&quot;,
+      &quot;ANC-002&quot;,
+      &quot;REQ-SAG-0002&quot;,
+      &quot;REQ-SAG-0006&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261109T232307Z-agt-4p2.5&quot;,
+    &quot;score&quot;: &quot;4/8&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.5&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:32+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+        &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+        &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+        &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023532Z-agt-4p2.5&quot;,
+    &quot;score&quot;: &quot;6/6&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 7,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-5: sc-agent-http&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:23:07+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-001&quot;,
+        &quot;ANC-002&quot;,
+        &quot;REQ-SAG-0002&quot;,
+        &quot;REQ-SAG-0006&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232307Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;4/8&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:24:33+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-002&quot;,
+          &quot;reason&quot;: &quot;A-5 builds the HTTP transport crate; it adds no CLI command and no Python API function.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0001&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232433Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;5/6&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:10:05+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0004&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011005Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;4/5&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:11:14+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T011114Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;5/5&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:42+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020442Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;1/1&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:14+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021114Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:32+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023532Z-agt-4p2.5&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.5: Sprint A-5: sc-agent-http
+Gate FAIL 4/8 -&gt; PASS 6/6 over 7 runs.
+Failing at first run: ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006.
+Failing now: none.
+Excluded ADR-SAG-0001: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
+Excluded ANC-001: ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.
+Excluded REQ-SAG-0006: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).
+Changed fields: acceptance_criteria, design.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>4/8</td><td>ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 7 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261109T232307Z-agt-4p2.5</code></td><td>2026-11-09T23:23:07+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/8</td><td>ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006</td></tr>
+        <tr><td><code>plan-20261109T232433Z-agt-4p2.5</code></td><td>2026-11-09T23:24:33+00:00</td><td><span class="status status-fail">FAIL</span></td><td>5/6</td><td>ADR-SAG-0001</td></tr>
+        <tr><td><code>plan-20261110T011005Z-agt-4p2.5</code></td><td>2026-11-10T01:10:05+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/5</td><td>ADR-SAG-0004</td></tr>
+        <tr><td><code>plan-20261110T011114Z-agt-4p2.5</code></td><td>2026-11-10T01:11:14+00:00</td><td><span class="status status-pass">PASS</span></td><td>5/5</td><td></td></tr>
+        <tr><td><code>plan-20261110T020442Z-agt-4p2.5</code></td><td>2026-11-10T02:04:42+00:00</td><td><span class="status status-pass">PASS</span></td><td>1/1</td><td></td></tr>
+        <tr><td><code>plan-20261110T021114Z-agt-4p2.5</code></td><td>2026-11-10T02:11:14+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T023532Z-agt-4p2.5</code></td><td>2026-11-10T02:35:32+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ADR-SAG-0001">ADR-SAG-0001</a></th><td>A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-001">ANC-001</a></th><td>ANC-001 governs code in crates/sc-decision-schema; A-5 adds no code to that crate.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0006">REQ-SAG-0006</a></th><td>REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-5.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="eq">- [ ] REQ-SAG-0601: default config, a request answered busy (429/502/529) every time is sent 5 times and ends http.provider_busy with reason sends and 5 attempts; with max_sends = 2 it is sent 2 times (no hard cap).</div><div class="eq">- [ ] REQ-SAG-0601: Retry-After: 3 holds off exactly 3 s; Retry-After: 99 holds off 30 s; Retry-After: abc (and absent) falls back to 1, 2, 4, 8 s (then doubling, capped 30 s) each with at most 250 ms jitter; Retry-After is valid only as 1-32 ASCII digits with an optional fraction.</div><div class="eq">- [ ] REQ-SAG-0601: no attempt starts after the 90 s budget (reason budget); ProviderBusy carries reason, attempts and the last retry_after_seconds unrounded (REQ-SAG-0007); a busy request is resent unchanged (same body bytes).</div><div class="eq">- [ ] REQ-SAG-0601: holdoff is returned as a not-before Instant (Next::ResendAt); sc-agent-http never waits and takes no CancelToken (the queue that waits owns cancellation, A-9).</div><div class="rm">- - [ ] REQ-SAG-0601: a connect failure returns http.network, retryable, after one send (real refused-connection test over UreqTransport); network errors are never resent.</div><div class="ad">+ - [ ] REQ-SAG-0601: a send that times out every time is sent 5 times with the default configuration and ends with the timeout error (http.network, kind timeout); a connect failure returns http.network after one send (real refused-connection test over UreqTransport); DNS and TLS failures are not resent.</div><div class="ad">+ - [ ] REQ-SAG-0601: a 402 response (and Anthropic&#x27;s usage-limit 400) is returned after one send as Next::Done with the remote error id and message unchanged; no remote error other than a busy response is resent.</div><div class="eq">- [ ] REQ-SAG-0602: a 429 with the documented Anthropic quota-exhausted body returns http.quota_exhausted after one send; a 429 with an unrecognized body is resent.</div><div class="ch">- [ ] Every final reply that is neither busy nor quota (e.g. 400,<ins> 402,</ins> 422, 503) is returned as Next::Done with the response unchanged, so the backend decodes it.</div><div class="eq">- [ ] HttpRequest carries a byte body (Arc&lt;[u8]&gt;) so multipart bodies can be sent; HttpRequest/HttpResponse/ResendPolicy are defined here and used unchanged by sc-decision-schema, the backends and the runner.</div><div class="eq">- [ ] REQ-SAG-0002: HttpError implements ErrorId with 6 distinct http.* ids; no assert!/unreachable!/panic in non-test code; clippy with the workspace denies passes.</div><div class="rm">- - [ ] Secrets: no error text, Debug output or log event contains the API key (test with the key in a transport error and a reply message); ApiKey::as_str is called only in ureq_transport (clippy disallowed-methods).</div><div class="rm">- - [ ] REQ-SAG-0008 / ANC-004: send, response, busy, exhaustion, quota and transport-failure events go to the GeneralLogger passed to HttpClient::new; no body, header value or key is logged; a log failure never changes a send result.</div><div class="ad">+ - [ ] Secrets: no error text, Debug output or log event contains the API key (test with the key in a transport error and a reply message); ApiKey::as_str is called only in ureq_transport (clippy disallowed-methods); provider text is redacted, never truncated (REQ-SAG-0002).</div><div class="ad">+ - [ ] Endpoint::parse refuses http://; Endpoint::parse_local accepts it (tests).</div><div class="ad">+ - [ ] REQ-SAG-0008: send, response, busy, exhaustion, quota and transport-failure events go to the GeneralLogger passed to HttpClient::new; no body, header value or key is logged; a log failure never changes a send result.</div><div class="eq">- [ ] ADR-SAG-0004 / REQ-SAG-0009 / REQ-SAG-0010: no ureq type in a public signature; cargo tree -p sc-agent-http lists no tokio and no sc-decision-* or sc-llm-provider crate; no sleep call.</div><div class="ad">+ - [ ] REQ-SAG-0002: a test makes the transport fail with a lower-layer (ureq) error and asserts the returned HttpError&#x27;s ErrorDetail chain carries that cause&#x27;s id and message.</div><div class="ad">+ - [ ] ADR-SAG-0004: sc-agent-http sits in the http layer; its only sc-agent crate dependencies are the lower-layer crates sc-agent-types, sc-agent-secrets and sc-agent-log, and it depends on no decision-schema, decision-backend, sc-llm-provider or runner crate, checked by `cargo tree -p sc-agent-http`.</div></div>
+  </details>
+  <details>
+    <summary>design</summary>
+    <div class="diff"><div class="eq"># Sprint A-5: sc-agent-http (bead agt-4p2.5)</div><div class="eq"></div><div class="ch">Governing: REQ-SAG-0601 (busy resend and holdoff), REQ-SAG-0602 (quota is not busy), REQ-SAG-0002. Also binding: ADR-SAG-0004 (layer: above sc-agent-types, sc-agent-secrets and sc-agent-log; below sc-decision-schema and sc-llm-provider), REQ-SAG-0009, REQ-SAG-0010, ADR-SAG-0001 (sans-IO backends, separate transport), REQ-SAG-0007 (`retry_after_seconds` unrounded), REQ-SAG-0401, REQ-SAG-0008 <del>/ ANC-004 </del>(logs through the injected GeneralLogger), owner-busy-resend, owner-no-sleep, owner-error-contract, owner-lowlevel-no-tokio, owner-architecture.</div><div class="eq"></div><div class="eq">Copy script: `docs/plans/phase-a/copy/a-5.sh` (source sc-agent-ref@dce239a; dry run 2026-11-09, reconciliation: 26 copy steps, 13 files, 2075 lines; no `sleep(` in any copied line).</div><div class="eq"></div><div class="eq">What the crate is: a sync HTTP layer with no queue. It owns `HttpRequest`/`HttpResponse` (byte bodies, so multipart works), sends one request once (`Transport`), classifies the reply (busy / quota / final), and for a busy reply returns a not-before `Instant` for the resend under `ResendPolicy`. It never waits and takes no `CancelToken`: the holdoff wait and cancellation live in the caller&#x27;s queue (the runner, A-9, uses `CancelToken::wait_until` and `on_cancel`). Every final reply that is neither busy nor quota is returned to the caller as `Next::Done(HttpResponse)`, whatever its status, so the backend decodes the API&#x27;s own error bodies (Jev 400/422 are sc-decision-schema types; LLM providers&#x27; errors are read by sc-llm-provider with `ProviderReply::read`).</div><div class="eq"></div><div class="eq">Main departures from the old crate:</div><div class="eq">- Old `retry.rs:247-268` (`Hooks::wait`, `thread::sleep` slices) and `retry_loop` (507-626) are not copied; `send_once` returns `Next::ResendAt(instant)`.</div><div class="eq">- Old `MAX_SENDS = 5` cap and `clamp(1, MAX_SENDS)` removed; `max_sends` is any `NonZeroU32`, default 5.</div><div class="eq">- A valid `Retry-After` is used exactly (clamped 0-30 s), without jitter; jitter is only for the fallback holdoffs (REQ-SAG-0601).</div><div class="eq">- Old `RetryAfter::report_seconds` rounded; the error now carries the parsed `f64`.</div><div class="eq">- Old `api_failure` status mapping is not copied: non-busy statuses go back to the backend.</div><div class="eq">- `HeaderName::new` and `Endpoint::loopback_http` panicked through `assert!`; both go.</div><div class="eq">- No `test-util` feature: tests drive `send_once` with an explicit clock and a scripted transport.</div><div class="ad">+ - A timed-out send is resent unchanged at once, counting toward `max_sends`; connect, DNS, TLS and other transport failures are returned after one send; every other remote error (402, Anthropic&#x27;s usage-limit 400, 503, ...) is a final reply returned to the backend with the remote id and message (REQ-SAG-0601).</div><div class="ad">+ - Provider text is kept whole after secret redaction: `PROVIDER_TEXT_MAX_BYTES` and `bound_provider_text` are deleted after copying (REQ-SAG-0002).</div><div class="ad">+ </div><div class="ad">+ Decisions (assistant, 2026-11-09):</div><div class="ad">+ - Scheme: `Endpoint::parse` accepts only https; `Endpoint::parse_local` also accepts http and is called only by sc-decision-local with a host and port from a `local_runners` entry (runners on the user&#x27;s machine or network often have no TLS).</div><div class="ad">+ - One-off calls with no runner queue (decide models and doctor, a non-decision LLM call, REQ-SAG-0502) hold off on `CancelToken::wait_until(t)` on the calling thread: a queue of one, ended at once by cancel; no sleep.</div><div class="eq"></div><div class="eq">## 1. Copy list (source `path:lines` -&gt; target)</div><div class="eq"></div><div class="eq">| # | Source (sc-agent-ref@dce239a) | Target | What it becomes |</div><div class="eq">|---|---|---|---|</div><div class="eq">| C1 | `crates/sc-agent-http/LICENSE` | `LICENSE` | unchanged |</div><div class="eq">| C2 | `crates/sc-agent-http/src/request.rs:1-37` | `src/request.rs` | `Method` |</div><div class="eq">| C3 | `crates/sc-agent-http/src/request.rs:119-484` | `src/request.rs` | `SecretHeader`, `Endpoint`, `HttpRequest`, `HttpResponse` |</div><div class="eq">| C4 | `crates/sc-agent-http/src/transport.rs:1-128` | `src/transport.rs` | `Transport`, `Timeouts` |</div><div class="eq">| C5 | `crates/sc-agent-http/src/ureq_transport.rs` (all) | `src/ureq_transport.rs` | `UreqTransport`, `LookupResolver`, error classification, unit tests |</div><div class="eq">| C6 | `crates/sc-agent-http/src/retry_after.rs` (all) | `src/retry_after.rs` | the one `Retry-After` parser |</div><div class="eq">| C7 | `crates/sc-agent-http/src/redact.rs:1-46` | `src/redact.rs` | `redact(error, request)` |</div><div class="eq">| C8 | `crates/sc-agent-http/src/failure.rs:1-53, 61-177, 390-422` | `src/quota.rs` | quota reader `Body`, `QUOTA_MARKERS`, `QUOTA_MESSAGES`, `is_quota_reply`, documented-shape test |</div><div class="ch">| C9 | `crates/sc-agent-http/src/failure.rs:304-352, 627-652` | `src/reply.rs` | `read_failure` (-&gt; `ProviderReply::read`), <del>key-scrub-before-cut</del><ins>key-scrub</ins> test |</div><div class="ch">| C10 | `crates/sc-agent-types/src/error.rs:67-73, 108-247` | `src/reply.rs` | <del>`PROVIDER_TEXT_MAX_BYTES`, `bound_provider_text`, </del>`ProviderFailure` (-&gt; `ProviderReply`) + <del>Display</del><ins>Display; the copied text bound is deleted</ins> |</div><div class="eq">| C11 | `crates/sc-agent-types/src/code.rs:268-325, 344-364` | `src/error.rs` | `NetworkErrorKind` (-&gt; `NetworkKind`), `BusyCause` (-&gt; `BusyReason`) |</div><div class="eq">| C12 | `crates/sc-agent-http/src/retry.rs:54-74, 231-245, 628-653, 663-713, 726-742` | `src/resend.rs` | constants, jitter, `is_busy`, `backoff`, unit tests |</div><div class="eq">| C13 | `crates/sc-agent-http/src/test_util.rs:18-30, 139-223` | `tests/support/mod.rs` | `ScriptedTransport`, `RecordingTransport`, `lock` |</div><div class="eq">| C14 | `crates/sc-agent-http/tests/ureq.rs:22-54, 240-284` | `tests/ureq.rs` | request helpers, `assert_network`, `send_once`, `serve_once`, refused-connection test |</div><div class="eq">| C15 | `crates/sc-agent-http/tests/retry.rs:22-45` | `tests/resend.rs` | `secs`, `request`, `busy`, `ok` builders |</div><div class="eq"></div><div class="eq">## 2. Required edits after copying</div><div class="eq"></div><div class="ch">- All files: `JevError` -&gt; `HttpError`; `ResolvedApiKey` -&gt; `sc_agent_secrets::ApiKey`; `BackendKeyId` -&gt; nothing (tests build keys with `sc_agent_secrets::resolve_var` over <ins>`KeySources` with </ins>a map env). Remove every `cfg(feature = &quot;test-util&quot;)` item.</div><div class="ch">- `request.rs`: delete `HeaderName`; headers are `(String, String)`, `SecretHeader.name` is `&amp;&#x27;static str`; an invalid header name/value becomes `HttpError::InvalidRequest` when the ureq request is built. `Endpoint`: drop `https`, `is_https`, `loopback_http`; `parse` <del>returns</del><ins>(https</ins> <del>`InvalidEndpoint`;</del><ins>only)</ins> <del>scheme</del><ins>and</ins> <del>rule</del><ins>`parse_local`</ins> <del>per</del><ins>(http</ins> <del>Q1.</del><ins>or https) return `InvalidEndpoint`.</ins> Rewrite `log_form` (286-308) with `get(..)`/`split_once` (no indexing). Body `Arc&lt;[u8]&gt;`. `Debug` prints `body_len` and the redacted secret.</div><div class="eq">- `transport.rs`: drop `MIN`, `MAX_CONNECT`, `MAX_REQUEST`, `clamp`; public fields, `Default` 10 s / 120 s. Drop ADR-SAG-0007/RSH-002 references.</div><div class="ch">- `ureq_transport.rs`: keep `AgentConfig::build` (no redirects, `http_status_as_error(false)`, idle pool 64, versioned User-Agent), `LookupResolver` (DNS failure -&gt; `Connect`), `secret_header_value`, `expose` (the single `ApiKey::as_str` site, `#[expect(clippy::disallowed_methods, reason = ..)]`), `read_response` (8 MiB cap), `ureq_error_kind`, `io_error_kind`. Delete `loopback_for_tests`, `is_valid_url`, `SecretHeader::matches`, the `https_only` refusal (164-169). `BodyExceedsLimit` -&gt; `ResponseTooLarge`; other errors and body read failures -&gt; `Network { kind, .. }`. Port the unit tests (380-561), <del>drop</del><ins>keep</ins> <del>`test_endpoint_parse_refuses_http`</del><ins>`test_endpoint_parse_refuses_http`,</ins> <del>(Q1).</del><ins>add a `parse_local` accepts-http test.</ins></div><div class="eq">- `retry_after.rs`: delete `REPORT_MAX_SECONDS`/`report_seconds`; add `pub(crate) fn seconds(self) -&gt; f64` (validated text parsed, unrounded). Keep `wait()` (0-30 s) and the integer `nanos` path.</div><div class="eq">- `redact.rs`: `redact(error: HttpError, request: &amp;HttpRequest) -&gt; HttpError` = `error.map_text(|t| key.redact_text(t))` when the request has a secret.</div><div class="ch">- `quota.rs`: keep the &quot;Documented body shapes&quot; doc (21-53), drop the mapping table (7-19). `is_quota_reply(status, body)` is consulted only for 429/502/529 (REQ-SAG-0602); the 402 shortcut and the <ins>Anthropic usage-limit </ins>400 message start are <del>kept</del><ins>dropped:</ins> <del>or</del><ins>those</ins> <del>dropped</del><ins>replies</ins> <del>per</del><ins>are</ins> <del>Q3.</del><ins>final, returned after one send with the remote id and message (REQ-SAG-0601).</ins> Port the test to `HttpError::QuotaExhausted`.</div><div class="ch">- `reply.rs`: `ProviderFailure` -&gt; `ProviderReply`: drop the `provider` label, `retry_after_seconds: Option&lt;f64&gt;`, drop `Eq`. `read_failure` -&gt; `pub fn ProviderReply::read(response: &amp;HttpResponse, secret: Option&lt;&amp;ApiKey&gt;) -&gt; Self` (scrub before bound, kept); public because sc-llm-provider reads non-2xx provider replies with it. <del>`bound_provider_text`</del><ins>Delete</ins> <del>stays</del><ins>`PROVIDER_TEXT_MAX_BYTES`</ins> <del>`pub(crate)`</del><ins>and</ins> <del>(Q5).</del><ins>`bound_provider_text`: text is redacted, never cut (REQ-SAG-0002).</ins></div><div class="eq">- `error.rs`: rename the two enums; drop serde derives, `FromStr`, `NetworkErrorKind::Cancelled` and the old `retryable()`; add `HttpError` (section 4).</div><div class="eq">- `resend.rs`: drop `MAX_SENDS`, `WAIT_SLICE`; `Hooks::jitter` -&gt; `fn jitter() -&gt; Duration` (std `RandomState` hash `% 251` ms); remove `sends_are_bounded_to_one_through_five`; keep `backoff_doubles_to_the_cap`, `retry_after_parser`, `system_jitter_stays_in_range`, `default_delays_are_one_two_four_eight`, `busy_set_is_exactly_three_statuses`. Write `ResendPolicy`, `Attempts`, `Next`, `HttpClient` (section 3).</div><div class="eq">- `tests/support/mod.rs`: drop `FakeClock` uses; script exhaustion returns `Network { kind: Connect, .. }`.</div><div class="ch">- `tests/ureq.rs`: `Endpoint::loopback_http(port, p)` -&gt; <del>`Endpoint::parse(&amp;format!(&quot;http://127.0.0.1:{port}{p}&quot;))` (Q1);</del><ins>`Endpoint::parse_local(&amp;format!(&quot;http://127.0.0.1:{port}{p}&quot;))`;</ins> `loopback_for_tests` -&gt; `UreqTransport::new`.</div><div class="eq">- `tests/resend.rs`: drop the `Hooks` struct; keep the four builders.</div><div class="eq"></div><div class="eq">## 3. New code (exact public surface; bodies elided)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">// src/lib.rs</div><div class="eq">#![warn(missing_docs)]</div><div class="eq">mod error; mod quota; mod redact; mod reply; mod request; mod resend; mod retry_after; mod transport; mod ureq_transport;</div><div class="eq">pub use error::{BusyReason, HttpError, NetworkKind};</div><div class="eq">pub use reply::ProviderReply;</div><div class="eq">pub use request::{Endpoint, HttpRequest, HttpResponse, Method, SecretHeader};</div><div class="eq">pub use resend::{Attempts, HttpClient, Next, ResendPolicy};</div><div class="eq">pub use transport::{Timeouts, Transport};</div><div class="eq">pub use ureq_transport::UreqTransport;</div><div class="eq"></div><div class="eq">// src/request.rs</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum Method { Get, Post }</div><div class="eq">impl Method { pub const fn as_str(self) -&gt; &amp;&#x27;static str; }</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq, Hash)]</div><div class="eq">pub struct Endpoint { url: String }</div><div class="eq">impl Endpoint {</div><div class="rm">-     pub fn parse(url: &amp;str) -&gt; Result&lt;Self, HttpError&gt;;   // InvalidEndpoint</div><div class="ad">+     pub fn parse(url: &amp;str) -&gt; Result&lt;Self, HttpError&gt;;   // https only; InvalidEndpoint</div><div class="ad">+     pub fn parse_local(url: &amp;str) -&gt; Result&lt;Self, HttpError&gt;; // http or https; only for a configured local runner</div><div class="eq">    pub fn as_str(&amp;self) -&gt; &amp;str;</div><div class="eq">    pub fn log_form(&amp;self) -&gt; String;                     // scheme://host/path only</div><div class="eq">}</div><div class="eq"></div><div class="eq">#[derive(Clone)]                                          // Debug hand-written: never the key</div><div class="eq">pub struct SecretHeader { name: &amp;&#x27;static str, prefix: &amp;&#x27;static str, key: ApiKey }</div><div class="eq">impl SecretHeader {</div><div class="eq">    pub fn new(name: &amp;&#x27;static str, key: ApiKey) -&gt; Self;  // e.g. &quot;x-api-key&quot;</div><div class="eq">    pub fn bearer(key: ApiKey) -&gt; Self;                   // Authorization: Bearer &lt;key&gt;</div><div class="eq">    pub fn name(&amp;self) -&gt; &amp;&#x27;static str;</div><div class="eq">    pub fn key(&amp;self) -&gt; &amp;ApiKey;                         // for redaction only</div><div class="eq">    pub fn redacted(&amp;self) -&gt; String;</div><div class="eq">}</div><div class="eq"></div><div class="eq">#[derive(Clone)]                                          // Debug: method, log_form, header names, body_len, redacted secret</div><div class="eq">pub struct HttpRequest { method: Method, endpoint: Endpoint, headers: Vec&lt;(String, String)&gt;, secret: Option&lt;SecretHeader&gt;, body: Arc&lt;[u8]&gt; }</div><div class="eq">impl HttpRequest {</div><div class="eq">    pub fn new(method: Method, endpoint: Endpoint, body: impl Into&lt;Arc&lt;[u8]&gt;&gt;) -&gt; Self;</div><div class="eq">    pub fn with_header(self, name: impl Into&lt;String&gt;, value: impl Into&lt;String&gt;) -&gt; Self;</div><div class="eq">    pub fn with_secret(self, secret: SecretHeader) -&gt; Self;</div><div class="eq">    pub fn method(&amp;self) -&gt; Method;</div><div class="eq">    pub fn endpoint(&amp;self) -&gt; &amp;Endpoint;</div><div class="eq">    pub fn headers(&amp;self) -&gt; &amp;[(String, String)];</div><div class="eq">    pub fn secret(&amp;self) -&gt; Option&lt;&amp;SecretHeader&gt;;</div><div class="eq">    pub fn body(&amp;self) -&gt; &amp;[u8];</div><div class="eq">}</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq)]</div><div class="eq">pub struct HttpResponse { status: u16, headers: Vec&lt;(String, String)&gt;, body: Vec&lt;u8&gt; }</div><div class="eq">impl HttpResponse {</div><div class="eq">    pub fn new(status: u16, headers: Vec&lt;(String, String)&gt;, body: Vec&lt;u8&gt;) -&gt; Self;</div><div class="eq">    pub fn status(&amp;self) -&gt; u16;</div><div class="eq">    pub fn header(&amp;self, name: &amp;str) -&gt; Option&lt;&amp;str&gt;;     // ASCII case-insensitive</div><div class="eq">    pub fn body(&amp;self) -&gt; &amp;[u8];</div><div class="eq">    pub fn into_body(self) -&gt; Vec&lt;u8&gt;;</div><div class="eq">}</div><div class="eq"></div><div class="eq">// src/transport.rs</div><div class="eq">pub trait Transport: Send + Sync {</div><div class="eq">    /// One send. Every HTTP status is Ok; only transport failures are Err.</div><div class="eq">    fn send(&amp;self, request: &amp;HttpRequest) -&gt; Result&lt;HttpResponse, HttpError&gt;;</div><div class="eq">}</div><div class="eq">impl&lt;T: Transport + ?Sized&gt; Transport for &amp;T {}</div><div class="eq">impl&lt;T: Transport + ?Sized&gt; Transport for Arc&lt;T&gt; {}</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">pub struct Timeouts { pub connect: Duration, pub request: Duration }</div><div class="eq">impl Default for Timeouts { /* 10 s, 120 s */ }</div><div class="eq"></div><div class="eq">// src/ureq_transport.rs</div><div class="eq">#[derive(Debug, Clone)]</div><div class="eq">pub struct UreqTransport { agent: ureq::Agent }</div><div class="eq">impl UreqTransport { pub fn new(timeouts: Timeouts) -&gt; Self; }</div><div class="eq">impl Default for UreqTransport {}</div><div class="eq">impl Transport for UreqTransport {}</div><div class="eq"></div><div class="eq">// src/resend.rs</div><div class="eq">const BUSY_STATUSES: [u16; 3] = [429, 502, 529];</div><div class="eq">const BACKOFF_FIRST: Duration = Duration::from_secs(1);</div><div class="eq">const BACKOFF_MAX: Duration = Duration::from_secs(30);</div><div class="eq">const JITTER_MAX: Duration = Duration::from_millis(250);</div><div class="eq">const BUDGET: Duration = Duration::from_secs(90);</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq)]</div><div class="eq">pub struct ResendPolicy { max_sends: NonZeroU32 }</div><div class="eq">impl ResendPolicy {</div><div class="eq">    pub const fn new(max_sends: NonZeroU32) -&gt; Self;      // AgentConfig.max_sends (A-4)</div><div class="eq">    pub const fn max_sends(self) -&gt; u32;</div><div class="eq">}</div><div class="eq">impl Default for ResendPolicy { /* sc_agent_config::DEFAULT_MAX_SENDS is the same 5; this crate does not depend on config */ }</div><div class="eq"></div><div class="eq">/// Busy-resend state of one request; the queue entry owns it between sends.</div><div class="eq">#[derive(Debug, Clone, Default)]</div><div class="eq">pub struct Attempts { first_send: Option&lt;Instant&gt;, sends: u32, last_busy: Option&lt;ProviderReply&gt; }</div><div class="eq">impl Attempts { pub fn new() -&gt; Self; pub fn sends(&amp;self) -&gt; u32; }</div><div class="eq"></div><div class="eq">#[derive(Debug)]</div><div class="eq">pub enum Next {</div><div class="eq">    /// A final reply (any status that is neither busy nor quota). The backend decodes it.</div><div class="eq">    Done(HttpResponse),</div><div class="eq">    /// Busy: requeue and send again, unchanged, no earlier than this instant.</div><div class="eq">    ResendAt(Instant),</div><div class="eq">}</div><div class="eq"></div><div class="eq">#[derive(Clone)]</div><div class="eq">pub struct HttpClient { transport: Arc&lt;dyn Transport&gt;, policy: ResendPolicy, log: GeneralLogger }</div><div class="eq">impl HttpClient {</div><div class="eq">    /// `log` is the caller&#x27;s GeneralLogger, default or injected (REQ-SAG-0008; sc-agent-log is below this crate).</div><div class="eq">    pub fn new(transport: Arc&lt;dyn Transport&gt;, policy: ResendPolicy, log: GeneralLogger) -&gt; Self;</div><div class="eq">    pub fn policy(&amp;self) -&gt; ResendPolicy;</div><div class="eq">    pub fn transport(&amp;self) -&gt; &amp;Arc&lt;dyn Transport&gt;;      // one-shot probes (A-6 discovery)</div><div class="eq">    /// One send. `now` is read for the budget check before the send and the holdoff start after it.</div><div class="eq">    /// Never waits. Every Err is redacted.</div><div class="eq">    pub fn send_once(&amp;self, request: &amp;HttpRequest, attempts: &amp;mut Attempts, now: &amp;dyn Fn() -&gt; Instant) -&gt; Result&lt;Next, HttpError&gt;;</div><div class="eq">}</div><div class="eq">```</div><div class="eq"></div><div class="eq">`send_once` order (each step is one REQ line):</div><div class="eq">1. If `first_send` is set and `now() - first_send &gt;= BUDGET` -&gt; `Err(ProviderBusy { reason: Budget, .. })` (attempts start only within 90 s).</div><div class="ch">2. `transport.send(request)`; `sends += 1`. <del>`Err`</del><ins>`Err(Network { kind: Timeout })` with `sends &lt; max_sends`</ins> -&gt; <ins>`Ok(ResendAt(now()))` (resent unchanged at once; a later step-1 budget check still applies); when sends or budget run out the timeout error is </ins>returned <del>(with</del><ins>with</ins> <del>`attempts`</del><ins>`attempts`.</ins> <del>filled),</del><ins>Every</ins> <del>never</del><ins>other</ins> <del>resent</del><ins>`Err`</ins> <del>(REQ-SAG-0601</del><ins>(connect,</ins> <del>network</del><ins>DNS,</ins> <del>rule).</del><ins>TLS, other) is returned after this send (REQ-SAG-0601).</ins></div><div class="eq">3. Status not in `BUSY_STATUSES` -&gt; `Ok(Next::Done(response))`.</div><div class="eq">4. Busy and `is_quota_reply` -&gt; `Err(QuotaExhausted { attempts, reply })` at once (REQ-SAG-0602).</div><div class="eq">5. Busy: `last_busy = Some(ProviderReply::read(&amp;response, request.secret().map(SecretHeader::key)))`. If `sends &gt;= max_sends` -&gt; `Err(ProviderBusy { reason: Sends, attempts, retry_after_seconds, last })`. Holdoff = valid `Retry-After` -&gt; `RetryAfter::wait()` (0-30 s, no jitter); else `backoff(sends) + jitter()` (1, 2, 4, 8, 16, 30 ... s + 0-250 ms). `remaining = BUDGET - (now() - first_send)`; zero -&gt; `ProviderBusy { reason: Budget }`; else `Ok(ResendAt(now() + min(holdoff, remaining)))`.</div><div class="eq"></div><div class="ch">Logging through `log.write(level, &quot;sc_agent_http&quot;, action, fields)` (never a body, header value or key; a log Err never changes the result, the logger counts it): `http.send` (method, endpoint log_form, attempt, max_sends), `http.response` (status, attempt), `http.busy` (status, attempt, holdoff_ms, retry_after_honoured), `http.busy_exhausted`, `http.budget_exhausted`, `http.quota_exhausted`, <ins>`http.timeout_resend` (attempt), </ins>`http.transport_failed` (error id).</div><div class="eq"></div><div class="ch">How the runner (A-9) uses it, no <del>sleep:</del><ins>sleep (one-off calls: see Decisions):</ins> take job -&gt; `send_once` -&gt; `ResendAt(t)` puts the job back in its queue keyed by `t`; idle workers wait with `Condvar::wait_timeout` to the earliest `t`, and a `CancelToken::on_cancel` hook wakes them at once; a cancelled job is never sent again.</div><div class="eq"></div><div class="eq">## 4. Error list (`src/error.rs`, full; ErrorId from A-1, Display = detail())</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum BusyReason { Sends, Budget }</div><div class="eq">impl BusyReason { pub const fn as_str(self) -&gt; &amp;&#x27;static str; }       // &quot;sends&quot; | &quot;budget&quot;</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum NetworkKind { Timeout, Connect, Tls, Other }</div><div class="eq">impl NetworkKind { pub const fn as_str(self) -&gt; &amp;&#x27;static str; }</div><div class="eq"></div><div class="ch">/// What a provider said in a reply. Text fields are <del>redacted,</del><ins>redacted</ins> <del>then</del><ins>and</ins> <del>bounded</del><ins>otherwise</ins> <del>(Q5).</del><ins>kept whole (REQ-SAG-0002).</ins></div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct ProviderReply {</div><div class="eq">    pub status: u16,</div><div class="eq">    pub provider_type: Option&lt;String&gt;,</div><div class="eq">    pub provider_code: Option&lt;String&gt;,</div><div class="eq">    pub message: String,</div><div class="eq">    pub param: Option&lt;String&gt;,</div><div class="eq">    pub request_id: Option&lt;String&gt;,</div><div class="eq">    pub retry_after_seconds: Option&lt;f64&gt;,   // valid Retry-After as sent, unrounded</div><div class="eq">}</div><div class="eq">impl ProviderReply { pub fn read(response: &amp;HttpResponse, secret: Option&lt;&amp;ApiKey&gt;) -&gt; Self; }</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum HttpError {</div><div class="ch">    /// Sends or budget ran out on busy replies (REQ-SAG-0601).<del> Retryable.</del></div><div class="eq">    ProviderBusy { reason: BusyReason, attempts: u32, retry_after_seconds: Option&lt;f64&gt;, last: ProviderReply }, // &quot;http.provider_busy&quot;</div><div class="eq">    /// Busy status whose body marks quota, credit or spend exhaustion (REQ-SAG-0602).</div><div class="eq">    QuotaExhausted { attempts: u32, reply: ProviderReply },        // &quot;http.quota_exhausted&quot;</div><div class="ch">    /// <del>Timeout,</del><ins>Transport</ins> <del>connect,</del><ins>failure.</ins> <del>DNS, TLS or other transport failure; never</del><ins>Timeout:</ins> resent <del>here.</del><ins>under</ins> <del>Retryable.</del><ins>max_sends, returned when they run out; Connect (incl. DNS), Tls, Other: returned after one send.</ins></div><div class="eq">    Network { kind: NetworkKind, attempts: u32, message: String }, // &quot;http.network&quot;</div><div class="eq">    /// The body exceeded the 8 MiB read cap.</div><div class="eq">    ResponseTooLarge { status: u16, limit_bytes: u64 },            // &quot;http.response_too_large&quot;</div><div class="ch">    /// The URL does not parse, has no host, or its scheme is refused <del>(Q1).</del><ins>(`parse`: https; `parse_local`: http or https).</ins></div><div class="eq">    InvalidEndpoint { url: String, reason: String },               // &quot;http.invalid_endpoint&quot;</div><div class="eq">    /// A header name or value the HTTP builder refuses.</div><div class="eq">    InvalidRequest { message: String },                            // &quot;http.invalid_request&quot;</div><div class="eq">}</div><div class="eq">impl HttpError {</div><div class="rm">-     pub const fn retryable(&amp;self) -&gt; bool;                          // ProviderBusy, Network -&gt; true</div><div class="eq">    pub(crate) fn map_text(self, map: &amp;impl Fn(&amp;str) -&gt; String) -&gt; Self;</div><div class="eq">}</div><div class="eq">impl ErrorId for HttpError {}   // cause(): Network/InvalidRequest keep the ureq/io text in `message`; no lower sc-agent error</div><div class="eq">impl std::error::Error for HttpError {}</div><div class="eq">```</div><div class="eq"></div><div class="eq">6 variants. Cancellation is not an HTTP error: the queue that waits owns it (DecisionError::Cancelled, A-2).</div><div class="eq"></div><div class="eq">## 5. Config keys</div><div class="eq"></div><div class="eq">`max_sends` (A-4 `AgentConfig.max_sends`, one value, default 5) -&gt; `ResendPolicy::new`. `Timeouts` stays code-level.</div><div class="eq"></div><div class="eq">## 6. Tests</div><div class="eq"></div><div class="ch">- `tests/resend.rs` (scripted transport, explicit clock `Cell&lt;Instant&gt;`, no sleep): busy every time -&gt; 5 sends, `ProviderBusy { Sends, attempts: 5 }`; `max_sends = 2` -&gt; 2 sends; `Retry-After: 3` -&gt; `ResendAt(t + 3 s)` exactly; `99` -&gt; `t + 30 s`; `abc`/absent -&gt; [1, 1.25], [2, 2.25], [4, 4.25], [8, 8.25] s; clock past 90 s -&gt; `Budget`; `Network { <ins>Timeout }` every time -&gt; 5 sends then that timeout error; `Network { </ins>Connect }` returned after 1 <ins>send; 402 (Jev and Anthropic bodies) and Anthropic&#x27;s usage-limit 400 -&gt; `Done` after 1 </ins>send, <del>`retryable()`;</del><ins>body unchanged;</ins> 429 with Anthropic `enforced_spend_limit_reached` -&gt; `QuotaExhausted` after 1 send; 429 `rate_limit_error` -&gt; `ResendAt`; 400 and 503 -&gt; `Done` with the response unchanged; same body bytes on every resend; `retry_after_seconds` `2.5` is `2.5`; a key echoed in a transport error and a busy reply message becomes `[redacted]`; <ins>a 4 KiB provider message is kept whole; </ins>events land in an injected GeneralLogger with no key or body; every HttpError id matches `^http\.[a-z_]+$`.</div><div class="ch">- `tests/ureq.rs`: real refused connection -&gt; `Network { Connect }`, <del>retryable, </del>one send; headers + secret + body over `serve_once`.</div><div class="eq">- Unit tests copied in C5, C6, C8, C9, C12, ported.</div><div class="eq"></div><div class="eq">## 7. Dependencies</div><div class="eq"></div><div class="eq">- `ureq = &quot;=3.5.1&quot;` (as pinned in ref-src), default features (rustls).</div><div class="eq">- `serde_json = &quot;1&quot;` (quota body reader, ProviderReply).</div><div class="eq">- `sc-agent-types` (path; ErrorId, ErrorDetail), `sc-agent-secrets` (path; ApiKey), `sc-agent-log` (path; GeneralLogger, Level).</div><div class="eq">- No thiserror, no serde derive, no tokio, no sc-observability directly.</div><div class="eq">- `clippy.toml` (A-1 owns it): add `{ path = &quot;sc_agent_secrets::ApiKey::as_str&quot;, reason = &quot;single read site in ureq_transport&quot; }` to `disallowed-methods`.</div><div class="eq"></div><div class="eq">Estimated size: about 620 lines of code, 350 of tests.</div></div>
+  </details>
+</section>

@@ -1,0 +1,380 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.7">
+  <div class="section-head">
+    <h2>agt-4p2.7 <span class="unit-title">Sprint A-7: sc-llm-provider and sc-decision-llm</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 396,
+      &quot;before_chars&quot;: 331,
+      &quot;field&quot;: &quot;description&quot;
+    },
+    {
+      &quot;after_chars&quot;: 4208,
+      &quot;before_chars&quot;: 2382,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    },
+    {
+      &quot;after_chars&quot;: 21430,
+      &quot;before_chars&quot;: 17466,
+      &quot;field&quot;: &quot;design&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+      &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+      &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+      &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-09T23:25:55+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-001&quot;,
+      &quot;REQ-SAG-0201&quot;,
+      &quot;REQ-SAG-0601&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261109T232555Z-agt-4p2.7&quot;,
+    &quot;score&quot;: &quot;6/9&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.7&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:34+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+        &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+        &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+        &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023534Z-agt-4p2.7&quot;,
+    &quot;score&quot;: &quot;7/7&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 12,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-7: sc-llm-provider and sc-decision-llm&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:25:55+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-001&quot;,
+        &quot;REQ-SAG-0201&quot;,
+        &quot;REQ-SAG-0601&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232555Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;6/9&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:12:31+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;REQ-SAG-0006&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011231Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;6/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:14:32+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T011432Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:24:26+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T012426Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:43+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020443Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:06+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020606Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;1/1&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:37+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020637Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:16+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T021116Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;6/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:35+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021135Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:37+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021137Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:39+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021139Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:34+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023534Z-agt-4p2.7&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.7: Sprint A-7: sc-llm-provider and sc-decision-llm
+Gate FAIL 6/9 -&gt; PASS 7/7 over 12 runs.
+Failing at first run: ANC-001, REQ-SAG-0201, REQ-SAG-0601.
+Failing now: none.
+Excluded ANC-001: ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.
+Excluded REQ-SAG-0006: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.
+Excluded REQ-SAG-0601: A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.
+Changed fields: description, acceptance_criteria, design.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>6/9</td><td>ANC-001, REQ-SAG-0201, REQ-SAG-0601</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 12 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261109T232555Z-agt-4p2.7</code></td><td>2026-11-09T23:25:55+00:00</td><td><span class="status status-fail">FAIL</span></td><td>6/9</td><td>ANC-001, REQ-SAG-0201, REQ-SAG-0601</td></tr>
+        <tr><td><code>plan-20261110T011231Z-agt-4p2.7</code></td><td>2026-11-10T01:12:31+00:00</td><td><span class="status status-fail">FAIL</span></td><td>6/7</td><td>REQ-SAG-0006</td></tr>
+        <tr><td><code>plan-20261110T011432Z-agt-4p2.7</code></td><td>2026-11-10T01:14:32+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T012426Z-agt-4p2.7</code></td><td>2026-11-10T01:24:26+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T020443Z-agt-4p2.7</code></td><td>2026-11-10T02:04:43+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020606Z-agt-4p2.7</code></td><td>2026-11-10T02:06:06+00:00</td><td><span class="status status-pass">PASS</span></td><td>1/1</td><td></td></tr>
+        <tr><td><code>plan-20261110T020637Z-agt-4p2.7</code></td><td>2026-11-10T02:06:37+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021116Z-agt-4p2.7</code></td><td>2026-11-10T02:11:16+00:00</td><td><span class="status status-fail">FAIL</span></td><td>6/7</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T021135Z-agt-4p2.7</code></td><td>2026-11-10T02:11:35+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021137Z-agt-4p2.7</code></td><td>2026-11-10T02:11:37+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021139Z-agt-4p2.7</code></td><td>2026-11-10T02:11:39+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T023534Z-agt-4p2.7</code></td><td>2026-11-10T02:35:34+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-001">ANC-001</a></th><td>ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0006">REQ-SAG-0006</a></th><td>REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0601">REQ-SAG-0601</a></th><td>A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="ch"><ins>sc-llm-provider and sc-decision-llm are sc-agent library crates. </ins>Anthropic Messages and OpenAI-compatible providers with JSON-schema output (LlmError); Haiku and Luna decision backends that translate the Jev request to a prompt and required schema, self-report probabilities and confidence, and signal a schema mismatch for resend. Records: REQ-SAG-0103, REQ-SAG-0502, REQ-SAG-0901, ADR-SAG-0001.</div></div>
+  </details>
+  <details>
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="rm">- - [ ] REQ-SAG-0103: a caller gives Provider and ModelId separately; the same model id is sent through two providers (OpenAI and OpenRouter) unchanged; the OpenAI provider is named openai.</div><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-7.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="ad">+ - [ ] REQ-SAG-0103: a caller gives Provider and ModelId separately; one catalog id selects the same model through two providers, each sending its own id (OpenRouter anthropic/claude-haiku-5.5 for claude-haiku-5-5); catalog_model_id maps provider ids back; the OpenAI provider is named openai.</div><div class="eq">- [ ] REQ-SAG-0502: sc-llm-provider encodes/decodes a request to a non-decision LLM on any configured provider (Anthropic Messages; Chat Completions for openai, OpenRouter, Together, Nous); a test sends a non-decision request for a model selected by short name through HttpClient over a scripted transport and returns its response.</div><div class="eq">- [ ] JSON-schema output: Output::Json is sent as Anthropic output_config.format json_schema and as Chat Completions response_format json_schema (strict), and the reply text is returned parsed.</div><div class="eq">- [ ] REQ-SAG-0901 AC1: Haiku/Luna answers to choice, score, noul and box questions are self-reported values that parse as the Jev answer type for each question (probabilities and confidence where Jev returns them).</div><div class="rm">- - [ ] REQ-SAG-0901: a reply that does not match the required schema (not JSON, truncated, ids differ, a required field missing or mistyped) is returned from decode as decision.schema_mismatch carrying the decision_llm/llm chain, so the runner sends it again; other failures are decision.backend and are not resent.</div><div class="rm">- - [ ] ADR-SAG-0001: LlmDecisionBackend implements the A-2 Backend trait (encode(&amp;DecisionRequest), decode(HttpResponse, &amp;DecisionRequest)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.</div><div class="ad">+ - [ ] REQ-SAG-0901: every request asks for the required schema through the provider&#x27;s structured-output feature (Anthropic output_config json_schema; Chat Completions response_format json_schema strict).</div><div class="ad">+ - [ ] REQ-SAG-0901: a reply that does not match the required schema (not JSON, truncated, ids differ, a required field missing or mistyped) is returned from decode as decision.schema_mismatch carrying the decision_llm/llm chain (what did not match), so the runner resends it unchanged up to max_sends; other failures are decision.backend and are not resent.</div><div class="ad">+ - [ ] REQ-SAG-0901: images and every other provider-supported input are passed to the provider; a provider rejection returns the provider&#x27;s error (decision.backend, cause llm.api_status); no unsupported-input error exists.</div><div class="ad">+ - [ ] REQ-SAG-0503 support: LlmClient::models_request/decode_models return a provider&#x27;s model ids (tests over canned replies).</div><div class="ad">+ - [ ] ADR-SAG-0001: LlmDecisionBackend implements the Backend trait imported from sc-decision-schema (no crate defines its own Backend trait) (encode(&amp;DecisionRequest), decode(HttpResponse, &amp;DecisionRequest)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.</div><div class="eq">- [ ] REQ-SAG-0007: a model probability of 0.123456789 is returned as 0.123456789; no rounding, normalizing or clamping.</div><div class="eq">- [ ] REQ-SAG-0002: LlmError (9 llm.* ids) wraps HttpError; DecisionLlmError (4 decision_llm.* ids) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError&#x27;s detail chain with http.network and its message; clippy with the workspace denies passes.</div><div class="ch">- [ ] ADR-SAG-0004: <del>cargo</del><ins>sc-llm-provider sits on the http layer and its only sc-agent crate dependencies are sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http; sc-decision-llm sits in the decision-backend layer and adds only sc-decision-schema and sc-llm-provider; neither depends on sc-decision-runner, checked by `cargo</ins> tree -p sc-llm-provider <del>lists</del><ins>-p</ins> <del>no sc-decision-* crate; sc-decision-schema does not depend on sc-llm-provider.</del><ins>sc-decision-llm`.</ins></div><div class="eq">- [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.</div><div class="eq">- [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio or ureq; no sleep call.</div><div class="ad">+ - [ ] REQ-SAG-0201: sc-decision-llm imports every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema and defines none of its own; sc-llm-provider uses no decision types.</div><div class="ad">+ - [ ] ANC-007: sc-llm-provider&#x27;s LlmClient and sc-decision-llm&#x27;s LlmDecisionBackend write log records for each request sent, its token usage and each schema mismatch (never a prompt, body or key) to an injected GeneralLogger; a test injects an in-memory GeneralLogger, runs one request and one schema mismatch, and finds those records.</div></div>
+  </details>
+  <details>
+    <summary>design</summary>
+    <div class="diff"><div class="eq"># Sprint A-7: sc-llm-provider and sc-decision-llm (bead agt-4p2.7)</div><div class="eq"></div><div class="ch">Governing: REQ-SAG-0103, REQ-SAG-0502, REQ-SAG-0901 (docs/sc-decision-llm: in decider mode Haiku and Luna produce probabilities and confidence themselves and return the Jev answer <del>schema;</del><ins>schema, requested through the provider&#x27;s structured-output feature;</ins> a reply that does not match is <del>retried</del><ins>resent</ins> <del>until</del><ins>unchanged</ins> <del>it</del><ins>up</ins> <del>does),</del><ins>to max_sends, then returned as decision.schema_mismatch with what did not match; every provider-supported input, images included, is passed through),</ins> ADR-SAG-0001, ADR-SAG-0004 (sc-llm-provider sits on sc-agent-http and needs no decision types; sc-decision-llm sits on sc-decision-schema and sc-llm-provider, below the runner; HttpError is wrapped by LlmError, and an LlmError reaches DecisionError as an ErrorDetail chain). Also binding: REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0007, REQ-SAG-0201, REQ-SAG-0401, REQ-SAG-0009, REQ-SAG-0010, owner-architecture, owner-decision-trait, owner-provider-and-model, owner-openai-naming, owner-lowlevel-no-tokio.</div><div class="eq"></div><div class="eq">Copy script: `docs/plans/phase-a/copy/a-7.sh` (source sc-agent-ref@dce239a; dry run 2026-11-09, reconciliation: 14 copy steps, 8 files, 405 lines; no `sleep(`; the old `wire.rs:426` `expect` is not copied).</div><div class="eq"></div><div class="rm">- Both crates are sans-IO: they build an `HttpRequest` and read an `HttpResponse` (A-5). Sending, busy resend and holdoff are sc-agent-http plus the runner&#x27;s queue; the schema-mismatch resend is the runner&#x27;s too (A-9), signalled by `DecisionError::SchemaMismatch` from `decode`.</div><div class="ad">+ Both crates are sans-IO: they build an `HttpRequest` and read an `HttpResponse` (A-5). Sending, busy resend and holdoff are sc-agent-http plus the runner&#x27;s queue; the schema-mismatch resend (up to max_sends) is the runner&#x27;s too (A-9), signalled by `DecisionError::SchemaMismatch` from `decode`.</div><div class="ad">+ </div><div class="ad">+ Decisions (assistant, 2026-11-09):</div><div class="ad">+ - Wire: Anthropic Messages for anthropic; Chat Completions for openai, openrouter, together and nous (one encoder). Token cap: `max_completion_tokens` for openai, `max_tokens` for the others.</div><div class="ad">+ - Nous: base `https://inference-api.nousresearch.com/v1`, Bearer, `response_format` json_schema; a model that rejects it returns the provider&#x27;s error.</div><div class="ad">+ - Provider ids (REQ-SAG-0103): `provider_model_id` maps a catalog id to the provider&#x27;s id: anthropic, openai, nous unchanged; openrouter `anthropic/&lt;id&gt;` for `claude-*` with the trailing `-&lt;major&gt;-&lt;minor&gt;` written `&lt;major&gt;.&lt;minor&gt;` (`claude-haiku-5-5` -&gt; `anthropic/claude-haiku-5.5`) and `openai/&lt;id&gt;` for `gpt-*`; together `anthropic/&lt;id&gt;` / `openai/&lt;id&gt;` (Together&#x27;s ids are unconfirmed; decide doctor reports any that do not map back). `catalog_model_id` is the inverse, used by decide doctor.</div><div class="ad">+ - Model lists for decide doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.</div><div class="ad">+ - Images: every asset is passed through (REQ-SAG-0901); a provider rejection is its own error (decision.backend, cause llm.api_status).</div><div class="ad">+ - Model name: the request sends `provider_model_id(provider, resolved ModelId)`; the response reports the model the provider names.</div><div class="ad">+ - System prompt: drafted below by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); the owner reviews the draft.</div><div class="eq"></div><div class="eq">What the old code did, and why little is copied: old `sc-jev-backends` sent a consumer system prompt (judge-jev `check.toml`) plus the canonical payload to a token-count endpoint, then to Anthropic Messages or OpenAI Responses, with no JSON schema; old `sc-decision-schema/src/llm` checked only ids, choice membership and numeric types; `noul` was refused, `score` was a choice, `box` did not exist. Dropped: canonical payload and `payload_sha256` (ADR-SAG-0001), `WireFault`, token counting and byte limits (no record), the consumer prompt (REQ-SAG-0006), `ModelFamily`/`SchemaFamily`, the macro-built backends.</div><div class="eq"></div><div class="eq">## 1. Copy list (source `path:lines` -&gt; target)</div><div class="eq"></div><div class="eq">| # | Source (sc-agent-ref@dce239a) | Target | What it becomes |</div><div class="eq">|---|---|---|---|</div><div class="eq">| C1 | `crates/sc-jev-backends/LICENSE` | both crates&#x27; `LICENSE` | unchanged |</div><div class="eq">| C2 | `crates/sc-jev-backends/src/wire.rs:13-30` | `sc-llm-provider/src/endpoints.rs` | hosts, paths, `ANTHROPIC_VERSION = &quot;2026-10-21&quot;`, `HAIKU_MAX_TOKENS = 16_000` (moves to sc-decision-llm as its default) |</div><div class="eq">| C3 | `crates/sc-jev-backends/src/wire.rs:200-223` | `sc-llm-provider/src/endpoints.rs` | non-secret headers and credential header per wire |</div><div class="eq">| C4 | `crates/sc-jev-backends/src/wire.rs:252-289, 302-339, 386-423` | `sc-llm-provider/src/decode.rs` | reply-envelope skeleton, Anthropic text gathering, truncation detection, usage counters |</div><div class="eq">| C5 | `crates/sc-jev-backends/src/backend.rs:325-336` | `sc-llm-provider/src/client.rs` | `HttpRequest` assembly (headers + secret) |</div><div class="eq">| C6 | `crates/sc-jev-backends/tests/llm.rs:51-68, 87-101, 498-533` | `sc-llm-provider/tests/decode.rs` | reply builders, truncation test |</div><div class="eq">| C7 | `crates/sc-decision-schema/src/llm/v1.rs:20-63` | `sc-decision-llm/src/answers.rs` | `LlmOutput` (model text -&gt; `answers` object), ids-differ error |</div><div class="eq">| C8 | `crates/sc-decision-schema/src/variants.rs:51-120` | `sc-decision-llm/src/answers.rs` | old per-answer check (choice + confidence + probabilities keyed by criteria) |</div><div class="eq">| C9 | `crates/sc-jev-backends/tests/llm.rs:74-85` | `sc-decision-llm/tests/translate.rs` | old answer fixture |</div><div class="eq"></div><div class="eq">## 2. Required edits after copying</div><div class="eq"></div><div class="eq">- All: `JevError` -&gt; `LlmError` / `DecisionLlmError`; `ResolvedApiKey` -&gt; `sc_agent_secrets::ApiKey`; `HeaderName::new(..)` -&gt; `&amp;&#x27;static str`; `ResponseInvalidCause` goes.</div><div class="ch">- `endpoints.rs`: `ProviderKind::{Anthropic, OpenAi}` -&gt; `Wire::{AnthropicMessages, ChatCompletions}`. Keep `ANTHROPIC_HOST`, `/v1/messages`, `ANTHROPIC_VERSION`. Chat Completions URL per <del>provider (Q1):</del><ins>provider:</ins> OpenAI `https://api.openai.com/v1/chat/completions`, OpenRouter `https://openrouter.ai/api/v1/chat/completions`, Together `https://api.together.ai/v1/chat/completions`, Nous <del>`https://inference-api.nousresearch.com/v1/chat/completions`</del><ins>`https://inference-api.nousresearch.com/v1/chat/completions`.</ins> <del>(Q2).</del><ins>Models list: `GET {base}/v1/models` per provider (Anthropic `https://api.anthropic.com/v1/models`).</ins> Delete the count paths. Anthropic `x-api-key`; Chat Completions `Authorization: Bearer`.</div><div class="eq">- `decode.rs`: `parse_vendor` -&gt; `decode_anthropic` / `decode_chat` -&gt; `LlmResponse`. Keep Anthropic text concatenation (drop `non_text_blocks`). Usage: provider&#x27;s own counters (Chat `prompt_tokens`/`completion_tokens`); no cache sums. Truncation: `stop_reason == &quot;max_tokens&quot;`, Chat `finish_reason == &quot;length&quot;`. Refusal: Anthropic `stop_reason == &quot;refusal&quot;`, Chat `message.refusal` non-null. First choice via `.first()`. Negative counter -&gt; `ReplyInvalid`.</div><div class="eq">- `client.rs`: the fold becomes `LlmClient::encode`&#x27;s tail.</div><div class="eq">- `tests/decode.rs`: port builders; add `chat_message(text, finish_reason)`; truncation asserts `LlmError::Truncated` on both wires.</div><div class="eq">- `answers.rs`: `LlmOutput::parse` keeps the not-JSON / no-`answers` split (`DecisionLlmError::AnswerInvalid` / `AnswerIds`). Replace the choice-only check with one check per Jev question type (section 3). Delete `input_bytes`, `parse_output`, `id_set`, `QuestionAnswer`.</div><div class="eq"></div><div class="eq">## 3. New code (exact public surface; bodies elided)</div><div class="eq"></div><div class="eq">### sc-llm-provider</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">#![warn(missing_docs)]</div><div class="ch">mod client; mod decode; mod encode; mod endpoints; mod error; mod <ins>ids; mod </ins>types;</div><div class="eq">pub use client::{LlmClient, Wire};</div><div class="eq">pub use error::LlmError;</div><div class="rm">- pub use types::{LlmRequest, LlmResponse, Message, Output, Role, Usage};</div><div class="ad">+ pub use ids::{catalog_model_id, provider_model_id};</div><div class="ad">+ pub use types::{LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};</div><div class="eq"></div><div class="eq">// src/types.rs - any LLM call (REQ-SAG-0502), not only decisions</div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">pub struct LlmRequest { pub model: ModelId, pub system: Option&lt;String&gt;, pub messages: Vec&lt;Message&gt;, pub max_tokens: u32, pub output: Output }</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq)]</div><div class="rm">- pub struct Message { pub role: Role, pub content: String }</div><div class="ad">+ pub struct Message { pub role: Role, pub content: Vec&lt;Part&gt; }</div><div class="ad">+ #[derive(Debug, Clone, PartialEq, Eq)]</div><div class="ad">+ pub enum Part {</div><div class="ad">+     Text(String),</div><div class="ad">+     /// Anthropic `{type:&quot;image&quot;, source:{type:&quot;base64&quot;, media_type, data}}`; Chat `{type:&quot;image_url&quot;, image_url:{url:&quot;data:&lt;media_type&gt;;base64,&lt;data&gt;&quot;}}`.</div><div class="ad">+     Image { media_type: &amp;&#x27;static str, data_base64: String },</div><div class="ad">+ }</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">pub enum Role { User, Assistant }</div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">pub enum Output {</div><div class="eq">    Text,</div><div class="eq">    /// Anthropic `output_config.format = {type:&quot;json_schema&quot;, schema}`;</div><div class="eq">    /// Chat Completions `response_format = {type:&quot;json_schema&quot;, json_schema:{name, strict:true, schema}}`.</div><div class="eq">    Json { name: String, schema: serde_json::Value },</div><div class="eq">}</div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">pub struct LlmResponse {</div><div class="eq">    pub model: String,                       // as the provider reports it</div><div class="eq">    pub text: String,</div><div class="eq">    pub json: Option&lt;serde_json::Value&gt;,     // Some(parsed text) for Output::Json</div><div class="eq">    pub stop_reason: Option&lt;String&gt;,         // verbatim</div><div class="eq">    pub usage: Usage,</div><div class="eq">}</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]</div><div class="eq">pub struct Usage { pub input_tokens: u64, pub output_tokens: u64 }</div><div class="eq"></div><div class="eq">// src/client.rs</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum Wire { AnthropicMessages, ChatCompletions }</div><div class="eq">impl Wire { pub const fn of(provider: Provider) -&gt; Option&lt;Self&gt;; }   // TypeSafe -&gt; None</div><div class="eq"></div><div class="eq">#[derive(Debug, Clone)]</div><div class="eq">pub struct LlmClient { provider: Provider, wire: Wire, endpoint: Endpoint, key: ApiKey }</div><div class="eq">impl LlmClient {</div><div class="eq">    pub fn new(provider: Provider, key: ApiKey) -&gt; Result&lt;Self, LlmError&gt;;   // built-in endpoint; UnsupportedProvider</div><div class="eq">    pub fn with_endpoint(self, endpoint: Endpoint) -&gt; Self;</div><div class="eq">    pub fn provider(&amp;self) -&gt; Provider;</div><div class="eq">    pub fn wire(&amp;self) -&gt; Wire;</div><div class="eq">    /// Sans-IO: the POST to send (JSON body, headers, secret header).</div><div class="eq">    pub fn encode(&amp;self, request: &amp;LlmRequest) -&gt; Result&lt;HttpRequest, LlmError&gt;;</div><div class="eq">    /// Sans-IO: read a final reply. Non-2xx -&gt; ApiStatus with ProviderReply::read(&amp;response, Some(&amp;key)).</div><div class="eq">    pub fn decode(&amp;self, request: &amp;LlmRequest, response: HttpResponse) -&gt; Result&lt;LlmResponse, LlmError&gt;;</div><div class="eq">    /// Wrap a send failure with this client&#x27;s provider, for callers that send.</div><div class="eq">    pub fn http_error(&amp;self, error: HttpError) -&gt; LlmError;</div><div class="ad">+     /// GET {base}/v1/models with the credential header (decide doctor).</div><div class="ad">+     pub fn models_request(&amp;self) -&gt; HttpRequest;</div><div class="ad">+     /// The provider&#x27;s model ids (`data[].id`, or a top-level array of `{id}`); non-2xx -&gt; ApiStatus.</div><div class="ad">+     pub fn decode_models(&amp;self, response: HttpResponse) -&gt; Result&lt;Vec&lt;String&gt;, LlmError&gt;;</div><div class="eq">}</div><div class="ad">+ </div><div class="ad">+ // src/ids.rs (REQ-SAG-0103; rule in Decisions)</div><div class="ad">+ pub fn provider_model_id(provider: Provider, model: &amp;ModelId) -&gt; String;</div><div class="ad">+ pub fn catalog_model_id(provider: Provider, provider_id: &amp;str) -&gt; String;</div><div class="eq">```</div><div class="eq"></div><div class="ch">Bodies: Anthropic `{&quot;model&quot;,&quot;max_tokens&quot;,&quot;system&quot;?,&quot;messages&quot;:[{&quot;role&quot;,&quot;content&quot;}],&quot;output_config&quot;?}`, headers `anthropic-version: 2026-10-21`, `content-type: application/json`, secret `x-api-key`. Chat Completions <del>`{&quot;model&quot;,&quot;max_tokens&quot;|&quot;max_completion_tokens&quot;</del><ins>`{&quot;model&quot;,&quot;max_completion_tokens&quot;</ins> <del>(Q1),&quot;messages&quot;:[{&quot;role&quot;:&quot;system&quot;?},...],&quot;response_format&quot;?}`,</del><ins>(openai) | &quot;max_tokens&quot; (others),&quot;messages&quot;:[{&quot;role&quot;:&quot;system&quot;?},...],&quot;response_format&quot;?}`,</ins> `content-type`, `Authorization: Bearer`. <del>Same</del><ins>`model`</ins> <del>`ModelId`</del><ins>=</ins> <del>string</del><ins>`provider_model_id(provider,</ins> <del>on every provider</del><ins>&amp;request.model)`</ins> (REQ-SAG-0103).</div><div class="eq"></div><div class="eq">### sc-decision-llm</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">#![warn(missing_docs)]</div><div class="eq">mod answers; mod backend; mod error; mod prompt; mod schema;</div><div class="eq">pub use backend::LlmDecisionBackend;</div><div class="eq">pub use error::DecisionLlmError;</div><div class="eq"></div><div class="eq">// src/backend.rs - Haiku and Luna are this one type with a different (provider, model)</div><div class="eq">#[derive(Debug, Clone)]</div><div class="eq">pub struct LlmDecisionBackend { llm: LlmClient, model: ModelId, max_tokens: u32 }</div><div class="eq">impl LlmDecisionBackend {</div><div class="eq">    pub const DEFAULT_MAX_TOKENS: u32 = 16_000;</div><div class="eq">    /// Haiku: LlmClient::new(Provider::Anthropic, key) with catalog.resolve(Latest(Haiku));</div><div class="eq">    /// Luna: LlmClient::new(Provider::OpenAi, key) with catalog.resolve(Latest(Luna)).</div><div class="eq">    pub fn new(llm: LlmClient, model: ModelId) -&gt; Self;</div><div class="eq">    pub fn with_max_tokens(self, max_tokens: u32) -&gt; Self;</div><div class="eq">    pub fn model(&amp;self) -&gt; &amp;ModelId;</div><div class="eq">}</div><div class="eq">impl Backend for LlmDecisionBackend {</div><div class="eq">    /// DecisionRequest -&gt; LlmRequest (built-in prompt + per-question JSON schema) -&gt; HttpRequest.</div><div class="rm">-     /// Assets / image parts -&gt; DecisionError::UnsupportedQuestion { question: &lt;asset id&gt;, kind: &quot;asset&quot; } (Q3).</div><div class="ad">+     /// Assets: after the JSON text part, one `Part::Text(&quot;asset &lt;id&gt;:&quot;)` and one `Part::Image` per asset in request order</div><div class="ad">+     /// (`data_base64` as given; a multipart `part` from its ImagePart bytes, base64-encoded). Nothing is refused here;</div><div class="ad">+     /// a provider that rejects an input returns its error (REQ-SAG-0901).</div><div class="eq">    fn encode(&amp;self, request: &amp;DecisionRequest) -&gt; Result&lt;HttpRequest, DecisionError&gt;;</div><div class="eq">    /// HttpResponse -&gt; LlmResponse -&gt; SystemOneResponse with one Answer per question, in request order.</div><div class="eq">    fn decode(&amp;self, response: HttpResponse, request: &amp;DecisionRequest) -&gt; Result&lt;SystemOneResponse, DecisionError&gt;;</div><div class="eq">}</div><div class="eq"></div><div class="eq">// src/prompt.rs</div><div class="rm">- pub(crate) const SYSTEM_PROMPT: &amp;str = &quot;..&quot;;   // built in (ADR-SAG-0001); wording needs owner approval (Q5)</div><div class="rm">- pub(crate) fn translate(request: &amp;SystemOneRequest, model: &amp;ModelId, max_tokens: u32) -&gt; Result&lt;LlmRequest, DecisionLlmError&gt;;</div><div class="rm">- // user message = compact JSON {&quot;state&quot;: &lt;request.state&gt;, &quot;questions&quot;: &lt;request.questions&gt;} in document order</div><div class="ad">+ /// Built in (ADR-SAG-0001). Assistant draft for owner review:</div><div class="ad">+ /// &quot;You answer decision questions in place of a decision model. The user message is JSON with a state and</div><div class="ad">+ /// questions keyed by id; images, if any, follow it. Answer every question in the required JSON schema. For a</div><div class="ad">+ /// choice or score question give your own probability for every option and your confidence from 0 to 1; for a</div><div class="ad">+ /// noul question give the probability that the answer is true; for a box question give the box edges and your</div><div class="ad">+ /// confidence. Return only the JSON.&quot;</div><div class="ad">+ pub(crate) const SYSTEM_PROMPT: &amp;str;</div><div class="ad">+ pub(crate) fn translate(request: &amp;DecisionRequest, model: &amp;ModelId, max_tokens: u32) -&gt; Result&lt;LlmRequest, DecisionLlmError&gt;;</div><div class="ad">+ // user message = Part::Text(compact JSON {&quot;state&quot;: &lt;request.state&gt;, &quot;questions&quot;: &lt;request.questions&gt;} in document order), then the asset parts</div><div class="eq"></div><div class="eq">// src/schema.rs - the required schema (REQ-SAG-0901)</div><div class="eq">pub(crate) fn answer_schema(request: &amp;SystemOneRequest) -&gt; serde_json::Value;</div><div class="eq">// {&quot;type&quot;:&quot;object&quot;,&quot;required&quot;:[&quot;answers&quot;],&quot;additionalProperties&quot;:false,</div><div class="eq">//  &quot;properties&quot;:{&quot;answers&quot;:{&quot;type&quot;:&quot;object&quot;,&quot;additionalProperties&quot;:false,</div><div class="eq">//    &quot;required&quot;:[&lt;every question id&gt;],&quot;properties&quot;:{&lt;id&gt;: &lt;per-type schema&gt;}}}}</div><div class="eq"></div><div class="eq">// src/answers.rs - the schema check</div><div class="eq">pub(crate) fn answers(request: &amp;SystemOneRequest, reply: &amp;LlmResponse) -&gt; Result&lt;SystemOneResponse, DecisionLlmError&gt;;</div><div class="eq">```</div><div class="eq"></div><div class="eq">Per question type: the model self-reports every value (REQ-SAG-0901); the schema requires them; `answers` checks the reply against the same rules (a provider&#x27;s strict mode is not trusted):</div><div class="eq"></div><div class="eq">| Jev type | Required from the model (schema) | Filled locally |</div><div class="eq">|---|---|---|</div><div class="eq">| `noul` | `noul`: number | `type` |</div><div class="eq">| `choice` | `choice`: enum of the criteria keys; `confidence`: number; `probabilities`: object with every criteria key required, numbers, `additionalProperties:false` | `type` |</div><div class="eq">| `score` | `score`, `confidence`: number; `probabilities`: object with keys `&quot;0&quot;..&quot;n-1&quot;` required | `type`; `legend` = `{&quot;&lt;index&gt;&quot;: criteria[index]}` from the request |</div><div class="eq">| `box` | `box`: `{top,bottom,left,right}` numbers; `confidence`: `[&quot;number&quot;,&quot;null&quot;]` | `type` |</div><div class="eq"></div><div class="ch">Anthropic structured outputs accept no numeric min/max, so ranges are not in the schema; values pass through unrounded and unchecked for range or sum (REQ-SAG-0007). `usage` = `LlmResponse.usage`; `model` <del>per</del><ins>=</ins> <del>Q4.</del><ins>`LlmResponse.model` (as the provider names it).</ins></div><div class="eq"></div><div class="ch">How decode maps failures (the runner resends on <del>`SchemaMismatch`,</del><ins>`SchemaMismatch` up to max_sends, then returns it,</ins> A-9; backend name `&quot;llm&quot;`):</div><div class="eq">- `DecisionError::SchemaMismatch { backend: &quot;llm&quot;, detail }`: `LlmError::OutputNotJson`, `LlmError::Truncated`, `LlmError::NoText`, `DecisionLlmError::AnswerIds`, `DecisionLlmError::AnswerInvalid` (e.g. a choice answer missing `probabilities`). `detail` = `DecisionLlmError::detail()`, which carries the LlmError chain.</div><div class="ch">- `DecisionError::Backend { backend: &quot;llm&quot;, detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `UnsupportedProvider`, `Encode`) and `DecisionLlmError::Encode`. Not <del>resent.</del><ins>resent; a provider rejecting an image is `ApiStatus` with its own message.</ins></div><div class="eq"></div><div class="eq">## 4. Error lists - full enums (ErrorId from A-1, Display = detail(), no thiserror)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">// sc-llm-provider/src/error.rs</div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum LlmError {</div><div class="eq">    /// The send failed in sc-agent-http; the HttpError is kept whole.</div><div class="eq">    Http { provider: Provider, source: HttpError },                 // &quot;llm.http&quot;</div><div class="eq">    /// A non-2xx final reply, in the provider&#x27;s own words (redacted).</div><div class="eq">    ApiStatus { provider: Provider, reply: ProviderReply },         // &quot;llm.api_status&quot;</div><div class="eq">    /// The provider has no LLM wire (TypeSafe).</div><div class="eq">    UnsupportedProvider { provider: Provider },                     // &quot;llm.unsupported_provider&quot;</div><div class="eq">    /// The request body could not be serialized.</div><div class="eq">    Encode { message: String },                                     // &quot;llm.encode&quot;</div><div class="eq">    /// The 2xx body is not JSON or not the provider&#x27;s envelope (serde message, never body bytes).</div><div class="eq">    ReplyInvalid { provider: Provider, message: String },           // &quot;llm.reply_invalid&quot;</div><div class="eq">    /// The reply has no text content.</div><div class="eq">    NoText { provider: Provider },                                  // &quot;llm.no_text&quot;</div><div class="eq">    /// stop_reason max_tokens / finish_reason length.</div><div class="eq">    Truncated { provider: Provider, stop_reason: String },          // &quot;llm.truncated&quot;</div><div class="eq">    /// The model refused.</div><div class="eq">    Refused { provider: Provider, message: String },                // &quot;llm.refused&quot;</div><div class="eq">    /// Output::Json was asked for and the text does not parse.</div><div class="eq">    OutputNotJson { provider: Provider, message: String },          // &quot;llm.output_not_json&quot;</div><div class="eq">}</div><div class="rm">- impl LlmError { pub const fn retryable(&amp;self) -&gt; bool; }           // Http -&gt; source.retryable(); others false</div><div class="eq">impl ErrorId for LlmError {}                                        // Http: cause = HttpError detail; source() = Some(source)</div><div class="eq"></div><div class="eq">// sc-decision-llm/src/error.rs</div><div class="eq">#[derive(Debug, Clone, PartialEq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum DecisionLlmError {</div><div class="eq">    /// Wraps LlmError (and through it HttpError), kept whole.</div><div class="eq">    Llm(LlmError),                                                   // &quot;decision_llm.llm&quot;</div><div class="eq">    /// State, questions or schema could not be serialized.</div><div class="eq">    Encode { message: String },                                      // &quot;decision_llm.encode&quot;</div><div class="eq">    /// The model&#x27;s answer ids differ from the question ids.</div><div class="eq">    AnswerIds { missing: Vec&lt;String&gt;, extra: Vec&lt;String&gt; },          // &quot;decision_llm.answer_ids&quot;</div><div class="eq">    /// One answer lacks a required field, has a wrong type, or a choice outside the criteria.</div><div class="eq">    AnswerInvalid { question: String, message: String },             // &quot;decision_llm.answer_invalid&quot;</div><div class="eq">}</div><div class="eq">impl ErrorId for DecisionLlmError {}</div><div class="eq">impl From&lt;LlmError&gt; for DecisionLlmError {}</div><div class="eq">```</div><div class="eq"></div><div class="eq">LlmError 9 variants, DecisionLlmError 4. sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).</div><div class="eq"></div><div class="eq">## 5. Config keys</div><div class="eq"></div><div class="eq">None. Model ids come from the A-1 catalog, keys from A-4 (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `NOUS_API_KEY`). `max_tokens` is a constructor argument, default 16 000.</div><div class="eq"></div><div class="eq">## 6. Tests</div><div class="eq"></div><div class="ch">- `sc-llm-provider/tests/encode.rs`: Anthropic body has `model`, `max_tokens`, `system`, `messages`, `output_config.format.type == &quot;json_schema&quot;`; headers `anthropic-version`, `content-type`; secret `x-api-key` (via `SecretHeader::redacted`); Chat body has `response_format.json_schema.strict == true` and Bearer; <del>the</del><ins>openai</ins> <del>same</del><ins>sends</ins> <del>`ModelId`</del><ins>`max_completion_tokens`, openrouter `max_tokens`; `claude-haiku-5-5`</ins> through <del>`Provider::OpenAi`</del><ins>`Provider::Anthropic`</ins> and `Provider::OpenRouter` <del>gives</del><ins>sends</ins> <del>the same `model` string</del><ins>`claude-haiku-5-5`</ins> and<ins> `anthropic/claude-haiku-5.5` to</ins> different endpoints <del>(REQ-SAG-0103);</del><ins>(REQ-SAG-0103 AC1); `catalog_model_id` inverts `provider_model_id` for every MODELS row; `Part::Image` encodes as an Anthropic image block and a Chat image_url data URL; `models_request` is GET /v1/models and `decode_models` reads both list shapes;</ins> `Output::Text` encodes with no format field (REQ-SAG-0502); `Provider::TypeSafe` -&gt; llm.unsupported_provider.</div><div class="eq">- `sc-llm-provider/tests/decode.rs`: Anthropic and Chat replies decode; truncation -&gt; llm.truncated; refusal -&gt; llm.refused; non-JSON body -&gt; llm.reply_invalid; 401 -&gt; llm.api_status with the provider message and no key; JSON output parsed into `json`; usage as reported. A non-decision request for a model resolved by short name through the A-1 catalog is sent through `HttpClient::send_once` over a scripted transport and its response returned (REQ-SAG-0502).</div><div class="ch">- `sc-decision-llm/tests/translate.rs`: one request with noul, choice, score and box questions yields a schema requiring all four ids and every per-type field; a reply for all four decodes into a SystemOneResponse whose answers parse as the Jev answer types (REQ-SAG-0901 AC1); `legend` built from the score criteria; a choice reply missing `probabilities` -&gt; decision.schema_mismatch with cause decision_llm.answer_invalid; missing/extra ids -&gt; schema_mismatch (answer_ids); choice outside criteria -&gt; schema_mismatch; refusal -&gt; decision.backend; an asset <ins>(data_base64 and a multipart part) is sent as an image part after the JSON text; a provider 400 rejecting the image </ins>-&gt; <del>decision.unsupported_question;</del><ins>decision.backend with cause llm.api_status and the provider&#x27;s whole message; the request asks for the schema through output_config / response_format (REQ-SAG-0901);</ins> `0.123456789` comes back unchanged (REQ-SAG-0007); an injected `HttpError::Network` wrapped as `DecisionLlmError::Llm(LlmError::Http{..})` shows `http.network` and its message in the detail chain (REQ-SAG-0002). The one-retry acceptance (REQ-SAG-0901 AC2) runs in A-9 over this backend&#x27;s mismatch signal.</div><div class="eq"></div><div class="eq">## 7. Dependencies</div><div class="eq"></div><div class="eq">- sc-llm-provider: `sc-agent-types` (Provider, ModelId, ErrorId), `sc-agent-secrets` (ApiKey), `sc-agent-http` (HttpRequest, HttpResponse, Endpoint, SecretHeader, ProviderReply, HttpError), `serde_json = &quot;1&quot;`. No sc-decision-* crate.</div><div class="ch">- sc-decision-llm: `sc-decision-schema` (types, Backend, DecisionError), `sc-llm-provider`, `sc-agent-http`, `sc-agent-types`, `serde_json = { version = &quot;1&quot;, features = [&quot;preserve_order&quot;, &quot;float_roundtrip&quot;] <del>}`.</del><ins>}`, `base64 = &quot;0.22&quot;` (multipart image bytes).</ins></div><div class="eq">- Neither depends on ureq, tokio, sc-observability or thiserror.</div><div class="eq"></div><div class="eq">Estimated size: sc-llm-provider about 350 lines of code, sc-decision-llm about 320; tests about 420.</div></div>
+  </details>
+</section>

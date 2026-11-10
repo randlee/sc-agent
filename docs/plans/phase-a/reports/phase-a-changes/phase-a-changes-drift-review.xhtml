@@ -1,0 +1,341 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-drift" id="drift-review">
+  <div class="section-head">
+    <h2>Drift review <span class="small">2026-11-09</span> <span class="status status-pass">NONE OPEN</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy drift review">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;acceptable_choices&quot;: [
+    {
+      &quot;location&quot;: &quot;A-1&quot;,
+      &quot;note&quot;: &quot;On an equal release date the config model wins (owner said he does not care). A-10 doctor warns on equal dates, as REQ-SAG-0503 requires.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-1&quot;,
+      &quot;note&quot;: &quot;Provider::PRIORITY = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous (direct providers before aggregators; assistant decision).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-1&quot;,
+      &quot;note&quot;: &quot;jev-1.13.0&#x27;s release date is a TODO for the owner. docs.typesafe.ai gives none, and the sprint cannot close without it. Owner said \&quot;look it up\&quot;; it was looked up and not found.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-3&quot;,
+      &quot;note&quot;: &quot;New crate crates/sc-treesitter-py; 19 error variants (the owner&#x27;s 17 plus Write and Log, added for tsq).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-3/A-10&quot;,
+      &quot;note&quot;: &quot;tsq lives in sc-treesitter behind a default `cli` feature (clap and sc-observability). The \&quot;library writes no log\&quot; check therefore runs with --no-default-features.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-4&quot;,
+      &quot;note&quot;: &quot;Deps keyring and whoami; config file ~/.sc-agent/default.json with SC_AGENT__ env overrides; a runner named like a short name is rejected (config.runner_name).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-5&quot;,
+      &quot;note&quot;: &quot;Retry-After counts as valid only when it is 1-32 ASCII digits with an optional fraction; after 8 s the backoff keeps doubling, capped at 30 s.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-6&quot;,
+      &quot;note&quot;: &quot;Daemon kinds are strands, laya, mapika and generic (`decider` renamed `strands` to keep it apart from Mapika/decider); a 503 from a local daemon is final.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-7&quot;,
+      &quot;note&quot;: &quot;sc-llm-provider \&quot;sits on the http layer\&quot;. This is stricter than the anchor&#x27;s \&quot;decision backends (sc-decision-llm over sc-llm-provider)\&quot; and matches the ADR rationale.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-7&quot;,
+      &quot;note&quot;: &quot;The decider system prompt is drafted by the assistant for owner review (Mapika/decider uses none).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-8&quot;,
+      &quot;note&quot;: &quot;Invented test name log_error_keeps_lower_layer_cause (harmless).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-8/A-4&quot;,
+      &quot;note&quot;: &quot;Default log_root is ~/.sc-agent, which matches sc-observability&#x27;s documented default `~/.&lt;app&gt;` (checked in its docs).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-9&quot;,
+      &quot;note&quot;: &quot;Queue capacity is a constant 4 x workers, not a config key.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-9&quot;,
+      &quot;note&quot;: &quot;A single `decide` holds off on the caller&#x27;s thread with CancelToken::wait_until rather than in the queue. Idle workers use Condvar timed waits. Neither is a sleep.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-10&quot;,
+      &quot;note&quot;: &quot;New crates `decide` (lib + bin) and `sc-agent-py` (module sc_agent, publish=false, depends on the decide lib).&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-10&quot;,
+      &quot;note&quot;: &quot;This is not scope creep. REQ-SAG-0002, 0004, 0007 and REQ-SAG-0104 AC2 already require PyO3 bindings, and no earlier sprint delivered them.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-10&quot;,
+      &quot;note&quot;: &quot;`SagError` is a Python exception carrying (id, message, detail chain), the same pattern as TreesitterError in A-3. It is consistent with the per-crate error unions.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-10&quot;,
+      &quot;note&quot;: &quot;--project and --agent-role are required with no default; tsq logs to the fixed path ~/.sc-agent/logs/tsq.log.jsonl, because sc-treesitter may not read sc-agent-config.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;ANC-003&quot;,
+      &quot;note&quot;: &quot;ANC-003 (\&quot;no REQ/NFR/ADR/bead cites plan-anchor or judge-jev as a source\&quot;) is still only proposed and gated nowhere. The designs mention plan-anchor and judge-jev only as agent_role examples and in REQ-SAG-0006 text.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;Outside this review&#x27;s scope&quot;,
+      &quot;note&quot;: &quot;16 REQ/NFR/ADR files have uncommitted modifications and 9 are new, all in the working tree. They match owner memories, but owner-rule-req-adr-changes requires owner approval before they are committed.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;A-6, A-7 descriptions (planner change after the review)&quot;,
+      &quot;note&quot;: &quot;Each description now says its crates are sc-agent library crates. Jev had doubted that, which made ANC-007 swing between 0.34 and 0.64. A-6 also states that both backends implement sc_decision_schema::Backend; before that, an unrelated edit swung ADR-SAG-0001 between 0.26 and 0.83, and after it the cell held 0.92-0.94 over 4 runs. Final full gate: all ten sprints pass; re-runs: A-6 passed 2/2 and A-7 3/3.&quot;
+    }
+  ],
+  &quot;compared&quot;: &quot;anchors.json a447d01 -&gt; HEAD (015839a); gate-items a-1..a-10 (ecd83ef -&gt; 015839a); beads agt-4p2.1..10 (acceptance_criteria, design, description). The bead acceptance_criteria match the gate-item texts exactly in all 10 sprints.&quot;,
+  &quot;confirmations&quot;: [
+    {
+      &quot;area&quot;: &quot;Anchors&quot;,
+      &quot;note&quot;: &quot;The approved changes are applied exactly: ANC-001 pass fixture, REQ-SAG-0006 pass fixture, REQ-SAG-0010 fixtures (name sc-agent), and the ADR-SAG-0004 statement (\&quot;must\&quot; -&gt; \&quot;may\&quot;, with sc-llm-provider placed under sc-decision-llm).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Anchors&quot;,
+      &quot;note&quot;: &quot;Since a447d01, no quote, scope, deterministic_check or kind changed on any pre-existing anchor. question_overrides are empty everywhere.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Anchors&quot;,
+      &quot;note&quot;: &quot;The other new fixtures are consistent with their records and owner memories: ADR-SAG-0001, ADR-SAG-0004, REQ-SAG-0002, 0009, 0201, 0601, 0701 and ANC-006.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Anchors&quot;,
+      &quot;note&quot;: &quot;ANC-002 -&gt; ANC-006 is correct. \&quot;sc-ai CLI\&quot; became \&quot;decide\&quot; (owner-cli-requirement-1), and the quote is unchanged. tsq-vs-PyO3 parity stays covered by REQ-SAG-0303 (\&quot;tsq CLI can expose a subset of the PyO3 query surface\&quot;).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Anchors&quot;,
+      &quot;note&quot;: &quot;ANC-005 -&gt; REQ-SAG-0701 is correct. REQ-SAG-0701 defines a batch as \&quot;one JSONL file, one stdin stream or one Python call\&quot;, and requires workers with a default of 8.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Anchors: exclusions&quot;,
+      &quot;note&quot;: &quot;Every exclusion reason was checked against the current sprint text and is true: ANC-001: A-5, A-6, A-7. ADR-SAG-0001: A-5; A-10 (it only wires backends and calls Decision). ADR-SAG-0004: A-3. REQ-SAG-0006: A-5 to A-8. REQ-SAG-0009: A-3. REQ-SAG-0201: A-1; A-10 (sc-agent-py takes JSON strings, and its only pyclass is CancelToken). REQ-SAG-0601: A-2, A-4, A-6, A-7, A-10. REQ-SAG-0701: A-4. ANC-006: A-1, A-3. The retired ANC-002&#x27;s exclusions are now moot.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;--provider is now optional and picked by ranking (owner-provider-priority); before, it was required.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;Timeouts are resent within max_sends; connect, DNS and TLS failures are not; 402 and quota errors are returned with the remote id and message (owner-busy-resend, owner-retry-transient).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;Key precedence is env, then repo .env, then keyring (owner-provider-priority).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;The global config is in ~/.sc-agent/ and each CLI writes its own general log (owner-config-log-root).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;There is one sessions.jsonl per repo/agent_role/project, and NFR-SAG-0001 now expects \&quot;one file\&quot; (owner-session-log-layout).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;There is no unsupported-input error variant (13 decision ids) (owner-llm-inputs).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;Structured output is used for Haiku and Luna (owner-llm-decider-mode).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;Mapika/decider is added (owner-system-one-backends, owner-local-decision-crate).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;A batch fails fast before any send, naming line and field (owner-input-fail-fast).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;doctor warns on ties and lists keys in order (owner-catalog-ties, owner-provider-priority).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;tsq is named (owner-treesitter-cli-name), and Python and Rust come first with csharp and Go second (owner-treesitter-grammars).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;No caching requirement appears anywhere in the sprint text (owner-decision-schema-scope).&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)&quot;,
+      &quot;note&quot;: &quot;No rounding (REQ-SAG-0007), ULIDs for ids, no agent_name.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Layering and dependencies&quot;,
+      &quot;note&quot;: &quot;Every per-crate dependency list in A-1..A-10 points down the ADR-SAG-0004 order: types: serde and ulid; config/secrets: types and sc-config; log: types; http: types, secrets, log; schema: types and http; backends: schema, plus sc-llm-provider for llm; runner: everything below except the backends; decide: all of them; sc-agent-py: decide.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Layering and dependencies&quot;,
+      &quot;note&quot;: &quot;sc-treesitter depends on no sc-agent crate.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Layering and dependencies&quot;,
+      &quot;note&quot;: &quot;No tokio: sc-observability 1.5.0 has no tokio dependency (checked its Cargo.toml), ureq is sync, and each sprint has a cargo-tree check.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Layering and dependencies&quot;,
+      &quot;note&quot;: &quot;No sleep in any sprint: there is a clippy disallowed-methods rule, and waits use the CancelToken or a Condvar.&quot;
+    },
+    {
+      &quot;area&quot;: &quot;Layering and dependencies&quot;,
+      &quot;note&quot;: &quot;REQ-SAG-0002 chain-carrying tests exist in every sprint.&quot;
+    }
+  ],
+  &quot;findings&quot;: [
+    {
+      &quot;authority&quot;: {
+        &quot;quote&quot;: &quot;resent unchanged, up to the configured maximum number of sends&quot;,
+        &quot;ref&quot;: &quot;REQ-SAG-0901&quot;
+      },
+      &quot;fix_note&quot;: &quot;Busy, timeout and schema resends share one max_sends and one 90 s budget per request (REQ-SAG-0901). Gate re-run: pass.&quot;,
+      &quot;id&quot;: &quot;M1&quot;,
+      &quot;location&quot;: &quot;A-9 (agt-4p2.9) design and acceptance criteria: schema-mismatch resends&quot;,
+      &quot;severity&quot;: &quot;material&quot;,
+      &quot;status&quot;: &quot;fixed&quot;,
+      &quot;suggested_fix&quot;: &quot;Keep one send counter and one budget per request, shared by busy, timeout and schema-mismatch resends; or get the owner to approve the per-reply count explicitly. Also contradicts owner-busy-resend (\&quot;Max sends configurable, default 5 ... 90 s attempt budget\&quot;).&quot;,
+      &quot;what_changed&quot;: &quot;Schema-mismatch resends got a fresh send count and a fresh 90 s budget: decoded replies were counted apart from the busy and timeout sends of each reply (an assistant decision), with `attempts: Attempts, // fresh after each schema resend`, and the AC said \&quot;decision.schema_mismatch ... after max_sends decoded replies\&quot;. One request could be sent max_sends x max_sends times (25 by default), and the 90 s attempt budget restarted after each schema resend. owner-llm-decider-mode leaves the mechanism to the assistant, but not the cap. Reviewer rating: medium; owner call.&quot;
+    },
+    {
+      &quot;authority&quot;: {
+        &quot;quote&quot;: &quot;let a non-decision program use HTTP, providers and logging without decision types&quot;,
+        &quot;ref&quot;: &quot;ADR-SAG-0004&quot;
+      },
+      &quot;fix_note&quot;: &quot;Only sc-decision-llm imports Jev types; sc-llm-provider uses no decision types (ADR-SAG-0004). Gate re-run: pass.&quot;,
+      &quot;id&quot;: &quot;M2&quot;,
+      &quot;location&quot;: &quot;A-7 (agt-4p2.7) acceptance criteria, REQ-SAG-0201 line (a-7.txt)&quot;,
+      &quot;severity&quot;: &quot;material&quot;,
+      &quot;status&quot;: &quot;fixed&quot;,
+      &quot;suggested_fix&quot;: &quot;\&quot;sc-decision-llm imports every Jev-mapped type from sc-decision-schema and defines none of its own; sc-llm-provider defines and uses no Jev-mapped type.\&quot; Also contradicts owner-architecture (\&quot;sc-llm-provider -&gt; sc-decision-llm\&quot;).&quot;,
+      &quot;what_changed&quot;: &quot;The line \&quot;sc-decision-llm and sc-llm-provider import every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema\&quot; made sc-llm-provider depend on the decision schema. The same sprint&#x27;s ADR-SAG-0004 AC says sc-llm-provider&#x27;s only sc-agent dependencies are types, secrets, log and http, and A-7 design line 232 says \&quot;sc-decision-schema does not depend on either\&quot;. Reviewer rating: low; wording fix.&quot;
+    },
+    {
+      &quot;authority&quot;: {
+        &quot;quote&quot;: &quot;You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.&quot;,
+        &quot;ref&quot;: &quot;ANC-004&quot;
+      },
+      &quot;fix_note&quot;: &quot;New anchor ANC-007, locked: \&quot;The existing sc-agent library code must be updated so that it writes log records.\&quot; The statement drops \&quot;inject the logger\&quot; (REQ-SAG-0008 covers injection) and \&quot;everywhere\&quot;; about 70 wordings that kept both failed the rubric (faithful or single_constraint). Rubric 3/3 pass; fixtures pass; tuned questions 54/54 cells (default questions 46/54, 2 unstable cases). Sprint lines added: A-6 (availability-check records), A-7 (request, token usage, schema mismatch), A-9 (stream start/end, worker stop, session-log failure), A-10 (send, models, doctor; sc-agent-py accepts a logger). Excluded: A-1 (types only, below the log layer), A-2 (ANC-001 bars logging code), A-3 (sc-treesitter depends on no sc-agent crate; tsq logging is in A-10), A-4 (ADR-SAG-0004: config and secrets share sc-agent-log&#x27;s layer and may depend only on lower layers, so their callers log key source and config events).&quot;,
+      &quot;id&quot;: &quot;M3&quot;,
+      &quot;location&quot;: &quot;anchors.json ANC-004 retirement reason&quot;,
+      &quot;severity&quot;: &quot;material&quot;,
+      &quot;status&quot;: &quot;fixed&quot;,
+      &quot;suggested_fix&quot;: &quot;Re-propose a narrowed anchor, e.g. \&quot;every sc-agent library crate that performs I/O logs through the injected or default general logger\&quot;; or record that the owner accepts REQ-SAG-0008 as sufficient.&quot;,
+      &quot;what_changed&quot;: &quot;ANC-004 was retired as \&quot;covered by REQ-SAG-0008 (optional logger injection with default loggers)\&quot;, but REQ-SAG-0008 covers injection and defaults only; the other half of the owner&#x27;s words had no anchor or requirement. The sprints that log are A-5 (http), A-8, A-9 and A-10; A-4 and A-6 had no general-log events of their own, and A-6 discovery was logged only through HttpClient. Mitigation: ANC-004 was only proposed, never locked, so it is not among the 11 approved anchors. Reviewer rating: low.&quot;
+    }
+  ],
+  &quot;not_reviewed&quot;: &quot;The content of the sealed plan question sets (8b9e6cb), and the full bead design bodies (about 200 KB) beyond targeted searches.&quot;,
+  &quot;reviewed_at&quot;: &quot;2026-11-09&quot;,
+  &quot;schema&quot;: &quot;plan-anchoring/drift-review/1&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Drift review (2026-11-09)
+M1 [material, fixed] A-9 (agt-4p2.9) design and acceptance criteria: schema-mismatch resends: Schema-mismatch resends got a fresh send count and a fresh 90 s budget: decoded replies were counted apart from the busy and timeout sends of each reply (an assistant decision), with `attempts: Attempts, // fresh after each schema resend`, and the AC said &quot;decision.schema_mismatch ... after max_sends decoded replies&quot;. One request could be sent max_sends x max_sends times (25 by default), and the 90 s attempt budget restarted after each schema resend. owner-llm-decider-mode leaves the mechanism to the assistant, but not the cap. Reviewer rating: medium; owner call. Authority REQ-SAG-0901: &quot;resent unchanged, up to the configured maximum number of sends&quot;. Fix: Keep one send counter and one budget per request, shared by busy, timeout and schema-mismatch resends; or get the owner to approve the per-reply count explicitly. Also contradicts owner-busy-resend (&quot;Max sends configurable, default 5 ... 90 s attempt budget&quot;). Done: Busy, timeout and schema resends share one max_sends and one 90 s budget per request (REQ-SAG-0901). Gate re-run: pass.
+M2 [material, fixed] A-7 (agt-4p2.7) acceptance criteria, REQ-SAG-0201 line (a-7.txt): The line &quot;sc-decision-llm and sc-llm-provider import every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema&quot; made sc-llm-provider depend on the decision schema. The same sprint&#x27;s ADR-SAG-0004 AC says sc-llm-provider&#x27;s only sc-agent dependencies are types, secrets, log and http, and A-7 design line 232 says &quot;sc-decision-schema does not depend on either&quot;. Reviewer rating: low; wording fix. Authority ADR-SAG-0004: &quot;let a non-decision program use HTTP, providers and logging without decision types&quot;. Fix: &quot;sc-decision-llm imports every Jev-mapped type from sc-decision-schema and defines none of its own; sc-llm-provider defines and uses no Jev-mapped type.&quot; Also contradicts owner-architecture (&quot;sc-llm-provider -&gt; sc-decision-llm&quot;). Done: Only sc-decision-llm imports Jev types; sc-llm-provider uses no decision types (ADR-SAG-0004). Gate re-run: pass.
+M3 [material, fixed] anchors.json ANC-004 retirement reason: ANC-004 was retired as &quot;covered by REQ-SAG-0008 (optional logger injection with default loggers)&quot;, but REQ-SAG-0008 covers injection and defaults only; the other half of the owner&#x27;s words had no anchor or requirement. The sprints that log are A-5 (http), A-8, A-9 and A-10; A-4 and A-6 had no general-log events of their own, and A-6 discovery was logged only through HttpClient. Mitigation: ANC-004 was only proposed, never locked, so it is not among the 11 approved anchors. Reviewer rating: low. Authority ANC-004: &quot;You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.&quot;. Fix: Re-propose a narrowed anchor, e.g. &quot;every sc-agent library crate that performs I/O logs through the injected or default general logger&quot;; or record that the owner accepts REQ-SAG-0008 as sufficient. Done: New anchor ANC-007, locked: &quot;The existing sc-agent library code must be updated so that it writes log records.&quot; The statement drops &quot;inject the logger&quot; (REQ-SAG-0008 covers injection) and &quot;everywhere&quot;; about 70 wordings that kept both failed the rubric (faithful or single_constraint). Rubric 3/3 pass; fixtures pass; tuned questions 54/54 cells (default questions 46/54, 2 unstable cases). Sprint lines added: A-6 (availability-check records), A-7 (request, token usage, schema mismatch), A-9 (stream start/end, worker stop, session-log failure), A-10 (send, models, doctor; sc-agent-py accepts a logger). Excluded: A-1 (types only, below the log layer), A-2 (ANC-001 bars logging code), A-3 (sc-treesitter depends on no sc-agent crate; tsq logging is in A-10), A-4 (ADR-SAG-0004: config and secrets share sc-agent-log&#x27;s layer and may depend only on lower layers, so their callers log key source and config events).">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Compared: anchors.json a447d01 -&gt; HEAD (015839a); gate-items a-1..a-10 (ecd83ef -&gt; 015839a); beads agt-4p2.1..10 (acceptance_criteria, design, description). The bead acceptance_criteria match the gate-item texts exactly in all 10 sprints.</p>
+
+  <h3>Findings (3)</h3>
+  <table class="findings">
+    <thead><tr><th scope="col">Id</th><th scope="col">Severity</th><th scope="col">Where</th><th scope="col">What changed</th><th scope="col">Authority</th><th scope="col">Suggested fix</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <th scope="row">M1</th>
+        <td><span class="status status-fail">material</span></td>
+        <td>A-9 (agt-4p2.9) design and acceptance criteria: schema-mismatch resends</td>
+        <td>Schema-mismatch resends got a fresh send count and a fresh 90 s budget: decoded replies were counted apart from the busy and timeout sends of each reply (an assistant decision), with `attempts: Attempts, // fresh after each schema resend`, and the AC said &quot;decision.schema_mismatch ... after max_sends decoded replies&quot;. One request could be sent max_sends x max_sends times (25 by default), and the 90 s attempt budget restarted after each schema resend. owner-llm-decider-mode leaves the mechanism to the assistant, but not the cap. Reviewer rating: medium; owner call.</td>
+        <td><div><b>REQ-SAG-0901</b></div><div class="quote">&#x201C;resent unchanged, up to the configured maximum number of sends&#x201D;</div></td>
+        <td>Keep one send counter and one budget per request, shared by busy, timeout and schema-mismatch resends; or get the owner to approve the per-reply count explicitly. Also contradicts owner-busy-resend (&quot;Max sends configurable, default 5 ... 90 s attempt budget&quot;).</td>
+        <td><span class="status status-pass">fixed</span><div class="small">Busy, timeout and schema resends share one max_sends and one 90 s budget per request (REQ-SAG-0901). Gate re-run: pass.</div></td>
+      </tr>
+      <tr>
+        <th scope="row">M2</th>
+        <td><span class="status status-fail">material</span></td>
+        <td>A-7 (agt-4p2.7) acceptance criteria, REQ-SAG-0201 line (a-7.txt)</td>
+        <td>The line &quot;sc-decision-llm and sc-llm-provider import every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema&quot; made sc-llm-provider depend on the decision schema. The same sprint&#x27;s ADR-SAG-0004 AC says sc-llm-provider&#x27;s only sc-agent dependencies are types, secrets, log and http, and A-7 design line 232 says &quot;sc-decision-schema does not depend on either&quot;. Reviewer rating: low; wording fix.</td>
+        <td><div><b>ADR-SAG-0004</b></div><div class="quote">&#x201C;let a non-decision program use HTTP, providers and logging without decision types&#x201D;</div></td>
+        <td>&quot;sc-decision-llm imports every Jev-mapped type from sc-decision-schema and defines none of its own; sc-llm-provider defines and uses no Jev-mapped type.&quot; Also contradicts owner-architecture (&quot;sc-llm-provider -&gt; sc-decision-llm&quot;).</td>
+        <td><span class="status status-pass">fixed</span><div class="small">Only sc-decision-llm imports Jev types; sc-llm-provider uses no decision types (ADR-SAG-0004). Gate re-run: pass.</div></td>
+      </tr>
+      <tr>
+        <th scope="row">M3</th>
+        <td><span class="status status-fail">material</span></td>
+        <td>anchors.json ANC-004 retirement reason</td>
+        <td>ANC-004 was retired as &quot;covered by REQ-SAG-0008 (optional logger injection with default loggers)&quot;, but REQ-SAG-0008 covers injection and defaults only; the other half of the owner&#x27;s words had no anchor or requirement. The sprints that log are A-5 (http), A-8, A-9 and A-10; A-4 and A-6 had no general-log events of their own, and A-6 discovery was logged only through HttpClient. Mitigation: ANC-004 was only proposed, never locked, so it is not among the 11 approved anchors. Reviewer rating: low.</td>
+        <td><div><b>ANC-004</b></div><div class="quote">&#x201C;You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.&#x201D;</div></td>
+        <td>Re-propose a narrowed anchor, e.g. &quot;every sc-agent library crate that performs I/O logs through the injected or default general logger&quot;; or record that the owner accepts REQ-SAG-0008 as sufficient.</td>
+        <td><span class="status status-pass">fixed</span><div class="small">New anchor ANC-007, locked: &quot;The existing sc-agent library code must be updated so that it writes log records.&quot; The statement drops &quot;inject the logger&quot; (REQ-SAG-0008 covers injection) and &quot;everywhere&quot;; about 70 wordings that kept both failed the rubric (faithful or single_constraint). Rubric 3/3 pass; fixtures pass; tuned questions 54/54 cells (default questions 46/54, 2 unstable cases). Sprint lines added: A-6 (availability-check records), A-7 (request, token usage, schema mismatch), A-9 (stream start/end, worker stop, session-log failure), A-10 (send, models, doctor; sc-agent-py accepts a logger). Excluded: A-1 (types only, below the log layer), A-2 (ANC-001 bars logging code), A-3 (sc-treesitter depends on no sc-agent crate; tsq logging is in A-10), A-4 (ADR-SAG-0004: config and secrets share sc-agent-log&#x27;s layer and may depend only on lower layers, so their callers log key source and config events).</div></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <details open="open">
+    <summary>Acceptable choices the owner should know (21)</summary>
+    <table>
+      <thead><tr><th scope="col">Where</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">A-1</th><td>On an equal release date the config model wins (owner said he does not care). A-10 doctor warns on equal dates, as REQ-SAG-0503 requires.</td></tr>
+        <tr><th scope="row">A-1</th><td>Provider::PRIORITY = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous (direct providers before aggregators; assistant decision).</td></tr>
+        <tr><th scope="row">A-1</th><td>jev-1.13.0&#x27;s release date is a TODO for the owner. docs.typesafe.ai gives none, and the sprint cannot close without it. Owner said &quot;look it up&quot;; it was looked up and not found.</td></tr>
+        <tr><th scope="row">A-3</th><td>New crate crates/sc-treesitter-py; 19 error variants (the owner&#x27;s 17 plus Write and Log, added for tsq).</td></tr>
+        <tr><th scope="row">A-3/A-10</th><td>tsq lives in sc-treesitter behind a default `cli` feature (clap and sc-observability). The &quot;library writes no log&quot; check therefore runs with --no-default-features.</td></tr>
+        <tr><th scope="row">A-4</th><td>Deps keyring and whoami; config file ~/.sc-agent/default.json with SC_AGENT__ env overrides; a runner named like a short name is rejected (config.runner_name).</td></tr>
+        <tr><th scope="row">A-5</th><td>Retry-After counts as valid only when it is 1-32 ASCII digits with an optional fraction; after 8 s the backoff keeps doubling, capped at 30 s.</td></tr>
+        <tr><th scope="row">A-6</th><td>Daemon kinds are strands, laya, mapika and generic (`decider` renamed `strands` to keep it apart from Mapika/decider); a 503 from a local daemon is final.</td></tr>
+        <tr><th scope="row">A-7</th><td>sc-llm-provider &quot;sits on the http layer&quot;. This is stricter than the anchor&#x27;s &quot;decision backends (sc-decision-llm over sc-llm-provider)&quot; and matches the ADR rationale.</td></tr>
+        <tr><th scope="row">A-7</th><td>The decider system prompt is drafted by the assistant for owner review (Mapika/decider uses none).</td></tr>
+        <tr><th scope="row">A-8</th><td>Invented test name log_error_keeps_lower_layer_cause (harmless).</td></tr>
+        <tr><th scope="row">A-8/A-4</th><td>Default log_root is ~/.sc-agent, which matches sc-observability&#x27;s documented default `~/.&lt;app&gt;` (checked in its docs).</td></tr>
+        <tr><th scope="row">A-9</th><td>Queue capacity is a constant 4 x workers, not a config key.</td></tr>
+        <tr><th scope="row">A-9</th><td>A single `decide` holds off on the caller&#x27;s thread with CancelToken::wait_until rather than in the queue. Idle workers use Condvar timed waits. Neither is a sleep.</td></tr>
+        <tr><th scope="row">A-10</th><td>New crates `decide` (lib + bin) and `sc-agent-py` (module sc_agent, publish=false, depends on the decide lib).</td></tr>
+        <tr><th scope="row">A-10</th><td>This is not scope creep. REQ-SAG-0002, 0004, 0007 and REQ-SAG-0104 AC2 already require PyO3 bindings, and no earlier sprint delivered them.</td></tr>
+        <tr><th scope="row">A-10</th><td>`SagError` is a Python exception carrying (id, message, detail chain), the same pattern as TreesitterError in A-3. It is consistent with the per-crate error unions.</td></tr>
+        <tr><th scope="row">A-10</th><td>--project and --agent-role are required with no default; tsq logs to the fixed path ~/.sc-agent/logs/tsq.log.jsonl, because sc-treesitter may not read sc-agent-config.</td></tr>
+        <tr><th scope="row">ANC-003</th><td>ANC-003 (&quot;no REQ/NFR/ADR/bead cites plan-anchor or judge-jev as a source&quot;) is still only proposed and gated nowhere. The designs mention plan-anchor and judge-jev only as agent_role examples and in REQ-SAG-0006 text.</td></tr>
+        <tr><th scope="row">Outside this review&#x27;s scope</th><td>16 REQ/NFR/ADR files have uncommitted modifications and 9 are new, all in the working tree. They match owner memories, but owner-rule-req-adr-changes requires owner approval before they are committed.</td></tr>
+        <tr><th scope="row">A-6, A-7 descriptions (planner change after the review)</th><td>Each description now says its crates are sc-agent library crates. Jev had doubted that, which made ANC-007 swing between 0.34 and 0.64. A-6 also states that both backends implement sc_decision_schema::Backend; before that, an unrelated edit swung ADR-SAG-0001 between 0.26 and 0.83, and after it the cell held 0.92-0.94 over 4 runs. Final full gate: all ten sprints pass; re-runs: A-6 passed 2/2 and A-7 3/3.</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details>
+    <summary>No-drift confirmations (24)</summary>
+    <table>
+      <thead><tr><th scope="col">Area</th><th scope="col">Confirmed</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Anchors</th><td>The approved changes are applied exactly: ANC-001 pass fixture, REQ-SAG-0006 pass fixture, REQ-SAG-0010 fixtures (name sc-agent), and the ADR-SAG-0004 statement (&quot;must&quot; -&gt; &quot;may&quot;, with sc-llm-provider placed under sc-decision-llm).</td></tr>
+        <tr><th scope="row">Anchors</th><td>Since a447d01, no quote, scope, deterministic_check or kind changed on any pre-existing anchor. question_overrides are empty everywhere.</td></tr>
+        <tr><th scope="row">Anchors</th><td>The other new fixtures are consistent with their records and owner memories: ADR-SAG-0001, ADR-SAG-0004, REQ-SAG-0002, 0009, 0201, 0601, 0701 and ANC-006.</td></tr>
+        <tr><th scope="row">Anchors</th><td>ANC-002 -&gt; ANC-006 is correct. &quot;sc-ai CLI&quot; became &quot;decide&quot; (owner-cli-requirement-1), and the quote is unchanged. tsq-vs-PyO3 parity stays covered by REQ-SAG-0303 (&quot;tsq CLI can expose a subset of the PyO3 query surface&quot;).</td></tr>
+        <tr><th scope="row">Anchors</th><td>ANC-005 -&gt; REQ-SAG-0701 is correct. REQ-SAG-0701 defines a batch as &quot;one JSONL file, one stdin stream or one Python call&quot;, and requires workers with a default of 8.</td></tr>
+        <tr><th scope="row">Anchors: exclusions</th><td>Every exclusion reason was checked against the current sprint text and is true: ANC-001: A-5, A-6, A-7. ADR-SAG-0001: A-5; A-10 (it only wires backends and calls Decision). ADR-SAG-0004: A-3. REQ-SAG-0006: A-5 to A-8. REQ-SAG-0009: A-3. REQ-SAG-0201: A-1; A-10 (sc-agent-py takes JSON strings, and its only pyclass is CancelToken). REQ-SAG-0601: A-2, A-4, A-6, A-7, A-10. REQ-SAG-0701: A-4. ANC-006: A-1, A-3. The retired ANC-002&#x27;s exclusions are now moot.</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>--provider is now optional and picked by ranking (owner-provider-priority); before, it was required.</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>Timeouts are resent within max_sends; connect, DNS and TLS failures are not; 402 and quota errors are returned with the remote id and message (owner-busy-resend, owner-retry-transient).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>Key precedence is env, then repo .env, then keyring (owner-provider-priority).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>The global config is in ~/.sc-agent/ and each CLI writes its own general log (owner-config-log-root).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>There is one sessions.jsonl per repo/agent_role/project, and NFR-SAG-0001 now expects &quot;one file&quot; (owner-session-log-layout).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>There is no unsupported-input error variant (13 decision ids) (owner-llm-inputs).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>Structured output is used for Haiku and Luna (owner-llm-decider-mode).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>Mapika/decider is added (owner-system-one-backends, owner-local-decision-crate).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>A batch fails fast before any send, naming line and field (owner-input-fail-fast).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>doctor warns on ties and lists keys in order (owner-catalog-ties, owner-provider-priority).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>tsq is named (owner-treesitter-cli-name), and Python and Rust come first with csharp and Go second (owner-treesitter-grammars).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>No caching requirement appears anywhere in the sprint text (owner-decision-schema-scope).</td></tr>
+        <tr><th scope="row">Sprint criteria (ecd83ef to HEAD move toward the owner&#x27;s decisions)</th><td>No rounding (REQ-SAG-0007), ULIDs for ids, no agent_name.</td></tr>
+        <tr><th scope="row">Layering and dependencies</th><td>Every per-crate dependency list in A-1..A-10 points down the ADR-SAG-0004 order: types: serde and ulid; config/secrets: types and sc-config; log: types; http: types, secrets, log; schema: types and http; backends: schema, plus sc-llm-provider for llm; runner: everything below except the backends; decide: all of them; sc-agent-py: decide.</td></tr>
+        <tr><th scope="row">Layering and dependencies</th><td>sc-treesitter depends on no sc-agent crate.</td></tr>
+        <tr><th scope="row">Layering and dependencies</th><td>No tokio: sc-observability 1.5.0 has no tokio dependency (checked its Cargo.toml), ureq is sync, and each sprint has a cargo-tree check.</td></tr>
+        <tr><th scope="row">Layering and dependencies</th><td>No sleep in any sprint: there is a clippy disallowed-methods rule, and waits use the CancelToken or a Condvar.</td></tr>
+        <tr><th scope="row">Layering and dependencies</th><td>REQ-SAG-0002 chain-carrying tests exist in every sprint.</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <p class="small">Not reviewed: The content of the sealed plan question sets (8b9e6cb), and the full bead design bodies (about 200 KB) beyond targeted searches.</p>
+</section>

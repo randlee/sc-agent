@@ -1,0 +1,200 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ANC-006">
+  <div class="section-head">
+    <h2>ANC-006 <span class="status status-locked">locked</span> <span class="small">bead agt-frw</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-frw&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [
+    {
+      &quot;after&quot;: &quot;Every operation available in the decide CLI must also be available in the sc-agent Python API.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;statement&quot;
+    },
+    {
+      &quot;after&quot;: &quot;adds or changes a decide subcommand or a function in the sc-agent Python bindings&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;scope&quot;
+    },
+    {
+      &quot;after&quot;: &quot;locked&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;status&quot;
+    },
+    {
+      &quot;after&quot;: &quot;directive&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;kind&quot;
+    },
+    {
+      &quot;after&quot;: &quot;I expect the python api may allow more flexibility than cli, NOT less.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;quote&quot;
+    },
+    {
+      &quot;after&quot;: &quot;each decide subcommand has a matching Python API function, checked by a test that lists both&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;deterministic_check&quot;
+    },
+    {
+      &quot;after&quot;: &quot;Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture pass&quot;
+    },
+    {
+      &quot;after&quot;: &quot;decide gains a `models` subcommand with no Python equivalent.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture fail&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.1&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;A-1 defines data types only; it adds no decide subcommand or Python binding function.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.3&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;2/2&quot;,
+  &quot;fixtures_before&quot;: &quot;2/2&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-09T23:59:51+00:00&quot;,
+      &quot;detail&quot;: &quot;status: locked&quot;,
+      &quot;event&quot;: &quot;created&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-09T23:59:53+00:00&quot;,
+      &quot;detail&quot;: &quot;beads: {\&quot;anchor\&quot;: \&quot;agt-frw\&quot;, \&quot;plan_questions\&quot;: \&quot;agt-frw.1\&quot;, \&quot;dev_questions\&quot;: \&quot;agt-frw.2\&quot;}&quot;,
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T00:12:10+00:00&quot;,
+      &quot;detail&quot;: &quot;fields: [\&quot;fixtures\&quot;]&quot;,
+      &quot;event&quot;: &quot;updated&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T01:06:53+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.3; reason: A-3 builds the sc-treesitter library; it adds no decide CLI operation.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T01:07:05+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.1; reason: A-1 defines data types only; it adds no decide subcommand or Python binding function.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-006&quot;,
+  &quot;questions_default&quot;: &quot;7/9&quot;,
+  &quot;questions_tuned&quot;: &quot;9/9&quot;,
+  &quot;quote&quot;: &quot;I expect the python api may allow more flexibility than cli, NOT less.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;Every operation available in the decide CLI must also be available in the sc-agent Python API.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;absent&quot;,
+  &quot;tuning&quot;: [
+    {
+      &quot;accepted&quot;: true,
+      &quot;default&quot;: 7,
+      &quot;source&quot;: &quot;docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ANC-006/tournament-1/result_vars.json&quot;,
+      &quot;total&quot;: 9,
+      &quot;tuned&quot;: 9
+    }
+  ],
+  &quot;version_before&quot;: &quot;-&quot;,
+  &quot;version_now&quot;: &quot;2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ANC-006 (absent v- -&gt; locked v2)
+Statement: Every operation available in the decide CLI must also be available in the sc-agent Python API.
+Quote: I expect the python api may allow more flexibility than cli, NOT less.
+Fixture checks: 2/2 -&gt; 2/2.
+Questions: default 7/9 -&gt; tuned 9/9 oracle cases.
+Changed statement: &#x27;&#x27; -&gt; &#x27;Every operation available in the decide CLI must also be available in the sc-agent Python API.&#x27;
+Changed scope: &#x27;&#x27; -&gt; &#x27;adds or changes a decide subcommand or a function in the sc-agent Python bindings&#x27;
+Changed status: &#x27;&#x27; -&gt; &#x27;locked&#x27;
+Changed kind: &#x27;&#x27; -&gt; &#x27;directive&#x27;
+Changed quote: &#x27;&#x27; -&gt; &#x27;I expect the python api may allow more flexibility than cli, NOT less.&#x27;
+Changed deterministic_check: &#x27;&#x27; -&gt; &#x27;each decide subcommand has a matching Python API function, checked by a test that lists both&#x27;
+Changed fixture pass: &#x27;&#x27; -&gt; &#x27;Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.&#x27;
+Changed fixture fail: &#x27;&#x27; -&gt; &#x27;decide gains a `models` subcommand with no Python equivalent.&#x27;
+Excluded for agt-4p2.1: A-1 defines data types only; it adds no decide subcommand or Python binding function.
+Excluded for agt-4p2.3: A-3 builds the sc-treesitter library; it adds no decide CLI operation.
+2026-11-09T23:59:51+00:00 created: status: locked
+2026-11-09T23:59:53+00:00 beads_set: beads: {&quot;anchor&quot;: &quot;agt-frw&quot;, &quot;plan_questions&quot;: &quot;agt-frw.1&quot;, &quot;dev_questions&quot;: &quot;agt-frw.2&quot;}
+2026-11-10T00:12:10+00:00 updated: fields: [&quot;fixtures&quot;]
+2026-11-10T01:06:53+00:00 excluded: item: agt-4p2.3; reason: A-3 builds the sc-treesitter library; it adds no decide CLI operation.; replaced: false
+2026-11-10T01:07:05+00:00 excluded: item: agt-4p2.1; reason: A-1 defines data types only; it adds no decide subcommand or Python binding function.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">Every operation available in the decide CLI must also be available in the sc-agent Python API.</p>
+  <p class="quote">&#x201C;I expect the python api may allow more flexibility than cli, NOT less.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>absent</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>-</td><td>2</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>2/2</td><td>2/2</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>7/9</td><td>9/9</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary>Tuning tournaments (1)</summary>
+    <table>
+      <thead><tr><th scope="col">Result file</th><th scope="col">Accepted</th><th scope="col">Default questions</th><th scope="col">Tuned (stable cases)</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ANC-006/tournament-1/result_vars.json</code></td><td><span class="status status-pass">yes</span></td><td>7/9</td><td>9/9</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Record changes</h3>
+  <p><b>statement</b></p>
+  <div class="diff"><ins>Every operation available in the decide CLI must also be available in the sc-agent Python API.</ins></div>
+  <p><b>scope</b></p>
+  <div class="diff"><ins>adds or changes a decide subcommand or a function in the sc-agent Python bindings</ins></div>
+  <p><b>status</b></p>
+  <div class="diff"><ins>locked</ins></div>
+  <p><b>kind</b></p>
+  <div class="diff"><ins>directive</ins></div>
+  <p><b>quote</b></p>
+  <div class="diff"><ins>I expect the python api may allow more flexibility than cli, NOT less.</ins></div>
+  <p><b>deterministic_check</b></p>
+  <div class="diff"><ins>each decide subcommand has a matching Python API function, checked by a test that lists both</ins></div>
+  <p><b>fixture pass</b></p>
+  <div class="diff"><ins>Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.</ins></div>
+  <p><b>fixture fail</b></p>
+  <div class="diff"><ins>decide gains a `models` subcommand with no Python equivalent.</ins></div>
+
+  <details>
+    <summary>History since the baseline (5)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-09T23:59:51+00:00</td><td>created</td><td>status: locked</td></tr>
+        <tr><td>2026-11-09T23:59:53+00:00</td><td>beads_set</td><td>beads: {&quot;anchor&quot;: &quot;agt-frw&quot;, &quot;plan_questions&quot;: &quot;agt-frw.1&quot;, &quot;dev_questions&quot;: &quot;agt-frw.2&quot;}</td></tr>
+        <tr><td>2026-11-10T00:12:10+00:00</td><td>updated</td><td>fields: [&quot;fixtures&quot;]</td></tr>
+        <tr><td>2026-11-10T01:06:53+00:00</td><td>excluded</td><td>item: agt-4p2.3; reason: A-3 builds the sc-treesitter library; it adds no decide CLI operation.; replaced: false</td></tr>
+        <tr><td>2026-11-10T01:07:05+00:00</td><td>excluded</td><td>item: agt-4p2.1; reason: A-1 defines data types only; it adds no decide subcommand or Python binding function.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (2)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-4p2.1</th><td>A-1 defines data types only; it adds no decide subcommand or Python binding function.</td><td>added</td></tr>
+        <tr><th scope="row">agt-4p2.3</th><td>A-3 builds the sc-treesitter library; it adds no decide CLI operation.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

@@ -1,0 +1,138 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ADR-SAG-0001">
+  <div class="section-head">
+    <h2>ADR-SAG-0001 <span class="status status-locked">locked</span> <span class="small">bead agt-7mi</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-7mi&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [
+    {
+      &quot;after&quot;: &quot;The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture pass&quot;
+    },
+    {
+      &quot;after&quot;: &quot;The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture fail&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.5&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.10&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;2/2&quot;,
+  &quot;fixtures_before&quot;: &quot;2/2&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-09T23:25:31+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.5; reason: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T00:12:09+00:00&quot;,
+      &quot;detail&quot;: &quot;fields: [\&quot;fixtures\&quot;]&quot;,
+      &quot;event&quot;: &quot;updated&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T01:15:09+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.10; reason: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ADR-SAG-0001&quot;,
+  &quot;questions_default&quot;: &quot;9/10&quot;,
+  &quot;questions_tuned&quot;: &quot;10/10&quot;,
+  &quot;quote&quot;: &quot;Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;Every sc-agent decision backend must implement the Backend trait defined in the sc-decision-schema crate.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [
+    {
+      &quot;accepted&quot;: true,
+      &quot;default&quot;: 9,
+      &quot;source&quot;: &quot;docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0001/tournament/result_vars.json&quot;,
+      &quot;total&quot;: 10,
+      &quot;tuned&quot;: 10
+    }
+  ],
+  &quot;version_before&quot;: &quot;1&quot;,
+  &quot;version_now&quot;: &quot;2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ADR-SAG-0001 (locked v1 -&gt; locked v2)
+Statement: Every sc-agent decision backend must implement the Backend trait defined in the sc-decision-schema crate.
+Quote: Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response.
+Fixture checks: 2/2 -&gt; 2/2.
+Questions: default 9/10 -&gt; tuned 10/10 oracle cases.
+Changed fixture pass: &#x27;&#x27; -&gt; &#x27;The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema.&#x27;
+Changed fixture fail: &#x27;&#x27; -&gt; &#x27;The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend.&#x27;
+Excluded for agt-4p2.5: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
+Excluded for agt-4p2.10: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
+2026-11-09T23:25:31+00:00 excluded: item: agt-4p2.5; reason: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.; replaced: false
+2026-11-10T00:12:09+00:00 updated: fields: [&quot;fixtures&quot;]
+2026-11-10T01:15:09+00:00 excluded: item: agt-4p2.10; reason: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">Every sc-agent decision backend must implement the Backend trait defined in the sc-decision-schema crate.</p>
+  <p class="quote">&#x201C;Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>1</td><td>2</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>2/2</td><td>2/2</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>9/10</td><td>10/10</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary>Tuning tournaments (1)</summary>
+    <table>
+      <thead><tr><th scope="col">Result file</th><th scope="col">Accepted</th><th scope="col">Default questions</th><th scope="col">Tuned (stable cases)</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0001/tournament/result_vars.json</code></td><td><span class="status status-pass">yes</span></td><td>9/10</td><td>10/10</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Record changes</h3>
+  <p><b>fixture pass</b></p>
+  <div class="diff"><ins>The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema.</ins></div>
+  <p><b>fixture fail</b></p>
+  <div class="diff"><ins>The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend.</ins></div>
+
+  <details>
+    <summary>History since the baseline (3)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-09T23:25:31+00:00</td><td>excluded</td><td>item: agt-4p2.5; reason: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.; replaced: false</td></tr>
+        <tr><td>2026-11-10T00:12:09+00:00</td><td>updated</td><td>fields: [&quot;fixtures&quot;]</td></tr>
+        <tr><td>2026-11-10T01:15:09+00:00</td><td>excluded</td><td>item: agt-4p2.10; reason: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (2)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-4p2.5</th><td>A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.</td><td>added</td></tr>
+        <tr><th scope="row">agt-4p2.10</th><td>A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

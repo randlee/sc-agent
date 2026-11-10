@@ -1,0 +1,332 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.3">
+  <div class="section-head">
+    <h2>agt-4p2.3 <span class="unit-title">Sprint A-3: sc-treesitter</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 2154,
+      &quot;before_chars&quot;: 1374,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    },
+    {
+      &quot;after_chars&quot;: 20445,
+      &quot;before_chars&quot;: 18373,
+      &quot;field&quot;: &quot;design&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+      &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+      &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+      &quot;reason&quot;: &quot;REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+      &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-09T23:19:37+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-002&quot;,
+      &quot;REQ-SAG-0009&quot;,
+      &quot;REQ-SAG-0010&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261109T231937Z-agt-4p2.3&quot;,
+    &quot;score&quot;: &quot;2/5&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.3&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:30+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+        &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+        &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+        &quot;reason&quot;: &quot;REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+        &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023530Z-agt-4p2.3&quot;,
+    &quot;score&quot;: &quot;2/2&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 10,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-3: sc-treesitter&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:19:37+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-002&quot;,
+        &quot;REQ-SAG-0009&quot;,
+        &quot;REQ-SAG-0010&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T231937Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;2/5&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:21:49+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-002&quot;,
+          &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library and adds no CLI command; the tree-sitter CLI and its Python parity are sprint A-10.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261109T232149Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;3/3&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:06:23+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0004&quot;,
+        &quot;ANC-006&quot;,
+        &quot;REQ-SAG-0010&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T010623Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;1/4&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:08:03+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+          &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;REQ-SAG-0010&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T010803Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;1/2&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:09:22+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+          &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T010922Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;2/2&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:43+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020443Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:06+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020606Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:29+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0301 makes sc-treesitter a stand-alone library that writes no log and depends on no sc-agent crate.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020629Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;0/0&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:12+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+          &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021112Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;2/2&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:30+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0004&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-006&quot;,
+          &quot;reason&quot;: &quot;A-3 builds the sc-treesitter library; it adds no decide CLI operation.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023530Z-agt-4p2.3&quot;,
+      &quot;score&quot;: &quot;2/2&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.3: Sprint A-3: sc-treesitter
+Gate FAIL 2/5 -&gt; PASS 2/2 over 10 runs.
+Failing at first run: ANC-002, REQ-SAG-0009, REQ-SAG-0010.
+Failing now: none.
+Excluded ADR-SAG-0004: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.
+Excluded ANC-006: A-3 builds the sc-treesitter library; it adds no decide CLI operation.
+Excluded ANC-007: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.
+Excluded REQ-SAG-0009: sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.
+Changed fields: acceptance_criteria, design.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>2/5</td><td>ANC-002, REQ-SAG-0009, REQ-SAG-0010</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>2/2</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 10 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261109T231937Z-agt-4p2.3</code></td><td>2026-11-09T23:19:37+00:00</td><td><span class="status status-fail">FAIL</span></td><td>2/5</td><td>ANC-002, REQ-SAG-0009, REQ-SAG-0010</td></tr>
+        <tr><td><code>plan-20261109T232149Z-agt-4p2.3</code></td><td>2026-11-09T23:21:49+00:00</td><td><span class="status status-pass">PASS</span></td><td>3/3</td><td></td></tr>
+        <tr><td><code>plan-20261110T010623Z-agt-4p2.3</code></td><td>2026-11-10T01:06:23+00:00</td><td><span class="status status-fail">FAIL</span></td><td>1/4</td><td>ADR-SAG-0004, ANC-006, REQ-SAG-0010</td></tr>
+        <tr><td><code>plan-20261110T010803Z-agt-4p2.3</code></td><td>2026-11-10T01:08:03+00:00</td><td><span class="status status-fail">FAIL</span></td><td>1/2</td><td>REQ-SAG-0010</td></tr>
+        <tr><td><code>plan-20261110T010922Z-agt-4p2.3</code></td><td>2026-11-10T01:09:22+00:00</td><td><span class="status status-pass">PASS</span></td><td>2/2</td><td></td></tr>
+        <tr><td><code>plan-20261110T020443Z-agt-4p2.3</code></td><td>2026-11-10T02:04:43+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020606Z-agt-4p2.3</code></td><td>2026-11-10T02:06:06+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020629Z-agt-4p2.3</code></td><td>2026-11-10T02:06:29+00:00</td><td><span class="status status-pass">PASS</span></td><td>0/0</td><td></td></tr>
+        <tr><td><code>plan-20261110T021112Z-agt-4p2.3</code></td><td>2026-11-10T02:11:12+00:00</td><td><span class="status status-pass">PASS</span></td><td>2/2</td><td></td></tr>
+        <tr><td><code>plan-20261110T023530Z-agt-4p2.3</code></td><td>2026-11-10T02:35:30+00:00</td><td><span class="status status-pass">PASS</span></td><td>2/2</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ADR-SAG-0004">ADR-SAG-0004</a></th><td>sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-006">ANC-006</a></th><td>A-3 builds the sc-treesitter library; it adds no decide CLI operation.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-007">ANC-007</a></th><td>REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent&#x27;s GeneralLogger; the tsq CLI&#x27;s logging is planned in A-10.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0009">REQ-SAG-0009</a></th><td>sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="eq">- [ ] cargo tree -p sc-treesitter lists no sc-agent crate (REQ-SAG-0301); no agent or decision-model code.</div><div class="eq">- [ ] A caller-written query runs against Python source and against Rust source through the same run_query call (REQ-SAG-0302, first release).</div><div class="eq">- [ ] Every id from languages() runs through the same run_query call; adding a grammar adds a table row only, no API change (REQ-SAG-0302).</div><div class="eq">- [ ] languages() lists the loaded grammars and queries() lists the predefined queries (python/branches, rust/match-arms) (REQ-SAG-0303 support).</div><div class="ch">- [ ] A caller-written query runs through the PyO3 bindings <del>(feature</del><ins>(crates/sc-treesitter-py</ins> <del>python)</del><ins>over feature python, module sc_treesitter)</ins> and returns its matches as Capture objects (REQ-SAG-0303).</div><div class="ch">- [ ] All <del>17</del><ins>19</ins> Error variants<ins> (the owner&#x27;s 17 plus Write and Log for tsq)</ins> exist with stable ids treesitter.&lt;variant_snake&gt; (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error&#x27;s kind and message (REQ-SAG-0002).</div><div class="eq">- [ ] An injected lowest-layer failure (non-UTF-8 source) reaches the PyO3 entry point with id treesitter.not_utf8 and its message (REQ-SAG-0002).</div><div class="eq">- [ ] Clippy passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code (REQ-SAG-0002).</div><div class="rm">- - [ ] No git, no tokio, no sleep(), no sc-sha; no u32 clamping of positions (PositionOverflow instead).</div><div class="rm">- - [ ] Second wave (C# as csharp, Go) is added later as table rows with no API change (REQ-SAG-0302).</div><div class="ad">+ - [ ] No git, no sc-sha; no u32 clamping of positions (PositionOverflow instead).</div><div class="ad">+ - [ ] Second wave (C# as csharp, Go) is a later sprint that adds table rows, queries and samples with no API change (REQ-SAG-0302).</div><div class="ad">+ - [ ] The library writes no log (REQ-SAG-0301); `cargo tree -p sc-treesitter --no-default-features --features grammar-python,grammar-rust` lists no sc-observability.</div><div class="ad">+ - [ ] REQ-SAG-0010: sc-treesitter and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.</div></div>
+  </details>
+  <details>
+    <summary>design</summary>
+    <div class="diff"><div class="eq"># Sprint A-3: sc-treesitter (bead agt-4p2.3)</div><div class="eq"></div><div class="eq">Copy script: `docs/plans/phase-a/copy/a-3.sh` (dry run 2026-11-09, reconciliation: 19 copy steps, 7 files, 511 lines before trimming).</div><div class="eq">Source: sc-agent-ref @ dce239a, `crates/sc-treesitter`. Target: `crates/sc-treesitter/`.</div><div class="eq">Governing records: REQ-SAG-0301, REQ-SAG-0302 (as amended: Python + Rust first release, C# `csharp` + Go second release), REQ-SAG-0303, REQ-SAG-0002 (now also denies `indexing_slicing`), REQ-SAG-0001, ADR-SAG-0004 (sc-treesitter stands alone).</div><div class="eq">Error convention: the workspace id rule (A-1) is `&quot;&lt;crate-prefix&gt;.&lt;variant_snake&gt;&quot;` with an id, a message and a cause chain. sc-treesitter MUST NOT depend on sc-agent-types (REQ-SAG-0301), so it does not implement A-1&#x27;s `ErrorId` trait; it follows the same convention with inherent `id()`/`message()` and serializes as the same `{&quot;id&quot;,&quot;message&quot;}` shape as `ErrorDetail`. Ids use the prefix `treesitter`. Owner memories: owner-sc-treesitter, owner-treesitter-grammars, owner-error-contract, owner-errors-settled, owner-no-sleep, owner-lowlevel-no-tokio.</div><div class="ch">Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and Rust grammars and queries; C#/Go are the second wave; use the <ins>owner&#x27;s </ins>17-variant error <del>list;</del><ins>list plus `Write` and `Log` for the `tsq` binary (the owner: missing errors are added in the plan);</ins> no sc-agent deps, no git; PyO3 support types behind a `python` feature, <del>placement</del><ins>built</ins> <del>open.</del><ins>into the extension module by `crates/sc-treesitter-py` (section 3a).</ins></div><div class="eq"></div><div class="rm">- Scope split with A-10: this sprint is the library, its CLI support types (output types, error ids, JSON encoder, file reader) and the PyO3 support types. The binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, the `cli` feature) is Sprint A-10.</div><div class="ad">+ Scope split with A-10: this sprint is the library, its CLI support types (output types, error ids, JSON encoder, file reader), the PyO3 support types and `crates/sc-treesitter-py`. The `tsq` binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, the `cli` feature) is Sprint A-10.</div><div class="ad">+ </div><div class="ad">+ Decisions (assistant, 2026-11-09; owner reviews the placement at architecture review):</div><div class="ad">+ - PyO3 placement: a separate crate `crates/sc-treesitter-py` builds the extension module; sc-treesitter stays an rlib with the support types behind `python` (section 3a).</div><div class="ad">+ - Output shape: flat captures sorted by (start_byte, name, end_byte), as copied; each capture is one part of a match.</div><div class="ad">+ - Logging: the library logs nothing (stand-alone, REQ-SAG-0301); the `tsq` binary writes its own general log (REQ-SAG-0003, A-10).</div><div class="ad">+ - Second wave (C# `csharp`, Go) is a later sprint, one predefined query each (proposed: csharp `switch-sections`, go `switch-cases`); each grammar is one table row, one `.scm` file and one test sample.</div><div class="eq"></div><div class="eq">## 1. Copy list (a-3.sh)</div><div class="eq"></div><div class="eq">| Source (`crates/sc-treesitter/`) | Target (`crates/sc-treesitter/`) | What |</div><div class="eq">|---|---|---|</div><div class="eq">| `LICENSE` | `LICENSE` | MIT |</div><div class="eq">| `src/grammar.rs:12-100` | `src/grammar.rs` | `Grammar` table, python/rust loaders and rows, `languages`, `language`, `lookup`, `all` |</div><div class="eq">| `src/query.rs:9-75` | `src/query.rs` | `QueryInfo`, `PYTHON`/`RUST` consts, `queries`, `query_source` |</div><div class="eq">| `src/extract.rs:7` | `src/run.rs` | tree-sitter imports |</div><div class="eq">| `src/extract.rs:132-138` | `src/run.rs` | `RawCapture` |</div><div class="eq">| `src/extract.rs:176-252` | `src/run.rs` | `extract` body: parse, compile, matches loop, sort, ERROR/MISSING check (becomes `run_query`) |</div><div class="eq">| `src/extract.rs:273-280` | `src/run.rs` | capture text via `source.get(..)` |</div><div class="eq">| `src/extract.rs:293-312` | `src/run.rs` | `capture_allowed`, `inclusive_lines` |</div><div class="eq">| `src/extract.rs:326-359` | `src/run.rs` | `error_line_inside` (becomes `error_inside`) |</div><div class="eq">| `src/extract.rs:361-363,494-523,552-611,639-658,679-702,734` | `src/run.rs` (`mod tests`) | tests: rust match arms; same-line determinism; parse error; unknown language; duplicate captures; empty result; invalid query; MISSING node; clean source |</div><div class="eq">| `src/lib.rs:34-59` | `src/lib.rs` | module wiring, re-exports |</div><div class="eq">| `src/render.rs:6-21` | `src/lib.rs` | pretty JSON + `\n` (becomes `to_json_bytes`) |</div><div class="eq">| `assets/queries/rust/match-arms.scm` | same | Rust predefined query `match-arms` |</div><div class="eq">| `assets/queries/python/branches.scm:2-5` | same | Python predefined query `branches`, case_clause half only (no Refusal/lite-gate half) |</div><div class="eq"></div><div class="eq">Not copied: `src/git_io.rs`, `src/cli/`, `src/main.rs` (A-10), `tests/` (git/envelope tests; `tests/cli.rs` parts go to A-10), `ExtractInput` and its getters (`extract.rs:12-130`), the builder/subjects code (`extract.rs:254-272,281-291`), `u32_from_usize` (`:314-324`), digest/subjects/cross-impl/manifest/newtype tests (`:364-493,524-551,613-638,659-678,703-733`), mimalloc, `PRODUCER_NAME`/`PRODUCER_MODE`, the old README and Cargo.toml.</div><div class="eq"></div><div class="eq">## 2. Required edits after copying</div><div class="eq"></div><div class="eq">- All files: delete every `sc_agent_types` import and use; replace `JevError` with `crate::Error` variants (section 4); delete doc text about sc/subjects/1, `query_sha256`, &quot;Phase A&quot;, git, producers; add module docs (`//!`) to each file.</div><div class="eq">- `src/grammar.rs`: features renamed `python` -&gt; `grammar-python`, `rust` -&gt; `grammar-rust` (the `python` feature is PyO3). Remove `LanguageInfo` (the hand-copied `grammar`/`grammar_version` strings are no longer output) and the public `language()`; `Grammar` keeps `id`, `load`, `queries`. `languages()` returns ids. Add `KNOWN_LANGUAGES` (every id this crate version can be built with, compiled or not) so `lookup` returns `GrammarUnavailable` for a known id whose feature is off and `UnknownLanguage` otherwise. Rewrite the doctest without `LanguageInfo`.</div><div class="eq">- `src/query.rs`: `QueryInfo` derives `Serialize` and skips `source` in serde; delete the `query_sha256` paragraphs (copied lines 12-15 and 50-54 of the target); `query_not_found` -&gt; `Error::UnknownQuery { language, name }`.</div><div class="eq">- `src/run.rs`: rename `extract` to `run_query` with the signature in section 3; delete `ExtractInput`, `path`/`rev`/`blob_sha` locals, `PRODUCER_*`, the empty-query special case (an empty query compiles to zero patterns and returns `NoMatches`). Before UTF-8: `source.len() &gt; MAX_SOURCE_BYTES` -&gt; `InputTooLarge`. `from_utf8` error -&gt; `NotUtf8 { byte_offset: e.valid_up_to() }`. `set_language` error -&gt; `GrammarLoad { detail: e.to_string() }`. `Query::new` error -&gt; `QueryCompile` keeping `offset,row,column,kind (Debug of QueryErrorKind),message`. After compiling, each name in `captures` must be in `query.capture_names()` else `QueryCaptureInvalid`. `parse` `None` -&gt; `ParseFailed`. Replace `capture_names[index]` with `.get(index)` (no index; a missing name is unreachable by tree-sitter contract, so skip it with `continue`, no panic) and delete both `debug_assert!`. `found.is_empty()` -&gt; `NoMatches { language, query }`. `error_line_inside` returns the node `(row, column, kind)` of the earliest ERROR/MISSING node (no `unwrap_or(u32::MAX)`), giving `SyntaxError { row, column, node_kind }`. `inclusive_lines` returns `Result&lt;(usize, usize), Error&gt;` with `checked_add(1)` -&gt; `PositionOverflow { row }`; no u32 narrowing. The copied text lookup (lines 273-280) maps to `Capture` construction; a `None` slice cannot occur for UTF-8 node boundaries, but return `Error::NotUtf8 { byte_offset: start_byte }` rather than panic. Remove `drop(matches)` comment noise.</div><div class="eq">- `src/run.rs` tests: port to `run_query`; assert `Error` variants (`matches!`) and `id()` (e.g. `&quot;treesitter.no_matches&quot;`), not `.code()`; replace python tests that used the cross-impl `hook.py` fixture with inline sources; in the determinism test drop the subject-id asserts and keep `once == twice` and same-line byte ordering; gate tests with `grammar-python`/`grammar-rust`.</div><div class="eq">- `src/lib.rs`: modules `error`, `grammar`, `query`, `run`, `source`, `#[cfg(feature = &quot;python&quot;)] python`; re-exports as in section 3; `#![warn(missing_docs)]`. Fold `render.rs` as generic `to_json_bytes`; encode error -&gt; `Error::Encode { detail }`.</div><div class="eq">- `assets/queries/python/branches.scm`: remove the sentence about `@_fn` from the comment (there is no helper capture now).</div><div class="eq"></div><div class="eq">## 3. Public API (exact Rust; bodies elided)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">// src/lib.rs</div><div class="eq">pub use error::Error;</div><div class="eq">pub use query::{QueryInfo, queries, query_source};</div><div class="eq">pub use run::{Capture, run_query};</div><div class="eq">pub use source::{MAX_SOURCE_BYTES, read_source};</div><div class="eq">pub use grammar::languages;</div><div class="eq">pub fn to_json_bytes&lt;T: serde::Serialize + ?Sized&gt;(value: &amp;T) -&gt; Result&lt;Vec&lt;u8&gt;, Error&gt;;</div><div class="eq"></div><div class="eq">// src/grammar.rs</div><div class="eq">pub(crate) struct Grammar {</div><div class="eq">    pub(crate) id: &amp;&#x27;static str,</div><div class="eq">    pub(crate) load: fn() -&gt; tree_sitter::Language,</div><div class="eq">    pub(crate) queries: &amp;&#x27;static [QueryInfo],</div><div class="eq">}</div><div class="eq">pub(crate) const KNOWN_LANGUAGES: &amp;[&amp;str] = &amp;[&quot;python&quot;, &quot;rust&quot;];</div><div class="eq">static GRAMMARS: &amp;[Grammar] = &amp;[ /* #[cfg(feature = &quot;grammar-python&quot;)] python, #[cfg(feature = &quot;grammar-rust&quot;)] rust */ ];</div><div class="eq">pub fn languages() -&gt; impl ExactSizeIterator&lt;Item = &amp;&#x27;static str&gt;;</div><div class="eq">pub(crate) fn lookup(id: &amp;str) -&gt; Result&lt;&amp;&#x27;static Grammar, Error&gt;;</div><div class="eq">pub(crate) fn all() -&gt; &amp;&#x27;static [Grammar];</div><div class="eq"></div><div class="eq">// src/query.rs</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct QueryInfo {</div><div class="eq">    pub language: &amp;&#x27;static str,</div><div class="eq">    #[serde(rename = &quot;query&quot;)]</div><div class="eq">    pub name: &amp;&#x27;static str,</div><div class="eq">    #[serde(skip)]</div><div class="eq">    pub source: &amp;&#x27;static str,</div><div class="eq">}</div><div class="eq">pub fn queries(language: Option&lt;&amp;str&gt;) -&gt; Result&lt;Vec&lt;&amp;&#x27;static QueryInfo&gt;, Error&gt;;</div><div class="eq">pub fn query_source(language: &amp;str, name: &amp;str) -&gt; Result&lt;&amp;&#x27;static str, Error&gt;;</div><div class="eq"></div><div class="eq">// src/run.rs</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]</div><div class="eq">#[cfg_attr(feature = &quot;python&quot;, pyo3::pyclass(frozen, get_all, module = &quot;sc_treesitter&quot;))]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct Capture {</div><div class="eq">    pub name: String,</div><div class="eq">    pub text: String,</div><div class="eq">    pub start_line: usize, // 1-based, inclusive</div><div class="eq">    pub end_line: usize,   // 1-based, inclusive</div><div class="eq">    pub start_byte: usize,</div><div class="eq">    pub end_byte: usize,</div><div class="eq">}</div><div class="eq">/// Runs any query against any loaded grammar; captures sorted by (start_byte, name, end_byte).</div><div class="eq">/// Names starting with `_` are helpers and never returned; `captures` is an allow-list.</div><div class="eq">pub fn run_query(</div><div class="eq">    language: &amp;str,</div><div class="eq">    query: &amp;str,</div><div class="eq">    source: &amp;[u8],</div><div class="eq">    path: Option&lt;&amp;std::path::Path&gt;, // only for error detail</div><div class="eq">    captures: Option&lt;&amp;[&amp;str]&gt;,</div><div class="eq">) -&gt; Result&lt;Vec&lt;Capture&gt;, Error&gt;;</div><div class="eq"></div><div class="eq">// src/source.rs (new)</div><div class="eq">pub const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024; // the old 8 MiB input cap</div><div class="eq">pub fn read_source(path: &amp;std::path::Path) -&gt; Result&lt;Vec&lt;u8&gt;, Error&gt;; // NotFound -&gt; FileNotFound, other io -&gt; FileRead, &gt; cap -&gt; InputTooLarge</div><div class="eq"></div><div class="ch">// src/python.rs (feature &quot;python&quot;; PyO3 support <del>types,</del><ins>types;</ins> <del>module</del><ins>the</ins> <del>placement</del><ins>#[pymodule]</ins> <del>open)</del><ins>is in crates/sc-treesitter-py)</ins></div><div class="eq">pyo3::create_exception!(sc_treesitter, TreesitterError, pyo3::exceptions::PyException);</div><div class="eq">impl From&lt;Error&gt; for pyo3::PyErr; // TreesitterError(args = (id, message))</div><div class="eq">#[pyo3::pyfunction] pub fn languages() -&gt; Vec&lt;&amp;&#x27;static str&gt;;</div><div class="eq">#[pyo3::pyfunction] #[pyo3(signature = (language = None))]</div><div class="eq">pub fn queries(language: Option&lt;&amp;str&gt;) -&gt; pyo3::PyResult&lt;Vec&lt;(&amp;&#x27;static str, &amp;&#x27;static str)&gt;&gt;;</div><div class="eq">#[pyo3::pyfunction] pub fn query_source(language: &amp;str, name: &amp;str) -&gt; pyo3::PyResult&lt;&amp;&#x27;static str&gt;;</div><div class="eq">#[pyo3::pyfunction] #[pyo3(signature = (language, query, source, captures = None))]</div><div class="eq">pub fn run_query(</div><div class="eq">    language: &amp;str,</div><div class="eq">    query: &amp;str,</div><div class="eq">    source: &amp;pyo3::Bound&lt;&#x27;_, pyo3::PyAny&gt;, // bytes or str; other types -&gt; Error::Python</div><div class="eq">    captures: Option&lt;Vec&lt;String&gt;&gt;,</div><div class="eq">) -&gt; pyo3::PyResult&lt;Vec&lt;Capture&gt;&gt;;</div><div class="eq">/// Adds the functions, `Capture` and `TreesitterError` to whichever #[pymodule] owns them.</div><div class="eq">pub fn register(module: &amp;pyo3::Bound&lt;&#x27;_, pyo3::types::PyModule&gt;) -&gt; pyo3::PyResult&lt;()&gt;;</div><div class="eq">```</div><div class="eq"></div><div class="ch">Synchronous, no tokio, no threads, no sleep, no logging <del>(ANC-004</del><ins>(stand-alone,</ins> <del>applicability is an open question).</del><ins>REQ-SAG-0301).</ins></div><div class="eq"></div><div class="ch">## <del>4.</del><ins>3a.</ins> <del>Error</del><ins>crates/sc-treesitter-py</ins> <del>enum (17 variants; `src/error.rs`, new)</del><ins>(new)</ins></div><div class="eq"></div><div class="rm">- Lower errors here are external (tree-sitter, std::io, std::str, serde_json, clap, pyo3); each variant keeps the lower error&#x27;s kind and message in its fields. No sc-agent error is wrapped. Hand-written `Display` (`&quot;&lt;id&gt;: &lt;message&gt;&quot;`), no thiserror, no serde tag.</div><div class="ad">+ ```toml</div><div class="ad">+ [package]</div><div class="ad">+ name = &quot;sc-treesitter-py&quot;</div><div class="ad">+ version = &quot;0.1.0&quot;</div><div class="ad">+ edition.workspace = true</div><div class="ad">+ rust-version.workspace = true</div><div class="ad">+ license = &quot;MIT&quot;</div><div class="ad">+ publish = false</div><div class="ad">+ </div><div class="ad">+ [lib]</div><div class="ad">+ name = &quot;sc_treesitter&quot;</div><div class="ad">+ crate-type = [&quot;cdylib&quot;]</div><div class="ad">+ </div><div class="ad">+ [lints]</div><div class="ad">+ workspace = true</div><div class="ad">+ </div><div class="ad">+ [dependencies]</div><div class="ad">+ sc-treesitter = { path = &quot;../sc-treesitter&quot;, features = [&quot;python&quot;] }</div><div class="ad">+ pyo3 = { version = &quot;=0.29.2&quot;, features = [&quot;abi3-py310&quot;, &quot;extension-module&quot;] }</div><div class="ad">+ ```</div><div class="ad">+ </div><div class="ad">+ ```rust</div><div class="ad">+ // src/lib.rs</div><div class="ad">+ #[pyo3::pymodule]</div><div class="ad">+ fn sc_treesitter(module: &amp;pyo3::Bound&lt;&#x27;_, pyo3::types::PyModule&gt;) -&gt; pyo3::PyResult&lt;()&gt; { sc_treesitter::python::register(module) }</div><div class="ad">+ ```</div><div class="ad">+ </div><div class="ad">+ `pyproject.toml` (maturin): wheel `sc-treesitter`, module `sc_treesitter`. `tests/test_query.py` holds test 9.</div><div class="ad">+ </div><div class="ad">+ ## 4. Error enum (19 variants; `src/error.rs`, new)</div><div class="ad">+ </div><div class="ad">+ Lower errors here are external (tree-sitter, std::io, std::str, serde_json, clap, pyo3, sc-observability); each variant keeps the lower error&#x27;s kind and message in its fields. No sc-agent error is wrapped. Hand-written `Display` (`&quot;&lt;id&gt;: &lt;message&gt;&quot;`), no thiserror, no serde tag.</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum Error {</div><div class="eq">    /// Id is not a language this crate knows.</div><div class="eq">    UnknownLanguage { language: String },                                      // &quot;treesitter.unknown_language&quot;</div><div class="eq">    /// Known language whose grammar feature is not compiled in.</div><div class="eq">    GrammarUnavailable { language: String },                                   // &quot;treesitter.grammar_unavailable&quot;</div><div class="eq">    /// tree_sitter::LanguageError (ABI/version mismatch); detail = its Display.</div><div class="eq">    GrammarLoad { language: String, detail: String },                          // &quot;treesitter.grammar_load&quot;</div><div class="eq">    /// No predefined query by that name for the language.</div><div class="eq">    UnknownQuery { language: String, name: String },                           // &quot;treesitter.unknown_query&quot;</div><div class="eq">    /// tree_sitter::QueryError, every field kept; kind = Debug of QueryErrorKind.</div><div class="eq">    QueryCompile { language: String, offset: usize, row: usize, column: usize, kind: String, detail: String }, // &quot;treesitter.query_compile&quot;</div><div class="eq">    /// Capture filter names a capture the query does not define.</div><div class="eq">    QueryCaptureInvalid { capture: String },                                   // &quot;treesitter.query_capture_invalid&quot;</div><div class="eq">    FileNotFound { path: std::path::PathBuf },                                 // &quot;treesitter.file_not_found&quot;</div><div class="eq">    /// io error other than NotFound; kind = Debug of io::ErrorKind, detail = Display.</div><div class="eq">    FileRead { path: std::path::PathBuf, kind: String, detail: String },       // &quot;treesitter.file_read&quot;</div><div class="eq">    /// Utf8Error::valid_up_to.</div><div class="eq">    NotUtf8 { path: Option&lt;std::path::PathBuf&gt;, byte_offset: usize },          // &quot;treesitter.not_utf8&quot;</div><div class="eq">    /// Source over MAX_SOURCE_BYTES.</div><div class="eq">    InputTooLarge { path: Option&lt;std::path::PathBuf&gt;, bytes: u64, limit: u64 }, // &quot;treesitter.input_too_large&quot;</div><div class="eq">    /// Parser::parse returned None.</div><div class="eq">    ParseFailed { language: String },                                          // &quot;treesitter.parse_failed&quot;</div><div class="eq">    /// ERROR or MISSING node inside a matched span; 0-based row/column.</div><div class="eq">    SyntaxError { path: Option&lt;std::path::PathBuf&gt;, row: usize, column: usize, node_kind: String }, // &quot;treesitter.syntax_error&quot;</div><div class="eq">    /// A 1-based line does not fit usize.</div><div class="eq">    PositionOverflow { path: Option&lt;std::path::PathBuf&gt;, row: usize },         // &quot;treesitter.position_overflow&quot;</div><div class="eq">    /// The query ran and matched nothing (after helper/allow-list filtering).</div><div class="eq">    NoMatches { language: String, query: String },                             // &quot;treesitter.no_matches&quot;</div><div class="eq">    /// serde_json error Display.</div><div class="eq">    Encode { detail: String },                                                 // &quot;treesitter.encode&quot;</div><div class="eq">    /// CLI argument error (A-10); kind = Debug of clap ErrorKind, detail = clap&#x27;s text.</div><div class="eq">    Usage { kind: String, detail: String },                                    // &quot;treesitter.usage&quot;</div><div class="eq">    /// PyO3 argument conversion failure (bindings only); detail = PyErr Display.</div><div class="eq">    Python { detail: String },                                                 // &quot;treesitter.python&quot;</div><div class="ad">+     /// `tsq` could not write stdout or stderr (A-10); kind = Debug of io::ErrorKind, detail = Display.</div><div class="ad">+     Write { kind: String, detail: String },                                    // &quot;treesitter.write&quot;</div><div class="ad">+     /// `tsq`&#x27;s general log could not start (A-10); detail = the sc-observability error&#x27;s code and message.</div><div class="ad">+     Log { detail: String },                                                    // &quot;treesitter.log&quot;</div><div class="eq">}</div><div class="eq">impl Error {</div><div class="eq">    /// Stable id &quot;treesitter.&lt;variant_snake&gt;&quot;.</div><div class="eq">    pub fn id(&amp;self) -&gt; &amp;&#x27;static str;</div><div class="eq">    /// One line naming the cause and every field.</div><div class="eq">    pub fn message(&amp;self) -&gt; String;</div><div class="eq">}</div><div class="eq">impl std::fmt::Display for Error {}            // &quot;&lt;id&gt;: &lt;message&gt;&quot;</div><div class="eq">impl std::error::Error for Error {}</div><div class="eq">impl serde::Serialize for Error {}             // {&quot;id&quot;: ..., &quot;message&quot;: ...}, the ErrorDetail shape</div><div class="eq">```</div><div class="eq"></div><div class="eq">A unit test checks every id is distinct and matches `^treesitter\.[a-z_]+$`, and that the serialized `id` equals `id()`.</div><div class="eq"></div><div class="eq">## 5. Cargo.toml (new)</div><div class="eq"></div><div class="eq">```toml</div><div class="eq">[package]</div><div class="eq">name = &quot;sc-treesitter&quot;</div><div class="eq">version = &quot;0.1.0&quot;</div><div class="eq">edition.workspace = true</div><div class="eq">rust-version.workspace = true</div><div class="eq">license = &quot;MIT&quot;</div><div class="eq">description = &quot;Load tree-sitter grammars and run any query against them.&quot;</div><div class="eq">include = [&quot;Cargo.toml&quot;, &quot;README.md&quot;, &quot;LICENSE&quot;, &quot;src/**&quot;, &quot;assets/queries/**&quot;]</div><div class="eq"></div><div class="eq">[lints]</div><div class="eq">workspace = true</div><div class="eq"></div><div class="eq">[features]</div><div class="eq">default = [&quot;grammar-python&quot;, &quot;grammar-rust&quot;]</div><div class="eq">grammar-python = [&quot;dep:tree-sitter-python&quot;]</div><div class="eq">grammar-rust = [&quot;dep:tree-sitter-rust&quot;]</div><div class="eq">python = [&quot;dep:pyo3&quot;]</div><div class="eq"># `cli` and clap are added by Sprint A-10.</div><div class="eq"></div><div class="eq">[dependencies]</div><div class="eq">serde = { version = &quot;1&quot;, features = [&quot;derive&quot;] }</div><div class="eq">serde_json = &quot;1&quot;</div><div class="eq">tree-sitter = &quot;=0.27.1&quot;</div><div class="eq">tree-sitter-python = { version = &quot;=0.25.0&quot;, optional = true }</div><div class="eq">tree-sitter-rust = { version = &quot;=0.24.2&quot;, optional = true }</div><div class="eq">pyo3 = { version = &quot;=0.29.2&quot;, optional = true, features = [&quot;abi3-py310&quot;] }</div><div class="eq">```</div><div class="eq"></div><div class="eq">Workspace lints (root `Cargo.toml`, owned by whichever sprint creates the workspace, A-1 expected): `[workspace.lints.clippy] panic = &quot;deny&quot;`, `unwrap_used = &quot;deny&quot;`, `expect_used = &quot;deny&quot;`, `indexing_slicing = &quot;deny&quot;`, and `clippy.toml` with `allow-unwrap-in-tests`, `allow-expect-in-tests`, `allow-panic-in-tests`, `allow-indexing-slicing-in-tests = true`. sc-lint does not enforce these yet. README.md: 3-4 lines, new.</div><div class="eq"></div><div class="ch">Second wave <del>(not</del><ins>(a</ins> <del>this</del><ins>later</ins> <del>sprint</del><ins>sprint;</ins> <del>unless</del><ins>see</ins> <del>the owner says so):</del><ins>Decisions):</ins> add `grammar-csharp` (`tree-sitter-c-sharp` 0.23.5, id `csharp`) and `grammar-go` (`tree-sitter-go` 0.25.0) rows to `GRAMMARS` and `KNOWN_LANGUAGES`, with their queries; no API change. Building them against tree-sitter 0.27.1 is not yet confirmed.</div><div class="eq"></div><div class="eq">## 6. New code</div><div class="eq"></div><div class="eq">- `src/error.rs` (section 4), ~110 lines.</div><div class="eq">- `src/source.rs`: `read_source`, `MAX_SOURCE_BYTES`, ~30 lines.</div><div class="eq">- `src/python.rs`: section 3, ~90 lines.</div><div class="eq">- `Capture` and the capture-filter check in `src/run.rs`.</div><div class="eq">- `README.md`, `Cargo.toml`.</div><div class="eq"></div><div class="eq">## 7. Tests</div><div class="eq"></div><div class="eq">Ported (from the copied ranges): Rust `match-arms` predefined query; same-line determinism and byte order; ERROR node -&gt; `SyntaxError`; MISSING node -&gt; `SyntaxError`; unknown language -&gt; `UnknownLanguage`; duplicate captures in one match; empty result -&gt; `NoMatches`; invalid query -&gt; `QueryCompile` with row/column/offset/kind; clean source succeeds.</div><div class="eq">New:</div><div class="eq">1. `python_and_rust_through_the_same_call` (REQ-0302 AC1): one caller-written query run through `run_query` on Python source and on Rust source.</div><div class="eq">2. `every_loaded_language_runs_through_run_query` (REQ-0302 AC2): iterates `languages()`, runs `(_) @node` over a per-id sample source from a test table; asserts every id has a sample, so a new grammar only adds a row and a sample.</div><div class="eq">3. Helper capture `@_x` is never returned; allow-list naming an undefined capture -&gt; `QueryCaptureInvalid`.</div><div class="eq">4. `NotUtf8` carries `byte_offset`; `InputTooLarge` carries bytes/limit; `PositionOverflow` from `inclusive_lines` at `usize::MAX`.</div><div class="eq">5. `GrammarUnavailable` when built without `grammar-rust` (`#[cfg(not(feature = &quot;grammar-rust&quot;))]`, run in CI with `--no-default-features --features grammar-python`).</div><div class="eq">6. `read_source`: missing file -&gt; `FileNotFound`; a directory -&gt; `FileRead` with kind.</div><div class="eq">7. `queries(None)` lists python/branches and rust/match-arms; `queries(Some(&quot;cobol&quot;))` -&gt; `UnknownLanguage`; `query_source` unknown name -&gt; `UnknownQuery`.</div><div class="ch">8. `id()` equals the serialized `id` for all <del>17</del><ins>19</ins> variants and follows `treesitter.&lt;variant_snake&gt;`; `to_json_bytes` ends with `\n`.</div><div class="ch">9. PyO3 (feature `python`, REQ-0303 AC1 and REQ-0002 AC1): a caller-written query through `run_query` returns `Capture` objects; a non-UTF-8 `bytes` source raises `TreesitterError` whose args are (`treesitter.not_utf8`, its message). Runs as a pytest <ins>(`crates/sc-treesitter-py/tests/test_query.py`) </ins>against the <ins>module </ins>built <del>module</del><ins>with</ins> <del>once placement is decided (open question 1).</del><ins>maturin.</ins></div><div class="eq">10. CI: `cargo tree -p sc-treesitter -e normal,build` contains no `sc-agent`/`sc-decision` crate (REQ-0301); `cargo clippy -p sc-treesitter --all-features -- -D warnings` with the workspace lints (REQ-0002).</div><div class="eq"></div><div class="eq">## 8. Dependencies</div><div class="eq"></div><div class="eq">`tree-sitter =0.27.1`, `tree-sitter-python =0.25.0` (optional), `tree-sitter-rust =0.24.2` (optional), `serde 1` (derive), `serde_json 1`, `pyo3 =0.29.2` with `abi3-py310` (optional). No sc-agent crate, no tokio, no git, no sc-sha, no mimalloc, no thiserror. Dev: `tempfile 3` (for the `read_source` tests only; other fixtures are inline).</div></div>
+  </details>
+</section>

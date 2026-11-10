@@ -1,0 +1,273 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.4">
+  <div class="section-head">
+    <h2>agt-4p2.4 <span class="unit-title">Sprint A-4: sc-agent-config and sc-agent-secrets</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 488,
+      &quot;before_chars&quot;: 377,
+      &quot;field&quot;: &quot;description&quot;
+    },
+    {
+      &quot;after_chars&quot;: 3034,
+      &quot;before_chars&quot;: 2139,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    },
+    {
+      &quot;after_chars&quot;: 16742,
+      &quot;before_chars&quot;: 11494,
+      &quot;field&quot;: &quot;design&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+      &quot;reason&quot;: &quot;sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+      &quot;reason&quot;: &quot;A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0701&quot;,
+      &quot;reason&quot;: &quot;A-4 delivers only the workers setting; the parallel batch run is built in A-9.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-09T23:22:50+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-002&quot;,
+      &quot;REQ-SAG-0601&quot;,
+      &quot;REQ-SAG-0701&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261109T232250Z-agt-4p2.4&quot;,
+    &quot;score&quot;: &quot;4/7&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.4&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:31+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+        &quot;reason&quot;: &quot;sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+        &quot;reason&quot;: &quot;A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;reason&quot;: &quot;A-4 delivers only the workers setting; the parallel batch run is built in A-9.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023531Z-agt-4p2.4&quot;,
+    &quot;score&quot;: &quot;4/4&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 8,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-4: sc-agent-config and sc-agent-secrets&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:22:50+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-002&quot;,
+        &quot;REQ-SAG-0601&quot;,
+        &quot;REQ-SAG-0701&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232250Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;4/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:24:31+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-002&quot;,
+          &quot;reason&quot;: &quot;A-4 builds config and secrets crates; it adds no CLI command and no Python API function.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;REQ-SAG-0601&quot;,
+        &quot;REQ-SAG-0701&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232431Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;4/6&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:07:20+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0701&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the workers setting; the parallel batch run is built in A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T010720Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;4/4&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:43+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020443Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:06+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020606Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:29+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020629Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;0/0&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:13+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0701&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the workers setting; the parallel batch run is built in A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021113Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;4/4&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:31+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-007&quot;,
+          &quot;reason&quot;: &quot;sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0701&quot;,
+          &quot;reason&quot;: &quot;A-4 delivers only the workers setting; the parallel batch run is built in A-9.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023531Z-agt-4p2.4&quot;,
+      &quot;score&quot;: &quot;4/4&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.4: Sprint A-4: sc-agent-config and sc-agent-secrets
+Gate FAIL 4/7 -&gt; PASS 4/4 over 8 runs.
+Failing at first run: ANC-002, REQ-SAG-0601, REQ-SAG-0701.
+Failing now: none.
+Excluded ANC-007: sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.
+Excluded REQ-SAG-0601: A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.
+Excluded REQ-SAG-0701: A-4 delivers only the workers setting; the parallel batch run is built in A-9.
+Changed fields: description, acceptance_criteria, design.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>4/7</td><td>ANC-002, REQ-SAG-0601, REQ-SAG-0701</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>4/4</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 8 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261109T232250Z-agt-4p2.4</code></td><td>2026-11-09T23:22:50+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/7</td><td>ANC-002, REQ-SAG-0601, REQ-SAG-0701</td></tr>
+        <tr><td><code>plan-20261109T232431Z-agt-4p2.4</code></td><td>2026-11-09T23:24:31+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/6</td><td>REQ-SAG-0601, REQ-SAG-0701</td></tr>
+        <tr><td><code>plan-20261110T010720Z-agt-4p2.4</code></td><td>2026-11-10T01:07:20+00:00</td><td><span class="status status-pass">PASS</span></td><td>4/4</td><td></td></tr>
+        <tr><td><code>plan-20261110T020443Z-agt-4p2.4</code></td><td>2026-11-10T02:04:43+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020606Z-agt-4p2.4</code></td><td>2026-11-10T02:06:06+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020629Z-agt-4p2.4</code></td><td>2026-11-10T02:06:29+00:00</td><td><span class="status status-pass">PASS</span></td><td>0/0</td><td></td></tr>
+        <tr><td><code>plan-20261110T021113Z-agt-4p2.4</code></td><td>2026-11-10T02:11:13+00:00</td><td><span class="status status-pass">PASS</span></td><td>4/4</td><td></td></tr>
+        <tr><td><code>plan-20261110T023531Z-agt-4p2.4</code></td><td>2026-11-10T02:35:31+00:00</td><td><span class="status status-pass">PASS</span></td><td>4/4</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-007">ANC-007</a></th><td>sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0601">REQ-SAG-0601</a></th><td>A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0701">REQ-SAG-0701</a></th><td>A-4 delivers only the workers setting; the parallel batch run is built in A-9.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="ch">Global config loaded with sc-config <del>(JSON):</del><ins>(JSON) from ~/.sc-agent/:</ins> extra models, <del>log_root,</del><ins>optional log_root (default ~/.sc-agent),</ins> workers (default 8), max_sends (default 5), local runners (kind, host, port, model, optional key_env). Secrets: credential env-var names (incl. LAYA_API_KEY) and key resolution per provider or configured <del>variable;</del><ins>variable: process env, then repo-root .env, then keyring;</ins> never log a key. Records: <ins>REQ-SAG-0003, </ins>REQ-SAG-0102, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801.</div></div>
+  </details>
+  <details>
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-4.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="eq">- [ ] REQ-SAG-0102 AC1/AC2: a default.json models entry for a haiku model dated later than every built-in haiku makes AgentConfig::catalog()?.resolve(Latest(Haiku)) return it with no rebuild; an earlier date does not (tempdir tests).</div><div class="ch">- [ ] REQ-SAG-0102: a user adds a model by editing JSON only; keys models, <del>log_root,</del><ins>log_root (optional),</ins> workers, max_sends, local_runners load through sc-config 0.2.0 Loader with SC_AGENT__ env overrides (tests: SC_AGENT__MAX_SENDS=2, SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000).</div><div class="ch">- [ ] <del>REQ-SAG-0601</del><ins>REQ-SAG-0601:</ins> <del>(config</del><ins>this</ins> <del>part):</del><ins>sprint delivers only the</ins> max_sends <del>defaults</del><ins>setting</ins> <del>to</del><ins>(default</ins> <del>5</del><ins>5;</ins> <del>and is configurable (2</del><ins>2</ins> via file or env gives <del>2);</del><ins>2;</ins> 0 <ins>rejected); resending on 429/502/529 </ins>is <del>rejected</del><ins>built</ins> <del>(CFG.DESERIALIZE).</del><ins>in A-5 and A-9.</ins></div><div class="ch">- [ ] <del>REQ-SAG-0701</del><ins>REQ-SAG-0701:</ins> <del>(config</del><ins>this</ins> <del>part):</del><ins>sprint delivers only the workers setting (default 8; 0 rejected); running a batch across that many</ins> workers is <del>a</del><ins>built</ins> <del>global</del><ins>in</ins> <del>configuration setting with default 8; 0 is rejected.</del><ins>A-9.</ins></div><div class="eq">- [ ] REQ-SAG-0801 (config part): each local_runners entry carries name (map key), kind, host, port, model and optional key_env from the config file; a runner added to default.json is returned by load() with no rebuild; no runner host or port literal outside tests (grep).</div><div class="eq">- [ ] REQ-SAG-0401: TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_API_KEY, NOUS_API_KEY and LAYA_API_KEY appear as string literals only in crates/sc-agent-secrets (automated check).</div><div class="rm">- - [ ] sc_agent_secrets::resolve(p, env) reads env_var(p) for each of the six Providers and resolve_var reads a configured variable; unset/empty/blank -&gt; secrets.key_missing naming the variable; malformed -&gt; secrets.key_malformed (MapEnv tests; process env never mutated).</div><div class="rm">- - [ ] Never log or print a key: ApiKey Debug/Display print [redacted]; no SecretsError Display/Debug contains key bytes (test).</div><div class="ad">+ - [ ] REQ-SAG-0401: resolve(p, sources) and resolve_var(var, sources) look in the process environment, then the repo-root .env, then the platform keyring, and report which source supplied the key; each of the six Providers uses env_var(p); none -&gt; secrets.key_missing naming the variable; malformed -&gt; secrets.key_malformed (MapEnv/MapKeyring/tempdir tests; process env never mutated).</div><div class="ad">+ - [ ] REQ-SAG-0003: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (sc-observability&#x27;s default for app sc-agent); the config directory decide passes is default_dir().</div><div class="ad">+ - [ ] A missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set (then config.load); a local runner named like a short name is config.runner_name (tests).</div><div class="ad">+ - [ ] Never log or print a key: ApiKey Debug/Display print [redacted]; no SecretsError Display/Debug contains key bytes, including keyring failures (test).</div><div class="eq">- [ ] REQ-SAG-0002: SecretsError and AgentConfigError implement ErrorId with ids secrets.* and config.*; bad JSON gives config.load whose cause has id CFG.PARSE and the sc-config message with the path; a model on two lines gives config.catalog whose cause is types.model_on_two_lines (tests); clippy with the workspace denies passes.</div><div class="ch">- [ ] REQ-SAG-0009/0010: cargo tree for both crates lists no tokio crate; no sleep call; dependencies limited to sc-agent-types, sc-config, <del>serde</del><ins>serde, keyring, whoami</ins> (dev: tempfile, serde_json).</div></div>
+  </details>
+  <details>
+    <summary>design</summary>
+    <div class="diff"><div class="eq"># Sprint A-4: sc-agent-config and sc-agent-secrets (bead agt-4p2.4)</div><div class="eq"></div><div class="ch">Copy script: `docs/plans/phase-a/copy/a-4.sh` (sources `lib.sh`; source sc-agent-ref@dce239a). Dry run 2026-11-09 <del>(reconciliation):</del><ins>(re-checked):</ins> <del>8</del><ins>13</ins> copy steps, <del>6</del><ins>8</ins> <del>files, 305 lines.</del><ins>files.</ins></div><div class="eq">Targets: `crates/sc-agent-config` (new code) and `crates/sc-agent-secrets`. Layer: directly above sc-agent-types (ADR-SAG-0004); both depend only on A-1.</div><div class="ch">Governing: REQ-SAG-0102, REQ-SAG-0401, REQ-SAG-0601 (max sends configurable, default 5), REQ-SAG-0701 (workers, default 8), REQ-SAG-0801 (each local decision runner in the global config by name, host, port and model), REQ-SAG-0002, <ins>REQ-SAG-0003 and </ins>REQ-SAG-0005 <del>(`&lt;log_root&gt;`),</del><ins>(`&lt;log_root&gt;`, default `~/.sc-agent`),</ins> REQ-SAG-0009, REQ-SAG-0010, ADR-SAG-0004.</div><div class="eq">Owner decisions: owner-architecture (sc-config, JSON), owner-model-catalog, owner-busy-resend, owner-local-discovery (ports in the config file), owner-local-decision-crate, owner-secrets-env-vars, owner-provider-and-model, owner-error-contract, owner-lowlevel-no-tokio.</div><div class="eq"></div><div class="eq">## sc-config 0.2.0 API (checked in ~/.cargo/registry, repo randlee/sc-runtime)</div><div class="eq"></div><div class="eq">- `AppName::new(&amp;str) -&gt; Result&lt;AppName, ConfigError&gt;`; `sc-agent` gives env prefix `SC_AGENT__`.</div><div class="eq">- `Loader::new(app, config_dir: PathBuf, environment: Vec&lt;(OsString, OsString)&gt;).load::&lt;T: DeserializeOwned&gt;()`: reads `&lt;dir&gt;/default.json` (required), merges optional `&lt;dir&gt;/local.json`, applies `SC_AGENT__A__B=value` overrides (segments lowercased; value parsed as JSON, else a string).</div><div class="eq">- `ConfigError` codes: CFG.MISSING_DEFAULT, CFG.READ, CFG.PARSE, CFG.OVERRIDE, CFG.DESERIALIZE, APP.INVALID_NAME, CFG.NON_UNICODE; has `code()`, Display, `source()`; not Clone.</div><div class="eq">- Overrides walk objects only, so `models` and `local_runners` are objects keyed by id or name (`SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000`).</div><div class="eq"></div><div class="eq">## 1. Copy list (a-4.sh)</div><div class="eq"></div><div class="eq">| Source (sc-agent-ref) | Lines | Target | What |</div><div class="eq">|---|---|---|---|</div><div class="eq">| crates/sc-agent-secrets/LICENSE | all | sc-agent-secrets/LICENSE, sc-agent-config/LICENSE | MIT |</div><div class="eq">| sc-agent-secrets/src/resolve.rs | 17-24 | sc-agent-secrets/src/vars.rs | TYPESAFE/ANTHROPIC/OPENAI_API_KEY consts |</div><div class="eq">| sc-agent-secrets/src/resolve.rs | 34-42 | sc-agent-secrets/src/env.rs | EnvSource trait |</div><div class="eq">| sc-agent-secrets/src/platform.rs | 15-31 | sc-agent-secrets/src/env.rs | ProcessEnv |</div><div class="eq">| sc-agent-types/src/secret.rs | 9-134 | sc-agent-secrets/src/api_key.rs | ResolvedApiKey (becomes ApiKey) |</div><div class="eq">| sc-agent-types/src/secret.rs | 136-194 | sc-agent-secrets/src/api_key.rs | unit tests |</div><div class="eq">| sc-agent-secrets/src/resolve.rs | 305-348 | sc-agent-secrets/tests/resolve.rs | MapEnv test double |</div><div class="ad">+ | sc-agent-secrets/src/dotenv.rs | 1-241 | sc-agent-secrets/src/dotenv.rs | repo-root .env parser and its tests |</div><div class="ad">+ | sc-agent-secrets/src/resolve.rs | 44-59 | sc-agent-secrets/src/keyring.rs | KeyringSource trait |</div><div class="ad">+ | sc-agent-secrets/src/platform.rs | 33-264 | sc-agent-secrets/src/keyring.rs | PlatformKeyring, ReadGate (15 s deadline by recv_timeout, no sleep), read_entry, classify_keyring, sanitized causes, current_account |</div><div class="ad">+ | sc-agent-secrets/src/platform.rs | 265-413 | sc-agent-secrets/src/keyring.rs | keyring unit tests |</div><div class="ad">+ | sc-agent-secrets/src/resolve.rs | 350-400 | sc-agent-secrets/tests/resolve.rs | MapKeyring test double |</div><div class="eq"></div><div class="rm">- Not copied: dotenv.rs, keyring parts of platform.rs (`PlatformKeyring`, `ReadGate`, 15 s thread deadline), `KeyringSource`, `ANTHROPIC_KEYCHAIN_SERVICE`, the `*_logged` functions, test_support.rs, `keyring`/`whoami`; `redact_error`, `JevError::map_detail`; the old TOML `models.toml` reader (sc-jev-host/src/paths.rs:266-282).</div><div class="ad">+ `a-4.sh` does not yet have the last five rows; add them before the sprint starts.</div><div class="ad">+ </div><div class="ad">+ Not copied: `ANTHROPIC_KEYCHAIN_SERVICE` (the keyring service is the variable name), the `*_logged` functions, test_support.rs; `redact_error`, `JevError::map_detail`; the old TOML `models.toml` reader (sc-jev-host/src/paths.rs:266-282).</div><div class="eq"></div><div class="eq">## 2. Required edits after copying</div><div class="eq"></div><div class="rm">- - vars.rs: keep the three consts; add `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `NOUS_API_KEY` (Q3) and `LAYA_API_KEY` (Laya&#x27;s own variable, laya/serve.py). Add `pub const fn env_var(provider: Provider) -&gt; &amp;&#x27;static str` (exhaustive match over the six) and `pub const ALL_VARS: &amp;[&amp;str]` (all seven). The only credential-name literals in the workspace (REQ-SAG-0401).</div><div class="rm">- - env.rs: drop ADR-SAG-0020 and the `.env` sentence; a non-Unicode value stays `Some(&quot;&quot;)` and resolves as `secrets.key_missing`.</div><div class="rm">- - api_key.rs: `ResolvedApiKey` -&gt; `ApiKey`; `pub(crate) fn try_new(var: &amp;str, raw: String) -&gt; Result&lt;Self, SecretsError&gt;`; empty -&gt; `KeyMissing { var }`; whitespace/control/non-visible-ASCII -&gt; `KeyMalformed { var, reason }`; recovery text drops &quot;.env file, or the keyring&quot;. Delete `redact_error`. Keep `as_str` (only sc-agent-http&#x27;s transport reads it) and `redact_text`. Port the unit tests to `Provider::ALL`/`env_var` and the new ids.</div><div class="rm">- - tests/resolve.rs: drop `#[cfg(test)]` on MapEnv; `use sc_agent_secrets::EnvSource`.</div><div class="ad">+ - vars.rs: keep the three consts; add `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `NOUS_API_KEY` (the providers&#x27; usual names; assistant decision) and `LAYA_API_KEY` (Laya&#x27;s own variable, laya/serve.py). Add `pub const fn env_var(provider: Provider) -&gt; &amp;&#x27;static str` (exhaustive match over the six) and `pub const ALL_VARS: &amp;[&amp;str]` (all seven). The only credential-name literals in the workspace (REQ-SAG-0401).</div><div class="ad">+ - env.rs: drop ADR-SAG-0020; a present empty value is `Some(&quot;&quot;)` (it skips `.env` and goes to the keyring, as before); a non-Unicode value is `Some(&quot;&quot;)`.</div><div class="ad">+ - dotenv.rs: `JevError::io_failed_with` -&gt; `SecretsError::DotenvRead { kind, cause }` (cause = the sanitized label); `load_dotenv(repo_root)` unchanged otherwise.</div><div class="ad">+ - keyring.rs: `JevError` -&gt; `SecretsError::KeyringRead { kind, cause }` (sanitized cause: keyring errors can carry secret bytes) and `SecretsError::KeyringTimeout`; `KeyringSource::password` returns `Result&lt;Option&lt;String&gt;, SecretsError&gt;`; drop the `# Panics` text and ADR-SAG-0020; the reader thread uses `thread::Builder` (no `thread::spawn`).</div><div class="ad">+ - api_key.rs: `ResolvedApiKey` -&gt; `ApiKey`; `pub(crate) fn try_new(var: &amp;str, raw: String) -&gt; Result&lt;Self, SecretsError&gt;`; empty -&gt; `KeyMissing { var }`; whitespace/control/non-visible-ASCII -&gt; `KeyMalformed { var, reason }`; recovery text names the process environment, the repo-root `.env` file and the keyring. Delete `redact_error`. Keep `as_str` (only sc-agent-http&#x27;s transport reads it) and `redact_text`. Port the unit tests to `Provider::ALL`/`env_var` and the new ids.</div><div class="ad">+ - tests/resolve.rs: drop `#[cfg(test)]` on MapEnv and MapKeyring; `use sc_agent_secrets::{EnvSource, KeyringSource}`.</div><div class="eq"></div><div class="eq">## 3. Target public API (exact; bodies elided)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">// ===== sc-agent-secrets =====</div><div class="ch">mod api_key;<ins> mod dotenv;</ins> mod env; mod error; mod <ins>keyring; mod </ins>resolve; mod vars;</div><div class="eq">pub use api_key::ApiKey;</div><div class="eq">pub use env::{EnvSource, ProcessEnv};</div><div class="eq">pub use error::SecretsError;</div><div class="rm">- pub use resolve::{resolve, resolve_var};</div><div class="ad">+ pub use keyring::{KeyringSource, PlatformKeyring};</div><div class="ad">+ pub use resolve::{resolve, resolve_var, KeySource, KeySources, ResolvedKey};</div><div class="eq">pub use vars::{env_var, ALL_VARS, ANTHROPIC_API_KEY, LAYA_API_KEY, NOUS_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_API_KEY, TYPESAFE_API_KEY};</div><div class="eq"></div><div class="eq">pub trait EnvSource: Send + Sync { fn var(&amp;self, name: &amp;str) -&gt; Option&lt;String&gt;; }</div><div class="ad">+ pub trait KeyringSource: Send + Sync { fn password(&amp;self, service: &amp;str, account: &amp;str) -&gt; Result&lt;Option&lt;String&gt;, SecretsError&gt;; }</div><div class="ad">+ #[derive(Debug, Default, Clone, Copy)]</div><div class="ad">+ pub struct PlatformKeyring;                                     // service = variable name, account = OS user</div><div class="ad">+ impl KeyringSource for PlatformKeyring {}</div><div class="eq">#[derive(Debug, Default, Clone, Copy)]</div><div class="eq">pub struct ProcessEnv;</div><div class="eq">impl EnvSource for ProcessEnv {}</div><div class="eq"></div><div class="eq">#[must_use = &quot;read the secret with as_str only at the transport that sends it&quot;]</div><div class="eq">#[derive(Clone, PartialEq, Eq)]</div><div class="eq">pub struct ApiKey(Arc&lt;str&gt;);</div><div class="eq">impl ApiKey {</div><div class="eq">    #[must_use] pub fn as_str(&amp;self) -&gt; &amp;str;</div><div class="eq">    #[must_use] pub fn redact_text(&amp;self, text: &amp;str) -&gt; String;   // replaces the key with &quot;[redacted]&quot;</div><div class="eq">}</div><div class="eq">impl fmt::Debug for ApiKey {}    // &quot;ApiKey([redacted])&quot;</div><div class="eq">impl fmt::Display for ApiKey {}  // &quot;[redacted]&quot;</div><div class="eq"></div><div class="rm">- /// The key for `provider`, from its variable in `env`.</div><div class="rm">- pub fn resolve(provider: Provider, env: &amp;impl EnvSource) -&gt; Result&lt;ApiKey, SecretsError&gt;;</div><div class="rm">- /// The key in a variable named by configuration (a local runner&#x27;s `key_env`, e.g. LAYA_API_KEY).</div><div class="rm">- pub fn resolve_var(var: &amp;str, env: &amp;impl EnvSource) -&gt; Result&lt;ApiKey, SecretsError&gt;;</div><div class="ad">+ /// Where keys are looked up, in this order (REQ-SAG-0401): process environment, `&lt;repo_root&gt;/.env`, keyring.</div><div class="ad">+ pub struct KeySources&lt;&#x27;a&gt; { pub env: &amp;&#x27;a dyn EnvSource, pub repo_root: Option&lt;&amp;&#x27;a Path&gt;, pub keyring: &amp;&#x27;a dyn KeyringSource }</div><div class="ad">+ impl&lt;&#x27;a&gt; KeySources&lt;&#x27;a&gt; {</div><div class="ad">+     /// ProcessEnv + PlatformKeyring; `repo_root` is the git work-tree top level (sc_agent_log::Repo::work_tree_root), None outside git (no .env read).</div><div class="ad">+     pub fn system(repo_root: Option&lt;&amp;&#x27;a Path&gt;) -&gt; Self;</div><div class="ad">+ }</div><div class="ad">+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]</div><div class="ad">+ pub enum KeySource { Env, DotEnv, Keyring }</div><div class="ad">+ impl KeySource { pub const fn as_str(self) -&gt; &amp;&#x27;static str; }   // &quot;env&quot; | &quot;.env&quot; | &quot;keyring&quot;</div><div class="ad">+ #[derive(Debug, Clone)]</div><div class="ad">+ pub struct ResolvedKey { pub key: ApiKey, pub source: KeySource }   // source: decide doctor lists it (REQ-SAG-0503)</div><div class="ad">+ /// The key for `provider`, from its variable: env, then .env (a variable already set in env is not overridden), then keyring.</div><div class="ad">+ pub fn resolve(provider: Provider, sources: &amp;KeySources&lt;&#x27;_&gt;) -&gt; Result&lt;ResolvedKey, SecretsError&gt;;</div><div class="ad">+ /// The same order for a variable named by configuration (a local runner&#x27;s `key_env`, e.g. LAYA_API_KEY).</div><div class="ad">+ pub fn resolve_var(var: &amp;str, sources: &amp;KeySources&lt;&#x27;_&gt;) -&gt; Result&lt;ResolvedKey, SecretsError&gt;;</div><div class="eq"></div><div class="eq">// ===== sc-agent-config =====</div><div class="eq">mod config; mod error;</div><div class="ch">pub use <del>config::{load,</del><ins>config::{default_dir, load,</ins> AgentConfig, ExtraModel, LocalRunner, APP_NAME, DEFAULT_MAX_SENDS, DEFAULT_WORKERS};</div><div class="eq">pub use error::AgentConfigError;</div><div class="eq"></div><div class="eq">pub const APP_NAME: &amp;str = &quot;sc-agent&quot;;                      // env prefix SC_AGENT__</div><div class="eq">pub const DEFAULT_WORKERS: NonZeroUsize;                    // 8: NonZeroUsize::MIN.saturating_add(7)</div><div class="eq">pub const DEFAULT_MAX_SENDS: NonZeroU32;                    // 5: NonZeroU32::MIN.saturating_add(4)</div><div class="eq"></div><div class="ch">#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]<ins>   // Default: no models, no log_root, workers 8, max_sends 5, no runners</ins></div><div class="eq">#[serde(deny_unknown_fields)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct AgentConfig {</div><div class="eq">    #[serde(default)] pub models: BTreeMap&lt;ModelId, ExtraModel&gt;,          // extra catalog rows (REQ-SAG-0102)</div><div class="ch">    <ins>#[serde(default)] </ins>pub log_root: <del>PathBuf,                                                </del><ins>Option&lt;PathBuf&gt;,                      </ins>// <del>session-log</del><ins>REQ-SAG-0003/0005;</ins> <del>root</del><ins>absent</ins> <del>(REQ-SAG-0005);</del><ins>-&gt;</ins> <del>Q4</del><ins>default_dir()</ins></div><div class="eq">    #[serde(default = &quot;default_workers&quot;)] pub workers: NonZeroUsize,      // REQ-SAG-0701, default 8</div><div class="eq">    #[serde(default = &quot;default_max_sends&quot;)] pub max_sends: NonZeroU32,    // REQ-SAG-0601, default 5, one value for all providers</div><div class="eq">    #[serde(default)] pub local_runners: BTreeMap&lt;String, LocalRunner&gt;,   // keyed by runner name (REQ-SAG-0801)</div><div class="eq">}</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]</div><div class="eq">#[serde(deny_unknown_fields)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct ExtraModel { pub line: ShortName, pub released: ReleaseDate }</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]</div><div class="eq">#[serde(deny_unknown_fields)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub struct LocalRunner {</div><div class="ch">    /// Daemon kind, parsed by sc-decision-local&#x27;s DaemonKind <del>(&quot;decider&quot;</del><ins>(&quot;strands&quot;</ins> | &quot;laya&quot; | <ins>&quot;mapika&quot; | </ins>&quot;generic&quot;).</div><div class="eq">    pub kind: String,</div><div class="eq">    pub host: String,</div><div class="eq">    pub port: u16,                                                        // owner-local-discovery</div><div class="eq">    pub model: ModelId,</div><div class="eq">    #[serde(default)] pub key_env: Option&lt;String&gt;,                        // resolved with sc_agent_secrets::resolve_var</div><div class="eq">}</div><div class="ad">+ impl Default for AgentConfig {}</div><div class="eq"></div><div class="rm">- /// Loads `&lt;config_dir&gt;/default.json` (+ optional local.json) and SC_AGENT__* overrides from `environment`.</div><div class="ad">+ /// `~/.sc-agent`: the config directory and sc-observability&#x27;s standard default log root for app sc-agent</div><div class="ad">+ /// (`~/.&lt;app&gt;`); std::env::home_dir(); none -&gt; HomeUnknown.</div><div class="ad">+ pub fn default_dir() -&gt; Result&lt;PathBuf, AgentConfigError&gt;;</div><div class="ad">+ </div><div class="ad">+ /// Loads `&lt;config_dir&gt;/default.json` (+ optional local.json) and SC_AGENT__* overrides from `environment`</div><div class="ad">+ /// (decide passes default_dir()). No default.json -&gt; AgentConfig::default(), unless an SC_AGENT__ variable is set</div><div class="ad">+ /// (then config.load with cause CFG.MISSING_DEFAULT, so an override is never ignored). A `local_runners` name equal</div><div class="ad">+ /// to a short name is RunnerName.</div><div class="eq">pub fn load(config_dir: PathBuf, environment: Vec&lt;(OsString, OsString)&gt;) -&gt; Result&lt;AgentConfig, AgentConfigError&gt;;</div><div class="eq">impl AgentConfig {</div><div class="ad">+     /// `log_root`, else default_dir() (REQ-SAG-0003).</div><div class="ad">+     pub fn log_root(&amp;self) -&gt; Result&lt;PathBuf, AgentConfigError&gt;;</div><div class="eq">    /// Catalog::builtin() plus every `models` entry, through Catalog::with_config_model.</div><div class="eq">    pub fn catalog(&amp;self) -&gt; Result&lt;Catalog, AgentConfigError&gt;;</div><div class="eq">}</div><div class="eq">```</div><div class="eq"></div><div class="eq">Example `default.json`:</div><div class="eq">```json</div><div class="ch">{<del> &quot;log_root&quot;: &quot;/Users/me/.sc-agent/sessions&quot;,</del> &quot;workers&quot;: 8, &quot;max_sends&quot;: 5,</div><div class="eq">  &quot;models&quot;: { &quot;claude-haiku-5-6&quot;: { &quot;line&quot;: &quot;haiku&quot;, &quot;released&quot;: &quot;2026-12-01&quot; } },</div><div class="eq">  &quot;local_runners&quot;: { &quot;laya&quot;: { &quot;kind&quot;: &quot;laya&quot;, &quot;host&quot;: &quot;127.0.0.1&quot;, &quot;port&quot;: 8000, &quot;model&quot;: &quot;convaiinnovations/laya&quot;, &quot;key_env&quot;: &quot;LAYA_API_KEY&quot; } } }</div><div class="eq">```</div><div class="ch">Invalid values (empty model id, `workers: 0`, unknown short name, bad date) fail inside sc-config as CFG.DESERIALIZE; the message carries the A-1 TypesError text with its id. <ins>`log_root` is optional (default `~/.sc-agent`). </ins>An unknown `kind` is caught by sc-decision-local when the runner is built (`local.unknown_daemon`).</div><div class="eq"></div><div class="eq">## 4. Full error enums (new; ErrorId from A-1, Display = detail(), no thiserror, never key bytes)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">// sc-agent-secrets/src/error.rs</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum SecretsError {</div><div class="eq">    /// The variable is unset, empty or blank; the message names the variable and how to set it.</div><div class="eq">    KeyMissing { var: String },                         // &quot;secrets.key_missing&quot;</div><div class="eq">    /// The key has whitespace, a control character or a non-visible-ASCII character.</div><div class="eq">    KeyMalformed { var: String, reason: &amp;&#x27;static str }, // &quot;secrets.key_malformed&quot;</div><div class="ad">+     /// The repo-root .env exists and cannot be read; cause = sanitized io label.</div><div class="ad">+     DotenvRead { kind: String, cause: &amp;&#x27;static str },   // &quot;secrets.dotenv_read&quot;</div><div class="ad">+     /// The platform keyring could not be read; cause = sanitized label (never the keyring&#x27;s own text).</div><div class="ad">+     KeyringRead { kind: String, cause: &amp;&#x27;static str },  // &quot;secrets.keyring_read&quot;</div><div class="ad">+     /// The keyring did not answer within 15 s (or an earlier read is still stuck).</div><div class="ad">+     KeyringTimeout,                                     // &quot;secrets.keyring_timeout&quot;</div><div class="eq">}</div><div class="eq">impl ErrorId for SecretsError {}   // cause() = None</div><div class="eq"></div><div class="eq">// sc-agent-config/src/error.rs</div><div class="eq">#[derive(Debug)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum AgentConfigError {</div><div class="eq">    /// sc-config failed; cause = ErrorDetail::foreign(inner.code(), &amp;inner), e.g. id &quot;CFG.PARSE&quot;.</div><div class="eq">    Load(sc_config::ConfigError),                       // &quot;config.load&quot;</div><div class="eq">    /// A `models` entry conflicts with the catalog; cause = the TypesError detail (types.model_on_two_lines).</div><div class="eq">    Catalog(sc_agent_types::TypesError),                // &quot;config.catalog&quot;</div><div class="ad">+     /// No home directory for default_dir().</div><div class="ad">+     HomeUnknown,                                        // &quot;config.home_unknown&quot;</div><div class="ad">+     /// A local runner is named like a built-in short name (assistant decision).</div><div class="ad">+     RunnerName { name: String },                        // &quot;config.runner_name&quot;</div><div class="eq">}</div><div class="eq">impl ErrorId for AgentConfigError {}</div><div class="eq">impl From&lt;sc_config::ConfigError&gt; for AgentConfigError {}</div><div class="eq">impl From&lt;sc_agent_types::TypesError&gt; for AgentConfigError {}</div><div class="eq">// source() = Some(inner)</div><div class="eq">```</div><div class="eq"></div><div class="eq">## 5. New code</div><div class="eq"></div><div class="eq">- Both crates: `Cargo.toml` (`[lints] workspace = true`, no features), `README.md`, `src/lib.rs`, `src/error.rs`.</div><div class="ch">- secrets `src/resolve.rs` <del>(~20</del><ins>(~50</ins> lines): `resolve` = `resolve_var(env_var(provider), <del>env)`;</del><ins>sources)`;</ins> `resolve_var` <del>reads</del><ins>follows</ins> <del>`env.var(var)`;</del><ins>the</ins> <del>None</del><ins>old</ins> <del>or</del><ins>`resolve_in_order`:</ins> <del>blank</del><ins>env value present and non-blank -&gt; Env; env unset -&gt; `.env` under `repo_root` (if any) -&gt; DotEnv; then the keyring (service = variable name, account = OS user) -&gt; Keyring; none</ins> -&gt; KeyMissing; <del>else</del><ins>each value through</ins> `ApiKey::try_new`. No <del>I/O,</del><ins>logging:</ins> <del>no</del><ins>config</ins> <del>threads,</del><ins>and</ins> <del>no</del><ins>secrets</ins> <del>logging.</del><ins>return errors only and callers log them (assistant decision).</ins></div><div class="ch">- config `src/config.rs` <del>(~60</del><ins>(~80</ins> lines): structs, default fns, <ins>`default_dir`, `log_root`, </ins>`load` (`AppName::new(APP_NAME)?`, <del>`Loader::new(..).load::&lt;AgentConfig&gt;()?`),</del><ins>missing default.json rule, `Loader::new(..).load::&lt;AgentConfig&gt;()?`, runner-name check),</ins> `catalog` (fold over `models`).</div><div class="ch">- Tests, secrets (`tests/resolve.rs`, <del>MapEnv):</del><ins>MapEnv, MapKeyring, tempdir .env): env wins over .env and keyring; .env wins over keyring; keyring last; a blank env value skips .env; `repo_root: None` reads no .env; each result names its KeySource; an unreadable .env -&gt; secrets.dotenv_read; a failing keyring -&gt; secrets.keyring_read with no secret bytes;</ins> each Provider resolves from its own variable; unset/empty/blank -&gt; secrets.key_missing naming the variable; malformed -&gt; secrets.key_malformed; no error, Debug or Display contains the key; `resolve_var(LAYA_API_KEY, ..)` works; `ALL_VARS` contains every `env_var(p)` and LAYA_API_KEY; `ApiKey`, `MapEnv`, `ProcessEnv` are Send + Sync.</div><div class="ch">- Tests, config (`tests/load.rs`, tempdir + explicit environment Vec, never the process env): defaults (workers 8, max_sends 5, no models, no <del>runners);</del><ins>runners, log_root None -&gt; default_dir()); no default.json -&gt; defaults, but with SC_AGENT__WORKERS=2 set -&gt; config.load (CFG.MISSING_DEFAULT); a runner named `jev` -&gt; config.runner_name;</ins> `SC_AGENT__MAX_SENDS=2` gives 2; local.json overrides default.json; later `haiku` model makes `catalog()?.resolve(Latest(Haiku))` return it, earlier does not; `claude-sonnet-5-5` under `haiku` -&gt; config.catalog with cause types.model_on_two_lines; missing default.json -&gt; config.load with cause CFG.MISSING_DEFAULT; bad JSON -&gt; cause CFG.PARSE with the path; `workers: 0` and an unknown key -&gt; CFG.DESERIALIZE; a `local_runners` entry loads kind, host, port, model and key_env; `SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000` overrides the port.</div><div class="eq">- Workspace gate (REQ-SAG-0401): a test greps for every name in ALL_VARS and fails if one appears as a literal outside `crates/sc-agent-secrets`.</div><div class="eq"></div><div class="eq">## 6. Dependencies</div><div class="eq"></div><div class="eq">| Crate | Version | Used by |</div><div class="eq">|---|---|---|</div><div class="eq">| sc-agent-types | path, A-1 | both |</div><div class="eq">| sc-config | &quot;0.2.0&quot; (crates.io) | config |</div><div class="eq">| serde | &quot;1&quot;, features [&quot;derive&quot;] | config |</div><div class="rm">- | dev: tempfile | &quot;3&quot; | config tests |</div><div class="ad">+ | keyring | &quot;3.6&quot;, no default features; per-target features as in sc-agent-ref (apple-native, windows-native, sync-secret-service + crypto-rust + vendored) | secrets |</div><div class="ad">+ | whoami | &quot;1.6&quot; | secrets (keyring account) |</div><div class="ad">+ | dev: tempfile | &quot;3&quot; | config and secrets tests |</div><div class="eq">| dev: serde_json | &quot;1&quot; | config tests |</div><div class="eq"></div><div class="ch">No <del>tokio,</del><ins>tokio</ins> <del>keyring,</del><ins>(keyring&#x27;s</ins> <del>whoami</del><ins>sync</ins> <del>or</del><ins>Secret Service backend) and no</ins> sc-observability.</div></div>
+  </details>
+</section>

@@ -1,0 +1,328 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.10">
+  <div class="section-head">
+    <h2>agt-4p2.10 <span class="unit-title">Sprint A-10: decide and tsq CLIs, sc-agent Python API</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 5053,
+      &quot;before_chars&quot;: 3421,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+      &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+      &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+      &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T01:14:32+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ADR-SAG-0001&quot;,
+      &quot;REQ-SAG-0201&quot;,
+      &quot;REQ-SAG-0701&quot;,
+      &quot;REQ-SAG-0009&quot;,
+      &quot;REQ-SAG-0601&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261110T011432Z-agt-4p2.10&quot;,
+    &quot;score&quot;: &quot;4/9&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.10&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:37+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+        &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+        &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+        &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023537Z-agt-4p2.10&quot;,
+    &quot;score&quot;: &quot;7/7&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 10,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-10: decide and tsq CLIs, sc-agent Python API&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:14:32+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0001&quot;,
+        &quot;REQ-SAG-0201&quot;,
+        &quot;REQ-SAG-0701&quot;,
+        &quot;REQ-SAG-0009&quot;,
+        &quot;REQ-SAG-0601&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011432Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;4/9&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:15:17+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0004&quot;,
+        &quot;REQ-SAG-0002&quot;,
+        &quot;REQ-SAG-0701&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011517Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;1/4&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:15:35+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;REQ-SAG-0009&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011535Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;5/6&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:15:58+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0004&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011558Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;5/6&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:16:17+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T011617Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:43+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020443Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:06+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020606Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;1/1&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:37+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020637Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:19+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021119Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:37+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;reason&quot;: &quot;A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;reason&quot;: &quot;A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023537Z-agt-4p2.10&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.10: Sprint A-10: decide and tsq CLIs, sc-agent Python API
+Gate FAIL 4/9 -&gt; PASS 7/7 over 10 runs.
+Failing at first run: ADR-SAG-0001, REQ-SAG-0201, REQ-SAG-0701, REQ-SAG-0009, REQ-SAG-0601.
+Failing now: none.
+Excluded ADR-SAG-0001: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
+Excluded REQ-SAG-0201: A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.
+Excluded REQ-SAG-0601: Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.
+Changed fields: acceptance_criteria.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>4/9</td><td>ADR-SAG-0001, REQ-SAG-0201, REQ-SAG-0701, REQ-SAG-0009, REQ-SAG-0601</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 10 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261110T011432Z-agt-4p2.10</code></td><td>2026-11-10T01:14:32+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/9</td><td>ADR-SAG-0001, REQ-SAG-0201, REQ-SAG-0701, REQ-SAG-0009, REQ-SAG-0601</td></tr>
+        <tr><td><code>plan-20261110T011517Z-agt-4p2.10</code></td><td>2026-11-10T01:15:17+00:00</td><td><span class="status status-fail">FAIL</span></td><td>1/4</td><td>ADR-SAG-0004, REQ-SAG-0002, REQ-SAG-0701</td></tr>
+        <tr><td><code>plan-20261110T011535Z-agt-4p2.10</code></td><td>2026-11-10T01:15:35+00:00</td><td><span class="status status-fail">FAIL</span></td><td>5/6</td><td>REQ-SAG-0009</td></tr>
+        <tr><td><code>plan-20261110T011558Z-agt-4p2.10</code></td><td>2026-11-10T01:15:58+00:00</td><td><span class="status status-fail">FAIL</span></td><td>5/6</td><td>ADR-SAG-0004</td></tr>
+        <tr><td><code>plan-20261110T011617Z-agt-4p2.10</code></td><td>2026-11-10T01:16:17+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T020443Z-agt-4p2.10</code></td><td>2026-11-10T02:04:43+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020606Z-agt-4p2.10</code></td><td>2026-11-10T02:06:06+00:00</td><td><span class="status status-pass">PASS</span></td><td>1/1</td><td></td></tr>
+        <tr><td><code>plan-20261110T020637Z-agt-4p2.10</code></td><td>2026-11-10T02:06:37+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021119Z-agt-4p2.10</code></td><td>2026-11-10T02:11:19+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T023537Z-agt-4p2.10</code></td><td>2026-11-10T02:35:37+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ADR-SAG-0001">ADR-SAG-0001</a></th><td>A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0201">REQ-SAG-0201</a></th><td>A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0601">REQ-SAG-0601</a></th><td>Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-10.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="eq">- [ ] tsq: languages lists the loaded grammars and queries lists the predefined queries (REQ-SAG-0303).</div><div class="eq">- [ ] tsq: query &lt;language&gt; &lt;query&gt; &lt;file&gt; runs a predefined query and prints its captures as JSON; failures print one stderr line {id, message} with the treesitter.* id, exit 1.</div><div class="eq">- [ ] tsq: a non-UTF-8 file (lowest-layer failure) reaches stderr as treesitter.not_utf8 with its message (REQ-SAG-0002); a failed stdout write is treesitter.write.</div><div class="eq">- [ ] REQ-SAG-0003: tsq writes ~/.sc-agent/logs/tsq.log.jsonl and decide writes &lt;log_root&gt;/logs/decide.log.jsonl, each its own file.</div><div class="eq">- [ ] decide send: one request from a file or stdin, or a JSONL batch (--batch), with --model, --project and --agent-role (required; no --agent-name) and an optional --provider override; without --provider the provider is the first in the fixed ranking with a detected key (process env, repo-root .env, keyring), and a configured local runner is selected by name (REQ-SAG-0103, REQ-SAG-0401, REQ-SAG-0801); runs through the Decision trait only, over DecisionRunner (ADR-SAG-0001).</div><div class="eq">- [ ] REQ-SAG-0504: a batch line that does not match the Jev request schema stops decide before any request is sent, with an error naming the line, the field and the reason (1,000-line test, line 412).</div><div class="ch">- [ ]<ins> REQ-SAG-0701: batch handling in decide: decide --batch hands the whole batch to DecisionRunner, which sends the requests of the batch in parallel across its workers setting (8 by default, configurable); decide starts no thread of its own, checked by a test that greps crates/decide for thread::spawn.</ins> decide prints JSON for one request and JSONL for a batch, fastest first, each line tagged with its session ULID and input position; a failed request is printed in its result as an ErrorDetail chain and the rest of the batch <del>continues (REQ-SAG-0701).</del><ins>continues.</ins></div><div class="eq">- [ ] Each TypeSafe request example can be sent through decide send and returns the API&#x27;s response (REQ-SAG-0501 AC1; test transport).</div><div class="eq">- [ ] The TypeSafe models list is returned by decide models (REQ-SAG-0501 AC2).</div><div class="eq">- [ ] decide doctor warns naming provider and model for every provider model in neither the built-in list nor the global configuration, prints no warning when all are present, warns when a config model has the release date of a built-in of its line, and lists every detected provider key (source, never the value) in the order it would be used (REQ-SAG-0503).</div><div class="eq">- [ ] ANC-006: crates/sc-agent-py (module sc_agent) offers send, send_batch, models and doctor, one per decide operation, checked by a test that lists both; a CancelToken cancelled from Python stops the request (REQ-SAG-0104 AC2); project and agent_role are accepted and validated through PyO3 as through the CLI (REQ-SAG-0004).</div><div class="eq">- [ ] An invalid --project or --agent-role (e.g. &#x27;Phase B&#x27;) is rejected as decide.log with cause log.invalid_slug and nothing is sent or logged (REQ-SAG-0004).</div><div class="ch">- [ ] REQ-SAG-0002: <ins>the error type </ins>DecideError<ins> (decide.* ids,</ins> implements <del>ErrorId</del><ins>ErrorId)</ins> <del>(decide.*</del><ins>is</ins> <del>ids)</del><ins>the return type of every public function of the decide library,</ins> and<ins> SagError is the error returned to Python by sc-agent-py; each</ins> wraps the real lower <del>errors</del><ins>error unchanged and carries its id and message</ins> (AgentConfigError, TypesError, SecretsError, LogError, LocalError, DecisionError, HttpError, LlmError, <del>RunnerError) unchanged, in the CLI and in SagError from Python;</del><ins>RunnerError);</ins> a lowest-layer error (http.network) appears with its id and message in decide output; values are not rounded (REQ-SAG-0007).</div><div class="ch">- [ ] ADR-SAG-0004: <ins>every dependency in crates/decide/Cargo.toml points down the layer order (types; config, secrets, log; http; decision schema; decision backends; runner): </ins>decide is <del>a</del><ins>the</ins> <del>binary</del><ins>top layer,</ins> above <del>the runner layer</del><ins>sc-decision-runner,</ins> and<del> the only crate that</del> depends on <del>the</del><ins>sc-agent-types,</ins> <del>decision-backend</del><ins>sc-agent-config,</ins> <del>crates;</del><ins>sc-agent-secrets, sc-agent-log, sc-agent-http, sc-decision-schema, sc-decision-systemone, sc-decision-local, sc-decision-llm and sc-decision-runner; crates/sc-agent-py depends on decide;</ins> no<ins> lower-layer</ins> sc-agent library crate <ins>lists decide, tsq or sc-agent-py as a dependency, so none </ins>depends on <del>decide</del><ins>a</ins> <del>or</del><ins>higher</ins> <del>tsq,</del><ins>layer,</ins> checked by `cargo <del>tree`.</del><ins>tree` for each lower crate.</ins></div><div class="ch">- [ ] REQ-SAG-0009: <ins>Cargo.toml dependencies: neither decide nor tsq adds a tokio dependency, and no low-level sc-agent crate gains tokio with default features through them; </ins>`cargo tree -p <del>decide`</del><ins>decide</ins> <del>lists</del><ins>-e normal` and `cargo tree -p tsq -e normal` list</ins> no tokio crate.</div><div class="eq">- [ ] REQ-SAG-0010: decide and tsq source call no sleep function, enforced by the workspace clippy disallowed-methods rule; clippy passes with the workspace denies (REQ-SAG-0002).</div><div class="ad">+ - [ ] ANC-007: the decide library and sc-agent-py write a log record for each send, models and doctor operation (never a key) to a GeneralLogger they inject into every library constructor they call, and sc-agent-py accepts an injected GeneralLogger; a test injects an in-memory GeneralLogger, runs one send and finds the records.</div></div>
+  </details>
+</section>

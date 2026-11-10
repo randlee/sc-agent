@@ -1,0 +1,146 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ADR-SAG-0004">
+  <div class="section-head">
+    <h2>ADR-SAG-0004 <span class="status status-locked">locked</span> <span class="small">bead agt-mud</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-mud&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [
+    {
+      &quot;after&quot;: &quot;No sc-agent crate&#x27;s Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.&quot;,
+      &quot;before&quot;: &quot;No sc-agent crate&#x27;s Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.&quot;,
+      &quot;field&quot;: &quot;statement&quot;
+    },
+    {
+      &quot;after&quot;: &quot;sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture pass&quot;
+    },
+    {
+      &quot;after&quot;: &quot;sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture fail&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.3&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;2/2&quot;,
+  &quot;fixtures_before&quot;: &quot;2/2&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-10T00:12:09+00:00&quot;,
+      &quot;detail&quot;: &quot;fields: [\&quot;fixtures\&quot;]&quot;,
+      &quot;event&quot;: &quot;updated&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T01:02:03+00:00&quot;,
+      &quot;detail&quot;: &quot;fields: [\&quot;statement\&quot;]; previous_statement: No sc-agent crate&#x27;s Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.&quot;,
+      &quot;event&quot;: &quot;updated&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T01:06:53+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.3; reason: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+  &quot;questions_default&quot;: &quot;9/9&quot;,
+  &quot;questions_tuned&quot;: &quot;9/9&quot;,
+  &quot;quote&quot;: &quot;Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;No sc-agent crate&#x27;s Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [
+    {
+      &quot;accepted&quot;: true,
+      &quot;default&quot;: 9,
+      &quot;source&quot;: &quot;docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004-v3/tournament-2/result_vars.json&quot;,
+      &quot;total&quot;: 9,
+      &quot;tuned&quot;: 9
+    },
+    {
+      &quot;accepted&quot;: true,
+      &quot;default&quot;: 8,
+      &quot;source&quot;: &quot;docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004/tournament-1/result_vars.json&quot;,
+      &quot;total&quot;: 9,
+      &quot;tuned&quot;: 9
+    }
+  ],
+  &quot;version_before&quot;: &quot;1&quot;,
+  &quot;version_now&quot;: &quot;3&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ADR-SAG-0004 (locked v1 -&gt; locked v3)
+Statement: No sc-agent crate&#x27;s Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.
+Quote: Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
+Fixture checks: 2/2 -&gt; 2/2.
+Questions: default 9/9 -&gt; tuned 9/9 oracle cases.
+Changed statement: &quot;No sc-agent crate&#x27;s Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.&quot; -&gt; &quot;No sc-agent crate&#x27;s Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.&quot;
+Changed fixture pass: &#x27;&#x27; -&gt; &#x27;sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.&#x27;
+Changed fixture fail: &#x27;&#x27; -&gt; &#x27;sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.&#x27;
+Excluded for agt-4p2.3: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.
+2026-11-10T00:12:09+00:00 updated: fields: [&quot;fixtures&quot;]
+2026-11-10T01:02:03+00:00 updated: fields: [&quot;statement&quot;]; previous_statement: No sc-agent crate&#x27;s Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.
+2026-11-10T01:06:53+00:00 excluded: item: agt-4p2.3; reason: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">No sc-agent crate&#x27;s Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.</p>
+  <p class="quote">&#x201C;Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>1</td><td>3</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>2/2</td><td>2/2</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>9/9</td><td>9/9</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary>Tuning tournaments (2)</summary>
+    <table>
+      <thead><tr><th scope="col">Result file</th><th scope="col">Accepted</th><th scope="col">Default questions</th><th scope="col">Tuned (stable cases)</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004-v3/tournament-2/result_vars.json</code></td><td><span class="status status-pass">yes</span></td><td>9/9</td><td>9/9</td></tr>
+        <tr><td><code>docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004/tournament-1/result_vars.json</code></td><td><span class="status status-pass">yes</span></td><td>8/9</td><td>9/9</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Record changes</h3>
+  <p><b>statement</b></p>
+  <div class="diff">No sc-agent crate&#x27;s Cargo.toml <del>must</del><ins>may</ins> depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision <del>backends;</del><ins>backends (sc-decision-llm over sc-llm-provider);</ins> runner.</div>
+  <p><b>fixture pass</b></p>
+  <div class="diff"><ins>sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.</ins></div>
+  <p><b>fixture fail</b></p>
+  <div class="diff"><ins>sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.</ins></div>
+
+  <details>
+    <summary>History since the baseline (3)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-10T00:12:09+00:00</td><td>updated</td><td>fields: [&quot;fixtures&quot;]</td></tr>
+        <tr><td>2026-11-10T01:02:03+00:00</td><td>updated</td><td>fields: [&quot;statement&quot;]; previous_statement: No sc-agent crate&#x27;s Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.</td></tr>
+        <tr><td>2026-11-10T01:06:53+00:00</td><td>excluded</td><td>item: agt-4p2.3; reason: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (1)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-4p2.3</th><td>sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

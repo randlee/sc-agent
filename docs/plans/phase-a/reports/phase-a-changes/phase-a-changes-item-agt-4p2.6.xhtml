@@ -1,0 +1,449 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-4p2.6">
+  <div class="section-head">
+    <h2>agt-4p2.6 <span class="unit-title">Sprint A-6: sc-decision-systemone and sc-decision-local</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 552,
+      &quot;before_chars&quot;: 299,
+      &quot;field&quot;: &quot;description&quot;
+    },
+    {
+      &quot;after_chars&quot;: 3552,
+      &quot;before_chars&quot;: 1914,
+      &quot;field&quot;: &quot;acceptance_criteria&quot;
+    },
+    {
+      &quot;after_chars&quot;: 13246,
+      &quot;before_chars&quot;: 11703,
+      &quot;field&quot;: &quot;design&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+      &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+      &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+      &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-09T23:23:08+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-001&quot;,
+      &quot;ANC-002&quot;,
+      &quot;REQ-SAG-0002&quot;,
+      &quot;REQ-SAG-0006&quot;,
+      &quot;REQ-SAG-0201&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261109T232308Z-agt-4p2.6&quot;,
+    &quot;score&quot;: &quot;4/9&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-4p2.6&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-10T02:35:33+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+        &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+        &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+        &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261110T023533Z-agt-4p2.6&quot;,
+    &quot;score&quot;: &quot;7/7&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 15,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;Sprint A-6: sc-decision-systemone and sc-decision-local&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:23:08+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-001&quot;,
+        &quot;ANC-002&quot;,
+        &quot;REQ-SAG-0002&quot;,
+        &quot;REQ-SAG-0006&quot;,
+        &quot;REQ-SAG-0201&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261109T232308Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;4/9&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-09T23:24:58+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-002&quot;,
+          &quot;reason&quot;: &quot;A-6 builds decision backends; it adds no CLI command and no Python API function.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261109T232458Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:10:05+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;REQ-SAG-0601&quot;,
+        &quot;ADR-SAG-0001&quot;,
+        &quot;REQ-SAG-0009&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T011005Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;4/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T01:11:15+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T011115Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;6/6&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:04:43+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020443Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:06+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020606Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;0/1&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:29+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020629Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;1/1&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:37+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0001&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020637Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;6/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:06:53+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T020653Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:08:13+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0001&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020813Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;6/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:08:15+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ADR-SAG-0001&quot;,
+        &quot;ANC-007&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261110T020815Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;5/7&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:10:58+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021058Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:00+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021100Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:11:15+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T021115Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-10T02:35:33+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;reason&quot;: &quot;REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;reason&quot;: &quot;Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261110T023533Z-agt-4p2.6&quot;,
+      &quot;score&quot;: &quot;7/7&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-4p2.6: Sprint A-6: sc-decision-systemone and sc-decision-local
+Gate FAIL 4/9 -&gt; PASS 7/7 over 15 runs.
+Failing at first run: ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0201.
+Failing now: none.
+Excluded ANC-001: ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.
+Excluded REQ-SAG-0006: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.
+Excluded REQ-SAG-0601: Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.
+Changed fields: description, acceptance_criteria, design.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>4/9</td><td>ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0201</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 15 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261109T232308Z-agt-4p2.6</code></td><td>2026-11-09T23:23:08+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/9</td><td>ANC-001, ANC-002, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0201</td></tr>
+        <tr><td><code>plan-20261109T232458Z-agt-4p2.6</code></td><td>2026-11-09T23:24:58+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T011005Z-agt-4p2.6</code></td><td>2026-11-10T01:10:05+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/7</td><td>REQ-SAG-0601, ADR-SAG-0001, REQ-SAG-0009</td></tr>
+        <tr><td><code>plan-20261110T011115Z-agt-4p2.6</code></td><td>2026-11-10T01:11:15+00:00</td><td><span class="status status-pass">PASS</span></td><td>6/6</td><td></td></tr>
+        <tr><td><code>plan-20261110T020443Z-agt-4p2.6</code></td><td>2026-11-10T02:04:43+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020606Z-agt-4p2.6</code></td><td>2026-11-10T02:06:06+00:00</td><td><span class="status status-fail">FAIL</span></td><td>0/1</td><td>ANC-007</td></tr>
+        <tr><td><code>plan-20261110T020629Z-agt-4p2.6</code></td><td>2026-11-10T02:06:29+00:00</td><td><span class="status status-pass">PASS</span></td><td>1/1</td><td></td></tr>
+        <tr><td><code>plan-20261110T020637Z-agt-4p2.6</code></td><td>2026-11-10T02:06:37+00:00</td><td><span class="status status-fail">FAIL</span></td><td>6/7</td><td>ADR-SAG-0001</td></tr>
+        <tr><td><code>plan-20261110T020653Z-agt-4p2.6</code></td><td>2026-11-10T02:06:53+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T020813Z-agt-4p2.6</code></td><td>2026-11-10T02:08:13+00:00</td><td><span class="status status-fail">FAIL</span></td><td>6/7</td><td>ADR-SAG-0001</td></tr>
+        <tr><td><code>plan-20261110T020815Z-agt-4p2.6</code></td><td>2026-11-10T02:08:15+00:00</td><td><span class="status status-fail">FAIL</span></td><td>5/7</td><td>ADR-SAG-0001, ANC-007</td></tr>
+        <tr><td><code>plan-20261110T021058Z-agt-4p2.6</code></td><td>2026-11-10T02:10:58+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021100Z-agt-4p2.6</code></td><td>2026-11-10T02:11:00+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T021115Z-agt-4p2.6</code></td><td>2026-11-10T02:11:15+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+        <tr><td><code>plan-20261110T023533Z-agt-4p2.6</code></td><td>2026-11-10T02:35:33+00:00</td><td><span class="status status-pass">PASS</span></td><td>7/7</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-001">ANC-001</a></th><td>ANC-001 governs code in crates/sc-decision-schema; A-6 adds sc-decision-systemone and sc-decision-local and no code to that crate.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0006">REQ-SAG-0006</a></th><td>REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-REQ-SAG-0601">REQ-SAG-0601</a></th><td>Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="ch"><ins>sc-decision-systemone and sc-decision-local are sc-agent library crates; each provides a decision backend that implements the Backend trait from sc-decision-schema. </ins>Jev backend (encode/decode POST <del>/v1/systemone).</del><ins>/v1/systemone, GET /v1/models).</ins> sc-decision-local: stub reusing the Jev encode/decode for any Jev-compatible local daemon from config <ins>by name </ins>(host and port in <del>config);</del><ins>config): Strands Decider, Laya, Mapika/decider or generic;</ins> LocalDaemon trait whose main task is discovering whether a model is available/loaded. Records: REQ-SAG-0201, <ins>REQ-SAG-0801, </ins>ADR-SAG-0001.</div></div>
+  </details>
+  <details>
+    <summary>acceptance_criteria</summary>
+    <div class="diff"><div class="ad">+ - [ ] Copy first: the sprint&#x27;s first commit is the unchanged output of `docs/plans/phase-a/copy/a-6.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).</div><div class="eq">- [ ] SystemOneBackend encodes every DecisionRequest (JSON and multipart with image parts, images and long-context headers, Bearer when a key is set) to POST {base}/v1/systemone and decodes 200/400/422/other final replies into SystemOneResponse or the matching DecisionError, covering 100% of the request and response (REQ-SAG-0201).</div><div class="eq">- [ ] GET /v1/models is encoded and decoded into ModelMetadataList (REQ-SAG-0201).</div><div class="ch">- [ ] The same SystemOneRequest is sent unchanged to Jev, <del>Decider</del><ins>Strands Decider, Laya</ins> and <del>Laya;</del><ins>Mapika/decider;</ins> no backend-specific request type exists (ADR-SAG-0001).</div><div class="ch">- [ ] <del>Neither</del><ins>Both</ins> <del>crate</del><ins>crates</ins> <del>defines</del><ins>import</ins> <del>a</del><ins>SystemOneRequest,</ins> <del>type</del><ins>SystemOneResponse,</ins> <del>that</del><ins>ModelMetadataList</ins> <del>maps</del><ins>and</ins> <del>to a</del><ins>the</ins> Jev <del>API</del><ins>error</ins> <del>field;</del><ins>types from sc-decision-schema and redefine none of them;</ins> daemon health shapes are private <del>(REQ-SAG-0201 AC2).</del><ins>(REQ-SAG-0201).</ins></div><div class="ch">- [ ] REQ-SAG-0801: discovery reports Loaded / LoadsOnDemand / <ins>NotReady, </ins>Unlisted or local.model_not_served for<ins> Strands</ins> Decider (GET /health), Laya (GET /health, optional <del>Bearer)</del><ins>Bearer), Mapika/decider (GET /health)</ins> and a generic daemon (GET <del>/v1/models);</del><ins>/v1/models), each selected by its config kind;</ins> a daemon that is not listening is reported down as local.http with cause http.network; a runner up without its model is reported up with the model not loaded.</div><div class="ch">- [ ] REQ-SAG-0801: LocalBackend is built from a config local_runners entry (kind, host, port, model, key_env) passed in by the <del>caller;</del><ins>caller, over http or https (SystemOneBackend::local);</ins> no host or port literal for a runner outside tests (grep).</div><div class="ch">- [ ] LocalBackend and SystemOneBackend implement the <del>A-2</del><ins>Backend trait imported from sc-decision-schema (no crate defines its own</ins> Backend <del>trait</del><ins>trait)</ins> (encode(&amp;DecisionRequest), decode(HttpResponse, &amp;DecisionRequest)) and are usable as Arc&lt;dyn Backend&gt; by sc-decision-runner (owner-local-decision-crate).</div><div class="eq">- [ ] REQ-SAG-0401: credential variable names (TYPESAFE_API_KEY, LAYA_API_KEY) come from sc-agent-secrets; no test or log prints a key.</div><div class="ad">+ - [ ] REQ-SAG-0601: a 503 from Laya or Mapika/decider is a final reply (decision.api_status with its body), not resent.</div><div class="eq">- [ ] REQ-SAG-0002: LocalError implements ErrorId with 6 distinct local.* ids; wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.</div><div class="eq">- [ ] ADR-SAG-0004: neither crate depends on sc-llm-provider, sc-decision-llm, sc-decision-runner or decide (cargo tree). No live API calls in tests.</div><div class="ad">+ - [ ] REQ-SAG-0002: a test makes the transport fail and asserts the returned LocalError and SystemOne DecisionError chains carry the lower HttpError&#x27;s id and message.</div><div class="ad">+ - [ ] ADR-SAG-0001: every decision backend this sprint adds implements the Backend trait defined in the sc-decision-schema crate: SystemOneBackend (sc-decision-systemone) and LocalBackend (sc-decision-local) are each `impl sc_decision_schema::Backend`, and a compile-time test builds `Arc&lt;dyn sc_decision_schema::Backend&gt;` from both.</div><div class="ad">+ - [ ] REQ-SAG-0009: neither sc-decision-systemone nor sc-decision-local depends on tokio; `cargo tree -p sc-decision-systemone -p sc-decision-local` lists no tokio crate.</div><div class="ad">+ - [ ] ANC-007: the existing sc-agent library code in sc-decision-local is updated to write log records: each daemon availability check writes one (daemon, model, loaded models; never a key) to the GeneralLogger the caller injects; a test with an in-memory GeneralLogger finds it.</div></div>
+  </details>
+  <details>
+    <summary>design</summary>
+    <div class="diff"><div class="eq"># Sprint A-6 design: sc-decision-systemone and sc-decision-local (bead agt-4p2.6)</div><div class="eq"></div><div class="eq">Governing: REQ-SAG-0201, ADR-SAG-0001, REQ-SAG-0801 (local runners from config, discovery, no hard-coded host/port). Also binding: ADR-SAG-0004 (layer: above sc-decision-schema, below sc-decision-runner), REQ-SAG-0002, REQ-SAG-0001, REQ-SAG-0007, REQ-SAG-0401, REQ-SAG-0601 (busy handled by sc-agent-http and the runner, not here), owner-architecture, owner-system-one-backends, owner-local-decision-crate, owner-local-discovery, owner-no-sleep, owner-lowlevel-no-tokio.</div><div class="eq"></div><div class="ch">- sc-decision-systemone: one sans-IO `Backend` for any System One server: Jev (`POST {base}/v1/systemone`, Bearer key), Strands <del>Decider</del><ins>Decider, Laya</ins> and <del>Laya</del><ins>Mapika/decider</ins> (same path, key optional); plus GET /v1/models encode/decode (used by `decide models`, A-10).</div><div class="ch">- sc-decision-local: minimal stub. Builds a `SystemOneBackend` for `http://{host}:{port}` from a config `local_runners` entry (A-4: kind, host, port, model, key_env) and adds discovery: is the daemon up, is its configured model loaded. One `LocalDaemon` implementation per daemon <del>kind;</del><ins>kind: `strands` (Strands Decider), `laya`, `mapika` (Mapika/decider), `generic`; a</ins> later <del>daemons</del><ins>daemon</ins> <del>(&#x27;ollaya&#x27;,</del><ins>(e.g.</ins> <del>&#x27;Mapika&#x27;)</del><ins>&#x27;ollaya&#x27;)</ins> <del>add</del><ins>adds</ins> one.<ins> Runners come from config by name (REQ-SAG-0801).</ins> It runs through sc-decision-runner like any backend (as `Arc&lt;dyn Backend&gt;`, wired by decide, A-10).</div><div class="eq"></div><div class="eq">## 1. Copy script</div><div class="eq"></div><div class="eq">`docs/plans/phase-a/copy/a-6.sh` (dry run 2026-11-09, reconciliation: 2 copy steps, 2 files). Copies only crates/sc-jev/LICENSE to both crates. No source is copied: the old Jev client is built on JudgeBackend, JevError, the canonical payload, TOML pins and the sleeping busy retry; its reusable part, the 6-line request build at client/mod.rs:234-240, is rewritten against the A-5 HttpRequest. sc-agent-ref has no discovery code.</div><div class="eq"></div><div class="eq">## 2. Discovery research (read-only, 2026-11-09)</div><div class="eq"></div><div class="eq">Strands Decider, github.com/strands-labs/strands-decider @846b69e, src/strands_decider/server.py:</div><div class="eq">- `GET /health` and `GET /ping`: 200 `{&quot;status&quot;:&quot;ok&quot;,&quot;model&quot;:&lt;served name&gt;,&quot;checkpoint&quot;:&lt;path or HF id&gt;,...}`. No `/v1/models`. One model per process. No auth (binds 127.0.0.1, default port 8000).</div><div class="eq">- Binds only after model load, so while loading every request is a connect failure (http.network).</div><div class="eq">- `POST /v1/systemone` ignores the request `model`; errors are FastAPI `{&quot;detail&quot;: ...}` (422 with a string detail). Adds top-level `latency_ms`.</div><div class="eq"></div><div class="eq">Laya, github.com/NandhaKishorM/laya @b8a0f09, laya/serve.py and docs/http-api.md:</div><div class="eq">- `GET /health` always 200. With `LAYA_API_KEY` set and no/wrong bearer: `{&quot;status&quot;:&quot;ok&quot;}` only; else `{&quot;status&quot;:&quot;ok&quot;,&quot;loaded&quot;:[&lt;checkpoint names&gt;],...}`. `loaded` is empty until a request builds a checkpoint; checkpoints load on demand.</div><div class="eq">- No `/v1/models`. A Jev id or `convaiinnovations/laya` auto-routes; an unpublished id is a 422.</div><div class="eq">- Bearer on every route except liveness when `LAYA_API_KEY` is set. `503 {&quot;detail&quot;:&quot;server busy, try again later&quot;}` past `LAYA_MAX_CONCURRENT`. Extra response fields: `routing`, `x_jev_confidence`, `usage.{truncated,...}`.</div><div class="eq"></div><div class="ad">+ Mapika/decider, github.com/Mapika/decider @91b6fa9, decider/serve.py:</div><div class="ad">+ - `POST /v1/systemone` (Jev wire format), `GET /v1/models` (`{&quot;models&quot;:[{name,description,release_date}]}`), `GET /health` 200 `{&quot;ok&quot;: bool, &quot;model&quot;: &lt;name&gt;, &quot;device&quot;, ...}`; default port 8000; one model per process; no auth.</div><div class="ad">+ - Errors: 422 bad question, 413 too large, 503 queue full.</div><div class="ad">+ </div><div class="eq">Generic Jev-compatible daemon: the only documented discovery endpoint is TypeSafe `GET /v1/models`.</div><div class="ad">+ </div><div class="ad">+ Busy: Laya and Mapika/decider answer 503 when full. REQ-SAG-0601 defines busy as 429/502/529, so a 503 is a final reply, decoded as decision.api_status with its body and not resent (assistant decision under the record).</div><div class="eq"></div><div class="eq">## 3. Discovery design</div><div class="eq"></div><div class="eq">| `kind` | Probe | Up | Loaded models | Configured model check |</div><div class="eq">|---|---|---|---|---|</div><div class="ch">| <del>`decider`</del><ins>`strands`</ins> | `GET {base}/health` | 200 | `[model, checkpoint]` | equal to either -&gt; `Loaded`; else `local.model_not_served` <del>(Q4) </del>|</div><div class="eq">| `laya` | `GET {base}/health`, Bearer if a key is configured | 200 | `loaded` | in `loaded` -&gt; `Loaded`; else `LoadsOnDemand`; `loaded` absent -&gt; `Unlisted` |</div><div class="ad">+ | `mapika` | `GET {base}/health` | 200 | `[model]` | `ok` true and equal -&gt; `Loaded`; `ok` false -&gt; `NotReady`; else `local.model_not_served` |</div><div class="eq">| `generic` | `GET {base}/v1/models`, Bearer if a key is configured | any HTTP answer | `models[].name` | listed -&gt; `Loaded`; else `local.model_not_served`; 404/405 -&gt; `Unlisted` |</div><div class="eq"></div><div class="eq">Down = the probe&#x27;s transport error, returned as `LocalError::Http(HttpError)` (id `local.http`, cause `http.network`). Any other status -&gt; `ProbeStatus`. Discovery is one GET through `Transport::send`, sent once (not a decision, no busy resend, nothing to wait on).</div><div class="eq"></div><div class="eq">## 4. Exact Rust surface (bodies elided)</div><div class="eq"></div><div class="eq">### sc-decision-systemone</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">pub use backend::{SystemOneBackend, TYPESAFE_BASE_URL};</div><div class="eq"></div><div class="eq">pub const TYPESAFE_BASE_URL: &amp;str = &quot;https://api.typesafe.ai&quot;;</div><div class="eq"></div><div class="eq">/// Backend for any System One server: POST {base}/v1/systemone, GET {base}/v1/models.</div><div class="eq">#[derive(Debug, Clone)]</div><div class="eq">pub struct SystemOneBackend { systemone: Endpoint, models: Endpoint, key: Option&lt;ApiKey&gt; }</div><div class="eq">impl SystemOneBackend {</div><div class="ch">    /// `base` has no trailing path, e.g. <del>TYPESAFE_BASE_URL</del><ins>TYPESAFE_BASE_URL.</ins> <del>or</del><ins>https</ins> <del>&quot;http://127.0.0.1:8000&quot;.</del><ins>only (Endpoint::parse).</ins></div><div class="eq">    pub fn new(base: &amp;str, key: Option&lt;ApiKey&gt;) -&gt; Result&lt;Self, DecisionError&gt;;   // Http(InvalidEndpoint)</div><div class="ad">+     /// A configured local runner&#x27;s base, e.g. &quot;http://127.0.0.1:8000&quot;; http or https (Endpoint::parse_local).</div><div class="ad">+     pub fn local(base: &amp;str, key: Option&lt;ApiKey&gt;) -&gt; Result&lt;Self, DecisionError&gt;;</div><div class="eq">    pub fn models_request(&amp;self) -&gt; HttpRequest;                                    // GET /v1/models, Bearer if key</div><div class="eq">    pub fn decode_models(&amp;self, response: HttpResponse) -&gt; Result&lt;ModelMetadataList, DecisionError&gt;;</div><div class="eq">}</div><div class="eq">impl Backend for SystemOneBackend {</div><div class="eq">    /// JSON when request.image_parts is empty, else multipart/form-data (part &quot;request&quot; application/json</div><div class="eq">    /// first, then one part per image: name = ImagePart.name, image/png or image/jpeg; boundary &quot;sc-agent-&lt;ULID&gt;&quot;).</div><div class="eq">    /// Headers: Content-Type; Bearer secret header when key is Some; TypeSafe-Danger-Zone-Images: true when</div><div class="eq">    /// needs_images_header(); TypeSafe-Danger-Zone-Long-Context: true when long_context.</div><div class="eq">    fn encode(&amp;self, request: &amp;DecisionRequest) -&gt; Result&lt;HttpRequest, DecisionError&gt;;</div><div class="eq">    /// 2xx -&gt; SystemOneResponse::from_json; 400 -&gt; ApiBadRequest (ApiStatus if another shape);</div><div class="ch">    /// 422 -&gt; ApiValidation (ApiStatus for <del>Decider/Laya</del><ins>Strands/Laya</ins> string details); other <ins>(incl. 402, 503) </ins>-&gt; <del>ApiStatus.</del><ins>ApiStatus, body whole.</ins> `request` unused.</div><div class="eq">    fn decode(&amp;self, response: HttpResponse, request: &amp;DecisionRequest) -&gt; Result&lt;SystemOneResponse, DecisionError&gt;;</div><div class="eq">}</div><div class="eq">fn multipart_body(request: &amp;DecisionRequest, boundary: &amp;str) -&gt; Result&lt;Vec&lt;u8&gt;, DecisionError&gt;;   // private</div><div class="eq">```</div><div class="eq"></div><div class="eq">No error enum of its own: every failure is a `DecisionError` (the trait fixes it); an invalid base URL is the A-5 `HttpError::InvalidEndpoint` wrapped as `DecisionError::Http`.</div><div class="eq"></div><div class="eq">### sc-decision-local</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">pub use backend::LocalBackend;</div><div class="eq">pub use daemon::{Availability, DaemonKind, LocalDaemon, ModelState};</div><div class="rm">- pub use decider::Decider;</div><div class="eq">pub use error::LocalError;</div><div class="eq">pub use generic::Generic;</div><div class="eq">pub use laya::Laya;</div><div class="ad">+ pub use mapika::Mapika;</div><div class="ad">+ pub use strands::Strands;</div><div class="eq"></div><div class="eq">/// One daemon kind&#x27;s discovery, sans-IO.</div><div class="eq">pub trait LocalDaemon: Send + Sync + fmt::Debug {</div><div class="ch">    fn name(&amp;self) -&gt; &amp;&#x27;static str;                                  // <del>&quot;decider&quot;</del><ins>&quot;strands&quot;</ins> | &quot;laya&quot; | <ins>&quot;mapika&quot; | </ins>&quot;generic&quot;</div><div class="eq">    fn probe(&amp;self, base: &amp;str, key: Option&lt;&amp;ApiKey&gt;) -&gt; Result&lt;HttpRequest, LocalError&gt;;</div><div class="eq">    fn availability(&amp;self, response: &amp;HttpResponse, model: &amp;str) -&gt; Result&lt;Availability, LocalError&gt;;</div><div class="eq">}</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq)]</div><div class="eq">#[non_exhaustive]</div><div class="ch">pub enum DaemonKind { <del>Decider,</del><ins>Strands,</ins> Laya,<ins> Mapika,</ins> Generic }</div><div class="eq">impl FromStr for DaemonKind { type Err = LocalError; }             // the config `kind` string; else UnknownDaemon</div><div class="eq">impl DaemonKind { pub fn daemon(self) -&gt; Box&lt;dyn LocalDaemon&gt;; }</div><div class="eq"></div><div class="eq">/// The daemon is up (the probe got an HTTP answer it understood).</div><div class="eq">#[derive(Debug, Clone, PartialEq, Eq)]</div><div class="eq">pub struct Availability { pub daemon: &amp;&#x27;static str, pub loaded: Vec&lt;String&gt;, pub model: ModelState }</div><div class="eq">#[derive(Debug, Clone, Copy, PartialEq, Eq)]</div><div class="eq">#[non_exhaustive]</div><div class="ch">pub enum ModelState { Loaded, LoadsOnDemand, <ins>NotReady, </ins>Unlisted }</div><div class="eq"></div><div class="ch">#[derive(Debug, Clone, Copy, Default)] pub struct <del>Decider;</del><ins>Strands;</ins></div><div class="eq">#[derive(Debug, Clone, Copy, Default)] pub struct Laya;</div><div class="ad">+ #[derive(Debug, Clone, Copy, Default)] pub struct Mapika;</div><div class="eq">#[derive(Debug, Clone, Copy, Default)] pub struct Generic;</div><div class="ch">// private serde shapes (not Jev API types): <del>DeciderHealth</del><ins>StrandsHealth</ins> { model, checkpoint }, LayaHealth { loaded: Option&lt;Vec&lt;String&gt;&gt; <ins>}, MapikaHealth { ok: bool, model: Option&lt;String&gt; </ins>};</div><div class="eq">// Generic decodes sc_decision_schema::ModelMetadataList.</div><div class="eq"></div><div class="eq">/// A System One backend at http://{host}:{port} with discovery; arguments come from a config</div><div class="eq">/// `local_runners` entry (A-4). This crate reads no config and hard-codes no host or port.</div><div class="eq">#[derive(Debug)]</div><div class="eq">pub struct LocalBackend { daemon: Box&lt;dyn LocalDaemon&gt;, base: String, model: String, key: Option&lt;ApiKey&gt;, backend: SystemOneBackend }</div><div class="eq">impl LocalBackend {</div><div class="ad">+     /// base = http://{host}:{port}; the backend is SystemOneBackend::local(base, key).</div><div class="eq">    pub fn new(kind: DaemonKind, host: &amp;str, port: u16, model: &amp;str, key: Option&lt;ApiKey&gt;) -&gt; Result&lt;Self, LocalError&gt;;</div><div class="eq">    /// Sends the probe once (no busy resend).</div><div class="eq">    pub fn discover(&amp;self, transport: &amp;dyn Transport) -&gt; Result&lt;Availability, LocalError&gt;;</div><div class="eq">}</div><div class="eq">impl Backend for LocalBackend { /* encode/decode delegate to SystemOneBackend */ }</div><div class="eq">```</div><div class="eq"></div><div class="eq">## 5. Error enum (full, sc-decision-local; ErrorId, Display = detail(), no thiserror)</div><div class="eq"></div><div class="eq">```rust</div><div class="eq">#[derive(Debug)]</div><div class="eq">#[non_exhaustive]</div><div class="eq">pub enum LocalError {</div><div class="ch">    /// Config `kind` is not <del>decider,</del><ins>strands,</ins> <del>laya</del><ins>laya, mapika</ins> or generic.</div><div class="eq">    UnknownDaemon { kind: String },                                                     // &quot;local.unknown_daemon&quot;</div><div class="eq">    /// The probe could not be sent: daemon down (http.network) or bad endpoint; wrapped unchanged.</div><div class="eq">    Http(HttpError),                                                                    // &quot;local.http&quot;</div><div class="eq">    /// SystemOneBackend::new or decode_models failed; wrapped unchanged.</div><div class="eq">    Decision(DecisionError),                                                            // &quot;local.decision&quot;</div><div class="eq">    ProbeStatus { daemon: &amp;&#x27;static str, path: &amp;&#x27;static str, status: u16, body: Vec&lt;u8&gt; }, // &quot;local.probe_status&quot;</div><div class="eq">    ProbeParse { daemon: &amp;&#x27;static str, path: &amp;&#x27;static str, message: String },          // &quot;local.probe_parse&quot; (full serde message)</div><div class="eq">    ModelNotServed { daemon: &amp;&#x27;static str, model: String, served: Vec&lt;String&gt; },       // &quot;local.model_not_served&quot;</div><div class="eq">}</div><div class="eq">impl ErrorId for LocalError {}</div><div class="eq">```</div><div class="eq"></div><div class="eq">`LocalBackend` as a `Backend` returns `DecisionError`; `LocalError` is only for construction and discovery, so `DecisionError` needs no local variant.</div><div class="eq"></div><div class="eq">## 6. Dependencies</div><div class="eq"></div><div class="eq">sc-decision-systemone: sc-decision-schema (A-2), sc-agent-http (A-5), sc-agent-secrets (A-4; ApiKey), sc-agent-types (ErrorId); serde_json = { version = &quot;1&quot;, features = [&quot;preserve_order&quot;, &quot;float_roundtrip&quot;] }; ulid = &quot;1&quot; (multipart boundary).</div><div class="eq">sc-decision-local: sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types (all path); serde = { version = &quot;1&quot;, features = [&quot;derive&quot;] }, serde_json (as above).</div><div class="eq">Both: workspace package and lints; no tokio, no thiserror.</div><div class="eq"></div><div class="eq">## 7. Tests (no live calls; fake transport and canned HttpResponse values; no key printed)</div><div class="eq"></div><div class="eq">sc-decision-systemone (tests/encode.rs, tests/decode.rs):</div><div class="eq">- JSON encode: POST {base}/v1/systemone, Content-Type application/json, body equals `to_json`, Bearer secret present only with a key, request Debug hides the key.</div><div class="eq">- Images header set for assets and for a box question, unset otherwise; long-context header only when flagged.</div><div class="eq">- Multipart encode: first part `request` application/json; one part per image with its name and content type; boundary &quot;sc-agent-&quot; + 26-char ULID.</div><div class="ch">- Decode: TypeSafe 200 example -&gt; equal response; <del>Decider</del><ins>Strands</ins> `latency_ms` and Laya `routing`/usage extras kept; 200 non-JSON -&gt; decision.response_parse; 400 string and object detail -&gt; decision.api_bad_request; 422 array -&gt; decision.api_validation; 422 string -&gt; decision.api_status; <del>401</del><ins>401, 402 and 503</ins> -&gt; decision.api_status with <del>body.</del><ins>the body whole.</ins></div><div class="ch">- models_request is GET {base}/v1/models; decode_models parses the openapi example; base &quot;not a url&quot; -&gt; decision.http with cause <del>http.invalid_endpoint.</del><ins>http.invalid_endpoint; `new(&quot;http://...&quot;)` refused, `local(&quot;http://127.0.0.1:8000&quot;)` accepted.</ins></div><div class="eq"></div><div class="eq">sc-decision-local (tests/discovery.rs):</div><div class="rm">- - Decider matching model / checkpoint -&gt; Loaded; other -&gt; local.model_not_served listing both.</div><div class="ad">+ - Strands matching model / checkpoint -&gt; Loaded; other -&gt; local.model_not_served listing both.</div><div class="ad">+ - Mapika `{&quot;ok&quot;:true,&quot;model&quot;:m}` -&gt; Loaded; another model -&gt; local.model_not_served; `{&quot;ok&quot;:false}` -&gt; NotReady.</div><div class="eq">- Laya loaded -&gt; Loaded; not loaded -&gt; LoadsOnDemand; `{&quot;status&quot;:&quot;ok&quot;}` -&gt; Unlisted; bearer only when a key is given.</div><div class="eq">- Generic listed -&gt; Loaded; not listed -&gt; local.model_not_served; 404 -&gt; Unlisted; 500 -&gt; local.probe_status.</div><div class="eq">- Health not JSON -&gt; local.probe_parse; connect failure -&gt; local.http with cause http.network.</div><div class="eq">- &quot;ollama&quot; -&gt; local.unknown_daemon; each DaemonKind parses from its config name.</div><div class="eq">- `LocalBackend::new(DaemonKind::Laya, &quot;127.0.0.1&quot;, 8000, ..)` encodes POST http://127.0.0.1:8000/v1/systemone and decodes like SystemOneBackend; it is usable as `Arc&lt;dyn Backend&gt;`.</div></div>
+  </details>
+</section>

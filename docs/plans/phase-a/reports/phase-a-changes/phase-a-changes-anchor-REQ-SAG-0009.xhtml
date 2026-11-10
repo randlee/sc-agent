@@ -1,0 +1,123 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-REQ-SAG-0009">
+  <div class="section-head">
+    <h2>REQ-SAG-0009 <span class="status status-locked">locked</span> <span class="small">bead agt-wth</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-wth&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [
+    {
+      &quot;after&quot;: &quot;`cargo tree -p sc-decision-runner` lists no tokio crate with default features.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture pass&quot;
+    },
+    {
+      &quot;after&quot;: &quot;sc-agent-http adds reqwest with its default tokio runtime as a required dependency.&quot;,
+      &quot;before&quot;: &quot;&quot;,
+      &quot;field&quot;: &quot;fixture fail&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-4p2.3&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;2/2&quot;,
+  &quot;fixtures_before&quot;: &quot;2/2&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-09T23:20:46+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-4p2.3; reason: sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-10T00:12:09+00:00&quot;,
+      &quot;detail&quot;: &quot;fields: [\&quot;fixtures\&quot;]&quot;,
+      &quot;event&quot;: &quot;updated&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;REQ-SAG-0009&quot;,
+  &quot;questions_default&quot;: &quot;9/9&quot;,
+  &quot;questions_tuned&quot;: &quot;9/9&quot;,
+  &quot;quote&quot;: &quot;A program that does not use tokio MUST be able to use every low-level crate.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [
+    {
+      &quot;accepted&quot;: true,
+      &quot;default&quot;: 9,
+      &quot;source&quot;: &quot;docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0009/tournament-r1/result_vars.json&quot;,
+      &quot;total&quot;: 9,
+      &quot;tuned&quot;: 9
+    }
+  ],
+  &quot;version_before&quot;: &quot;1&quot;,
+  &quot;version_now&quot;: &quot;2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor REQ-SAG-0009 (locked v1 -&gt; locked v2)
+Statement: No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.
+Quote: A program that does not use tokio MUST be able to use every low-level crate.
+Fixture checks: 2/2 -&gt; 2/2.
+Questions: default 9/9 -&gt; tuned 9/9 oracle cases.
+Changed fixture pass: &#x27;&#x27; -&gt; &#x27;`cargo tree -p sc-decision-runner` lists no tokio crate with default features.&#x27;
+Changed fixture fail: &#x27;&#x27; -&gt; &#x27;sc-agent-http adds reqwest with its default tokio runtime as a required dependency.&#x27;
+Excluded for agt-4p2.3: sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.
+2026-11-09T23:20:46+00:00 excluded: item: agt-4p2.3; reason: sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.; replaced: false
+2026-11-10T00:12:09+00:00 updated: fields: [&quot;fixtures&quot;]">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.</p>
+  <p class="quote">&#x201C;A program that does not use tokio MUST be able to use every low-level crate.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>1</td><td>2</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>2/2</td><td>2/2</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>9/9</td><td>9/9</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary>Tuning tournaments (1)</summary>
+    <table>
+      <thead><tr><th scope="col">Result file</th><th scope="col">Accepted</th><th scope="col">Default questions</th><th scope="col">Tuned (stable cases)</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0009/tournament-r1/result_vars.json</code></td><td><span class="status status-pass">yes</span></td><td>9/9</td><td>9/9</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Record changes</h3>
+  <p><b>fixture pass</b></p>
+  <div class="diff"><ins>`cargo tree -p sc-decision-runner` lists no tokio crate with default features.</ins></div>
+  <p><b>fixture fail</b></p>
+  <div class="diff"><ins>sc-agent-http adds reqwest with its default tokio runtime as a required dependency.</ins></div>
+
+  <details>
+    <summary>History since the baseline (2)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-09T23:20:46+00:00</td><td>excluded</td><td>item: agt-4p2.3; reason: sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.; replaced: false</td></tr>
+        <tr><td>2026-11-10T00:12:09+00:00</td><td>updated</td><td>fields: [&quot;fixtures&quot;]</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (1)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-4p2.3</th><td>sc-treesitter is not in REQ-SAG-0009&#x27;s list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>
