@@ -306,7 +306,8 @@ mod cases {
             .send(&post(endpoint(port, "/x"), None))
             .expect_err("zero request timeout");
         assert_eq!(error.id(), "http.invalid_request", "{error:?}");
-        let long = post(endpoint(port, "/x"), None).with_deadline(Timeouts::MAX * 2);
+        let long = post(endpoint(port, "/x"), None)
+            .with_deadline(Timeouts::DEADLINE_MAX + Duration::from_secs(1));
         let error = loopback().send(&long).expect_err("over-long deadline");
         assert_eq!(error.id(), "http.invalid_request", "{error:?}");
     }
