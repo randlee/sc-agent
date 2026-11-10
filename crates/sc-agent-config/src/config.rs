@@ -467,6 +467,9 @@ pub fn default_dir() -> Result<PathBuf, AgentConfigError> {
 ///
 /// # Errors
 ///
+/// - [`AgentConfigError::NotAFile`] when `default.json` or `local.json`
+///   exists but is not a regular file (a FIFO, a device, a directory),
+///   checked from its metadata before any read.
 /// - [`AgentConfigError::FileTooLarge`] when `default.json` or `local.json`
 ///   is larger than [`MAX_CONFIG_FILE_BYTES`] (checked before reading).
 /// - [`AgentConfigError::Load`] when sc-config fails (unreadable file, bad
@@ -491,7 +494,7 @@ pub fn load(
     // An unreadable directory counts as "local.json may exist": the error is kept.
     let has_local = config_dir.join("local.json").try_exists().unwrap_or(true);
     for file in ["default.json", "local.json"] {
-        check_file_size(&config_dir.join(file))?;
+        check_file(&config_dir.join(file))?;
     }
     let value = match Loader::new(app, config_dir, environment).load::<serde_json::Value>() {
         Ok(value) => value,
@@ -505,9 +508,14 @@ pub fn load(
     Ok(config)
 }
 
-/// Refuses a config file over [`MAX_CONFIG_FILE_BYTES`]; a missing or unreadable one is sc-config's to report.
-fn check_file_size(path: &std::path::Path) -> Result<(), AgentConfigError> {
+/// Refuses, from its metadata alone, a config file that is not a regular file (a FIFO or
+/// device, whose read can block forever) or is over [`MAX_CONFIG_FILE_BYTES`]; a missing or
+/// unreadable one is sc-config's to report.
+fn check_file(path: &std::path::Path) -> Result<(), AgentConfigError> {
     match std::fs::metadata(path) {
+        Ok(metadata) if !metadata.is_file() => Err(AgentConfigError::NotAFile {
+            file: path.to_path_buf(),
+        }),
         Ok(metadata) if metadata.len() > MAX_CONFIG_FILE_BYTES => {
             Err(AgentConfigError::FileTooLarge {
                 file: path.to_path_buf(),

@@ -1,17 +1,30 @@
 //! [`Repo`]: the repository a session ran in, from its git origin or the folder (REQ-SAG-0004).
 //!
 //! git runs as an argv-only child (`git --no-pager -C <dir> ...`) with no terminal prompt, the C
-//! locale, the repository-redirect variables removed and stdin closed. It is waited for with
-//! [`Command::output`]: no timer and no sleep (REQ-SAG-0010).
+//! locale, the repository-redirect variables removed and stdin closed. Each call has a
+//! [`GIT_DEADLINE`] (RSH-001): the child is polled with `try_wait` between deadline waits on
+//! the [`Clock`] (no sleep, REQ-SAG-0010), and a git still running at the deadline is killed,
+//! reaped and reported as [`LogError::GitUnavailable`], so a hung git (a stalled network
+//! filesystem, lock contention) cannot hold an interrupted decide.
 
 use std::ffi::OsStr;
 use std::fmt;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::Arc;
+use std::time::Duration;
+
+use sc_agent_types::{CancelToken, Clock};
 
 use crate::LogError;
 use crate::name::is_path_safe;
+
+/// Longest one git call may run before it is killed (RSH-001).
+pub const GIT_DEADLINE: Duration = Duration::from_secs(10);
+
+/// How often a running git is looked at: a deadline wait between two `try_wait` calls.
+const GIT_POLL: Duration = Duration::from_millis(10);
 
 /// `<host>/<owner>/<repo>` from the git origin URL, else `local/<host>/<folder-name>` (REQ-SAG-0004).
 ///
@@ -74,8 +87,9 @@ impl Repo {
     ///
     /// # Errors
     ///
-    /// [`LogError::GitUnavailable`] when git cannot be started, [`LogError::GitOutput`] for
-    /// output that is not UTF-8.
+    /// [`LogError::GitUnavailable`] when git cannot be started or has not exited within
+    /// [`GIT_DEADLINE`] (it is then killed), [`LogError::GitOutput`] for output that is not
+    /// UTF-8.
     pub fn work_tree_root(dir: &Path) -> Result<Option<PathBuf>, LogError> {
         Ok(git_text(dir, &["rev-parse", "--show-toplevel"], "rev-parse")?.map(PathBuf::from))
     }
@@ -252,16 +266,64 @@ fn folder_name(folder: &Path) -> Result<String, LogError> {
 /// Runs `git <args>` in `dir`: `None` when git exits non-zero or prints nothing, else its
 /// stdout without the trailing line break.
 fn git_text(dir: &Path, args: &[&str], command: &'static str) -> Result<Option<String>, LogError> {
-    let output = git(dir)
-        .args(args)
-        .output()
+    let mut git = git(dir);
+    git.args(args);
+    let (status, stdout) = run_within(git, &Clock::system(), GIT_DEADLINE)
         .map_err(|source| LogError::GitUnavailable { source })?;
-    if !output.status.success() {
+    if !status.success() {
         return Ok(None);
     }
-    let text = String::from_utf8(output.stdout).map_err(|_| LogError::GitOutput { command })?;
+    let text = String::from_utf8(stdout).map_err(|_| LogError::GitOutput { command })?;
     let text = text.trim_end_matches(['\n', '\r']);
     Ok((!text.is_empty()).then(|| text.to_owned()))
+}
+
+/// Runs `command` with its stdout piped and stderr discarded, waiting at most `deadline` on
+/// `clock`: its exit status and stdout.
+///
+/// The child is polled with `try_wait` between deadline waits of [`GIT_POLL`]; stdout is read
+/// after it exits (the git calls here print one short line, far below a pipe buffer). A child
+/// still running at the deadline is killed and reaped.
+///
+/// # Errors
+///
+/// The spawn or wait error, or `TimedOut` when the deadline passed (the child was killed).
+fn run_within(
+    mut command: Command,
+    clock: &Clock,
+    deadline: Duration,
+) -> std::io::Result<(ExitStatus, Vec<u8>)> {
+    command.stdout(Stdio::piped()).stderr(Stdio::null());
+    let mut child = command.spawn()?;
+    let start = clock.now();
+    let deadline_at = start.checked_add(deadline).unwrap_or(start);
+    let never = CancelToken::new();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            let mut stdout = Vec::new();
+            if let Some(mut pipe) = child.stdout.take() {
+                pipe.read_to_end(&mut stdout)?;
+            }
+            return Ok((status, stdout));
+        }
+        let now = clock.now();
+        if now >= deadline_at {
+            // A killed child exits at once; reaping it leaves no zombie.
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!(
+                    "git did not exit within {} s and was killed",
+                    deadline.as_secs()
+                ),
+            ));
+        }
+        let next = now
+            .checked_add(GIT_POLL)
+            .map_or(deadline_at, |next| next.min(deadline_at));
+        let _ = clock.wait_until(&never, next);
+    }
 }
 
 /// The one git spawn of sc-agent-log: argv only, no prompt, no repository redirect.
@@ -286,7 +348,45 @@ fn git(dir: &Path) -> Command {
 
 #[cfg(test)]
 mod tests {
-    use super::short_host;
+    use std::process::Stdio;
+
+    use sc_agent_testkit::{HANG_GUARD, join_within};
+    use sc_agent_types::testing::ManualClock;
+
+    use super::{GIT_DEADLINE, git, run_within, short_host};
+
+    /// RSH-001: a git that does not exit is killed at the deadline and reported as a timeout.
+    /// `git hash-object --stdin` with a stdin the child keeps open blocks forever (no repository
+    /// is needed); the clock is a ManualClock moved to the deadline once the wait is parked, so
+    /// the test waits no real time.
+    #[test]
+    fn a_git_that_does_not_exit_is_killed_at_the_deadline() {
+        let clock = ManualClock::new();
+        let mut hung = git(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        hung.args(["hash-object", "--stdin"]).stdin(Stdio::piped());
+        let waiting = clock.clock();
+        let run = std::thread::spawn(move || run_within(hung, &waiting, GIT_DEADLINE));
+        assert!(clock.wait_for_waiters(1), "the poll is parked on the clock");
+        clock.advance(GIT_DEADLINE);
+        let error = join_within(run, HANG_GUARD)
+            .expect("runner thread")
+            .expect_err("killed at the deadline");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(error.to_string().contains("10 s"), "{error}");
+    }
+
+    /// A git that exits gives its status and stdout through the same bounded path. The poll
+    /// runs on the real clock (a manual one would never move between polls) with the hang
+    /// guard as the deadline, so only a hang can fail it; no time is asserted.
+    #[test]
+    fn a_git_that_exits_gives_its_output() {
+        let mut version = git(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        version.arg("--version");
+        let (status, stdout) =
+            run_within(version, &sc_agent_types::Clock::system(), HANG_GUARD).expect("git runs");
+        assert!(status.success());
+        assert!(String::from_utf8_lossy(&stdout).starts_with("git version"));
+    }
 
     /// A8-06: `m5.local` is the host `m5`.
     #[test]

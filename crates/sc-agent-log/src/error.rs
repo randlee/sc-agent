@@ -42,7 +42,7 @@ pub enum LogError {
         /// Why it was refused.
         reason: &'static str,
     },
-    /// git could not be started.
+    /// git could not be started, or did not exit within the git deadline and was killed.
     GitUnavailable {
         /// The spawn failure.
         source: std::io::Error,
@@ -171,7 +171,9 @@ impl ErrorId for LogError {
                 "{field} {value:?} is not a slug: use only lowercase a-z, 0-9, '.', '_' and '-' (not empty, not '.' or '..')"
             ),
             Self::InvalidRepo { value, reason } => format!("repo {value:?} is not valid: {reason}"),
-            Self::GitUnavailable { .. } => "git could not be started".to_owned(),
+            Self::GitUnavailable { .. } => {
+                "git could not be started or did not finish in time".to_owned()
+            }
             Self::GitOutput { command } => {
                 format!("git {command} printed output that is not UTF-8")
             }

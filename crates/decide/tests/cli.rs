@@ -406,24 +406,21 @@ mod tests {
         }
     }
 
-    /// AC: REQ-SAG-0011 decide (RSH-001). SIGTERM while decide blocks reading a held-open
-    /// stdin exits 130 at once, with nothing printed or sent.
+    /// AC: REQ-SAG-0011 decide (RSH-001). SIGTERM while decide blocks reading its input exits
+    /// 130 at once, with nothing printed or sent.
     ///
-    /// Synchronised without a sleep: `default.json` is a FIFO, so the test's open of its write
-    /// end returns only once decide (past `signal::install`, the first thing `main` does) has
-    /// opened it to load the configuration. Decide then blocks on stdin, which the test keeps
-    /// open and never writes.
+    /// Synchronised without a sleep: the batch input is a FIFO, so the test's open of its write
+    /// end returns only once decide (past `signal::install`, the first thing `main` does, and
+    /// past loading its configuration) has opened it to read. Decide then blocks reading it;
+    /// the test keeps it open and never writes.
     #[test]
-    fn sigterm_while_stdin_blocks_exits_130() {
+    fn sigterm_while_the_input_blocks_exits_130() {
         let runner = serve_each(|_| {});
-        let port = runner.port();
-        let home = tempfile::tempdir().expect("home");
-        let config = home.path().join(".sc-agent");
-        std::fs::create_dir_all(&config).expect("config dir");
-        let fifo = config.join("default.json");
+        let home = home(runner.port());
+        let fifo = home.path().join("input.jsonl");
         let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
         assert!(made.success());
-        let mut child = ChildGuard::spawn(
+        let child = ChildGuard::spawn(
             decide(
                 home.path(),
                 &[
@@ -435,14 +432,13 @@ mod tests {
                     "proj",
                     "--agent-role",
                     "role",
-                    "-",
+                    fifo.to_str().expect("utf-8"),
                 ],
             )
-            .stdin(Stdio::piped())
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
         );
-        let held_stdin = child.take_stdin().expect("stdin");
         // Opening the FIFO's write end blocks until decide opens it to read; bounded.
         let (opened, writer) = mpsc::channel();
         {
@@ -451,16 +447,14 @@ mod tests {
                 let _ = opened.send(std::fs::OpenOptions::new().write(true).open(&fifo));
             });
         }
-        let mut writer = recv_within(&writer, HANG_GUARD).expect("fifo");
-        write!(writer, "{}", config_json(&config, port)).expect("config");
-        drop(writer);
+        let held = recv_within(&writer, HANG_GUARD).expect("decide opened its input");
         let status = Command::new("kill")
             .args(["-TERM", &child.id().to_string()])
             .status()
             .expect("kill");
         assert!(status.success());
         let output = finish(child);
-        drop(held_stdin);
+        drop(held);
         assert_eq!(
             output.status.code(),
             Some(130),
@@ -469,5 +463,24 @@ mod tests {
         );
         assert!(output.stdout.is_empty());
         assert_eq!(runner.stop(), 0, "nothing was sent");
+    }
+
+    /// RSH-002: a `default.json` that is a FIFO is refused from its metadata
+    /// (`config.not_a_file`), never opened, so decide cannot block on it: it exits 1 at once.
+    #[test]
+    fn a_fifo_config_file_is_refused_without_blocking() {
+        let home = tempfile::tempdir().expect("home");
+        let config = home.path().join(".sc-agent");
+        std::fs::create_dir_all(&config).expect("config dir");
+        let made = Command::new("mkfifo")
+            .arg(config.join("default.json"))
+            .status()
+            .expect("mkfifo");
+        assert!(made.success());
+        let output = run_bounded(&mut decide(home.path(), &["models"]));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decide.config");
+        assert_eq!(detail["cause"]["id"], "config.not_a_file");
     }
 }

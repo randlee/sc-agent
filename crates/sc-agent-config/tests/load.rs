@@ -261,6 +261,23 @@ fn local_runners_load_by_name_from_the_file() {
     );
 }
 
+/// A `default.json` or `local.json` that is not a regular file (here a directory; a FIFO is
+/// the same metadata check) is refused from its metadata before any read, which for a FIFO
+/// could block forever (RSH-002).
+#[test]
+fn a_config_path_that_is_not_a_regular_file_is_refused_before_reading() {
+    for file in ["default.json", "local.json"] {
+        let dir = dir_with("{}");
+        let path = dir.path().join(file);
+        let _ = fs::remove_file(&path);
+        fs::create_dir(&path).unwrap();
+        let error = load(dir.path().to_path_buf(), Vec::new()).unwrap_err();
+        assert_eq!(error.id(), "config.not_a_file", "{file}");
+        assert!(matches!(&error, AgentConfigError::NotAFile { file: got } if got == &path));
+        assert!(error.recovery().is_some());
+    }
+}
+
 /// AC REQ-SAG-0003 and ADR-SAG-0002: log_root is the configured value, else ~/.sc-agent.
 #[test]
 fn log_root_is_configured_value_else_default_dir() {
