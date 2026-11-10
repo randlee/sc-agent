@@ -136,8 +136,7 @@ mod tests {
             };
             let mut depth = 0_i64;
             let mut fields = Vec::new();
-            for at in start..lines.len() {
-                let line = lines[at];
+            for (at, line) in lines.iter().enumerate().skip(start) {
                 depth += line.matches('{').count() as i64 - line.matches('}').count() as i64;
                 let trimmed = line.trim_start();
                 let trimmed = trimmed
@@ -160,10 +159,9 @@ mod tests {
                     .split("rename = \"")
                     .nth(1)
                     .and_then(|rest| rest.split('"').next())
+                    && JEV_FIELDS.contains(&rename)
                 {
-                    if JEV_FIELDS.contains(&rename) {
-                        fields.push(rename.to_owned());
-                    }
+                    fields.push(rename.to_owned());
                 }
                 if at > start && depth <= 0 || (depth == 0 && line.trim_end().ends_with(';')) {
                     break;

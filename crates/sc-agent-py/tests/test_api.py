@@ -15,6 +15,7 @@ import re
 import subprocess
 import threading
 import os
+import signal
 import warnings
 
 import pytest
@@ -197,6 +198,10 @@ def test_keyboard_interrupt_cancels_drains_and_reraises(env):
         if not returned.wait(HANG_GUARD):
             token.cancel()
 
+    # interrupt_main only reaches a SIGINT handler Python owns; a launcher (a background
+    # shell job, some CI runners) may start the process with SIGINT ignored, so the test
+    # installs Python's default handler for its own duration.
+    previous = signal.signal(signal.SIGINT, signal.default_int_handler)
     thread = threading.Thread(target=interrupt)
     thread.start()
     try:
@@ -205,6 +210,7 @@ def test_keyboard_interrupt_cancels_drains_and_reraises(env):
     finally:
         returned.set()
         thread.join(HANG_GUARD)
+        signal.signal(signal.SIGINT, previous)
     assert not loopback.release.is_set(), "the runner never answered"
     assert token.is_cancelled()
     assert len(lines) == 3
