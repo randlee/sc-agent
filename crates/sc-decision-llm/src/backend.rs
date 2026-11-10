@@ -312,4 +312,35 @@ mod tests {
             "{network_message:?}"
         );
     }
+
+    /// QA2-001 (mutant N3a): an invariant failure is decision.backend, never a schema
+    /// mismatch, so the runner does not resend a bug.
+    #[test]
+    fn invariant_is_a_backend_failure_not_a_mismatch() {
+        let sources = KeySources {
+            env: &OneVar,
+            repo_root: None,
+            keyring: &NoKeyring,
+        };
+        let key = resolve_var(&"UNIT_KEY".parse().unwrap(), &sources)
+            .unwrap()
+            .key;
+        let llm = LlmClient::new(LlmProvider::Anthropic, key).unwrap();
+        let backend = LlmDecisionBackend::new(llm, "claude-haiku-5-5".parse().unwrap());
+        let error = backend.decision_error(
+            DecisionLlmError::Invariant {
+                message: "a duplicate key".to_owned(),
+            },
+            LogContext::NONE,
+        );
+        assert_eq!(error.id(), "decision.backend");
+        assert!(matches!(
+            &error,
+            DecisionError::Backend { backend: "llm", .. }
+        ));
+        assert_eq!(
+            error.cause_detail().map(|detail| detail.id),
+            Some("decision_llm.invariant".to_owned())
+        );
+    }
 }

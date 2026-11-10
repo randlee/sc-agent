@@ -301,3 +301,21 @@ fn answer(
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sc_agent_types::ErrorId;
+
+    use super::*;
+
+    /// QA2-001 (mutant N3b): a duplicate key in a built map is a bug of this crate,
+    /// decision_llm.invariant, not an answer the runner would resend.
+    #[test]
+    fn duplicate_key_is_an_invariant_failure() {
+        let error = ordered(vec![("q".to_owned(), 1.0), ("q".to_owned(), 2.0)]).unwrap_err();
+        assert_eq!(error.id(), "decision_llm.invariant");
+        assert!(matches!(error, DecisionLlmError::Invariant { .. }));
+        let map = ordered(vec![("a".to_owned(), 1.0), ("b".to_owned(), 2.0)]).unwrap();
+        assert_eq!(map.len(), 2);
+    }
+}
