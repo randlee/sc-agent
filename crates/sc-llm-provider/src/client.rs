@@ -14,6 +14,21 @@ use crate::{LlmError, LlmProvider, LlmRequest, LlmResponse, Output, encode};
 /// The log target of this crate's records.
 const LOG_TARGET: &str = "sc_llm_provider";
 
+/// The most bytes of the provider-reported model name an `llm.usage` record carries.
+const MAX_LOGGED_MODEL_BYTES: usize = 128;
+
+/// `text` cut to at most `max` bytes at a char boundary, and whether it was cut.
+fn bounded(text: &str, max: usize) -> (&str, bool) {
+    if text.len() <= max {
+        return (text, false);
+    }
+    let end = (0..=max)
+        .rev()
+        .find(|index| text.is_char_boundary(*index))
+        .unwrap_or(0);
+    (text.get(..end).unwrap_or(""), true)
+}
+
 /// The HTTP dialect a provider speaks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -108,7 +123,11 @@ impl LlmClient {
     /// # Errors
     ///
     /// [`LlmError::Http`] with `http.invalid_endpoint` only if a built-in endpoint constant
-    /// fails [`Endpoint::parse`] (a test builds a client for every [`LlmProvider`]).
+    /// fails [`Endpoint::parse`]. Every built-in endpoint is a valid https URL, so this is
+    /// unreachable in a released build: the `Result` is the plan's fixed signature and the
+    /// boundary at which a bad constant would surface. The test
+    /// `every_llm_provider_has_a_client` builds a client for every [`LlmProvider`], so a bad
+    /// constant fails the test suite rather than a caller.
     pub fn new(provider: LlmProvider, key: ApiKey) -> Result<Self, LlmError> {
         let endpoint = Endpoint::parse(&call_url(provider))
             .map_err(|source| LlmError::Http { provider, source })?;
@@ -156,15 +175,14 @@ impl LlmClient {
     ///
     /// # Errors
     ///
-    /// [`LlmError::Encode`] when the body does not serialize; [`LlmError::Http`] when
-    /// sc-agent-http refuses a header or the secret (`http.key_on_plain_http` can only come
-    /// from a [`Self::with_endpoint`] override: every built-in endpoint is https).
-    pub fn encode(&self, request: &LlmRequest) -> Result<HttpRequest, LlmError> {
-        let body = serde_json::to_vec(&encode::body(self.provider, request)).map_err(|error| {
-            LlmError::Encode {
-                message: error.to_string(),
-            }
-        })?;
+    /// [`LlmError::Http`] when sc-agent-http refuses a header or the secret (`http.key_on_plain_http`
+    /// can only come from a [`Self::with_endpoint`] override: every built-in endpoint is
+    /// https). The body itself cannot fail: it is a `serde_json::Value`, whose keys are all
+    /// strings, written with its infallible `Display`.
+    pub fn encode(&self, request: &LlmRequest<'_>) -> Result<HttpRequest, LlmError> {
+        let body = encode::body(self.provider, request)
+            .to_string()
+            .into_bytes();
         self.http_request(Method::Post, self.endpoint.clone(), body)
     }
 
@@ -173,7 +191,8 @@ impl LlmClient {
     /// Only `request.output` is read: [`Output::Json`] parses the text into
     /// [`LlmResponse::json`]. With a logger set, every 2xx reply whose envelope decodes
     /// (truncated, refused and not-JSON outputs included) writes one `llm.usage` record
-    /// (provider, model as reported, input and output tokens) carrying `ctx`. A log write
+    /// (provider, model as reported, cut to 128 bytes with `model_truncated: true` when
+    /// longer, input and output tokens) carrying `ctx`. A log write
     /// error is ignored (sc-agent-log counts it) and never changes the result.
     ///
     /// # Errors
@@ -181,11 +200,12 @@ impl LlmClient {
     /// - [`LlmError::ApiStatus`] for a non-2xx status, read with [`ProviderReply::read`] and
     ///   redacted of this client's key;
     /// - [`LlmError::ReplyInvalid`] when the body is not the wire's envelope;
-    /// - [`LlmError::Refused`], then [`LlmError::Truncated`], then [`LlmError::NoText`];
+    /// - [`LlmError::Refused`] (the model's text redacted of the key, otherwise whole), then
+    ///   [`LlmError::Truncated`], then [`LlmError::NoText`];
     /// - [`LlmError::OutputNotJson`] when JSON was asked for and the text does not parse.
     pub fn decode(
         &self,
-        request: &LlmRequest,
+        request: &LlmRequest<'_>,
         response: HttpResponse,
         ctx: LogContext,
     ) -> Result<LlmResponse, LlmError> {
@@ -208,7 +228,9 @@ impl LlmClient {
                     stop_reason.as_deref().unwrap_or("none")
                 )
             } else {
-                refusal
+                // Provider-written text: kept whole (REQ-SAG-0002), with the key scrubbed as
+                // ProviderReply::read scrubs an ApiStatus reply.
+                self.key.redact_text(&refusal).into_owned()
             };
             return Err(LlmError::Refused { provider, message });
         }
@@ -315,7 +337,11 @@ impl LlmClient {
         };
         let mut fields = Map::new();
         fields.insert("provider".to_owned(), self.provider.as_str().into());
-        fields.insert("model".to_owned(), envelope.model.clone().into());
+        let (model, cut) = bounded(&envelope.model, MAX_LOGGED_MODEL_BYTES);
+        fields.insert("model".to_owned(), model.into());
+        if cut {
+            fields.insert("model_truncated".to_owned(), true.into());
+        }
         fields.insert(
             "input_tokens".to_owned(),
             Value::from(envelope.usage.input_tokens),
@@ -327,5 +353,18 @@ impl LlmClient {
         // A failed write is counted by sc-agent-log and reported by its flush; it never
         // changes a decode result.
         let _ = log.write(Level::Info, LOG_TARGET, "llm.usage", ctx, fields);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bounded;
+
+    #[test]
+    fn bounded_cuts_at_a_char_boundary() {
+        assert_eq!(bounded("short", 128), ("short", false));
+        assert_eq!(bounded("abcdef", 3), ("abc", true));
+        // 'é' is two bytes: a cut inside it backs off to the boundary before it.
+        assert_eq!(bounded("aé", 2), ("a", true));
     }
 }

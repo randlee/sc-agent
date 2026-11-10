@@ -91,8 +91,9 @@ fn question_schema(question: &Question) -> Value {
                 json!({ "type": ["number", "null"] }),
             );
         }
-        // Question is #[non_exhaustive]: an unknown type gets no fields here, and decode
-        // refuses its answer as `decision_llm.answer_invalid`.
+        // Question is #[non_exhaustive]. An unknown type never gets this far in a send:
+        // translate refuses it first (`decision_llm.encode`, prompt::check_question_types),
+        // and decode refuses it the same way before checking any answer.
         _ => {}
     }
     object(fields)

@@ -1,19 +1,22 @@
 //! The request and response of any LLM call (REQ-SAG-0502), not only decisions.
 
+use std::borrow::Cow;
+
 use sc_agent_types::ModelId;
 
 /// One LLM call: model, optional system prompt, messages, token cap and output form.
 ///
 /// The model is the provider-neutral catalog id; [`LlmClient::encode`](crate::LlmClient::encode)
-/// sends [`provider_model_id`](crate::provider_model_id) of it.
+/// sends [`provider_model_id`](crate::provider_model_id) of it. `'a` is the lifetime of image
+/// data borrowed from the caller ([`Part::Image`]), so inline base64 is not copied.
 #[derive(Debug, Clone, PartialEq)]
-pub struct LlmRequest {
+pub struct LlmRequest<'a> {
     /// The catalog model id.
     pub model: ModelId,
     /// The system prompt, if any.
     pub system: Option<String>,
     /// The conversation, in order.
-    pub messages: Vec<Message>,
+    pub messages: Vec<Message<'a>>,
     /// The completion token cap (`max_tokens`, or `max_completion_tokens` for OpenAI).
     pub max_tokens: u32,
     /// Plain text or a JSON-schema reply.
@@ -22,16 +25,16 @@ pub struct LlmRequest {
 
 /// One message of the conversation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message {
+pub struct Message<'a> {
     /// Who wrote it.
     pub role: Role,
     /// Its parts, in order.
-    pub content: Vec<Part>,
+    pub content: Vec<Part<'a>>,
 }
 
 /// One part of a message.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Part {
+pub enum Part<'a> {
     /// Text.
     Text(String),
     /// An image, base64-encoded.
@@ -39,11 +42,44 @@ pub enum Part {
     /// Anthropic `{type:"image", source:{type:"base64", media_type, data}}`; Chat
     /// `{type:"image_url", image_url:{url:"data:<media_type>;base64,<data>"}}`.
     Image {
-        /// The MIME type, e.g. `image/png`.
-        media_type: &'static str,
-        /// The image bytes, base64.
-        data_base64: String,
+        /// The MIME type.
+        media_type: ImageMediaType,
+        /// The image bytes, base64; borrowed when the caller already holds base64 text.
+        data_base64: Cow<'a, str>,
     },
+}
+
+/// The MIME type of a [`Part::Image`].
+///
+/// # Examples
+///
+/// ```
+/// use sc_llm_provider::ImageMediaType;
+///
+/// assert_eq!(ImageMediaType::Jpeg.as_str(), "image/jpeg");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ImageMediaType {
+    /// `image/png`.
+    Png,
+    /// `image/jpeg`.
+    Jpeg,
+    /// `application/octet-stream`: bytes of an unknown format, sent as given; a provider
+    /// that rejects them returns its own error.
+    OctetStream,
+}
+
+impl ImageMediaType {
+    /// The MIME type text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::OctetStream => "application/octet-stream",
+        }
+    }
 }
 
 /// The author of a message.

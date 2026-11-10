@@ -88,3 +88,55 @@ fn truncated_reply_still_logs_usage() {
         1
     );
 }
+
+/// RSH-003: the provider-reported model is cut to 128 bytes in the record, flagged.
+#[test]
+fn long_model_name_is_cut_in_the_record() {
+    let log = MemoryLog::new().expect("memory log");
+    let client = LlmClient::new(LlmProvider::OpenRouter, common::key())
+        .expect("client")
+        .with_log(log.general());
+    let request = LlmRequest {
+        model: "claude-haiku-5-5".parse().expect("model"),
+        system: None,
+        messages: Vec::new(),
+        max_tokens: 8,
+        output: Output::Text,
+    };
+    let long_model = "m".repeat(300);
+    let reply = common::response(
+        200,
+        Vec::new(),
+        json!({
+            "model": long_model,
+            "choices": [{ "message": { "content": "ok" }, "finish_reason": "stop" }]
+        }),
+    );
+    let response = client
+        .decode(&request, reply, LogContext::NONE)
+        .expect("decode");
+    assert_eq!(
+        response.model, long_model,
+        "the response keeps the name whole"
+    );
+    let records = log.records().expect("records");
+    assert_eq!(records[0].fields["model"], "m".repeat(128));
+    assert_eq!(records[0].fields["model_truncated"], true);
+
+    let short = MemoryLog::new().expect("memory log");
+    LlmClient::new(LlmProvider::Anthropic, common::key())
+        .expect("client")
+        .with_log(short.general())
+        .decode(
+            &request,
+            haiku_message("ok", "end_turn", 1),
+            LogContext::NONE,
+        )
+        .expect("decode");
+    assert!(
+        short.records().expect("records")[0]
+            .fields
+            .get("model_truncated")
+            .is_none()
+    );
+}
