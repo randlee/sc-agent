@@ -96,15 +96,15 @@ pub use client::{LlmClient, Wire};
 pub use provider::LlmProvider;
 pub use error::LlmError;
 pub use ids::{catalog_model_id, provider_model_id};
-pub use types::{LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
+pub use types::{ImageMediaType, LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
 
 // src/types.rs - any LLM call (REQ-SAG-0502), not only decisions
 #[derive(Debug, Clone, PartialEq)]
 pub struct LlmRequest<'a> { pub model: ModelId, pub system: Option<String>, pub messages: Vec<Message<'a>>, pub max_tokens: u32, pub output: Output }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message { pub role: Role, pub content: Vec<Part> }
+pub struct Message<'a> { pub role: Role, pub content: Vec<Part<'a>> }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Part {
+pub enum Part<'a> {
     Text(String),
     /// Anthropic `{type:"image", source:{type:"base64", media_type, data}}`; Chat `{type:"image_url", image_url:{url:"data:<media_type>;base64,<data>"}}`.
     Image { media_type: ImageMediaType, data_base64: Cow<'a, str> },   // ImageMediaType: #[non_exhaustive] { Png, Jpeg, OctetStream } with as_str()
@@ -295,7 +295,8 @@ pub enum DecisionLlmError {
     InvalidMaxTokens { max_tokens: u32 },                            // "decision_llm.invalid_max_tokens"
     Invariant { message: String },                                   // "decision_llm.invariant" (never a mismatch)
     /// The model's answer ids differ from the question ids.
-    AnswerIds { missing: Vec<String>, extra: Vec<String>, extra_count: usize },   // extra listed at most MAX_LISTED_IDS (8)          // "decision_llm.answer_ids"
+    /// `extra` lists at most MAX_LISTED_IDS (8); extra_count is the full count.
+    AnswerIds { missing: Vec<String>, extra: Vec<String>, extra_count: usize },   // "decision_llm.answer_ids"
     /// One answer lacks a required field, has a wrong type, or a choice outside the criteria.
     AnswerInvalid { question: String, message: String },             // "decision_llm.answer_invalid"
 }
@@ -367,9 +368,9 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 - Q4 provider-mapped model id sent; response.model reported.
 - Q6 model lists live in sc-llm-provider.
 Owner review pending (not a question): the SYSTEM_PROMPT draft in the design.
-Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usage) and LlmDecisionBackend::with_log (llm.schema_mismatch), sc-agent-log added to both crates and the ADR-SAG-0004 line; PLAN-CRIT-014 encode calls DecisionRequest::validate (a-2), no own part check; PLAN-CRIT-010 tests use a-5 ScriptedTransport and a-8 MemoryLog (no fake Backend is needed, so a-2 ScriptedBackend is unused); front matter, Required validation, tests cite acceptance lines.
+Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usage) and LlmDecisionBackend::with_log (llm.schema_mismatch), sc-agent-log added to both crates and the ADR-SAG-0004 line; PLAN-CRIT-014 encode calls DecisionRequest::validate (superseded in round 2: validate removed) (a-2), no own part check; PLAN-CRIT-010 tests use a-5 ScriptedTransport and a-8 MemoryLog (no fake Backend is needed, so a-2 ScriptedBackend is unused); front matter, Required validation, tests cite acceptance lines.
 
-Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
+Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids then; 7 after llm.encode was removed in the QA-1 fix round); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
 a-1 contract folded in: Catalog::resolve is infallible (no error arm); Display prints `<id>: <message>` only; cause_detail()/recovery() from ErrorId.
 Resolved: a-2 Backend::decode takes ctx: &LogContext; LlmDecisionBackend passes it to LlmClient::decode, so llm.usage and llm.schema_mismatch carry it. LogContext/GeneralLogger::write(.., ctx, fields)/may_start+SendPermit+send_once match a-5/a-8.
 Round 3 (REQ-QA-R2-007): sc_llm_provider::Usage is a provider-wire type, excluded from REQ-SAG-0201 AC2 (new acceptance line).
