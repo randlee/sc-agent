@@ -582,15 +582,12 @@ launching you. Your job is to **audit the handoff** against this list and
 Implementation QA-1:
 
 - always: `req-qa`, `arch-qa`, `rust-qa-agent`, `rust-best-practices-agent`,
-  `rust-service-hardening-agent`
-- conditional: `flaky-test-qa` when tests changed, CI flakes, or rust-qa
-  surfaces instability
+  `rust-service-hardening-agent`, `flaky-test-qa`
 
 QA-2 and later rechecks:
 
-- always: `req-qa`, `arch-qa`, `rust-qa-agent`
+- always: `req-qa`, `arch-qa`, `rust-qa-agent`, `flaky-test-qa`
 - do **not** run `rust-best-practices-agent` or `rust-service-hardening-agent`
-- conditional: `flaky-test-qa` as above
 
 Phase-ending QA: all six reviewers (flaky always on).
 
