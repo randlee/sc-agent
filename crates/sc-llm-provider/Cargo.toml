@@ -1,0 +1,21 @@
+[package]
+name = "sc-llm-provider"
+version = "0.1.0"
+description = "Sans-IO LLM provider wire for sc-agent: Anthropic Messages and OpenAI-compatible Chat Completions, JSON-schema output."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-log = { path = "../sc-agent-log" }
+sc-agent-secrets = { path = "../sc-agent-secrets" }
+sc-agent-types = { path = "../sc-agent-types" }
+serde_json = "1"
+
+[dev-dependencies]
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+
+[lints]
+workspace = true
