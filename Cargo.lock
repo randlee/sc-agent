@@ -1539,6 +1539,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-agent-py"
+version = "0.1.0"
+dependencies = [
+ "decide",
+ "pyo3",
+ "pyo3-build-config",
+ "sc-agent-log",
+ "sc-agent-types",
+ "sc-decision-schema",
+ "sc-observability",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "sc-agent-secrets"
 version = "0.1.0"
 dependencies = [

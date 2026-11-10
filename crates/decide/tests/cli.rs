@@ -2,11 +2,33 @@
 //! fail-fast batch, against a loopback runner (no external network).
 //!
 //! Each child gets its own HOME (config and logs under `HOME/.sc-agent`) and a cleared
-//! environment; the test process's own environment is never changed.
+//! environment; the test process's own environment is never changed. The HOME-based tests
+//! are Unix-only (Windows finds the home directory through USERPROFILE).
 
 mod common;
 
+/// AC: ANC-006 (the subcommands the Python parity test lists).
 #[cfg(test)]
+#[test]
+fn help_lists_send_models_and_doctor() {
+    let decide = env!("CARGO_BIN_EXE_decide");
+    let output = std::process::Command::new(decide)
+        .arg("--help")
+        .output()
+        .expect("run");
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    for command in ["send", "models", "doctor"] {
+        assert!(text.contains(command), "{text}");
+    }
+    let output = std::process::Command::new(decide)
+        .args(["send", "--help"])
+        .output()
+        .expect("run");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
+}
+
+#[cfg(all(test, unix))]
 mod tests {
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::{TcpListener, TcpStream};
@@ -159,22 +181,6 @@ mod tests {
     fn stderr_detail(output: &Output) -> Value {
         let text = String::from_utf8_lossy(&output.stderr);
         serde_json::from_str(text.lines().last().expect("one stderr line")).expect("stderr json")
-    }
-
-    /// AC: ANC-006 (the subcommands the Python parity test lists).
-    #[test]
-    fn help_lists_send_models_and_doctor() {
-        let home = tempfile::tempdir().expect("home");
-        let output = decide(home.path(), &["--help"]).output().expect("run");
-        assert!(output.status.success());
-        let text = String::from_utf8_lossy(&output.stdout);
-        for command in ["send", "models", "doctor"] {
-            assert!(text.contains(command), "{text}");
-        }
-        let output = decide(home.path(), &["send", "--help"])
-            .output()
-            .expect("run");
-        assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
     }
 
     /// AC: REQ-SAG-0004. `--project "Phase B"` is `decide.log` (cause `log.invalid_slug`);
@@ -332,7 +338,6 @@ mod tests {
     /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
     /// runner that never answers: every printed line is `decision.cancelled`, one session
     /// row per started request is on disk, exit 130 both times.
-    #[cfg(unix)]
     #[test]
     fn an_interrupt_cancels_flushes_and_exits_130() {
         for signal in ["-INT", "-TERM"] {
