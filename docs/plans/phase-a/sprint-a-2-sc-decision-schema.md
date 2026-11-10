@@ -65,7 +65,7 @@ pub use api_error::{HttpBadRequestError, HttpValidationError, LocItem, Validatio
 pub use backend::Backend;
 pub use decision::{Decision, DecisionRequest, DecisionResult, ImagePart, MAX_IMAGES, MAX_IMAGE_BYTES};
 pub use digest::QuestionDigest;
-pub use error::DecisionError;
+pub use error::{DecisionError, LimitKind};
 pub use map::OrderedMap;
 pub use models::{ModelMetadata, ModelMetadataList};
 pub use request::{Asset, AssetKind, ImageFormat, NoulCriteria, Question, State, SystemOneRequest};
@@ -83,6 +83,7 @@ impl<K: PartialEq, V> OrderedMap<K, V> { pub fn get(&self, key: &K) -> Option<&V
 /// POST /v1/systemone body. Field order is the wire order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+// SystemOneRequest::new(model, state, questions, assets); carries a private key_order (from_json keeps the document's key order)
 pub struct SystemOneRequest {
     pub model: String,
     pub state: State,
@@ -128,20 +129,21 @@ pub struct NoulCriteria {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Asset {
-    #[serde(rename = "type")] pub kind: AssetKind,
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")] pub kind: Option<AssetKind>, // optional in openapi v0.2.0
     #[serde(default, skip_serializing_if = "Option::is_none")] pub format: Option<ImageFormat>,
     #[serde(default, skip_serializing_if = "Option::is_none")] pub data_base64: Option<String>,  // opaque
     #[serde(default, skip_serializing_if = "Option::is_none")] pub part: Option<String>,         // multipart part name
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)] #[serde(rename_all = "lowercase")]
-pub enum AssetKind { Image }
+#[non_exhaustive] pub enum AssetKind { Image }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)] #[serde(rename_all = "lowercase")]
-pub enum ImageFormat { Png, Jpg, Jpeg }
+#[non_exhaustive] pub enum ImageFormat { Png, Jpg, Jpeg }
 /// Keeps an explicit JSON null as Some(Null) so absent and null both round-trip.
 fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(d: D) -> Result<Option<T>, D::Error>;
 
 // response.rs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// SystemOneResponse::new(model, answers, usage, extra); carries a private key_order
 pub struct SystemOneResponse {
     pub model: String,
     pub answers: OrderedMap<String, Answer>,
@@ -165,7 +167,7 @@ pub struct BoxCoordinates { pub top: f64, pub bottom: f64, pub left: f64, pub ri
 
 // models.rs  (GET /v1/models)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModelMetadataList { pub models: Vec<ModelMetadata> }
+pub struct ModelMetadataList { pub models: Vec<ModelMetadata>, /* private key_order */ }  // ModelMetadataList::new(models)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelMetadata { pub name: String, pub description: String, pub release_date: String }
 impl ModelMetadataList { pub fn from_json(status: u16, body: &[u8]) -> Result<Self, DecisionError>; }
@@ -202,7 +204,7 @@ pub const MAX_IMAGES: usize = 20;
 pub const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 impl DecisionRequest {
     /// Checks, in order: at most MAX_IMAGES parts and each at most MAX_IMAGE_BYTES
-    /// (Err Limits { what: "images" | "image_bytes", max }); every `Asset.part` names exactly one
+    /// (Err Limits { what: LimitKind::Images | LimitKind::ImageBytes, max }; every image asset, inline or by part, counts); every `Asset.part` names exactly one
     /// `ImagePart` by `name`, no two parts share a name, none is unreferenced (Err ImageParts { detail }
     /// naming the asset id / part name); then computes the question digests (Err Encode only if
     /// serde_json refuses the digest input).
@@ -217,11 +219,13 @@ impl DecisionRequest {
 /// (TryFrom, not From: a body whose asset names a part has no valid request without its image.)
 impl TryFrom<SystemOneRequest> for DecisionRequest { type Error = DecisionError; }
 #[derive(Clone, PartialEq, Eq)]
-pub struct ImagePart { pub name: String, pub format: ImageFormat, pub bytes: Vec<u8> }   // Debug: name, format, byte length
+#[non_exhaustive] pub struct ImagePart { pub name: String, pub format: ImageFormat, pub bytes: Vec<u8> }   // Debug: name, format, byte length
+impl ImagePart { pub fn new(name: impl Into<String>, format: ImageFormat, bytes: Vec<u8>) -> Self; }
 
 /// One result of decide/decide_stream. The decided response is SystemOneResponse, the one
 /// response form (ADR-SAG-0001); no wrapper type.
 #[derive(Debug)]
+#[non_exhaustive] // built with DecisionResult::new(session_id, position, digests, outcome)
 pub struct DecisionResult {
     pub session_id: SessionId,                          // ULID (REQ-SAG-0001)
     pub position: u64,                                  // index of the request in the input; 0 for decide (REQ-SAG-0701)
@@ -312,7 +316,7 @@ pub enum DecisionError {
     /// ImagePart no asset references; `detail` names the asset id / part name.
     ImageParts { detail: String },                                     // "decision.image_parts"
     /// DecisionRequest::new: a REQ-SAG-0014 limit exceeded; `what` = "images" | "image_bytes", `max` = the limit.
-    Limits { what: &'static str, max: u64 },                           // "decision.limits"
+    Limits { what: LimitKind, max: u64 },                           // "decision.limits"
     /// HTTP 400 with the documented body.
     ApiBadRequest { body: HttpBadRequestError },                       // "decision.api_bad_request"
     /// HTTP 422 with the documented body.
@@ -368,6 +372,9 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - `cargo test -p sc-decision-schema`
 - `cargo tree -p sc-decision-schema -e normal`: sc-agent crates are only sc-agent-types and sc-agent-http (plus their own); no tokio, no sc-decision-* backend, no sc-llm-provider, no sc-decision-runner
 - `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n '\bsha2\b|Sha256::' crates/` (word-bounded: the digest-input key `sha256` is not a match) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
+
+// LimitKind (error.rs): #[non_exhaustive] pub enum LimitKind { Images, ImageBytes } with as_str() and Display.
+// Question, Answer, State, LocItem, AssetKind and ImageFormat are #[non_exhaustive].
 
 ## Acceptance criteria
 
