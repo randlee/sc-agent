@@ -14,14 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done. `agent_name` is a caller-supplied name for the agent that did it. `session_id` is the session's ULID. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
+Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). `session_id` is the session's ULID. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
 
 **MUST statements:**
 
-- Every session log row MUST carry `session_id`, `repo`, `project`, `agent_role` and `agent_name`.
+- Every session log row MUST carry `session_id`, `repo`, `project` and `agent_role`.
 - `repo` MUST be the repository's git `origin` URL normalized to `<host>/<owner>/<repo>`, with no scheme and no `.git` suffix.
 - When the working folder is not in a git repository, `repo` MUST be `local/<host>/<folder-name>`.
-- `project`, `agent_role` and `agent_name` MUST be accepted from the user through the CLI and the PyO3 bindings.
+- `project` and `agent_role` MUST be accepted from the user through the CLI and the PyO3 bindings.
 - `project` and `agent_role` MUST be slugs.
 
 **MUST NOT statements:**
@@ -38,7 +38,7 @@ Session logs are separated and analysed by repository, by type of work and by pr
 
 - [ ] A session run in a clone of `https://github.com/randlee/sc-agent.git` writes rows whose `repo` is `github.com/randlee/sc-agent`.
 - [ ] A session run outside git in folder `work` on host `m5` writes rows whose `repo` is `local/m5/work`.
-- [ ] A CLI call and a PyO3 call with the same `project`, `agent_role` and `agent_name` write rows with the same values in those fields.
+- [ ] A CLI call and a PyO3 call with the same `project` and `agent_role` write rows with the same values in those fields.
 - [ ] A `project` of `Phase B` is rejected with an error and no row is written.
 
 ### Dependencies

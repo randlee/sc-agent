@@ -22,20 +22,22 @@
 
 ### Context
 
-sc-agent sends decisions to Jev and to LLM backends such as Haiku and Luna.
+sc-agent sends decisions to Jev, to local runners that serve the Jev API, and to LLM backends such as Haiku and Luna.
 
 **Problem Statement:**
 
-Jev, Haiku and Luna must answer the same decision so their answers can be compared, without shared crates knowing how any one backend adapts it.
+Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision so their answers can be compared, without shared crates knowing how any one backend adapts it.
 
 ### Decision
 
-Jev, Haiku and Luna each implement one decision trait. Every backend receives the same Jev API request and returns a Jev API response. Each LLM backend adapts the request internally.
+Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response. Callers use one sync `Decision` trait (`decide` for one request, `decide_stream` for many). `sc-decision-runner` implements `Decision` for any `Backend` and transport; the queue, worker threads, holdoff, cancellation and session logging live behind it. Each LLM backend adapts the request internally.
 
 **Key Principles:**
 
 - There is one request form: the Jev API request.
 - Adaptation knowledge lives only in the backend that adapts.
+- Backends do no I/O; the transport is separate, so an async transport can be added without changing backends.
+- `decide_stream` returns results fastest first, each tagged with its session ULID; a failed request is returned in its result and the stream continues.
 
 ### Rationale
 

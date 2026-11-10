@@ -18,7 +18,7 @@ Definitions: Quota exhaustion is a response whose body says the account's quota,
 
 **MUST statements:**
 
-- A busy status whose body marks quota exhaustion MUST be returned at once as `QUOTA_EXHAUSTED`.
+- A busy status whose body marks quota exhaustion MUST be returned at once as `HttpError::QuotaExhausted`.
 - A 429 with a body that does not mark quota exhaustion MUST be treated as busy.
 
 **MUST NOT statements:**
@@ -33,7 +33,7 @@ Resending cannot succeed until the account is topped up, so holding off only del
 
 **Acceptance Criteria:**
 
-- [ ] A 429 carrying the documented Anthropic quota-exhausted body returns `QUOTA_EXHAUSTED` after one send.
+- [ ] A 429 carrying the documented Anthropic quota-exhausted body returns `HttpError::QuotaExhausted` after one send.
 - [ ] A 429 with an unrecognized body is resent under REQ-SAG-0601.
 
 ### Dependencies

@@ -29,7 +29,7 @@ The first requirement for sc-agent is to expose the TypeSafe API, so any Jev que
 
 **Acceptance Criteria:**
 
-- [ ] Each request and response example in the TypeSafe API documentation, for all four question types, round-trips through `sc-decision-schema` types without loss.
+- [ ] Each request and response example in the TypeSafe API documentation (https://docs.typesafe.ai, OpenAPI 0.2.0 at https://api.typesafe.ai/openapi.json), for all four question types, round-trips through `sc-decision-schema` types without loss.
 - [ ] No crate other than `sc-decision-schema` defines a type that maps to a Jev API field.
 
 ### Dependencies

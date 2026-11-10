@@ -34,7 +34,7 @@ Session logs must be separable by repository, type of work and project, kept ind
 
 ### Decision
 
-For the MVP, session logs are JSONL under `<log_root>/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project`, `agent_role` and `agent_name`.
+For the MVP, session logs are JSONL under `<log_root>/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.
 
 **Key Principles:**
 
@@ -75,11 +75,29 @@ Write each session to its own file named by its ULID.
 
 Tasks create tens of thousands of single-query sessions.
 
-#### Alternative 2: Encode repo, project and role in one hyphenated name
+#### Alternative 2: One JSONL file per run
 
 **Description:**
 
-Name logs `<repo>-<project>-<agent-name>`.
+Write each caller run to its own file.
+
+**Pros:**
+
+- Files never grow across runs.
+
+**Cons:**
+
+- Thousands of runs leave thousands of files in one folder.
+
+**Why Rejected:**
+
+Too many files; a project's sessions belong together.
+
+#### Alternative 3: Encode repo, project and role in one hyphenated name
+
+**Description:**
+
+Name logs `<repo>-<project>-<agent_role>`.
 
 **Pros:**
 

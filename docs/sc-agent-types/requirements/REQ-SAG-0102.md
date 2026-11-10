@@ -18,9 +18,10 @@ Definitions: The model catalog is the union of the models built into sc-agent an
 
 **MUST statements:**
 
-- sc-agent MUST read additional models from the global configuration.
+- The catalog type in `sc-agent-types` MUST accept additional models read from the global configuration by a higher layer; `sc-agent-types` itself reads no files.
 - A user MUST be able to add a model to the global configuration without upgrading any crate.
 - A short name MUST resolve to the model of its line with the latest release date across the union of built-in and global-configuration models.
+- Each built-in model MUST carry the model's published release date.
 
 ### Rationale
 

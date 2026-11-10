@@ -22,6 +22,8 @@ Definitions: A discriminated union is a tagged result type whose variant names t
 - Rust APIs MUST return `Result<T, E>` from the lowest layer to the top-level CLI and PyO3 entry points.
 - An error MUST carry the error id and message of every lower-layer error that caused it.
 - A layer that changes an error MUST change it only by adding detail.
+- Error text received from a provider MUST be kept whole.
+- Every error variant MUST have a stable id of the form `<crate>.<variant>`, such as `http.provider_busy`.
 
 **MUST NOT statements:**
 
@@ -37,7 +39,7 @@ Agents and tools act on errors programmatically. A dropped lower-layer id or a p
 **Acceptance Criteria:**
 
 - [ ] A test that injects a failure at the lowest layer of a call path receives, at the CLI and PyO3 entry points, that failure's error id and message in the returned error.
-- [ ] Clippy runs with `panic`, `unwrap_used` and `expect_used` denied in non-test code and passes.
+- [ ] Clippy runs with `panic`, `unwrap_used`, `expect_used` and `indexing_slicing` denied in non-test code and passes.
 
 ### Product Applicability
 

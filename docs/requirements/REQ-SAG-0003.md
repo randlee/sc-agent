@@ -14,12 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: The general log is the application diagnostic log. A session log is the record of every model send that sc-agent makes. sc-observability is the logging library sc-agent uses.
+Definitions: The general log is the application diagnostic log. A session log is the record of every session. A session is one model request with its own ULID `session_id`; every send of that request, including busy resends, belongs to the same session. sc-observability is the logging library sc-agent uses.
 
 **MUST statements:**
 
 - The general log MUST use the rotation and retention built into sc-observability.
 - Session logs MUST be kept indefinitely.
+- <log_root> MUST default to sc-observability's default log location for the application name `sc-agent`.
+- Each CLI MUST write its own general log file.
 
 **MUST NOT statements:**
 

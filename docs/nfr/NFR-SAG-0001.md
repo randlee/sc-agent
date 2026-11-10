@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A task is one caller run. A session is one decision send with its own ULID. One task of the owner's produced 40,000 sessions, each one Jev query.
+Definitions: A task is one caller run. A session is one model request with its own ULID `session_id`; every send of that request, including busy resends, belongs to the same session. One task of the owner's produced 40,000 sessions, each one Jev query.
 
 **MUST statements:**
 

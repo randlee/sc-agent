@@ -19,6 +19,7 @@ Definitions: `<log_root>` is the session log root folder. JSONL is newline-delim
 **MUST statements:**
 
 - Session logs MUST be written as JSONL under `<log_root>/<repo>/<agent_role>/<project>/`.
+- All sessions of one repo, agent role and project MUST be appended to one JSONL file in that directory.
 
 ### Rationale
 

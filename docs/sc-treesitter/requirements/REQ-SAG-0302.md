@@ -14,10 +14,13 @@
 
 ### Requirement Statement
 
+Definitions: A language id is the name a caller uses to select a grammar.
+
 **MUST statements:**
 
 - `sc-treesitter` MUST load tree-sitter grammars and run queries against any loaded grammar.
-- The dotnet and Go grammars MUST be supported early.
+- The first release MUST support the Python and Rust grammars.
+- The second release MUST add the C# grammar, with language id `csharp`, and the Go grammar.
 
 **MUST NOT statements:**
 
@@ -25,11 +28,12 @@
 
 ### Rationale
 
-The design must support any language; .NET and Go are the first needed.
+The design must support any language; Python and Rust are needed first, C# and Go next.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A query runs against dotnet source and against Go source through the same API call.
+- [ ] A query runs against Python source and against Rust source through the same API call.
+- [ ] After the second release, the same call runs a query against C# source selected as `csharp` and against Go source.
 - [ ] A grammar added after release is queried through the existing API with no API change.
