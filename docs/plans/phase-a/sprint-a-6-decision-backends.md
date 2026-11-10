@@ -195,6 +195,8 @@ impl LocalBackend {
     pub fn new(kind: DaemonKind, host: &RunnerHost, port: NonZeroU16, model: ModelId, key: Option<ApiKey>) -> Result<Self, LocalError>;
     /// The caller's GeneralLogger (default or injected, REQ-SAG-0008); discover writes to it.
     pub fn with_log(self, log: GeneralLogger) -> Self;
+    pub fn base(&self) -> &str;
+    pub fn kind(&self) -> DaemonKind;
     /// REQ-SAG-0015 timeouts for this runner, used for the load-on-first-request deadline (encode). Without them no
     /// deadline is set. wait_until_loaded takes its load_timeout as an argument (the caller passes timeouts.load).
     pub fn with_timeouts(self, timeouts: LocalTimeouts) -> Self;
