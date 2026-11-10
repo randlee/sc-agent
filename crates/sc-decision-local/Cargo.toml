@@ -1,0 +1,25 @@
+[package]
+name = "sc-decision-local"
+version = "0.1.0"
+description = "Local System One decision backend for sc-agent: a configured Jev-compatible daemon (Strands Decider, Laya, Mapika/decider, generic) with model discovery."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-config = { path = "../sc-agent-config" }
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-log = { path = "../sc-agent-log" }
+sc-agent-secrets = { path = "../sc-agent-secrets" }
+sc-agent-types = { path = "../sc-agent-types" }
+sc-decision-schema = { path = "../sc-decision-schema" }
+sc-decision-systemone = { path = "../sc-decision-systemone" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+
+[dev-dependencies]
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+
+[lints]
+workspace = true
