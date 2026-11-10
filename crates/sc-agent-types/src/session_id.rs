@@ -1,3 +1,13 @@
+//! [`SessionId`], the ULID that correlates one session's records.
+
+use std::fmt;
+use std::str::FromStr;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use ulid::Ulid;
+
+use crate::TypesError;
+
 /// Session correlation id: a ULID (26 Crockford base32 characters).
 ///
 /// `Display`, `FromStr` and serde all use the 26-character text form. The id
@@ -24,7 +34,7 @@ impl SessionId {
     #[must_use]
     #[expect(
         clippy::new_without_default,
-        reason = "a random id is not a sensible Default value"
+        reason = "each call is a new id; a random Default would surprise callers"
     )]
     pub fn new() -> Self {
         Self(Ulid::new())
@@ -32,31 +42,30 @@ impl SessionId {
 }
 
 impl FromStr for SessionId {
-    type Err = JevError;
+    type Err = TypesError;
 
-    /// Parses a 26-character ULID.
+    /// Parses the canonical 26-character uppercase ULID form.
     ///
     /// # Errors
     ///
-    /// `INPUT_INVALID` for anything else, a UUID included; the message says
-    /// session ids are ULIDs since Phase A.1.
+    /// [`TypesError::InvalidSessionId`] for anything else, a UUID or a lowercase ULID included.
     ///
     /// # Examples
     ///
     /// ```
-    /// use sc_agent_types::SessionId;
+    /// use sc_agent_types::{ErrorId, SessionId};
     ///
     /// let id: SessionId = "01ARZ3NDEKTSV4RRFFQ69G5FAV".parse().unwrap();
     /// assert_eq!(id.to_string(), "01ARZ3NDEKTSV4RRFFQ69G5FAV");
     /// let uuid = "00000000-0000-0000-0000-000000000000";
-    /// assert_eq!(uuid.parse::<SessionId>().unwrap_err().code(), "INPUT_INVALID");
+    /// assert_eq!(uuid.parse::<SessionId>().unwrap_err().id(), "types.invalid_session_id");
     /// ```
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        parse_ulid(text).map(Self).ok_or_else(|| {
-            JevError::input_invalid(format!(
-                "session id {text:?} is not a ULID; session ids are ULIDs since Phase A.1"
-            ))
-        })
+        parse_ulid(text)
+            .map(Self)
+            .ok_or_else(|| TypesError::InvalidSessionId {
+                text: text.to_owned(),
+            })
     }
 }
 
@@ -78,6 +87,7 @@ impl<'de> Deserialize<'de> for SessionId {
         text.parse().map_err(serde::de::Error::custom)
     }
 }
+
 /// Strict ULID text: the canonical 26-character uppercase Crockford form.
 ///
 /// `Ulid::from_string` also accepts lowercase, the `I`/`L`/`O` aliases and

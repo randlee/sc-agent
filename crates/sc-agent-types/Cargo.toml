@@ -5,8 +5,6 @@ description = "Shared value types for sc-agent: model catalog, providers, sessio
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-# Temporary: the copied tests in tests/ are not ported yet; re-enabled when they are.
-autotests = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
