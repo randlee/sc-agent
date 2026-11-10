@@ -36,7 +36,7 @@ fn defaults_write_both() {
     .expect("open");
     write_both(&loggers).expect("both rows");
     assert_eq!(
-        events(&root.path().join("logs/decide.log.jsonl"))
+        events(&root.path().join("logs").join("decide.log.jsonl"))
             .expect("rows")
             .len(),
         1
@@ -73,7 +73,7 @@ fn injected_session_only() {
     assert_eq!(records[0].action, SessionLogger::ACTION);
     assert_eq!(loggers.session.path(), None);
     assert_eq!(
-        events(&root.path().join("logs/decide.log.jsonl"))
+        events(&root.path().join("logs").join("decide.log.jsonl"))
             .expect("rows")
             .len(),
         1

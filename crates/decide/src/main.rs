@@ -183,7 +183,6 @@ fn run_send(
     outcome.map(exit)
 }
 
-/// The binary's context with its general logger opened (and kept, to close it later).
 /// The binary's context: `--config-dir` (else `~/.sc-agent`) and every other seam default.
 fn base_context(config_dir: Option<std::path::PathBuf>) -> Context {
     let mut context = Context::new(SERVICE);
@@ -191,6 +190,7 @@ fn base_context(config_dir: Option<std::path::PathBuf>) -> Context {
     context
 }
 
+/// The binary's context with its general logger opened (and kept, to close it later).
 fn context_with_general(
     config_dir: Option<std::path::PathBuf>,
 ) -> Result<(Context, GeneralLogger), DecideError> {

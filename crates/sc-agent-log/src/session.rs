@@ -78,7 +78,13 @@ impl SessionIdentity {
 /// log.flush()?;
 /// let file = root
 ///     .path()
-///     .join("logs").join("github.com").join("randlee").join("sc-agent").join("rust-developer").join("phase-b").join("sessions.jsonl");
+///     .join("logs")
+///     .join("github.com")
+///     .join("randlee")
+///     .join("sc-agent")
+///     .join("rust-developer")
+///     .join("phase-b")
+///     .join("sessions.jsonl");
 /// assert_eq!(log.path(), Some(file.as_path()));
 /// assert!(file.exists());
 /// # Ok::<(), Box<dyn std::error::Error>>(())

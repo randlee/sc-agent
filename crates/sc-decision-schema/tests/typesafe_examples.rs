@@ -36,7 +36,9 @@ mod tests {
 
     fn fixture(name: &str) -> String {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/typesafe")
+            .join("tests")
+            .join("fixtures")
+            .join("typesafe")
             .join(format!("{name}.json"));
         let text =
             std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{path:?}: {error}"));
@@ -57,7 +59,10 @@ mod tests {
 
     /// Every fixture file, by name without `.json`.
     fn fixture_names() -> Vec<String> {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/typesafe");
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("typesafe");
         let mut names: Vec<String> = std::fs::read_dir(&dir)
             .expect("fixture dir")
             .map(|entry| {

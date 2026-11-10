@@ -55,7 +55,7 @@ fn general_write_generic() {
     )
     .expect("row");
     log.flush().expect("flush");
-    let rows = events(&root.path().join("logs/decide.log.jsonl")).expect("rows");
+    let rows = events(&root.path().join("logs").join("decide.log.jsonl")).expect("rows");
     assert_eq!(rows[0].fields, row);
     assert_eq!(rows[0].level, Level::Warn);
     assert_eq!(rows[0].target.as_str(), "sc_agent_http");
