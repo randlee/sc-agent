@@ -5,9 +5,11 @@
 //!
 //! Two phases. Before [`SignalWatch::start_run`] decide is reading its input (a file, stdin or
 //! a FIFO, where a read can block forever) and nothing has been sent, so an interrupt exits
-//! the process at once with [`EXIT_INTERRUPTED`] (RSH-001). After it, the first interrupt
-//! cancels the run's token: unfinished requests end `decision.cancelled`, are printed, and the
-//! session log is flushed before `main` exits 130. A second interrupt exits at once.
+//! the process at once with [`EXIT_INTERRUPTED`] (RSH-001). After it, an interrupt cancels the
+//! run's token: unfinished requests end `decision.cancelled`, are printed, and the session log
+//! is flushed before `main` exits 130. A second or later interrupt changes nothing: the cancel
+//! is idempotent and the drain is already bounded, so every exit after a run starts goes
+//! through the flush (REQ-SAG-0011).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -32,9 +34,9 @@ struct State {
 /// What the handler does with one interrupt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Action {
-    /// Cancel the token and let `main` drain, flush and exit 130.
+    /// Cancel the token (again, for a later interrupt) and let `main` drain, flush and exit 130.
     Cancel,
-    /// Exit the process now with 130.
+    /// Exit the process now with 130: only before the run starts, when nothing was sent.
     Exit,
 }
 
@@ -51,8 +53,8 @@ impl SignalWatch {
         self.state.interrupts.load(Ordering::Acquire) > 0
     }
 
-    /// The input is read and the run starts: from now on the first interrupt cancels and
-    /// drains instead of exiting.
+    /// The input is read and the run starts: from now on every interrupt cancels and lets the
+    /// run drain and flush; none exits at once.
     pub fn start_run(&self) {
         self.state.running.store(true, Ordering::Release);
     }
@@ -78,14 +80,12 @@ pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
     Ok(watch)
 }
 
-/// What the handler does: count the interrupt, cancel the token, and say whether to exit now.
+/// What the handler does: count the interrupt, cancel the token, and exit now only before the
+/// run starts.
 fn on_interrupt(cancel: &CancelToken, state: &State) -> Action {
-    let count = state
-        .interrupts
-        .fetch_add(1, Ordering::AcqRel)
-        .saturating_add(1);
+    state.interrupts.fetch_add(1, Ordering::AcqRel);
     cancel.cancel();
-    if state.running.load(Ordering::Acquire) && count == 1 {
+    if state.running.load(Ordering::Acquire) {
         Action::Cancel
     } else {
         Action::Exit
@@ -109,29 +109,18 @@ mod tests {
         assert!(watch.interrupted());
     }
 
-    /// The first interrupt of a run cancels; a second one exits at once.
-    #[test]
-    fn a_second_interrupt_of_a_run_exits() {
-        let cancel = CancelToken::new();
-        let watch = SignalWatch {
-            state: Arc::new(State::default()),
-        };
-        watch.start_run();
-        assert_eq!(on_interrupt(&cancel, &watch.state), Action::Cancel);
-        assert!(cancel.is_cancelled());
-        assert_eq!(on_interrupt(&cancel, &watch.state), Action::Exit);
-    }
-
-    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. `on_interrupt` during a `send_batch` over a
-    /// blocked transport cancels the token; every unfinished request ends `decision.cancelled`
-    /// and the session log holds one row per started request.
-    #[test]
-    fn an_interrupt_during_a_batch_cancels_every_unfinished_request() {
+    /// Runs a 12-request batch whose 8th send (all 8 workers then blocked) delivers
+    /// `interrupts` interrupts to the handler before it blocks too; returns the handler's
+    /// actions, the results and the session-row count. Ordering is forced by the transport
+    /// itself (the interrupts arrive inside the 8th send); no thread of the test's own, no
+    /// timing.
+    fn interrupted_batch(
+        interrupts: usize,
+    ) -> (Vec<Action>, Vec<sc_decision_schema::DecisionResult>, usize) {
         use sc_agent_http::HttpResponse;
         use sc_agent_http::testing::BlockingTransport;
         use sc_agent_log::testing::MemoryLog;
         use sc_agent_log::{Repo, SessionIdentity, Slug};
-        use sc_decision_schema::DecisionError;
 
         // The interrupt arrives while 8 sends are blocked: the 8th send runs the handler on
         // its worker thread (no thread of this test's own), then blocks like the others.
@@ -139,7 +128,8 @@ mod tests {
             sends: std::sync::atomic::AtomicUsize,
             cancel: CancelToken,
             state: Arc<State>,
-            action: std::sync::Mutex<Option<Action>>,
+            interrupts: usize,
+            actions: std::sync::Mutex<Vec<Action>>,
             inner: BlockingTransport,
         }
         impl sc_agent_http::Transport for InterruptAt {
@@ -148,8 +138,10 @@ mod tests {
                 request: &sc_agent_http::HttpRequest,
             ) -> Result<HttpResponse, sc_agent_http::HttpError> {
                 if self.sends.fetch_add(1, Ordering::SeqCst) + 1 == 8 {
-                    let action = on_interrupt(&self.cancel, &self.state);
-                    *self.action.lock().expect("lock") = Some(action);
+                    for _ in 0..self.interrupts {
+                        let action = on_interrupt(&self.cancel, &self.state);
+                        self.actions.lock().expect("lock").push(action);
+                    }
                 }
                 self.inner.send(request)
             }
@@ -167,7 +159,8 @@ mod tests {
             sends: std::sync::atomic::AtomicUsize::new(0),
             cancel: cancel.clone(),
             state: Arc::clone(&watch.state),
-            action: std::sync::Mutex::new(None),
+            interrupts,
+            actions: std::sync::Mutex::new(Vec::new()),
             inner: transport.clone(),
         });
         let context = crate::Context {
@@ -205,22 +198,49 @@ mod tests {
         .expect("batch");
         transport.release();
         assert!(watch.interrupted());
-        assert_eq!(
-            *interrupting.action.lock().expect("lock"),
-            Some(Action::Cancel)
-        );
-        assert_eq!(results.len(), 12);
-        assert!(
-            results
-                .iter()
-                .all(|result| matches!(result.outcome, Err(DecisionError::Cancelled { .. })))
-        );
         let rows = log
             .records()
             .expect("records")
             .into_iter()
             .filter(|record| record.action == "session.row")
             .count();
+        let actions = interrupting.actions.lock().expect("lock").clone();
+        (actions, results, rows)
+    }
+
+    fn all_cancelled(results: &[sc_decision_schema::DecisionResult]) -> bool {
+        results.iter().all(|result| {
+            matches!(
+                result.outcome,
+                Err(sc_decision_schema::DecisionError::Cancelled { .. })
+            )
+        })
+    }
+
+    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. An interrupt during a `send_batch` over a blocked
+    /// transport cancels the token; every unfinished request ends `decision.cancelled` and the
+    /// session log holds one row per started request.
+    #[test]
+    fn an_interrupt_during_a_batch_cancels_every_unfinished_request() {
+        let (actions, results, rows) = interrupted_batch(1);
+        assert_eq!(actions, [Action::Cancel]);
+        assert_eq!(results.len(), 12);
+        assert!(all_cancelled(&results));
         assert_eq!(rows, 12, "one row per started request");
+    }
+
+    /// REQ-SAG-0011 (REQ-QA-002): a second interrupt during a run does not exit at once; the
+    /// run still drains every request as cancelled and flushes one row per started request.
+    #[test]
+    fn a_second_interrupt_of_a_run_still_drains_and_flushes() {
+        let (actions, results, rows) = interrupted_batch(2);
+        assert_eq!(
+            actions,
+            [Action::Cancel, Action::Cancel],
+            "no immediate exit"
+        );
+        assert_eq!(results.len(), 12);
+        assert!(all_cancelled(&results));
+        assert_eq!(rows, 12, "one row per started request, flushed");
     }
 }
