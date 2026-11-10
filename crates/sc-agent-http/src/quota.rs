@@ -1,22 +1,11 @@
-//! Classification of a provider reply with a failing status.
+//! Quota detection for busy replies (REQ-SAG-0602).
 //!
-//! One place decides which error id a non-200 reply from Jev, Haiku or Luna
-//! becomes, so no backend maps statuses on its own. The decision uses the
-//! status first and the body second, and keeps what the provider said.
-//!
-//! # Mapping
-//!
-//! | Reply | Error |
-//! | --- | --- |
-//! | 401, 403 | `AUTH_FAILED` |
-//! | 402, or a quota body (below) | `QUOTA_EXHAUSTED` |
-//! | 413, or 400/422 with a structured marker (`context_length_exceeded`, `request_too_large`), or, for Haiku and Luna ([`ReplyShape::Llm`]), Anthropic's `invalid_request_error` whose message starts "prompt is too long" (unverified wording), or, for Jev only ([`ReplyShape::Jev`]), a message naming `max_tokens` or tokens exceeded (below) | `INPUT_TOO_LARGE` (unit `bytes` for 413, else `tokens`) |
-//! | 400, 422 | `API_REQUEST_INVALID` |
-//! | every other status, 5xx included | `API_ERROR` |
-//!
-//! 429, 502 and 529 are busy and retried by [`send_with_busy_retry`]
-//! ([`crate::send_with_busy_retry`]); they reach this module only with a
-//! quota body, which [`retry`](crate::retry) hands over instead of retrying.
+//! A busy status (429, 502, 529) is resent, unless its body says the account
+//! is out of tokens, credit or spend allowance: no wait makes that succeed, so
+//! [`is_quota_reply`] turns it into `http.quota_exhausted` at once. It is
+//! consulted only for busy statuses; every other status is a final reply
+//! that the backend decodes. The same [`Body`] reader gives
+//! [`ProviderReply`](crate::ProviderReply) its fields.
 //!
 //! # Documented body shapes
 //!
@@ -37,20 +26,20 @@
 //!   out of quota; a 429 with `rate_limit_exceeded` is a rate limit. A 400
 //!   `context_length_exceeded` is a too-long input (that code is widely
 //!   reported but not listed on the page above).
-//! - **Jev** (`plan-anchor`'s `jev_judge.py.j2`, `http_error`): a 4xx whose
-//!   message mentions `max_tokens`, or `token` and `exceed`, is a context
-//!   overflow (matched on the message text, never on JSON keys, and only for
-//!   [`ReplyShape::Jev`]; for Haiku and Luna a message about `max_tokens`, the
-//!   output cap, is an ordinary invalid request); 401 is a credential failure; 422 carries the field error text;
-//!   429 and 529 are busy; 5xx is transient. Jev's own error JSON is not
-//!   documented here, so the reader also accepts `{"detail": "..."}`,
-//!   `{"detail": [{"loc": [...], "msg": "..."}]}` and `{"message": "..."}`,
-//!   and falls back to the bounded raw body. Live replies on 2026-11-08
+//! - **Jev** (`plan-anchor`'s `jev_judge.py.j2`, `http_error`): 401 is a
+//!   credential failure; 422 carries the field error text; 429 and 529 are
+//!   busy; 5xx is transient (the backend decodes every non-busy reply). Jev's
+//!   own error JSON is not documented here, so the reader also accepts
+//!   `{"detail": "..."}`, `{"detail": [{"loc": [...], "msg": "..."}]}` and
+//!   `{"message": "..."}`, and falls back to the raw body. Live replies on 2026-11-08
 //!   showed `{"detail": {"error_type": "billing_error", "message": "..."}}`
 //!   on 402 and the same shape with `authentication_error` on 401.
 //!
 //! A body that is none of these stays what its status says: an unknown 429
 //! body is busy, never quota.
+
+use serde_json::Value;
+
 /// `error.code`, `error.type` or `error.details.error_code` values that
 /// mean the account is out of tokens, credit or spend allowance.
 const QUOTA_MARKERS: [&str; 4] = [
@@ -60,23 +49,21 @@ const QUOTA_MARKERS: [&str; 4] = [
     "enforced_spend_limit_reached",
 ];
 
-/// Message starts (lower case) that mean out of quota. Anthropic's customer
-/// spend limit is a 400 with the first; the second is Anthropic's
-/// credit-balance text, reported by users but not listed in its docs.
-const QUOTA_MESSAGES: [&str; 2] = [
-    "you have reached your specified",
-    "your credit balance is too low",
-];
+/// Message starts (lower case) of a busy reply that mean out of quota:
+/// Anthropic's credit-balance text, reported by users but not listed in its
+/// docs. Anthropic's customer spend limit (a 400 whose message starts "You
+/// have reached your specified") is not here: a 400 is a final reply.
+const QUOTA_MESSAGES: [&str; 1] = ["your credit balance is too low"];
 
 /// What the reader found in a failing reply's body.
 #[derive(Debug, Default)]
-struct Body {
-    provider_type: Option<String>,
-    provider_code: Option<String>,
+pub(crate) struct Body {
+    pub(crate) provider_type: Option<String>,
+    pub(crate) provider_code: Option<String>,
     detail_code: Option<String>,
-    message: Option<String>,
-    param: Option<String>,
-    request_id: Option<String>,
+    pub(crate) message: Option<String>,
+    pub(crate) param: Option<String>,
+    pub(crate) request_id: Option<String>,
 }
 
 fn string_of(value: &Value) -> Option<String> {
@@ -88,7 +75,8 @@ fn string_of(value: &Value) -> Option<String> {
 }
 
 impl Body {
-    fn read(bytes: &[u8]) -> Self {
+    /// The fields of a provider error body; all `None` when it is not JSON.
+    pub(crate) fn read(bytes: &[u8]) -> Self {
         let Ok(Value::Object(root)) = serde_json::from_slice::<Value>(bytes) else {
             return Self::default();
         };
@@ -142,7 +130,7 @@ impl Body {
         body
     }
 
-    fn marks_quota(&self, status: u16) -> bool {
+    fn marks_quota(&self) -> bool {
         let marker = |value: &Option<String>| {
             value
                 .as_deref()
@@ -151,41 +139,52 @@ impl Body {
         if marker(&self.provider_code) || marker(&self.provider_type) || marker(&self.detail_code) {
             return true;
         }
-        matches!(status, 400 | 429)
-            && self.message.as_deref().is_some_and(|message| {
-                let lower = message.to_ascii_lowercase();
-                QUOTA_MESSAGES.iter().any(|start| lower.starts_with(start))
-            })
+        self.message.as_deref().is_some_and(|message| {
+            let lower = message.to_ascii_lowercase();
+            QUOTA_MESSAGES.iter().any(|start| lower.starts_with(start))
+        })
     }
 }
 
-/// Whether a reply with `status` and `body` says the account is out of
+/// Whether a busy reply with `status` and `body` says the account is out of
 /// tokens, credit or spend allowance.
 ///
-/// This is the classification hook of the busy retry: a 429 for which this
-/// returns `true` is handed to the caller instead of being retried, because
-/// no wait will make it succeed.
+/// Only a busy status (429, 502, 529) can be a quota reply: a 402 or
+/// Anthropic's usage-limit 400 is a final reply, returned to the backend
+/// after one send (REQ-SAG-0601). A busy reply for which this returns `true`
+/// is `http.quota_exhausted` instead of being resent (REQ-SAG-0602).
 pub(crate) fn is_quota_reply(status: u16, body: &[u8]) -> bool {
-    status == 402 || Body::read(body).marks_quota(status)
+    crate::resend::is_busy_status(status) && Body::read(body).marks_quota()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     #[test]
     fn quota_markers_come_from_documented_shapes_only() {
         let anthropic_cap = r#"{"type":"error","error":{"type":"rate_limit_error","message":"You have reached your API usage limits","details":{"error_code":"enforced_spend_limit_reached"}}}"#;
         let openai_quota = r#"{"error":{"message":"You exceeded your current quota","type":"insufficient_quota","param":null,"code":"insufficient_quota"}}"#;
         let openai_credit = r#"{"error":{"message":"no credit","type":"billing","code":"credit_balance_exhausted"}}"#;
         let anthropic_limit = r#"{"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified API usage limits. You will regain access on 2026-12-01."}}"#;
+        let anthropic_credit = r#"{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the API."}}"#;
         for (status, body) in [
             (429, anthropic_cap),
             (429, openai_quota),
             (429, openai_credit),
-            (400, anthropic_limit),
-            (402, "{}"),
+            (529, anthropic_credit),
+            (502, openai_quota),
         ] {
             assert!(is_quota_reply(status, body.as_bytes()), "{status} {body}");
-            assert_eq!(
-                api_failure("p", ReplyShape::Llm, &req(), &reply(status, body)).code(),
-                "QUOTA_EXHAUSTED"
-            );
+        }
+        // Final replies are never quota here: the backend reads them.
+        for (status, body) in [
+            (400, anthropic_limit),
+            (402, "{}"),
+            (402, openai_quota),
+            (400, anthropic_credit),
+        ] {
+            assert!(!is_quota_reply(status, body.as_bytes()), "{status} {body}");
         }
         let rate = r#"{"error":{"message":"Rate limit reached","type":"requests","code":"rate_limit_exceeded"}}"#;
         let anthropic_rate =
@@ -201,3 +200,4 @@ pub(crate) fn is_quota_reply(status: u16, body: &[u8]) -> bool {
             assert!(!is_quota_reply(429, body.as_bytes()), "{body}");
         }
     }
+}

@@ -5,9 +5,15 @@
 //! [`SecretHeader`], which no accessor in this module reveals.
 
 use std::fmt;
+use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
-use sc_agent_types::{JevError, ResolvedApiKey};
+use sc_agent_secrets::ApiKey;
+use ureq::http::Uri;
+
+use crate::error::HttpError;
 
 /// HTTP request method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,58 +41,73 @@ impl fmt::Display for Method {
         formatter.write_str(self.as_str())
     }
 }
+
 /// The credential header of one request.
 ///
-/// Holds a [`ResolvedApiKey`]. Only [`UreqTransport`](crate::UreqTransport)
-/// writes the value to the wire (ADR-SAG-0020). Other transports, test
-/// doubles included, see the name and [`Self::redacted`]; with the
-/// `test-util` feature, test transports can also compare the key with
-/// `SecretHeader::matches`. Nothing here returns the key.
+/// Holds an [`ApiKey`]. Only [`UreqTransport`](crate::UreqTransport) writes
+/// the value to the wire. Other transports, test doubles included, see the
+/// name and [`Self::redacted`]. [`Self::key`] exists for redaction
+/// ([`ApiKey::redact_text`]); [`Debug`](fmt::Debug) never prints the key.
 ///
 /// # Examples
 ///
 /// ```
-/// use sc_agent_http::{HeaderName, SecretHeader};
-/// use sc_agent_types::{BackendKeyId, ResolvedApiKey};
+/// # use sc_agent_secrets::{resolve_var, EnvSource, KeySources, KeyringSource, SecretsError};
+/// # struct Env;
+/// # impl EnvSource for Env { fn var(&self, _: &str) -> Option<String> { Some("sk-test".into()) } }
+/// # struct NoKeyring;
+/// # impl KeyringSource for NoKeyring {
+/// #     fn password(&self, _: &str, _: &str) -> Result<Option<String>, SecretsError> { Ok(None) }
+/// # }
+/// # let sources = KeySources { env: &Env, repo_root: None, keyring: &NoKeyring };
+/// # let key = resolve_var(&"TEST_KEY".parse()?, &sources)?.key;
+/// use sc_agent_http::SecretHeader;
 ///
-/// let key = ResolvedApiKey::try_new(BackendKeyId::OpenAi, "sk-test".to_owned())?;
 /// let header = SecretHeader::bearer(key);
-/// assert_eq!(header.name().as_str(), "Authorization");
+/// assert_eq!(header.name(), "Authorization");
 /// assert_eq!(header.redacted(), "Authorization: Bearer [redacted]");
-/// # Ok::<(), sc_agent_types::JevError>(())
+/// assert!(!format!("{header:?}").contains("sk-test"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct SecretHeader {
-    name: HeaderName,
+    name: &'static str,
     prefix: &'static str,
-    value: ResolvedApiKey,
+    key: ApiKey,
 }
 
 impl SecretHeader {
-    /// A header whose value is the key itself (for example `x-api-key`).
+    /// A header named `name` whose value is the key itself (for example
+    /// `x-api-key`).
     #[must_use]
-    pub fn new(name: HeaderName, value: ResolvedApiKey) -> Self {
+    pub fn new(name: &'static str, key: ApiKey) -> Self {
         Self {
             name,
             prefix: "",
-            value,
+            key,
         }
     }
 
     /// `Authorization: Bearer <key>`.
     #[must_use]
-    pub fn bearer(value: ResolvedApiKey) -> Self {
+    pub fn bearer(key: ApiKey) -> Self {
         Self {
-            name: HeaderName::new("Authorization"),
+            name: "Authorization",
             prefix: "Bearer ",
-            value,
+            key,
         }
     }
 
     /// The header name.
     #[must_use]
-    pub fn name(&self) -> HeaderName {
+    pub fn name(&self) -> &'static str {
         self.name
+    }
+
+    /// The key, for redaction only ([`ApiKey::redact_text`]).
+    #[must_use]
+    pub fn key(&self) -> &ApiKey {
+        &self.key
     }
 
     /// `<name>: <scheme prefix>[redacted]`, safe to log.
@@ -99,11 +120,6 @@ impl SecretHeader {
     pub(crate) fn prefix(&self) -> &'static str {
         self.prefix
     }
-
-    /// The sealed key. Read only through `ureq_transport`.
-    pub(crate) fn key(&self) -> &ResolvedApiKey {
-        &self.value
-    }
 }
 
 impl fmt::Debug for SecretHeader {
@@ -111,16 +127,18 @@ impl fmt::Debug for SecretHeader {
         formatter
             .debug_struct("SecretHeader")
             .field("name", &self.name)
-            .field("value", &self.value)
+            .field("value", &format_args!("{}[redacted]", self.prefix))
             .finish()
     }
 }
 
 /// An absolute URL a request may be sent to.
 ///
-/// [`Endpoint::parse`] accepts only `https://` URLs, in every build. With the
-/// `test-util` feature, `Endpoint::loopback_http` can also build
-/// `http://127.0.0.1:<port>/…`, and nothing else in plain HTTP.
+/// [`Endpoint::parse`] accepts only `https://` URLs: every provider is
+/// reached over TLS. [`Endpoint::parse_local`] also accepts `http://`, for a
+/// configured local runner (sc-decision-local), which often has no TLS; a key
+/// may still be attached only when its host is loopback
+/// ([`HttpRequest::with_secret`], REQ-SAG-0013).
 ///
 /// # Examples
 ///
@@ -129,13 +147,23 @@ impl fmt::Debug for SecretHeader {
 ///
 /// let endpoint = Endpoint::parse("https://api.openai.com/v1/responses")?;
 /// assert_eq!(endpoint.as_str(), "https://api.openai.com/v1/responses");
+/// assert_eq!(endpoint.host(), "api.openai.com");
 /// assert!(Endpoint::parse("http://api.openai.com/v1/responses").is_err());
-/// # Ok::<(), sc_agent_types::JevError>(())
+///
+/// let local = Endpoint::parse_local("http://127.0.0.1:11434/v1/chat/completions")?;
+/// assert!(local.is_plain_http() && local.is_loopback());
+/// # Ok::<(), sc_agent_http::HttpError>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Endpoint {
     url: String,
-    https: bool,
+}
+
+/// Which schemes a parse accepts.
+#[derive(Clone, Copy)]
+enum Schemes {
+    HttpsOnly,
+    HttpOrHttps,
 }
 
 impl Endpoint {
@@ -143,34 +171,49 @@ impl Endpoint {
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::ConfigInvalid`] when `url` is not a valid URL, has
-    /// no host, or its scheme is not `https`.
-    pub fn parse(url: &str) -> Result<Self, JevError> {
-        crate::ureq_transport::check_https_url(url)?;
-        Ok(Self {
-            url: url.to_owned(),
-            https: true,
-        })
+    /// Returns [`HttpError::InvalidEndpoint`] when `url` is not a valid URL,
+    /// has no host, or its scheme is not `https`.
+    pub fn parse(url: &str) -> Result<Self, HttpError> {
+        Self::parse_with(url, Schemes::HttpsOnly)
     }
 
-    /// `http://127.0.0.1:<port><path>`, for loopback transport tests.
+    /// Parses an absolute `http://` or `https://` URL with a host.
     ///
-    /// Only the IPv4 loopback address can be built, so this cannot send plain
-    /// HTTP off the machine even if a build enables `test-util` by mistake.
+    /// Only for the endpoint of a configured local runner (a `local_runners`
+    /// entry); providers use [`Self::parse`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when `path` does not start with `/` or is not a valid URL path.
-    #[cfg(feature = "test-util")]
-    #[must_use]
-    pub fn loopback_http(port: u16, path: &str) -> Self {
-        let url = format!("http://127.0.0.1:{port}{path}");
-        assert!(path.starts_with('/'), "loopback path must start with '/'");
-        assert!(
-            crate::ureq_transport::is_valid_url(&url),
-            "loopback path is not a valid URL path"
-        );
-        Self { url, https: false }
+    /// Returns [`HttpError::InvalidEndpoint`] when `url` is not a valid URL,
+    /// has no host, or its scheme is neither `http` nor `https`.
+    pub fn parse_local(url: &str) -> Result<Self, HttpError> {
+        Self::parse_with(url, Schemes::HttpOrHttps)
+    }
+
+    fn parse_with(url: &str, schemes: Schemes) -> Result<Self, HttpError> {
+        let invalid = |reason: String| HttpError::InvalidEndpoint {
+            url: url.to_owned(),
+            reason,
+        };
+        let uri = Uri::from_str(url).map_err(|error| invalid(error.to_string()))?;
+        // The scheme is compared on the text as written, lower case only.
+        let scheme = url.split_once("://").map(|(scheme, _)| scheme);
+        let allowed = match schemes {
+            Schemes::HttpsOnly => scheme == Some("https"),
+            Schemes::HttpOrHttps => matches!(scheme, Some("https" | "http")),
+        };
+        if !allowed {
+            return Err(invalid(match schemes {
+                Schemes::HttpsOnly => "the scheme must be https".to_owned(),
+                Schemes::HttpOrHttps => "the scheme must be http or https".to_owned(),
+            }));
+        }
+        if uri.host().is_none_or(str::is_empty) {
+            return Err(invalid("the URL has no host".to_owned()));
+        }
+        Ok(Self {
+            url: url.to_owned(),
+        })
     }
 
     /// The URL text.
@@ -179,14 +222,6 @@ impl Endpoint {
         &self.url
     }
 
-    /// Whether the scheme is `https` (always true outside `test-util`).
-    #[must_use]
-    pub fn is_https(&self) -> bool {
-        self.https
-    }
-}
-
-impl Endpoint {
     /// The endpoint as it may appear in a log: scheme, host and path only.
     ///
     /// Userinfo (`user:pass@`), the port, the query and the fragment are
@@ -200,31 +235,73 @@ impl Endpoint {
     ///
     /// let endpoint = Endpoint::parse("https://user:pw@api.example.test:8443/v1/x?key=SECRET#f")?;
     /// assert_eq!(endpoint.log_form(), "https://api.example.test/v1/x");
-    /// # Ok::<(), sc_agent_types::JevError>(())
+    /// # Ok::<(), sc_agent_http::HttpError>(())
     /// ```
     #[must_use]
     pub fn log_form(&self) -> String {
-        let text = self.as_str();
+        let parts = self.parts();
+        format!("{}://{}{}", parts.scheme, parts.host, parts.path)
+    }
+
+    /// The host without port or userinfo (IPv6 in brackets): the
+    /// [`ProviderPause`](crate::ProviderPause) key.
+    #[must_use]
+    pub fn host(&self) -> &str {
+        self.parts().host
+    }
+
+    /// Scheme is http (only [`Self::parse_local`] can produce one).
+    #[must_use]
+    pub fn is_plain_http(&self) -> bool {
+        self.parts().scheme == "http"
+    }
+
+    /// Host is `localhost`, an IPv4 address in 127.0.0.0/8, or `::1`
+    /// (parsed with `std::net`, no DNS lookup).
+    #[must_use]
+    pub fn is_loopback(&self) -> bool {
+        let host = self.host();
+        if host.eq_ignore_ascii_case("localhost") {
+            return true;
+        }
+        let bare = host
+            .strip_prefix('[')
+            .and_then(|inner| inner.strip_suffix(']'))
+            .unwrap_or(host);
+        match IpAddr::from_str(bare) {
+            Ok(IpAddr::V4(address)) => address.is_loopback(),
+            Ok(IpAddr::V6(address)) => address == std::net::Ipv6Addr::LOCALHOST,
+            Err(_) => false,
+        }
+    }
+
+    /// Scheme, host and path of the URL text (validated at parse).
+    fn parts(&self) -> UrlParts<'_> {
+        let text = self.url.as_str();
         let (scheme, rest) = text.split_once("://").unwrap_or(("", text));
         let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-        let (authority, tail) = rest.split_at(end);
+        let (authority, tail) = rest.split_at_checked(end).unwrap_or((rest, ""));
         let host_port = authority
             .rsplit_once('@')
             .map_or(authority, |(_, host)| host);
         let host = if host_port.starts_with('[') {
             host_port
                 .split_once(']')
-                .map_or(host_port, |(h, _)| &host_port[..=h.len()])
+                .and_then(|(inner, _)| host_port.get(..=inner.len()))
+                .unwrap_or(host_port)
         } else {
             host_port.split(':').next().unwrap_or(host_port)
         };
         let path = tail.split(['?', '#']).next().unwrap_or("");
-        if scheme.is_empty() {
-            format!("{host}{path}")
-        } else {
-            format!("{scheme}://{host}{path}")
-        }
+        UrlParts { scheme, host, path }
     }
+}
+
+/// Borrowed pieces of an [`Endpoint`] URL.
+struct UrlParts<'a> {
+    scheme: &'a str,
+    host: &'a str,
+    path: &'a str,
 }
 
 impl fmt::Display for Endpoint {
@@ -235,64 +312,107 @@ impl fmt::Display for Endpoint {
 
 /// One outbound HTTP request.
 ///
-/// The body is shared text (`Arc<str>`), so busy retries resend the same
-/// bytes without copying and the request digest needs no UTF-8 branch. [`Debug`](fmt::Debug) prints the body length and redacts
-/// the secret.
+/// The body is shared bytes (`Arc<[u8]>`), so multipart bodies can be sent
+/// and resends send the same bytes without copying. [`Debug`](fmt::Debug)
+/// prints the method, the endpoint's log form, the header names, the body
+/// length and the redacted secret: never a header value, the body or the key.
 ///
 /// # Examples
 ///
 /// ```
-/// use std::sync::Arc;
+/// # use sc_agent_secrets::{resolve_var, EnvSource, KeySources, KeyringSource, SecretsError};
+/// # struct Env;
+/// # impl EnvSource for Env { fn var(&self, _: &str) -> Option<String> { Some("sk-test".into()) } }
+/// # struct NoKeyring;
+/// # impl KeyringSource for NoKeyring {
+/// #     fn password(&self, _: &str, _: &str) -> Result<Option<String>, SecretsError> { Ok(None) }
+/// # }
+/// # let sources = KeySources { env: &Env, repo_root: None, keyring: &NoKeyring };
+/// # let key = resolve_var(&"TEST_KEY".parse()?, &sources)?.key;
+/// use sc_agent_http::{Endpoint, HttpRequest, Method, SecretHeader};
 ///
-/// use sc_agent_http::{Endpoint, HeaderName, HttpRequest, Method, SecretHeader};
-/// use sc_agent_types::{BackendKeyId, ResolvedApiKey};
-///
-/// let key = ResolvedApiKey::try_new(BackendKeyId::Anthropic, "sk-test".to_owned())?;
 /// let request = HttpRequest::new(
 ///     Method::Post,
 ///     Endpoint::parse("https://api.anthropic.com/v1/messages")?,
-///     Arc::from(r#"{"model":"m"}"#),
+///     br#"{"model":"m"}"#.as_slice(),
 /// )
-/// .with_header(HeaderName::new("content-type"), "application/json")
-/// .with_secret(SecretHeader::new(HeaderName::new("x-api-key"), key));
+/// .with_header("content-type", "application/json")
+/// .with_secret(SecretHeader::new("x-api-key", key))?;
 /// assert_eq!(request.headers().len(), 1);
+/// assert_eq!(request.body(), br#"{"model":"m"}"#);
 /// assert!(!format!("{request:?}").contains("sk-test"));
-/// # Ok::<(), sc_agent_types::JevError>(())
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]
 pub struct HttpRequest {
     method: Method,
     endpoint: Endpoint,
-    headers: Vec<(HeaderName, String)>,
+    headers: Vec<(String, String)>,
     secret: Option<SecretHeader>,
-    body: Arc<str>,
+    body: Arc<[u8]>,
+    deadline: Option<Duration>,
 }
 
 impl HttpRequest {
-    /// A request with no headers and no secret.
+    /// A request with no headers, no secret and no per-request deadline.
     #[must_use]
-    pub fn new(method: Method, endpoint: Endpoint, body: Arc<str>) -> Self {
+    pub fn new(method: Method, endpoint: Endpoint, body: impl Into<Arc<[u8]>>) -> Self {
         Self {
             method,
             endpoint,
             headers: Vec::new(),
             secret: None,
-            body,
+            body: body.into(),
+            deadline: None,
         }
     }
 
     /// Appends a non-secret header. Headers are sent in insertion order.
+    ///
+    /// The name and value are checked when the transport builds the request:
+    /// one the HTTP builder refuses is [`HttpError::InvalidRequest`].
     #[must_use]
-    pub fn with_header(mut self, name: HeaderName, value: impl Into<String>) -> Self {
-        self.headers.push((name, value.into()));
+    pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
         self
     }
 
     /// Sets the credential header, replacing any earlier one.
-    #[must_use]
-    pub fn with_secret(mut self, secret: SecretHeader) -> Self {
+    ///
+    /// This is the only way a secret enters a request, so the REQ-SAG-0013
+    /// check runs here, before any send: no request to a plain-http host
+    /// that is not loopback carries a key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HttpError::KeyOnPlainHttp`] when the endpoint is plain http
+    /// ([`Endpoint::is_plain_http`]) and its host is not loopback
+    /// ([`Endpoint::is_loopback`]).
+    pub fn with_secret(mut self, secret: SecretHeader) -> Result<Self, HttpError> {
+        if self.endpoint.is_plain_http() && !self.endpoint.is_loopback() {
+            return Err(HttpError::KeyOnPlainHttp {
+                host: self.endpoint.host().to_owned(),
+            });
+        }
         self.secret = Some(secret);
+        Ok(self)
+    }
+
+    /// Replaces the transport's request timeout
+    /// ([`Timeouts::request`](crate::Timeouts::request)) for every send of
+    /// this request only (REQ-SAG-0015): a load-on-first-request daemon's
+    /// first request gets the load timeout plus the request timeout. Resends
+    /// keep it unchanged.
+    #[must_use]
+    pub fn with_deadline(mut self, deadline: Duration) -> Self {
+        self.deadline = Some(deadline);
         self
+    }
+
+    /// The per-request deadline, when [`Self::with_deadline`] set one.
+    #[must_use]
+    pub fn deadline(&self) -> Option<Duration> {
+        self.deadline
     }
 
     /// The method.
@@ -307,9 +427,9 @@ impl HttpRequest {
         &self.endpoint
     }
 
-    /// Non-secret headers, in send order.
+    /// Non-secret headers `(name, value)`, in send order.
     #[must_use]
-    pub fn headers(&self) -> &[(HeaderName, String)] {
+    pub fn headers(&self) -> &[(String, String)] {
         &self.headers
     }
 
@@ -319,26 +439,27 @@ impl HttpRequest {
         self.secret.as_ref()
     }
 
-    /// The body text; transports send its bytes on every attempt.
+    /// The body bytes; transports send them unchanged on every send.
     #[must_use]
-    pub fn body(&self) -> &str {
+    pub fn body(&self) -> &[u8] {
         &self.body
     }
 }
 
 impl fmt::Debug for HttpRequest {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let header_names: Vec<&str> = self.headers.iter().map(|(name, _)| name.as_str()).collect();
         formatter
             .debug_struct("HttpRequest")
             .field("method", &self.method)
-            .field("endpoint", &self.endpoint)
-            .field("headers", &self.headers)
-            .field("secret", &self.secret)
+            .field("endpoint", &self.endpoint.log_form())
+            .field("headers", &header_names)
+            .field("secret", &self.secret.as_ref().map(SecretHeader::redacted))
             .field("body_len", &self.body.len())
+            .field("deadline", &self.deadline)
             .finish()
     }
 }
-
 /// One HTTP response, including non-2xx statuses.
 ///
 /// [`Transport`](crate::Transport) implementations build it.
@@ -399,5 +520,98 @@ impl HttpResponse {
     #[must_use]
     pub fn into_body(self) -> Vec<u8> {
         self.body
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_endpoint_parse_refuses_http() {
+        for url in [
+            "http://api.openai.com/v1/responses",
+            "http://127.0.0.1:8080/x",
+            "HTTP://api.openai.com/",
+            "ftp://api.openai.com/",
+            "api.openai.com/v1",
+            "https://",
+            "",
+        ] {
+            let error = Endpoint::parse(url).expect_err(url);
+            assert!(
+                matches!(error, HttpError::InvalidEndpoint { .. }),
+                "{url}: {error:?}"
+            );
+        }
+        let endpoint = Endpoint::parse("https://api.openai.com/v1/responses").expect("https");
+        assert!(!endpoint.is_plain_http());
+    }
+
+    #[test]
+    fn parse_local_accepts_http() {
+        for url in [
+            "http://127.0.0.1:11434/v1/chat/completions",
+            "http://localhost:8080/",
+            "http://10.0.0.5/v1",
+            "https://gpu.lan/v1",
+        ] {
+            let endpoint = Endpoint::parse_local(url).expect(url);
+            assert_eq!(endpoint.as_str(), url);
+        }
+        for url in ["ftp://host/", "http://", "localhost:8080/x", "HTTP://host/"] {
+            assert!(
+                matches!(
+                    Endpoint::parse_local(url),
+                    Err(HttpError::InvalidEndpoint { .. })
+                ),
+                "{url}"
+            );
+        }
+    }
+
+    #[test]
+    fn host_and_loopback_need_no_lookup() {
+        let cases = [
+            ("http://127.0.0.1:8080/x", "127.0.0.1", true),
+            ("http://127.9.8.7/x", "127.9.8.7", true),
+            ("http://LocalHost:1/", "LocalHost", true),
+            ("http://[::1]:8080/x", "[::1]", true),
+            ("http://u:p@localhost/", "localhost", true),
+            ("http://10.0.0.5/v1", "10.0.0.5", false),
+            ("http://[::2]/", "[::2]", false),
+            ("http://localhost.evil.test/", "localhost.evil.test", false),
+            (
+                "https://api.example.test:8443/v1?q#f",
+                "api.example.test",
+                false,
+            ),
+        ];
+        for (url, host, loopback) in cases {
+            let endpoint = Endpoint::parse_local(url).expect(url);
+            assert_eq!(endpoint.host(), host, "{url}");
+            assert_eq!(endpoint.is_loopback(), loopback, "{url}");
+        }
+        assert_eq!(
+            Endpoint::parse_local("http://[::1]:8080/x?k=v")
+                .expect("v6")
+                .log_form(),
+            "http://[::1]/x"
+        );
+    }
+
+    #[test]
+    fn debug_prints_no_header_value_or_body() {
+        let request = HttpRequest::new(
+            Method::Post,
+            Endpoint::parse("https://u:pw@api.example.test/v1?key=q").expect("https"),
+            b"secret-body".as_slice(),
+        )
+        .with_header("x-trace", "header-value");
+        let rendered = format!("{request:?}");
+        for hidden in ["header-value", "secret-body", "pw", "key=q"] {
+            assert!(!rendered.contains(hidden), "{hidden}: {rendered}");
+        }
+        assert!(rendered.contains("x-trace") && rendered.contains("body_len: 11"));
     }
 }

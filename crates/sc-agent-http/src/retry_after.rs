@@ -2,32 +2,29 @@
 //!
 //! Valid is 1 to 32 bytes of ASCII digits with an optional `.` and ASCII-digit
 //! fraction. Anything else (an HTTP-date, a sign, an exponent, `inf`, `NaN`,
-//! empty, longer than 32 bytes) is malformed and gives `None`. No floating
-//! point is involved: the integer part saturates and only the first nine
-//! fraction digits count toward the wait.
+//! empty, longer than 32 bytes) is malformed and gives `None`. The wait uses
+//! no floating point: the integer part saturates and only the first nine
+//! fraction digits count toward it.
 //!
-//! - [`RetryAfter::wait`] is what the retry loop honours: clamped to 0-30 s.
-//! - [`RetryAfter::report_seconds`] is what an error reports: whole seconds,
-//!   a fraction rounded up, capped at one day, so a long provider wait is not
-//!   shown as the 30 s clamp.
+//! - [`RetryAfter::wait`] is the provider's wait, clamped to 0-30 s (the
+//!   resend schedule adds its floor and jitter, REQ-SAG-0012).
+//! - [`RetryAfter::seconds`] is what an error reports: the value as sent,
+//!   unrounded (REQ-SAG-0007).
 
 use std::time::Duration;
 
 /// Upper clamp of an honoured `Retry-After`.
 pub(crate) const WAIT_MAX: Duration = Duration::from_secs(30);
 
-/// Largest value an error reports, in seconds (one day).
-pub(crate) const REPORT_MAX_SECONDS: u64 = 86_400;
-
 /// Longest valid `Retry-After` value, in bytes.
 const MAX_LEN: usize = 32;
 
 /// A parsed, valid `Retry-After` value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryAfter {
     seconds: u64,
     nanos: u32,
-    fraction_is_nonzero: bool,
+    exact: f64,
 }
 
 impl RetryAfter {
@@ -56,11 +53,12 @@ impl RetryAfter {
                 .take(9)
                 .fold(0_u32, |acc, byte| acc * 10 + u32::from(byte - b'0'))
         });
-        let fraction_is_nonzero = fraction.is_some_and(|part| part.bytes().any(|b| b != b'0'));
+        // Digits with an optional digit fraction always parse as an f64.
+        let exact = text.parse::<f64>().ok()?;
         Some(Self {
             seconds,
             nanos,
-            fraction_is_nonzero,
+            exact,
         })
     }
 
@@ -72,10 +70,22 @@ impl RetryAfter {
         Duration::new(self.seconds, self.nanos).min(WAIT_MAX)
     }
 
-    /// Whole seconds to report: a fraction rounds up, capped at one day.
-    pub(crate) fn report_seconds(self) -> u64 {
-        self.seconds
-            .saturating_add(u64::from(self.fraction_is_nonzero))
-            .min(REPORT_MAX_SECONDS)
+    /// The value as sent, in seconds, unrounded and unclamped (REQ-SAG-0007).
+    pub(crate) fn seconds(self) -> f64 {
+        self.exact
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seconds_are_unrounded_and_unclamped() {
+        let seconds = |text: &str| RetryAfter::parse(Some(text)).map(RetryAfter::seconds);
+        assert_eq!(seconds("2.5"), Some(2.5));
+        assert_eq!(seconds("0.001"), Some(0.001));
+        assert_eq!(seconds("120"), Some(120.0));
+        assert_eq!(seconds("abc"), None);
     }
 }
