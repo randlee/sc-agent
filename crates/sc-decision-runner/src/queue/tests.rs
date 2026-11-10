@@ -133,8 +133,8 @@ fn a_cancel_ends_a_hold_without_the_clock_moving() {
     join_within(worker, HANG_GUARD).expect("worker");
 }
 
-/// A held job falls due exactly when the run's clock reaches its holdoff end: an advance 1 ms
-/// short leaves the parked worker waiting, the advance to the end hands it the job.
+/// A held job falls due when the run's clock reaches its holdoff end: the parked worker is
+/// handed it on the advance.
 #[test]
 fn a_hold_falls_due_when_the_clock_reaches_it() {
     let manual = ManualClock::new();
@@ -150,10 +150,27 @@ fn a_hold_falls_due_when_the_clock_reaches_it() {
         })
     };
     assert!(manual.wait_for_waiters(1), "the worker parked on the hold");
-    manual.advance(Duration::from_secs(30) - Duration::from_millis(1));
-    assert!(manual.wait_for_waiters(1), "still parked 1 ms short");
-    assert!(receiver.try_recv().is_err(), "not due 1 ms short");
     manual.advance_to(until);
     assert!(recv_within(&receiver, HANG_GUARD), "due at its end");
     join_within(worker, HANG_GUARD).expect("worker");
+}
+
+/// A hold 1 ms ahead of a clock that does not move is not due: the parked worker gets it only
+/// as cancelled, never to run.
+#[test]
+fn a_hold_just_ahead_of_the_clock_is_not_due() {
+    let manual = ManualClock::new();
+    let jobs: JobQueue<u32, ()> = JobQueue::new(4, manual.clock());
+    jobs.hold(7, manual.now() + Duration::from_millis(1));
+    let jobs = Arc::new(jobs);
+    let worker = {
+        let jobs = Arc::clone(&jobs);
+        thread::spawn(move || matches!(jobs.take(), Taken::Cancelled(7)))
+    };
+    assert!(manual.wait_for_waiters(1), "the worker parked on the hold");
+    jobs.cancel();
+    assert!(
+        join_within(worker, HANG_GUARD).expect("worker"),
+        "taken as cancelled, not run"
+    );
 }

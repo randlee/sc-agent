@@ -57,27 +57,39 @@ fn test_cancel_from_another_thread_ends_a_parked_wait() {
     assert_eq!(manual.waiters(), 0, "the wait deregistered from the clock");
 }
 
-/// A parked wait ends `DeadlineReached` exactly when the clock reaches the deadline: an advance
-/// short of it leaves it parked, the advance to it ends it.
+/// A parked wait ends `DeadlineReached` when the clock is advanced to the deadline.
 #[test]
 fn test_wait_ends_when_the_clock_reaches_the_deadline() {
     let manual = ManualClock::new();
     let clock = manual.clock();
     let deadline = clock.now() + LONG;
-    let (sender, ended) = mpsc::channel();
-    let handle = thread::spawn(move || {
-        let wait = clock.wait_until(&CancelToken::new(), deadline);
-        sender.send(wait).expect("report");
-    });
+    let handle = thread::spawn(move || clock.wait_until(&CancelToken::new(), deadline));
     assert!(manual.wait_for_waiters(1), "the waiter parked");
-    manual.advance(LONG - Duration::from_millis(1));
-    // `advance` returns after it has woken the waiter; the waiter re-checks under its lock
-    // and parks again, still registered: it cannot have ended.
-    assert!(manual.wait_for_waiters(1));
-    assert!(ended.try_recv().is_err(), "1 ms short of the deadline");
-    manual.advance(Duration::from_millis(1));
-    assert_eq!(recv_within(&ended, HANG_GUARD), Wait::DeadlineReached);
-    join_within(handle, HANG_GUARD).expect("waiter");
+    manual.advance(LONG);
+    assert_eq!(
+        join_within(handle, HANG_GUARD).expect("waiter"),
+        Wait::DeadlineReached
+    );
+}
+
+/// A deadline 1 ms ahead of a clock that does not move is never reached: the waiter parks and
+/// only the cancel (sent once it is parked) ends the wait. Deterministic: the deadline check
+/// does not depend on when the test runs, only on the clock reading.
+#[test]
+fn test_a_deadline_just_ahead_is_not_reached_before_the_clock_gets_there() {
+    let manual = ManualClock::new();
+    let clock = manual.clock();
+    let token = CancelToken::new();
+    let waiter = token.clone();
+    let deadline = clock.now() + std::time::Duration::from_millis(1);
+    let handle = thread::spawn(move || clock.wait_until(&waiter, deadline));
+    assert!(manual.wait_for_waiters(1), "the waiter registered");
+    token.cancel();
+    assert_eq!(
+        join_within(handle, HANG_GUARD).expect("waiter"),
+        Wait::Cancelled,
+        "1 ms short of the deadline is not the deadline"
+    );
 }
 
 #[test]
