@@ -456,3 +456,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); each decision is r
 7. Hardening round 1 (2026-11-09): the tsq binary, its copy rows, tests and acceptance moved here from A-10 (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); `cli` is a non-default feature; this sprint is the single owner of crates/sc-treesitter/Cargo.toml; must_follow A-1 (workspace root, PLAN-CRIT-004).
 Round 2 (2026-11-09): ADR-SAG-0005 cited; PositionOverflow deleted (18 variants), impossible slice skipped (RBP-F006); C#/Go outside phase A (REQ-QA-008); tsq needs no signal handling (REQ-SAG-0011).
 No open questions.
+
+Dev round 1 corrections (2026-11-10, from the a-3 developer; code at 94f8039 is right, doc follows): (1) section 7 test 8 id pattern is `^treesitter\.[a-z][a-z0-9_]*$` (treesitter.not_utf8 has a digit); (2) section 3b general_log returns `sc_observability::v2::Logger` (the v1 Logger is deprecated in 1.5.0 and fails -D warnings); (3) section 3a: sc-treesitter-py has build.rs + build-dependency `pyo3-build-config = "=0.29.2"` calling add_extension_module_link_args() so plain cargo links on macOS.
