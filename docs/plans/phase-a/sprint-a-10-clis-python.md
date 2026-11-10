@@ -30,7 +30,7 @@ sprint:
       artifact: sc_decision_runner::{DecisionRunner, RunnerConfig, RunnerError}
       trigger: dev-push
   requirements: [NFR-SAG-0001, REQ-SAG-0201, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0011, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0014, REQ-SAG-0015, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0501, REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0701, REQ-SAG-0801, REQ-SAG-0901]
-  adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
+  adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004, ADR-SAG-0005]  # 0005: pattern reference for the sc-agent-py packaging (separate PyO3 crate)
   does_not_close:
     - "Discovery is a library capability of sc-decision-local; no decide or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
     - "tsq and REQ-SAG-0303: Sprint A-3."
@@ -359,7 +359,7 @@ pub enum DecideError {
 impl ErrorId for DecideError {}   // recovery(): Some(..) for NoProviderKey; the wrapped errors carry their own
 ```
 
-21 variants (round 2: `LineTooLong` folded into `LimitExceeded`; `ImageRead`, `ImageFormat` and `Signal` added). A decision that fails inside `decide`/`decide_stream` is not a `DecideError`: it is the `DecisionError` inside that `DecisionResult`, printed in its `ResultLine.error`.
+22 variants (QA-1: `UnknownRunner` (decide.unknown_runner) added for `models --runner NAME`; Log, Local, Decision, Runner and RequestInvalid.source are boxed for clippy result_large_err, the wrapped error unchanged; round 2: `LineTooLong` folded into `LimitExceeded`; `ImageRead`, `ImageFormat` and `Signal` added). A decision that fails inside `decide`/`decide_stream` is not a `DecideError`: it is the `DecisionError` inside that `DecisionResult`, printed in its `ResultLine.error`.
 
 ## 5. Cargo.toml (decide, new)
 
@@ -488,7 +488,7 @@ decide (`crates/decide`):
 26. Limits: a 9 MiB single request, a 10,001-line batch, a line past 8 MiB, a 21 MiB image, 21 images -> `decide.limit_exceeded` / `decide.request_invalid` (cause `decision.limits`) naming the limit; nothing sent (AC: REQ-SAG-0014).
 27. Unit: `on_interrupt` during a `send_batch` over a `BlockingTransport` cancels the token; every unfinished result is `decision.cancelled` and the session rows are flushed (MemoryLog has one row per started request). Process (Unix CI): a `decide send --batch` child against a loopback runner that never answers, sent SIGINT and, in a second run, SIGTERM (`kill -INT` / `kill -TERM`): every line printed is `decision.cancelled`, the rows are in sessions.jsonl, exit code 130 both times (AC: REQ-SAG-0011 decide).
 30. Local runner load (REQ-SAG-0015): a scripted local daemon (ScriptedTransport via the Context) answers the load probe not-loaded twice, then loaded; `send --model laya` makes the probes, then one send, and the send's deadline (recorded by the transport) is the runner's request timeout measured from after the load, not from the first probe; a runner entry with `request_timeout: 300`/`load_timeout: 600` defaults applies when absent. Cancelling the token while the probe transport blocks (BlockingTransport) ends the wait at once with `decision.cancelled` and no send (AC: REQ-SAG-0015).
-28a. Workspace check: in every crate except sc-decision-schema, no type maps the Jev API (no `SystemOneRequest`/`SystemOneResponse`/`Question`/`Asset`/`ModelMetadata`-shaped struct deriving serde with Jev field names: `rg -n 'struct (SystemOne|Question|Asset|ModelMetadata|NoulCriteria)' crates/ -g '!crates/sc-decision-schema/**'` finds nothing); provider usage types in sc-llm-provider map provider wire fields and are excluded (AC: REQ-SAG-0201 AC2).
+28a. Workspace check: in every crate except sc-decision-schema, no type maps the Jev API (no `SystemOneRequest`/`SystemOneResponse`/`Question`/`Asset`/`ModelMetadata`-shaped struct deriving serde with Jev field names: `rg -n 'struct (SystemOne|Question|Asset|ModelMetadata|NoulCriteria)' crates/ -g '!crates/sc-decision-schema/**'` finds nothing); provider usage types in sc-llm-provider map provider wire fields and are excluded (AC: REQ-SAG-0201 AC2). QA-1: the literal rg also matches SystemOneBackend (no serde derive, maps no Jev field), so the check is a test that finds no serde-derived struct with a Jev type name outside sc-decision-schema (crates/decide/tests/workspace.rs).
 28. Workspace searches: `rg -n 'Uuid|uuid::|uuid =' crates/` and `rg -n 'round\(|\{:\.[0-9]+\}' crates/ -g '*.rs'` (outside tests) find nothing (AC: REQ-SAG-0001 AC2, REQ-SAG-0007).
 
 sc-agent-py (Rust unit tests in `src/lib.rs`):
@@ -570,3 +570,4 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 Also: a bad batch line stops decide before any send (owner 'fail fast on first', REQ-SAG-0504); each CLI writes its own general log (REQ-SAG-0003).
 Hardening round 1 (2026-11-09): tsq (binary, copy rows, tests, REQ-SAG-0303) moved to A-3 and the A-3 dependency was dropped (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); injection seams in SendOptions/ModelsOptions/DoctorOptions (PLAN-CRIT-006); send vs send_batch dispatch (CRIT-M3); this sprint owns the end-to-end REQ criteria the boundary sprints list in does_not_close.
 Round 2 (2026-11-09): ADR-SAG-0004 amendment approved by the owner (open-question lines removed, ARCH-002); ADR-SAG-0002 added; images/long-context input, REQ-SAG-0101/0102/0602/0001 AC2/0007/0004 AC3/0801 tests, Context seams, Python logger callables, signals (REQ-SAG-0011), REQ-SAG-0012/0013/0014 end to end, typed options (RBP-F010), cause -> cause_detail.
+- QA-1 (2026-11-10): a local model that fails to load surfaces as decide.decision (cause decision.backend -> local.*), not decide.local, because A-6 LocalBackend::wait_until_loaded returns DecisionError; the chain is unchanged (REQ-SAG-0002). decide.local stays for LocalError returned directly (e.g. discovery). SIGINT and SIGTERM both exit 130 (ctrlc does not report which signal fired; REQ-SAG-0011 only requires non-zero). ADR-SAG-0005 listed as the packaging pattern for sc-agent-py.

@@ -31,7 +31,7 @@ sprint:
     - sprint: a-4
       artifact: sc_agent_config::{AgentConfig, DEFAULT_WORKERS}
       trigger: dev-push
-  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0011, NFR-SAG-0001]
+  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0011, NFR-SAG-0001, REQ-SAG-0006]
   adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0701 end to end (a parallel batch through decide --batch and sc-agent-py, against real backends): a-10; a-9 closes it at the runner boundary with scripted transports"
@@ -81,7 +81,7 @@ Busy classification, quota, `Retry-After`, the schedule with jitter, max sends a
 // src/lib.rs
 #![forbid(unsafe_code)]
 mod config; mod error; mod pool; mod queue; mod row; mod runner;
-pub use config::RunnerConfig;
+pub use config::{RunnerConfig, MAX_WORKERS, JOBS_PER_WORKER};   // MAX_WORKERS = 64 (re-export of sc_agent_config), JOBS_PER_WORKER = 4
 pub use error::RunnerError;
 pub use runner::DecisionRunner;
 
@@ -89,14 +89,17 @@ pub use runner::DecisionRunner;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunnerConfig {
     /// Worker threads (REQ-SAG-0701; AgentConfig.workers, default 8).
-    pub workers: NonZeroUsize,
+    workers: NonZeroUsize,          // private; accessor workers()
     /// Most jobs in the runner at once (queued + held + running); the feeder blocks past it. 4 x workers, a constant, not a config key (assistant decision).
-    pub queue_capacity: NonZeroUsize,
+    queue_capacity: NonZeroUsize,   // private; accessor queue_capacity() = 4 x workers (at most 256)
 }
 impl RunnerConfig {
     /// workers from AgentConfig.workers (1..=64, checked at config load, REQ-SAG-0013);
     /// queue_capacity = workers.checked_mul(FOUR) — never None for workers <= 64; `.unwrap_or(NonZeroUsize::MAX)` keeps it total without a panic path.
-    pub fn from_config(config: &sc_agent_config::AgentConfig) -> Self;
+    pub fn new(workers: usize) -> Result<Self, RunnerError>;   // 1..=64, else RunnerError::InvalidConfig (runner.invalid_config)
+    pub fn from_config(config: &sc_agent_config::AgentConfig) -> Result<Self, RunnerError>;
+    pub fn workers(&self) -> NonZeroUsize;
+    pub fn queue_capacity(&self) -> NonZeroUsize;
 }
 impl Default for RunnerConfig { /* workers sc_agent_config::DEFAULT_WORKERS (8), queue_capacity 32 */ }
 
@@ -125,7 +128,7 @@ impl Decision for DecisionRunner {
 }
 
 // crate-private
-pub(crate) enum Step<J, A> { Done(A), HoldOff { until: Instant, job: J } }   // a schema resend is HoldOff { until: now }
+pub(crate) enum Step<J, A> { Done(A), HoldOff { until: Instant, job: J }, Discarded }   // Discarded: win() returned None after a cancelled in-flight send; nothing written   // a schema resend is HoldOff { until: now }
 pub(crate) struct JobQueue<J> { state: Mutex<JobState<J>>, changed: Condvar, capacity: usize }
 struct JobState<J> { ready: VecDeque<J>, held: BinaryHeap<Held<J>>, running: usize, in_flight: Vec<InFlight>, orphans: Vec<InFlight>, closed: bool, cancelled: bool, seq: u64 }
 struct InFlight { key: u64, session_id: SessionId, position: u64, model: String, digests: OrderedMap<String, QuestionDigest>, sends: u32 /* sends including this one, taken from SendState before the permit */, claim: Arc<Claim> }
@@ -134,9 +137,11 @@ impl Claim { fn win(&self) -> Option<Finish>; }      // compare_exchange(false, 
 /// Proof that this caller alone finishes the request. Not Clone, not Copy; only Claim::win makes one.
 struct Finish(PhantomData<Claim>);
 /// Proof that the one row was written (or its failure logged). Not Clone, not Copy.
-struct RowWritten(PhantomData<Finish>);
+struct RowWritten(());   // Finish(()) likewise; finish() is the only place a token is paired with a result
 fn write_row(session: &SessionLogger, general: &GeneralLogger, proof: Finish, row: Row) -> RowWritten;   // worker path: write; cancel/orphan/abandon paths: try_write (never blocks)
-// result push: BoundedQueue<DecisionResult>::push(&self, proof: RowWritten, result: DecisionResult) (blocks while full)
+// result queue: BoundedQueue<Finished>; Finished::new(RowWritten, DecisionResult) is the only constructor (blocks while full)
+// pool: crate-private trait Work { run, receipt, skipped, stopped } instead of RunFn/SkipFn closures; Taken::Finished { cancelled } decided under the JobQueue lock; Tally { sends, schema_resends }
+// general log: runner.stream.start {run_id, workers, queue_capacity}, runner.stream.end {run_id, live_threads, abandoned, dropped}, runner.worker.stopped {run_id, worker, reason}
 struct Held<J> { until: Instant, seq: u64, job: J }       // Ord: earliest `until`, then `seq`
 pub(crate) enum Taken<J> { Run(J), Cancelled(J), Finished }
 impl<J> JobQueue<J> {
