@@ -223,4 +223,67 @@ mod tests {
         );
         assert_eq!(error.cause_detail(), Some(source.detail()));
     }
+
+    /// Every variant once. The exhaustive match below fails to compile when a variant is
+    /// added or removed, so the count asserted is the real one.
+    fn every() -> Vec<LlmError> {
+        let provider = LlmProvider::Anthropic;
+        let reply = || {
+            Box::new(sc_agent_http::ProviderReply::read(
+                &sc_agent_http::HttpResponse::new(401, vec![], b"no".to_vec()),
+                None,
+            ))
+        };
+        let all = vec![
+            LlmError::Http {
+                provider,
+                source: sc_agent_http::HttpError::network(
+                    sc_agent_http::NetworkKind::Connect,
+                    1,
+                    "refused",
+                ),
+            },
+            LlmError::ApiStatus {
+                provider,
+                reply: reply(),
+            },
+            LlmError::ReplyInvalid {
+                provider,
+                message: "m".into(),
+            },
+            LlmError::NoText { provider },
+            LlmError::Truncated {
+                provider,
+                stop_reason: "max_tokens".into(),
+            },
+            LlmError::Refused {
+                provider,
+                message: "m".into(),
+            },
+            LlmError::OutputNotJson {
+                provider,
+                message: "m".into(),
+            },
+        ];
+        for error in &all {
+            match error {
+                LlmError::Http { .. }
+                | LlmError::ApiStatus { .. }
+                | LlmError::ReplyInvalid { .. }
+                | LlmError::NoText { .. }
+                | LlmError::Truncated { .. }
+                | LlmError::Refused { .. }
+                | LlmError::OutputNotJson { .. } => {}
+            }
+        }
+        all
+    }
+
+    /// a-7 REQ-SAG-0002: exactly 7 distinct `llm.*` ids.
+    #[test]
+    fn there_are_seven_llm_ids() {
+        let ids: std::collections::BTreeSet<&str> = every().iter().map(ErrorId::id).collect();
+        assert_eq!(ids.len(), 7, "{ids:?}");
+        assert!(ids.iter().all(|id| id.starts_with("llm.")), "{ids:?}");
+    }
 }

@@ -105,6 +105,62 @@ mod tests {
         );
     }
 
+    /// The ids of an ErrorDetail chain, top first.
+    fn chain(detail: sc_agent_types::ErrorDetail) -> Vec<(String, String)> {
+        let mut levels = Vec::new();
+        let mut level = Some(Box::new(detail));
+        while let Some(current) = level {
+            levels.push((current.id.clone(), current.message.clone()));
+            level = current.cause;
+        }
+        levels
+    }
+
+    /// a-7 AC13 (REQ-SAG-0002), the production chain: an LLM send that fails in the
+    /// transport goes through `LlmDecisionBackend` and the real `DecisionRunner`, which wraps
+    /// it as `DecisionError::Http`; the result shows `decision.http` -> `http.network` with
+    /// the transport's message. A provider 401 is decoded by the LLM backend:
+    /// `decision.backend` -> `decision_llm.llm` -> `llm.api_status` with the provider's text.
+    #[test]
+    fn an_llm_failure_reaches_the_result_with_its_whole_chain() {
+        let transport = ScriptedTransport::new(vec![
+            Err(sc_agent_http::HttpError::network(
+                sc_agent_http::NetworkKind::Connect,
+                1,
+                "connection refused by the llm test",
+            )),
+            Ok(json_response(
+                401,
+                r#"{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"#,
+            )),
+        ]);
+        let log = MemoryLog::new().expect("log");
+        let dir = empty_config_dir();
+        let ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY)],
+            Arc::new(transport),
+            &log,
+        );
+        let options = options("haiku", None, ctx, &log);
+        let network = send(&options, request(NOUL), &CancelToken::new()).expect("send");
+        let levels = chain(network.outcome.expect_err("network").detail());
+        assert_eq!(levels[0].0, "decision.http");
+        assert_eq!(levels[1].0, "http.network");
+        assert!(
+            levels[1].1.contains("connection refused by the llm test"),
+            "{levels:?}"
+        );
+        let refused = send(&options, request(NOUL), &CancelToken::new()).expect("send");
+        let levels = chain(refused.outcome.expect_err("401").detail());
+        let ids: Vec<&str> = levels.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["decision.backend", "decision_llm.llm", "llm.api_status"]
+        );
+        assert!(levels[2].1.contains("invalid x-api-key"), "{levels:?}");
+    }
+
     /// AC: REQ-SAG-0602. An Anthropic 429 with the quota body ends with
     /// `http.quota_exhausted` after one send, with the remote message and its recovery.
     #[test]

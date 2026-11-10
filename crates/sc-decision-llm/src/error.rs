@@ -190,3 +190,51 @@ impl Error for DecisionLlmError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// a-7 REQ-SAG-0002: exactly 6 distinct `decision_llm.*` ids; the exhaustive match fails
+    /// to compile when a variant is added or removed.
+    #[test]
+    fn there_are_six_decision_llm_ids() {
+        let all = [
+            DecisionLlmError::Llm(LlmError::NoText {
+                provider: sc_llm_provider::LlmProvider::OpenAi,
+            }),
+            DecisionLlmError::Encode {
+                message: "m".into(),
+            },
+            DecisionLlmError::AnswerIds {
+                missing: vec!["q".into()],
+                extra: Vec::new(),
+                extra_count: 0,
+            },
+            DecisionLlmError::AnswerInvalid {
+                question: "q".into(),
+                message: "m".into(),
+            },
+            DecisionLlmError::InvalidMaxTokens { max_tokens: 0 },
+            DecisionLlmError::Invariant {
+                message: "m".into(),
+            },
+        ];
+        for error in &all {
+            match error {
+                DecisionLlmError::Llm(_)
+                | DecisionLlmError::Encode { .. }
+                | DecisionLlmError::AnswerIds { .. }
+                | DecisionLlmError::AnswerInvalid { .. }
+                | DecisionLlmError::InvalidMaxTokens { .. }
+                | DecisionLlmError::Invariant { .. } => {}
+            }
+        }
+        let ids: std::collections::BTreeSet<&str> = all.iter().map(ErrorId::id).collect();
+        assert_eq!(ids.len(), 6, "{ids:?}");
+        assert!(
+            ids.iter().all(|id| id.starts_with("decision_llm.")),
+            "{ids:?}"
+        );
+    }
+}
