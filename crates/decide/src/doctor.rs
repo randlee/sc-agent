@@ -115,9 +115,10 @@ fn examine(
     let catalog = config.catalog().map_err(DecideError::from)?;
     let found = detected_keys(context)?;
     let http = probe_client(context, config, general);
+    let clock = context.clock();
     let mut missing = Vec::new();
     for (provider, key) in &found {
-        for model in provider_models(*provider, key.clone(), &http, general, cancel)? {
+        for model in provider_models(*provider, key.clone(), &http, &clock, general, cancel)? {
             if catalog.line_of(model.catalog.as_str()).is_none() {
                 missing.push(MissingModel {
                     provider: *provider,
@@ -150,6 +151,7 @@ fn provider_models(
     provider: Provider,
     key: ResolvedKey,
     http: &sc_agent_http::HttpClient,
+    clock: &sc_agent_types::Clock,
     general: &GeneralLogger,
     cancel: &CancelToken,
 ) -> Result<Vec<Listed>, DecideError> {
@@ -157,7 +159,7 @@ fn provider_models(
         None => {
             let backend = typesafe_backend(key)?;
             let request = backend.models_request().map_err(DecideError::from)?;
-            let response = probe(http, &request, cancel)?;
+            let response = probe(http, &request, clock, cancel)?;
             let list = backend.decode_models(response).map_err(DecideError::from)?;
             Ok(list
                 .models
@@ -173,7 +175,7 @@ fn provider_models(
                 .map_err(DecideError::from)?
                 .with_log(general.clone());
             let request = client.models_request().map_err(DecideError::from)?;
-            let response = probe(http, &request, cancel)?;
+            let response = probe(http, &request, clock, cancel)?;
             let ids = client.decode_models(response).map_err(DecideError::from)?;
             Ok(ids
                 .into_iter()

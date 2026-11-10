@@ -1,5 +1,7 @@
 //! REQ-SAG-0601 / REQ-SAG-0602 / REQ-SAG-0012 acceptance over a scripted
-//! transport and an explicit clock. No sleep, no network.
+//! transport and an explicit clock. No sleep, no network, no real time: every
+//! instant is a ManualClock reading, and the holdoff jitter is fixed (zero
+//! unless a test names an edge of its range), so each holdoff is exact.
 
 /// Clippy treats only `#[test]` functions and `#[cfg(test)]` items as test
 /// code (where clippy.toml allows unwrap, expect, panic and indexing); the
@@ -13,7 +15,7 @@ mod cases {
 
     use sc_agent_http::testing::{ManualClock, ScriptedTransport};
     use sc_agent_http::{
-        Attempts, BusyReason, Endpoint, HttpClient, HttpError, HttpRequest, HttpResponse,
+        Attempts, BusyReason, Endpoint, HttpClient, HttpError, HttpRequest, HttpResponse, Jitter,
         LogContext, Method, NetworkKind, Next, ResendPolicy, SecretHeader, Start,
     };
     use sc_agent_log::testing::MemoryLog;
@@ -90,9 +92,14 @@ mod cases {
         ResendPolicy::new(NonZeroU32::new(max_sends).expect("nonzero"))
     }
 
+    /// A client with no holdoff jitter, so every holdoff is exact.
     fn client(transport: &ScriptedTransport, policy: ResendPolicy) -> HttpClient {
+        jittered(transport, policy, Jitter::fixed(Duration::ZERO))
+    }
+
+    fn jittered(transport: &ScriptedTransport, policy: ResendPolicy, jitter: Jitter) -> HttpClient {
         let memory = MemoryLog::new().expect("memory log");
-        HttpClient::new(Arc::new(transport.clone()), policy, memory.general())
+        HttpClient::new(Arc::new(transport.clone()), policy, memory.general()).with_jitter(jitter)
     }
 
     fn advance_to(clock: &ManualClock, at: Instant) {
@@ -109,7 +116,7 @@ mod cases {
         request: &HttpRequest,
         clock: &ManualClock,
     ) -> (Result<(HttpResponse, Attempts), HttpError>, Vec<Duration>) {
-        let now = || clock.now();
+        let now = clock.clock();
         let mut holdoffs = Vec::new();
         let mut start = client
             .may_start(request, Attempts::new(), clock.now())
@@ -151,26 +158,25 @@ mod cases {
         }
     }
 
-    /// The holdoff `send_once` returns for one busy `response` at a fixed clock.
+    /// The holdoff `send_once` returns for one busy `response` at a fixed clock, with no
+    /// jitter.
     fn first_holdoff(response: HttpResponse) -> Duration {
+        first_holdoff_with(response, Jitter::fixed(Duration::ZERO))
+    }
+
+    /// [`first_holdoff`] with `jitter`.
+    fn first_holdoff_with(response: HttpResponse, jitter: Jitter) -> Duration {
         let transport = ScriptedTransport::responses(vec![response]);
-        let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let client = jittered(&transport, ResendPolicy::default(), jitter);
+        let clock = ManualClock::new();
         let request = request();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now()) else {
             panic!("fresh request");
         };
-        match client.send_once(&request, permit, LogContext::NONE, &|| clock.now()) {
+        match client.send_once(&request, permit, LogContext::NONE, &clock.clock()) {
             Ok(Next::ResendAt { at, .. }) => at - clock.now(),
             other => panic!("expected ResendAt: {other:?}"),
         }
-    }
-
-    fn assert_between(holdoff: Duration, low: f64, high: f64) {
-        assert!(
-            holdoff >= secs(low) && holdoff <= secs(high),
-            "{holdoff:?} not in {low}..={high} s"
-        );
     }
 
     // A5-02
@@ -181,7 +187,7 @@ mod cases {
             .to_vec();
         let transport = ScriptedTransport::responses(replies);
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let (result, holdoffs) = drive(&client, &request(), &clock);
         match result {
             Err(HttpError::ProviderBusy {
@@ -203,7 +209,7 @@ mod cases {
             let transport =
                 ScriptedTransport::responses((0..10).map(|_| busy(529, None)).collect());
             let client = client(&transport, policy(max));
-            let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+            let (result, _) = drive(&client, &request(), &ManualClock::new());
             assert!(
                 matches!(result, Err(HttpError::ProviderBusy { reason: BusyReason::Sends, attempts, .. }) if attempts == max),
                 "{max}: {result:?}"
@@ -212,20 +218,24 @@ mod cases {
         }
     }
 
-    // A5-03
+    // A5-03: the Retry-After holdoff plus jitter, at both edges of the jitter range
+    // (none, and the 250 ms maximum), each once.
     #[test]
     fn retry_after_jittered() {
-        for _ in 0..16 {
-            assert_between(first_holdoff(busy(429, Some("3"))), 3.0, 3.25);
-        }
-        assert_between(first_holdoff(busy(429, Some("2.5"))), 2.5, 2.75);
+        let none = Jitter::fixed(Duration::ZERO);
+        let most = Jitter::fixed(Duration::from_millis(250));
+        assert_eq!(first_holdoff_with(busy(429, Some("3")), none), secs(3.0));
+        assert_eq!(first_holdoff_with(busy(429, Some("3")), most), secs(3.25));
+        assert_eq!(first_holdoff_with(busy(429, Some("2.5")), none), secs(2.5));
+        assert_eq!(first_holdoff_with(busy(429, Some("2.5")), most), secs(2.75));
+        assert_eq!(most.max(), Duration::from_millis(250));
     }
 
     // A5-03
     #[test]
     fn retry_after_capped() {
         for value in ["99", "30", &"9".repeat(32)] {
-            assert_between(first_holdoff(busy(502, Some(value))), 30.0, 30.25);
+            assert_eq!(first_holdoff(busy(502, Some(value))), secs(30.0));
         }
     }
 
@@ -233,7 +243,7 @@ mod cases {
     #[test]
     fn retry_after_zero_floored() {
         for value in ["0", "0.1", "0.0"] {
-            assert_between(first_holdoff(busy(429, Some(value))), 0.25, 0.5);
+            assert_eq!(first_holdoff(busy(429, Some(value))), secs(0.25));
         }
     }
 
@@ -255,20 +265,16 @@ mod cases {
                 ok(),
             ]);
             let client = client(&transport, ResendPolicy::default());
-            let (result, holdoffs) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+            let (result, holdoffs) = drive(&client, &request(), &ManualClock::new());
             assert!(result.is_ok(), "{header:?}: {result:?}");
             assert_eq!(holdoffs.len(), 4);
-            for (holdoff, base) in holdoffs.iter().zip([1.0, 2.0, 4.0, 8.0]) {
-                assert_between(*holdoff, base, base + 0.25);
-            }
+            assert_eq!(holdoffs, [1.0, 2.0, 4.0, 8.0].map(secs));
         }
         // Doubling continues to the 30 s cap.
         let transport = ScriptedTransport::responses((0..7).map(|_| busy(529, None)).collect());
         let client = client(&transport, policy(7));
-        let (_, holdoffs) = drive(&client, &request(), &ManualClock::new(Instant::now()));
-        let whole: Vec<u64> = holdoffs.iter().map(Duration::as_secs).collect();
-        assert_eq!(whole, [1, 2, 4, 8, 16, 30]);
-        assert_between(holdoffs[5], 30.0, 30.25);
+        let (_, holdoffs) = drive(&client, &request(), &ManualClock::new());
+        assert_eq!(holdoffs, [1.0, 2.0, 4.0, 8.0, 16.0, 30.0].map(secs));
     }
 
     // A5-04: the 90 s start budget refuses the next resend.
@@ -277,7 +283,7 @@ mod cases {
         let transport =
             ScriptedTransport::responses((0..10).map(|_| busy(429, Some("30"))).collect());
         let client = client(&transport, policy(10));
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let start = clock.now();
         let (result, _) = drive(&client, &request(), &clock);
         match result {
@@ -302,7 +308,7 @@ mod cases {
         // Sends: max_sends 1 used by the first send.
         let transport = ScriptedTransport::responses(vec![ok(), ok()]);
         let client = client(&transport, policy(1));
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let (result, _) = drive(&client, &request, &clock);
         let (_, attempts) = result.expect("200");
         assert_eq!(attempts.sends(), 1);
@@ -331,7 +337,7 @@ mod cases {
         let transport =
             ScriptedTransport::responses(vec![busy(429, Some("1.5")), busy(429, Some("2.25"))]);
         let client = client(&transport, policy(2));
-        let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+        let (result, _) = drive(&client, &request(), &ManualClock::new());
         match result {
             Err(HttpError::ProviderBusy {
                 retry_after_seconds,
@@ -356,7 +362,7 @@ mod cases {
         ]);
         let client = client(&transport, ResendPolicy::default());
         let request = request();
-        let (result, _) = drive(&client, &request, &ManualClock::new(Instant::now()));
+        let (result, _) = drive(&client, &request, &ManualClock::new());
         assert!(result.is_ok(), "{result:?}");
         let sent = transport.requests();
         assert_eq!(sent.len(), 4);
@@ -378,20 +384,18 @@ mod cases {
     fn holdoff_is_resend_at() {
         let transport = ScriptedTransport::responses(vec![busy(429, Some("30"))]);
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let before = clock.now();
         let request = request();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
-        let wall = Instant::now();
-        let next = client.send_once(&request, permit, LogContext::NONE, &|| clock.now());
-        // The call returned well inside the 30 s holdoff it reports.
-        assert!(wall.elapsed() < secs(30.0));
+        let next = client.send_once(&request, permit, LogContext::NONE, &clock.clock());
+        // send_once returned the holdoff without waiting it out: the clock did not move.
         assert_eq!(clock.now(), before);
         match next {
             Ok(Next::ResendAt { at, pending }) => {
-                assert!(at >= before + secs(30.0));
+                assert_eq!(at, before + secs(30.0));
                 assert_eq!(pending.attempts().sends(), 1);
             }
             other => panic!("{other:?}"),
@@ -403,7 +407,7 @@ mod cases {
     fn timeout_resent_under_max_sends() {
         let transport = ScriptedTransport::new((0..8).map(|_| Err(timeout())).collect());
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let (result, holdoffs) = drive(&client, &request(), &clock);
         match result {
             Err(HttpError::Network {
@@ -414,22 +418,25 @@ mod cases {
             other => panic!("expected timeout after 5 sends: {other:?}"),
         }
         assert_eq!(transport.sends(), 5);
-        // Resent after only 0-250 ms of jitter (RSH-003), and the host is not paused.
-        assert_eq!(holdoffs.len(), 4);
-        assert!(
-            holdoffs.iter().all(|holdoff| *holdoff <= secs(0.25)),
-            "{holdoffs:?}"
-        );
-        // The exact `ended + jitter()` is checked in resend.rs's unit tests
-        // (timeout_resend_adds_the_jitter) through a fixed-jitter seam.
+        // Resent after the jitter alone (RSH-003), none here, and the host is not paused.
+        assert_eq!(holdoffs, [Duration::ZERO; 4]);
         assert_eq!(client.pause().not_before("api.example.test"), None);
+        // At the other edge of the jitter range each timeout resend waits exactly 250 ms.
+        let transport = ScriptedTransport::new((0..8).map(|_| Err(timeout())).collect());
+        let most = jittered(
+            &transport,
+            ResendPolicy::default(),
+            Jitter::fixed(Duration::from_millis(250)),
+        );
+        let (_, holdoffs) = drive(&most, &request(), &ManualClock::new());
+        assert_eq!(holdoffs, [secs(0.25); 4]);
     }
 
     // A5-06: a 120 s timeout uses the budget; the request ends with the timeout
     // error, never provider_busy.
     #[test]
     fn timeout_then_budget_ends_with_timeout() {
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let transport = ScriptedTransport::new(vec![Err(timeout()), Ok(ok())])
             .with_send_duration(clock.clone(), Duration::from_secs(120));
         let client = client(&transport, ResendPolicy::default());
@@ -452,7 +459,7 @@ mod cases {
     fn default_timeouts_which_resend() {
         let defaults = sc_agent_http::Timeouts::default();
         for (per_send, sends) in [(defaults.connect, 5), (defaults.request, 1)] {
-            let clock = ManualClock::new(Instant::now());
+            let clock = ManualClock::new();
             let transport = ScriptedTransport::new((0..8).map(|_| Err(timeout())).collect())
                 .with_send_duration(clock.clone(), per_send);
             let client = client(&transport, ResendPolicy::default());
@@ -472,7 +479,7 @@ mod cases {
             let error = HttpError::network(kind, 1, "ureq.HostNotFound: host not found".to_owned());
             let transport = ScriptedTransport::new(vec![Err(error), Ok(ok())]);
             let client = client(&transport, ResendPolicy::default());
-            let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+            let (result, _) = drive(&client, &request(), &ManualClock::new());
             assert!(
                 matches!(result, Err(HttpError::Network { kind: got, attempts: 1, .. }) if got == kind),
                 "{kind:?}: {result:?}"
@@ -504,7 +511,7 @@ mod cases {
         ] {
             let transport = ScriptedTransport::responses(vec![response.clone(), ok()]);
             let client = client(&transport, ResendPolicy::default());
-            let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+            let (result, _) = drive(&client, &request(), &ManualClock::new());
             let (got, attempts) = result.expect("final reply");
             assert_eq!(
                 got, response,
@@ -520,7 +527,7 @@ mod cases {
     fn quota_429_is_final() {
         let transport = ScriptedTransport::responses(vec![reply(429, ANTHROPIC_SPEND_CAP), ok()]);
         let client = client(&transport, ResendPolicy::default());
-        let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+        let (result, _) = drive(&client, &request(), &ManualClock::new());
         match result {
             Err(HttpError::QuotaExhausted { attempts: 1, reply }) => {
                 assert_eq!(reply.status, 429);
@@ -538,7 +545,7 @@ mod cases {
     fn openai_quota_429_is_final() {
         let transport = ScriptedTransport::responses(vec![reply(429, OPENAI_QUOTA), ok()]);
         let client = client(&transport, ResendPolicy::default());
-        let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+        let (result, _) = drive(&client, &request(), &ManualClock::new());
         match result {
             Err(HttpError::QuotaExhausted { attempts: 1, reply }) => {
                 assert_eq!(reply.provider_code.as_deref(), Some("insufficient_quota"));
@@ -569,7 +576,7 @@ mod cases {
             let response = reply(status, r#"{"error":{"message":"m","type":"t"}}"#);
             let transport = ScriptedTransport::responses(vec![response.clone()]);
             let client = client(&transport, ResendPolicy::default());
-            let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
+            let (result, _) = drive(&client, &request(), &ManualClock::new());
             assert_eq!(result.map(|(got, _)| got).ok(), Some(response), "{status}");
             assert_eq!(transport.sends(), 1);
         }
@@ -580,13 +587,13 @@ mod cases {
     fn busy_pauses_host() {
         let transport = ScriptedTransport::responses(vec![busy(429, Some("5"))]);
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let first = request();
         let Ok(Start::Go(permit)) = client.may_start(&first, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
         let Ok(Next::ResendAt { pending, .. }) =
-            client.send_once(&first, permit, LogContext::NONE, &|| clock.now())
+            client.send_once(&first, permit, LogContext::NONE, &clock.clock())
         else {
             panic!("busy");
         };
@@ -594,7 +601,7 @@ mod cases {
             .pause()
             .not_before("api.example.test")
             .expect("host paused");
-        assert!(paused_until >= clock.now() + secs(5.0));
+        assert_eq!(paused_until, clock.now() + secs(5.0));
         // Another request to the same host waits until the pause ends.
         let other = request_to("https://api.example.test/v1/other");
         match client.may_start(&other, Attempts::new(), clock.now()) {
@@ -627,12 +634,12 @@ mod cases {
     fn pause_is_per_host() {
         let transport = ScriptedTransport::responses(vec![busy(529, Some("10"))]);
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let request = request();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
-        let _held = client.send_once(&request, permit, LogContext::NONE, &|| clock.now());
+        let _held = client.send_once(&request, permit, LogContext::NONE, &clock.clock());
         let elsewhere = request_to("https://api.other.test/v1/x");
         assert!(matches!(
             client.may_start(&elsewhere, Attempts::new(), clock.now()),
@@ -647,12 +654,12 @@ mod cases {
         let transport = ScriptedTransport::responses(vec![busy(502, None)]);
         let client = client(&transport, ResendPolicy::default());
         let twin = client.clone();
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let request = request();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
-        let _held = client.send_once(&request, permit, LogContext::NONE, &|| clock.now());
+        let _held = client.send_once(&request, permit, LogContext::NONE, &clock.clock());
         assert!(matches!(
             twin.may_start(&request, Attempts::new(), clock.now()),
             Ok(Start::Wait { .. })
@@ -666,7 +673,7 @@ mod cases {
     // A5-26: a load wait before the first send never counts toward the budget.
     #[test]
     fn budget_starts_at_first_send() {
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         clock.advance(Duration::from_secs(600));
         let transport = ScriptedTransport::responses(vec![busy(429, Some("1")), ok()]);
         let client = client(&transport, ResendPolicy::default());
@@ -674,7 +681,7 @@ mod cases {
         let (result, holdoffs) = drive(&client, &request, &clock);
         let (_, attempts) = result.expect("resent after the busy reply");
         assert_eq!(attempts.sends(), 2);
-        assert_between(holdoffs[0], 1.0, 1.25);
+        assert_eq!(holdoffs, [secs(1.0)]);
         assert!(
             transport
                 .requests()
@@ -689,7 +696,7 @@ mod cases {
     fn last_send_busy_pauses_host() {
         let transport = ScriptedTransport::responses(vec![busy(429, Some("5"))]);
         let client = client(&transport, policy(1));
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let (result, _) = drive(&client, &request(), &clock);
         assert!(
             matches!(
@@ -704,7 +711,7 @@ mod cases {
         );
         let other = request_to("https://api.example.test/v1/other");
         match client.may_start(&other, Attempts::new(), clock.now()) {
-            Ok(Start::Wait { at, .. }) => assert_between(at - clock.now(), 5.0, 5.25),
+            Ok(Start::Wait { at, .. }) => assert_eq!(at - clock.now(), secs(5.0)),
             other => panic!("expected Wait: {other:?}"),
         }
     }
@@ -715,7 +722,7 @@ mod cases {
         let transport =
             ScriptedTransport::responses((0..5).map(|_| busy(529, Some("7"))).collect());
         let client = client(&transport, ResendPolicy::default());
-        let clock = ManualClock::new(Instant::now());
+        let clock = ManualClock::new();
         let (result, _) = drive(&client, &request(), &clock);
         assert!(
             matches!(
@@ -733,7 +740,7 @@ mod cases {
             .pause()
             .not_before("api.example.test")
             .expect("paused after the fifth reply");
-        assert_between(paused - clock.now(), 7.0, 7.25);
+        assert_eq!(paused - clock.now(), secs(7.0));
     }
 
     // RSH-004: a zero or over-long deadline is refused before any send.
@@ -743,11 +750,12 @@ mod cases {
             let transport = ScriptedTransport::responses(vec![ok()]);
             let client = client(&transport, ResendPolicy::default());
             let request = request().with_deadline(deadline);
-            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+            let clock = ManualClock::new().clock();
+            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now())
             else {
                 panic!("fresh");
             };
-            let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+            let result = client.send_once(&request, permit, LogContext::NONE, &clock);
             assert!(
                 matches!(result, Err(HttpError::InvalidRequest { .. })),
                 "{deadline:?}: {result:?}"
@@ -764,11 +772,12 @@ mod cases {
             let transport = ScriptedTransport::responses(vec![ok()]);
             let client = client(&transport, ResendPolicy::default());
             let request = request().with_deadline(deadline);
-            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+            let clock = ManualClock::new().clock();
+            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now())
             else {
                 panic!("fresh");
             };
-            let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+            let result = client.send_once(&request, permit, LogContext::NONE, &clock);
             assert!(
                 matches!(result, Ok(Next::Done { .. })),
                 "{deadline:?}: {result:?}"
@@ -787,11 +796,11 @@ mod cases {
         let transport = ScriptedTransport::responses(vec![ok()]);
         let client = client(&transport, ResendPolicy::default());
         let request = request().with_deadline(Duration::from_secs(10_801));
-        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
-        else {
+        let clock = ManualClock::new().clock();
+        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
-        let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+        let result = client.send_once(&request, permit, LogContext::NONE, &clock);
         match result {
             Err(error) => assert_eq!(sc_agent_types::ErrorId::id(&error), "http.invalid_request"),
             other => panic!("{other:?}"),
@@ -819,19 +828,15 @@ mod cases {
             sc_agent_http::Endpoint::parse_local("http://127.0.0.1:9/never").expect("endpoint"),
             Vec::new(),
         );
+        let clock = ManualClock::new().clock();
         let start = client
-            .may_start(&request, sc_agent_http::Attempts::new(), Instant::now())
+            .may_start(&request, sc_agent_http::Attempts::new(), clock.now())
             .expect("admitted");
         let sc_agent_http::Start::Go(permit) = start else {
             panic!("an unpaused host starts at once");
         };
         let error = client
-            .send_once(
-                &request,
-                permit,
-                sc_agent_http::LogContext::NONE,
-                &Instant::now,
-            )
+            .send_once(&request, permit, sc_agent_http::LogContext::NONE, &clock)
             .expect_err("refused");
         assert_eq!(sc_agent_types::ErrorId::id(&error), "http.invalid_request");
         let actions: Vec<String> = memory

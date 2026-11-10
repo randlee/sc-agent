@@ -42,8 +42,13 @@ mod tests {
         let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
             let start = Instant::now();
-            let result =
-                backend.wait_until_loaded(&*transport, &cancel, load_timeout, LogContext::NONE);
+            let result = backend.wait_until_loaded(
+                &*transport,
+                &sc_agent_types::Clock::system(),
+                &cancel,
+                load_timeout,
+                LogContext::NONE,
+            );
             let _ = sender.send((result, start.elapsed()));
         });
         receiver
@@ -220,6 +225,7 @@ mod tests {
         let transport = ScriptedTransport::responses(vec![json(200, READY)]);
         loopback(DaemonKind::Mapika, None).wait_until_loaded(
             &transport,
+            &sc_agent_types::Clock::system(),
             &CancelToken::new(),
             Duration::MAX,
             LogContext::NONE,
@@ -265,6 +271,7 @@ mod tests {
         cancel.cancel();
         let result = loopback(DaemonKind::Mapika, None).wait_until_loaded(
             &transport,
+            &sc_agent_types::Clock::system(),
             &cancel,
             Duration::from_secs(30),
             LogContext::NONE,
@@ -281,6 +288,7 @@ mod tests {
         let error = loopback(DaemonKind::Mapika, None)
             .wait_until_loaded(
                 &transport,
+                &sc_agent_types::Clock::system(),
                 &CancelToken::new(),
                 Duration::from_secs(30),
                 LogContext::NONE,
@@ -301,6 +309,7 @@ mod tests {
         loopback(DaemonKind::Generic, None)
             .wait_until_loaded(
                 &transport,
+                &sc_agent_types::Clock::system(),
                 &CancelToken::new(),
                 Duration::from_secs(30),
                 LogContext::NONE,
@@ -323,6 +332,7 @@ mod tests {
             ScriptedTransport::responses(vec![json(200, r#"{"status":"ok","loaded":[]}"#)]);
         backend.wait_until_loaded(
             &transport,
+            &sc_agent_types::Clock::system(),
             &CancelToken::new(),
             timeouts.load,
             LogContext::NONE,

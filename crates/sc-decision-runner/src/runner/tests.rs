@@ -59,7 +59,7 @@ fn request() -> DecisionRequest {
 /// `decision.http` / `http.provider_busy`.
 #[test]
 fn budget_runs_out_after_mismatch() {
-    let clock = ManualClock::new(Instant::now());
+    let clock = ManualClock::new();
     let ok = HttpResponse::new(200, vec![], b"{}".to_vec());
     let transport = ScriptedTransport::responses(vec![ok.clone(), ok.clone(), ok]);
     let log = MemoryLog::new().expect("log");
@@ -82,7 +82,7 @@ fn budget_runs_out_after_mismatch() {
         log.session(identity),
         log.general(),
         RunnerConfig::default(),
-        Arc::new(move || reading.now()),
+        reading.clock(),
     );
     let result = runner.decide(request(), &CancelToken::new());
     let error = result.outcome.expect_err("no valid reply");
@@ -135,7 +135,7 @@ fn the_cancel_hook_is_registered_before_any_thread_starts() {
         SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
             .expect("identity");
     let backend = Arc::new(NeverMatches {
-        clock: ManualClock::new(Instant::now()),
+        clock: ManualClock::new(),
         decodes: AtomicU32::new(0),
     });
     let runner = DecisionRunner::new(
@@ -239,7 +239,7 @@ impl sc_agent_http::Transport for ClockedTransport {
 /// is asserted (the real waits only bound how long the worker naps between clock reads).
 #[test]
 fn provider_pause_holds_other_jobs_until_exactly_its_end() {
-    let clock = ManualClock::new(Instant::now());
+    let clock = ManualClock::new();
     let transport = Arc::new(ClockedTransport {
         clock: clock.clone(),
         sends: Mutex::new(Vec::new()),
@@ -261,7 +261,7 @@ fn provider_pause_holds_other_jobs_until_exactly_its_end() {
         log.session(identity),
         log.general(),
         RunnerConfig::new(1).expect("one worker"),
-        Arc::new(move || reading.now()),
+        reading.clock(),
     );
     let (paused_to, paused) = std::sync::mpsc::channel();
     *runner.shared.paused.lock().expect("lock") = Some(paused_to);

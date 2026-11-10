@@ -172,7 +172,7 @@ fn decide_cancel_during_holdoff() {
         let _ = lock(&busy_sent).send(());
         Ok(busy("30"))
     });
-    let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+    let clock = sc_agent_http::testing::ManualClock::new();
     let frozen = clock.now();
     let harness = Harness::with_clock(
         Arc::new(ScriptedBackend::new()),

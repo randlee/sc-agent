@@ -9,7 +9,6 @@ mod cases {
 
     use std::collections::HashSet;
     use std::sync::Arc;
-    use std::time::Instant;
 
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{
@@ -22,6 +21,11 @@ mod cases {
         ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var,
     };
     use sc_agent_types::{ErrorDetail, ErrorId};
+
+    /// A manual clock for sends whose timing is not under test: it never moves.
+    fn test_clock() -> sc_agent_types::Clock {
+        sc_agent_http::testing::ManualClock::new().clock()
+    }
 
     struct OneVar;
     impl EnvSource for OneVar {
@@ -85,11 +89,11 @@ mod cases {
     fn send_err(transport: Arc<dyn Transport>, request: &HttpRequest) -> HttpError {
         let memory = MemoryLog::new().expect("memory log");
         let client = HttpClient::new(transport, ResendPolicy::default(), memory.general());
-        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), Instant::now())
+        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
         };
-        match client.send_once(request, permit, LogContext::NONE, &Instant::now) {
+        match client.send_once(request, permit, LogContext::NONE, &test_clock()) {
             Err(error) => error,
             Ok(next) => panic!("expected an error: {next:?}"),
         }
@@ -203,11 +207,11 @@ mod cases {
             memory.general(),
         );
         let request = keyed_request();
-        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
         };
-        let error = match client.send_once(&request, permit, LogContext::NONE, &Instant::now) {
+        let error = match client.send_once(&request, permit, LogContext::NONE, &test_clock()) {
             Err(error) => error,
             Ok(next) => panic!("{next:?}"),
         };
@@ -299,12 +303,13 @@ mod cases {
             memory.general(),
         );
         let request = keyed_request();
-        let now = Instant::now();
+        let clock = test_clock();
+        let now = clock.now();
         let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
             panic!("fresh");
         };
         let Ok(Next::ResendAt { pending, .. }) =
-            client.send_once(&request, permit, LogContext::NONE, &|| now)
+            client.send_once(&request, permit, LogContext::NONE, &clock)
         else {
             panic!("timeout is held for resend");
         };

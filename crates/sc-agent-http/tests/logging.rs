@@ -8,10 +8,11 @@
 #[cfg(test)]
 mod cases {
 
+    use sc_agent_http::testing::ManualClock;
+    use sc_agent_types::Clock;
     use std::num::NonZeroU32;
     use std::sync::Arc;
     use std::thread;
-    use std::time::Instant;
 
     use sc_agent_http::testing::{BlockingTransport, ScriptedTransport};
     use sc_agent_http::{
@@ -93,17 +94,17 @@ mod cases {
         )
     }
 
-    /// One admitted send at `now`.
+    /// One admitted send on `clock`.
     fn send(
         client: &HttpClient,
         request: &HttpRequest,
         ctx: LogContext,
-        now: Instant,
+        clock: &Clock,
     ) -> Result<Next, HttpError> {
-        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), now) else {
+        let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), clock.now()) else {
             panic!("fresh");
         };
-        client.send_once(request, permit, ctx, &|| now)
+        client.send_once(request, permit, ctx, clock)
     }
 
     fn actions(records: &[MemoryRecord]) -> Vec<&str> {
@@ -128,7 +129,7 @@ mod cases {
     /// a connect-failure send on `log`, and returns their results.
     fn scenarios(log: &GeneralLogger, ctx: LogContext) -> Vec<String> {
         let request = request();
-        let now = Instant::now();
+        let clock = ManualClock::new().clock();
         let mut results = Vec::new();
         let mut run = |replies: Vec<Result<HttpResponse, HttpError>>, max: u32| {
             let client = HttpClient::new(
@@ -136,7 +137,7 @@ mod cases {
                 policy(max),
                 log.clone(),
             );
-            results.push(format!("{:?}", send(&client, &request, ctx, now)));
+            results.push(format!("{:?}", send(&client, &request, ctx, &clock)));
             client
         };
         // busy, held for resend
@@ -155,24 +156,19 @@ mod cases {
         run(vec![Err(timeout())], 5);
         // connect failure
         run(vec![Err(connect())], 5);
-        // budget exhausted: the first send started 90 s before the busy reply
+        // budget exhausted: the first send takes 90 s and ends with a busy reply
+        let manual = ManualClock::new();
         let client = HttpClient::new(
-            Arc::new(ScriptedTransport::new(vec![Ok(response(502, "busy MARK"))])),
+            Arc::new(
+                ScriptedTransport::new(vec![Ok(response(502, "busy MARK"))])
+                    .with_send_duration(manual.clone(), std::time::Duration::from_secs(90)),
+            ),
             policy(5),
             log.clone(),
         );
-        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
-            panic!("fresh");
-        };
-        let clock = std::cell::Cell::new(now);
-        let late = || {
-            let read = clock.get();
-            clock.set(now + std::time::Duration::from_secs(90));
-            read
-        };
         results.push(format!(
             "{:?}",
-            client.send_once(&request, permit, ctx, &late)
+            send(&client, &request, ctx, &manual.clock())
         ));
         results
     }
@@ -323,7 +319,7 @@ mod cases {
             memory.general(),
         );
         let sessions = [SessionId::new(), SessionId::new()];
-        let now = Instant::now();
+        let clock = ManualClock::new().clock();
         let workers: Vec<_> = sessions
             .iter()
             .enumerate()
@@ -332,12 +328,15 @@ mod cases {
                 let ctx = LogContext::request(*session, Some(position as u64));
                 let request = request();
                 // Both are admitted before either busy reply pauses the host.
-                let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
+                let Ok(Start::Go(permit)) =
+                    client.may_start(&request, Attempts::new(), clock.now())
+                else {
                     panic!("fresh");
                 };
+                let clock = clock.clone();
                 thread::spawn(move || {
                     matches!(
-                        client.send_once(&request, permit, ctx, &|| now),
+                        client.send_once(&request, permit, ctx, &clock),
                         Ok(Next::ResendAt { .. })
                     )
                 })
@@ -348,7 +347,8 @@ mod cases {
         gate.release();
         for worker in workers {
             assert!(
-                worker.join().expect("worker"),
+                sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
+                    .expect("worker"),
                 "each send is held for resend"
             );
         }

@@ -217,7 +217,7 @@ impl Harness {
             log.session(identity),
             log.general(),
             config,
-            Arc::new(move || clock.now()),
+            clock.clock(),
         );
         Self {
             log,

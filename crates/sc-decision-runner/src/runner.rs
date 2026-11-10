@@ -21,11 +21,12 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
+#[cfg(test)]
 use std::time::Instant;
 
 use sc_agent_http::{Attempts, HttpClient, HttpRequest, Next, Pending, SendPermit, Start};
 use sc_agent_log::{GeneralLogger, Level, LogContext, SessionLogger};
-use sc_agent_types::{CancelToken, SessionId};
+use sc_agent_types::{CancelToken, Clock, SessionId};
 use sc_decision_schema::{
     Backend, Decision, DecisionError, DecisionRequest, DecisionResult, OrderedMap, QuestionDigest,
     SystemOneResponse,
@@ -35,7 +36,7 @@ use serde_json::{Map, Value};
 use crate::config::RunnerConfig;
 use crate::error::RunnerError;
 use crate::pool::{Pool, Step, Stopped, Work};
-use crate::queue::{BoundedQueue, Clock, JobQueue, Popped, Skipped};
+use crate::queue::{BoundedQueue, JobQueue, Popped, Skipped};
 use crate::row::{Claim, Finished, LOG_TARGET, Mode, Progress, Row, write_row};
 
 /// The job queue of a run: jobs, with the request's [`Identity`] per in-flight send.
@@ -117,8 +118,9 @@ struct Shared {
     http: HttpClient,
     session: SessionLogger,
     general: GeneralLogger,
-    /// `Instant::now`, or a test clock; passed to `may_start`, `may_resend` and `send_once`.
-    now: Clock,
+    /// The real clock, or a test clock; read for `may_start`, `may_resend` and `send_once`,
+    /// and the job queue's holdoff waits run on it.
+    clock: Clock,
     /// Runner threads (workers and feeders of every run) alive now.
     live_threads: Arc<AtomicUsize>,
     /// Test seam (A-9 QA-002): called once, right after a run registers its cancel hook, with
@@ -156,23 +158,17 @@ impl DecisionRunner {
         general: GeneralLogger,
         config: RunnerConfig,
     ) -> Self {
-        Self::with_clock(
-            backend,
-            http,
-            session,
-            general,
-            config,
-            Arc::new(Instant::now),
-        )
+        Self::with_clock(backend, http, session, general, config, Clock::system())
     }
 
-    /// [`Self::new`] with an explicit clock: `now` is read for every admission, holdoff and
-    /// send instead of `Instant::now` (passed to `may_start`, `may_resend` and `send_once`).
+    /// [`Self::new`] with an explicit clock: `clock` is read for every admission, holdoff and
+    /// send (passed to `may_start`, `may_resend` and `send_once`), and the job queue waits for
+    /// a holdoff on it.
     ///
-    /// A seam for callers' tests (decide's `Context.clock`, `sc_agent_http::testing::
+    /// A seam for callers' tests (decide's `Context.clock`, `sc_agent_types::testing::
     /// ManualClock`): with a clock only the test moves, a holdoff or provider pause cannot
     /// elapse on its own, so ordering is forced without real waiting. Production uses
-    /// [`Self::new`].
+    /// [`Self::new`] (the real clock).
     #[must_use]
     pub fn with_clock(
         backend: Arc<dyn Backend>,
@@ -180,7 +176,7 @@ impl DecisionRunner {
         session: SessionLogger,
         general: GeneralLogger,
         config: RunnerConfig,
-        now: Arc<dyn Fn() -> Instant + Send + Sync>,
+        clock: Clock,
     ) -> Self {
         Self {
             shared: Arc::new(Shared {
@@ -188,7 +184,7 @@ impl DecisionRunner {
                 http,
                 session,
                 general,
-                now,
+                clock,
                 live_threads: Arc::new(AtomicUsize::new(0)),
                 #[cfg(test)]
                 after_hook: Mutex::new(None),
@@ -232,7 +228,7 @@ impl DecisionRunner {
                 ("queue_capacity", capacity.into()),
             ],
         );
-        let jobs = Arc::new(RunnerJobs::new(capacity, Arc::clone(&shared.now)));
+        let jobs = Arc::new(RunnerJobs::new(capacity, shared.clock.clone()));
         // Producers: every worker and the feeder.
         let results = Arc::new(Results::new(capacity, workers.get().saturating_add(1)));
         #[cfg(test)]
@@ -724,7 +720,7 @@ impl RunnerWork {
     /// Asks the client for leave to send, then sends, holds or finishes.
     fn step(&self, prepared: Prepared) -> Step<Job, Finished> {
         let Prepared { core, state } = prepared;
-        let now = (self.shared.now)();
+        let now = self.shared.clock.now();
         match state {
             SendState::Start { attempts, mismatch } => {
                 let sent = attempts.sends();
@@ -801,7 +797,7 @@ impl RunnerWork {
             };
             self.shared
                 .http
-                .send_once(&core.http, permit, ctx, &*self.shared.now)
+                .send_once(&core.http, permit, ctx, &self.shared.clock)
         };
         if self.jobs.is_cancelled() {
             // Cancelled during the send: the late reply is discarded.
@@ -816,7 +812,7 @@ impl RunnerWork {
             Ok(Next::Done { response, attempts }) => {
                 match self.shared.backend.decode(response, &core.request, &ctx) {
                     Err(error @ DecisionError::SchemaMismatch { .. }) => Step::HoldOff {
-                        until: (self.shared.now)(),
+                        until: self.shared.clock.now(),
                         job: Job::prepared(
                             core,
                             SendState::Start {

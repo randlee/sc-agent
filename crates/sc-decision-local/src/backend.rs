@@ -10,7 +10,7 @@ use sc_agent_config::RunnerHost;
 use sc_agent_http::{HttpError, HttpRequest, HttpResponse, LogContext, Transport};
 use sc_agent_log::{GeneralLogger, Level};
 use sc_agent_secrets::ApiKey;
-use sc_agent_types::{CancelToken, ErrorId, ModelId, Wait};
+use sc_agent_types::{CancelToken, Clock, ErrorId, ModelId, Wait};
 use sc_decision_schema::{Backend, DecisionError, DecisionRequest, SystemOneResponse};
 use sc_decision_systemone::{BaseUrl, SystemOneBackend};
 use serde_json::{Map, Value};
@@ -247,11 +247,12 @@ impl LocalBackend {
     pub fn wait_until_loaded(
         &self,
         transport: &dyn Transport,
+        clock: &Clock,
         cancel: &CancelToken,
         load_timeout: Duration,
         ctx: LogContext,
     ) -> Result<(), DecisionError> {
-        let start = Instant::now();
+        let start = clock.now();
         let deadline = load_deadline(start, load_timeout);
         let mut polls: u64 = 0;
         let outcome = loop {
@@ -260,7 +261,12 @@ impl LocalBackend {
             }
             let probe = self.probe_once(transport);
             polls += 1;
-            self.log_poll(ctx, polls, start.elapsed(), &probe);
+            self.log_poll(
+                ctx,
+                polls,
+                clock.now().saturating_duration_since(start),
+                &probe,
+            );
             match probe {
                 Ok(availability) => match availability.model {
                     ModelState::Loaded | ModelState::LoadsOnDemand | ModelState::Unlisted => {
@@ -271,7 +277,7 @@ impl LocalBackend {
                 Err(LocalError::Http(HttpError::Network { .. })) => {}
                 Err(error) => break LoadOutcome::Failed(error),
             }
-            let now = Instant::now();
+            let now = clock.now();
             if now >= deadline {
                 break LoadOutcome::Failed(LocalError::LoadTimeout {
                     runner: self.base.to_string(),
@@ -281,11 +287,16 @@ impl LocalBackend {
             let next = now
                 .checked_add(LOAD_POLL_INTERVAL)
                 .map_or(deadline, |next| next.min(deadline));
-            if cancel.wait_until(next) == Wait::Cancelled {
+            if clock.wait_until(cancel, next) == Wait::Cancelled {
                 break LoadOutcome::Cancelled;
             }
         };
-        self.log_load_end(ctx, polls, start.elapsed(), &outcome);
+        self.log_load_end(
+            ctx,
+            polls,
+            clock.now().saturating_duration_since(start),
+            &outcome,
+        );
         match outcome {
             LoadOutcome::Ready => Ok(()),
             LoadOutcome::Cancelled => Err(DecisionError::Cancelled { sends: 0 }),
@@ -451,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_load_deadline_is_finite_for_huge_timeouts() {
-        let start = Instant::now();
+        let start = Clock::system().now();
         assert_eq!(load_deadline(start, Duration::MAX) - start, MAX_LOAD_WAIT);
         assert_eq!(
             load_deadline(start, MAX_LOAD_WAIT + Duration::from_secs(1)) - start,

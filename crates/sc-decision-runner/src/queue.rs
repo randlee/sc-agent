@@ -2,7 +2,8 @@
 //! [`BoundedQueue`] (results waiting for the consumer).
 //!
 //! Both are a `Mutex` plus `Condvar`s. Nothing here sleeps: a held job is waited for
-//! with `Condvar::wait_timeout` to the earliest holdoff end, and every state change that
+//! through the run's [`Clock`] to the earliest holdoff end ([`Clock::park`]; a manual clock
+//! wakes the wait when the test advances it), and every state change that
 //! a waiter may need (submit, hold, done, close, cancel, push, pop, interrupt) notifies.
 //! No code runs while a lock is held except plain collection operations, so a poisoned
 //! lock still guards a consistent state and is recovered.
@@ -12,8 +13,7 @@ use std::collections::{BinaryHeap, VecDeque};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
-/// The run's clock: `Instant::now` in production, a test clock in unit tests.
-pub(crate) type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
+use sc_agent_types::{Clock, Waker};
 
 /// Locks `mutex`, recovering a poisoned lock (see the module docs).
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -103,8 +103,9 @@ struct JobState<J, F> {
 /// `J` is the job, `F` the in-flight entry kept while a job's send is in progress.
 /// Capacity counts ready + held + running jobs, so held-off jobs also throttle the feeder.
 pub(crate) struct JobQueue<J, F> {
-    state: Mutex<JobState<J, F>>,
-    changed: Condvar,
+    /// Shared (`Arc`) with the clock's waker of a parked [`Self::take`].
+    state: Arc<Mutex<JobState<J, F>>>,
+    changed: Arc<Condvar>,
     capacity: usize,
     clock: Clock,
 }
@@ -113,7 +114,7 @@ impl<J, F> JobQueue<J, F> {
     /// An empty queue of `capacity` jobs (at least one); held jobs fall due by `clock`.
     pub(crate) fn new(capacity: usize, clock: Clock) -> Self {
         Self {
-            state: Mutex::new(JobState {
+            state: Arc::new(Mutex::new(JobState {
                 ready: VecDeque::new(),
                 held: BinaryHeap::new(),
                 running: 0,
@@ -124,8 +125,8 @@ impl<J, F> JobQueue<J, F> {
                 seq: 0,
                 #[cfg(test)]
                 waiting_submitters: 0,
-            }),
-            changed: Condvar::new(),
+            })),
+            changed: Arc::new(Condvar::new()),
             capacity: capacity.max(1),
             clock,
         }
@@ -177,54 +178,6 @@ impl<J, F> JobQueue<J, F> {
             state.held.push(Held { until, seq, job });
         }
         self.changed.notify_all();
-    }
-
-    /// The next job for a worker: due held jobs move to the back of the ready queue,
-    /// then the oldest ready job; else waits to the earliest holdoff end, or for a change.
-    pub(crate) fn take(&self) -> Taken<J> {
-        let mut state = self.lock();
-        loop {
-            if state.cancelled {
-                let job = state
-                    .ready
-                    .pop_front()
-                    .or_else(|| state.held.pop().map(|held| held.job));
-                return match job {
-                    Some(job) => {
-                        state.running += 1;
-                        Taken::Cancelled(job)
-                    }
-                    // A running job that is held later is taken as cancelled by its own worker.
-                    None => Taken::Finished { cancelled: true },
-                };
-            }
-            let now = (self.clock)();
-            while state.held.peek().is_some_and(|held| held.until <= now) {
-                if let Some(held) = state.held.pop() {
-                    state.ready.push_back(held.job);
-                }
-            }
-            if let Some(job) = state.ready.pop_front() {
-                state.running += 1;
-                return Taken::Run(job);
-            }
-            if let Some(earliest) = state.held.peek().map(|held| held.until) {
-                let wait = earliest.saturating_duration_since(now);
-                state = self
-                    .changed
-                    .wait_timeout(state, wait)
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .0;
-                continue;
-            }
-            if state.closed && state.running == 0 {
-                return Taken::Finished { cancelled: false };
-            }
-            state = self
-                .changed
-                .wait(state)
-                .unwrap_or_else(PoisonError::into_inner);
-        }
     }
 
     /// A taken job is finished, requeued or held.
@@ -314,6 +267,67 @@ impl<J, F> JobQueue<J, F> {
     pub(crate) fn take_orphans(&self) -> Vec<F> {
         let orphans = std::mem::take(&mut self.lock().orphans);
         orphans.into_iter().map(|(_, entry)| entry).collect()
+    }
+}
+
+impl<J: Send + 'static, F: Send + 'static> JobQueue<J, F> {
+    /// The next job for a worker: due held jobs move to the back of the ready queue,
+    /// then the oldest ready job; else waits to the earliest holdoff end, or for a change.
+    pub(crate) fn take(&self) -> Taken<J> {
+        let mut state = self.lock();
+        loop {
+            if state.cancelled {
+                let job = state
+                    .ready
+                    .pop_front()
+                    .or_else(|| state.held.pop().map(|held| held.job));
+                return match job {
+                    Some(job) => {
+                        state.running += 1;
+                        Taken::Cancelled(job)
+                    }
+                    // A running job that is held later is taken as cancelled by its own worker.
+                    None => Taken::Finished { cancelled: true },
+                };
+            }
+            let now = self.clock.now();
+            while state.held.peek().is_some_and(|held| held.until <= now) {
+                if let Some(held) = state.held.pop() {
+                    state.ready.push_back(held.job);
+                }
+            }
+            if let Some(job) = state.ready.pop_front() {
+                state.running += 1;
+                return Taken::Run(job);
+            }
+            if let Some(earliest) = state.held.peek().map(|held| held.until) {
+                // Registered under the lock, so an advance after the `now` read above cannot
+                // be missed: its waker needs this lock, released only by the park.
+                let _advance = self.clock.on_advance(self.waker());
+                state = self.clock.park(&self.changed, state, earliest);
+                continue;
+            }
+            if state.closed && state.running == 0 {
+                return Taken::Finished { cancelled: false };
+            }
+            state = self
+                .changed
+                .wait(state)
+                .unwrap_or_else(PoisonError::into_inner);
+        }
+    }
+
+    /// A waker for the run's clock: locks the queue and notifies, so a parked [`Self::take`]
+    /// re-reads the clock.
+    fn waker(&self) -> Waker {
+        let state = Arc::downgrade(&self.state);
+        let changed = Arc::downgrade(&self.changed);
+        Arc::new(move || {
+            if let (Some(state), Some(changed)) = (state.upgrade(), changed.upgrade()) {
+                drop(lock(&state));
+                changed.notify_all();
+            }
+        })
     }
 }
 

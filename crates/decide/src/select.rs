@@ -23,7 +23,7 @@ use sc_agent_secrets::{
     resolve_var,
 };
 use sc_agent_types::{
-    CancelToken, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
+    CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
 };
 use sc_decision_llm::LlmDecisionBackend;
 use sc_decision_local::{DaemonKind, LocalBackend, LocalTimeouts};
@@ -59,10 +59,11 @@ pub struct Context {
     pub transport: Option<Arc<dyn Transport>>,
     /// The general log; `None` is `GeneralLogger::open_default(log_root, service)`.
     pub general: Option<GeneralLogger>,
-    /// The clock of every decision run (admissions, holdoffs, provider pauses, sends);
-    /// `None` is `Instant::now`. A test seam: with `sc_agent_http::testing::ManualClock`, a
-    /// holdoff or pause falls due only when the test moves the clock.
-    pub clock: Option<Arc<dyn Fn() -> Instant + Send + Sync>>,
+    /// The clock of every decision run and of every wait (admissions, holdoffs, provider
+    /// pauses, sends, the local load wait, probe holdoffs); `None` is the real clock
+    /// ([`Clock::system`]). A test seam: with `sc_agent_types::testing::ManualClock`, a
+    /// holdoff, pause or load poll falls due only when the test moves the clock.
+    pub clock: Option<Clock>,
 }
 
 impl Context {
@@ -79,6 +80,11 @@ impl Context {
             general: None,
             clock: None,
         }
+    }
+
+    /// The clock of this context: the injected one, else the real clock.
+    pub(crate) fn clock(&self) -> Clock {
+        self.clock.clone().unwrap_or_default()
     }
 
     /// The environment: the injected one borrowed, else the process environment read once.
@@ -559,7 +565,7 @@ fn probe_transport(context: &Context) -> Arc<dyn Transport> {
 /// One `HttpClient` (so the REQ-SAG-0012 provider pause is shared by every worker) and one
 /// `DecisionRunner` over `backend`.
 fn runner(
-    clock: Option<&Arc<dyn Fn() -> Instant + Send + Sync>>,
+    clock: Clock,
     config: &AgentConfig,
     transport: Arc<dyn Transport>,
     session: SessionLogger,
@@ -573,17 +579,14 @@ fn runner(
         ResendPolicy::new(config.max_sends),
         general.clone(),
     );
-    Ok(match clock {
-        Some(clock) => DecisionRunner::with_clock(
-            backend,
-            http,
-            session,
-            general,
-            runner_config,
-            Arc::clone(clock),
-        ),
-        None => DecisionRunner::new(backend, http, session, general, runner_config),
-    })
+    Ok(DecisionRunner::with_clock(
+        backend,
+        http,
+        session,
+        general,
+        runner_config,
+        clock,
+    ))
 }
 
 /// Everything one send or batch needs, built before anything is sent.
@@ -594,6 +597,7 @@ struct Prepared {
     owns_general: bool,
     chosen: Chosen,
     probe: Arc<dyn Transport>,
+    clock: Clock,
     service: &'static str,
 }
 
@@ -616,7 +620,7 @@ impl Prepared {
         };
         let transport = decision_transport(context, local).build();
         let runner = runner(
-            context.clock.as_ref(),
+            context.clock(),
             &config,
             transport,
             session,
@@ -629,6 +633,7 @@ impl Prepared {
             owns_general: context.general.is_none(),
             chosen,
             probe: probe_transport(context),
+            clock: context.clock(),
             service: context.service,
         })
     }
@@ -645,6 +650,7 @@ impl Prepared {
         match wait_until_loaded(
             backend,
             &*self.probe,
+            &self.clock,
             cancel,
             runner.load_timeout(),
             LogContext::NONE,
@@ -709,13 +715,14 @@ fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecideError> 
 fn wait_until_loaded(
     backend: &LocalBackend,
     probe: &dyn Transport,
+    clock: &Clock,
     cancel: &CancelToken,
     load_timeout: std::time::Duration,
     ctx: LogContext,
 ) -> Result<(), DecisionError> {
     #[cfg(test)]
     LOAD_TIMEOUT_PASSED.with(|passed| passed.set(Some(load_timeout)));
-    backend.wait_until_loaded(probe, cancel, load_timeout, ctx)
+    backend.wait_until_loaded(probe, clock, cancel, load_timeout, ctx)
 }
 
 #[cfg(test)]
@@ -891,6 +898,7 @@ fn deliver(
 fn send_probe(
     http: &HttpClient,
     request: &HttpRequest,
+    clock: &Clock,
     cancel: &CancelToken,
 ) -> Result<HttpResponse, DecideError> {
     let cancelled = |sends: u32| DecideError::from(DecisionError::Cancelled { sends });
@@ -901,12 +909,12 @@ fn send_probe(
                 pending.as_ref().map_or(0, |held| held.attempts().sends()),
             ));
         }
-        let now = Instant::now();
+        let now = clock.now();
         let permit = match pending.take() {
             None => match http.may_start(request, Attempts::new(), now) {
                 Ok(Start::Go(permit)) => permit,
                 Ok(Start::Wait { at, .. }) => {
-                    wait(cancel, at, 0)?;
+                    wait(clock, cancel, at, 0)?;
                     continue;
                 }
                 Err(reason) => {
@@ -921,29 +929,29 @@ fn send_probe(
                 Ok(Start::Wait { at, state }) => {
                     let sends = state.attempts().sends();
                     pending = Some(state);
-                    wait(cancel, at, sends)?;
+                    wait(clock, cancel, at, sends)?;
                     continue;
                 }
                 Err(error) => return Err(DecideError::from(error)),
             },
         };
         match http
-            .send_once(request, permit, LogContext::NONE, &Instant::now)
+            .send_once(request, permit, LogContext::NONE, clock)
             .map_err(DecideError::from)?
         {
             Next::Done { response, .. } => return Ok(response),
             Next::ResendAt { at, pending: held } => {
                 let sends = held.attempts().sends();
                 pending = Some(held);
-                wait(cancel, at, sends)?;
+                wait(clock, cancel, at, sends)?;
             }
         }
     }
 }
 
 /// Waits until `at` or a cancel.
-fn wait(cancel: &CancelToken, at: Instant, sends: u32) -> Result<(), DecideError> {
-    match cancel.wait_until(at) {
+fn wait(clock: &Clock, cancel: &CancelToken, at: Instant, sends: u32) -> Result<(), DecideError> {
+    match clock.wait_until(cancel, at) {
         Wait::Cancelled => Err(DecideError::from(DecisionError::Cancelled { sends })),
         Wait::DeadlineReached => Ok(()),
     }
@@ -966,9 +974,10 @@ pub(crate) fn probe_client(
 pub(crate) fn probe(
     http: &HttpClient,
     request: &HttpRequest,
+    clock: &Clock,
     cancel: &CancelToken,
 ) -> Result<HttpResponse, DecideError> {
-    send_probe(http, request, cancel)
+    send_probe(http, request, clock, cancel)
 }
 
 /// The TypeSafe `SystemOneBackend` with its resolved key.
@@ -1086,7 +1095,7 @@ fn list_models(
     };
     let request = backend.models_request().map_err(DecideError::from)?;
     let http = probe_client(&options.context, config, general);
-    let response = probe(&http, &request, cancel)?;
+    let response = probe(&http, &request, &options.context.clock(), cancel)?;
     backend.decode_models(response).map_err(DecideError::from)
 }
 

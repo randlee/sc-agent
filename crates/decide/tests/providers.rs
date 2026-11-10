@@ -467,7 +467,7 @@ mod tests {
         );
         ctx.general = Some(general);
         let reading = clock.clone();
-        ctx.clock = Some(Arc::new(move || reading.now()));
+        ctx.clock = Some(reading.clock());
         let options = options("jev", None, ctx, &log);
         let busy_at = clock.now();
         let worker = std::thread::spawn(move || {
@@ -523,7 +523,7 @@ mod tests {
             ("1", Duration::from_secs(1)),
             ("0", Duration::from_millis(250)),
         ] {
-            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let clock = sc_agent_http::testing::ManualClock::new();
             let transport =
                 ClockedTransport::new(clock.clone(), vec![retry_after(seconds), ok_noul()], None);
             let (general, notify) = crate::common::notify_log();
@@ -569,7 +569,7 @@ mod tests {
     #[test]
     fn with_two_workers_a_request_admitted_after_the_429_waits_the_pause() {
         for seconds in ["1", "0"] {
-            let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+            let clock = sc_agent_http::testing::ManualClock::new();
             let (general, notify) = crate::common::notify_log();
             let gate = Arc::clone(&notify);
             let hold: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
@@ -610,7 +610,7 @@ mod tests {
     /// budget would not be touched and the request would be resent.
     #[test]
     fn the_context_clock_reaches_the_runner() {
-        let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+        let clock = sc_agent_http::testing::ManualClock::new();
         let transport = ScriptedTransport::responses(vec![retry_after("1"), ok_noul()])
             .with_send_duration(clock.clone(), Duration::from_secs(91));
         let log = MemoryLog::new().expect("log");
@@ -622,7 +622,7 @@ mod tests {
             &log,
         );
         let reading = clock.clone();
-        ctx.clock = Some(Arc::new(move || reading.now()));
+        ctx.clock = Some(reading.clock());
         let result = send(
             &options("jev", None, ctx, &log),
             request(NOUL),

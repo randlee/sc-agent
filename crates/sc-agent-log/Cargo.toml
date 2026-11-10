@@ -19,6 +19,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 hostname = "0.4.2"
 
 [dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
 tempfile = "3"
 sc-agent-log = { path = ".", features = ["testing"] }
 

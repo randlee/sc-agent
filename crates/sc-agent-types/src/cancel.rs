@@ -1,13 +1,16 @@
 //! Cooperative cancellation: [`CancelToken`], its waits and its wake hooks.
 //!
-//! Std-only and runtime-free: a holdoff waits on a condition variable with a deadline and
-//! wakes at once on cancel; nothing blocks on a fixed delay.
+//! Std-only and runtime-free: a holdoff waits on a condition variable with a deadline
+//! ([`Clock::wait_until`](crate::Clock::wait_until)) and wakes at once on cancel; nothing
+//! blocks on a fixed delay.
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
 use std::thread::{self, ThreadId};
 use std::time::Instant;
+
+use crate::clock::Clock;
 
 /// A hook run once on cancel.
 type Hook = Arc<dyn Fn() + Send + Sync>;
@@ -20,21 +23,22 @@ type Hook = Arc<dyn Fn() + Send + Sync>;
 /// # Examples
 ///
 /// ```
-/// use std::time::{Duration, Instant};
-/// use sc_agent_types::{CancelToken, Wait};
+/// use std::time::Duration;
+/// use sc_agent_types::{CancelToken, Clock, Wait};
 ///
+/// let clock = Clock::system();
 /// let token = CancelToken::new();
 /// let worker = token.clone();
 /// assert!(!worker.is_cancelled());
 /// token.cancel();
 /// assert!(worker.is_cancelled());
-/// assert_eq!(worker.wait_until(Instant::now() + Duration::from_secs(60)), Wait::Cancelled);
+/// assert_eq!(clock.wait_until(&worker, clock.now() + Duration::from_secs(60)), Wait::Cancelled);
 /// ```
 #[derive(Clone, Default)]
 pub struct CancelToken(Arc<Inner>);
 
 // Why the fields are laid out this way:
-// - `cancelled` is set while `state` is locked, and `wait_until` checks it under the same lock
+// - `cancelled` is set while `state` is locked, and `park_until` checks it under the same lock
 //   before parking on `wake`, so a waiter cannot check, miss the `notify_all` and then park.
 // - `cancelled` is also an atomic so `is_cancelled` is lock-free: work loops poll it often.
 // - The hook list, the running hook and both condition variables share the one `state` Mutex:
@@ -47,11 +51,19 @@ pub struct CancelToken(Arc<Inner>);
 struct Inner {
     cancelled: AtomicBool,
     state: Mutex<Hooks>,
-    /// Signalled once, on cancel: wakes every `wait_until`.
+    /// Signalled on cancel, and by a manual clock's advance: wakes every `park_until`.
     wake: Condvar,
     /// Signalled each time a running hook finishes: wakes a `CancelHook::drop` waiting for it.
     hook_done: Condvar,
+    /// Test seam (feature `testing`): told when cancel has taken a hook and when a drop
+    /// starts waiting for a running hook, so a test forces each interleaving once.
+    #[cfg(feature = "testing")]
+    trace: Mutex<Option<Trace>>,
 }
+
+/// The `testing` trace callback.
+#[cfg(feature = "testing")]
+type Trace = Arc<dyn Fn(crate::testing::CancelEvent) + Send + Sync>;
 
 #[derive(Default)]
 struct Hooks {
@@ -62,7 +74,7 @@ struct Hooks {
     running: Option<(u64, ThreadId)>,
 }
 
-/// How a [`CancelToken::wait_until`] ended.
+/// How a [`Clock::wait_until`] ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Wait {
     /// The token was cancelled (before or during the wait).
@@ -76,6 +88,19 @@ impl Inner {
     fn lock(&self) -> MutexGuard<'_, Hooks> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
+
+    /// Tells the `testing` trace, if one is set, that `event` happened.
+    #[cfg(feature = "testing")]
+    fn trace(&self, event: crate::testing::CancelEvent) {
+        let trace = self
+            .trace
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if let Some(trace) = trace {
+            trace(event);
+        }
+    }
 }
 
 impl CancelToken {
@@ -87,7 +112,7 @@ impl CancelToken {
 
     /// Requests cancellation. Idempotent.
     ///
-    /// The first call wakes every [`Self::wait_until`] and then runs every registered hook
+    /// The first call wakes every [`Clock::wait_until`] and then runs every registered hook
     /// once, one at a time, on the calling thread. No hook runs while the token's lock is
     /// held. A later call returns at once, even while the first is still running hooks.
     pub fn cancel(&self) {
@@ -110,6 +135,8 @@ impl CancelToken {
                 hook
             };
             let _done = HookDone(&self.0);
+            #[cfg(feature = "testing")]
+            self.0.trace(crate::testing::CancelEvent::HookTaken);
             hook();
         }
     }
@@ -120,28 +147,43 @@ impl CancelToken {
         self.0.cancelled.load(Ordering::Acquire)
     }
 
-    /// Blocks until the token is cancelled or `deadline` passes, whichever is first.
+    /// Blocks until the token is cancelled or `clock` reaches `deadline` (the body of
+    /// [`Clock::wait_until`]).
     ///
-    /// Returns [`Wait::Cancelled`] at once if the token is already cancelled. This waits on a
-    /// condition variable; it does not poll.
-    #[must_use]
-    pub fn wait_until(&self, deadline: Instant) -> Wait {
+    /// The waker registered with the clock locks `state` before it notifies, and the deadline
+    /// is checked under that lock, so an advance cannot slip between the check and the park.
+    pub(crate) fn park_until(&self, clock: &Clock, deadline: Instant) -> Wait {
         let mut state = self.0.lock();
+        if self.is_cancelled() {
+            return Wait::Cancelled;
+        }
+        let inner = Arc::downgrade(&self.0);
+        let _advance = clock.on_advance(Arc::new(move || {
+            if let Some(inner) = inner.upgrade() {
+                let _state = inner.lock();
+                inner.wake.notify_all();
+            }
+        }));
         loop {
             if self.is_cancelled() {
                 return Wait::Cancelled;
             }
-            let timeout = deadline.saturating_duration_since(Instant::now());
-            if timeout.is_zero() {
+            if clock.now() >= deadline {
                 return Wait::DeadlineReached;
             }
-            state = self
-                .0
-                .wake
-                .wait_timeout_while(state, timeout, |_| !self.is_cancelled())
-                .unwrap_or_else(PoisonError::into_inner)
-                .0;
+            state = clock.park(&self.0.wake, state, deadline);
         }
+    }
+
+    /// Sets the `testing` trace: `trace` is called with each [`CancelEvent`] of this token
+    /// (and its clones). It runs on the thread of the event, `DropWaiting` with the token's
+    /// lock held, so it must not call into this token; it may block (to hold that thread at
+    /// the event) only for `HookTaken`.
+    ///
+    /// [`CancelEvent`]: crate::testing::CancelEvent
+    #[cfg(feature = "testing")]
+    pub fn set_trace(&self, trace: Arc<dyn Fn(crate::testing::CancelEvent) + Send + Sync>) {
+        *self.0.trace.lock().unwrap_or_else(PoisonError::into_inner) = Some(trace);
     }
 
     /// Registers `wake` to run once on cancel, or at once if the token is already cancelled.
@@ -224,6 +266,13 @@ impl Drop for CancelHook {
             return;
         }
         let me = thread::current().id();
+        #[cfg(feature = "testing")]
+        if state
+            .running
+            .is_some_and(|(id, thread)| id == self.id && thread != me)
+        {
+            inner.trace(crate::testing::CancelEvent::DropWaiting);
+        }
         let _state = inner
             .hook_done
             .wait_while(state, |state| {

@@ -1,5 +1,11 @@
 //! Platform keyring access with a read deadline.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
+
+use sc_agent_types::{CancelToken, Clock, Wait};
+
 use crate::error::SecretsError;
 
 /// Reads one keyring entry.
@@ -42,7 +48,7 @@ pub struct PlatformKeyring;
 /// show its prompt, a Secret Service with no agent) can block a read forever.
 /// A headless run must not hang on it, so the read gets a deadline and a
 /// typed error ([`SecretsError::KeyringTimeout`]).
-pub(crate) const KEYRING_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+pub(crate) const KEYRING_READ_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Why a bounded read returned nothing.
 #[derive(Debug, PartialEq, Eq)]
@@ -63,54 +69,70 @@ pub(crate) enum DeadlineMiss {
 /// that same reader finishing (a drop guard, so a panic clears it too). While
 /// it is set, every `run` returns [`DeadlineMiss::TimedOut`] at once, without
 /// starting a thread: several backends cost one wait and at most one thread is
-/// stranded. No clock is compared. Tests build their own gate, so none shares
-/// a process global.
+/// stranded. The deadline is waited for on the caller's [`Clock`], so a test
+/// moves it with a manual clock. Tests build their own gate, so none shares a
+/// process global.
 pub(crate) struct ReadGate {
-    stuck: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    next_id: std::sync::atomic::AtomicU64,
+    stuck: Arc<AtomicU64>,
+    next_id: AtomicU64,
     /// Held for the whole of one read (start to answer or deadline), so reads
     /// run one at a time: a second caller waits for the first read's answer
     /// or deadline, then sees the stuck mark and returns at once. Without it,
     /// two concurrent callers could both pass the stuck check and strand two
     /// threads.
-    in_flight: std::sync::Mutex<()>,
+    in_flight: Mutex<()>,
+    /// The `finished` latch of the read that is stuck now, so a test can wait
+    /// (bounded) for it to clear instead of polling.
+    #[cfg(test)]
+    stuck_read: Mutex<Option<CancelToken>>,
 }
 
-/// Clears the gate's stuck mark if (and only if) it names this reader.
+/// The answer slot of one read and the latch that says the reader has ended.
+struct Answer<T> {
+    value: Mutex<Option<T>>,
+    /// Cancelled once the reader ended (answer stored, or panicked): the
+    /// caller's deadline wait ends on it.
+    finished: CancelToken,
+}
+
+/// Run by the reader thread when it ends, even by a panic: clears the gate's
+/// stuck mark if (and only if) it names this reader, then fires `finished`.
 struct Finished {
     id: u64,
-    finished: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    stuck: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    finished: CancelToken,
+    stuck: Arc<AtomicU64>,
 }
 
 impl Drop for Finished {
     fn drop(&mut self) {
-        use std::sync::atomic::Ordering;
-        self.finished.store(true, Ordering::SeqCst);
         let _ = self
             .stuck
             .compare_exchange(self.id, 0, Ordering::SeqCst, Ordering::SeqCst);
+        self.finished.cancel();
     }
 }
 
 impl ReadGate {
     pub(crate) fn new() -> Self {
         Self {
-            stuck: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            next_id: std::sync::atomic::AtomicU64::new(1),
-            in_flight: std::sync::Mutex::new(()),
+            stuck: Arc::new(AtomicU64::new(0)),
+            next_id: AtomicU64::new(1),
+            in_flight: Mutex::new(()),
+            #[cfg(test)]
+            stuck_read: Mutex::new(None),
         }
     }
 
     /// Whether a timed-out read is still running.
     pub(crate) fn is_stuck(&self) -> bool {
-        self.stuck.load(std::sync::atomic::Ordering::SeqCst) != 0
+        self.stuck.load(Ordering::SeqCst) != 0
     }
 
-    /// Runs `read` on its own thread and waits at most `timeout`.
+    /// Runs `read` on its own thread and waits at most `timeout` on `clock`.
     ///
     /// Reads are serialized (see `in_flight`), so a caller may wait for an
-    /// earlier read's deadline before its own read starts.
+    /// earlier read's deadline before its own read starts. The deadline is
+    /// taken before the reader starts.
     ///
     /// On timeout the thread is left to finish (or stay blocked) on its own;
     /// it only reads the keystore and holds no state, so abandoning it is
@@ -118,47 +140,64 @@ impl ReadGate {
     /// or that panics before answering, is [`DeadlineMiss::Failed`].
     pub(crate) fn run<T: Send + 'static>(
         &self,
-        timeout: std::time::Duration,
+        clock: &Clock,
+        timeout: Duration,
         read: impl FnOnce() -> T + Send + 'static,
     ) -> Result<T, DeadlineMiss> {
-        use std::sync::atomic::{AtomicBool, Ordering};
         // The guard holds no data, so a poisoned lock is still a valid one.
         let _one_at_a_time = self
             .in_flight
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .unwrap_or_else(PoisonError::into_inner);
         if self.is_stuck() {
             return Err(DeadlineMiss::TimedOut);
         }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let finished = std::sync::Arc::new(AtomicBool::new(false));
+        let now = clock.now();
+        // A timeout past the end of `Instant` waits no time: the read is then a timeout.
+        let deadline = now.checked_add(timeout).unwrap_or(now);
+        let answer = Arc::new(Answer {
+            value: Mutex::new(None),
+            finished: CancelToken::new(),
+        });
         let guard = Finished {
             id,
-            finished: std::sync::Arc::clone(&finished),
-            stuck: std::sync::Arc::clone(&self.stuck),
+            finished: answer.finished.clone(),
+            stuck: Arc::clone(&self.stuck),
         };
-        let (sender, receiver) = std::sync::mpsc::channel();
+        let reader = Arc::clone(&answer);
         std::thread::Builder::new()
             .name("sc-keyring-read".to_owned())
             .spawn(move || {
                 let _guard = guard;
-                let _ = sender.send(read());
+                let value = read();
+                *reader.value.lock().unwrap_or_else(PoisonError::into_inner) = Some(value);
             })
             .map_err(|_| DeadlineMiss::Failed)?;
-        receiver.recv_timeout(timeout).map_err(|error| match error {
-            std::sync::mpsc::RecvTimeoutError::Timeout => {
-                self.stuck.store(id, Ordering::SeqCst);
-                // The reader may have finished between the timeout and the
-                // store above; if so it will not clear the mark again.
-                if finished.load(Ordering::SeqCst) {
-                    let _ = self
-                        .stuck
-                        .compare_exchange(id, 0, Ordering::SeqCst, Ordering::SeqCst);
-                }
-                DeadlineMiss::TimedOut
-            }
-            std::sync::mpsc::RecvTimeoutError::Disconnected => DeadlineMiss::Failed,
-        })
+        if clock.wait_until(&answer.finished, deadline) == Wait::Cancelled {
+            return answer
+                .value
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take()
+                .ok_or(DeadlineMiss::Failed);
+        }
+        self.stuck.store(id, Ordering::SeqCst);
+        // The reader may have finished between the deadline and the store
+        // above; if so it will not clear the mark again.
+        if answer.finished.is_cancelled() {
+            let _ = self
+                .stuck
+                .compare_exchange(id, 0, Ordering::SeqCst, Ordering::SeqCst);
+        }
+        #[cfg(test)]
+        {
+            *self
+                .stuck_read
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = Some(answer.finished.clone());
+        }
+        Err(DeadlineMiss::TimedOut)
     }
 }
 
@@ -177,7 +216,9 @@ fn keyring_read_failed() -> SecretsError {
 impl KeyringSource for PlatformKeyring {
     fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError> {
         let (service, account) = (service.to_owned(), account.to_owned());
-        match GATE.run(KEYRING_READ_TIMEOUT, move || read_entry(&service, &account)) {
+        match GATE.run(&Clock::system(), KEYRING_READ_TIMEOUT, move || {
+            read_entry(&service, &account)
+        }) {
             Ok(result) => result,
             Err(DeadlineMiss::TimedOut) => Err(SecretsError::KeyringTimeout),
             Err(DeadlineMiss::Failed) => Err(keyring_read_failed()),
@@ -316,104 +357,124 @@ mod tests {
         );
     }
 
-    use std::sync::mpsc;
-    use std::time::Duration;
+    use std::sync::atomic::AtomicBool;
 
-    /// Short deadline for tests; no test waits on a clock for its result.
+    use sc_agent_testkit::{Gate, HANG_GUARD, Started, cancelled_within, join_within};
+    use sc_agent_types::testing::ManualClock;
+
+    /// The read deadline of these tests; only an advance of the manual clock reaches it.
     const SHORT: Duration = Duration::from_millis(20);
-    /// A deadline long enough that only the read finishing ends the wait.
-    const LONG: Duration = Duration::from_secs(60);
 
-    /// Waits by yielding (never a timed pause) until the stuck mark clears.
+    /// Waits (bounded) until the read that is stuck now has finished and cleared the mark.
     fn wait_until_unstuck(gate: &ReadGate) {
-        let mut spins = 0_u64;
-        while gate.is_stuck() {
-            spins += 1;
-            assert!(spins < 50_000_000, "the stuck mark never cleared");
-            std::thread::yield_now();
-        }
+        let finished = gate
+            .stuck_read
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .expect("a read is stuck");
+        cancelled_within(&finished, HANG_GUARD);
+        assert!(!gate.is_stuck(), "the finished reader cleared the mark");
     }
 
-    /// A read that never answers returns a typed error at the
-    /// deadline instead of hanging. The blocked reader waits on a channel, so
-    /// the test depends on no timed pause: it ends when the test releases the gate.
+    /// A read that never answers returns a typed error at the deadline instead of hanging.
+    /// The deadline is reached by advancing a manual clock once the read is known to be in
+    /// flight; the blocked reader waits at a gate the test opens.
     #[test]
     fn a_blocked_keyring_read_times_out_with_a_typed_error() {
-        let gate = ReadGate::new();
-        let (release, held) = mpsc::channel::<()>();
-        let blocked = gate.run(SHORT, move || {
-            let _ = held.recv();
-            1_u8
-        });
-        assert_eq!(blocked, Err(DeadlineMiss::TimedOut));
+        let manual = ManualClock::new();
+        let gate = Arc::new(ReadGate::new());
+        let (started, release) = (Started::new(), Gate::new());
+        let opener = release.opener();
+        let caller = {
+            let (gate, clock) = (Arc::clone(&gate), manual.clock());
+            let (started, release) = (started.clone(), release.clone());
+            std::thread::spawn(move || {
+                gate.run(&clock, SHORT, move || {
+                    started.signal();
+                    release.wait();
+                    1_u8
+                })
+            })
+        };
+        started.wait();
+        assert!(manual.wait_for_waiters(1), "the caller waits on the clock");
+        manual.advance(SHORT);
+        assert_eq!(
+            join_within(caller, HANG_GUARD).expect("caller"),
+            Err(DeadlineMiss::TimedOut)
+        );
         assert!(gate.is_stuck());
         // While it is stuck a later read fails at once and never runs.
-        let ran = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let flag = std::sync::Arc::clone(&ran);
-        let later = gate.run(LONG, move || {
-            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        let ran = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&ran);
+        let later = gate.run(&manual.clock(), SHORT, move || {
+            flag.store(true, Ordering::SeqCst);
         });
         assert_eq!(later, Err(DeadlineMiss::TimedOut));
-        assert!(!ran.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(!ran.load(Ordering::SeqCst));
         // Releasing the stuck reader clears the mark, and reads work again.
-        drop(release);
+        opener.open();
         wait_until_unstuck(&gate);
-        assert_eq!(gate.run(LONG, || 7_u8), Ok(7));
+        assert_eq!(gate.run(&manual.clock(), SHORT, || 7_u8), Ok(7));
     }
 
-    /// Two callers whose reads would both block start one reader thread
-    /// between them: both get `TimedOut` and at most one thread is stranded.
+    /// Two callers whose reads would both block start one reader thread between them: both
+    /// get `TimedOut` and at most one thread is stranded. The first read is known to be in
+    /// flight before the clock reaches its deadline, so the second caller, whichever thread it
+    /// is, finds the stuck mark.
     #[test]
     fn two_concurrent_blocked_reads_strand_one_thread() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        use std::sync::{Arc, Barrier, Mutex};
-
+        let manual = ManualClock::new();
         let gate = Arc::new(ReadGate::new());
-        let started = Arc::new(AtomicUsize::new(0));
-        let (release, held) = mpsc::channel::<()>();
-        let held = Arc::new(Mutex::new(held));
-        let barrier = Arc::new(Barrier::new(2));
+        let (started, release) = (Started::new(), Gate::new());
+        let opener = release.opener();
         let callers: Vec<_> = (0..2)
             .map(|index| {
-                let (gate, started, held, barrier) = (
-                    Arc::clone(&gate),
-                    Arc::clone(&started),
-                    Arc::clone(&held),
-                    Arc::clone(&barrier),
-                );
+                let (gate, clock) = (Arc::clone(&gate), manual.clock());
+                let (started, release) = (started.clone(), release.clone());
                 std::thread::Builder::new()
                     .name(format!("caller-{index}"))
                     .spawn(move || {
-                        barrier.wait();
-                        gate.run(SHORT, move || {
-                            started.fetch_add(1, Ordering::SeqCst);
-                            let _ = held.lock().map(|receiver| receiver.recv());
+                        gate.run(&clock, SHORT, move || {
+                            started.signal();
+                            release.wait();
                         })
                     })
                     .expect("spawn a caller")
             })
             .collect();
+        started.wait();
+        assert!(
+            manual.wait_for_waiters(1),
+            "the first caller waits on the clock"
+        );
+        manual.advance(SHORT);
         for caller in callers {
-            assert_eq!(caller.join().expect("caller"), Err(DeadlineMiss::TimedOut));
+            assert_eq!(
+                join_within(caller, HANG_GUARD).expect("caller"),
+                Err(DeadlineMiss::TimedOut)
+            );
         }
-        assert_eq!(started.load(Ordering::SeqCst), 1, "one reader thread only");
+        assert_eq!(started.count(), 1, "one reader thread only");
         assert!(gate.is_stuck());
-        drop(release);
+        opener.open();
         wait_until_unstuck(&gate);
-        assert_eq!(gate.run(LONG, || 9_u8), Ok(9));
+        assert_eq!(gate.run(&manual.clock(), SHORT, || 9_u8), Ok(9));
     }
 
-    /// A reader that panics before answering is not a timeout and leaves the
-    /// gate usable.
+    /// A reader that panics before answering is not a timeout and leaves the gate usable;
+    /// the clock never moves, so no deadline is involved.
     #[test]
     fn a_panicking_keyring_read_is_not_a_timeout_and_the_next_read_works() {
+        let clock = ManualClock::new().clock();
         let gate = ReadGate::new();
-        let result = gate.run(LONG, || -> u8 {
+        let result = gate.run(&clock, SHORT, || -> u8 {
             panic!("keystore reader failed (expected in this test)")
         });
         assert_eq!(result, Err(DeadlineMiss::Failed));
         assert!(!gate.is_stuck());
-        assert_eq!(gate.run(LONG, || 3_u8), Ok(3));
+        assert_eq!(gate.run(&clock, SHORT, || 3_u8), Ok(3));
         let error = keyring_read_failed();
         assert_eq!(error.id(), "secrets.keyring_read");
     }

@@ -100,7 +100,10 @@ fn pool_with_stops<A: Send + 'static>(
 ) -> (Pool<Closures<A>>, mpsc::Receiver<(usize, Stopped)>) {
     let (stops, stopped) = mpsc::channel();
     let workers = NonZeroUsize::new(workers).expect("workers");
-    let jobs = Arc::new(JobQueue::new(queue, Arc::new(Instant::now)));
+    let jobs = Arc::new(JobQueue::new(
+        queue,
+        sc_agent_types::testing::ManualClock::new().clock(),
+    ));
     let results = Arc::new(BoundedQueue::new(queue, workers.get()));
     let work = Arc::new(Closures {
         run: Box::new(run),
@@ -281,7 +284,10 @@ fn a_held_job_frees_its_worker() {
 fn dropping_a_pool_never_cancels_its_queue() {
     let (stops_to, stopped) = mpsc::channel();
     let workers = NonZeroUsize::new(4).expect("workers");
-    let jobs = Arc::new(JobQueue::new(8, Arc::new(Instant::now)));
+    let jobs = Arc::new(JobQueue::new(
+        8,
+        sc_agent_types::testing::ManualClock::new().clock(),
+    ));
     let results = Arc::new(BoundedQueue::new(8, workers.get()));
     let work = Arc::new(Closures {
         run: Box::new(Step::Done),

@@ -47,7 +47,7 @@ pub use reply::ProviderReply;
 pub use request::{Endpoint, HttpRequest, HttpResponse, Method, SecretHeader};
 #[doc(inline)]
 pub use resend::{
-    Attempts, HttpClient, Next, Pending, ProviderPause, ResendPolicy, SendPermit, Start,
+    Attempts, HttpClient, Jitter, Next, Pending, ProviderPause, ResendPolicy, SendPermit, Start,
 };
 /// Which request a log event belongs to; re-exported because
 /// [`HttpClient::send_once`] takes it.

@@ -9,12 +9,12 @@
 //! # Examples
 //!
 //! ```
-//! use std::time::{Duration, Instant};
+//! use std::time::Duration;
 //!
 //! use sc_agent_http::testing::{ManualClock, ScriptedTransport};
 //! use sc_agent_http::{Endpoint, HttpRequest, HttpResponse, Method, Transport};
 //!
-//! let clock = ManualClock::new(Instant::now());
+//! let clock = ManualClock::new();
 //! let start = clock.now();
 //! let transport = ScriptedTransport::responses(vec![HttpResponse::new(200, vec![], Vec::new())])
 //!     .with_send_duration(clock.clone(), Duration::from_secs(2));
@@ -29,7 +29,7 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::error::{HttpError, NetworkKind};
 use crate::request::{HttpRequest, HttpResponse};
@@ -41,35 +41,9 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Explicit test clock shared with a transport: `now()` for `send_once`,
-/// advanced by sends ([`ScriptedTransport::with_send_duration`]) or by the
-/// test. Clones share one instant.
-#[derive(Debug, Clone)]
-pub struct ManualClock {
-    now: Arc<Mutex<Instant>>,
-}
-
-impl ManualClock {
-    /// A clock reading `start`.
-    #[must_use]
-    pub fn new(start: Instant) -> Self {
-        Self {
-            now: Arc::new(Mutex::new(start)),
-        }
-    }
-
-    /// The current reading.
-    #[must_use]
-    pub fn now(&self) -> Instant {
-        *lock(&self.now)
-    }
-
-    /// Moves the clock forward by `by`.
-    pub fn advance(&self, by: Duration) {
-        let mut now = lock(&self.now);
-        *now += by;
-    }
-}
+/// The manual clock of sc-agent-types, re-exported: `now()` for `send_once`, advanced by
+/// sends ([`ScriptedTransport::with_send_duration`]) or by the test.
+pub use sc_agent_types::testing::ManualClock;
 
 /// A transport that answers from a script, first entry first.
 ///
