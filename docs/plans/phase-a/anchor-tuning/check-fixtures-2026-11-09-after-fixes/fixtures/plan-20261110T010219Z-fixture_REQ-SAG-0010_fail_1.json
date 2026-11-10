@@ -1,0 +1,133 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T010219Z-fixture_REQ-SAG-0010_fail_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T01:02:19+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:REQ-SAG-0010:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 90,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "REQ-SAG-0010",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0010",
+      "statement": "sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.",
+      "quote": "sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0010",
+      "anchor_version": 3,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "5122a4181a62bfa5e6f67cfee1006f4ca6b996fdaf27f1dbec414c5293613e97",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The described work writes or edits no Rust code inside an sc-agent crate (for example docs only, CI files, or a script in another language).",
+            "unclear": "The item text is too vague to tell whether Rust code in an sc-agent crate is written or edited.",
+            "yes": "The described work writes or edits Rust code inside an sc-agent crate."
+          },
+          "instructions": "`anchor.scope` names the work the anchor governs: adding or changing Rust source in an sc-agent crate. Does `item.text` describe work within that scope? Count any Rust code in an sc-agent crate (library code, runners, clients, types or tests), whether or not it involves waiting or timing. Work that touches only documents, CI files, or non-Rust or non-sc-agent code is outside the scope. Judge whether the item is within scope only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item writes down no such commitment, whatever else it says about waiting, retries or timeouts.",
+            "unclear": "The item contains wording that may or may not be a no-sleep commitment.",
+            "yes": "The item writes down the no-sleep commitment or a named replacement for sleeping."
+          },
+          "instructions": "Does `item.text` contain an explicit commitment matching `anchor.statement`, namely that the sc-agent code will not sleep? Look for wording such as 'no sleep calls', a rule or lint forbidding sleep, or a named replacement for sleeping such as CancelToken::wait_until. Mentioning delays, retries, holdoffs or timeouts without that commitment does not count, and an item that sleeps does not count. Judge only whether the commitment is written in the item.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "The item states no sleep call and no permission for one in sc-agent Rust source.",
+            "unclear": "The item states a call in sc-agent Rust source that might be a sleep function, but the text does not show which.",
+            "yes": "The item states a sleep call, or permission for one, in sc-agent Rust source."
+          },
+          "instructions": "Judge only what `item.text` states. Does it state that sc-agent Rust code (tests included) will call std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or another sleep function, or that such a call is allowed, which `anchor.statement` rules out? Do not infer a sleep from an unstated waiting mechanism: 'waits out the holdoff' or 'retries after a delay' without a named sleep is not a conflict. tokio::time::timeout and cancellation-token waits are not sleep functions. Sleep calls outside sc-agent Rust source are not a conflict. Silence is not a conflict.",
+          "type": "choice"
+        }
+      },
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.03,
+            "yes": 0.97
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        }
+      },
+      "min_confidence": 0.96,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1054,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 90,
+      "item_shortened": false,
+      "request_bytes": 3026
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "REQ-SAG-0010"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": false
+  }
+}

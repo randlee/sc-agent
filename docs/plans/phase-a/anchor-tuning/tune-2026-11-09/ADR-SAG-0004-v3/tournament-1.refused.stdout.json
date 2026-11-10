@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "TOURNAMENT.ORACLE_CHANGED",
+    "message": "oracle digest 9b290f723ec82250639b62678c36f1bbc6cd130c75daa55b0e969c81c54a3518 differs from the tuning history's frozen oracle 8b975a4358acb31f8a5a7487da75cf362784ff6f46741d69bb5ec69cc98d5d1c",
+    "recoverable": false,
+    "suggested_action": "Never add, remove or relabel an oracle case after an answer; evaluate new candidates against the frozen oracle."
+  }
+}

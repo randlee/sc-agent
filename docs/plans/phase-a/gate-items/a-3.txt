@@ -10,10 +10,11 @@ Build sc-treesitter as a stand-alone library with PyO3 and CLI support types for
 - [ ] A caller-written query runs against Python source and against Rust source through the same run_query call (REQ-SAG-0302, first release).
 - [ ] Every id from languages() runs through the same run_query call; adding a grammar adds a table row only, no API change (REQ-SAG-0302).
 - [ ] languages() lists the loaded grammars and queries() lists the predefined queries (python/branches, rust/match-arms) (REQ-SAG-0303 support).
-- [ ] A caller-written query runs through the PyO3 bindings (feature python) and returns its matches as Capture objects (REQ-SAG-0303).
-- [ ] All 17 Error variants exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message (REQ-SAG-0002).
+- [ ] A caller-written query runs through the PyO3 bindings (crates/sc-treesitter-py over feature python, module sc_treesitter) and returns its matches as Capture objects (REQ-SAG-0303).
+- [ ] All 19 Error variants (the owner's 17 plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message (REQ-SAG-0002).
 - [ ] An injected lowest-layer failure (non-UTF-8 source) reaches the PyO3 entry point with id treesitter.not_utf8 and its message (REQ-SAG-0002).
 - [ ] Clippy passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code (REQ-SAG-0002).
-- [ ] No git, no tokio, no sleep(), no sc-sha; no u32 clamping of positions (PositionOverflow instead).
-- [ ] Second wave (C# as csharp, Go) is added later as table rows with no API change (REQ-SAG-0302).
-- [ ] REQ-SAG-0010: no call to std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function in sc-treesitter source; enforced by the workspace clippy disallowed-methods rule.
+- [ ] No git, no sc-sha; no u32 clamping of positions (PositionOverflow instead).
+- [ ] Second wave (C# as csharp, Go) is a later sprint that adds table rows, queries and samples with no API change (REQ-SAG-0302).
+- [ ] The library writes no log (REQ-SAG-0301); `cargo tree -p sc-treesitter --no-default-features --features grammar-python,grammar-rust` lists no sc-observability.
+- [ ] REQ-SAG-0010: sc-treesitter and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.

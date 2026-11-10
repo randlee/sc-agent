@@ -28,7 +28,7 @@ Anchor: crates/sc-decision-schema must contain only the code necessary to send a
 
 > Has the absolute minimum code that is necessary to send/receive 100% of the decision api
 
-Said by Rand Lee, planning session, 2026-11-09T07:40:40Z. Status: locked. Version 2.
+Said by Rand Lee, planning session, 2026-11-09T07:40:40Z. Status: locked. Version 3.
 
 Summary: sc-decision-schema holds only minimum decision-API code
 
@@ -44,7 +44,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 Beads: anchor `agt-e49`, plan questions `agt-e49.1`, dev questions `agt-e49.2`
 
 Fixtures:
-- pass: sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code.
+- pass: Add to crates/sc-decision-schema only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; the crate gets no transport, logging or CLI code.
 - fail: sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client.
 
 ## ANC-002
@@ -129,15 +129,18 @@ Fixtures:
 
 ## ADR-SAG-0004
 
-Anchor: No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.
+Anchor: No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 3.
 
 Summary: No crate depends on a crate above it in the layering
 
 Scope: adds or changes a crate dependency in a Cargo.toml
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.3`: sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.
 
 Beads: anchor `agt-mud`, plan questions `agt-mud.1`, dev questions `agt-mud.2`
 
@@ -169,7 +172,7 @@ Anchor: No type, field or constant in the sc-agent-types or sc-decision-schema c
 
 > `sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.
 
-Said by Rand Lee, record REQ-SAG-0006, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, record REQ-SAG-0006, 2026-11-09. Status: locked. Version 3.
 
 Summary: No consumer-app or Jev-mock types in shared crates
 
@@ -178,11 +181,13 @@ Scope: adds or changes a type in sc-agent-types or sc-decision-schema
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.5`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-5 changes neither (it builds sc-agent-http).
 - `agt-4p2.6`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.
+- `agt-4p2.7`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.
+- `agt-4p2.8`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log.
 
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
 Fixtures:
-- pass: sc-decision-schema contains only TypeSafe API types; no type names plan-anchor or judge-jev.
+- pass: Add the TypeSafe API request and response types to sc-decision-schema; no type, field or constant names plan-anchor or judge-jev.
 - fail: sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate.
 
 ## REQ-SAG-0009
@@ -212,7 +217,7 @@ Anchor: sc-agent source code must not call std::thread::sleep, tokio::time::slee
 
 > sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.
 
-Said by Rand Lee, record REQ-SAG-0010, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, record REQ-SAG-0010, 2026-11-09. Status: locked. Version 3.
 
 Summary: No sleep calls in sc-agent source
 
@@ -221,8 +226,8 @@ Scope: adds or changes Rust source in an sc-agent crate
 Beads: anchor `agt-6dm`, plan questions `agt-6dm.1`, dev questions `agt-6dm.2`
 
 Fixtures:
-- pass: The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.
-- fail: The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.
+- pass: The sc-agent runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.
+- fail: The sc-agent retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.
 
 ## REQ-SAG-0201
 
@@ -260,6 +265,8 @@ Scope: adds or changes busy-response handling, resend, holdoff or the runner que
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.4`: A-4 delivers only the max_sends setting; resending is built in A-5 and A-9.
 - `agt-4p2.7`: A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.
+- `agt-4p2.2`: Resending on 429/502/529 is built in A-5 and A-9; sc-decision-schema only encodes and decodes.
+- `agt-4p2.6`: Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.
 
 Beads: anchor `agt-ebd`, plan questions `agt-ebd.1`, dev questions `agt-ebd.2`
 
@@ -301,6 +308,10 @@ Summary: Python API offers every decide CLI operation
 Scope: adds or changes a decide subcommand or a function in the sc-agent Python bindings
 
 Deterministic check to pair with the development gate: each decide subcommand has a matching Python API function, checked by a test that lists both
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.3`: A-3 builds the sc-treesitter library; it adds no decide CLI operation.
+- `agt-4p2.1`: A-1 defines data types only; it adds no decide subcommand or Python binding function.
 
 Beads: anchor `agt-frw`, plan questions `agt-frw.1`, dev questions `agt-frw.2`
 

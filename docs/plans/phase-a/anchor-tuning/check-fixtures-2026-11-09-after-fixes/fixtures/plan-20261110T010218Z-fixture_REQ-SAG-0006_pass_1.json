@@ -1,0 +1,131 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T010218Z-fixture_REQ-SAG-0006_pass_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T01:02:18+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:REQ-SAG-0006:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 129,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "REQ-SAG-0006",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0006",
+      "statement": "No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.",
+      "quote": "`sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record REQ-SAG-0006",
+      "anchor_version": 3,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "f77c5208b9d254802e04a348e0412cf838f609e96959e58512b723dca212b90c",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "It concerns something else and touches neither crate's contents.",
+            "unclear": "It is too vague to tell which crates it touches.",
+            "yes": "It plans, adds or changes contents of either crate."
+          },
+          "instructions": "Does `item.text` plan work on the contents (types, fields, constants) of sc-agent-types or sc-decision-schema, the crates `anchor.statement` restricts? Judge overlap only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does not state the restriction: it is silent about consumer-specific types, only adds or describes types, or adds consumer-specific types.",
+            "unclear": "The item contains wording that partly restates the restriction, but it cannot be told whether it excludes consumer-specific types.",
+            "yes": "The item explicitly states that sc-agent-types or sc-decision-schema hold no types, fields or constants specific to plan-anchor, judge-jev or other consumer applications."
+          },
+          "instructions": "`anchor.statement` forbids putting any type, field or constant specific to plan-anchor, judge-jev or another consumer application into sc-agent-types or sc-decision-schema. Does `item.text` explicitly state that restriction, for example by saying the crates hold no consumer-specific or plan-anchor/judge-jev types, or that such types stay in the consumer's own crate? Only an explicit statement of the restriction counts. Merely adding generic types, describing the crates, or being silent is not stating it. Judge presence of the stated restriction only, not whether the item breaks it.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Everything the item adds to these crates is generic or mirrors the TypeSafe API, or the item adds nothing to them.",
+            "unclear": "The item adds something to these crates and it cannot be told whether it is specific to one consumer application.",
+            "yes": "The item places in sc-agent-types or sc-decision-schema a type, field or constant that exists for plan-anchor, judge-jev or another specific consumer application."
+          },
+          "instructions": "`anchor.statement` forbids any type, field or constant in sc-agent-types or sc-decision-schema that is specific to plan-anchor, judge-jev or another application built on sc-agent. Does `item.text` plan to add or keep such content in either crate? This includes whole types, single fields, constants, mocks and test helpers, and content behind a cargo feature or used only in tests; the anchor grants no exception. A type is not forbidden just because its name sounds like a judging concept: a type that mirrors the TypeSafe API or is useful to every consumer is allowed. Silence about the rule is not a contradiction. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.1,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.28,
+            "yes": 0.4
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1072,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 129,
+      "item_shortened": false,
+      "request_bytes": 3252
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": true
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "REQ-SAG-0010",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "The sc-agent runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0010_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0010",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "The sc-agent retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0010_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "judged": 2,
+    "pass": true,
+    "path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures",
+    "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures",
+    "runs": [
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0010_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0010_fail_1.json"
+    ]
+  },
+  "error": null
+}

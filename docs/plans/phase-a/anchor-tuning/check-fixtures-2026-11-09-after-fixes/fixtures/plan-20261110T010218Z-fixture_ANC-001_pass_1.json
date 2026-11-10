@@ -1,0 +1,131 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T010218Z-fixture_ANC-001_pass_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T01:02:18+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:ANC-001:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 180,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "crates/sc-decision-schema must contain only the code necessary to send and receive 100% of the decision API, with nothing beyond that minimum.",
+      "quote": "Has the absolute minimum code that is necessary to send/receive 100% of the decision api",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T07:40:40Z",
+      "context": "planning session",
+      "anchor_version": 3,
+      "deterministic_check": "every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "225552998be8fbc417b164ec5e5eed55cd0f5c9024bd6ff481a214c311e681d0",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item modifies some other area, or only uses or depends on the scoped area and leaves it unmodified.",
+            "unclear": "The item text does not say where its code changes land, so it cannot be told whether the scoped area is modified.",
+            "yes": "The item adds, removes, or changes code in the area named by anchor.scope."
+          },
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor with its governed area in `anchor.scope`. Does the work in `item.text` add, remove, or change code inside the area named in `anchor.scope` (here: code in crates/sc-decision-schema)? Only an item that itself modifies that area counts. An item that only uses, imports, or depends on that area while leaving it unmodified does not count. Judge whether the item modifies the scoped area only; do not judge whether it obeys the anchor.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item makes no such commitment, postpones it, makes an exception to it, or plans extra code in the crate.",
+            "unclear": "Some wording might be a commitment to minimal crate contents, but it is too vague to decide.",
+            "yes": "The item explicitly commits the crate to only the decision-API minimum, with no exception."
+          },
+          "instructions": "Does `item.text` commit to the directive in `anchor.statement` - that the crate holds only the minimum code needed to send and receive the decision API? Look for an explicit commitment in the item: words such as 'only', 'nothing else', or a stated list of what is excluded. Silence about the limit is no. Promising to look at the crate's size later is no. Stating the limit but making an exception to it is no, because the directive allows nothing beyond the minimum. Judge the presence of this commitment only.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Everything the item puts in the crate is decision-API code, or the item puts nothing in the crate.",
+            "unclear": "The item adds something to the crate whose relation to sending or receiving the decision API cannot be determined.",
+            "yes": "The item places, or explicitly allows, code beyond the decision-API minimum inside the crate."
+          },
+          "instructions": "`anchor.statement` forbids crates/sc-decision-schema from holding any code beyond the minimum needed to send and receive the decision API. Does `item.text` plan to put such extra code into that crate - for example an HTTP client or transport, retries, a cache, logging, report formatting, or CLI code - or explicitly allow an exception for it? Decision request, response, answer and error types and the decision traits are permitted. Silence about the limit is not a conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1085,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 180,
+      "item_shortened": false,
+      "request_bytes": 3264
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": true
+  }
+}

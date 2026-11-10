@@ -1,0 +1,1673 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "tune",
+    "gate": "planning",
+    "accepted": true,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "semantic_score": {
+      "exact_role_cells": 54,
+      "total_role_cells": 54,
+      "exact_semantic_verdicts": 18,
+      "total_semantic_verdicts": 18,
+      "stable_cases": 9,
+      "total_cases": 9,
+      "regressions": 0
+    },
+    "confidence_diagnostics": {
+      "threshold": 0.8,
+      "cells_at_or_above_threshold": 51,
+      "total_cells": 54,
+      "minimum": 0.56,
+      "p10": 0.83,
+      "median": 1.0,
+      "mean": 0.9481
+    },
+    "tuning_history_before_sha256": "142954b36db9df229d9c63656bf189474018c5b0bc7c31c1c283bc6c15eae1b3",
+    "tuning_history_after": {
+      "schema": "plan-anchor/tuning-history/2",
+      "history_id": "phase-a-ADR-SAG-0004-planning",
+      "events": [
+        {
+          "authority": {
+            "anchor_id": "ADR-SAG-0004",
+            "anchor_record_sha256": "b1da3b79a8ee8ebbba565360a497299ec083ff21c135d4a2e66c39616e0e5f92",
+            "anchor_version": 2,
+            "intent_id": "phase-a-intent",
+            "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+            "intent_version": 1
+          },
+          "candidate": {
+            "candidate_id": "b_aba",
+            "question_sha256": "a759d2f105f5e9e21f7d3ee03975ada66bd5902ca86f2653aa91ea326bbd16d4"
+          },
+          "decision": {
+            "question_set_sha256": "a759d2f105f5e9e21f7d3ee03975ada66bd5902ca86f2653aa91ea326bbd16d4",
+            "reason_code": "TOURNAMENT.SEALED",
+            "status": "sealed"
+          },
+          "event": "question_set_sealed",
+          "event_index": 1,
+          "evidence": {
+            "canonical_request_sha256": [
+              "ba7df9d39ef3cd61f8050fbc1e4a893539659c3914736818acead63648e6d604",
+              "ba7df9d39ef3cd61f8050fbc1e4a893539659c3914736818acead63648e6d604",
+              "6e454372584ac1676ba18dc6f9c202c02f8fd275c721f530bed2317786aab273",
+              "6e454372584ac1676ba18dc6f9c202c02f8fd275c721f530bed2317786aab273",
+              "1c883f9a01c9f75ab772deeddc27d47dcb9b65241ec3b1f60d74ba4cc3ddd52a",
+              "1c883f9a01c9f75ab772deeddc27d47dcb9b65241ec3b1f60d74ba4cc3ddd52a",
+              "8bb75671d3ee40ad0fddf2a2a2b4c5f96129e5db8ddb67a38f332fe21ceefe04",
+              "8bb75671d3ee40ad0fddf2a2a2b4c5f96129e5db8ddb67a38f332fe21ceefe04",
+              "885f91ac07b52fb5eef6fbb067ecfe580f813c50233a45e83c613098497bf2ed",
+              "885f91ac07b52fb5eef6fbb067ecfe580f813c50233a45e83c613098497bf2ed",
+              "32d04edd0edafff15e8ed85e08b1522f78c41f44feeb7d1c72ab08ac5a94385f",
+              "32d04edd0edafff15e8ed85e08b1522f78c41f44feeb7d1c72ab08ac5a94385f",
+              "baabd21c78541a61ec17df2381a9059f594ad29ee16a1d92535aa7d239f26b40",
+              "baabd21c78541a61ec17df2381a9059f594ad29ee16a1d92535aa7d239f26b40",
+              "3292ba5941e7d7705984761b39ec83e86470fde4ea13a322b8bf4b63339bf2d0",
+              "3292ba5941e7d7705984761b39ec83e86470fde4ea13a322b8bf4b63339bf2d0",
+              "538c5c73309117bbeae590692bbc06cd9e7cd57ca0d0fd17001142a2ccff5aa6",
+              "538c5c73309117bbeae590692bbc06cd9e7cd57ca0d0fd17001142a2ccff5aa6"
+            ],
+            "raw_response_sha256": [
+              "df7a7e6913ad4c3def54948586bd6a69bb2f21959ea14df4bfc5b3f2372d2794",
+              "bb5b5a7ff4647a9530933977c9f1385ffb0a57329ce494cbfdba8acbbfc952e4",
+              "5e45741d9f4a08c3b73c3f365f083b4e4be88ee4970c563bb02015933c4560bd",
+              "5e45741d9f4a08c3b73c3f365f083b4e4be88ee4970c563bb02015933c4560bd",
+              "b3fde7b0456243891bf27b4dfc7c2bc9f3a94d5caf16336a19d7e8caf44b6f10",
+              "2120ee921eacd346d3641f732ebfe72d7dd711d2ab18c3e78386cf35851bd0a1",
+              "ac679ca49dc1fad9266d0f844de89f9c2731a2955a32f195baf2a82cb1a82557",
+              "6917ce94f9e40da72a073125570dce1db2748807bb66154a003624d961cc157e",
+              "32c6cb7ef00559ac0f70c477ca0fda3fe696cf5d8a9a3d8aa6950ea943111d49",
+              "32c6cb7ef00559ac0f70c477ca0fda3fe696cf5d8a9a3d8aa6950ea943111d49",
+              "b4a38e673c7602cd410207ffa642bc69d65b0adbdcc161a3c2c74f27713e9976",
+              "65db2e10498216db04467f107eabf2f6a8c0e9ca3eba65517efd4ef0336ba7a4",
+              "d7402050aefa6fc4bf17c7c6c82ee81d5053d01ef348bb919fec447eea3830c0",
+              "83fece6fbb0eca65a7bb844e1653c176e1d552b013d3fd8b59471ca47c495a25",
+              "9b727f234e638afc272b26478a43ae3fb109d9f8f427993d711beb63b76157cd",
+              "9b727f234e638afc272b26478a43ae3fb109d9f8f427993d711beb63b76157cd",
+              "8c21ed6b59424f6cf9bb9a96f5880535eb31cb43270fe34230a656afb72678a0",
+              "d8650a457568486a7fd71840e16bb9850f734848b8b1aa3bf5c0a6582988370d"
+            ],
+            "run_ids": [
+              "25d0c9f4e6ea83b5",
+              "462e3b91a7429e00",
+              "b5425a8e0c2a3b51",
+              "b7bd41dd716b0389",
+              "7c8bf0b9f2ae719c",
+              "a3591b0732b6c55a",
+              "0ff5b4598ed47d07",
+              "2b8acba80cc985ae",
+              "e30bff0cb38e0166",
+              "5ef880346d120281",
+              "db8a56b8cf8c5e8b",
+              "2a05dfb0b8d08df2",
+              "3a0a558702dc070d",
+              "84ae4c9808362280",
+              "6f03e09d2fa5794c",
+              "4506ec7628c38c02",
+              "abf35357a2b8d467",
+              "1da4c848f92a448b"
+            ]
+          },
+          "oracle": {
+            "case_count": 9,
+            "case_ids": [
+              "fixture-pass-1",
+              "fixture-fail-1",
+              "compliant-1",
+              "silent-1",
+              "topical-only-1",
+              "conflicting-1",
+              "irrelevant-1",
+              "boundary-same-layer-1",
+              "exception-claimed-1"
+            ],
+            "repeat_count": 2,
+            "sha256": "8b975a4358acb31f8a5a7487da75cf362784ff6f46741d69bb5ec69cc98d5d1c"
+          },
+          "previous_event_sha256": null,
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "score": {
+            "confidence": {
+              "cells_at_or_above_threshold": 54,
+              "mean": 0.975,
+              "median": 1.0,
+              "minimum": 0.8,
+              "p10": 0.913,
+              "threshold": 0.8,
+              "total_cells": 54
+            },
+            "exact_role_cells": 54,
+            "exact_semantic_verdicts": 18,
+            "regressions": 0,
+            "stable_cases": 9,
+            "total_cases": 9,
+            "total_role_cells": 54,
+            "total_semantic_verdicts": 18
+          },
+          "supersedes": null
+        },
+        {
+          "event_index": 2,
+          "previous_event_sha256": "22ffb76127fc28d855e64206427b75c1140a6562be256e9ad9e6268844337cba",
+          "event": "question_set_sealed",
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "authority": {
+            "intent_id": "phase-a-intent",
+            "intent_version": 1,
+            "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+            "anchor_id": "ADR-SAG-0004",
+            "anchor_version": 3,
+            "anchor_record_sha256": "fc258a39c75e8dc6b3894ec9dbd3f8117831da0ef65f96c81900e781e28f5abf"
+          },
+          "oracle": {
+            "sha256": "8b975a4358acb31f8a5a7487da75cf362784ff6f46741d69bb5ec69cc98d5d1c",
+            "case_ids": [
+              "fixture-pass-1",
+              "fixture-fail-1",
+              "compliant-1",
+              "silent-1",
+              "topical-only-1",
+              "conflicting-1",
+              "irrelevant-1",
+              "boundary-same-layer-1",
+              "exception-claimed-1"
+            ],
+            "case_count": 9,
+            "repeat_count": 2
+          },
+          "candidate": {
+            "candidate_id": "b_cca",
+            "question_sha256": "13438a79d1f61dd1d78518a378fb284406c967add48d1c6ba3068543bc9848e7"
+          },
+          "evidence": {
+            "canonical_request_sha256": [
+              "900f82997c652928f0d9e8d90b02571d64840934eb5358f7b29aaba2f87a63df",
+              "900f82997c652928f0d9e8d90b02571d64840934eb5358f7b29aaba2f87a63df",
+              "5d4cf15acdb3805e470f3755c85ae891439d2dd0f450c5fac5e553f4fe189f96",
+              "5d4cf15acdb3805e470f3755c85ae891439d2dd0f450c5fac5e553f4fe189f96",
+              "e04a56c6a4e970a59ea821a58bbff5cfff61f6197c5a6c8c8b4d9c8389a00a61",
+              "e04a56c6a4e970a59ea821a58bbff5cfff61f6197c5a6c8c8b4d9c8389a00a61",
+              "ba9b626836b3f4795193900453489b726eaa2c3d83ef8d51732ae94c25746355",
+              "ba9b626836b3f4795193900453489b726eaa2c3d83ef8d51732ae94c25746355",
+              "a48c3aefacb535398d1a4e37c0a9b53e62bf0819ec0d1bf971ef8c09715555cb",
+              "a48c3aefacb535398d1a4e37c0a9b53e62bf0819ec0d1bf971ef8c09715555cb",
+              "f7fbd51deecc207015387799bbc6580199054911a4aff1b41b0695cdee8f1373",
+              "f7fbd51deecc207015387799bbc6580199054911a4aff1b41b0695cdee8f1373",
+              "5cca51cea23360d634af0fad13ef93a646edb10c8d8cb5ad132f9ece0cd590a5",
+              "5cca51cea23360d634af0fad13ef93a646edb10c8d8cb5ad132f9ece0cd590a5",
+              "bbe68ae5da1819817f754e4b3da0210de279e851a07820b84e9df4ed8c6f7708",
+              "bbe68ae5da1819817f754e4b3da0210de279e851a07820b84e9df4ed8c6f7708",
+              "53c342df5ebd505e6e77c335de621f50babc40b3c6dc6a0162572187c40a1004",
+              "53c342df5ebd505e6e77c335de621f50babc40b3c6dc6a0162572187c40a1004"
+            ],
+            "raw_response_sha256": [
+              "3bc41c53a4057971bb6ed2285a97ceb92da89251e38c2c73132b3fab7039bf1d",
+              "c29fa524368f592d5a11bc5c11410293486f225de4ce204838e25908197532f0",
+              "5c418310c3064edeff7a39910275ad912a626d71f0318be6f42a4338de4ef679",
+              "5c418310c3064edeff7a39910275ad912a626d71f0318be6f42a4338de4ef679",
+              "d709a98f5257efae241d317256a0c3504f3579d9878e71549e37467be0c88823",
+              "d709a98f5257efae241d317256a0c3504f3579d9878e71549e37467be0c88823",
+              "588df94fe7dd8041569b7ce3b397387391d8e5d6d634d5026a2d9165a4861d72",
+              "3fcce1752a0e3ff90339652f516bcbdedca86e8d7a790432f2cb4d14a8668052",
+              "27eafbf3eb4cfb2b53179faad889e1aadff42e5a638236ac9f74d66f3b9bd18e",
+              "27eafbf3eb4cfb2b53179faad889e1aadff42e5a638236ac9f74d66f3b9bd18e",
+              "9f2fae42bdbcbb2eb0fa0cae19524b772aad6d7869a1cb1e22e0197902f9288c",
+              "1c261fb5022985a5c849c294067375b94481768dfed617cda60f64a180d5e5fa",
+              "02b028e68b4c2c434c7d7002eefc793b492a900fcba9f0fbb5786110b7acc423",
+              "ece880b73b24328a54b8473bce69d07ad3a3d3b6c4f731b18ce5f08a03ef837e",
+              "21ab93c35e0ab1776bfbefb492901dd78c564df82681f1cc66cc0b8548f1c9bc",
+              "f6d0d2f25ad13944f71403692306aa03ad96f12e0beae32c84fd4b14d0aefed7",
+              "cf5230c724d197e9babf66d2d437e796b42abb67354037958ff30ff35aee07ee",
+              "c43f3898e668485091bafcd482b972531055fafe97a77da8fa0c3984bc47d04a"
+            ],
+            "run_ids": [
+              "08b52537dd0041a4",
+              "88abaf6be88bfcd8",
+              "55ab083d437e4605",
+              "3c4634b7f178dfda",
+              "95bdeaa8073f8e98",
+              "ffc2e4327b8eafe0",
+              "10cbd0db6b239dc1",
+              "c4d24b056204c178",
+              "8e277860b6c2c964",
+              "6c67ad6f88a444ce",
+              "8ad91054c0345061",
+              "108b9872d11c14c7",
+              "ec7fbf0fad7f19bb",
+              "ab354b5f8b58b104",
+              "03b6b125675abc91",
+              "3e84d7769e90fd04",
+              "bb2e79e028b4d765",
+              "77a90fe89b8ba1fd"
+            ]
+          },
+          "score": {
+            "exact_role_cells": 54,
+            "total_role_cells": 54,
+            "exact_semantic_verdicts": 18,
+            "total_semantic_verdicts": 18,
+            "stable_cases": 9,
+            "total_cases": 9,
+            "regressions": 0,
+            "confidence": {
+              "threshold": 0.8,
+              "cells_at_or_above_threshold": 51,
+              "total_cells": 54,
+              "minimum": 0.56,
+              "p10": 0.83,
+              "median": 1.0,
+              "mean": 0.9481
+            }
+          },
+          "decision": {
+            "status": "sealed",
+            "question_set_sha256": "13438a79d1f61dd1d78518a378fb284406c967add48d1c6ba3068543bc9848e7",
+            "reason_code": "TOURNAMENT.SEALED"
+          },
+          "supersedes": {
+            "protocol_version": "plan-anchor/question-tournament/2.0.0",
+            "decision_sha256": "6ae706a4871fb4d55320f82b4fb198737ca79452695a78d643e5f1a9d913c01f"
+          }
+        }
+      ]
+    },
+    "tuning_history_after_sha256": "681af7efbbd94620db96159a11df624528c018b10c1f35635ba97aad8162fbec",
+    "production_semantics_unchanged": true,
+    "authority_citations": [
+      "ADR-SAG-0004 v2 (locked, kind prohibition): No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner. Scope: adds or changes a crate dependency in a Cargo.toml.",
+      "ADR-SAG-0004 v2 approved fixtures (pass and fail).",
+      "phase-a-intent v1: low-level sc-agent libraries sc-agent-types, sc-decision-schema with the decision trait, and the shared HTTP layer."
+    ],
+    "oracle_sha256": "8b975a4358acb31f8a5a7487da75cf362784ff6f46741d69bb5ec69cc98d5d1c",
+    "sealed_question_set": {
+      "digest": "13438a79d1f61dd1d78518a378fb284406c967add48d1c6ba3068543bc9848e7",
+      "questions": {
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly carry out or preserve the directive in `anchor.statement`, by including its specific content as a stated constraint, such as \"depends only on\" lower-layer crates or \"no crate depends on\" a higher-layer crate? A generic mention of the topic, or a dependency change that merely happens to comply, does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+          "criteria": {
+            "yes": "The item contains the directive's specific content as a constraint, a closed dependency list or an explicit exclusion.",
+            "no": "The item text does not contain the directive's specific content, whether or not what it does is allowed.",
+            "unclear": "The item text alludes to the directive but it is not possible to tell whether the directive itself is included."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Using the layer order in `anchor.statement` (bottom to top), does `item.text` plan for an sc-agent crate to depend, in any Cargo.toml dependency section, on an sc-agent crate in a higher layer than its own? Dependencies on the same or a lower layer are not conflicts. Calling a dependency temporary or an exception does not remove a conflict. Silence about dependencies is not a conflict. Judge conflict only.",
+          "criteria": {
+            "yes": "The item makes some sc-agent crate depend on an sc-agent crate in a higher layer.",
+            "no": "Every dependency the item plans is on the same or a lower layer, or the item plans no dependency.",
+            "unclear": "The item plans a dependency but the crates or their layers cannot be determined from the text."
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "instructions": "`anchor.statement` restricts which sc-agent crates a crate's Cargo.toml may depend on, and `anchor.scope` says it governs adding or changing a crate dependency. Read `item.text`: will doing this item put a dependency on an sc-agent crate into some Cargo.toml, change one, or state which sc-agent crates a crate depends on? Do not judge whether the dependency is allowed.",
+          "criteria": {
+            "yes": "Doing the item adds, changes or states a dependency on an sc-agent crate in a Cargo.toml.",
+            "no": "Doing the item leaves every sc-agent crate dependency untouched and states none; talking about the layers does not count.",
+            "unclear": "It cannot be told from the text whether the item touches sc-agent crate dependencies."
+          }
+        }
+      }
+    },
+    "candidate_rankings": [
+      {
+        "rank": 1,
+        "bundle_id": "b_cca",
+        "roles": {
+          "relevant": "rel_c",
+          "addressed": "addr_c",
+          "contradicted": "con_a"
+        },
+        "question_sha256": "3d4e7ddb340f6d020c37b51d5f38fba9ced0a95d7e01c07bb8ff6a58ade52607",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 51,
+          "total_cells": 54,
+          "minimum": 0.56,
+          "p10": 0.83,
+          "median": 1.0,
+          "mean": 0.9481
+        },
+        "complexity_bytes": 2375,
+        "selected": true,
+        "co_leader": false,
+        "reason": "Selected: top lexicographic rank among semantically accepted bundles.",
+        "mismatches": []
+      },
+      {
+        "rank": 2,
+        "bundle_id": "b_aca",
+        "roles": {
+          "relevant": "rel_a",
+          "addressed": "addr_c",
+          "contradicted": "con_a"
+        },
+        "question_sha256": "10e9e87393277354ccbe562f26b76f96c503d576be0b298f2893fda3cf0dc5b9",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 50,
+          "total_cells": 54,
+          "minimum": 0.53,
+          "p10": 0.823,
+          "median": 1.0,
+          "mean": 0.9507
+        },
+        "complexity_bytes": 2495,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 3,
+        "bundle_id": "b_aba",
+        "roles": {
+          "relevant": "rel_a",
+          "addressed": "addr_b",
+          "contradicted": "con_a"
+        },
+        "question_sha256": "e1300ca30950e9bdb7369d37078c8f6f88e11be313096fd2630f1eeea66af591",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 49,
+          "total_cells": 54,
+          "minimum": 0.52,
+          "p10": 0.829,
+          "median": 1.0,
+          "mean": 0.9526
+        },
+        "complexity_bytes": 2375,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 4,
+        "bundle_id": "b_caa",
+        "roles": {
+          "relevant": "rel_c",
+          "addressed": "addr_a",
+          "contradicted": "con_a"
+        },
+        "question_sha256": "279125d497c2d497f6991b676579cdffb922ca4ae9c26d907455e3407c2413b2",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 48,
+          "total_cells": 54,
+          "minimum": 0.62,
+          "p10": 0.772,
+          "median": 1.0,
+          "mean": 0.9404
+        },
+        "complexity_bytes": 2474,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 5,
+        "bundle_id": "baseline",
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "question_sha256": "e1300ca30950e9bdb7369d37078c8f6f88e11be313096fd2630f1eeea66af591",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 48,
+          "total_cells": 54,
+          "minimum": 0.56,
+          "p10": 0.793,
+          "median": 1.0,
+          "mean": 0.9481
+        },
+        "complexity_bytes": 2375,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 6,
+        "bundle_id": "b_aaa",
+        "roles": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_a"
+        },
+        "question_sha256": "31f503b625072100402fac10607f79f1425cd304660864c3463a361f6b781153",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.58,
+          "p10": 0.742,
+          "median": 1.0,
+          "mean": 0.9465
+        },
+        "complexity_bytes": 2594,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 7,
+        "bundle_id": "b_ccc",
+        "roles": {
+          "relevant": "rel_c",
+          "addressed": "addr_c",
+          "contradicted": "con_c"
+        },
+        "question_sha256": "960ff07cd3f43f9a1d6996f99de73607a1fcc00c1372e38bfcf85ce7a517faa6",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.55,
+          "p10": 0.652,
+          "median": 0.98,
+          "mean": 0.9211
+        },
+        "complexity_bytes": 2194,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 8,
+        "bundle_id": "b_aac",
+        "roles": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_c"
+        },
+        "question_sha256": "6ca893882e52d2540aff84920c6937c0c8315afcab53c7493e5cf5cb7614bc83",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 44,
+          "total_cells": 54,
+          "minimum": 0.58,
+          "p10": 0.681,
+          "median": 1.0,
+          "mean": 0.9285
+        },
+        "complexity_bytes": 2413,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 9,
+        "bundle_id": "b_aab",
+        "roles": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_b"
+        },
+        "question_sha256": "9ec66f3af8a506c0dd4800fb755b87b9524c88edca26973e75bc5cf7ef802e4f",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 44,
+          "total_cells": 54,
+          "minimum": 0.48,
+          "p10": 0.646,
+          "median": 1.0,
+          "mean": 0.9246
+        },
+        "complexity_bytes": 2547,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      },
+      {
+        "rank": 10,
+        "bundle_id": "b_bbb",
+        "roles": {
+          "relevant": "rel_b",
+          "addressed": "addr_b",
+          "contradicted": "con_b"
+        },
+        "question_sha256": "20a642a87185daae36a57506884b98b31bccf8cbe19d360c8bf52dcf9b97d7b2",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 44,
+          "total_cells": 54,
+          "minimum": 0.37,
+          "p10": 0.62,
+          "median": 0.98,
+          "mean": 0.9059
+        },
+        "complexity_bytes": 2277,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Semantically accepted; ranked below b_cca in the lexicographic order.",
+        "mismatches": []
+      }
+    ],
+    "acceptance_table": [
+      {
+        "case_id": "fixture-pass-1",
+        "probe": "fixture_pass",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.98,
+            "contradicted": 0.91,
+            "relevant": 0.97
+          },
+          {
+            "addressed": 0.98,
+            "contradicted": 0.88,
+            "relevant": 0.97
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Approved pass fixture. It states a closed set of sc-agent dependencies for sc-agent-http, all in lower layers (types; secrets and log), and excludes dependence on the top-layer runner, so it states the restriction and nothing conflicts."
+      },
+      {
+        "case_id": "fixture-fail-1",
+        "probe": "fixture_fail",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Approved fail fixture. sc-agent-types is the bottom layer and sc-decision-schema is the decision-schema layer above it; the item adds a dependency the statement prohibits and does not state the restriction."
+      },
+      {
+        "case_id": "compliant-1",
+        "probe": "compliant",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.97,
+            "contradicted": 0.96,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.97,
+            "contradicted": 0.96,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Paraphrased compliance: a backend crate depends only on the decision-schema and types layers below it and explicitly excludes the runner layer above it."
+      },
+      {
+        "case_id": "silent-1",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.83,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.77,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Adds an sc-agent crate dependency (in scope). sc-agent-log (config/secrets/log layer) depending on sc-agent-types (bottom layer) is a downward dependency, so nothing conflicts; the item says nothing about the layering restriction, so it does not state it. Prohibition gating ignores the compliance role."
+      },
+      {
+        "case_id": "topical-only-1",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.98,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.98,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Mentions the layering topic but adds or changes no Cargo.toml dependency, which is the anchor's scope; the prohibition does not govern documentation work."
+      },
+      {
+        "case_id": "conflicting-1",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.86,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.8,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "sc-agent-log is in the config/secrets/log layer and sc-agent-http is the layer above it, so this upward dependency is prohibited."
+      },
+      {
+        "case_id": "irrelevant-1",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.92
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.91
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Test work inside one crate; no Cargo.toml dependency is added or changed."
+      },
+      {
+        "case_id": "boundary-same-layer-1",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.83,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.8,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "sc-agent-config and sc-agent-secrets are in the same layer (config, secrets and log); the statement prohibits only dependencies on a higher layer, so a same-layer dependency does not conflict. The item does not state the restriction."
+      },
+      {
+        "case_id": "exception-claimed-1",
+        "probe": "exception",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.92,
+            "contradicted": 0.72,
+            "relevant": 0.96
+          },
+          {
+            "addressed": 0.92,
+            "contradicted": 0.56,
+            "relevant": 0.89
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "underspecified"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "The statement allows no exception. sc-agent-http (http layer) depending on sc-decision-schema (decision-schema layer above it) is an upward dependency regardless of the temporary framing."
+      }
+    ],
+    "evidence": {
+      "out_dir": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004-v3/tournament-2",
+      "results_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004-v3/tournament-2/results.jsonl",
+      "oracle_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ADR-SAG-0004-v3/tournament-2/oracle.frozen.json",
+      "oracle_frozen_before_first_jev_call": true,
+      "calls": 180,
+      "failed_calls": [],
+      "missing_calls": [],
+      "retries": 0,
+      "max_parallel_evaluators": 4,
+      "repeat_requests_byte_identical": true,
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "b_aaa": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_a"
+        },
+        "b_bbb": {
+          "relevant": "rel_b",
+          "addressed": "addr_b",
+          "contradicted": "con_b"
+        },
+        "b_ccc": {
+          "relevant": "rel_c",
+          "addressed": "addr_c",
+          "contradicted": "con_c"
+        },
+        "b_aca": {
+          "relevant": "rel_a",
+          "addressed": "addr_c",
+          "contradicted": "con_a"
+        },
+        "b_caa": {
+          "relevant": "rel_c",
+          "addressed": "addr_a",
+          "contradicted": "con_a"
+        },
+        "b_aab": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_b"
+        },
+        "b_aac": {
+          "relevant": "rel_a",
+          "addressed": "addr_a",
+          "contradicted": "con_c"
+        },
+        "b_cca": {
+          "relevant": "rel_c",
+          "addressed": "addr_c",
+          "contradicted": "con_a"
+        },
+        "b_aba": {
+          "relevant": "rel_a",
+          "addressed": "addr_b",
+          "contradicted": "con_a"
+        }
+      },
+      "role_rankings": {
+        "addressed": [
+          {
+            "candidate_id": "addr_a",
+            "bundles": [
+              "b_aaa",
+              "b_caa",
+              "b_aab",
+              "b_aac"
+            ],
+            "exact_cells": 72,
+            "total_cells": 72,
+            "stable_cases": 36,
+            "total_cases": 36
+          },
+          {
+            "candidate_id": "addr_c",
+            "bundles": [
+              "b_ccc",
+              "b_aca",
+              "b_cca"
+            ],
+            "exact_cells": 54,
+            "total_cells": 54,
+            "stable_cases": 27,
+            "total_cases": 27
+          },
+          {
+            "candidate_id": "addr_b",
+            "bundles": [
+              "b_bbb",
+              "b_aba"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ],
+        "contradicted": [
+          {
+            "candidate_id": "con_a",
+            "bundles": [
+              "b_aaa",
+              "b_aca",
+              "b_caa",
+              "b_cca",
+              "b_aba"
+            ],
+            "exact_cells": 90,
+            "total_cells": 90,
+            "stable_cases": 45,
+            "total_cases": 45
+          },
+          {
+            "candidate_id": "con_b",
+            "bundles": [
+              "b_bbb",
+              "b_aab"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "con_c",
+            "bundles": [
+              "b_ccc",
+              "b_aac"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ],
+        "relevant": [
+          {
+            "candidate_id": "rel_a",
+            "bundles": [
+              "b_aaa",
+              "b_aca",
+              "b_aab",
+              "b_aac",
+              "b_aba"
+            ],
+            "exact_cells": 90,
+            "total_cells": 90,
+            "stable_cases": 45,
+            "total_cases": 45
+          },
+          {
+            "candidate_id": "rel_c",
+            "bundles": [
+              "b_ccc",
+              "b_caa",
+              "b_cca"
+            ],
+            "exact_cells": 54,
+            "total_cells": 54,
+            "stable_cases": 27,
+            "total_cases": 27
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "rel_b",
+            "bundles": [
+              "b_bbb"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ]
+      },
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "run_ids_all": [
+        "00c7c0055f1fe444",
+        "027575ba11cb994d",
+        "03b6b125675abc91",
+        "04430855733b760a",
+        "04490ec8ee7bfead",
+        "056242d3a76206d8",
+        "0851f8e20e4530d4",
+        "08b52537dd0041a4",
+        "0cdaa39f1c15b8b9",
+        "0dc2a690fa871186",
+        "0de5233a5c336f0b",
+        "0f127ee19ca46db5",
+        "100a6c179ebda749",
+        "108b9872d11c14c7",
+        "10cbd0db6b239dc1",
+        "155bdcea7e39d087",
+        "16cb362fad1f2cb3",
+        "17d8d6c1f8c86bd3",
+        "1dea82e138620b25",
+        "20f8906973c234b5",
+        "23424c49f9df97e1",
+        "2352b3b665356f69",
+        "252ad73daa788127",
+        "27848a766215e101",
+        "2de387887ee56b8b",
+        "2f29c9f15b780e46",
+        "2f7c67d1096fd5b1",
+        "2fdbf8ab88c5695c",
+        "30725eddd07f025b",
+        "34291d372e43f0d8",
+        "350195bb89778062",
+        "3652a4a63fbab810",
+        "366d70284003fbfc",
+        "38d4d11f0c94c9a8",
+        "39b4e16d277d06a4",
+        "3a04a0b7e10784fa",
+        "3bb1c8f01e225022",
+        "3c4634b7f178dfda",
+        "3e84d7769e90fd04",
+        "3eb137474960f3ae",
+        "4032e9d82683aea4",
+        "4080cd8a083fb855",
+        "40f51baed979ef90",
+        "4526bb54f882bdc2",
+        "45f80f5102f85197",
+        "4781c2a1e4afa303",
+        "4843cb16698e83a2",
+        "486f542894dc1f87",
+        "4931c7f5d878d812",
+        "4957c3d61cb7ec0d",
+        "4c094228e4b0438a",
+        "4ef1983ebfc49f03",
+        "4f3aa1d2bddbddee",
+        "4f4d6e5db6f79739",
+        "4f70094710d79125",
+        "50ccf9b27f3f44dc",
+        "5176546cc2e1107e",
+        "52d5c4900413cef2",
+        "53077027c7968e89",
+        "54ee14f692bf6337",
+        "55ab083d437e4605",
+        "57887a93d07a33c0",
+        "5872fc935448c259",
+        "58f61bce443cca72",
+        "5910a69f225da785",
+        "5b5595ee9f6354b9",
+        "5ddaf49d31b68c79",
+        "5e0d09cf1f03345a",
+        "5e1497e7457ca917",
+        "5fae5b8025bfc61b",
+        "5fbbe682de63c619",
+        "60d84cbcbf544ad6",
+        "60e1ccb4a1c8df9f",
+        "6336b3a7e3f63bea",
+        "633eddded15149aa",
+        "63a14cb757ca4310",
+        "63a2b1169afb1757",
+        "66488aa6bf7a6d96",
+        "68bc728e0a8900f9",
+        "6c67ad6f88a444ce",
+        "6e397cb75c1d8770",
+        "6e9613ba1b954bc3",
+        "6f50be8377cc5837",
+        "744148902cd69336",
+        "75ff2cf767ff678f",
+        "760cd4408f3982c1",
+        "77a90fe89b8ba1fd",
+        "79232d73a47ba9c6",
+        "797a92d03ddf1ffc",
+        "7c8edcb71db13463",
+        "7c99737d452719fd",
+        "7d10b0bdda57a7d0",
+        "7d89f15e51c24c7f",
+        "7e086405a6a3cbf5",
+        "7f51c040c34636f2",
+        "804eb2598ebecfe0",
+        "80d792ed727cc381",
+        "8326b8f40882f900",
+        "850230d936c0ed4d",
+        "86ceeeeed1ffe899",
+        "88abaf6be88bfcd8",
+        "8a5a2d214777f17b",
+        "8ad91054c0345061",
+        "8b3ee903fa61e787",
+        "8e277860b6c2c964",
+        "8e92f77a239b135a",
+        "90dcc9e342ca6370",
+        "94560fdbd9c47e7e",
+        "94f282e53da4e924",
+        "95bdeaa8073f8e98",
+        "965f66a36ad51d5a",
+        "979dfa1772eecd4d",
+        "985d02dc5132e7b3",
+        "99a79915760fbfe5",
+        "99dd3c55ad04c966",
+        "9aa0706db5aad274",
+        "9abe194efc651744",
+        "9bcb7017b6c96633",
+        "9d11c4bccde884d6",
+        "a1813725473dccee",
+        "a4eef6a09289ab40",
+        "a53042a1b1d20972",
+        "a55c508f504e2013",
+        "a656948f0fa59a15",
+        "a7b6dfce10e2a15c",
+        "a7c3e89103000364",
+        "aabefdfad51ced07",
+        "ab354b5f8b58b104",
+        "ab45f3f38673d482",
+        "acb599d37075dc62",
+        "acee7bbdbaeaaf78",
+        "ae3afe89cc5d16ad",
+        "aebf9ee197c17f22",
+        "b01ec33f910feb71",
+        "b092a2f75201274b",
+        "b0dd54905a560a42",
+        "b19d8f3e06dae2ce",
+        "b1f545122a6a3802",
+        "b6fd50a1bae6e767",
+        "b769b6fb91a297e7",
+        "b83a5ddbb35aa834",
+        "ba02d288e17406ef",
+        "bb2e79e028b4d765",
+        "bbbf601f024ba007",
+        "c3f2efaccfa6c6b0",
+        "c4d24b056204c178",
+        "c6a8bce61bae0358",
+        "c7641562ef7fb4f2",
+        "c847deff419636f8",
+        "c93984cb6cb310f7",
+        "c96530da5bc297e8",
+        "c968439dd2122ec9",
+        "ca59fdc23b1f9e0f",
+        "ca63acd22e628161",
+        "ccda958d96892eb2",
+        "cee2f7dc4e59bc7d",
+        "d0b1fc9ccee4cf8d",
+        "d0f301b35c80ebda",
+        "d139334c0a006b66",
+        "d7b69914f1a0a9e5",
+        "d900a2ee31723ad6",
+        "dba5f52a793ff637",
+        "dd1507a9efaeeb45",
+        "ddc9f59277671f12",
+        "de3b54c3f45f1459",
+        "df63371bf564de55",
+        "e69ce359a5d1ff65",
+        "e8f558e0895f14b2",
+        "eb04a9687d939bfc",
+        "eb772bebb869aa20",
+        "ec7fbf0fad7f19bb",
+        "ecba225babb63231",
+        "ee5f270b9e9cb1dd",
+        "f4e092277e9474d5",
+        "fadd13cceebef2fa",
+        "fb36b4700d9f3c00",
+        "fcd653a75f0a8a08",
+        "fefba01235614395",
+        "ffc2e4327b8eafe0",
+        "ffd07fbf9d7637aa"
+      ],
+      "tie": null
+    },
+    "explanation": "10 role-complete bundles (baseline included) x 9 frozen oracle cases x 2 repeats: 180 calls, 0 retries. Bundle b_cca is the top-ranked semantically accepted set: 54/54 role cells, 18/18 threshold-0 verdicts, 9/9 stable cases, zero regressions against the baseline. Confidence is diagnostic only; production review keeps the 0.6 threshold.",
+    "planner_action": "Write sealed_question_set.questions as the anchor's plan-questions override after validating this result; store tuning_history_after byte-identical. Do not use tournament confidence in production review.",
+    "question_action": null,
+    "sealed_question_set_digest_before": null,
+    "sealed_question_set_digest_after": "13438a79d1f61dd1d78518a378fb284406c967add48d1c6ba3068543bc9848e7",
+    "authority_recommendations": []
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 5599,
+    "tool_calls": 180,
+    "retry_count": 0,
+    "correlation_id": "tune-plan-ADR-SAG-0004-v3",
+    "jev_run_ids": [
+      "00c7c0055f1fe444",
+      "027575ba11cb994d",
+      "03b6b125675abc91",
+      "04430855733b760a",
+      "04490ec8ee7bfead",
+      "056242d3a76206d8",
+      "0851f8e20e4530d4",
+      "08b52537dd0041a4",
+      "0cdaa39f1c15b8b9",
+      "0dc2a690fa871186",
+      "0de5233a5c336f0b",
+      "0f127ee19ca46db5",
+      "100a6c179ebda749",
+      "108b9872d11c14c7",
+      "10cbd0db6b239dc1",
+      "155bdcea7e39d087",
+      "16cb362fad1f2cb3",
+      "17d8d6c1f8c86bd3",
+      "1dea82e138620b25",
+      "20f8906973c234b5",
+      "23424c49f9df97e1",
+      "2352b3b665356f69",
+      "252ad73daa788127",
+      "27848a766215e101",
+      "2de387887ee56b8b",
+      "2f29c9f15b780e46",
+      "2f7c67d1096fd5b1",
+      "2fdbf8ab88c5695c",
+      "30725eddd07f025b",
+      "34291d372e43f0d8",
+      "350195bb89778062",
+      "3652a4a63fbab810",
+      "366d70284003fbfc",
+      "38d4d11f0c94c9a8",
+      "39b4e16d277d06a4",
+      "3a04a0b7e10784fa",
+      "3bb1c8f01e225022",
+      "3c4634b7f178dfda",
+      "3e84d7769e90fd04",
+      "3eb137474960f3ae",
+      "4032e9d82683aea4",
+      "4080cd8a083fb855",
+      "40f51baed979ef90",
+      "4526bb54f882bdc2",
+      "45f80f5102f85197",
+      "4781c2a1e4afa303",
+      "4843cb16698e83a2",
+      "486f542894dc1f87",
+      "4931c7f5d878d812",
+      "4957c3d61cb7ec0d",
+      "4c094228e4b0438a",
+      "4ef1983ebfc49f03",
+      "4f3aa1d2bddbddee",
+      "4f4d6e5db6f79739",
+      "4f70094710d79125",
+      "50ccf9b27f3f44dc",
+      "5176546cc2e1107e",
+      "52d5c4900413cef2",
+      "53077027c7968e89",
+      "54ee14f692bf6337",
+      "55ab083d437e4605",
+      "57887a93d07a33c0",
+      "5872fc935448c259",
+      "58f61bce443cca72",
+      "5910a69f225da785",
+      "5b5595ee9f6354b9",
+      "5ddaf49d31b68c79",
+      "5e0d09cf1f03345a",
+      "5e1497e7457ca917",
+      "5fae5b8025bfc61b",
+      "5fbbe682de63c619",
+      "60d84cbcbf544ad6",
+      "60e1ccb4a1c8df9f",
+      "6336b3a7e3f63bea",
+      "633eddded15149aa",
+      "63a14cb757ca4310",
+      "63a2b1169afb1757",
+      "66488aa6bf7a6d96",
+      "68bc728e0a8900f9",
+      "6c67ad6f88a444ce",
+      "6e397cb75c1d8770",
+      "6e9613ba1b954bc3",
+      "6f50be8377cc5837",
+      "744148902cd69336",
+      "75ff2cf767ff678f",
+      "760cd4408f3982c1",
+      "77a90fe89b8ba1fd",
+      "79232d73a47ba9c6",
+      "797a92d03ddf1ffc",
+      "7c8edcb71db13463",
+      "7c99737d452719fd",
+      "7d10b0bdda57a7d0",
+      "7d89f15e51c24c7f",
+      "7e086405a6a3cbf5",
+      "7f51c040c34636f2",
+      "804eb2598ebecfe0",
+      "80d792ed727cc381",
+      "8326b8f40882f900",
+      "850230d936c0ed4d",
+      "86ceeeeed1ffe899",
+      "88abaf6be88bfcd8",
+      "8a5a2d214777f17b",
+      "8ad91054c0345061",
+      "8b3ee903fa61e787",
+      "8e277860b6c2c964",
+      "8e92f77a239b135a",
+      "90dcc9e342ca6370",
+      "94560fdbd9c47e7e",
+      "94f282e53da4e924",
+      "95bdeaa8073f8e98",
+      "965f66a36ad51d5a",
+      "979dfa1772eecd4d",
+      "985d02dc5132e7b3",
+      "99a79915760fbfe5",
+      "99dd3c55ad04c966",
+      "9aa0706db5aad274",
+      "9abe194efc651744",
+      "9bcb7017b6c96633",
+      "9d11c4bccde884d6",
+      "a1813725473dccee",
+      "a4eef6a09289ab40",
+      "a53042a1b1d20972",
+      "a55c508f504e2013",
+      "a656948f0fa59a15",
+      "a7b6dfce10e2a15c",
+      "a7c3e89103000364",
+      "aabefdfad51ced07",
+      "ab354b5f8b58b104",
+      "ab45f3f38673d482",
+      "acb599d37075dc62",
+      "acee7bbdbaeaaf78",
+      "ae3afe89cc5d16ad",
+      "aebf9ee197c17f22",
+      "b01ec33f910feb71",
+      "b092a2f75201274b",
+      "b0dd54905a560a42",
+      "b19d8f3e06dae2ce",
+      "b1f545122a6a3802",
+      "b6fd50a1bae6e767",
+      "b769b6fb91a297e7",
+      "b83a5ddbb35aa834",
+      "ba02d288e17406ef",
+      "bb2e79e028b4d765",
+      "bbbf601f024ba007",
+      "c3f2efaccfa6c6b0",
+      "c4d24b056204c178",
+      "c6a8bce61bae0358",
+      "c7641562ef7fb4f2",
+      "c847deff419636f8",
+      "c93984cb6cb310f7",
+      "c96530da5bc297e8",
+      "c968439dd2122ec9",
+      "ca59fdc23b1f9e0f",
+      "ca63acd22e628161",
+      "ccda958d96892eb2",
+      "cee2f7dc4e59bc7d",
+      "d0b1fc9ccee4cf8d",
+      "d0f301b35c80ebda",
+      "d139334c0a006b66",
+      "d7b69914f1a0a9e5",
+      "d900a2ee31723ad6",
+      "dba5f52a793ff637",
+      "dd1507a9efaeeb45",
+      "ddc9f59277671f12",
+      "de3b54c3f45f1459",
+      "df63371bf564de55",
+      "e69ce359a5d1ff65",
+      "e8f558e0895f14b2",
+      "eb04a9687d939bfc",
+      "eb772bebb869aa20",
+      "ec7fbf0fad7f19bb",
+      "ecba225babb63231",
+      "ee5f270b9e9cb1dd",
+      "f4e092277e9474d5",
+      "fadd13cceebef2fa",
+      "fb36b4700d9f3c00",
+      "fcd653a75f0a8a08",
+      "fefba01235614395",
+      "ffc2e4327b8eafe0",
+      "ffd07fbf9d7637aa"
+    ],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

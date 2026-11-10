@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "REQ-SAG-0006",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Add the TypeSafe API request and response types to sc-decision-schema; no type, field or constant names plan-anchor or judge-jev.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010218Z-fixture_REQ-SAG-0006_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0006",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0006_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "judged": 2,
+    "pass": true,
+    "path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures",
+    "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures",
+    "runs": [
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010218Z-fixture_REQ-SAG-0006_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09-after-fixes/fixtures/plan-20261110T010219Z-fixture_REQ-SAG-0006_fail_1.json"
+    ]
+  },
+  "error": null
+}

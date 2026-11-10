@@ -41,3 +41,4 @@ tmp/
 *.gate.lock*
 .beads-credential-key
 .beads/proxieddb/
+anchors.json.lock

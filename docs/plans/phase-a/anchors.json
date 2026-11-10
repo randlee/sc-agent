@@ -18,14 +18,14 @@
       "deterministic_check": "every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait",
       "fixtures": {
         "pass": [
-          "sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code."
+          "Add to crates/sc-decision-schema only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; the crate gets no transport, logging or CLI code."
         ],
         "fail": [
           "sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -71,6 +71,13 @@
         },
         {
           "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T01:02:03+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -370,12 +377,23 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:15:09+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.10",
+          "reason": "A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-4p2.5",
           "reason": "A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner."
+        },
+        {
+          "item": "agt-4p2.10",
+          "reason": "A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait."
         }
       ]
     },
@@ -383,7 +401,7 @@
       "id": "ADR-SAG-0004",
       "source_type": "ADR",
       "source_ref": "ADR-SAG-0004",
-      "statement": "No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.",
+      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.",
       "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
       "kind": "prohibition",
       "stated_by": "Rand Lee",
@@ -401,7 +419,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -430,6 +448,27 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:02:03+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner."
+        },
+        {
+          "at": "2026-11-10T01:06:53+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-4p2.3",
+          "reason": "sc-treesitter stands outside the sc-agent layering (REQ-SAG-0301) and depends on no sc-agent crate."
         }
       ]
     },
@@ -502,14 +541,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "sc-decision-schema contains only TypeSafe API types; no type names plan-anchor or judge-jev."
+          "Add the TypeSafe API request and response types to sc-decision-schema; no type, field or constant names plan-anchor or judge-jev."
         ],
         "fail": [
           "sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -552,6 +591,27 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:02:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T01:13:52+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.7",
+          "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T01:13:52+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.8",
+          "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -562,6 +622,14 @@
         {
           "item": "agt-4p2.6",
           "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either."
+        },
+        {
+          "item": "agt-4p2.7",
+          "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either."
+        },
+        {
+          "item": "agt-4p2.8",
+          "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log."
         }
       ]
     },
@@ -647,14 +715,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls."
+          "The sc-agent runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls."
         ],
         "fail": [
-          "The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts."
+          "The sc-agent retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -679,6 +747,13 @@
         },
         {
           "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T01:02:03+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -744,12 +819,23 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:15:09+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.10",
+          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-4p2.1",
           "reason": "sc-agent-types defines no type that maps to a TypeSafe API field; those are sprint A-2 (sc-decision-schema)."
+        },
+        {
+          "item": "agt-4p2.10",
+          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them."
         }
       ]
     },
@@ -818,6 +904,27 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:07:05+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.2",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; sc-decision-schema only encodes and decodes.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T01:10:43+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.6",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T01:15:09+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.10",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -828,6 +935,18 @@
         {
           "item": "agt-4p2.7",
           "reason": "A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9."
+        },
+        {
+          "item": "agt-4p2.2",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; sc-decision-schema only encodes and decodes."
+        },
+        {
+          "item": "agt-4p2.6",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode."
+        },
+        {
+          "item": "agt-4p2.10",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic."
         }
       ]
     },
@@ -949,6 +1068,30 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-10T01:06:53+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "A-3 builds the sc-treesitter library; it adds no decide CLI operation.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T01:07:05+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.1",
+          "reason": "A-1 defines data types only; it adds no decide subcommand or Python binding function.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-4p2.3",
+          "reason": "A-3 builds the sc-treesitter library; it adds no decide CLI operation."
+        },
+        {
+          "item": "agt-4p2.1",
+          "reason": "A-1 defines data types only; it adds no decide subcommand or Python binding function."
         }
       ]
     }

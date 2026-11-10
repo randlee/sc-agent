@@ -1,0 +1,215 @@
+{
+ "schema_version": "2.0.0",
+ "operation": "tune",
+ "template": {
+  "id": "anchor-tuning-tune-request",
+  "version": "0.4.1",
+  "sha256": "d8d6796121bb8155af53277053b25fe9cf99ead86ba55f51b19df8962b441ed3"
+ },
+ "correlation_id": "tune-plan-ADR-SAG-0004-v3",
+ "runtime": {
+  "agent": "anchor-tuning",
+  "contract_script": ".claude/skills/plan-anchoring/scripts/anchor_tuning_contract.py",
+  "contract_sha256": "357b58b6de3b438d8945b5e087ea13eb265af22871e2b6032394786a66930e62",
+  "harness": "claude",
+  "model": "opus",
+  "script": ".claude/skills/plan-anchoring/scripts/jev_judge.py",
+  "sha256": "906335de770b6393c6b0922aff177e579d1c216ed20d13b80f198cab7ed8ed0a",
+  "version": "0.10.1",
+  "workspace": "/Volumes/Extreme Pro/github/sc-agent"
+ },
+ "authority": {
+  "intent": {
+   "content": "# Intent - phase-a\n\nWritten 2026-11-09 by Rand Lee (owner), recorded by the planning session. One page at most. This is the \"why\" that frames every anchor beneath it; Jev questions are judged against anchors, not against this document, so keep it short and let the anchors carry the testable facts.\n\n## What this plan is for\n\nDefine the low-level sc-agent libraries: `sc-agent-types`, `sc-decision-schema` with the decision trait, and the shared HTTP layer. Jev, Haiku, Luna, Strands Decider and Laya sit behind one decision trait. The goal is sc-agent with streaming and session logging, so the owner can analyse 10,000 to 20,000 or more decisions and tune consumer code quickly.\n\n## What success looks like\n\n- Every TypeSafe API request and response can be sent and received through sc-agent with the minimum code needed.\n- A batch of decision requests runs in parallel behind the decision trait, and every send is session-logged.\n\n## What is deliberately out of scope\n\n- The decide CLI design beyond what the low-level libraries must support.\n- Decision-model caching.\n\n## Anchors\n\nAnchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. Requirements and ADRs that govern this plan are listed there too, under their own IDs.\n",
+   "id": "phase-a-intent",
+   "sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+   "version": 1
+  },
+  "anchors": {
+   "records": [
+    {
+     "check": "",
+     "fixtures": {
+      "fail": [
+       "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."
+      ],
+      "pass": [
+       "sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner."
+      ]
+     },
+     "id": "ADR-SAG-0004",
+     "kind": "prohibition",
+     "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+     "scope": "adds or changes a crate dependency in a Cargo.toml",
+     "state": "locked",
+     "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner.",
+     "summary": "No crate depends on a crate above it in the layering",
+     "version": 3
+    }
+   ],
+   "sha256": "77be14f982f60ab71ae1e826daab92b6eb3f3c37023b3e57482a6a375cc492d5"
+  }
+ },
+ "gate": "planning",
+ "current_questions": {
+  "addressed": {
+   "criteria": {
+    "no": "The item says nothing about limits on a crate's dependencies.",
+    "unclear": "The item mentions limits in words too vague to tell whether they are the anchor's restriction.",
+    "yes": "The item says what a crate is limited to depending on, or names a crate it does not depend on, consistent with the layer restriction."
+   },
+   "instructions": "`anchor.statement` is a restriction on Cargo.toml dependencies. Does `item.text` itself carry that restriction as a constraint, in its own words, by saying what a crate is limited to depending on or what it does not depend on? Silence about limits is no, even when the dependency the item adds is allowed. Judge presence of the restriction only.",
+   "type": "choice"
+  },
+  "contradicted": {
+   "criteria": {
+    "no": "Every dependency the item plans is on the same or a lower layer, or the item plans no dependency.",
+    "unclear": "The item plans a dependency but the crates or their layers cannot be determined from the text.",
+    "yes": "The item makes some sc-agent crate depend on an sc-agent crate in a higher layer."
+   },
+   "instructions": "Using the layer order in `anchor.statement` (bottom to top), does `item.text` plan for an sc-agent crate to depend, in any Cargo.toml dependency section, on an sc-agent crate in a higher layer than its own? Dependencies on the same or a lower layer are not conflicts. Calling a dependency temporary or an exception does not remove a conflict. Silence about dependencies is not a conflict. Judge conflict only.",
+   "type": "choice"
+  },
+  "relevant": {
+   "criteria": {
+    "no": "The item adds, removes, changes and lists no dependency between sc-agent crates, for example implementation, test or documentation work, including documentation or diagrams about the crate layering.",
+    "unclear": "The item is too vague to tell whether it adds or changes a dependency between sc-agent crates.",
+    "yes": "The item adds, removes, changes or explicitly lists a dependency between sc-agent crates."
+   },
+   "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, with the activity it governs in `anchor.scope`). Does the work in `item.text` add, remove or change a dependency of one sc-agent crate on another sc-agent crate in a Cargo.toml, or explicitly state which sc-agent crates a crate depends on? Judge subject overlap only, not whether the item obeys the anchor.",
+   "type": "choice"
+  }
+ },
+ "candidate_minimum": 3,
+ "repeat_count": 2,
+ "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+ "production_confidence_threshold": 0.6,
+ "confidence_reference_threshold": 0.8,
+ "tuning_history": {
+  "events": [
+   {
+    "authority": {
+     "anchor_id": "ADR-SAG-0004",
+     "anchor_record_sha256": "b1da3b79a8ee8ebbba565360a497299ec083ff21c135d4a2e66c39616e0e5f92",
+     "anchor_version": 2,
+     "intent_id": "phase-a-intent",
+     "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+     "intent_version": 1
+    },
+    "candidate": {
+     "candidate_id": "b_aba",
+     "question_sha256": "a759d2f105f5e9e21f7d3ee03975ada66bd5902ca86f2653aa91ea326bbd16d4"
+    },
+    "decision": {
+     "question_set_sha256": "a759d2f105f5e9e21f7d3ee03975ada66bd5902ca86f2653aa91ea326bbd16d4",
+     "reason_code": "TOURNAMENT.SEALED",
+     "status": "sealed"
+    },
+    "event": "question_set_sealed",
+    "event_index": 1,
+    "evidence": {
+     "canonical_request_sha256": [
+      "ba7df9d39ef3cd61f8050fbc1e4a893539659c3914736818acead63648e6d604",
+      "ba7df9d39ef3cd61f8050fbc1e4a893539659c3914736818acead63648e6d604",
+      "6e454372584ac1676ba18dc6f9c202c02f8fd275c721f530bed2317786aab273",
+      "6e454372584ac1676ba18dc6f9c202c02f8fd275c721f530bed2317786aab273",
+      "1c883f9a01c9f75ab772deeddc27d47dcb9b65241ec3b1f60d74ba4cc3ddd52a",
+      "1c883f9a01c9f75ab772deeddc27d47dcb9b65241ec3b1f60d74ba4cc3ddd52a",
+      "8bb75671d3ee40ad0fddf2a2a2b4c5f96129e5db8ddb67a38f332fe21ceefe04",
+      "8bb75671d3ee40ad0fddf2a2a2b4c5f96129e5db8ddb67a38f332fe21ceefe04",
+      "885f91ac07b52fb5eef6fbb067ecfe580f813c50233a45e83c613098497bf2ed",
+      "885f91ac07b52fb5eef6fbb067ecfe580f813c50233a45e83c613098497bf2ed",
+      "32d04edd0edafff15e8ed85e08b1522f78c41f44feeb7d1c72ab08ac5a94385f",
+      "32d04edd0edafff15e8ed85e08b1522f78c41f44feeb7d1c72ab08ac5a94385f",
+      "baabd21c78541a61ec17df2381a9059f594ad29ee16a1d92535aa7d239f26b40",
+      "baabd21c78541a61ec17df2381a9059f594ad29ee16a1d92535aa7d239f26b40",
+      "3292ba5941e7d7705984761b39ec83e86470fde4ea13a322b8bf4b63339bf2d0",
+      "3292ba5941e7d7705984761b39ec83e86470fde4ea13a322b8bf4b63339bf2d0",
+      "538c5c73309117bbeae590692bbc06cd9e7cd57ca0d0fd17001142a2ccff5aa6",
+      "538c5c73309117bbeae590692bbc06cd9e7cd57ca0d0fd17001142a2ccff5aa6"
+     ],
+     "raw_response_sha256": [
+      "df7a7e6913ad4c3def54948586bd6a69bb2f21959ea14df4bfc5b3f2372d2794",
+      "bb5b5a7ff4647a9530933977c9f1385ffb0a57329ce494cbfdba8acbbfc952e4",
+      "5e45741d9f4a08c3b73c3f365f083b4e4be88ee4970c563bb02015933c4560bd",
+      "5e45741d9f4a08c3b73c3f365f083b4e4be88ee4970c563bb02015933c4560bd",
+      "b3fde7b0456243891bf27b4dfc7c2bc9f3a94d5caf16336a19d7e8caf44b6f10",
+      "2120ee921eacd346d3641f732ebfe72d7dd711d2ab18c3e78386cf35851bd0a1",
+      "ac679ca49dc1fad9266d0f844de89f9c2731a2955a32f195baf2a82cb1a82557",
+      "6917ce94f9e40da72a073125570dce1db2748807bb66154a003624d961cc157e",
+      "32c6cb7ef00559ac0f70c477ca0fda3fe696cf5d8a9a3d8aa6950ea943111d49",
+      "32c6cb7ef00559ac0f70c477ca0fda3fe696cf5d8a9a3d8aa6950ea943111d49",
+      "b4a38e673c7602cd410207ffa642bc69d65b0adbdcc161a3c2c74f27713e9976",
+      "65db2e10498216db04467f107eabf2f6a8c0e9ca3eba65517efd4ef0336ba7a4",
+      "d7402050aefa6fc4bf17c7c6c82ee81d5053d01ef348bb919fec447eea3830c0",
+      "83fece6fbb0eca65a7bb844e1653c176e1d552b013d3fd8b59471ca47c495a25",
+      "9b727f234e638afc272b26478a43ae3fb109d9f8f427993d711beb63b76157cd",
+      "9b727f234e638afc272b26478a43ae3fb109d9f8f427993d711beb63b76157cd",
+      "8c21ed6b59424f6cf9bb9a96f5880535eb31cb43270fe34230a656afb72678a0",
+      "d8650a457568486a7fd71840e16bb9850f734848b8b1aa3bf5c0a6582988370d"
+     ],
+     "run_ids": [
+      "25d0c9f4e6ea83b5",
+      "462e3b91a7429e00",
+      "b5425a8e0c2a3b51",
+      "b7bd41dd716b0389",
+      "7c8bf0b9f2ae719c",
+      "a3591b0732b6c55a",
+      "0ff5b4598ed47d07",
+      "2b8acba80cc985ae",
+      "e30bff0cb38e0166",
+      "5ef880346d120281",
+      "db8a56b8cf8c5e8b",
+      "2a05dfb0b8d08df2",
+      "3a0a558702dc070d",
+      "84ae4c9808362280",
+      "6f03e09d2fa5794c",
+      "4506ec7628c38c02",
+      "abf35357a2b8d467",
+      "1da4c848f92a448b"
+     ]
+    },
+    "oracle": {
+     "case_count": 9,
+     "case_ids": [
+      "fixture-pass-1",
+      "fixture-fail-1",
+      "compliant-1",
+      "silent-1",
+      "topical-only-1",
+      "conflicting-1",
+      "irrelevant-1",
+      "boundary-same-layer-1",
+      "exception-claimed-1"
+     ],
+     "repeat_count": 2,
+     "sha256": "8b975a4358acb31f8a5a7487da75cf362784ff6f46741d69bb5ec69cc98d5d1c"
+    },
+    "previous_event_sha256": null,
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 54,
+      "mean": 0.975,
+      "median": 1.0,
+      "minimum": 0.8,
+      "p10": 0.913,
+      "threshold": 0.8,
+      "total_cells": 54
+     },
+     "exact_role_cells": 54,
+     "exact_semantic_verdicts": 18,
+     "regressions": 0,
+     "stable_cases": 9,
+     "total_cases": 9,
+     "total_role_cells": 54,
+     "total_semantic_verdicts": 18
+    },
+    "supersedes": null
+   }
+  ],
+  "history_id": "phase-a-ADR-SAG-0004-planning",
+  "schema": "plan-anchor/tuning-history/2"
+ },
+ "diagnostic_plan": null
+}

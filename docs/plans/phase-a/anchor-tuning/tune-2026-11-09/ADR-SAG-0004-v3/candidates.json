@@ -1,0 +1,168 @@
+{
+ "schema": "plan-anchor/tune-candidates/1",
+ "gate": "planning",
+ "anchor_id": "ADR-SAG-0004",
+ "candidates": {
+  "relevant": {
+   "rel_a": {
+    "type": "choice",
+    "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, with the activity it governs in `anchor.scope`). Does the work in `item.text` add, remove or change a dependency of one sc-agent crate on another sc-agent crate in a Cargo.toml, or explicitly state which sc-agent crates a crate depends on? Judge subject overlap only, not whether the item obeys the anchor.",
+    "criteria": {
+     "yes": "The item adds, removes, changes or explicitly lists a dependency between sc-agent crates.",
+     "no": "The item adds, removes, changes and lists no dependency between sc-agent crates, for example implementation, test or documentation work, including documentation or diagrams about the crate layering.",
+     "unclear": "The item is too vague to tell whether it adds or changes a dependency between sc-agent crates."
+    }
+   },
+   "rel_b": {
+    "type": "choice",
+    "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor whose governed activity is `anchor.scope`. Does the work in `item.text` perform the activity `anchor.scope` names, or explicitly fix how that activity is done for a crate? An item that only describes, documents or diagrams the anchor's topic without performing the scoped activity does not count. Judge overlap only, not whether the item obeys `anchor.statement`.",
+    "criteria": {
+     "yes": "The item performs, or explicitly fixes the outcome of, the activity named in `anchor.scope`.",
+     "no": "The item does not perform the activity named in `anchor.scope`; it is about other work or only discusses the topic.",
+     "unclear": "The item is too vague to tell whether it performs the activity named in `anchor.scope`."
+    }
+   },
+   "rel_c": {
+    "type": "choice",
+    "instructions": "`anchor.statement` restricts which sc-agent crates a crate's Cargo.toml may depend on, and `anchor.scope` says it governs adding or changing a crate dependency. Read `item.text`: will doing this item put a dependency on an sc-agent crate into some Cargo.toml, change one, or state which sc-agent crates a crate depends on? Do not judge whether the dependency is allowed.",
+    "criteria": {
+     "yes": "Doing the item adds, changes or states a dependency on an sc-agent crate in a Cargo.toml.",
+     "no": "Doing the item leaves every sc-agent crate dependency untouched and states none; talking about the layers does not count.",
+     "unclear": "It cannot be told from the text whether the item touches sc-agent crate dependencies."
+    }
+   }
+  },
+  "addressed": {
+   "addr_a": {
+    "type": "choice",
+    "instructions": "Does `item.text` explicitly state the restriction in `anchor.statement` for the crates it touches: that a crate depends only on crates in its own or lower layers, a closed list of its sc-agent dependencies (\"only\", \"no other\"), or an explicit exclusion of a higher-layer crate? Adding a dependency that happens to comply without saying it is limited does not count, and neither does a generic mention of layering. Judge whether the restriction is stated, not whether the item conflicts with it.",
+    "criteria": {
+     "yes": "The item states the restriction, a closed set of a crate's sc-agent dependencies, or an explicit exclusion of a higher-layer dependency.",
+     "no": "The item does not state the restriction: it adds or breaks a dependency without limiting it, or does not deal with dependencies.",
+     "unclear": "The item gestures at a dependency restriction but it cannot be told whether it states one."
+    }
+   },
+   "addr_b": {
+    "type": "choice",
+    "instructions": "`anchor.statement` is a restriction on Cargo.toml dependencies. Does `item.text` itself carry that restriction as a constraint, in its own words, by saying what a crate is limited to depending on or what it does not depend on? Silence about limits is no, even when the dependency the item adds is allowed. Judge presence of the restriction only.",
+    "criteria": {
+     "yes": "The item says what a crate is limited to depending on, or names a crate it does not depend on, consistent with the layer restriction.",
+     "no": "The item says nothing about limits on a crate's dependencies.",
+     "unclear": "The item mentions limits in words too vague to tell whether they are the anchor's restriction."
+    }
+   },
+   "addr_c": {
+    "type": "choice",
+    "instructions": "Does `item.text` explicitly carry out or preserve the directive in `anchor.statement`, by including its specific content as a stated constraint, such as \"depends only on\" lower-layer crates or \"no crate depends on\" a higher-layer crate? A generic mention of the topic, or a dependency change that merely happens to comply, does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+    "criteria": {
+     "yes": "The item contains the directive's specific content as a constraint, a closed dependency list or an explicit exclusion.",
+     "no": "The item text does not contain the directive's specific content, whether or not what it does is allowed.",
+     "unclear": "The item text alludes to the directive but it is not possible to tell whether the directive itself is included."
+    }
+   }
+  },
+  "contradicted": {
+   "con_a": {
+    "type": "choice",
+    "instructions": "Using the layer order in `anchor.statement` (bottom to top), does `item.text` plan for an sc-agent crate to depend, in any Cargo.toml dependency section, on an sc-agent crate in a higher layer than its own? Dependencies on the same or a lower layer are not conflicts. Calling a dependency temporary or an exception does not remove a conflict. Silence about dependencies is not a conflict. Judge conflict only.",
+    "criteria": {
+     "yes": "The item makes some sc-agent crate depend on an sc-agent crate in a higher layer.",
+     "no": "Every dependency the item plans is on the same or a lower layer, or the item plans no dependency.",
+     "unclear": "The item plans a dependency but the crates or their layers cannot be determined from the text."
+    }
+   },
+   "con_b": {
+    "type": "choice",
+    "instructions": "Does `item.text` propose something `anchor.statement` rules out? Here that means a crate depending on a crate in a higher layer. Place each crate the item names in the layers listed in `anchor.statement`, then check the direction of every dependency it plans. A same-layer or downward dependency is allowed; no stated reason, exception or temporary framing permits an upward one. Silence is not a contradiction.",
+    "criteria": {
+     "yes": "The item plans at least one dependency from a lower-layer crate onto a higher-layer crate.",
+     "no": "Nothing in the item makes a crate depend on a higher layer.",
+     "unclear": "The item is ambiguous enough that a planned dependency might point upward."
+    }
+   },
+   "con_c": {
+    "type": "choice",
+    "instructions": "`anchor.statement` forbids an upward dependency between sc-agent crates. Does any dependency the item adds or keeps run from a crate to a crate in a higher layer of that list? An upward dependency is a conflict even when the item calls it an exception; same-layer and downward dependencies, and items that add no dependency, are not.",
+    "criteria": {
+     "yes": "At least one dependency in the item runs upward in the layer list.",
+     "no": "No dependency in the item runs upward.",
+     "unclear": "The direction of a dependency in the item cannot be determined."
+    }
+   }
+  }
+ },
+ "bundles": [
+  {
+   "bundle_id": "b_aaa",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "addr_a",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "b_bbb",
+   "roles": {
+    "relevant": "rel_b",
+    "addressed": "addr_b",
+    "contradicted": "con_b"
+   }
+  },
+  {
+   "bundle_id": "b_ccc",
+   "roles": {
+    "relevant": "rel_c",
+    "addressed": "addr_c",
+    "contradicted": "con_c"
+   }
+  },
+  {
+   "bundle_id": "b_aca",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "addr_c",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "b_caa",
+   "roles": {
+    "relevant": "rel_c",
+    "addressed": "addr_a",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "b_aab",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "addr_a",
+    "contradicted": "con_b"
+   }
+  },
+  {
+   "bundle_id": "b_aac",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "addr_a",
+    "contradicted": "con_c"
+   }
+  },
+  {
+   "bundle_id": "b_cca",
+   "roles": {
+    "relevant": "rel_c",
+    "addressed": "addr_c",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "b_aba",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "addr_b",
+    "contradicted": "con_a"
+   }
+  }
+ ]
+}
