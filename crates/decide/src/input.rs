@@ -1,21 +1,342 @@
-fn request_bytes(repo: &RepoRoot, spec: &str, stdin: &mut dyn Read) -> Result<Vec<u8>, JevError> {
-    if spec == "-" {
-        let mut bytes = Vec::new();
-        stdin
-            .read_to_end(&mut bytes)
-            .map_err(|error| JevError::io_failed("stdin", &error))?;
-        return Ok(bytes);
-    }
-    let path = joined_path(repo.as_path(), Path::new(spec));
-    std::fs::read(&path).map_err(|error| {
-        JevError::read_failed_with(
-            path.display().to_string(),
-            format!("request JSON {}", path.display()),
-            "Pass an existing file as --request-json (or - for stdin).",
-            &error,
-        )
-    })
+//! Reading requests: one JSON request, a JSONL batch, image files, and the REQ-SAG-0014 limits.
+//!
+//! Every request is built with `DecisionRequest::new` (ADR-SAG-0001). A batch is read and
+//! validated whole before anything is sent; the first bad line stops decide (REQ-SAG-0504).
+//! The in-memory forms ([`build_request_bytes`], [`build_batch`]) apply the same limits for
+//! sc-agent-py.
+
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
+use std::path::{Path, PathBuf};
+
+use sc_decision_schema::{
+    DecisionError, DecisionRequest, ImageFormat, ImagePart, LimitKind, MAX_IMAGES, OrderedMap,
+    SystemOneRequest,
+};
+use serde_json::value::RawValue;
+
+use crate::DecideError;
+
+/// The most bytes of one request: a request file, stdin, or one batch line (8 MiB).
+pub const MAX_REQUEST_BYTES: usize = 8 * 1024 * 1024;
+/// The most requests in one batch.
+pub const MAX_BATCH_LINES: u64 = 10_000;
+/// The most bytes of one batch, lines plus image bytes (256 MiB).
+pub const MAX_BATCH_BYTES: u64 = 256 * 1024 * 1024;
+/// The most bytes of one image (20 MiB); also enforced by `DecisionRequest::new` (A-2).
+pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+
+/// `usize` -> `u64` for limits and sizes (lossless on every supported target).
+fn to_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
 }
+
+/// Reads one request: the file `spec`, or `stdin` when `spec` is `-`.
+///
+/// Reads at most [`MAX_REQUEST_BYTES`] + 1 bytes, so an oversized input is refused without
+/// being held whole. Paths are relative to the working directory.
+///
+/// # Errors
+///
+/// [`DecideError::LimitExceeded`] (`request_bytes`) past the cap; [`DecideError::InputNotFound`]
+/// for a missing file; [`DecideError::InputRead`] for any other io error.
+pub fn request_bytes(spec: &str, stdin: &mut dyn Read) -> Result<Vec<u8>, DecideError> {
+    let mut bytes = Vec::new();
+    let cap = to_u64(MAX_REQUEST_BYTES).saturating_add(1);
+    if spec == "-" {
+        stdin
+            .take(cap)
+            .read_to_end(&mut bytes)
+            .map_err(|error| DecideError::input("stdin", &error))?;
+    } else {
+        File::open(spec)
+            .and_then(|file| file.take(cap).read_to_end(&mut bytes))
+            .map_err(|error| DecideError::input(spec, &error))?;
+    }
+    if bytes.len() > MAX_REQUEST_BYTES {
+        return Err(DecideError::LimitExceeded {
+            what: "request_bytes",
+            line: None,
+            max: to_u64(MAX_REQUEST_BYTES),
+        });
+    }
+    Ok(bytes)
+}
+
+/// The JSONL lines of `spec`: `stdin` when `spec` is `-`, else the file, buffered.
+///
+/// # Errors
+///
+/// [`DecideError::InputNotFound`] or [`DecideError::InputRead`] when the file cannot be opened.
+pub fn open_lines(
+    spec: &str,
+    stdin: Box<dyn BufRead + Send>,
+) -> Result<Box<dyn BufRead + Send>, DecideError> {
+    if spec == "-" {
+        return Ok(stdin);
+    }
+    let file = File::open(spec).map_err(|error| DecideError::input(spec, &error))?;
+    Ok(Box::new(BufReader::new(file)))
+}
+
+/// Reads one image file: its size is checked from metadata before it is read.
+///
+/// The format comes from the extension (`.png`, `.jpg`, `.jpeg`, any case).
+///
+/// # Errors
+///
+/// [`DecideError::LimitExceeded`] (`image_bytes`) over [`MAX_IMAGE_BYTES`];
+/// [`DecideError::ImageFormat`] for another extension; [`DecideError::ImageRead`] for an io
+/// error.
+pub fn read_image(name: &str, path: &Path) -> Result<ImagePart, DecideError> {
+    read_image_at(name, path, None)
+}
+
+fn read_image_at(name: &str, path: &Path, line: Option<u64>) -> Result<ImagePart, DecideError> {
+    let image_error = |error: &std::io::Error| DecideError::ImageRead {
+        name: name.to_owned(),
+        path: path.to_path_buf(),
+        kind: format!("{:?}", error.kind()),
+        detail: error.to_string(),
+    };
+    let too_large = || DecideError::LimitExceeded {
+        what: "image_bytes",
+        line,
+        max: MAX_IMAGE_BYTES,
+    };
+    let format = extension_format(path).ok_or_else(|| DecideError::ImageFormat {
+        name: name.to_owned(),
+        path: path.to_path_buf(),
+    })?;
+    let metadata = std::fs::metadata(path).map_err(|error| image_error(&error))?;
+    if metadata.len() > MAX_IMAGE_BYTES {
+        return Err(too_large());
+    }
+    let mut bytes = Vec::new();
+    File::open(path)
+        .and_then(|file| {
+            file.take(MAX_IMAGE_BYTES.saturating_add(1))
+                .read_to_end(&mut bytes)
+        })
+        .map_err(|error| image_error(&error))?;
+    // The file may have grown between the metadata check and the read.
+    if to_u64(bytes.len()) > MAX_IMAGE_BYTES {
+        return Err(too_large());
+    }
+    Ok(ImagePart::new(name, format, bytes))
+}
+
+fn extension_format(path: &Path) -> Option<ImageFormat> {
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    match extension.as_str() {
+        "png" => Some(ImageFormat::Png),
+        "jpg" => Some(ImageFormat::Jpg),
+        "jpeg" => Some(ImageFormat::Jpeg),
+        _ => None,
+    }
+}
+
+/// The format of in-memory image bytes, from their magic bytes.
+fn magic_format(bytes: &[u8]) -> Option<ImageFormat> {
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        Some(ImageFormat::Png)
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some(ImageFormat::Jpeg)
+    } else {
+        None
+    }
+}
+
+/// `DecisionError::Limits` for more than [`MAX_IMAGES`] images, checked before any image is read.
+fn check_image_count(count: usize, line: Option<u64>) -> Result<(), DecideError> {
+    if count > MAX_IMAGES {
+        return Err(DecideError::request_invalid(
+            line,
+            DecisionError::Limits {
+                what: LimitKind::Images,
+                max: to_u64(MAX_IMAGES),
+            },
+        ));
+    }
+    Ok(())
+}
+
+/// The request body of `json`: at most [`MAX_REQUEST_BYTES`], UTF-8, a `SystemOneRequest`.
+fn parse_body(json: &[u8], line: Option<u64>) -> Result<SystemOneRequest, DecideError> {
+    if json.len() > MAX_REQUEST_BYTES {
+        return Err(DecideError::LimitExceeded {
+            what: "request_bytes",
+            line,
+            max: to_u64(MAX_REQUEST_BYTES),
+        });
+    }
+    let text = std::str::from_utf8(json).map_err(|error| {
+        DecideError::request_invalid(
+            line,
+            DecisionError::RequestParse {
+                path: ".".to_owned(),
+                message: format!(
+                    "the request is not UTF-8 (invalid byte at offset {})",
+                    error.valid_up_to()
+                ),
+            },
+        )
+    })?;
+    SystemOneRequest::from_json(text).map_err(|source| DecideError::request_invalid(line, source))
+}
+
+/// `DecisionRequest::new`, its refusal wrapped as `RequestInvalid` naming `line`.
+fn new_request(
+    body: SystemOneRequest,
+    parts: Vec<ImagePart>,
+    long_context: bool,
+    line: Option<u64>,
+) -> Result<DecisionRequest, DecideError> {
+    DecisionRequest::new(body, parts, long_context)
+        .map_err(|source| DecideError::request_invalid(line, source))
+}
+
+/// Builds a request from JSON bytes, image files and the long-context flag.
+///
+/// `SystemOneRequest::from_json`, [`read_image`] for each image, then
+/// `DecisionRequest::new(body, parts, long_context)`, which checks the parts and the image
+/// limits (A-2). `line` names the JSONL line in errors (`None` for a single request).
+///
+/// # Errors
+///
+/// [`DecideError::RequestInvalid`] (cause `decision.request_parse`, `decision.image_parts` or
+/// `decision.limits`), [`DecideError::LimitExceeded`], or an image error of [`read_image`].
+pub fn build_request(
+    json: &[u8],
+    images: &[(String, PathBuf)],
+    long_context: bool,
+    line: Option<u64>,
+) -> Result<DecisionRequest, DecideError> {
+    let body = parse_body(json, line)?;
+    check_image_count(images.len(), line)?;
+    let parts = images
+        .iter()
+        .map(|(name, path)| read_image_at(name, path, line))
+        .collect::<Result<Vec<_>, _>>()?;
+    new_request(body, parts, long_context, line)
+}
+
+/// The in-memory form of [`build_request`] (sc-agent-py).
+///
+/// `json` over [`MAX_REQUEST_BYTES`] and an image over [`MAX_IMAGE_BYTES`] are
+/// `LimitExceeded`; the format comes from the magic bytes (PNG `89 50 4E 47`, JPEG
+/// `FF D8 FF`).
+///
+/// # Errors
+///
+/// As [`build_request`]; [`DecideError::ImageFormat`] (empty path) for unknown magic bytes.
+pub fn build_request_bytes(
+    json: &[u8],
+    images: Vec<(String, Vec<u8>)>,
+    long_context: bool,
+    line: Option<u64>,
+) -> Result<DecisionRequest, DecideError> {
+    let body = parse_body(json, line)?;
+    check_image_count(images.len(), line)?;
+    let parts = images
+        .into_iter()
+        .map(|(name, bytes)| {
+            if to_u64(bytes.len()) > MAX_IMAGE_BYTES {
+                return Err(DecideError::LimitExceeded {
+                    what: "image_bytes",
+                    line,
+                    max: MAX_IMAGE_BYTES,
+                });
+            }
+            let format = magic_format(&bytes).ok_or_else(|| DecideError::ImageFormat {
+                name: name.clone(),
+                path: PathBuf::new(),
+            })?;
+            Ok(ImagePart::new(name, format, bytes))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    new_request(body, parts, long_context, line)
+}
+
+/// One in-memory batch item (sc-agent-py): JSON text, image bytes by name, long-context flag.
+#[derive(Debug, Clone, Default)]
+pub struct BatchInput {
+    /// The Jev request JSON.
+    pub json: String,
+    /// Image parts by name.
+    pub images: Vec<(String, Vec<u8>)>,
+    /// Whether the request carries the long-context header.
+    pub long_context: bool,
+}
+
+/// Counts requests and bytes of a batch against [`MAX_BATCH_LINES`] and [`MAX_BATCH_BYTES`].
+#[derive(Default)]
+struct BatchBudget {
+    requests: u64,
+    bytes: u64,
+}
+
+impl BatchBudget {
+    /// Adds one request of `bytes` bytes at `line`.
+    fn add(&mut self, bytes: u64, line: u64) -> Result<(), DecideError> {
+        self.requests = self.requests.saturating_add(1);
+        if self.requests > MAX_BATCH_LINES {
+            return Err(DecideError::LimitExceeded {
+                what: "batch_lines",
+                line: Some(line),
+                max: MAX_BATCH_LINES,
+            });
+        }
+        self.add_bytes(bytes, line)
+    }
+
+    /// Adds `bytes` more bytes (an image) at `line`.
+    fn add_bytes(&mut self, bytes: u64, line: u64) -> Result<(), DecideError> {
+        self.bytes = self.bytes.saturating_add(bytes);
+        if self.bytes > MAX_BATCH_BYTES {
+            return Err(DecideError::LimitExceeded {
+                what: "batch_bytes",
+                line: Some(line),
+                max: MAX_BATCH_BYTES,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// The in-memory batch path (sc-agent-py), with the limits of [`read_batch`].
+///
+/// More than [`MAX_BATCH_LINES`] items, or more than [`MAX_BATCH_BYTES`] in total (JSON plus
+/// image bytes), is refused before any item is built; then each item goes through
+/// [`build_request_bytes`] with `line` = its 1-based index.
+///
+/// # Errors
+///
+/// [`DecideError::LimitExceeded`] (`batch_lines`, `batch_bytes`) or the first item's error of
+/// [`build_request_bytes`].
+pub fn build_batch(items: Vec<BatchInput>) -> Result<Vec<DecisionRequest>, DecideError> {
+    let mut budget = BatchBudget::default();
+    for (index, item) in items.iter().enumerate() {
+        let line = to_u64(index).saturating_add(1);
+        let images: usize = item.images.iter().map(|(_, bytes)| bytes.len()).sum();
+        budget.add(to_u64(item.json.len()).saturating_add(to_u64(images)), line)?;
+    }
+    items
+        .into_iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let line = to_u64(index).saturating_add(1);
+            build_request_bytes(
+                item.json.as_bytes(),
+                item.images,
+                item.long_context,
+                Some(line),
+            )
+        })
+        .collect()
+}
+
+/// Outcome of one bounded line read.
 enum LineRead {
     /// End of input with no further bytes.
     End,
@@ -27,7 +348,7 @@ enum LineRead {
 
 /// Reads one line into `out`, holding at most `max` bytes: the rest of a
 /// longer line is consumed and dropped, so memory stays bounded.
-fn read_line_bounded<R: BufRead>(
+fn read_line_bounded<R: BufRead + ?Sized>(
     reader: &mut R,
     max: usize,
     out: &mut Vec<u8>,
@@ -48,11 +369,12 @@ fn read_line_bounded<R: BufRead>(
         let newline = available.iter().position(|byte| *byte == b'\n');
         let take = newline.map_or(available.len(), |at| at + 1);
         if !too_long {
-            if out.len() + take > max {
-                too_long = true;
-                out.clear();
-            } else {
-                out.extend_from_slice(&available[..take]);
+            match available.get(..take) {
+                Some(chunk) if out.len() + take <= max => out.extend_from_slice(chunk),
+                _ => {
+                    too_long = true;
+                    out.clear();
+                }
             }
         }
         reader.consume(take);
@@ -65,48 +387,209 @@ fn read_line_bounded<R: BufRead>(
         }
     }
 }
-fn read_all(data: &[u8], max: usize) -> Vec<(&'static str, Vec<u8>)> {
-    let mut reader = Cursor::new(data.to_vec());
-    let mut out = Vec::new();
-    let mut buffer = Vec::new();
-    loop {
-        match read_line_bounded(&mut reader, max, &mut buffer).expect("read") {
-            LineRead::End => return out,
-            LineRead::Line => out.push(("line", buffer.clone())),
-            LineRead::TooLong => out.push(("long", Vec::new())),
+
+/// One batch line in its wrapper form, chosen by the presence of the `"request"` key.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchLine {
+    request: Box<RawValue>,
+    #[serde(default)]
+    images: Option<OrderedMap<String, PathBuf>>,
+    #[serde(default)]
+    long_context: bool,
+}
+
+/// Whether `text` is a JSON object with a top-level `"request"` key.
+fn is_wrapper(text: &str) -> bool {
+    serde_json::from_str::<std::collections::BTreeMap<String, &RawValue>>(text)
+        .is_ok_and(|object| object.contains_key("request"))
+}
+
+/// The request of one non-blank batch line `text` at `line`.
+fn batch_request(
+    text: &str,
+    line: u64,
+    budget: &mut BatchBudget,
+) -> Result<DecisionRequest, DecideError> {
+    if !is_wrapper(text) {
+        return build_request(text.as_bytes(), &[], false, Some(line));
+    }
+    let wrapper: BatchLine = serde_json::from_str(text).map_err(|error| {
+        DecideError::request_invalid(
+            Some(line),
+            DecisionError::RequestParse {
+                path: ".".to_owned(),
+                message: format!("the batch line wrapper is invalid: {error}"),
+            },
+        )
+    })?;
+    let images: Vec<(String, PathBuf)> = wrapper
+        .images
+        .as_ref()
+        .map(|images| {
+            images
+                .into_iter()
+                .map(|(name, path)| (name.clone(), path.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    check_image_count(images.len(), Some(line))?;
+    for (_, path) in &images {
+        // A missing file is reported by build_request with its name; size counts when known.
+        if let Ok(metadata) = std::fs::metadata(path) {
+            budget.add_bytes(metadata.len(), line)?;
         }
+    }
+    build_request(
+        wrapper.request.get().as_bytes(),
+        &images,
+        wrapper.long_context,
+        Some(line),
+    )
+}
+
+/// Reads and validates a whole JSONL batch before anything is sent (REQ-SAG-0504, REQ-SAG-0014).
+///
+/// Each non-blank line is a bare Jev request or `{"request": {..}, "images": {"NAME": "path"},
+/// "long_context": true}` (paths relative to the working directory). Blank lines and a
+/// leading UTF-8 BOM are skipped; line numbers count every physical line from 1.
+///
+/// # Errors
+///
+/// The first bad line: [`DecideError::LimitExceeded`] (`request_bytes` for a line over
+/// [`MAX_REQUEST_BYTES`], `batch_lines`, `batch_bytes`, `image_bytes`),
+/// [`DecideError::LineNotUtf8`], [`DecideError::RequestInvalid`] naming the line, the field
+/// and the reason, or an image error; [`DecideError::InputRead`] for an io error.
+pub fn read_batch(reader: &mut dyn BufRead) -> Result<Vec<DecisionRequest>, DecideError> {
+    let mut requests = Vec::new();
+    let mut budget = BatchBudget::default();
+    let mut buffer = Vec::new();
+    let mut line: u64 = 0;
+    loop {
+        let read = read_line_bounded(reader, MAX_REQUEST_BYTES, &mut buffer)
+            .map_err(|error| DecideError::input("batch", &error))?;
+        line = line.saturating_add(1);
+        match read {
+            LineRead::End => return Ok(requests),
+            LineRead::TooLong => {
+                return Err(DecideError::LimitExceeded {
+                    what: "request_bytes",
+                    line: Some(line),
+                    max: to_u64(MAX_REQUEST_BYTES),
+                });
+            }
+            LineRead::Line => {}
+        }
+        let mut bytes = buffer.as_slice();
+        if line == 1 {
+            bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+        }
+        let text = std::str::from_utf8(bytes).map_err(|error| DecideError::LineNotUtf8 {
+            line,
+            byte_offset: error.valid_up_to(),
+        })?;
+        let text = text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        budget.add(to_u64(buffer.len()), line)?;
+        requests.push(batch_request(text, line, &mut budget)?);
     }
 }
 
-#[test]
-fn lines_are_split_and_a_final_line_without_newline_is_kept() {
-    let got = read_all(b"ab\ncd\nef", 64);
-    assert_eq!(
-        got,
-        vec![
-            ("line", b"ab\n".to_vec()),
-            ("line", b"cd\n".to_vec()),
-            ("line", b"ef".to_vec()),
-        ]
-    );
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
 
-#[test]
-fn an_over_long_line_is_dropped_whole_and_the_next_line_survives() {
-    let mut data = vec![b'x'; 50];
-    data.push(b'\n');
-    data.extend_from_slice(b"ok\n");
-    let got = read_all(&data, 10);
-    assert_eq!(got, vec![("long", Vec::new()), ("line", b"ok\n".to_vec())]);
-}
+    fn read_all(data: &[u8], max: usize) -> Vec<(&'static str, Vec<u8>)> {
+        let mut reader = Cursor::new(data.to_vec());
+        let mut out = Vec::new();
+        let mut buffer = Vec::new();
+        loop {
+            match read_line_bounded(&mut reader, max, &mut buffer).expect("read") {
+                LineRead::End => return out,
+                LineRead::Line => out.push(("line", buffer.clone())),
+                LineRead::TooLong => out.push(("long", Vec::new())),
+            }
+        }
+    }
 
-/// The buffer never holds more than the cap, however long the line is.
-#[test]
-fn reading_never_buffers_more_than_the_cap() {
-    let data = vec![b'x'; 10_000];
-    let mut reader = Cursor::new(data);
-    let mut buffer = Vec::new();
-    let read = read_line_bounded(&mut reader, 100, &mut buffer).expect("read");
-    assert!(matches!(read, LineRead::TooLong));
-    assert!(buffer.len() <= 100);
+    #[test]
+    fn lines_are_split_and_a_final_line_without_newline_is_kept() {
+        let got = read_all(b"ab\ncd\nef", 64);
+        assert_eq!(
+            got,
+            vec![
+                ("line", b"ab\n".to_vec()),
+                ("line", b"cd\n".to_vec()),
+                ("line", b"ef".to_vec()),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_over_long_line_is_dropped_whole_and_the_next_line_survives() {
+        let mut data = vec![b'x'; 50];
+        data.push(b'\n');
+        data.extend_from_slice(b"ok\n");
+        let got = read_all(&data, 10);
+        assert_eq!(got, vec![("long", Vec::new()), ("line", b"ok\n".to_vec())]);
+    }
+
+    /// The buffer never holds more than the cap, however long the line is.
+    #[test]
+    fn reading_never_buffers_more_than_the_cap() {
+        let data = vec![b'x'; 10_000];
+        let mut reader = Cursor::new(data);
+        let mut buffer = Vec::new();
+        let read = read_line_bounded(&mut reader, 100, &mut buffer).expect("read");
+        assert!(matches!(read, LineRead::TooLong));
+        assert!(buffer.len() <= 100);
+    }
+
+    const NOUL: &str = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
+
+    #[test]
+    fn blank_lines_and_a_bom_are_skipped() {
+        let data = format!("\u{feff}{NOUL}\n\n  \n{NOUL}\r\n");
+        let requests = read_batch(&mut Cursor::new(data)).expect("batch");
+        assert_eq!(requests.len(), 2);
+    }
+
+    #[test]
+    fn a_non_utf8_line_is_named() {
+        let mut data = format!("{NOUL}\n").into_bytes();
+        data.extend_from_slice(b"{\"x\xff\n");
+        let error = read_batch(&mut Cursor::new(data)).expect_err("not utf-8");
+        assert!(matches!(
+            error,
+            DecideError::LineNotUtf8 {
+                line: 2,
+                byte_offset: 3
+            }
+        ));
+    }
+
+    #[test]
+    fn a_wrapper_with_an_unknown_key_is_refused() {
+        let data = format!(r#"{{"request":{NOUL},"extra":1}}"#);
+        let error = read_batch(&mut Cursor::new(data)).expect_err("unknown key");
+        assert!(matches!(
+            error,
+            DecideError::RequestInvalid { line: Some(1), .. }
+        ));
+    }
+
+    #[test]
+    fn in_memory_images_need_png_or_jpeg_magic() {
+        let error = build_request_bytes(
+            NOUL.as_bytes(),
+            vec![("i".into(), vec![1, 2, 3])],
+            false,
+            None,
+        )
+        .expect_err("unknown magic");
+        assert!(matches!(error, DecideError::ImageFormat { .. }));
+    }
 }
