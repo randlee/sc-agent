@@ -2,7 +2,7 @@
 
 ## Description
 
-Jev backend (encode/decode POST /v1/systemone, GET /v1/models). sc-decision-local: stub reusing the Jev encode/decode for any Jev-compatible local daemon from config by name (host and port in config): Strands Decider, Laya, Mapika/decider or generic; LocalDaemon trait whose main task is discovering whether a model is available/loaded. Records: REQ-SAG-0201, REQ-SAG-0801, ADR-SAG-0001.
+sc-decision-systemone and sc-decision-local are sc-agent library crates; each provides a decision backend that implements the Backend trait from sc-decision-schema. Jev backend (encode/decode POST /v1/systemone, GET /v1/models). sc-decision-local: stub reusing the Jev encode/decode for any Jev-compatible local daemon from config by name (host and port in config): Strands Decider, Laya, Mapika/decider or generic; LocalDaemon trait whose main task is discovering whether a model is available/loaded. Records: REQ-SAG-0201, REQ-SAG-0801, ADR-SAG-0001.
 
 ## Acceptance criteria
 
@@ -18,5 +18,6 @@ Jev backend (encode/decode POST /v1/systemone, GET /v1/models). sc-decision-loca
 - [ ] REQ-SAG-0002: LocalError implements ErrorId with 6 distinct local.* ids; wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.
 - [ ] ADR-SAG-0004: neither crate depends on sc-llm-provider, sc-decision-llm, sc-decision-runner or decide (cargo tree). No live API calls in tests.
 - [ ] REQ-SAG-0002: a test makes the transport fail and asserts the returned LocalError and SystemOne DecisionError chains carry the lower HttpError's id and message.
-- [ ] ADR-SAG-0001: a compile-time test builds `Arc<dyn sc_decision_schema::Backend>` from both SystemOneBackend and LocalBackend.
+- [ ] ADR-SAG-0001: every decision backend this sprint adds implements the Backend trait defined in the sc-decision-schema crate: SystemOneBackend (sc-decision-systemone) and LocalBackend (sc-decision-local) are each `impl sc_decision_schema::Backend`, and a compile-time test builds `Arc<dyn sc_decision_schema::Backend>` from both.
 - [ ] REQ-SAG-0009: neither sc-decision-systemone nor sc-decision-local depends on tokio; `cargo tree -p sc-decision-systemone -p sc-decision-local` lists no tokio crate.
+- [ ] ANC-007: the existing sc-agent library code in sc-decision-local is updated to write log records: each daemon availability check writes one (daemon, model, loaded models; never a key) to the GeneralLogger the caller injects; a test with an in-memory GeneralLogger finds it.

@@ -1,0 +1,99 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "ANC-007",
+  "candidates": {
+    "relevant": {
+      "rel-a": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, governing `anchor.scope`). The anchor concerns code in the sc-agent library crates (for example sc-agent-http, sc-agent-types, sc-agent-secrets, sc-decision-schema, sc-treesitter). Does the work in `item.text` add, change, remove, or depend on code in an sc-agent library crate? Judge subject overlap only, not whether the item writes log records or obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds, changes, removes, or depends on code in an sc-agent library crate.",
+          "no": "The item works on something other than sc-agent library crate code (for example documentation, CI, or developer setup) and changes no library code.",
+          "unclear": "The item text is too vague to tell whether it touches code in an sc-agent library crate."
+        }
+      },
+      "rel-b": {
+        "type": "choice",
+        "instructions": "Read `anchor.scope`, which names the work the anchor governs, and `item.text`. Is the item work of that kind: does it add or change code (functions, types, modules, tests) in an sc-agent library crate? Only decide whether the item falls inside the scope; do not decide whether it obeys `anchor.statement`.",
+        "criteria": {
+          "yes": "The item text describes code in an sc-agent library crate that it adds or changes.",
+          "no": "The item text describes no code being added or changed in any sc-agent library crate.",
+          "unclear": "It cannot be told from the item text whether code in an sc-agent library crate is added or changed."
+        }
+      },
+      "rel-c": {
+        "type": "choice",
+        "instructions": "The state holds one planning item and one anchor, a directive in `anchor.statement` with its area in `anchor.scope`. Does completing the item touch the subject of `anchor.statement` - the code of the sc-agent library crates and whether it writes log records? Judge subject matter only.",
+        "criteria": {
+          "yes": "The item plans or changes code in an sc-agent library crate, or plans its logging.",
+          "no": "The item plans nothing in sc-agent library crate code.",
+          "unclear": "The item is too vague to tell which part of the system it touches."
+        }
+      }
+    },
+    "addressed": {
+      "add-a": {
+        "type": "choice",
+        "instructions": "The anchor requires that existing sc-agent library code is updated so that it writes log records (`anchor.statement`). Does `item.text` explicitly provide for this: does it plan for library code it touches to write log records (for example through an injected logger), or state that existing log records and their test are kept? A general remark that logging matters, or making something easy to log, without a step that makes the code write log records, does not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item plans that library code writes log records, or states that existing log records are kept.",
+          "no": "The item plans no log records being written; it is silent about logging or mentions it only in general terms.",
+          "unclear": "The item mentions logging but it cannot be told whether the code will actually write log records."
+        }
+      },
+      "add-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` carry out the directive in `anchor.statement`? Count it as carried out only when the item text itself contains a concrete step for it: library code that is made to write log records, a logger injected into library code so it logs, or existing log records explicitly kept. Topic mentions and design goals do not count. Judge presence of the directive only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item contains a concrete step that makes library code write log records, or keeps existing log records.",
+          "no": "The item contains no step that makes library code write log records and keeps none.",
+          "unclear": "The item alludes to logging but it is not possible to tell if a concrete logging step is included."
+        }
+      },
+      "add-c": {
+        "type": "choice",
+        "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive in `anchor.statement` (existing sc-agent library code updated so that it writes log records)? Look for the directive's specific content: code that writes log records or an injected logger used to write them. Naming a test is not required. A generic mention of logging without that specific content does not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item text contains library code writing log records, or keeps existing log records.",
+          "no": "The item text is silent about log records or mentions logging only in general terms.",
+          "unclear": "The item text alludes to log records but it cannot be told whether any are actually written."
+        }
+      }
+    },
+    "contradicted": {
+      "con-a": {
+        "type": "choice",
+        "instructions": "The anchor requires that existing sc-agent library code is updated so that it writes log records. Does `item.text` plan for library code to write no log records: leaving code unlogged on purpose, deferring its logging to later, removing log calls, or removing the injected logger? Silence about logging is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states that library code will write no log records, defers its logging, or removes its log calls or logger.",
+          "no": "The item states nothing that leaves library code without log records; it is compliant, silent, or unrelated.",
+          "unclear": "The item text might mean library code is left without log records, but it is ambiguous."
+        }
+      },
+      "con-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` state a plan that cannot be reconciled with `anchor.statement` - for example sc-agent library code described as writing no log records, logging postponed to a later phase, or log calls deleted? An item that simply does not mention logging is silent, not in conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item text explicitly leaves or makes sc-agent library code without log records.",
+          "no": "Nothing in the item text leaves or makes library code without log records.",
+          "unclear": "The item text is ambiguous about whether library code is left without log records."
+        }
+      },
+      "con-c": {
+        "type": "choice",
+        "instructions": "Does `item.text` propose something that `anchor.statement` rules out? Here that means sc-agent library code not writing log records by decision: code kept unlogged, logging deferred, or existing log calls or the logger removed. Silence about the directive is not a contradiction. Judge conflict only.",
+        "criteria": {
+          "yes": "The item text states a plan under which some sc-agent library code writes no log records.",
+          "no": "No plan in the item text leaves library code without log records, whether or not logging is mentioned.",
+          "unclear": "The item text could be read as leaving library code without log records, but it is ambiguous."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {"bundle_id": "bundle-a", "roles": {"relevant": "rel-a", "addressed": "add-a", "contradicted": "con-a"}},
+    {"bundle_id": "bundle-b", "roles": {"relevant": "rel-b", "addressed": "add-b", "contradicted": "con-b"}},
+    {"bundle_id": "bundle-c", "roles": {"relevant": "rel-c", "addressed": "add-c", "contradicted": "con-c"}}
+  ]
+}

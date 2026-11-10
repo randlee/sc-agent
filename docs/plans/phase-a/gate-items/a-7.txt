@@ -2,7 +2,7 @@
 
 ## Description
 
-Anthropic Messages and OpenAI-compatible providers with JSON-schema output (LlmError); Haiku and Luna decision backends that translate the Jev request to a prompt and required schema, self-report probabilities and confidence, and signal a schema mismatch for resend. Records: REQ-SAG-0103, REQ-SAG-0502, REQ-SAG-0901, ADR-SAG-0001.
+sc-llm-provider and sc-decision-llm are sc-agent library crates. Anthropic Messages and OpenAI-compatible providers with JSON-schema output (LlmError); Haiku and Luna decision backends that translate the Jev request to a prompt and required schema, self-report probabilities and confidence, and signal a schema mismatch for resend. Records: REQ-SAG-0103, REQ-SAG-0502, REQ-SAG-0901, ADR-SAG-0001.
 
 ## Acceptance criteria
 
@@ -21,3 +21,4 @@ Anthropic Messages and OpenAI-compatible providers with JSON-schema output (LlmE
 - [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.
 - [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio or ureq; no sleep call.
 - [ ] REQ-SAG-0201: sc-decision-llm imports every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema and defines none of its own; sc-llm-provider uses no decision types.
+- [ ] ANC-007: sc-llm-provider's LlmClient and sc-decision-llm's LlmDecisionBackend write log records for each request sent, its token usage and each schema mismatch (never a prompt, body or key) to an injected GeneralLogger; a test injects an in-memory GeneralLogger, runs one request and one schema mismatch, and finds those records.

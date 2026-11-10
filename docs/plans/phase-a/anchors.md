@@ -21,6 +21,7 @@ Intent: `docs/plans/phase-a/intent.md`
 | REQ-SAG-0601 | locked | Busy resend: configurable sends, holdoff in the queue | 2026-11-09 |
 | REQ-SAG-0701 | locked | Batches run in parallel, fastest first, failures returned | 2026-11-09 |
 | ANC-006 | locked | Python API offers every decide CLI operation | 2026-11-08T21:07:35Z |
+| ANC-007 | locked | Existing sc-agent library code updated to write log records | 2026-11-09T00:26:57Z |
 
 ## ANC-001
 
@@ -120,6 +121,7 @@ Scope: adds or changes a decision backend, the Backend or Decision trait, or sc-
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.5`: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
+- `agt-4p2.10`: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
 
 Beads: anchor `agt-7mi`, plan questions `agt-7mi.1`, dev questions `agt-7mi.2`
 
@@ -243,6 +245,7 @@ Scope: adds or changes a type that maps to a TypeSafe API field
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.1`: sc-agent-types defines no type that maps to a TypeSafe API field; those are sprint A-2 (sc-decision-schema).
+- `agt-4p2.10`: A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.
 
 Beads: anchor `agt-gc6`, plan questions `agt-gc6.1`, dev questions `agt-gc6.2`
 
@@ -267,6 +270,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.7`: A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.
 - `agt-4p2.2`: Resending on 429/502/529 is built in A-5 and A-9; sc-decision-schema only encodes and decodes.
 - `agt-4p2.6`: Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.
+- `agt-4p2.10`: Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.
 
 Beads: anchor `agt-ebd`, plan questions `agt-ebd.1`, dev questions `agt-ebd.2`
 
@@ -318,3 +322,29 @@ Beads: anchor `agt-frw`, plan questions `agt-frw.1`, dev questions `agt-frw.2`
 Fixtures:
 - pass: Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.
 - fail: decide gains a `models` subcommand with no Python equivalent.
+
+## ANC-007
+
+Anchor: The existing sc-agent library code must be updated so that it writes log records.
+
+> You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.
+
+Said by Rand Lee, planning session, 2026-11-09T00:26:57Z. Status: locked. Version 2.
+
+Summary: Existing sc-agent library code updated to write log records
+
+Scope: adds or changes code in an sc-agent library crate
+
+Deterministic check to pair with the development gate: a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-4p2.1`: sc-agent-types is the bottom ADR-SAG-0004 layer, below sc-agent-log, and holds data types with no I/O; it cannot take a GeneralLogger.
+- `agt-4p2.2`: ANC-001 limits sc-decision-schema to the decision API types and traits with no logging code; its logging happens in the HTTP client and runner.
+- `agt-4p2.4`: sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.
+- `agt-4p2.3`: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10.
+
+Beads: anchor `agt-em9`, plan questions `agt-em9.1`, dev questions `agt-em9.2`
+
+Fixtures:
+- pass: sc-agent-http's existing request code is updated to write a log record for each request it sends, checked by a test that injects an in-memory GeneralLogger and reads the records back.
+- fail: sc-agent-http's request code is left as it is and writes no log records; logging is deferred to a later phase.

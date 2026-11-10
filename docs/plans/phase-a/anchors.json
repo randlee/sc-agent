@@ -1094,6 +1094,118 @@
           "reason": "A-1 defines data types only; it adds no decide subcommand or Python binding function."
         }
       ]
+    },
+    {
+      "id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The existing sc-agent library code must be updated so that it writes log records.",
+      "quote": "You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T00:26:57Z",
+      "context": "planning session",
+      "summary": "Existing sc-agent library code updated to write log records",
+      "scope": "adds or changes code in an sc-agent library crate",
+      "deterministic_check": "a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote",
+      "fixtures": {
+        "pass": [
+          "sc-agent-http's existing request code is updated to write a log record for each request it sends, checked by a test that injects an in-memory GeneralLogger and reads the records back."
+        ],
+        "fail": [
+          "sc-agent-http's request code is left as it is and writes no log records; logging is deferred to a later phase."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-em9",
+        "plan_questions": "agt-em9.1",
+        "dev_questions": "agt-em9.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-10T01:59:19+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-10T01:59:26+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-10T01:59:50+00:00",
+          "event": "locked",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-10T02:00:02+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-em9",
+            "plan_questions": "agt-em9.1",
+            "dev_questions": "agt-em9.2"
+          }
+        },
+        {
+          "at": "2026-11-10T02:06:18+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.1",
+          "reason": "sc-agent-types is the bottom ADR-SAG-0004 layer, below sc-agent-log, and holds data types with no I/O; it cannot take a GeneralLogger.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T02:06:18+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.2",
+          "reason": "ANC-001 limits sc-decision-schema to the decision API types and traits with no logging code; its logging happens in the HTTP client and runner.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T02:06:18+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that writes no log and depends on no sc-agent crate.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T02:06:18+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.4",
+          "reason": "sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-10T02:07:52+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10.",
+          "replaced": true
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-4p2.1",
+          "reason": "sc-agent-types is the bottom ADR-SAG-0004 layer, below sc-agent-log, and holds data types with no I/O; it cannot take a GeneralLogger."
+        },
+        {
+          "item": "agt-4p2.2",
+          "reason": "ANC-001 limits sc-decision-schema to the decision API types and traits with no logging code; its logging happens in the HTTP client and runner."
+        },
+        {
+          "item": "agt-4p2.4",
+          "reason": "sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events."
+        },
+        {
+          "item": "agt-4p2.3",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10."
+        }
+      ]
     }
   ]
 }

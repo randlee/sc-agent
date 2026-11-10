@@ -1,0 +1,82 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T020629Z-agt-4p2.4",
+  "gate": "plan",
+  "created_at": "2026-11-10T02:06:29+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "agt-4p2.4",
+    "title": "Sprint A-4: sc-agent-config and sc-agent-secrets",
+    "source": "docs/plans/phase-a/gate-items/a-4.txt",
+    "chars": 3359,
+    "truncated": false,
+    "chars_before_reduction": 3359,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Volumes/Extreme Pro/github/sc-agent/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The existing sc-agent library code must be updated so that it writes log records.",
+      "quote": "You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T00:26:57Z",
+      "context": "planning session",
+      "anchor_version": 2,
+      "deterministic_check": "a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote",
+      "kind": "directive",
+      "leaning": null,
+      "verdict": "excluded",
+      "answers": null,
+      "min_confidence": null,
+      "exclusion": {
+        "item": "agt-4p2.4",
+        "reason": "sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events."
+      },
+      "explanation": "Excluded from this bead by the anchor's exclude list: sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.",
+      "attempts": 0
+    }
+  ],
+  "summary": {
+    "counts": {
+      "excluded": 1
+    },
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "excluded": [
+      {
+        "anchor_id": "ANC-007",
+        "reason": "sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events."
+      }
+    ],
+    "shortened": [],
+    "pass": true
+  }
+}

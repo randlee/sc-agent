@@ -1,0 +1,1115 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "tune",
+    "gate": "planning",
+    "accepted": true,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "semantic_score": {
+      "exact_role_cells": 54,
+      "total_role_cells": 54,
+      "exact_semantic_verdicts": 18,
+      "total_semantic_verdicts": 18,
+      "stable_cases": 9,
+      "total_cases": 9,
+      "regressions": 0
+    },
+    "confidence_diagnostics": {
+      "threshold": 0.8,
+      "cells_at_or_above_threshold": 54,
+      "total_cells": 54,
+      "minimum": 0.83,
+      "p10": 0.96,
+      "median": 1.0,
+      "mean": 0.9872
+    },
+    "tuning_history_before_sha256": "fff6101bb4def6b94719e349f81d66146ea5aca217f49d01505e96dabbfbfc61",
+    "tuning_history_after": {
+      "schema": "plan-anchor/tuning-history/2",
+      "history_id": "phase-a-ANC-007-planning",
+      "events": [
+        {
+          "event_index": 1,
+          "previous_event_sha256": null,
+          "event": "question_set_sealed",
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "authority": {
+            "intent_id": "phase-a-intent",
+            "intent_version": 1,
+            "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+            "anchor_id": "ANC-007",
+            "anchor_version": 2,
+            "anchor_record_sha256": "2bcedba42c63e328f61719661b3cedd0fa9796ea0e8033d022a24c9dee18b8ac"
+          },
+          "oracle": {
+            "sha256": "0b5aa120d82e195694d6650d6583e551c9b39b40f04b5a8f07707fa2666dbad5",
+            "case_ids": [
+              "fixture-pass",
+              "fixture-fail",
+              "compliant-secrets",
+              "silent-timeout",
+              "topical-types",
+              "conflict-treesitter",
+              "irrelevant-readme",
+              "boundary-no-test",
+              "exception-preserve"
+            ],
+            "case_count": 9,
+            "repeat_count": 2
+          },
+          "candidate": {
+            "candidate_id": "bundle-a",
+            "question_sha256": "3b8782bb5b4cf1a8fe274f31bc8ecd4c3f0ff430450c76cb499247a6c05f5664"
+          },
+          "evidence": {
+            "canonical_request_sha256": [
+              "1978ffaa7e656a879bda18e089262600ad2aed151bd791a5526d4e1c72a9d481",
+              "1978ffaa7e656a879bda18e089262600ad2aed151bd791a5526d4e1c72a9d481",
+              "3cdc36bbe28a730f36a25148558da4ab43429dc4f369e473f66b002ba5e01675",
+              "3cdc36bbe28a730f36a25148558da4ab43429dc4f369e473f66b002ba5e01675",
+              "7df8c94b22104d9dc1bb04a0776028c8969c9a63423ac27e11716144abff0860",
+              "7df8c94b22104d9dc1bb04a0776028c8969c9a63423ac27e11716144abff0860",
+              "c9001f17f12815f6d6da82a9ac902d296f0ae1383c4f972cd4ebcd6b8b93771c",
+              "c9001f17f12815f6d6da82a9ac902d296f0ae1383c4f972cd4ebcd6b8b93771c",
+              "ede90681791d2ace8fd3cd372bdf13d8b5738300467e72933aa52eb8171eead4",
+              "ede90681791d2ace8fd3cd372bdf13d8b5738300467e72933aa52eb8171eead4",
+              "1742c6257335e08c5f0a6db0edd21f5729f3af67ad7e24a2414526e7dc8efa3b",
+              "1742c6257335e08c5f0a6db0edd21f5729f3af67ad7e24a2414526e7dc8efa3b",
+              "8af56a57b3c4ad4a81449aa73b2888d1ef785d7ae46f5c7644b7fde48e907f02",
+              "8af56a57b3c4ad4a81449aa73b2888d1ef785d7ae46f5c7644b7fde48e907f02",
+              "505932262d29c118e769a8161e3fa39e4bc5f52360eb37e91e809f6a1816245b",
+              "505932262d29c118e769a8161e3fa39e4bc5f52360eb37e91e809f6a1816245b",
+              "3c8beeef9042941f2a36faca79caddb8ca65c03e919cb477a49699db9fcc6660",
+              "3c8beeef9042941f2a36faca79caddb8ca65c03e919cb477a49699db9fcc6660"
+            ],
+            "raw_response_sha256": [
+              "43baa54addf686a7ea6a5ff0074c3d6c4c7bc63cfd36ea42f532226d11b8701f",
+              "43baa54addf686a7ea6a5ff0074c3d6c4c7bc63cfd36ea42f532226d11b8701f",
+              "2674e786fa8648aadc0ad98b131fb7a197b349f7ab42caa86b36d2c3a73ec956",
+              "375fd1f5eaa70d777f383ccec7a0e9f2232958ca78922b07c240848fa247585b",
+              "d6c50bf9ef9ded8518d82f23f117ae8395793cb15dc4b6d25844445cf1388d6e",
+              "d6c50bf9ef9ded8518d82f23f117ae8395793cb15dc4b6d25844445cf1388d6e",
+              "e260fcb4be3f9cec2cb9d4289e9da852715819fac6f9a1f039aad27a51ba227a",
+              "e260fcb4be3f9cec2cb9d4289e9da852715819fac6f9a1f039aad27a51ba227a",
+              "c0739a09c54cba4b0e3d0e3897830ff99736d9db7581407541bb42e787a2edbe",
+              "8fcc476b3d4bbea2eee1041f2be980a7fd8d6b10b6918cef93e51d23c933b875",
+              "c866914de9a9b0ac791ae75d1efefc35fdd5159c0b7b009b5f2b6893192cc172",
+              "863a505688568def680524c21a19d787fee757aca2e82eb60691b70e8b3da24e",
+              "a00b1da114f8ec94999a8137f3a91fb480cce907864c695135b834892b89bf4d",
+              "a00b1da114f8ec94999a8137f3a91fb480cce907864c695135b834892b89bf4d",
+              "e4834d8b5242c3b5a732a42d5419baff6e1fae3b1202253bb519e9e889c02b7a",
+              "f7f5fda3e8bc0f74efcf5552171b0765212c85fd8abfc7d618d81aa94f108b6b",
+              "937d9c048c4993c9af47c4060c39ef25c1aa924f5a66f5b8e0d768355dc1f2a1",
+              "937d9c048c4993c9af47c4060c39ef25c1aa924f5a66f5b8e0d768355dc1f2a1"
+            ],
+            "run_ids": [
+              "959494c3e6c847e9",
+              "f6f71c20ce84a5c4",
+              "aa4789c49cc5212f",
+              "34e26327cd6055bc",
+              "0be5b9366f5e09dd",
+              "9476f732ada75a99",
+              "3319e8158581aa8c",
+              "139b24b591099535",
+              "4a4f769570ca12df",
+              "e05fdb36827c7d4b",
+              "680a00687e012438",
+              "2315b5349e0802ce",
+              "8a090d19172b0fd8",
+              "566d515e8615712d",
+              "6b6c58dbdf13cf8f",
+              "62c02d20a2e130eb",
+              "1f97d8a42e381f94",
+              "49f1449a24ad28b9"
+            ]
+          },
+          "score": {
+            "exact_role_cells": 54,
+            "total_role_cells": 54,
+            "exact_semantic_verdicts": 18,
+            "total_semantic_verdicts": 18,
+            "stable_cases": 9,
+            "total_cases": 9,
+            "regressions": 0,
+            "confidence": {
+              "threshold": 0.8,
+              "cells_at_or_above_threshold": 54,
+              "total_cells": 54,
+              "minimum": 0.83,
+              "p10": 0.96,
+              "median": 1.0,
+              "mean": 0.9872
+            }
+          },
+          "decision": {
+            "status": "sealed",
+            "question_set_sha256": "3b8782bb5b4cf1a8fe274f31bc8ecd4c3f0ff430450c76cb499247a6c05f5664",
+            "reason_code": "TOURNAMENT.SEALED"
+          },
+          "supersedes": null
+        }
+      ]
+    },
+    "tuning_history_after_sha256": "d7b70a967e366fb1ad5b844130b5c4ad4e723fb9a2cb731995e9a353dcab3bc1",
+    "production_semantics_unchanged": true,
+    "authority_citations": [
+      "ANC-007 v2 statement: The existing sc-agent library code must be updated so that it writes log records.",
+      "ANC-007 v2 quote: You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+      "ANC-007 v2 scope: adds or changes code in an sc-agent library crate",
+      "ANC-007 v2 check: a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote",
+      "ANC-007 v2 fixtures (pass/fail)",
+      "phase-a-intent v1: every send is session-logged"
+    ],
+    "oracle_sha256": "0b5aa120d82e195694d6650d6583e551c9b39b40f04b5a8f07707fa2666dbad5",
+    "sealed_question_set": {
+      "digest": "3b8782bb5b4cf1a8fe274f31bc8ecd4c3f0ff430450c76cb499247a6c05f5664",
+      "questions": {
+        "addressed": {
+          "type": "choice",
+          "instructions": "The anchor requires that existing sc-agent library code is updated so that it writes log records (`anchor.statement`). Does `item.text` explicitly provide for this: does it plan for library code it touches to write log records (for example through an injected logger), or state that existing log records and their test are kept? A general remark that logging matters, or making something easy to log, without a step that makes the code write log records, does not count. Judge presence only, not conflict.",
+          "criteria": {
+            "yes": "The item plans that library code writes log records, or states that existing log records are kept.",
+            "no": "The item plans no log records being written; it is silent about logging or mentions it only in general terms.",
+            "unclear": "The item mentions logging but it cannot be told whether the code will actually write log records."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "The anchor requires that existing sc-agent library code is updated so that it writes log records. Does `item.text` plan for library code to write no log records: leaving code unlogged on purpose, deferring its logging to later, removing log calls, or removing the injected logger? Silence about logging is not a conflict. Judge conflict only.",
+          "criteria": {
+            "yes": "The item states that library code will write no log records, defers its logging, or removes its log calls or logger.",
+            "no": "The item states nothing that leaves library code without log records; it is compliant, silent, or unrelated.",
+            "unclear": "The item text might mean library code is left without log records, but it is ambiguous."
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, governing `anchor.scope`). The anchor concerns code in the sc-agent library crates (for example sc-agent-http, sc-agent-types, sc-agent-secrets, sc-decision-schema, sc-treesitter). Does the work in `item.text` add, change, remove, or depend on code in an sc-agent library crate? Judge subject overlap only, not whether the item writes log records or obeys the anchor.",
+          "criteria": {
+            "yes": "The item adds, changes, removes, or depends on code in an sc-agent library crate.",
+            "no": "The item works on something other than sc-agent library crate code (for example documentation, CI, or developer setup) and changes no library code.",
+            "unclear": "The item text is too vague to tell whether it touches code in an sc-agent library crate."
+          }
+        }
+      }
+    },
+    "candidate_rankings": [
+      {
+        "rank": 1,
+        "bundle_id": "bundle-a",
+        "roles": {
+          "relevant": "rel-a",
+          "addressed": "add-a",
+          "contradicted": "con-a"
+        },
+        "question_sha256": "4c34494ded6083495906e20428bc591bf97e37c45213c0e8889d5bf35b92adda",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 54,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 18,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 54,
+          "total_cells": 54,
+          "minimum": 0.83,
+          "p10": 0.96,
+          "median": 1.0,
+          "mean": 0.9872
+        },
+        "complexity_bytes": 2519,
+        "selected": true,
+        "co_leader": false,
+        "reason": "Selected: top lexicographic rank among semantically accepted bundles.",
+        "mismatches": []
+      },
+      {
+        "rank": 2,
+        "bundle_id": "bundle-c",
+        "roles": {
+          "relevant": "rel-c",
+          "addressed": "add-c",
+          "contradicted": "con-c"
+        },
+        "question_sha256": "257dd355c3a6dfa94a394353a7a1d8887574801ae585fd46f87d0c0f98a8954e",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 50,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 14,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 47,
+          "total_cells": 54,
+          "minimum": 0.25,
+          "p10": 0.748,
+          "median": 0.97,
+          "mean": 0.9015
+        },
+        "complexity_bytes": 2033,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-no-test: relevant no, expected yes; boundary-no-test: verdict not_applicable, expected satisfied; conflict-treesitter: relevant no, expected yes; conflict-treesitter: verdict not_applicable, expected contradicted.",
+        "mismatches": [
+          "boundary-no-test: relevant no, expected yes",
+          "boundary-no-test: verdict not_applicable, expected satisfied",
+          "conflict-treesitter: relevant no, expected yes",
+          "conflict-treesitter: verdict not_applicable, expected contradicted"
+        ]
+      },
+      {
+        "rank": 3,
+        "bundle_id": "bundle-b",
+        "roles": {
+          "relevant": "rel-b",
+          "addressed": "add-b",
+          "contradicted": "con-b"
+        },
+        "question_sha256": "87b8ffe0e87e7c1fc3816bb3c83fed52cbd88d051219103fc92202917e6ecc51",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 48,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 12,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.4,
+          "p10": 0.739,
+          "median": 1.0,
+          "mean": 0.9244
+        },
+        "complexity_bytes": 2090,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-no-test: relevant no, expected yes; boundary-no-test: verdict not_applicable, expected satisfied; conflict-treesitter: relevant no, expected yes; conflict-treesitter: verdict not_applicable, expected contradicted; fixture-fail: relevant no, expected yes; fixture-fail: verdict not_applicable, expected contradicted.",
+        "mismatches": [
+          "boundary-no-test: relevant no, expected yes",
+          "boundary-no-test: verdict not_applicable, expected satisfied",
+          "conflict-treesitter: relevant no, expected yes",
+          "conflict-treesitter: verdict not_applicable, expected contradicted",
+          "fixture-fail: relevant no, expected yes",
+          "fixture-fail: verdict not_applicable, expected contradicted"
+        ]
+      },
+      {
+        "rank": 4,
+        "bundle_id": "baseline",
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "question_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 46,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 11,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 7,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 33,
+          "total_cells": 54,
+          "minimum": 0.16,
+          "p10": 0.253,
+          "median": 0.89,
+          "mean": 0.7504
+        },
+        "complexity_bytes": 2554,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-no-test: relevant no, expected yes; boundary-no-test: unstable across repeats; boundary-no-test: verdict not_applicable, expected satisfied; conflict-treesitter: relevant no, expected yes; conflict-treesitter: verdict not_applicable, expected contradicted; fixture-fail: addressed yes, expected no; fixture-fail: unstable across repeats; silent-timeout: relevant no, expected yes; silent-timeout: verdict not_applicable, expected not_addressed; topical-types: addressed unclear, expected no; topical-types: verdict underspecified, expected not_addressed.",
+        "mismatches": [
+          "boundary-no-test: relevant no, expected yes",
+          "boundary-no-test: unstable across repeats",
+          "boundary-no-test: verdict not_applicable, expected satisfied",
+          "conflict-treesitter: relevant no, expected yes",
+          "conflict-treesitter: verdict not_applicable, expected contradicted",
+          "fixture-fail: addressed yes, expected no",
+          "fixture-fail: unstable across repeats",
+          "silent-timeout: relevant no, expected yes",
+          "silent-timeout: verdict not_applicable, expected not_addressed",
+          "topical-types: addressed unclear, expected no",
+          "topical-types: verdict underspecified, expected not_addressed"
+        ]
+      }
+    ],
+    "acceptance_table": [
+      {
+        "case_id": "fixture-pass",
+        "probe": "fixture_pass",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Approved ANC-007 pass fixture: existing library code is updated to write log records, with the check."
+      },
+      {
+        "case_id": "fixture-fail",
+        "probe": "fixture_fail",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.96,
+            "contradicted": 1.0,
+            "relevant": 0.85
+          },
+          {
+            "addressed": 0.96,
+            "contradicted": 1.0,
+            "relevant": 0.83
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Approved ANC-007 fail fixture: leaving existing library code without log records and deferring logging is what the statement rules out."
+      },
+      {
+        "case_id": "compliant-secrets",
+        "probe": "compliant",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Updates existing sc-agent library code to write log records through an injected logger, as the ANC-007 statement and quote require."
+      },
+      {
+        "case_id": "silent-timeout",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Changes code in an sc-agent library crate (in ANC-007 scope) but says nothing about log records; silence is not conflict."
+      },
+      {
+        "case_id": "topical-types",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.97,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.96,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Mentions logging as a general concern but plans no update that makes existing library code write log records, so the ANC-007 obligation is not carried out."
+      },
+      {
+        "case_id": "conflict-treesitter",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.94,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.91,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Makes existing sc-agent library code stop writing log records, which the ANC-007 statement rules out."
+      },
+      {
+        "case_id": "irrelevant-readme",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Documentation only; it adds or changes no code in an sc-agent library crate, so it is outside ANC-007 scope."
+      },
+      {
+        "case_id": "boundary-no-test",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.97,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.96,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "The ANC-007 statement requires existing code to write log records; this item plans exactly that. It omits the check test, but the statement does not require the item to name the check, so the directive is still carried out."
+      },
+      {
+        "case_id": "exception-preserve",
+        "probe": "exception",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Changes library code (in scope) that already writes log records and explicitly preserves the logging and its check, so the ANC-007 directive is kept."
+      }
+    ],
+    "evidence": {
+      "out_dir": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ANC-007/tournament-1",
+      "results_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ANC-007/tournament-1/results.jsonl",
+      "oracle_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/ANC-007/tournament-1/oracle.frozen.json",
+      "oracle_frozen_before_first_jev_call": true,
+      "calls": 72,
+      "failed_calls": [],
+      "missing_calls": [],
+      "retries": 0,
+      "max_parallel_evaluators": 4,
+      "repeat_requests_byte_identical": true,
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "bundle-a": {
+          "relevant": "rel-a",
+          "addressed": "add-a",
+          "contradicted": "con-a"
+        },
+        "bundle-b": {
+          "relevant": "rel-b",
+          "addressed": "add-b",
+          "contradicted": "con-b"
+        },
+        "bundle-c": {
+          "relevant": "rel-c",
+          "addressed": "add-c",
+          "contradicted": "con-c"
+        }
+      },
+      "role_rankings": {
+        "addressed": [
+          {
+            "candidate_id": "add-a",
+            "bundles": [
+              "bundle-a"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "add-b",
+            "bundles": [
+              "bundle-b"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "add-c",
+            "bundles": [
+              "bundle-c"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 15,
+            "total_cells": 18,
+            "stable_cases": 8,
+            "total_cases": 9
+          }
+        ],
+        "contradicted": [
+          {
+            "candidate_id": "con-a",
+            "bundles": [
+              "bundle-a"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "con-b",
+            "bundles": [
+              "bundle-b"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "con-c",
+            "bundles": [
+              "bundle-c"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ],
+        "relevant": [
+          {
+            "candidate_id": "rel-a",
+            "bundles": [
+              "bundle-a"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "rel-c",
+            "bundles": [
+              "bundle-c"
+            ],
+            "exact_cells": 14,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 13,
+            "total_cells": 18,
+            "stable_cases": 8,
+            "total_cases": 9
+          },
+          {
+            "candidate_id": "rel-b",
+            "bundles": [
+              "bundle-b"
+            ],
+            "exact_cells": 12,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ]
+      },
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "run_ids_all": [
+        "066911f050e882e2",
+        "07ba7402fdcab2c0",
+        "08a8d94238c6ce41",
+        "0be5b9366f5e09dd",
+        "139b24b591099535",
+        "16bfc6b64a542a11",
+        "188be782d4dc66d2",
+        "18ce2151fb611273",
+        "1afa5dfcd370c978",
+        "1cbae808c8f4f3f9",
+        "1f97d8a42e381f94",
+        "2315b5349e0802ce",
+        "2bd80cc32a8ca3fe",
+        "2c8b0896d93513b6",
+        "2d6a40fea09bd75c",
+        "2e225d7e232e2dda",
+        "300f00c6a6bd8366",
+        "3319e8158581aa8c",
+        "34e26327cd6055bc",
+        "3b2b7f2fc35d7620",
+        "3bc7a88a9e5c7140",
+        "40cde66b3f56c266",
+        "41cfe4d979e2f6b0",
+        "49f1449a24ad28b9",
+        "4a4f769570ca12df",
+        "566d515e8615712d",
+        "57b24449f24ffd49",
+        "5927a91b483e82e7",
+        "59440fd0d602f323",
+        "61548492c735a7ff",
+        "62c02d20a2e130eb",
+        "64b5b7a737d86a72",
+        "680a00687e012438",
+        "6b15a197d3a46d1d",
+        "6b6c58dbdf13cf8f",
+        "6c9b503dc04b6456",
+        "726ed2cb2741d805",
+        "75537b7ca052662b",
+        "756a19cc31ad1f3d",
+        "7b21bf6bb37ea52c",
+        "7dbcbfc36d80e09c",
+        "8349342cdcdb0c0e",
+        "8a090d19172b0fd8",
+        "8e3d7eae76b2a6cb",
+        "907afc19ce0e7afa",
+        "93fce205098c1232",
+        "9476f732ada75a99",
+        "959494c3e6c847e9",
+        "9b5440a39a0f0e50",
+        "a39878a2d71e54ed",
+        "aa4789c49cc5212f",
+        "ad9c6a95fd338ae5",
+        "ae8fc97244fb8576",
+        "b09ca5ab865f6b0a",
+        "b1a2ce777598afcb",
+        "b4adcb4f62379762",
+        "bae75931d803d761",
+        "c1b03685eaa9b8fd",
+        "c25b0f9f841de882",
+        "c3268c214742d0a2",
+        "c4176ff70e7a4574",
+        "ce9b125f26a9f282",
+        "d978c678b5ffd4b6",
+        "da52bd1df98eda59",
+        "e05fdb36827c7d4b",
+        "e128b81c89ee7830",
+        "e35f4ed278e1d51f",
+        "e65f7070a2a6e7b5",
+        "e676525c19ab93b4",
+        "f3647229c3ec8078",
+        "f6f71c20ce84a5c4",
+        "fae0cb3dc671ca38"
+      ],
+      "tie": null
+    },
+    "explanation": "4 role-complete bundles (baseline included) x 9 frozen oracle cases x 2 repeats: 72 calls, 0 retries. Bundle bundle-a is the top-ranked semantically accepted set: 54/54 role cells, 18/18 threshold-0 verdicts, 9/9 stable cases, zero regressions against the baseline. Confidence is diagnostic only; production review keeps the 0.6 threshold.",
+    "planner_action": "Write sealed_question_set.questions as the anchor's plan-questions override after validating this result; store tuning_history_after byte-identical. Do not use tournament confidence in production review.",
+    "question_action": null,
+    "sealed_question_set_digest_before": null,
+    "sealed_question_set_digest_after": "3b8782bb5b4cf1a8fe274f31bc8ecd4c3f0ff430450c76cb499247a6c05f5664",
+    "authority_recommendations": []
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 2326,
+    "tool_calls": 72,
+    "retry_count": 0,
+    "correlation_id": "tune-plan-ANC-007",
+    "jev_run_ids": [
+      "066911f050e882e2",
+      "07ba7402fdcab2c0",
+      "08a8d94238c6ce41",
+      "0be5b9366f5e09dd",
+      "139b24b591099535",
+      "16bfc6b64a542a11",
+      "188be782d4dc66d2",
+      "18ce2151fb611273",
+      "1afa5dfcd370c978",
+      "1cbae808c8f4f3f9",
+      "1f97d8a42e381f94",
+      "2315b5349e0802ce",
+      "2bd80cc32a8ca3fe",
+      "2c8b0896d93513b6",
+      "2d6a40fea09bd75c",
+      "2e225d7e232e2dda",
+      "300f00c6a6bd8366",
+      "3319e8158581aa8c",
+      "34e26327cd6055bc",
+      "3b2b7f2fc35d7620",
+      "3bc7a88a9e5c7140",
+      "40cde66b3f56c266",
+      "41cfe4d979e2f6b0",
+      "49f1449a24ad28b9",
+      "4a4f769570ca12df",
+      "566d515e8615712d",
+      "57b24449f24ffd49",
+      "5927a91b483e82e7",
+      "59440fd0d602f323",
+      "61548492c735a7ff",
+      "62c02d20a2e130eb",
+      "64b5b7a737d86a72",
+      "680a00687e012438",
+      "6b15a197d3a46d1d",
+      "6b6c58dbdf13cf8f",
+      "6c9b503dc04b6456",
+      "726ed2cb2741d805",
+      "75537b7ca052662b",
+      "756a19cc31ad1f3d",
+      "7b21bf6bb37ea52c",
+      "7dbcbfc36d80e09c",
+      "8349342cdcdb0c0e",
+      "8a090d19172b0fd8",
+      "8e3d7eae76b2a6cb",
+      "907afc19ce0e7afa",
+      "93fce205098c1232",
+      "9476f732ada75a99",
+      "959494c3e6c847e9",
+      "9b5440a39a0f0e50",
+      "a39878a2d71e54ed",
+      "aa4789c49cc5212f",
+      "ad9c6a95fd338ae5",
+      "ae8fc97244fb8576",
+      "b09ca5ab865f6b0a",
+      "b1a2ce777598afcb",
+      "b4adcb4f62379762",
+      "bae75931d803d761",
+      "c1b03685eaa9b8fd",
+      "c25b0f9f841de882",
+      "c3268c214742d0a2",
+      "c4176ff70e7a4574",
+      "ce9b125f26a9f282",
+      "d978c678b5ffd4b6",
+      "da52bd1df98eda59",
+      "e05fdb36827c7d4b",
+      "e128b81c89ee7830",
+      "e35f4ed278e1d51f",
+      "e65f7070a2a6e7b5",
+      "e676525c19ab93b4",
+      "f3647229c3ec8078",
+      "f6f71c20ce84a5c4",
+      "fae0cb3dc671ca38"
+    ],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

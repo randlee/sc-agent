@@ -1,0 +1,104 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T015934Z-fixture_ANC-007_fail_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T01:59:34+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:ANC-007:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 110,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The existing sc-agent library code must be updated so that it writes log records.",
+      "quote": "You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09T00:26:57Z",
+      "context": "planning session",
+      "anchor_version": 2,
+      "deterministic_check": "a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.88,
+          "probabilities": {
+            "yes": 0.92,
+            "no": 0.07,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.2,
+          "probabilities": {
+            "yes": 0.47,
+            "no": 0.44,
+            "unclear": 0.09
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.2,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1005,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 110,
+      "item_shortened": false,
+      "request_bytes": 3011
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-007"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": false
+  }
+}

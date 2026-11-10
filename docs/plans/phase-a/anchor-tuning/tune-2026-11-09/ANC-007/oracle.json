@@ -1,0 +1,87 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "ANC-007",
+  "authority_citations": [
+    "ANC-007 v2 statement: The existing sc-agent library code must be updated so that it writes log records.",
+    "ANC-007 v2 quote: You need to go through the code and add logging and inject the logger everywhere that should have had it from day-1.",
+    "ANC-007 v2 scope: adds or changes code in an sc-agent library crate",
+    "ANC-007 v2 check: a test in each changed sc-agent library crate injects an in-memory GeneralLogger, runs the crate's operations and finds the log records they wrote",
+    "ANC-007 v2 fixtures (pass/fail)",
+    "phase-a-intent v1: every send is session-logged"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass",
+      "probe": "fixture_pass",
+      "item": {"title": "Log sc-agent-http requests", "text": "sc-agent-http's existing request code is updated to write a log record for each request it sends, checked by a test that injects an in-memory GeneralLogger and reads the records back."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Approved ANC-007 pass fixture: existing library code is updated to write log records, with the check."
+    },
+    {
+      "case_id": "fixture-fail",
+      "probe": "fixture_fail",
+      "item": {"title": "Defer sc-agent-http logging", "text": "sc-agent-http's request code is left as it is and writes no log records; logging is deferred to a later phase."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Approved ANC-007 fail fixture: leaving existing library code without log records and deferring logging is what the statement rules out."
+    },
+    {
+      "case_id": "compliant-secrets",
+      "probe": "compliant",
+      "item": {"title": "Inject logger into sc-agent-secrets", "text": "Go through sc-agent-secrets' existing key-loading and key-lookup functions, add a GeneralLogger parameter to each, and write a log record (without the key value) for every load and lookup. A crate test injects an in-memory GeneralLogger, runs a load and a lookup, and finds both records."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Updates existing sc-agent library code to write log records through an injected logger, as the ANC-007 statement and quote require."
+    },
+    {
+      "case_id": "silent-timeout",
+      "probe": "silent",
+      "item": {"title": "Configurable HTTP timeout", "text": "Add a `timeout` option to sc-agent-http's client builder and pass it to the underlying HTTP client; default to 30 seconds and cover it with a unit test."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "Changes code in an sc-agent library crate (in ANC-007 scope) but says nothing about log records; silence is not conflict."
+    },
+    {
+      "case_id": "topical-types",
+      "probe": "topical_only",
+      "item": {"title": "Decision error enum", "text": "Add a `DecisionError` enum to sc-agent-types with variants for timeout, rate limit and malformed response. Good logging matters for analysing large decision batches, so these errors should be easy to log."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "Mentions logging as a general concern but plans no update that makes existing library code write log records, so the ANC-007 obligation is not carried out."
+    },
+    {
+      "case_id": "conflict-treesitter",
+      "probe": "conflicting",
+      "item": {"title": "Simplify sc-treesitter API", "text": "Remove the GeneralLogger parameter from sc-treesitter's existing parse functions and delete their log calls to simplify the API; the parser will write no log records."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Makes existing sc-agent library code stop writing log records, which the ANC-007 statement rules out."
+    },
+    {
+      "case_id": "irrelevant-readme",
+      "probe": "irrelevant",
+      "item": {"title": "Developer setup docs", "text": "Write a README section explaining how a developer installs the TypeSafe API key in their shell profile and checks it with `env | grep TYPESAFE`."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "Documentation only; it adds or changes no code in an sc-agent library crate, so it is outside ANC-007 scope."
+    },
+    {
+      "case_id": "boundary-no-test",
+      "probe": "boundary",
+      "item": {"title": "Log decision dispatch", "text": "Update sc-decision-schema's existing decision dispatch code so that every decision it sends writes a log record through an injected GeneralLogger."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "The ANC-007 statement requires existing code to write log records; this item plans exactly that. It omits the check test, but the statement does not require the item to name the check, so the directive is still carried out."
+    },
+    {
+      "case_id": "exception-preserve",
+      "probe": "exception",
+      "item": {"title": "Rename sc-agent-http send", "text": "Rename sc-agent-http's `send_raw` function to `send_request`. Its existing log record per request and the crate test that injects an in-memory GeneralLogger and reads that record back are kept unchanged and still pass."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Changes library code (in scope) that already writes log records and explicitly preserves the logging and its check, so the ANC-007 directive is kept."
+    }
+  ]
+}
