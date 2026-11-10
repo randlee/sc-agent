@@ -1,9 +1,9 @@
 //! The `decide` binary as a process: help, slug refusal, interrupts, broken stdout and the
 //! fail-fast batch, against a loopback runner (no external network).
 //!
-//! Each child gets its own HOME (config and logs under `HOME/.sc-agent`) and a cleared
-//! environment; the test process's own environment is never changed. The HOME-based tests
-//! are Unix-only (Windows finds the home directory through USERPROFILE).
+//! Each child gets a cleared environment with its own `SC_AGENT_CONFIG_DIR` (config and logs
+//! under `<tempdir>/.sc-agent`), never HOME; the test process's own environment is never
+//! changed. The process tests use Unix signals, `kill` and `mkfifo`, so they are Unix-only.
 
 mod common;
 
@@ -130,7 +130,8 @@ mod tests {
         }
     }
 
-    /// A HOME whose `.sc-agent/default.json` names runner `dec` on `port`.
+    /// A tempdir whose `.sc-agent/default.json` (the child's `SC_AGENT_CONFIG_DIR`) names
+    /// runner `dec` on `port`.
     fn home(port: u16) -> tempfile::TempDir {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
@@ -151,7 +152,7 @@ mod tests {
             .args(args)
             .env_clear()
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-            .env("HOME", home)
+            .env(decide::CONFIG_DIR_VAR, home.join(".sc-agent"))
             .current_dir(env!("CARGO_MANIFEST_DIR"));
         command
     }

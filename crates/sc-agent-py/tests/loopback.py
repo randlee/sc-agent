@@ -59,7 +59,7 @@ class Loopback:
                     )
                 loopback.started.set()
                 if loopback.mode == "hang":
-                    loopback.release.wait()
+                    loopback.release.wait(60.0)
                     self.close_connection = True
                     return
                 self._reply(503, FIXED_ERROR)

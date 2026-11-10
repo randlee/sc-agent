@@ -1,7 +1,9 @@
 """The sc-agent Python API over the maturin build, against a loopback runner.
 
-HOME is a tempdir whose default.json names the loopback runner `dec`; no test reaches an
-external network. Each test names the acceptance line it proves.
+SC_AGENT_CONFIG_DIR (never HOME) is a tempdir whose default.json names the loopback runner
+`dec`; no test reaches an external network. Each test names the acceptance line it proves.
+Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
+depends on elapsed time.
 """
 
 from __future__ import annotations
@@ -12,11 +14,13 @@ import pathlib
 import re
 import subprocess
 import threading
-import time
+import os
+import warnings
 
 import pytest
 
 import sc_agent
+from conftest import HANG_GUARD
 
 NOUL = json.dumps({"model": "jev-latest", "state": "s", "questions": {"q": {"type": "noul"}}})
 PART = json.dumps(
@@ -46,11 +50,15 @@ def error_of(info: pytest.ExceptionInfo) -> tuple[str, dict]:
 
 def test_every_decide_operation_has_its_python_function(decide_bin):
     """AC: ANC-006."""
-    text = subprocess.run([decide_bin, "--help"], check=True, capture_output=True, text=True).stdout
+    text = subprocess.run(
+        [decide_bin, "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+    ).stdout
     commands = re.findall(r"^\s{2}(\w+)\s", text.split("Commands:")[1].split("Options:")[0], re.M)
     commands = [name for name in commands if name != "help"]
     assert sorted(commands) == ["doctor", "models", "send"]
-    batch = subprocess.run([decide_bin, "send", "--help"], check=True, capture_output=True, text=True).stdout
+    batch = subprocess.run(
+        [decide_bin, "send", "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+    ).stdout
     assert "--batch" in batch
     operations = {"send": "send", "models": "models", "doctor": "doctor", "send --batch": "send_batch"}
     for operation, function in operations.items():
@@ -91,7 +99,8 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path):
         [decide_bin, "send", "--model", "dec", "--project", "proj", "--agent-role", "role", str(request)],
         capture_output=True,
         text=True,
-        env={"HOME": str(tmp_path), "PATH": __import__("os").environ.get("PATH", "")},
+        env=dict(os.environ),  # carries SC_AGENT_CONFIG_DIR from the fixture
+        timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
     assert json.loads(child.stdout)["error"]["id"] == "decision.api_status"
@@ -148,28 +157,57 @@ def test_only_a_general_log_callable_keeps_the_default_session_log(env):
 
 @pytest.mark.mode("hang")
 def test_keyboard_interrupt_cancels_drains_and_reraises(env):
-    """AC: REQ-SAG-0011 Python."""
+    """AC: REQ-SAG-0011 Python.
+
+    The interrupt is raised once the runner holds a request it never answers, so the drained
+    results can only come from the cancel, not from the transport. A guard cancels the token
+    if KeyboardInterrupt is never seen, so a broken build fails instead of hanging.
+    """
     loopback, log_root = env
     lines: list[str] = []
-    sent_at: list[float] = []
+    token = sc_agent.CancelToken()
+    returned = threading.Event()
 
     def interrupt() -> None:
-        loopback.started.wait()
-        sent_at.append(time.monotonic())
-        _thread.interrupt_main()
+        if loopback.started.wait(HANG_GUARD):
+            _thread.interrupt_main()
+        if not returned.wait(HANG_GUARD):
+            token.cancel()
 
     thread = threading.Thread(target=interrupt)
     thread.start()
-    token = sc_agent.CancelToken()
-    with pytest.raises(KeyboardInterrupt):
-        sc_agent.send_batch([NOUL] * 3, cancel=token, on_result=lines.append, **ARGS)
-    raised_at = time.monotonic()
-    thread.join()
-    assert raised_at - sent_at[0] < 2.0
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            sc_agent.send_batch([NOUL] * 3, cancel=token, on_result=lines.append, **ARGS)
+    finally:
+        returned.set()
+        thread.join(HANG_GUARD)
+    assert not loopback.release.is_set(), "the runner never answered"
     assert token.is_cancelled()
     assert len(lines) == 3
     assert all(json.loads(line)["error"]["id"] == "decision.cancelled" for line in lines)
     assert len(session_rows(log_root)) == 3
+
+
+def test_a_raising_log_callable_never_changes_the_result(env):
+    """AC: REQ-SAG-0008 (QA-003). A general_log or session_log callable that raises makes its
+    writes refused writes: the send returns its normal result, and the lost rows are reported
+    (as a RuntimeWarning naming log.rows_lost) instead of being dropped silently."""
+
+    def refuse(_record: dict) -> None:
+        raise ValueError("this callable refuses every record")
+
+    with pytest.warns(RuntimeWarning, match="log.rows_lost"):
+        line = json.loads(sc_agent.send(NOUL, general_log=refuse, **ARGS))
+    assert line["error"]["id"] == "decision.api_status"  # the loopback's fixed error, as always
+
+    with pytest.warns(RuntimeWarning, match="log.rows_lost"):
+        line = json.loads(sc_agent.send(NOUL, session_log=refuse, **ARGS))
+    assert line["error"]["id"] == "decision.api_status"
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # a callable that accepts every record warns nothing
+        sc_agent.send(NOUL, general_log=lambda _record: None, session_log=lambda _record: None, **ARGS)
 
 
 def test_an_on_result_exception_cancels_drains_and_reraises(env):

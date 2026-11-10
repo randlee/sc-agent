@@ -234,43 +234,22 @@ mod tests {
         )
     }
 
-    /// AC: REQ-SAG-0012. A 429 with `Retry-After: 1` on the first send pauses every later send
-    /// to that host until the not-before time, the other request's included, because the
-    /// pause lives in the one `HttpClient` the runner shares; `Retry-After: 0` still waits the
-    /// 250 ms floor. Real clock: the runner's clock seam is crate-private to
-    /// sc-decision-runner, so the waits are real (about 1.25 s each).
+    /// AC: REQ-SAG-0012 with `workers: 1`. A 429 with `Retry-After: 1` pauses every later send
+    /// to that host, the other request's included, because the pause lives in the one
+    /// `HttpClient` the runner shares; `Retry-After: 0` still waits the 250 ms floor.
     ///
-    /// With the default 8 workers both requests may be sent before the 429 returns, so that
-    /// run checks every send that starts after the 429. With `workers: 1` the other request
-    /// can only start after the 429: three sends are made (the 429, the other request's first
-    /// send, the resend), and both later ones wait out the pause, which proves that the pause
-    /// holds the other request too.
+    /// Ordering is forced by the single worker: the other request can only start after the
+    /// 429 returned, so the three sends are the 429, the other request's first send and the
+    /// resend, and both later ones must start at least the pause after the 429. The pause is
+    /// on the real clock (the runner's clock seam is crate-private to sc-decision-runner), so
+    /// the check is a monotonic lower bound the pause itself guarantees, never an upper bound.
+    /// The parallel case is `with_two_workers_a_request_admitted_after_the_429_waits_the_pause`.
     #[test]
     fn a_retry_after_pauses_every_send_to_the_host() {
         for (seconds, floor) in [
             ("1", Duration::from_secs(1)),
             ("0", Duration::from_millis(250)),
         ] {
-            // Default workers: two parallel requests.
-            let transport = TimedTransport::new(vec![Ok(retry_after(seconds)), Ok(ok_noul())]);
-            paused_batch(&transport, "{}");
-            let sends = transport.sends();
-            let busy_at = sends[0].0;
-            let after: Vec<Duration> = sends
-                .iter()
-                .skip(1)
-                .map(|(at, _)| at.duration_since(busy_at))
-                .filter(|since| *since > Duration::from_millis(50))
-                .collect();
-            assert!(!after.is_empty(), "the resend comes after the 429");
-            for since in after {
-                assert!(
-                    since >= floor,
-                    "a send {since:?} after the 429 ignored the {floor:?} pause"
-                );
-            }
-
-            // One worker: the other request starts after the 429 and is paused too.
             let transport = TimedTransport::new(vec![Ok(retry_after(seconds)), Ok(ok_noul())]);
             paused_batch(&transport, r#"{"workers":1}"#);
             let sends = transport.sends();

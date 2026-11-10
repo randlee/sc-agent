@@ -232,7 +232,8 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// exception (`KeyboardInterrupt`) or an `on_result` exception cancels `cancel`, drains the
 /// remaining results, joins the worker and is re-raised (REQ-SAG-0011). After a signal the
 /// drained results are still passed to `on_result`; after an `on_result` exception they are
-/// not. A logger that failed to close is reported as a `RuntimeWarning`; it never changes the
+/// not. A logger that failed to close (or a session flush after the result) is reported as a
+/// `RuntimeWarning` whose text is the error chain as JSON; it never changes the
 /// result (REQ-SAG-0008). A worker panic raises `SagError` `sc_agent_py.worker_panicked`.
 fn run_interruptible<T: Send>(
     py: Python<'_>,
@@ -300,7 +301,10 @@ fn run_interruptible<T: Send>(
             ));
         };
         for error in &closed {
-            let message = std::ffi::CString::new(error.to_string()).unwrap_or_default();
+            // The whole chain (every cause id, e.g. `log.rows_lost`), as `SagError`'s detail.
+            let text =
+                decide::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
+            let message = std::ffi::CString::new(text).unwrap_or_default();
             PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
         }
         if let Some(error) = raised {
