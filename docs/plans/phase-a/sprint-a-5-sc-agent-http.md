@@ -146,7 +146,7 @@ impl SecretHeader {
 pub struct HttpRequest { method: Method, endpoint: Endpoint, headers: Vec<(String, String)>, secret: Option<SecretHeader>, body: Arc<[u8]>, deadline: Option<Duration> }
 impl HttpRequest {
     pub fn new(method: Method, endpoint: Endpoint, body: impl Into<Arc<[u8]>>) -> Self;
-    pub fn with_header(self, name: impl Into<String>, value: impl Into<String>) -> Self;
+    pub fn with_header(self, name: impl Into<String>, value: impl Into<String>) -> Result<Self, HttpError>; // refuses authorization, proxy-authorization, x-api-key, api-key, x-goog-api-key, cookie (case-insensitive) -> InvalidRequest (RSH-006)
     /// REQ-SAG-0013: refused with `HttpError::KeyOnPlainHttp` when `endpoint.is_plain_http() && !endpoint.is_loopback()`,
     /// so no request to a plain-http non-loopback host carries a key. This is the only way a secret enters a request
     /// (fields are private), so the check runs before any send.
@@ -337,6 +337,14 @@ impl BlockingTransport {
 impl Transport for BlockingTransport {}
 ```
 
+Corrections after QA-1 (2026-11-10; code at 2671dc5 follows these):
+- Step 4 order (REQ-SAG-0012, REQ-QA-001): every busy reply that is not quota computes the holdoff and calls pause.hold_until(host, ended + holdoff) BEFORE the sends/budget checks, so a busy reply on the last allowed send still pauses the host.
+- A timed-out send is resent after 0-250 ms jitter (no host pause) (RSH-003).
+- Timeouts::MAX = 3600 s and Timeouts::validate(self) -> Result<Self, HttpError>; a zero or over-max timeout or deadline is refused as http.invalid_request before any send; with_deadline stays infallible (RSH-004).
+- InvalidEndpoint.url drops userinfo, query and fragment and is cut to 256 bytes (RSH-005).
+- http.response, http.busy, http.busy_exhausted, http.budget_exhausted and http.quota_exhausted carry a redacted provider_request_id when present; busy events carry host and endpoint (log_form) (RSH-007).
+- CI runs cargo-deny (advisories, licenses) with a repo-root deny.toml; ureq stays pinned =3.5.1, with the reason in Cargo.toml (RSH-002).
+
 ## 4. Error list (`src/error.rs`, full; ErrorId from A-1, Display = `id: message` only, the chain stays in source()/detail())
 
 ```rust
@@ -369,9 +377,9 @@ impl ProviderReply { pub fn read(response: &HttpResponse, secret: Option<&ApiKey
 pub enum HttpError {
     /// Sends or budget ran out on busy replies (REQ-SAG-0601).
     /// `last` is the latest busy reply (always present: only a held busy request can end this way).
-    ProviderBusy { reason: BusyReason, attempts: u32, retry_after_seconds: Option<f64>, last: ProviderReply }, // "http.provider_busy"
+    ProviderBusy { reason: BusyReason, attempts: u32, retry_after_seconds: Option<f64>, last: Box<ProviderReply> }, // "http.provider_busy" (boxed: clippy result_large_err on every Result<_, HttpError>)
     /// Busy status whose body marks quota, credit or spend exhaustion (REQ-SAG-0602).
-    QuotaExhausted { attempts: u32, reply: ProviderReply },        // "http.quota_exhausted"
+    QuotaExhausted { attempts: u32, reply: Box<ProviderReply> },        // "http.quota_exhausted"
     /// Transport failure. Timeout: resent under max_sends and the start budget, returned when either runs out; Connect (incl. DNS), Tls, Other: returned after one send.
     Network { kind: NetworkKind, attempts: u32, message: String }, // "http.network"
     /// The body exceeded the 8 MiB read cap.
@@ -386,7 +394,7 @@ pub enum HttpError {
 impl HttpError {
     pub(crate) fn map_text(self, map: &impl Fn(&str) -> String) -> Self;
 }
-impl ErrorId for HttpError {}   // cause_detail() (a-1 rename, RBP-F001): Network/InvalidRequest keep the ureq/io text in `message`; no lower sc-agent error
+impl ErrorId for HttpError {}   // cause_detail() (a-1 rename, RBP-F001): Network/InvalidRequest carry an explicit `cause: Option<Box<ErrorDetail>>` (built with ErrorDetail::foreign), are #[non_exhaustive], and are built with HttpError::network / invalid_request / with_cause; message() is this layer's text only; cause_detail() and source() return the cause (RBP-F001)
                                 // recovery() (RBP-F005): provider_busy -> "the provider is busy; try again later or lower workers"; quota_exhausted -> "the provider account is out of quota or credit; add credit or use another key"; key_on_plain_http -> "use an https endpoint or a loopback host (localhost, 127.0.0.0/8, ::1) for a runner that needs a key"; others None
 impl std::error::Error for HttpError {}
 ```
@@ -471,11 +479,11 @@ Estimated size: about 620 lines of code, 350 of tests.
 - [ ] A5-14 REQ-SAG-0008: sc-agent-http: send, response, busy, exhaustion, quota and transport-failure events go to the GeneralLogger passed to HttpClient::new; no body, header value or key is logged; a log failure never changes a send result.
 - [ ] A5-15 ANC-007: sc-agent-http's HttpClient::send_once writes http.send (the "request sent" record for every backend), http.response (with elapsed_ms), http.busy, http.busy_exhausted, http.budget_exhausted, http.quota_exhausted, http.timeout_resend and http.transport_failed to the GeneralLogger passed to HttpClient::new; a test injects sc_agent_log::testing::MemoryLog, runs busy, quota, timeout and connect-failure sends and finds each record with no key or body.
 - [ ] A5-16 ADR-SAG-0004 / REQ-SAG-0009 / REQ-SAG-0010: sc-agent-http: no ureq type in a public signature; cargo tree -p sc-agent-http lists no tokio and no sc-decision-* or sc-llm-provider crate; no sleep call.
-- [ ] A5-17 REQ-SAG-0002: sc-agent-http: a test makes the transport fail with a lower-layer (ureq) error and asserts the returned HttpError's ErrorDetail chain carries that cause's id and message.
+- [ ] A5-17 REQ-SAG-0002: sc-agent-http: a test makes the transport fail with a lower-layer (ureq) error and asserts the returned HttpError's detail().cause (and source()) carries that cause's id and message, held in the explicit cause field.
 - [ ] A5-18 ADR-SAG-0004: sc-agent-http sits in the http layer; its only sc-agent crate dependencies are the lower-layer crates sc-agent-types, sc-agent-secrets and sc-agent-log, and it depends on no decision-schema, decision-backend, sc-llm-provider or runner crate, checked by `cargo tree -p sc-agent-http` (with and without `--features testing`).
 - [ ] A5-19 sc-agent-http: feature `testing` (not default) exposes sc_agent_http::testing::{ScriptedTransport, RecordingTransport, BlockingTransport}; tests/support/ is gone; BlockingTransport returns only after the test calls release() (no sleep).
 - [ ] A5-20 sc-agent-http: every http.* event carries the LogContext passed to send_once (session_id as correlation id, position); two concurrent requests on one HttpClient log http.busy records with different session_ids.
-- [ ] A5-21 REQ-SAG-0012: sc-agent-http: a busy reply sets HttpClient's ProviderPause for that host, so may_start / may_resend for any request to the same host return Start::Wait until then; another host is not paused; clones of the HttpClient share the pause.
+- [ ] A5-21 REQ-SAG-0012: sc-agent-http: every non-quota busy reply, including one on the last allowed send, sets HttpClient's ProviderPause for that host, so may_start / may_resend for any request to the same host return Start::Wait until then; another host is not paused; clones of the HttpClient share the pause.
 - [ ] A5-22 sc-agent-http: SendPermit has no public constructor and send_once consumes it; a held request is a Pending made only by send_once, so ProviderBusy always carries the last busy ProviderReply.
 - [ ] A5-23 sc-agent-http: Timeouts::request is one global deadline over connect, headers and body (ureq timeout_global); Timeouts::probe() is connect 5 s, request 10 s.
 - [ ] A5-24 REQ-SAG-0013: sc-agent-http: no request to a plain-http host that is not loopback carries a key: HttpRequest::with_secret on http://10.0.0.5 returns http.key_on_plain_http (with recovery text) before any send (ScriptedTransport records 0 sends); http://127.0.0.1 and http://localhost with a key, https://host with a key, and http://10.0.0.5 without a key are accepted (tests key_refused_on_plain_http_remote, key_allowed_on_loopback, key_allowed_on_https, plain_http_remote_without_key_allowed).
@@ -496,7 +504,7 @@ Plan hardening round 1 (2026-11-10):
 - Round 2 (RBP-F009): admission moved to HttpClient::may_start / may_resend returning Start::{Go(SendPermit), Wait}; send_once consumes the SendPermit and returns Next::{Done { response, attempts }, ResendAt { at, pending }}. ProviderBusy.last is ProviderReply again (the last: None fallback is gone).
 - Round 2: ProviderPause (REQ-SAG-0012), Retry-After floor 250 ms + 0-250 ms jitter, Timeouts::probe(), LogContext on every http.* event (RSH-009), elapsed_ms (RSH-010), OpenAI quota test (REQ-QA-017), cause -> cause_detail, recovery text, Display = id: message.
 - Accepted risk (owner: resend on timeout): a POST resent after a timeout may run twice at the provider and be billed twice.
-- Conflict for the records agent: REQ-SAG-0601 still says a valid Retry-After is used exactly; REQ-SAG-0012 adds jitter and a floor. A5-03 follows REQ-SAG-0012.
+- REQ-SAG-0601 and REQ-SAG-0012 agree: a valid Retry-After is clamped to 0.25-30 s plus up to 250 ms jitter (A5-03).
 - Feature `testing` overrides the earlier no-test-util decision (PLAN-CRIT-010; reason: five sprints would otherwise re-implement the same fakes).
 - clippy.toml edit dropped: a-1 owns the file (PLAN-SCOPE-009).
 - Round 3 (REQ-QA-R2-001): request-level REQ-SAG-0013 guard; HttpRequest::with_secret now returns Result<Self, HttpError> (callers in a-6/a-7 add `?`); new variant HttpError::KeyOnPlainHttp { host } id http.key_on_plain_http; 7 variants.

@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use sc_agent_log::{GeneralLogger, Level, LogContext};
-use sc_agent_types::ErrorId;
+use sc_agent_types::{ErrorDetail, ErrorId};
 use serde_json::{Map, Value};
 
 use crate::error::{BusyReason, HttpError, NetworkKind};
@@ -195,8 +195,11 @@ pub struct Pending {
 enum Last {
     /// The last reply was busy (already redacted).
     Busy(ProviderReply),
-    /// The last send timed out (message already redacted).
-    Timeout { message: String },
+    /// The last send timed out (message and cause already redacted).
+    Timeout {
+        message: String,
+        cause: Option<Box<ErrorDetail>>,
+    },
 }
 
 impl Last {
@@ -225,11 +228,13 @@ impl Pending {
                 retry_after_seconds: reply.retry_after_seconds,
                 last: Box::new(reply),
             },
-            Last::Timeout { message } => HttpError::Network {
-                kind: NetworkKind::Timeout,
-                attempts,
-                message,
-            },
+            Last::Timeout { message, cause } => {
+                let error = HttpError::network(NetworkKind::Timeout, attempts, message);
+                match cause {
+                    Some(cause) => error.with_cause(*cause),
+                    None => error,
+                }
+            }
         }
     }
 }
@@ -485,10 +490,14 @@ impl HttpClient {
     /// `now` is the caller's clock: read before the send (the first send
     /// starts the 90 s budget) and after it (the holdoff start). Every
     /// `http.*` event carries `ctx`. Every error is redacted of the request's
-    /// key.
+    /// key. Every busy reply that is not quota pauses the request's host
+    /// ([`ProviderPause`], REQ-SAG-0012), the last allowed send's included.
     ///
     /// # Errors
     ///
+    /// - [`HttpError::InvalidRequest`] before any send when the request's
+    ///   deadline is zero or over
+    ///   [`Timeouts::DEADLINE_MAX`](crate::Timeouts::DEADLINE_MAX);
     /// - [`HttpError::QuotaExhausted`] for a busy status whose body marks
     ///   quota exhaustion, after this send (REQ-SAG-0602);
     /// - [`HttpError::ProviderBusy`] for a busy reply on the last allowed
@@ -502,16 +511,24 @@ impl HttpClient {
         ctx: LogContext,
         now: &dyn Fn() -> Instant,
     ) -> Result<Next, HttpError> {
+        if let Some(deadline) = request.deadline() {
+            crate::transport::check_duration(
+                "the request deadline",
+                deadline,
+                crate::Timeouts::DEADLINE_MAX,
+            )?;
+        }
         let SendPermit { mut attempts, last } = permit;
         let max_sends = self.policy.max_sends();
         let attempt = attempts.sends.saturating_add(1);
+        let endpoint = request.endpoint().log_form();
         self.event(
             Level::Info,
             "http.send",
             ctx,
             fields([
                 ("method", request.method().as_str().into()),
-                ("endpoint", request.endpoint().log_form().into()),
+                ("endpoint", endpoint.clone().into()),
                 ("attempt", attempt.into()),
                 ("max_sends", max_sends.into()),
                 ("after", last.as_ref().map(Last::as_str).into()),
@@ -533,6 +550,20 @@ impl HttpClient {
             }
         };
         let status = response.status();
+        let secret = request.secret().map(SecretHeader::key);
+        // A busy reply is read whole (body or header request id); a final
+        // reply only for its request-id header (the backend reads the body).
+        let reply = is_busy_status(status).then(|| ProviderReply::read(&response, secret));
+        let request_id = match &reply {
+            Some(reply) => reply.request_id.clone(),
+            None => response
+                .header("request-id")
+                .or_else(|| response.header("x-request-id"))
+                .map(|id| match secret {
+                    Some(key) => crate::redact::redact_owned(key, id.to_owned()),
+                    None => id.to_owned(),
+                }),
+        };
         self.event(
             Level::Info,
             "http.response",
@@ -541,24 +572,50 @@ impl HttpClient {
                 ("status", status.into()),
                 ("attempt", attempt.into()),
                 ("elapsed_ms", elapsed_ms.into()),
+                ("provider_request_id", request_id.clone().into()),
             ]),
         );
-        if !is_busy_status(status) {
+        let Some(reply) = reply else {
             return Ok(Next::Done { response, attempts });
-        }
-        let reply = ProviderReply::read(&response, request.secret().map(SecretHeader::key));
+        };
         if is_quota_reply(status, response.body()) {
             self.event(
                 Level::Warn,
                 "http.quota_exhausted",
                 ctx,
-                fields([("status", status.into()), ("attempt", attempt.into())]),
+                fields([
+                    ("status", status.into()),
+                    ("attempt", attempt.into()),
+                    ("endpoint", endpoint.into()),
+                    ("provider_request_id", request_id.into()),
+                ]),
             );
             return Err(HttpError::QuotaExhausted {
                 attempts: attempt,
                 reply: Box::new(reply),
             });
         }
+        // Every non-quota busy reply pauses the host, whatever happens to
+        // this request next (REQ-SAG-0012).
+        let (holdoff, retry_after_honoured) = holdoff(&response, attempt);
+        let host = request.endpoint().host();
+        self.pause.hold_until(host, ended + holdoff);
+        let host_paused_until_ms = self
+            .pause
+            .not_before(host)
+            .map(|at| millis(at.saturating_duration_since(ended)));
+        let busy_fields = |extra: [(&str, Value); 2]| {
+            let mut map = fields([
+                ("status", status.into()),
+                ("attempt", attempt.into()),
+                ("endpoint", endpoint.clone().into()),
+                ("host", host.into()),
+                ("provider_request_id", request_id.clone().into()),
+                ("host_paused_until_ms", host_paused_until_ms.into()),
+            ]);
+            map.extend(extra.map(|(name, value)| (name.to_owned(), value)));
+            map
+        };
         let pending = Pending {
             attempts,
             last: Last::Busy(reply),
@@ -568,31 +625,22 @@ impl HttpClient {
                 Level::Warn,
                 "http.busy_exhausted",
                 ctx,
-                fields([
-                    ("status", status.into()),
-                    ("attempt", attempt.into()),
+                busy_fields([
                     ("max_sends", max_sends.into()),
+                    ("holdoff_ms", millis(holdoff).into()),
                 ]),
             );
             return Err(pending.into_error(BusyReason::Sends));
         }
-        let (holdoff, retry_after_honoured) = holdoff(&response, attempt);
-        let host = request.endpoint().host();
-        self.pause.hold_until(host, ended + holdoff);
-        let host_paused_until_ms = self
-            .pause
-            .not_before(host)
-            .map(|at| millis(at.saturating_duration_since(ended)));
         let remaining = BUDGET.saturating_sub(ended.saturating_duration_since(first_send));
         if remaining.is_zero() {
             self.event(
                 Level::Warn,
                 "http.budget_exhausted",
                 ctx,
-                fields([
-                    ("status", status.into()),
-                    ("attempt", attempt.into()),
+                busy_fields([
                     ("budget_ms", millis(BUDGET).into()),
+                    ("holdoff_ms", millis(holdoff).into()),
                 ]),
             );
             return Err(pending.into_error(BusyReason::Budget));
@@ -601,12 +649,9 @@ impl HttpClient {
             Level::Warn,
             "http.busy",
             ctx,
-            fields([
-                ("status", status.into()),
-                ("attempt", attempt.into()),
+            busy_fields([
                 ("holdoff_ms", millis(holdoff).into()),
                 ("retry_after_honoured", retry_after_honoured.into()),
-                ("host_paused_until_ms", host_paused_until_ms.into()),
             ]),
         );
         Ok(Next::ResendAt {
@@ -616,8 +661,8 @@ impl HttpClient {
     }
 
     /// A transport error of send `attempts.sends`: a timeout with sends left
-    /// is held for an immediate resend (REQ-SAG-0601); anything else is
-    /// returned now.
+    /// is held for a resend after 0-250 ms of jitter, with no host pause
+    /// (REQ-SAG-0601); anything else is returned now.
     fn transport_failed(
         &self,
         error: HttpError,
@@ -627,32 +672,34 @@ impl HttpClient {
         ended: Instant,
     ) -> Result<Next, HttpError> {
         let attempt = attempts.sends;
-        if let HttpError::Network {
-            kind: NetworkKind::Timeout,
-            message,
-            ..
-        } = &error
-            && attempt < self.policy.max_sends()
-        {
-            self.event(
-                Level::Warn,
-                "http.timeout_resend",
-                ctx,
-                fields([
-                    ("attempt", attempt.into()),
-                    ("elapsed_ms", elapsed_ms.into()),
-                ]),
-            );
-            return Ok(Next::ResendAt {
-                at: ended,
-                pending: Pending {
-                    attempts,
-                    last: Last::Timeout {
-                        message: message.clone(),
+        let error = match error {
+            HttpError::Network {
+                kind: NetworkKind::Timeout,
+                message,
+                cause,
+                ..
+            } if attempt < self.policy.max_sends() => {
+                let holdoff = jitter();
+                self.event(
+                    Level::Warn,
+                    "http.timeout_resend",
+                    ctx,
+                    fields([
+                        ("attempt", attempt.into()),
+                        ("elapsed_ms", elapsed_ms.into()),
+                        ("holdoff_ms", millis(holdoff).into()),
+                    ]),
+                );
+                return Ok(Next::ResendAt {
+                    at: ended + holdoff,
+                    pending: Pending {
+                        attempts,
+                        last: Last::Timeout { message, cause },
                     },
-                },
-            });
-        }
+                });
+            }
+            other => other,
+        };
         self.event(
             Level::Warn,
             "http.transport_failed",

@@ -80,6 +80,33 @@ impl Default for Timeouts {
 }
 
 impl Timeouts {
+    /// Longest accepted connect or request timeout: one hour (the largest
+    /// configurable request timeout; a typo such as a value in milliseconds
+    /// does not fit).
+    pub const MAX: Duration = Duration::from_secs(3600);
+
+    /// Longest accepted per-request deadline
+    /// ([`HttpRequest::with_deadline`](crate::HttpRequest::with_deadline)):
+    /// three hours, the largest load timeout (7200 s) plus the largest
+    /// request timeout (3600 s) for a load-on-first-request daemon's first
+    /// request (REQ-SAG-0015).
+    pub const DEADLINE_MAX: Duration = Duration::from_secs(10_800);
+
+    /// `self` when both timeouts are in `(0, MAX]`.
+    ///
+    /// [`UreqTransport`](crate::UreqTransport) runs this check at each send;
+    /// callers that build `Timeouts` from config may run it at load.
+    ///
+    /// # Errors
+    ///
+    /// [`HttpError::InvalidRequest`] when `connect` or `request` is zero or
+    /// longer than [`Self::MAX`].
+    pub fn validate(self) -> Result<Self, HttpError> {
+        check_duration("the connect timeout", self.connect, Self::MAX)?;
+        check_duration("the request timeout", self.request, Self::MAX)?;
+        Ok(self)
+    }
+
     /// Connect 5 s, request 10 s: discovery, `decide models`, `decide doctor`
     /// and health probes.
     #[must_use]
@@ -102,6 +129,19 @@ impl Timeouts {
     }
 }
 
+/// `Ok` when `value` is in `(0, max]`; `what` names it in the error.
+pub(crate) fn check_duration(what: &str, value: Duration, max: Duration) -> Result<(), HttpError> {
+    if value.is_zero() {
+        return Err(HttpError::invalid_request(format!("{what} is zero")));
+    }
+    if value > max {
+        return Err(HttpError::invalid_request(format!(
+            "{what} of {value:?} is over the {max:?} maximum"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,6 +153,30 @@ mod tests {
             (probe.connect, probe.request),
             (Duration::from_secs(5), Duration::from_secs(10))
         );
+    }
+
+    #[test]
+    fn zero_and_over_long_timeouts_are_refused() {
+        assert!(Timeouts::default().validate().is_ok());
+        assert!(
+            Timeouts::default()
+                .with_request(Timeouts::MAX)
+                .validate()
+                .is_ok()
+        );
+        for bad in [
+            Timeouts::default().with_request(Duration::ZERO),
+            Timeouts::default().with_request(Timeouts::MAX + Duration::from_nanos(1)),
+            Timeouts {
+                connect: Duration::ZERO,
+                request: Duration::from_secs(1),
+            },
+        ] {
+            assert!(
+                matches!(bad.validate(), Err(HttpError::InvalidRequest { .. })),
+                "{bad:?}"
+            );
+        }
     }
 
     #[test]

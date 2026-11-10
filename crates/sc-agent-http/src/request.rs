@@ -192,7 +192,7 @@ impl Endpoint {
 
     fn parse_with(url: &str, schemes: Schemes) -> Result<Self, HttpError> {
         let invalid = |reason: String| HttpError::InvalidEndpoint {
-            url: url.to_owned(),
+            url: sanitize_url(url),
             reason,
         };
         let uri = Uri::from_str(url).map_err(|error| invalid(error.to_string()))?;
@@ -297,6 +297,50 @@ impl Endpoint {
     }
 }
 
+/// Longest URL text kept in an [`HttpError::InvalidEndpoint`], in bytes.
+const INVALID_URL_MAX_BYTES: usize = 256;
+
+/// `url` safe to carry in an error: userinfo (`user:pass@`), the query and
+/// the fragment are dropped, and the rest is cut to
+/// [`INVALID_URL_MAX_BYTES`] at a character boundary (ending in `...`).
+/// Works on text that does not parse.
+fn sanitize_url(url: &str) -> String {
+    let (scheme, rest) = match url.split_once("://") {
+        Some((scheme, rest)) => (Some(scheme), rest),
+        None => (None, url),
+    };
+    let rest = rest.split(['?', '#']).next().unwrap_or("");
+    // Everything up to the last '@' goes, even past a '/': a malformed
+    // userinfo with a '/' in its password must not leak half of it.
+    let rest = rest.rsplit_once('@').map_or(rest, |(_, after)| after);
+    let mut text = match scheme {
+        Some(scheme) => format!("{scheme}://{rest}"),
+        None => rest.to_owned(),
+    };
+    if text.len() > INVALID_URL_MAX_BYTES {
+        let mut cut = INVALID_URL_MAX_BYTES - 3;
+        while !text.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        text.truncate(cut);
+        text.push_str("...");
+    }
+    text
+}
+
+/// Header names that carry credentials: refused by
+/// [`HttpRequest::with_header`] (compared ASCII case-insensitively), so a key
+/// enters a request only through [`HttpRequest::with_secret`], where it is
+/// redacted and guarded (REQ-SAG-0013).
+const CREDENTIAL_HEADERS: [&str; 6] = [
+    "authorization",
+    "proxy-authorization",
+    "x-api-key",
+    "api-key",
+    "x-goog-api-key",
+    "cookie",
+];
+
 /// Borrowed pieces of an [`Endpoint`] URL.
 struct UrlParts<'a> {
     scheme: &'a str,
@@ -336,7 +380,7 @@ impl fmt::Display for Endpoint {
 ///     Endpoint::parse("https://api.anthropic.com/v1/messages")?,
 ///     br#"{"model":"m"}"#.as_slice(),
 /// )
-/// .with_header("content-type", "application/json")
+/// .with_header("content-type", "application/json")?
 /// .with_secret(SecretHeader::new("x-api-key", key))?;
 /// assert_eq!(request.headers().len(), 1);
 /// assert_eq!(request.body(), br#"{"model":"m"}"#);
@@ -369,12 +413,32 @@ impl HttpRequest {
 
     /// Appends a non-secret header. Headers are sent in insertion order.
     ///
-    /// The name and value are checked when the transport builds the request:
-    /// one the HTTP builder refuses is [`HttpError::InvalidRequest`].
-    #[must_use]
-    pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.push((name.into(), value.into()));
-        self
+    /// Other name and value syntax is checked when the transport builds the
+    /// request: one the HTTP builder refuses is [`HttpError::InvalidRequest`]
+    /// at send.
+    ///
+    /// # Errors
+    ///
+    /// [`HttpError::InvalidRequest`] when `name` is a credential header
+    /// (`authorization`, `proxy-authorization`, `x-api-key`, `api-key`,
+    /// `x-goog-api-key`, `cookie`, any case): a key goes only through
+    /// [`Self::with_secret`]. The error never contains the value.
+    pub fn with_header(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, HttpError> {
+        let name = name.into();
+        if CREDENTIAL_HEADERS
+            .iter()
+            .any(|credential| name.eq_ignore_ascii_case(credential))
+        {
+            return Err(HttpError::invalid_request(format!(
+                "{name:?} is a credential header: attach the key with with_secret"
+            )));
+        }
+        self.headers.push((name, value.into()));
+        Ok(self)
     }
 
     /// Sets the credential header, replacing any earlier one.
@@ -403,6 +467,12 @@ impl HttpRequest {
     /// this request only (REQ-SAG-0015): a load-on-first-request daemon's
     /// first request gets the load timeout plus the request timeout. Resends
     /// keep it unchanged.
+    ///
+    /// The deadline must be in `(0, Timeouts::DEADLINE_MAX]` (three hours:
+    /// the largest load timeout plus the largest request timeout); otherwise
+    /// [`HttpClient::send_once`](crate::HttpClient::send_once) and
+    /// [`UreqTransport`](crate::UreqTransport) refuse the request with
+    /// [`HttpError::InvalidRequest`] before any send.
     #[must_use]
     pub fn with_deadline(mut self, deadline: Duration) -> Self {
         self.deadline = Some(deadline);
@@ -601,13 +671,70 @@ mod tests {
     }
 
     #[test]
+    fn invalid_endpoint_drops_userinfo_query_and_fragment() {
+        for url in [
+            "http://user:pw-SECRET@api.example.test/v1?key=SECRET#SECRET",
+            "ftp://user:pw-SECRET@host/x?token=SECRET",
+            "user:pw-SECRET@host/x?SECRET",
+            "https://user:pw-SECRET@[::1/x?SECRET",
+            "ftp://user:pw/SECRET@host/x",
+        ] {
+            let error = Endpoint::parse(url).expect_err(url);
+            let rendered = format!(
+                "{error} {error:?} {:?}",
+                sc_agent_types::ErrorId::detail(&error)
+            );
+            assert!(!rendered.contains("SECRET"), "{url}: {rendered}");
+            assert!(!rendered.contains("user:pw"), "{url}: {rendered}");
+        }
+        let long = format!("ftp://host/{}", "é".repeat(400));
+        match Endpoint::parse(&long) {
+            Err(HttpError::InvalidEndpoint { url, .. }) => {
+                assert!(
+                    url.len() <= INVALID_URL_MAX_BYTES && url.ends_with("..."),
+                    "{url}"
+                );
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn credential_headers_are_refused() {
+        let request = || {
+            HttpRequest::new(
+                Method::Get,
+                Endpoint::parse("https://h.test/").expect("https"),
+                Vec::new(),
+            )
+        };
+        for name in [
+            "Authorization",
+            "PROXY-AUTHORIZATION",
+            "x-api-key",
+            "Api-Key",
+            "X-Goog-Api-Key",
+            "cookie",
+        ] {
+            let error = request().with_header(name, "sk-VALUE").expect_err(name);
+            assert!(matches!(error, HttpError::InvalidRequest { .. }), "{name}");
+            assert!(!format!("{error:?}").contains("sk-VALUE"));
+        }
+        let ok = request()
+            .with_header("x-api-version", "1")
+            .expect("not a credential");
+        assert_eq!(ok.headers().len(), 1);
+    }
+
+    #[test]
     fn debug_prints_no_header_value_or_body() {
         let request = HttpRequest::new(
             Method::Post,
             Endpoint::parse("https://u:pw@api.example.test/v1?key=q").expect("https"),
             b"secret-body".as_slice(),
         )
-        .with_header("x-trace", "header-value");
+        .with_header("x-trace", "header-value")
+        .expect("not a credential header");
         let rendered = format!("{request:?}");
         for hidden in ["header-value", "secret-body", "pw", "key=q"] {
             assert!(!rendered.contains(hidden), "{hidden}: {rendered}");

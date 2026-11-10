@@ -61,6 +61,7 @@ mod cases {
             format!(r#"{{"text":"{BODY}"}}"#).into_bytes(),
         )
         .with_header("x-trace", "HEADER-VALUE-1618")
+        .expect("not a credential header")
         .with_secret(SecretHeader::bearer(key()))
         .expect("https")
     }
@@ -68,25 +69,28 @@ mod cases {
     fn response(status: u16, body: &str) -> HttpResponse {
         HttpResponse::new(
             status,
-            vec![("x-echo".to_owned(), format!("{KEY} {BODY}"))],
+            vec![
+                ("x-echo".to_owned(), format!("{KEY} {BODY}")),
+                ("request-id".to_owned(), format!("req-{KEY}-7")),
+            ],
             body.replace("MARK", &format!("{BODY} {KEY}")).into_bytes(),
         )
     }
 
     fn timeout() -> HttpError {
-        HttpError::Network {
-            kind: NetworkKind::Timeout,
-            attempts: 1,
-            message: format!("ureq.Timeout.Global: {KEY}"),
-        }
+        HttpError::network(
+            NetworkKind::Timeout,
+            1,
+            format!("ureq.Timeout.Global: {KEY}"),
+        )
     }
 
     fn connect() -> HttpError {
-        HttpError::Network {
-            kind: NetworkKind::Connect,
-            attempts: 1,
-            message: format!("io.ConnectionRefused: refused {KEY}"),
-        }
+        HttpError::network(
+            NetworkKind::Connect,
+            1,
+            format!("io.ConnectionRefused: refused {KEY}"),
+        )
     }
 
     /// One admitted send at `now`.
@@ -228,6 +232,27 @@ mod cases {
             find(&records, "http.transport_failed").fields.get("error"),
             Some(&Value::from("http.network"))
         );
+        // RSH-007: the provider request id, redacted, and the host.
+        for action in ["http.response", "http.busy", "http.quota_exhausted"] {
+            assert_eq!(
+                find(&records, action).fields.get("provider_request_id"),
+                Some(&Value::from("req-[redacted]-7")),
+                "{action}"
+            );
+        }
+        for action in ["http.busy", "http.busy_exhausted", "http.budget_exhausted"] {
+            let record = find(&records, action);
+            assert_eq!(
+                record.fields.get("host"),
+                Some(&Value::from("api.example.test")),
+                "{action}"
+            );
+            assert_eq!(
+                record.fields.get("endpoint"),
+                Some(&Value::from("https://api.example.test/v1/x")),
+                "{action}"
+            );
+        }
         let busy = find(&records, "http.busy");
         for field in [
             "status",
