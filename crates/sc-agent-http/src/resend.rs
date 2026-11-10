@@ -87,7 +87,7 @@ fn backoff(nth: u32) -> Duration {
 /// A valid `Retry-After` is clamped to 250 ms-30 s and gets 0-250 ms jitter
 /// (REQ-SAG-0012); without one the backoff is 1, 2, 4, 8, 16, 30 … s plus
 /// 0-250 ms jitter (REQ-SAG-0601).
-fn holdoff(response: &HttpResponse, sends: u32) -> (Duration, bool) {
+fn holdoff(response: &HttpResponse, sends: u32, jitter: fn() -> Duration) -> (Duration, bool) {
     match RetryAfter::parse(response.header("retry-after")) {
         Some(retry_after) => (
             retry_after.wait().clamp(RETRY_AFTER_MIN, BACKOFF_MAX) + jitter(),
@@ -386,6 +386,9 @@ pub struct HttpClient {
     policy: ResendPolicy,
     pause: ProviderPause,
     log: GeneralLogger,
+    /// Source of holdoff jitter: [`jitter`] in every build; unit tests
+    /// replace it with a fixed value to check the exact holdoff.
+    jitter: fn() -> Duration,
 }
 
 impl fmt::Debug for HttpClient {
@@ -408,6 +411,7 @@ impl HttpClient {
             policy,
             pause: ProviderPause::default(),
             log,
+            jitter,
         }
     }
 
@@ -496,7 +500,8 @@ impl HttpClient {
     /// # Errors
     ///
     /// - [`HttpError::InvalidRequest`] before any send when the request's
-    ///   deadline is zero or over [`Timeouts::MAX`](crate::Timeouts::MAX);
+    ///   deadline is zero or over
+    ///   [`Timeouts::DEADLINE_MAX`](crate::Timeouts::DEADLINE_MAX);
     /// - [`HttpError::QuotaExhausted`] for a busy status whose body marks
     ///   quota exhaustion, after this send (REQ-SAG-0602);
     /// - [`HttpError::ProviderBusy`] for a busy reply on the last allowed
@@ -511,7 +516,11 @@ impl HttpClient {
         now: &dyn Fn() -> Instant,
     ) -> Result<Next, HttpError> {
         if let Some(deadline) = request.deadline() {
-            crate::transport::check_duration("the request deadline", deadline)?;
+            crate::transport::check_duration(
+                "the request deadline",
+                deadline,
+                crate::Timeouts::DEADLINE_MAX,
+            )?;
         }
         let SendPermit { mut attempts, last } = permit;
         let max_sends = self.policy.max_sends();
@@ -592,7 +601,7 @@ impl HttpClient {
         }
         // Every non-quota busy reply pauses the host, whatever happens to
         // this request next (REQ-SAG-0012).
-        let (holdoff, retry_after_honoured) = holdoff(&response, attempt);
+        let (holdoff, retry_after_honoured) = holdoff(&response, attempt, self.jitter);
         let host = request.endpoint().host();
         self.pause.hold_until(host, ended + holdoff);
         let host_paused_until_ms = self
@@ -674,7 +683,7 @@ impl HttpClient {
                 cause,
                 ..
             } if attempt < self.policy.max_sends() => {
-                let holdoff = jitter();
+                let holdoff = (self.jitter)();
                 self.event(
                     Level::Warn,
                     "http.timeout_resend",
@@ -780,6 +789,78 @@ mod tests {
                 "{header:?}"
             );
         }
+    }
+
+    /// A fixed jitter for the exact-holdoff tests below.
+    fn fixed_jitter() -> Duration {
+        Duration::from_millis(137)
+    }
+
+    /// Answers every send with `reply`.
+    struct Always(Result<HttpResponse, HttpError>);
+
+    impl Transport for Always {
+        fn send(&self, _: &crate::HttpRequest) -> Result<HttpResponse, HttpError> {
+            self.0.clone()
+        }
+    }
+
+    fn client_with(reply: Result<HttpResponse, HttpError>) -> HttpClient {
+        let memory = sc_agent_log::testing::MemoryLog::new().expect("memory log");
+        HttpClient {
+            jitter: fixed_jitter,
+            ..HttpClient::new(
+                Arc::new(Always(reply)),
+                ResendPolicy::default(),
+                memory.general(),
+            )
+        }
+    }
+
+    /// One send at a fixed clock; returns `(ended, at)` of the ResendAt.
+    fn resend_at(client: &HttpClient) -> (Instant, Instant) {
+        let request = crate::HttpRequest::new(
+            crate::Method::Post,
+            crate::Endpoint::parse("https://jitter.test/v1").expect("https"),
+            Vec::new(),
+        );
+        let now = Instant::now();
+        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), now) else {
+            panic!("fresh");
+        };
+        match client.send_once(&request, permit, LogContext::NONE, &|| now) {
+            Ok(Next::ResendAt { at, .. }) => (now, at),
+            other => panic!("expected ResendAt: {other:?}"),
+        }
+    }
+
+    /// RSH-003 / QA2-001: a timed-out send is resent at exactly
+    /// `ended + jitter()`, and the host is not paused.
+    #[test]
+    fn timeout_resend_adds_the_jitter() {
+        let client = client_with(Err(HttpError::network(
+            NetworkKind::Timeout,
+            1,
+            "timed out",
+        )));
+        let (ended, at) = resend_at(&client);
+        assert_eq!(at, ended + fixed_jitter());
+        assert_eq!(client.pause().not_before("jitter.test"), None);
+    }
+
+    /// The busy holdoff is the backoff (or Retry-After) plus exactly one jitter.
+    #[test]
+    fn busy_holdoff_adds_the_jitter() {
+        let client = client_with(Ok(HttpResponse::new(429, Vec::new(), Vec::new())));
+        let (ended, at) = resend_at(&client);
+        assert_eq!(at, ended + BACKOFF_FIRST + fixed_jitter());
+        let retry_after = client_with(Ok(HttpResponse::new(
+            529,
+            vec![("Retry-After".to_owned(), "3".to_owned())],
+            Vec::new(),
+        )));
+        let (ended, at) = resend_at(&retry_after);
+        assert_eq!(at, ended + Duration::from_secs(3) + fixed_jitter());
     }
 
     #[test]

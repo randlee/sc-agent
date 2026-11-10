@@ -129,7 +129,8 @@ impl UreqTransport {
     /// A transport with one agent using `timeouts`.
     ///
     /// `timeouts` are checked at each send: a zero value or one over
-    /// [`Timeouts::MAX`] makes every send [`HttpError::InvalidRequest`],
+    /// [`Timeouts::MAX`] makes every send [`HttpError::InvalidRequest`] (a
+    /// request's own deadline may go up to [`Timeouts::DEADLINE_MAX`]),
     /// without a connection.
     #[must_use]
     pub fn new(timeouts: Timeouts) -> Self {
@@ -151,7 +152,11 @@ impl Transport for UreqTransport {
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         self.timeouts.validate()?;
         if let Some(deadline) = request.deadline() {
-            crate::transport::check_duration("the request deadline", deadline)?;
+            crate::transport::check_duration(
+                "the request deadline",
+                deadline,
+                Timeouts::DEADLINE_MAX,
+            )?;
         }
         let mut outbound = build_outbound(request)?;
         if let Some(deadline) = request.deadline() {
