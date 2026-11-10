@@ -58,6 +58,7 @@ mod cases {
             b"{\"same\":\"body\"}".as_slice(),
         )
         .with_header("content-type", "application/json")
+        .expect("not a credential header")
         .with_secret(SecretHeader::bearer(key()))
         .expect("https carries a key")
     }
@@ -78,11 +79,11 @@ mod cases {
     }
 
     fn timeout() -> HttpError {
-        HttpError::Network {
-            kind: NetworkKind::Timeout,
-            attempts: 1,
-            message: "ureq.Timeout.Global: timeout: global".to_owned(),
-        }
+        HttpError::network(
+            NetworkKind::Timeout,
+            1,
+            "ureq.Timeout.Global: timeout: global".to_owned(),
+        )
     }
 
     fn policy(max_sends: u32) -> ResendPolicy {
@@ -413,8 +414,13 @@ mod cases {
             other => panic!("expected timeout after 5 sends: {other:?}"),
         }
         assert_eq!(transport.sends(), 5);
-        // Resent at once: no holdoff after a timeout.
-        assert_eq!(holdoffs, vec![Duration::ZERO; 4]);
+        // Resent after only 0-250 ms of jitter (RSH-003), and the host is not paused.
+        assert_eq!(holdoffs.len(), 4);
+        assert!(
+            holdoffs.iter().all(|holdoff| *holdoff <= secs(0.25)),
+            "{holdoffs:?}"
+        );
+        assert_eq!(client.pause().not_before("api.example.test"), None);
     }
 
     // A5-06: a 120 s timeout uses the budget; the request ends with the timeout
@@ -461,11 +467,7 @@ mod cases {
     #[test]
     fn connect_not_resent() {
         for kind in [NetworkKind::Connect, NetworkKind::Tls, NetworkKind::Other] {
-            let error = HttpError::Network {
-                kind,
-                attempts: 1,
-                message: "ureq.HostNotFound: host not found".to_owned(),
-            };
+            let error = HttpError::network(kind, 1, "ureq.HostNotFound: host not found".to_owned());
             let transport = ScriptedTransport::new(vec![Err(error), Ok(ok())]);
             let client = client(&transport, ResendPolicy::default());
             let (result, _) = drive(&client, &request(), &ManualClock::new(Instant::now()));
@@ -677,5 +679,78 @@ mod cases {
                 .iter()
                 .all(|sent| sent.deadline() == Some(Duration::from_secs(900)))
         );
+    }
+
+    // QA-001 (REQ-SAG-0012): the busy reply on the last allowed send pauses
+    // the host too.
+    #[test]
+    fn last_send_busy_pauses_host() {
+        let transport = ScriptedTransport::responses(vec![busy(429, Some("5"))]);
+        let client = client(&transport, policy(1));
+        let clock = ManualClock::new(Instant::now());
+        let (result, _) = drive(&client, &request(), &clock);
+        assert!(
+            matches!(
+                result,
+                Err(HttpError::ProviderBusy {
+                    reason: BusyReason::Sends,
+                    attempts: 1,
+                    ..
+                })
+            ),
+            "{result:?}"
+        );
+        let other = request_to("https://api.example.test/v1/other");
+        match client.may_start(&other, Attempts::new(), clock.now()) {
+            Ok(Start::Wait { at, .. }) => assert_between(at - clock.now(), 5.0, 5.25),
+            other => panic!("expected Wait: {other:?}"),
+        }
+    }
+
+    // QA-001: the fifth busy reply under the default policy pauses the host.
+    #[test]
+    fn fifth_busy_pauses_host() {
+        let transport =
+            ScriptedTransport::responses((0..5).map(|_| busy(529, Some("7"))).collect());
+        let client = client(&transport, ResendPolicy::default());
+        let clock = ManualClock::new(Instant::now());
+        let (result, _) = drive(&client, &request(), &clock);
+        assert!(
+            matches!(
+                result,
+                Err(HttpError::ProviderBusy {
+                    reason: BusyReason::Sends,
+                    attempts: 5,
+                    ..
+                })
+            ),
+            "{result:?}"
+        );
+        assert_eq!(transport.sends(), 5);
+        let paused = client
+            .pause()
+            .not_before("api.example.test")
+            .expect("paused after the fifth reply");
+        assert_between(paused - clock.now(), 7.0, 7.25);
+    }
+
+    // RSH-004: a zero or over-long deadline is refused before any send.
+    #[test]
+    fn invalid_deadline_refused_before_send() {
+        for deadline in [Duration::ZERO, Duration::from_secs(3601)] {
+            let transport = ScriptedTransport::responses(vec![ok()]);
+            let client = client(&transport, ResendPolicy::default());
+            let request = request().with_deadline(deadline);
+            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+            else {
+                panic!("fresh");
+            };
+            let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+            assert!(
+                matches!(result, Err(HttpError::InvalidRequest { .. })),
+                "{deadline:?}: {result:?}"
+            );
+            assert_eq!(transport.sends(), 0);
+        }
     }
 }

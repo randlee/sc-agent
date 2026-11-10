@@ -5,7 +5,7 @@ Sync HTTP layer for sc-agent: one send per call, no queue, no sleep.
 - `HttpRequest` / `HttpResponse`: byte bodies (`Arc<[u8]>`), so multipart works.
   `Endpoint::parse` accepts https only; `Endpoint::parse_local` also accepts http for a
   configured local runner. A key is attached only over https or to a loopback host
-  (`HttpRequest::with_secret`, REQ-SAG-0013).
+  (`HttpRequest::with_secret`, REQ-SAG-0013); `with_header` refuses credential header names.
 - `Transport` sends once; `UreqTransport` is the production transport, bounded by
   `Timeouts` (connect, plus one global request deadline; `Timeouts::probe()` for probes).
   `HttpRequest::with_deadline` replaces the request deadline for one request (REQ-SAG-0015).

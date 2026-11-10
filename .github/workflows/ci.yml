@@ -184,12 +184,28 @@ jobs:
           python -m pip install --no-index --find-links dist sc-treesitter
           python -m pytest crates/sc-treesitter-py/tests
 
+  # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).
+  # Exact pins such as ureq =3.5.1 are not floated, so this job is how a
+  # published advisory against a pinned crate reaches the merge gate.
+  deny:
+    name: Dependency advisories and licenses
+    needs: [detect]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo deny check advisories licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses
+
   # The one required status check: it always reports, passes when every job
   # above succeeded or was skipped, and fails if any failed or was cancelled.
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test, treesitter]
+    needs: [detect, fmt, clippy, test, treesitter, deny]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results

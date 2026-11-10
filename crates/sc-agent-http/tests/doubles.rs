@@ -36,11 +36,7 @@ mod cases {
         let start = clock.now();
         let scripted = ScriptedTransport::new(vec![
             Ok(status(201)),
-            Err(HttpError::Network {
-                kind: NetworkKind::Tls,
-                attempts: 1,
-                message: "tls".to_owned(),
-            }),
+            Err(HttpError::network(NetworkKind::Tls, 1, "tls".to_owned())),
         ])
         .with_send_duration(clock.clone(), Duration::from_secs(3));
         let twin = scripted.clone();

@@ -3,6 +3,10 @@
 //! [`HttpClient::send_once`](crate::HttpClient::send_once) passes every error
 //! it returns through [`redact`] once, whichever transport produced it.
 
+use std::borrow::Cow;
+
+use sc_agent_secrets::ApiKey;
+
 use crate::error::HttpError;
 use crate::request::HttpRequest;
 
@@ -16,9 +20,18 @@ pub(crate) fn redact(error: HttpError, request: &HttpRequest) -> HttpError {
     match request.secret() {
         Some(secret) => {
             let key = secret.key();
-            error.map_text(&|text: &str| key.redact_text(text).into_owned())
+            error.map_text(&|text: String| redact_owned(key, text))
         }
         None => error,
+    }
+}
+
+/// `text` with `key` replaced by `[redacted]`; `text` itself is returned,
+/// not copied, when it does not contain the key.
+pub(crate) fn redact_owned(key: &ApiKey, text: String) -> String {
+    match key.redact_text(&text) {
+        Cow::Owned(redacted) => redacted,
+        Cow::Borrowed(_) => text,
     }
 }
 
@@ -39,15 +52,18 @@ mod tests {
         )
         .with_secret(SecretHeader::bearer(crate::test_key::key("sk-test-1")))
         .expect("https");
-        let error = HttpError::Network {
-            kind: NetworkKind::Connect,
-            attempts: 1,
-            message: "io.Other: echo: Bearer sk-test-1".to_owned(),
-        };
+        let error =
+            HttpError::network(NetworkKind::Connect, 1, "echo: Bearer sk-test-1").with_cause(
+                sc_agent_types::ErrorDetail::new("io.Other", "proxy echo sk-test-1", None),
+            );
         let redacted = redact(error, &request);
         assert_eq!(
             redacted.message(),
-            "connect failure after 1 send: io.Other: echo: Bearer [redacted]"
+            "connect failure after 1 send: echo: Bearer [redacted]"
+        );
+        assert_eq!(
+            redacted.cause_detail().map(|cause| cause.message),
+            Some("proxy echo [redacted]".to_owned())
         );
     }
 }

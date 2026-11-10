@@ -104,24 +104,21 @@ const KEY_ON_PLAIN_HTTP_RECOVERY: &str = "use an https endpoint or a loopback ho
 /// the request's key and otherwise kept whole (REQ-SAG-0002).
 ///
 /// A [`Network`](Self::Network) or [`InvalidRequest`](Self::InvalidRequest)
-/// made by [`UreqTransport`](crate::UreqTransport) carries the lower-layer
-/// (ureq, io or http builder) error in `message` as
-/// `"<foreign id>: <foreign message>"`, for example
-/// `"io.ConnectionRefused: io: Connection refused (os error 61)"`;
-/// [`ErrorId::cause_detail`] returns that pair as the cause. A message
-/// without a foreign id (a test double's) has no cause.
+/// made by [`UreqTransport`](crate::UreqTransport) keeps the lower-layer
+/// (ureq, io or http builder) error unchanged as its `cause`
+/// ([`ErrorDetail::foreign`]), returned by [`ErrorId::cause_detail`] and
+/// [`Error::source`](std::error::Error::source). Both variants are
+/// `#[non_exhaustive]`: build them with [`HttpError::network`] and
+/// [`HttpError::invalid_request`].
 ///
 /// # Examples
 ///
 /// ```
 /// use sc_agent_http::{HttpError, NetworkKind};
-/// use sc_agent_types::ErrorId;
+/// use sc_agent_types::{ErrorDetail, ErrorId};
 ///
-/// let error = HttpError::Network {
-///     kind: NetworkKind::Connect,
-///     attempts: 1,
-///     message: "io.ConnectionRefused: connection refused".to_owned(),
-/// };
+/// let lower = ErrorDetail::new("io.ConnectionRefused", "connection refused", None);
+/// let error = HttpError::network(NetworkKind::Connect, 1, "could not connect").with_cause(lower);
 /// assert_eq!(error.id(), "http.network");
 /// assert_eq!(error.to_string(), format!("http.network: {}", error.message()));
 /// let cause = error.detail().cause.expect("cause");
@@ -143,8 +140,8 @@ pub enum HttpError {
         /// The last reply's valid `Retry-After`, as sent and unrounded
         /// (REQ-SAG-0007).
         retry_after_seconds: Option<f64>,
-        /// The last busy reply (boxed: it keeps the error small on the
-        /// `Ok` path, clippy `result_large_err`).
+        /// The last busy reply (boxed so the `Err` path keeps every
+        /// `Result<_, HttpError>` small, clippy `result_large_err`).
         last: Box<ProviderReply>,
     },
     /// Busy status whose body marks quota, credit or spend exhaustion
@@ -160,13 +157,16 @@ pub enum HttpError {
     /// `Timeout`: resent under `max_sends` and the start budget, returned
     /// when either runs out. `Connect` (DNS included), `Tls`, `Other`:
     /// returned after one send.
+    #[non_exhaustive]
     Network {
         /// The failure class.
         kind: NetworkKind,
         /// Sends made, the first included.
         attempts: u32,
-        /// What failed, with the lower-layer text (see the type docs).
+        /// What failed, in this layer's words.
         message: String,
+        /// The lower-layer error, unchanged, when one caused this.
+        cause: Option<Box<ErrorDetail>>,
     },
     /// The body exceeded the 8 MiB read cap.
     ResponseTooLarge {
@@ -180,15 +180,21 @@ pub enum HttpError {
     /// ([`Endpoint::parse`](crate::Endpoint::parse): https;
     /// [`Endpoint::parse_local`](crate::Endpoint::parse_local): http or https).
     InvalidEndpoint {
-        /// The refused URL.
+        /// The refused URL without userinfo, query or fragment, at most
+        /// 256 bytes.
         url: String,
         /// Why it was refused.
         reason: String,
     },
-    /// A header name or value the HTTP builder refuses.
+    /// A request this crate refuses to send: a header name or value the HTTP
+    /// builder refuses, a credential header passed as an ordinary header, or
+    /// a zero or over-long timeout or deadline.
+    #[non_exhaustive]
     InvalidRequest {
-        /// What the builder said (see the type docs).
+        /// What is wrong, in this layer's words.
         message: String,
+        /// The lower-layer error, unchanged, when one caused this.
+        cause: Option<Box<ErrorDetail>>,
     },
     /// A key was attached to a plain-http endpoint whose host is not
     /// loopback (REQ-SAG-0013). Carries the host only, never the key.
@@ -199,8 +205,54 @@ pub enum HttpError {
 }
 
 impl HttpError {
-    /// This error with `map` applied to every text field (redaction).
-    pub(crate) fn map_text(self, map: &impl Fn(&str) -> String) -> Self {
+    /// [`HttpError::Network`] with no lower-layer cause (add one with
+    /// [`Self::with_cause`]). For transports and test doubles.
+    #[must_use]
+    pub fn network(kind: NetworkKind, attempts: u32, message: impl Into<String>) -> Self {
+        Self::Network {
+            kind,
+            attempts,
+            message: message.into(),
+            cause: None,
+        }
+    }
+
+    /// [`HttpError::InvalidRequest`] with no lower-layer cause.
+    #[must_use]
+    pub fn invalid_request(message: impl Into<String>) -> Self {
+        Self::InvalidRequest {
+            message: message.into(),
+            cause: None,
+        }
+    }
+
+    /// This error with `cause` as its lower-layer cause; unchanged for a
+    /// variant that has no cause field.
+    #[must_use]
+    pub fn with_cause(self, cause: ErrorDetail) -> Self {
+        match self {
+            Self::Network {
+                kind,
+                attempts,
+                message,
+                ..
+            } => Self::Network {
+                kind,
+                attempts,
+                message,
+                cause: Some(Box::new(cause)),
+            },
+            Self::InvalidRequest { message, .. } => Self::InvalidRequest {
+                message,
+                cause: Some(Box::new(cause)),
+            },
+            other => other,
+        }
+    }
+
+    /// This error with `map` applied to every text field and to every level
+    /// of the cause chain (redaction). Owned text is moved through `map`.
+    pub(crate) fn map_text(self, map: &impl Fn(String) -> String) -> Self {
         match self {
             Self::ProviderBusy {
                 reason,
@@ -221,10 +273,12 @@ impl HttpError {
                 kind,
                 attempts,
                 message,
+                cause,
             } => Self::Network {
                 kind,
                 attempts,
-                message: map(&message),
+                message: map(message),
+                cause: cause.map(|cause| Box::new(map_detail(*cause, map))),
             },
             Self::ResponseTooLarge {
                 status,
@@ -234,13 +288,14 @@ impl HttpError {
                 limit_bytes,
             },
             Self::InvalidEndpoint { url, reason } => Self::InvalidEndpoint {
-                url: map(&url),
-                reason: map(&reason),
+                url: map(url),
+                reason: map(reason),
             },
-            Self::InvalidRequest { message } => Self::InvalidRequest {
-                message: map(&message),
+            Self::InvalidRequest { message, cause } => Self::InvalidRequest {
+                message: map(message),
+                cause: cause.map(|cause| Box::new(map_detail(*cause, map))),
             },
-            Self::KeyOnPlainHttp { host } => Self::KeyOnPlainHttp { host: map(&host) },
+            Self::KeyOnPlainHttp { host } => Self::KeyOnPlainHttp { host: map(host) },
         }
     }
 
@@ -248,30 +303,30 @@ impl HttpError {
     /// know how many sends the client made).
     pub(crate) fn with_attempts(self, sends: u32) -> Self {
         match self {
-            Self::Network { kind, message, .. } => Self::Network {
+            Self::Network {
+                kind,
+                message,
+                cause,
+                ..
+            } => Self::Network {
                 kind,
                 attempts: sends,
                 message,
+                cause,
             },
             other => other,
         }
     }
 }
 
-/// The lower-layer `(id, message)` pair at the front of a transport-made
-/// message (`"<foreign id>: <foreign message>"`), if there is one.
-///
-/// A foreign id is one dotted token whose first segment is a known lower
-/// layer (`ureq`, `io`, `http`), so free text is never mistaken for one.
-fn foreign_cause(message: &str) -> Option<ErrorDetail> {
-    let (id, text) = message.split_once(": ")?;
-    let (layer, rest) = id.split_once('.')?;
-    let known = matches!(layer, "ureq" | "io" | "http");
-    let token = !rest.is_empty()
-        && rest
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'));
-    (known && token).then(|| ErrorDetail::new(id, text, None))
+/// `detail` with `map` applied to its id, message and every cause level.
+fn map_detail(detail: ErrorDetail, map: &impl Fn(String) -> String) -> ErrorDetail {
+    ErrorDetail {
+        id: map(detail.id),
+        message: map(detail.message),
+        recovery: detail.recovery,
+        cause: detail.cause.map(|cause| Box::new(map_detail(*cause, map))),
+    }
 }
 
 impl ErrorId for HttpError {
@@ -315,6 +370,7 @@ impl ErrorId for HttpError {
                 kind,
                 attempts,
                 message,
+                ..
             } => format!(
                 "{kind} failure after {attempts} {}: {message}",
                 plural(*attempts)
@@ -326,7 +382,7 @@ impl ErrorId for HttpError {
             Self::InvalidEndpoint { url, reason } => {
                 format!("endpoint {url:?} is invalid: {reason}")
             }
-            Self::InvalidRequest { message } => format!("the request is invalid: {message}"),
+            Self::InvalidRequest { message, .. } => format!("the request is invalid: {message}"),
             Self::KeyOnPlainHttp { host } => format!(
                 "a key may not be sent over plain http to {host:?}, which is not a loopback host"
             ),
@@ -334,16 +390,7 @@ impl ErrorId for HttpError {
     }
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
-        match self {
-            Self::Network { message, .. } | Self::InvalidRequest { message } => {
-                foreign_cause(message)
-            }
-            Self::ProviderBusy { .. }
-            | Self::QuotaExhausted { .. }
-            | Self::ResponseTooLarge { .. }
-            | Self::InvalidEndpoint { .. }
-            | Self::KeyOnPlainHttp { .. } => None,
-        }
+        self.cause().cloned()
     }
 
     fn recovery(&self) -> Option<&'static str> {
@@ -359,6 +406,20 @@ impl ErrorId for HttpError {
     }
 }
 
+impl HttpError {
+    /// The lower-layer cause, for the variants that carry one.
+    fn cause(&self) -> Option<&ErrorDetail> {
+        match self {
+            Self::Network { cause, .. } | Self::InvalidRequest { cause, .. } => cause.as_deref(),
+            Self::ProviderBusy { .. }
+            | Self::QuotaExhausted { .. }
+            | Self::ResponseTooLarge { .. }
+            | Self::InvalidEndpoint { .. }
+            | Self::KeyOnPlainHttp { .. } => None,
+        }
+    }
+}
+
 fn plural(sends: u32) -> &'static str {
     if sends == 1 { "send" } else { "sends" }
 }
@@ -369,27 +430,31 @@ impl fmt::Display for HttpError {
     }
 }
 
-impl std::error::Error for HttpError {}
+impl std::error::Error for HttpError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.cause()
+            .map(|cause| cause as &(dyn std::error::Error + 'static))
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn foreign_cause_needs_a_known_dotted_id() {
-        let cause = foreign_cause("ureq.timeout.Global: timeout: global").expect("cause");
+    fn map_text_reaches_every_cause_level() {
+        let inner = ErrorDetail::new("io.Other", "inner SECRET", None);
+        let outer = ErrorDetail::new("ureq.Io", "outer SECRET", Some(inner));
+        let error = HttpError::network(NetworkKind::Other, 1, "msg SECRET").with_cause(outer);
+        let mapped = error.map_text(&|text: String| text.replace("SECRET", "[redacted]"));
+        let rendered = format!("{mapped:?}");
+        assert!(!rendered.contains("SECRET"), "{rendered}");
+        let cause = mapped.cause_detail().expect("cause");
+        assert_eq!(cause.message, "outer [redacted]");
         assert_eq!(
-            (cause.id.as_str(), cause.message.as_str()),
-            ("ureq.timeout.Global", "timeout: global")
+            cause.cause.map(|inner| inner.message),
+            Some("inner [redacted]".to_owned())
         );
-        for text in [
-            "script exhausted",
-            "request timed out: x",
-            "ureq.: x",
-            "net.x: y",
-            "io.Conn refused: x",
-        ] {
-            assert_eq!(foreign_cause(text), None, "{text}");
-        }
+        assert!(std::error::Error::source(&mapped).is_some());
     }
 }
