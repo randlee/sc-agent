@@ -319,6 +319,14 @@ Not proved by a test here: A8-01 (commit history), A8-17/A8-18 (Required validat
 - Feature `testing` (not default): enables `src/testing.rs` (`MemoryLog`); no extra dependencies.
 - No tokio, no thiserror, no sc-decision-* crate.
 
+Corrections after dev round 1 / QA-1 (2026-11-10; code at bf05150 follows these):
+- lib.rs re-exports `sc_observability::Level` and `sc_observability::v2::Logger` (v2 has no Level in 1.5.0).
+- repo.rs git(): no #[expect(clippy::disallowed_methods)] — clippy.toml does not disallow Command::new.
+- C5: a-8.sh copies log_event into src/session.rs (copy commit); it is then moved into Writer::event.
+- testing::MemoryLog also has `pub fn logger(&self) -> Arc<Logger>` (inject into Loggers::open) and `pub fn events(&self) -> Result<Vec<LogEvent>, LogError>` (whole events, for correlation_id checks).
+- Slug also rejects '.' and '..' (keeps <log_root>/<repo>/<agent_role>/<project> inside its directory).
+- Required validation grep: `grep -rniE "rotat|prune" crates/sc-agent-log/src` may match only never_rotate(), its policy fields and their comments.
+
 ## Acceptance criteria
 
 - [ ] A8-01 Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-8.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
@@ -336,7 +344,7 @@ Not proved by a test here: A8-01 (commit history), A8-17/A8-18 (Required validat
 - [ ] A8-13 ADR-SAG-0004: sc-agent-log sits in the config, secrets and log layer; its only sc-agent crate dependency is sc-agent-types, and it depends on no http, decision-schema, decision-backend or runner crate, checked by `cargo tree -p sc-agent-log` (with and without `--features testing`); both loggers take generic rows (serde_json::Map).
 - [ ] A8-14 sc-agent-log: rows refused at write or lost by the writer are returned once as log.rows_lost from flush(), with the latest failure as ErrorDetail; never lost silently.
 - [ ] A8-15 REQ-SAG-0002: every LogError returned by a public sc-agent-log function carries the id and message of each lower-layer cause (sc-observability error or io error), kept as its source and in ErrorDetail, never dropped or replaced; test log_error_keeps_lower_layer_cause injects an sc-observability failure and an io failure (unwritable <log_root>) and asserts the returned LogError exposes that cause's id and message through source() and ErrorDetail.
-- [ ] A8-16 REQ-SAG-0002: LogError implements ErrorId with 13 distinct log.* ids; clippy with the workspace denies (panic, unwrap_used, expect_used, indexing_slicing) passes for sc-agent-log.
+- [ ] A8-16 REQ-SAG-0002: LogError implements ErrorId with 14 distinct log.* ids (log.row_too_large added for RSH-003); clippy with the workspace denies (panic, unwrap_used, expect_used, indexing_slicing) passes for sc-agent-log.
 - [ ] A8-17 REQ-SAG-0009/0010: cargo tree -p sc-agent-log shows no tokio; no sleep call (git runs via Command::output()).
 - [ ] A8-18 REQ-SAG-0010: sc-agent-log source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
 - [ ] A8-19 sc-agent-log: feature `testing` (not default) exposes sc_agent_log::testing::MemoryLog, a sc_observability::v2::LogSink registered through SinkRegistration::typed with file and console sinks off; GeneralLogger and SessionLogger built from it write no file, and records() (after its flush) returns each event's level, target, action and fields in write order.
@@ -354,3 +362,4 @@ No open questions.
 Plan hardening round 1 (2026-11-10): added sc_agent_log::testing::MemoryLog behind feature `testing` (PLAN-CRIT-010). Checked sc-observability 1.5.0 source (cargo registry): no public in-memory sink exists (RecordingEventSink is #[cfg(test)]-private), so MemoryLog implements sc_observability::v2::LogSink and is registered with v2::LoggerBuilder::register_sink(SinkRegistration::typed(..)).
 
 Plan review round 2: LogContext { session_id, position } in sc-agent-log (RSH-009), carried by GeneralLogger::write/try_write as LogEvent.correlation_id + fields; try_write for cancel/result paths (RSH-010); lost-row accounting under one Mutex with poison rationale (RBP-F015); AsRef<str> on Slug/Repo (RBP-F017); cause -> cause_detail; Display = id: message. The C2/C5 copy rows' edit column was updated; source and target columns untouched.
+Dev round 1 corrections (2026-11-10, a-8 developer; code at bf05150 is right, doc follows): (1) §2 re-export is sc_observability::Level + sc_observability::v2::Logger (v2 has no Level in 1.5.0); (2) C7 row: no #[expect(clippy::disallowed_methods)] on repo.rs git() — clippy.toml does not disallow Command::new; (3) C5 row: a-8.sh copies log_event into src/session.rs (followed for the copy commit), later moved into Writer::event; (4) the rotat|prune grep also matches never_rotate()'s doc and call sites — only policy values matter. Additions: MemoryLog::logger() and MemoryLog::events(); Slug also rejects '.' and '..'.

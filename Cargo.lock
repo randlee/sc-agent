@@ -681,6 +681,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hostname"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "617aaa3557aef3810a6369d0a99fac8a080891b68bd9f9812a1eeda0c0730cbd"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "windows-link",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1240,6 +1251,19 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "tempfile",
+]
+
+[[package]]
+name = "sc-agent-log"
+version = "0.1.0"
+dependencies = [
+ "hostname",
+ "sc-agent-log",
+ "sc-agent-types",
+ "sc-observability",
+ "sc-observability-types",
+ "serde_json",
  "tempfile",
 ]
 
