@@ -24,7 +24,7 @@ fn busy_records_carry_session() {
     let harness = Harness::new(
         Arc::new(ScriptedBackend::new()),
         Arc::new(transport),
-        config(2, 8),
+        config(2),
         5,
     );
     let results: Vec<_> = harness
@@ -76,7 +76,7 @@ fn runner_general_records() {
     let harness = Harness::new(
         Arc::new(ScriptedBackend::new()),
         Arc::new(transport),
-        config(2, 8),
+        config(2),
         5,
     );
     let results: Vec<_> = harness
@@ -105,19 +105,70 @@ fn runner_general_records() {
     let start = of("runner.stream.start");
     assert_eq!(start.len(), 1);
     assert_eq!(start[0].fields["workers"], 2);
+    assert_eq!(start[0].fields["queue_capacity"], 8);
+    let run_id = start[0].fields["run_id"]
+        .as_str()
+        .expect("run_id")
+        .to_owned();
     let end = of("runner.stream.end");
     assert_eq!(end.len(), 1);
+    assert_eq!(end[0].fields["run_id"], run_id.as_str());
     assert_eq!(end[0].fields["results"], 3);
     assert_eq!(end[0].fields["failed"], 1);
+    assert!(end[0].fields["live_threads"].is_u64());
+    assert!(end[0].fields.get("abandoned").is_none());
     let stopped = of("runner.worker.stopped");
     assert_eq!(stopped.len(), 2, "one per worker");
-    assert!(
-        stopped
-            .iter()
-            .all(|record| record.fields["reason"] == "input_ended")
-    );
+    for record in &stopped {
+        assert_eq!(record.fields["run_id"], run_id.as_str());
+        assert_eq!(record.fields["reason"], "input_ended", "{record:?}");
+    }
+    let workers: BTreeSet<u64> = stopped
+        .iter()
+        .map(|record| record.fields["worker"].as_u64().expect("worker"))
+        .collect();
+    assert_eq!(workers, BTreeSet::from([0, 1]));
     let log_failed = of("runner.session_log_failed");
     assert_eq!(log_failed.len(), 1);
     assert_eq!(log_failed[0].fields["session_id"], failed_session);
     assert_eq!(log_failed[0].fields["position"], 2);
+}
+
+/// RSH-003: an abandoned run's runner.stream.end says so and counts the runner threads
+/// still alive (here the 2 workers blocked in sends, plus at most the feeder).
+#[test]
+fn abandon_record_counts_live_threads() {
+    let gate = Gate::default();
+    let held = gate.clone();
+    let (transport, dropped) = FnTransport::new(move |_| {
+        held.pass();
+        Ok(ok())
+    });
+    let harness = Harness::new(
+        Arc::new(ScriptedBackend::new()),
+        Arc::new(transport),
+        config(2),
+        5,
+    );
+    let stream = harness
+        .runner
+        .decide_stream(Box::new(requests(4).into_iter()), &CancelToken::new());
+    gate.wait_inside(2);
+    drop(stream);
+    let end: Vec<_> = harness
+        .records_of("sc_decision_runner")
+        .into_iter()
+        .filter(|record| record.action == "runner.stream.end")
+        .collect();
+    assert_eq!(end.len(), 1);
+    assert_eq!(end[0].fields["abandoned"], true);
+    let live = end[0].fields["live_threads"]
+        .as_u64()
+        .expect("live_threads");
+    assert!(
+        (2..=3).contains(&live),
+        "2 blocked workers (+ the feeder): {live}"
+    );
+    gate.open();
+    harness.finish(&dropped);
 }

@@ -73,7 +73,7 @@ fn lower_errors_reach_the_top() {
             ),
         })
     });
-    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1, 4), 5);
+    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1), 5);
     let error = harness
         .runner
         .decide(request("m0"), &CancelToken::new())
@@ -126,7 +126,7 @@ fn panic_in_backend_is_a_result() {
         assert_ne!(index, 0, "decoder exploded");
         SystemOneResponse::from_json(response.status(), response.body())
     });
-    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1, 4), 5);
+    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1), 5);
     let mut results: Vec<_> = harness
         .runner
         .decide_stream(Box::new(requests(2).into_iter()), &CancelToken::new())
@@ -140,7 +140,17 @@ fn panic_in_backend_is_a_result() {
         other => panic!("{other:?}"),
     }
     assert!(results[1].outcome.is_ok(), "the worker survived the panic");
-    assert_eq!(harness.rows().len(), 2);
+    let rows = harness.rows();
+    assert_eq!(rows.len(), 2);
+    let panicked = rows
+        .iter()
+        .find(|row| row.fields["position"] == 0)
+        .expect("row of the panicked request");
+    assert_eq!(panicked.fields["error"]["id"], "decision.shutdown");
+    assert_eq!(
+        panicked.fields["sends"], 1,
+        "the send made before the panic is counted"
+    );
 }
 
 /// REQ-SAG-0002: a session-log write failure never replaces the decision result; it is

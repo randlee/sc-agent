@@ -3,42 +3,71 @@
 
 use std::collections::BTreeSet;
 use std::num::NonZeroUsize;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use sc_agent_config::AgentConfig;
 use sc_agent_http::HttpResponse;
-use sc_agent_types::CancelToken;
-use sc_decision_runner::RunnerConfig;
+use sc_agent_types::{CancelToken, ErrorId};
+use sc_decision_runner::{RunnerConfig, RunnerError};
 use sc_decision_schema::Decision;
 
 use crate::support::*;
 
-/// Counts transport calls in flight and the most seen at once.
-#[derive(Default)]
+/// Counts transport calls in flight and the most seen at once; the first `parties` calls
+/// meet at a barrier (each returns only once `parties` calls are inside together).
 struct InFlight {
-    now_and_max: Mutex<(usize, usize)>,
+    parties: usize,
+    /// (in flight now, most at once, calls so far, first `parties` calls that met).
+    state: Mutex<(usize, usize, usize, usize)>,
+    changed: Condvar,
 }
 
 impl InFlight {
+    fn new(parties: usize) -> Self {
+        Self {
+            parties,
+            state: Mutex::new((0, 0, 0, 0)),
+            changed: Condvar::new(),
+        }
+    }
+
     fn enter(&self) {
-        let mut state = lock(&self.now_and_max);
+        let mut state = lock(&self.state);
         state.0 += 1;
         state.1 = state.1.max(state.0);
+        state.2 += 1;
+        if state.2 > self.parties {
+            return;
+        }
+        // Rendezvous: wait until `parties` calls are inside at once.
+        self.changed.notify_all();
+        let (mut state, timeout) = self
+            .changed
+            .wait_timeout_while(state, FAILSAFE, |state| {
+                state.0 < self.parties && state.1 < self.parties
+            })
+            .unwrap_or_else(PoisonError::into_inner);
+        if !timeout.timed_out() {
+            state.3 += 1;
+        }
     }
 
     fn leave(&self) {
-        lock(&self.now_and_max).0 -= 1;
+        lock(&self.state).0 -= 1;
     }
 
-    fn max(&self) -> usize {
-        lock(&self.now_and_max).1
+    /// (most in flight at once, how many of the first `parties` calls met).
+    fn seen(&self) -> (usize, usize) {
+        let state = lock(&self.state);
+        (state.1, state.3)
     }
 }
 
-/// Runs 40 requests answered after `each`, returns (elapsed, most in flight).
-fn forty(config: RunnerConfig, each: Duration) -> (Duration, usize) {
-    let in_flight = Arc::new(InFlight::default());
+/// Runs 40 requests answered after `each`, the first `parties` calls at a barrier;
+/// returns (elapsed, most in flight, how many of the first calls met).
+fn forty(config: RunnerConfig, parties: usize, each: Duration) -> (Duration, usize, usize) {
+    let in_flight = Arc::new(InFlight::new(parties));
     let counted = Arc::clone(&in_flight);
     let (transport, _dropped) = FnTransport::new(move |_| {
         counted.enter();
@@ -62,20 +91,23 @@ fn forty(config: RunnerConfig, each: Duration) -> (Duration, usize) {
     assert!(results.iter().all(|result| result.outcome.is_ok()));
     let positions: BTreeSet<u64> = results.iter().map(|result| result.position).collect();
     assert_eq!(positions, (0..40).collect());
-    (elapsed, in_flight.max())
+    let (most, met) = in_flight.seen();
+    (elapsed, most, met)
 }
 
-/// REQ-SAG-0701 AC1: 40 requests with the default 8 workers: 8 transport calls in flight
-/// at once, finishing in about an eighth of the serial time.
+/// REQ-SAG-0701 AC1: 40 requests with the default 8 workers: the first 8 transport calls
+/// meet at a Rendezvous(8) barrier, so 8 are in flight at once (deterministic), and the
+/// run takes well under the serial time.
 #[test]
 fn forty_requests_parallel() {
     let each = Duration::from_millis(50);
-    let (elapsed, most) = forty(RunnerConfig::default(), each);
-    assert_eq!(most, 8, "8 transport calls observed in flight at once");
+    let (elapsed, most, met) = forty(RunnerConfig::default(), 8, each);
+    assert_eq!(met, 8, "the first 8 calls were in flight together");
+    assert_eq!(most, 8, "never more than 8 at once");
     let serial = each * 40;
-    // 5 rounds of 50 ms; the bound leaves room for a loaded machine.
+    // About serial / 8 (5 rounds); the loose bound only rules out a serial run.
     assert!(
-        elapsed < serial / 2,
+        elapsed < serial * 3 / 4,
         "parallel run took {elapsed:?}, serial would be {serial:?}"
     );
 }
@@ -84,28 +116,47 @@ fn forty_requests_parallel() {
 #[test]
 fn one_worker_is_serial() {
     let each = Duration::from_millis(10);
-    let (elapsed, most) = forty(config(1, 4), each);
+    let (elapsed, most, _) = forty(config(1), 1, each);
     assert_eq!(most, 1, "one worker: one call at a time");
     assert!(elapsed >= each * 40, "serial run took {elapsed:?}");
 }
 
 /// REQ-SAG-0701 AC2 / REQ-SAG-0013: workers from AgentConfig.workers (default 8),
-/// queue_capacity = 4 x workers.
+/// queue_capacity = 4 x workers; out-of-bounds workers are a typed error.
 #[test]
 fn config_from_agent_config() {
     let mut agent = AgentConfig::default();
-    let default = RunnerConfig::from_config(&agent);
+    let default = RunnerConfig::from_config(&agent).expect("default");
     assert_eq!(
-        (default.workers.get(), default.queue_capacity.get()),
+        (default.workers().get(), default.queue_capacity().get()),
         (8, 32)
     );
     assert_eq!(RunnerConfig::default(), default);
     agent.workers = NonZeroUsize::new(64).expect("64");
-    let most = RunnerConfig::from_config(&agent);
-    assert_eq!((most.workers.get(), most.queue_capacity.get()), (64, 256));
+    let most = RunnerConfig::from_config(&agent).expect("64 workers");
+    assert_eq!(
+        (most.workers().get(), most.queue_capacity().get()),
+        (64, 256)
+    );
     agent.workers = NonZeroUsize::MIN;
-    let one = RunnerConfig::from_config(&agent);
-    assert_eq!((one.workers.get(), one.queue_capacity.get()), (1, 4));
+    let one = RunnerConfig::from_config(&agent).expect("1 worker");
+    assert_eq!((one.workers().get(), one.queue_capacity().get()), (1, 4));
+    agent.workers = NonZeroUsize::new(65).expect("65");
+    let error = RunnerConfig::from_config(&agent).expect_err("65 is over the bound");
+    assert!(matches!(
+        error,
+        RunnerError::InvalidConfig {
+            workers: 65,
+            max: 64
+        }
+    ));
+    assert_eq!(error.id(), "runner.invalid_config");
+    assert_eq!(
+        error.to_string(),
+        "runner.invalid_config: workers must be 1..=64, got 65"
+    );
+    assert!(RunnerConfig::new(0).is_err());
+    assert!(RunnerConfig::new(usize::MAX).is_err());
 }
 
 /// REQ-SAG-0701 AC3: one failing request is returned with its session ULID; every other

@@ -8,24 +8,24 @@
 //! provider pause and a schema resend all put the job back in the queue, never wait in
 //! the worker.
 //!
-//! Cancel: the hook cancels the job queue (every waiting job is answered as cancelled by
-//! the workers, every in-flight send becomes an orphan) and interrupts the result queue,
-//! so the result iterator answers each orphan at once, on the consumer's thread, without
-//! waiting for the transport. The worker whose send later returns loses the claim and
-//! discards the reply.
+//! Cancel: the hook (registered before any thread starts) cancels the job queue and
+//! interrupts the result queue. The result iterator then answers, at once and on the
+//! consumer's thread, every queued and held job and every in-flight send (an orphan),
+//! without waiting for a worker or the transport. The worker whose send later returns
+//! loses the claim and discards the reply.
 
 use std::collections::VecDeque;
 use std::fmt;
 use std::iter;
 use std::num::NonZeroUsize;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Instant;
 
 use sc_agent_http::{Attempts, HttpClient, HttpRequest, Next, Pending, SendPermit, Start};
 use sc_agent_log::{GeneralLogger, Level, LogContext, SessionLogger};
-use sc_agent_types::{CancelHook, CancelToken, SessionId};
+use sc_agent_types::{CancelToken, SessionId};
 use sc_decision_schema::{
     Backend, Decision, DecisionError, DecisionRequest, DecisionResult, OrderedMap, QuestionDigest,
     SystemOneResponse,
@@ -36,10 +36,10 @@ use crate::config::RunnerConfig;
 use crate::error::RunnerError;
 use crate::pool::{Pool, Step, Stopped, Work};
 use crate::queue::{BoundedQueue, Clock, JobQueue, Popped, Skipped};
-use crate::row::{Claim, Finished, LOG_TARGET, Mode, Row, write_row};
+use crate::row::{Claim, Finished, LOG_TARGET, Mode, Progress, Row, write_row};
 
-/// The job queue of a run: jobs, with a [`Ticket`] per in-flight send.
-type RunnerJobs = JobQueue<Job, Ticket>;
+/// The job queue of a run: jobs, with the request's [`Identity`] per in-flight send.
+type RunnerJobs = JobQueue<Job, Identity>;
 /// The result queue of a run.
 type Results = BoundedQueue<Finished>;
 /// The caller's requests.
@@ -52,6 +52,16 @@ type Requests = Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>;
 /// request on one runner worker. Every worker sends through the one `HttpClient`, so a
 /// provider pause set by one busy reply delays every job's next send to that host
 /// (REQ-SAG-0012).
+///
+/// # Lingering threads
+///
+/// Dropping a result iterator before it ends (abandon) joins no thread. A worker blocked
+/// in a send exits when the send returns, at most the transport's request deadline
+/// (`Timeouts::request`, or the request's own deadline) later. Worst case, the threads
+/// still alive are `workers` per abandoned run plus one feeder per run whose caller
+/// iterator is blocked in `next()`, for every run abandoned within one request deadline.
+/// `runner.stream.end` reports `live_threads`: the runner threads (of every run of this
+/// runner) alive at that moment.
 ///
 /// # Examples
 ///
@@ -109,11 +119,16 @@ struct Shared {
     general: GeneralLogger,
     /// `Instant::now`, or a test clock; passed to `may_start`, `may_resend` and `send_once`.
     now: Clock,
+    /// Runner threads (workers and feeders of every run) alive now.
+    live_threads: Arc<AtomicUsize>,
 }
 
 impl DecisionRunner {
     /// A runner of `backend` sending through `http`, one row per result to `session`,
     /// runner events to `general`.
+    ///
+    /// `config` is valid by construction ([`RunnerConfig::new`]: 1..=64 workers, capacity
+    /// 4 x workers), so there is nothing left to check here.
     #[must_use]
     pub fn new(
         backend: Arc<dyn Backend>,
@@ -148,6 +163,7 @@ impl DecisionRunner {
                 session,
                 general,
                 now,
+                live_threads: Arc::new(AtomicUsize::new(0)),
             }),
             config,
         }
@@ -164,31 +180,59 @@ impl DecisionRunner {
     }
 
     /// Starts one run of `requests` with `workers` workers.
+    ///
+    /// The cancel hook is registered before any thread starts, so a token cancelled
+    /// before or during the start sends nothing.
     fn run(&self, requests: Requests, cancel: &CancelToken, workers: NonZeroUsize) -> ResultStream {
         let shared = Arc::clone(&self.shared);
+        let run_id = SessionId::new();
+        let capacity = self.config.queue_capacity().get();
         shared.event(
             Mode::Blocking,
             Level::Info,
             "runner.stream.start",
             LogContext::NONE,
-            [("workers", workers.get().into())],
+            [
+                ("run_id", run_id.to_string().into()),
+                ("workers", workers.get().into()),
+                ("queue_capacity", capacity.into()),
+            ],
         );
-        let capacity = self.config.queue_capacity.get();
         let jobs = Arc::new(RunnerJobs::new(capacity, Arc::clone(&shared.now)));
         // Producers: every worker and the feeder.
         let results = Arc::new(Results::new(capacity, workers.get().saturating_add(1)));
+        let hook = {
+            let jobs = Arc::clone(&jobs);
+            let results = Arc::clone(&results);
+            // Only flips state and notifies: never blocks, never does I/O. Runs at once
+            // when the token is already cancelled.
+            cancel.on_cancel(Arc::new(move || {
+                jobs.cancel();
+                results.interrupt();
+            }))
+        };
         let feed = Arc::new(Feed::default());
         let work = Arc::new(RunnerWork {
             shared: Arc::clone(&shared),
             jobs: Arc::clone(&jobs),
+            run_id,
         });
-        let pool = match Pool::start(workers, Arc::clone(&jobs), Arc::clone(&results), work) {
+        let pool = match Pool::start(
+            workers,
+            Arc::clone(&jobs),
+            Arc::clone(&results),
+            work,
+            Arc::clone(&shared.live_threads),
+        ) {
             Ok(pool) => pool,
             Err(error) => {
                 results.producer_done();
-                return ResultStream::failed(shared, requests, worker_error(&error));
+                return ResultStream::failed(shared, run_id, requests, worker_error(&error));
             }
         };
+        // Hands the caller's iterator to the feeder thread. A slot, not a plain move, so
+        // the iterator comes back when the spawn fails (the closure is then dropped unrun)
+        // and those requests are still answered. Locked once on each side.
         let slot = Arc::new(Mutex::new(Some(requests)));
         let feeder = Feeder {
             shared: Arc::clone(&shared),
@@ -197,6 +241,7 @@ impl DecisionRunner {
             feed: Arc::clone(&feed),
         };
         let feeder_slot = Arc::clone(&slot);
+        shared.live_threads.fetch_add(1, Ordering::AcqRel);
         let spawned = thread::Builder::new()
             .name("sc-decision-feeder".to_owned())
             .spawn(move || {
@@ -207,6 +252,7 @@ impl DecisionRunner {
                 feeder.feed(requests);
             });
         if let Err(error) = spawned {
+            shared.live_threads.fetch_sub(1, Ordering::AcqRel);
             pool.abandon();
             results.producer_done();
             let requests = slot
@@ -214,26 +260,18 @@ impl DecisionRunner {
                 .unwrap_or_else(PoisonError::into_inner)
                 .take()
                 .unwrap_or_else(|| Box::new(iter::empty()));
-            return ResultStream::failed(shared, requests, worker_error(&error));
+            return ResultStream::failed(shared, run_id, requests, worker_error(&error));
         }
-        let hook = {
-            let jobs = Arc::clone(&jobs);
-            let results = Arc::clone(&results);
-            // Only flips state and notifies: never blocks, never does I/O.
-            cancel.on_cancel(Arc::new(move || {
-                jobs.cancel();
-                results.interrupt();
-            }))
-        };
         ResultStream::Running(Box::new(Running {
             shared,
+            run_id,
             jobs,
             results,
             feed,
             ready: VecDeque::new(),
             counts: Counts::default(),
             ended: false,
-            _pool: pool,
+            pool,
             _hook: hook,
         }))
     }
@@ -262,7 +300,7 @@ impl Decision for DecisionRunner {
             let outcome = Err(DecisionError::Shutdown {
                 reason: "the runner ended without a result".to_owned(),
             });
-            return finish(&self.shared, &identity, 0, 0, outcome, Mode::Blocking).map_or_else(
+            return finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
                 || decision_result(&identity, Err(cancelled(0))),
                 Finished::into_result,
             );
@@ -280,7 +318,7 @@ impl Decision for DecisionRunner {
         requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>,
         cancel: &CancelToken,
     ) -> Box<dyn Iterator<Item = DecisionResult> + Send + 'a> {
-        Box::new(self.run(requests, cancel, self.config.workers))
+        Box::new(self.run(requests, cancel, self.config.workers()))
     }
 }
 
@@ -304,6 +342,46 @@ impl Shared {
                 .general
                 .try_write(level, LOG_TARGET, action, ctx, fields),
         };
+    }
+
+    fn live_threads(&self) -> usize {
+        self.live_threads.load(Ordering::Acquire)
+    }
+
+    /// `runner.stream.end` of run `run_id`.
+    fn stream_end(&self, mode: Mode, run_id: SessionId, counts: Counts, abandoned: Option<usize>) {
+        let base = [
+            ("run_id", run_id.to_string().into()),
+            ("results", counts.results.into()),
+            ("failed", counts.failed.into()),
+            ("live_threads", self.live_threads().into()),
+        ];
+        match abandoned {
+            None => self.event(
+                mode,
+                Level::Info,
+                "runner.stream.end",
+                LogContext::NONE,
+                base,
+            ),
+            Some(dropped) => {
+                let [run, results, failed, live] = base;
+                self.event(
+                    mode,
+                    Level::Info,
+                    "runner.stream.end",
+                    LogContext::NONE,
+                    [
+                        run,
+                        results,
+                        failed,
+                        live,
+                        ("abandoned", true.into()),
+                        ("dropped", dropped.into()),
+                    ],
+                );
+            }
+        }
     }
 }
 
@@ -332,11 +410,13 @@ fn decision_result(
 
 /// Finishes the request of `identity` with `outcome`: wins its claim, writes its row,
 /// builds its result. `None` when the claim was already won (the result was given).
+///
+/// The only place that pairs a [`Finish`](crate::row::Finish) and a
+/// [`RowWritten`](crate::row::RowWritten) with a result: the row and the result are built
+/// from the same `identity` and `outcome` here, so they describe the same request.
 fn finish(
     shared: &Shared,
     identity: &Identity,
-    sends: u32,
-    schema_resends: u32,
     outcome: Result<SystemOneResponse, DecisionError>,
     mode: Mode,
 ) -> Option<Finished> {
@@ -344,8 +424,7 @@ fn finish(
     let row = Row {
         position: identity.position,
         model: &identity.model,
-        sends,
-        schema_resends,
+        tally: identity.progress.tally(),
         digests: &identity.digests,
         outcome: &outcome,
     };
@@ -360,7 +439,14 @@ fn finish(
     Some(Finished::new(written, decision_result(identity, outcome)))
 }
 
-/// Who a request is: kept with the job from the feeder to its result.
+/// Finishes `identity` as cancelled after the sends it made (non-blocking row write).
+fn finish_cancelled(shared: &Shared, identity: &Identity) -> Option<Finished> {
+    let sends = identity.progress.tally().sends;
+    finish(shared, identity, Err(cancelled(sends)), Mode::NonBlocking)
+}
+
+/// Who a request is, and how far it got: kept with the job from the feeder to its
+/// result. Clones share the claim and the progress.
 #[derive(Debug, Clone)]
 struct Identity {
     session_id: SessionId,
@@ -368,6 +454,9 @@ struct Identity {
     model: String,
     digests: OrderedMap<String, QuestionDigest>,
     claim: Arc<Claim>,
+    /// Sends and schema resends so far; updated when each send starts, so a panic,
+    /// cancel or orphan path reads the sends really made.
+    progress: Arc<Progress>,
 }
 
 impl Identity {
@@ -378,22 +467,13 @@ impl Identity {
             model: request.body().model.clone(),
             digests: request.digests().clone(),
             claim: Arc::new(Claim::new()),
+            progress: Arc::new(Progress::default()),
         }
     }
 
     fn log_context(&self) -> LogContext {
         LogContext::request(self.session_id, Some(self.position))
     }
-}
-
-/// What is kept of a job to answer it without the job: the receipt of a running job and
-/// the in-flight entry of a send.
-#[derive(Debug, Clone)]
-struct Ticket {
-    identity: Identity,
-    /// Sends made (for an in-flight entry: including the one in flight).
-    sends: u32,
-    schema_resends: u32,
 }
 
 /// A queued request.
@@ -413,24 +493,13 @@ impl Job {
     /// `LogContext::request(session_id, Some(position))`.
     #[cfg(test)]
     fn log_context(&self) -> LogContext {
-        match self {
-            Self::Fresh(fresh) => fresh.identity.log_context(),
-            Self::Prepared(prepared) => prepared.core.identity.log_context(),
-        }
+        self.identity().log_context()
     }
 
-    fn ticket(&self) -> Ticket {
+    fn identity(&self) -> &Identity {
         match self {
-            Self::Fresh(fresh) => Ticket {
-                identity: fresh.identity.clone(),
-                sends: 0,
-                schema_resends: 0,
-            },
-            Self::Prepared(prepared) => Ticket {
-                identity: prepared.core.identity.clone(),
-                sends: prepared.state.sends(),
-                schema_resends: prepared.core.schema_resends,
-            },
+            Self::Fresh(fresh) => &fresh.identity,
+            Self::Prepared(prepared) => &prepared.core.identity,
         }
     }
 }
@@ -460,7 +529,6 @@ impl Fresh {
                         identity,
                         request,
                         http,
-                        schema_resends: 0,
                     },
                     state: SendState::Start {
                         attempts: Attempts::new(),
@@ -487,7 +555,6 @@ struct Core {
     request: DecisionRequest,
     /// Encoded once: every send (busy, timeout or schema resend) sends these bytes.
     http: HttpRequest,
-    schema_resends: u32,
 }
 
 /// Where the request's resend state lives between sends (the `SendPermit` carries it
@@ -503,63 +570,49 @@ enum SendState {
     Resend(Pending),
 }
 
-impl SendState {
-    fn sends(&self) -> u32 {
-        match self {
-            Self::Start { attempts, .. } => attempts.sends(),
-            Self::Resend(pending) => pending.attempts().sends(),
-        }
-    }
-}
-
 /// The work of a run's pool.
 struct RunnerWork {
     shared: Arc<Shared>,
     jobs: Arc<RunnerJobs>,
+    run_id: SessionId,
 }
 
 impl Work for RunnerWork {
     type Job = Job;
     type Answer = Finished;
-    type InFlight = Ticket;
-    type Receipt = Ticket;
+    type InFlight = Identity;
+    type Receipt = Identity;
 
-    fn receipt(&self, job: &Job) -> Ticket {
-        job.ticket()
+    fn receipt(&self, job: &Job) -> Identity {
+        job.identity().clone()
     }
 
     fn run(&self, job: Job) -> Step<Job, Finished> {
         let prepared = match job {
             Job::Fresh(fresh) => match fresh.prepare(&*self.shared.backend) {
                 Ok(prepared) => prepared,
-                Err((fresh, error)) => return self.finish(&fresh.identity, 0, 0, Err(error)),
+                Err((fresh, error)) => return self.finish(&fresh.identity, Err(error)),
             },
             Job::Prepared(prepared) => *prepared,
         };
         self.step(prepared)
     }
 
-    fn skipped(&self, receipt: Ticket, why: Skipped) -> Option<Finished> {
-        let (outcome, mode) = match why {
-            Skipped::Cancelled => (Err(cancelled(receipt.sends)), Mode::NonBlocking),
-            Skipped::Panicked(text) => (
+    fn skipped(&self, receipt: Identity, why: Skipped) -> Option<Finished> {
+        match why {
+            Skipped::Cancelled => finish_cancelled(&self.shared, &receipt),
+            Skipped::Panicked(text) => finish(
+                &self.shared,
+                &receipt,
                 Err(DecisionError::Shutdown {
                     reason: format!("a runner worker caught a panic: {text}"),
                 }),
                 Mode::Blocking,
             ),
-        };
-        finish(
-            &self.shared,
-            &receipt.identity,
-            receipt.sends,
-            receipt.schema_resends,
-            outcome,
-            mode,
-        )
+        }
     }
 
-    fn stopped(&self, why: Stopped) {
+    fn stopped(&self, worker: usize, why: Stopped) {
         let mode = match why {
             Stopped::InputEnded => Mode::Blocking,
             Stopped::Cancelled => Mode::NonBlocking,
@@ -569,7 +622,11 @@ impl Work for RunnerWork {
             Level::Info,
             "runner.worker.stopped",
             LogContext::NONE,
-            [("reason", why.as_str().into())],
+            [
+                ("run_id", self.run_id.to_string().into()),
+                ("worker", worker.into()),
+                ("reason", why.as_str().into()),
+            ],
         );
     }
 }
@@ -579,35 +636,14 @@ impl RunnerWork {
     fn finish(
         &self,
         identity: &Identity,
-        sends: u32,
-        schema_resends: u32,
         outcome: Result<SystemOneResponse, DecisionError>,
     ) -> Step<Job, Finished> {
-        to_step(finish(
-            &self.shared,
-            identity,
-            sends,
-            schema_resends,
-            outcome,
-            Mode::Blocking,
-        ))
-    }
-
-    /// Finishes as cancelled after `sends` sends (non-blocking row write).
-    fn cancelled(&self, core: &Core, sends: u32) -> Step<Job, Finished> {
-        to_step(finish(
-            &self.shared,
-            &core.identity,
-            sends,
-            core.schema_resends,
-            Err(cancelled(sends)),
-            Mode::NonBlocking,
-        ))
+        to_step(finish(&self.shared, identity, outcome, Mode::Blocking))
     }
 
     /// Asks the client for leave to send, then sends, holds or finishes.
     fn step(&self, prepared: Prepared) -> Step<Job, Finished> {
-        let Prepared { mut core, state } = prepared;
+        let Prepared { core, state } = prepared;
         let now = (self.shared.now)();
         match state {
             SendState::Start { attempts, mismatch } => {
@@ -622,7 +658,7 @@ impl RunnerWork {
                                 reason.as_str()
                             ),
                         });
-                        self.finish(&core.identity, sent, core.schema_resends, Err(error))
+                        self.finish(&core.identity, Err(error))
                     }
                     Ok(Start::Wait { at, state }) => Step::HoldOff {
                         until: at,
@@ -634,44 +670,37 @@ impl RunnerWork {
                             },
                         ),
                     },
-                    Ok(Start::Go(permit)) => {
-                        if mismatch.is_some() {
-                            core.schema_resends = core.schema_resends.saturating_add(1);
-                        }
-                        self.send(core, permit, sent)
-                    }
+                    Ok(Start::Go(permit)) => self.send(core, permit, sent, mismatch.is_some()),
                 }
             }
             SendState::Resend(pending) => {
                 let sent = pending.attempts().sends();
                 match self.shared.http.may_resend(&core.http, pending, now) {
-                    Err(error) => self.finish(
-                        &core.identity,
-                        sent,
-                        core.schema_resends,
-                        Err(DecisionError::Http(error)),
-                    ),
+                    Err(error) => self.finish(&core.identity, Err(DecisionError::Http(error))),
                     Ok(Start::Wait { at, state }) => Step::HoldOff {
                         until: at,
                         job: Job::prepared(core, SendState::Resend(state)),
                     },
-                    Ok(Start::Go(permit)) => self.send(core, permit, sent),
+                    Ok(Start::Go(permit)) => self.send(core, permit, sent, false),
                 }
             }
         }
     }
 
     /// One send of an admitted request, registered in flight so cancel can answer it.
-    fn send(&self, core: Core, permit: SendPermit, sent: u32) -> Step<Job, Finished> {
+    /// `schema_resend`: this send follows a schema mismatch.
+    fn send(
+        &self,
+        core: Core,
+        permit: SendPermit,
+        sent: u32,
+        schema_resend: bool,
+    ) -> Step<Job, Finished> {
+        let Ok(key) = self.jobs.start_send(core.identity.clone()) else {
+            return to_step(finish_cancelled(&self.shared, &core.identity));
+        };
         let sends = sent.saturating_add(1);
-        let entry = Ticket {
-            identity: core.identity.clone(),
-            sends,
-            schema_resends: core.schema_resends,
-        };
-        let Ok(key) = self.jobs.start_send(entry) else {
-            return self.cancelled(&core, sent);
-        };
+        core.identity.progress.send_started(sends, schema_resend);
         let ctx = core.identity.log_context();
         let next = {
             let _in_flight = InFlightGuard {
@@ -684,15 +713,10 @@ impl RunnerWork {
         };
         if self.jobs.is_cancelled() {
             // Cancelled during the send: the late reply is discarded.
-            return self.cancelled(&core, sends);
+            return to_step(finish_cancelled(&self.shared, &core.identity));
         }
         match next {
-            Err(error) => self.finish(
-                &core.identity,
-                sends,
-                core.schema_resends,
-                Err(DecisionError::Http(error)),
-            ),
+            Err(error) => self.finish(&core.identity, Err(DecisionError::Http(error))),
             Ok(Next::ResendAt { at, pending }) => Step::HoldOff {
                 until: at,
                 job: Job::prepared(core, SendState::Resend(pending)),
@@ -709,12 +733,7 @@ impl RunnerWork {
                             },
                         ),
                     },
-                    outcome => self.finish(
-                        &core.identity,
-                        attempts.sends(),
-                        core.schema_resends,
-                        outcome,
-                    ),
+                    outcome => self.finish(&core.identity, outcome),
                 }
             }
         }
@@ -787,17 +806,9 @@ impl Feeder {
                 Err(_) if self.results.is_discarded() => break,
                 Err(job) => {
                     self.feed.count();
-                    let ticket = job.ticket();
+                    let identity = job.identity().clone();
                     drop(job);
-                    let answer = finish(
-                        &self.shared,
-                        &ticket.identity,
-                        0,
-                        0,
-                        Err(cancelled(0)),
-                        Mode::NonBlocking,
-                    );
-                    if let Some(answer) = answer
+                    if let Some(answer) = finish_cancelled(&self.shared, &identity)
                         && self.results.push(answer).is_err()
                     {
                         break;
@@ -820,6 +831,7 @@ impl Drop for FeedEnd<'_> {
         feeder.jobs.close();
         feeder.results.interrupt();
         feeder.results.producer_done();
+        feeder.shared.live_threads.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
@@ -849,9 +861,10 @@ enum ResultStream {
 }
 
 impl ResultStream {
-    fn failed(shared: Arc<Shared>, requests: Requests, reason: String) -> Self {
+    fn failed(shared: Arc<Shared>, run_id: SessionId, requests: Requests, reason: String) -> Self {
         Self::Failed(Failed {
             shared,
+            run_id,
             requests: (0_u64..).zip(requests),
             reason,
             counts: Counts::default(),
@@ -873,17 +886,18 @@ impl Iterator for ResultStream {
 
 struct Running {
     shared: Arc<Shared>,
+    run_id: SessionId,
     jobs: Arc<RunnerJobs>,
     results: Arc<Results>,
     feed: Arc<Feed>,
-    /// Orphans answered and not yet yielded.
+    /// Orphans and cancelled jobs answered and not yet yielded.
     ready: VecDeque<DecisionResult>,
     counts: Counts,
     ended: bool,
-    /// Dropped after `Drop::drop` (abandon); never joined.
-    _pool: Pool<RunnerWork>,
+    /// Dropped after `Drop::drop`; never joined.
+    pool: Pool<RunnerWork>,
     /// Lives as long as the run.
-    _hook: CancelHook,
+    _hook: sc_agent_types::CancelHook,
 }
 
 impl Running {
@@ -897,7 +911,7 @@ impl Running {
             }
             // Read before the orphans, so an interrupt after this point wakes the pop.
             let seen = self.results.generation();
-            self.answer_orphans();
+            self.answer_cancelled();
             if !self.ready.is_empty() {
                 continue;
             }
@@ -918,23 +932,16 @@ impl Running {
 
     /// After a cancel, answers every in-flight send cut off by it and every queued or
     /// held job, on this thread, now: no wait for a worker or the transport.
-    fn answer_orphans(&mut self) {
+    fn answer_cancelled(&mut self) {
         let queued = self
             .jobs
             .take_cancelled()
             .into_iter()
-            .map(|job| job.ticket());
-        let tickets: Vec<Ticket> = self.jobs.take_orphans().into_iter().chain(queued).collect();
-        for ticket in tickets {
-            let answer = finish(
-                &self.shared,
-                &ticket.identity,
-                ticket.sends,
-                ticket.schema_resends,
-                Err(cancelled(ticket.sends)),
-                Mode::NonBlocking,
-            );
-            if let Some(answer) = answer {
+            .map(|job| job.identity().clone());
+        let identities: Vec<Identity> =
+            self.jobs.take_orphans().into_iter().chain(queued).collect();
+        for identity in identities {
+            if let Some(answer) = finish_cancelled(&self.shared, &identity) {
                 self.ready.push_back(answer.into_result());
             }
         }
@@ -942,16 +949,8 @@ impl Running {
 
     fn end(&mut self) {
         self.ended = true;
-        self.shared.event(
-            Mode::Blocking,
-            Level::Info,
-            "runner.stream.end",
-            LogContext::NONE,
-            [
-                ("results", self.counts.results.into()),
-                ("failed", self.counts.failed.into()),
-            ],
-        );
+        self.shared
+            .stream_end(Mode::Blocking, self.run_id, self.counts, None);
     }
 }
 
@@ -965,28 +964,18 @@ impl Drop for Running {
             return;
         }
         // Discard first, so the feeder sees the consumer is gone and stops pulling.
-        self.results.discard();
-        self.jobs.cancel();
-        self.answer_orphans();
+        self.pool.abandon();
+        self.answer_cancelled();
         let dropped = std::mem::take(&mut self.ready).len();
-        self.shared.event(
-            Mode::NonBlocking,
-            Level::Info,
-            "runner.stream.end",
-            LogContext::NONE,
-            [
-                ("results", self.counts.results.into()),
-                ("failed", self.counts.failed.into()),
-                ("abandoned", true.into()),
-                ("dropped", dropped.into()),
-            ],
-        );
+        self.shared
+            .stream_end(Mode::NonBlocking, self.run_id, self.counts, Some(dropped));
     }
 }
 
 /// The result iterator when no thread could start.
 struct Failed {
     shared: Arc<Shared>,
+    run_id: SessionId,
     requests: iter::Zip<std::ops::RangeFrom<u64>, Requests>,
     reason: String,
     counts: Counts,
@@ -1000,23 +989,15 @@ impl Failed {
         }
         let Some((position, request)) = self.requests.next() else {
             self.ended = true;
-            self.shared.event(
-                Mode::Blocking,
-                Level::Info,
-                "runner.stream.end",
-                LogContext::NONE,
-                [
-                    ("results", self.counts.results.into()),
-                    ("failed", self.counts.failed.into()),
-                ],
-            );
+            self.shared
+                .stream_end(Mode::Blocking, self.run_id, self.counts, None);
             return None;
         };
         let identity = Identity::new(SessionId::new(), position, &request);
         let outcome = Err(DecisionError::Shutdown {
             reason: self.reason.clone(),
         });
-        let result = finish(&self.shared, &identity, 0, 0, outcome, Mode::Blocking).map_or_else(
+        let result = finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
             || decision_result(&identity, Err(cancelled(0))),
             Finished::into_result,
         );

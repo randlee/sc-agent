@@ -112,5 +112,8 @@ fn job_log_context_is_session_and_position() {
         request,
     }));
     assert_eq!(job.log_context(), LogContext::request(session_id, Some(7)));
-    assert_eq!(job.ticket().sends, 0);
+    assert_eq!(
+        job.identity().progress.tally(),
+        crate::row::Tally::default()
+    );
 }

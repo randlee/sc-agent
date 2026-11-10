@@ -6,7 +6,7 @@
 pub mod scripted_backend;
 
 use std::collections::HashMap;
-use std::num::{NonZeroU32, NonZeroUsize};
+use std::num::NonZeroU32;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
@@ -319,12 +319,9 @@ pub fn drain(results: &Receiver<DecisionResult>) -> Vec<DecisionResult> {
     }
 }
 
-/// A config of `workers` workers and `capacity` jobs.
-pub fn config(workers: usize, capacity: usize) -> RunnerConfig {
-    RunnerConfig {
-        workers: NonZeroUsize::new(workers).expect("workers"),
-        queue_capacity: NonZeroUsize::new(capacity).expect("capacity"),
-    }
+/// A config of `workers` workers (capacity 4 x workers).
+pub fn config(workers: usize) -> RunnerConfig {
+    RunnerConfig::new(workers).expect("workers in 1..=64")
 }
 
 /// Session rows of `log`.

@@ -29,12 +29,7 @@ fn busy_four_then_ok() {
     let transport =
         ScriptedTransport::responses(vec![busy("0"), busy("0"), busy("0"), busy("0"), ok()]);
     let backend = Arc::new(ScriptedBackend::new());
-    let harness = Harness::new(
-        backend.clone(),
-        Arc::new(transport.clone()),
-        config(1, 4),
-        5,
-    );
+    let harness = Harness::new(backend.clone(), Arc::new(transport.clone()), config(1), 5);
     let result = harness.runner.decide(request("m0"), &CancelToken::new());
     assert!(result.outcome.is_ok(), "{result:?}");
     assert_eq!(transport.sends(), 5);
@@ -50,12 +45,7 @@ fn busy_four_then_ok() {
 fn same_bytes_each_send() {
     let transport = ScriptedTransport::responses(vec![busy("0"), busy("0"), ok()]);
     let backend = Arc::new(ScriptedBackend::new());
-    let harness = Harness::new(
-        backend.clone(),
-        Arc::new(transport.clone()),
-        config(1, 4),
-        5,
-    );
+    let harness = Harness::new(backend.clone(), Arc::new(transport.clone()), config(1), 5);
     let result = harness.runner.decide(request("m0"), &CancelToken::new());
     assert!(result.outcome.is_ok(), "{result:?}");
     let sent = transport.requests();
@@ -100,7 +90,7 @@ fn holdoff_frees_the_worker() {
     let harness = Harness::new(
         Arc::new(host_per_request()),
         Arc::new(transport),
-        config(1, 4),
+        config(1),
         5,
     );
     let results = harness.stream(requests(2), &CancelToken::new());
@@ -128,7 +118,7 @@ fn cancel_ends_holdoff_at_once() {
     let harness = Harness::new(
         Arc::new(host_per_request()),
         Arc::new(transport),
-        config(1, 4),
+        config(1),
         5,
     );
     let cancel = CancelToken::new();
@@ -209,7 +199,7 @@ fn busy_quota_network_passed_through() {
     let harness = Harness::new(
         Arc::new(host_per_request()),
         Arc::new(transport),
-        config(3, 12),
+        config(3),
         2,
     );
     let mut results: Vec<_> = harness
@@ -270,7 +260,7 @@ fn provider_pause_holds_other_jobs() {
     let harness = Harness::new(
         Arc::new(ScriptedBackend::new()),
         Arc::new(transport),
-        config(2, 8),
+        config(2),
         5,
     );
     let results: Vec<_> = harness
