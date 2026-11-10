@@ -3,7 +3,7 @@
 # Sprint A-8: sc-agent-log
 - id: `a-8` (bead `agt-4p2.8`)
 - branch: `sprint/a-8-sc-agent-log`
-- depends on: agt-4p2.1
+- depends on: a-1
 - copy script: `docs/plans/phase-a/copy/a-8.sh`
 
 ## Description
@@ -11,6 +11,25 @@
 Separate general and session loggers on sc-observability, injectable with defaults; general log one file per CLI under <log_root>/logs/; session JSONL appended to one sessions.jsonl per <log_root>/<repo>/<agent_role>/<project>/, kept indefinitely; <log_root> defaults to ~/.sc-agent. Records: REQ-SAG-0003, 0004, 0005, 0008, NFR-SAG-0001, ADR-SAG-0002.
 
 ## Design
+
+```yaml
+sprint:
+  id: a-8
+  closure_type: boundary
+  target_boundary: sc-agent-log
+  owned_paths: [crates/sc-agent-log/**]
+  must_follow:
+    - sprint: a-1
+      artifact: sc_agent_types::{SessionId, ErrorId, ErrorDetail} + workspace root Cargo.toml and clippy.toml
+      trigger: dev-push
+  requirements: [REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0008, NFR-SAG-0001, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0009, REQ-SAG-0010]
+  adrs: [ADR-SAG-0002, ADR-SAG-0004]
+  does_not_close:
+    - "REQ-SAG-0004 slug rejection end to end (decide and sc-agent-py refuse project \"Phase B\" with log.invalid_slug and write nothing): a-10 acceptance"
+    - "REQ-SAG-0004 AC3 end to end (the CLI and PyO3 inputs are only project and agent_role): a-10 acceptance"
+    - "REQ-SAG-0003 per-CLI file in use (decide opens GeneralLogger::open_default(.., \"decide\"), tsq its own): a-10 and a-3; the ~/.sc-agent default of <log_root> is AgentConfig::log_root, a-4"
+    - "REQ-SAG-0008 end to end (logger injection through decide's options and sc-agent-py): a-10 acceptance"
+```
 
 # Sprint A-8: sc-agent-log (bead agt-4p2.8)
 
@@ -51,6 +70,8 @@ pub use repo::Repo;
 pub use session::{SessionIdentity, SessionLogger};
 pub use slug::Slug;
 pub use sc_observability::v2::{Level, Logger};
+#[cfg(feature = "testing")]
+pub mod testing;   // MemoryLog (in-memory GeneralLogger/SessionLogger for consumers' ANC-007 tests)
 
 // src/slug.rs
 /// Lowercase text of only `a-z`, `0-9`, `.`, `_` and `-`, non-empty (REQ-SAG-0004). Never rewritten.
@@ -143,6 +164,33 @@ pub(crate) struct Writer { logger: Arc<Logger>, owned: bool, reported_lost: Atom
 
 `SessionId` is `sc_agent_types::SessionId`; `ErrorDetail`/`ErrorId` are A-1's.
 
+```rust
+// src/testing.rs (feature "testing", not default; PLAN-CRIT-010)
+/// In-memory log for tests. sc-observability 1.5.0 has no public in-memory sink (its RecordingEventSink is
+/// test-private; the public sinks are JsonlFileSink and ConsoleSink), so MemoryLog implements
+/// `sc_observability::v2::LogSink` itself (write: push a clone of the `LogEvent`; flush: Ok; health:
+/// `SinkHealth { name: SinkName "memory", state: SinkHealthState::Healthy, last_error: None }`).
+#[derive(Clone)]
+pub struct MemoryLog { sink: Arc<MemorySink>, logger: Arc<Logger> }
+struct MemorySink { events: Mutex<Vec<LogEvent>> }          // private; impl sc_observability::v2::LogSink
+impl MemoryLog {
+    /// Builds one Logger: `LoggerConfig::default_for(ServiceName::new("sc-agent-test")?, PathBuf::new())` with
+    /// `enable_file_sink = false`, `enable_console_sink = false`;
+    /// `v2::LoggerBuilder::new(config)?.register_sink(SinkRegistration::typed(sink.clone())).build()`. Err: LogError::Start / InvalidName.
+    pub fn new() -> Result<Self, LogError>;
+    /// A GeneralLogger writing into this log (GeneralLogger::injected; never shut down by it).
+    pub fn general(&self) -> GeneralLogger;
+    /// A SessionLogger writing into this log (SessionLogger::injected).
+    pub fn session(&self, identity: SessionIdentity) -> SessionLogger;
+    /// Flushes the logger, then returns every event written so far, in write order.
+    pub fn records(&self) -> Result<Vec<MemoryRecord>, LogError>;
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemoryRecord { pub level: Level, pub target: String, pub action: String, pub fields: serde_json::Map<String, serde_json::Value> }
+impl sc_observability::v2::LogSink for MemorySink {}
+```
+Consumers (a-5, a-6, a-7, a-9, a-10 ANC-007 tests) take `sc-agent-log = { path = .., features = ["testing"] }` as a dev-dependency. The poisoned-mutex case recovers with `into_inner` (no unwrap).
+
 ## 3. Error union (full list; ErrorId, Display = detail(), source() = the wrapped error)
 
 ```rust
@@ -188,57 +236,67 @@ impl ErrorId for LogError {}   // foreign sources become ErrorDetail::foreign ca
 
 ## 5. Tests
 
+Each test names the acceptance line (A8-nn) it proves; the assertion itself is in that line.
+
 | Test | Proves |
 |---|---|
-| `slug_rules`: `phase-b`, `rust-developer`, `a.b_c-1` ok; `Phase B`, `""`, `a/b`, `Rust` -> log.invalid_slug | REQ-SAG-0004 slug rule, no rewrite |
-| `invalid_project_writes_nothing` | REQ-SAG-0004 AC4 |
-| `origin_forms`: https, scp, `ssh://git@github.com:22/...`, `https://u:tok@github.com/randlee/sc-agent/` -> `github.com/randlee/sc-agent`; token never in value or error; `https://h/../x` -> log.invalid_repo | REQ-SAG-0004 AC1 |
-| `local_repo`: `Repo::local("m5","work")` = `local/m5/work`; `detect` on a non-git dir `work` | REQ-SAG-0004 AC2 |
-| `detect_origin`: `git init` + `git remote add origin ...` in a temp dir | REQ-SAG-0004 AC1 end to end |
-| `rows_under_layout` | REQ-SAG-0005 AC |
-| `rows_self_describe`: `fields` starts with the 4 identity keys; no `agent_name` key; `session_id` parses as a ULID | ADR-SAG-0002, REQ-SAG-0001 |
-| `reserved_field_refused_and_counted`: write returns log.reserved_field; the next flush returns log.rows_lost count 1 with `last.id == "log.reserved_field"` | nothing lost silently |
-| `forty_thousand_sessions`: 40,000 writes with distinct SessionIds -> 40,000 rows in 1 file `sessions.jsonl` | NFR-SAG-0001 |
-| `runs_append_one_file`: two SessionLoggers opened one after another (and two at once) with the same identity append to the same `sessions.jsonl`; every row present | REQ-SAG-0005 |
-| `general_file_per_cli`: `open_default(root, "decide")` writes `root/logs/decide.log.jsonl` | REQ-SAG-0003 |
-| `repo_edge_cases`: no origin and a local-path origin -> `local/<host>/<folder>`; `m5.local` -> `m5` | REQ-SAG-0004 |
-| `session_file_never_rotates`: a 65 MiB sparse file is not renamed to `.1` | REQ-SAG-0003 |
-| `old_session_log_survives` (mtime 8 days back) | REQ-SAG-0003 AC2 |
-| `general_rotates_at_start` (T1 port) | REQ-SAG-0003 AC1 |
-| `general_write_generic`: `GeneralLogger::write(Level::Info, "sc_agent_http", "http.busy", fields)` lands with those fields | generic rows (ADR-SAG-0004) |
-| `defaults_write_both`, `injected_session_only`, `injected_general_only` | REQ-SAG-0008 ACs 1-3 |
-| `injected_logger_not_shut_down` | injection safety |
-| `rows_lost_reported_once` (unix) / `healthy_writer_loses_nothing` | no silent loss |
-| `ids`: every LogError id matches `^log\.[a-z_]+$` and is distinct | REQ-SAG-0002 |
+| `slug_rules` (`phase-b`, `rust-developer`, `a.b_c-1` ok; `Phase B`, `""`, `a/b`, `Rust` refused), `invalid_project_writes_nothing` | A8-08 |
+| `origin_forms` (https, scp, `ssh://git@github.com:22/...`, userinfo URL; `https://h/../x` refused), `detect_origin` (`git init` + `git remote add origin`) | A8-05 |
+| `local_repo`, `repo_edge_cases` (no origin, local-path origin, `m5.local` -> `m5`) | A8-06 |
+| `identity_inputs` (SessionIdentity::new takes only repo, project, agent_role; no agent_name key in any row) | A8-07 |
+| `rows_under_layout`, `runs_append_one_file` | A8-09 |
+| `rows_self_describe` | A8-10 |
+| `forty_thousand_sessions` | A8-11 |
+| `general_file_per_cli` | A8-03 |
+| `session_file_never_rotates`, `old_session_log_survives` | A8-04 |
+| `general_rotates_at_start` (T1 port) | A8-02 |
+| `general_write_generic` | A8-13 |
+| `defaults_write_both`, `injected_session_only`, `injected_general_only`, `injected_logger_not_shut_down` | A8-12 |
+| `reserved_field_refused_and_counted`, `rows_lost_reported_once` (unix), `healthy_writer_loses_nothing` | A8-14 |
+| `log_error_keeps_lower_layer_cause` | A8-15 |
+| `ids` | A8-16 |
+| `memory_log_records` (feature `testing`: GeneralLogger and SessionLogger from MemoryLog; records() returns level, target, action, fields in order; no file under any root) | A8-19 |
+
+Not proved by a test here: A8-01 (commit history), A8-17/A8-18 (Required validation commands below).
+
+## Required validation
+
+- `cargo build -p sc-agent-log` and `cargo build -p sc-agent-log --features testing`
+- `cargo clippy -p sc-agent-log --all-targets --features testing -- -D warnings` (workspace denies: panic, unwrap_used, expect_used, indexing_slicing; disallowed-methods incl. every sleep)
+- `cargo test -p sc-agent-log --features testing`
+- `cargo tree -p sc-agent-log -e normal` (and with `--features testing`): no tokio; the only sc-agent crate is sc-agent-types; no http, decision or runner crate
+- `grep -rnE "sleep\(" crates/sc-agent-log` finds nothing; `grep -rniE "rotat|prune" crates/sc-agent-log/src` shows only the never_rotate() policy values (A8-02)
 
 ## 6. Dependencies
 
 - `sc-agent-types` (path, A-1): `SessionId`, `ErrorId`, `ErrorDetail`.
 - `sc-observability = "=1.5.0"` (ref-src pin): v2 `Logger`, `LoggerBuilder`, `LoggerConfig`, `JsonlFileSink`, `SinkRegistration`, `RetainedLogPolicy`, names, `Level`, `LogEvent`.
 - `serde_json = "1"` (lock 1.0.154), `hostname = "0.4.2"` (new).
-- dev: `tempfile = "3"`.
+- dev: `tempfile = "3"`; self dev-dependency `sc-agent-log = { path = ".", features = ["testing"] }`.
+- Feature `testing` (not default): enables `src/testing.rs` (`MemoryLog`); no extra dependencies.
 - No tokio, no thiserror, no sc-decision-* crate.
 
 ## Acceptance criteria
 
-- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-8.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
-- [ ] REQ-SAG-0003 AC1: the general log rotates under sc-observability's RetainedLogPolicy (startup pass test), and no sc-agent-log source contains rotation or pruning code.
-- [ ] REQ-SAG-0003: each CLI writes its own general log <log_root>/logs/<cli>.log.jsonl; <log_root> defaults to ~/.sc-agent (A-4 AgentConfig::log_root).
-- [ ] REQ-SAG-0003 AC2: a session log file older than the retention age (mtime 8 days back) is still present after a new session writes and flushes in the same directory; session files never rotate (an over-64 MiB session file is not renamed).
-- [ ] REQ-SAG-0004 AC1: a clone whose origin is https://github.com/randlee/sc-agent.git writes rows with repo = github.com/randlee/sc-agent (also scp and ssh forms; userinfo never appears).
-- [ ] REQ-SAG-0004 AC2: outside git, folder work on host m5 gives repo = local/m5/work.
-- [ ] REQ-SAG-0004 AC3: project and agent_role are the only caller inputs of SessionIdentity::new (no agent_name anywhere; end-to-end CLI/PyO3 check lands with those sprints).
-- [ ] REQ-SAG-0004 AC4: project "Phase B" returns log.invalid_slug and no row or file is written.
-- [ ] REQ-SAG-0005 AC: rows for repo github.com/randlee/sc-agent, agent_role rust-developer, project phase-b are in <log_root>/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl; every later run and every concurrent logger with that identity appends to the same file (test).
-- [ ] ADR-SAG-0002 / REQ-SAG-0001: every row's fields carry session_id, repo, project and agent_role (one field for role and name); session_id parses as a ULID.
-- [ ] NFR-SAG-0001: 40,000 sessions write 40,000 rows with distinct session_id into one file.
-- [ ] REQ-SAG-0008 AC1-3: no injection -> both default files written; injected session logger -> rows there, general log default; injected general logger -> general log there, rows in the default session file. An injected logger is never shut down by sc-agent-log.
-- [ ] ADR-SAG-0004: sc-agent-log sits in the config, secrets and log layer; its only sc-agent crate dependency is sc-agent-types, and it depends on no http, decision-schema, decision-backend or runner crate, checked by `cargo tree -p sc-agent-log`; both loggers take generic rows (serde_json::Map).
-- [ ] Rows refused at write or lost by the writer are returned once as log.rows_lost from flush(), with the latest failure as ErrorDetail; never lost silently.
-- [ ] REQ-SAG-0002: every LogError returned by a public sc-agent-log function carries the id and message of each lower-layer cause (sc-observability error or io error), kept as its source and in ErrorDetail, never dropped or replaced; test log_error_keeps_lower_layer_cause injects an sc-observability failure and an io failure (unwritable <log_root>) and asserts the returned LogError exposes that cause's id and message through source() and ErrorDetail.
-- [ ] REQ-SAG-0002: LogError implements ErrorId with 13 distinct log.* ids; clippy with the workspace denies (panic, unwrap_used, expect_used, indexing_slicing) passes for sc-agent-log.
-- [ ] REQ-SAG-0009/0010: cargo tree shows no tokio; no sleep call (git runs via Command::output()).
-- [ ] REQ-SAG-0010: sc-agent-log source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
+- [ ] A8-01 Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-8.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
+- [ ] A8-02 REQ-SAG-0003 AC1: sc-agent-log: GeneralLogger::open_default's general log rotates under sc-observability's RetainedLogPolicy (startup pass test), and no sc-agent-log source contains rotation or pruning code.
+- [ ] A8-03 REQ-SAG-0003: sc-agent-log: GeneralLogger::open_default(log_root, service) writes <log_root>/logs/<service>.log.jsonl, one file per CLI name (the ~/.sc-agent default of <log_root> is AgentConfig::log_root, a-4).
+- [ ] A8-04 REQ-SAG-0003 AC2: sc-agent-log: a session log file older than the retention age (mtime 8 days back) is still present after a new SessionLogger writes and flushes in the same directory; session files never rotate (an over-64 MiB session file is not renamed).
+- [ ] A8-05 REQ-SAG-0004 AC1: sc-agent-log: Repo::detect in a clone whose origin is https://github.com/randlee/sc-agent.git gives repo = github.com/randlee/sc-agent and SessionLogger rows carry it (also scp and ssh forms; userinfo never appears).
+- [ ] A8-06 REQ-SAG-0004 AC2: sc-agent-log: outside git, folder work on host m5 gives repo = local/m5/work.
+- [ ] A8-07 REQ-SAG-0004 AC3: sc-agent-log: project and agent_role are the only caller inputs of SessionIdentity::new besides the detected Repo (no agent_name anywhere in sc-agent-log); the CLI/PyO3 end-to-end check is a-10's.
+- [ ] A8-08 REQ-SAG-0004 AC4: sc-agent-log: SessionIdentity::new with project "Phase B" returns log.invalid_slug and no row or file is written.
+- [ ] A8-09 REQ-SAG-0005 AC: sc-agent-log: SessionLogger rows for repo github.com/randlee/sc-agent, agent_role rust-developer, project phase-b are in <log_root>/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl; every later run and every concurrent logger with that identity appends to the same file (test).
+- [ ] A8-10 ADR-SAG-0002 / REQ-SAG-0001: sc-agent-log: every SessionLogger row's fields carry session_id, repo, project and agent_role (one field for role and name); session_id parses as a ULID.
+- [ ] A8-11 NFR-SAG-0001: sc-agent-log: 40,000 SessionLogger writes with distinct session_id give 40,000 rows in one file.
+- [ ] A8-12 REQ-SAG-0008 AC1-3: sc-agent-log: Loggers::open with no injection -> both default files written; injected session logger -> rows there, general log default; injected general logger -> general log there, rows in the default session file. An injected logger is never shut down by sc-agent-log.
+- [ ] A8-13 ADR-SAG-0004: sc-agent-log sits in the config, secrets and log layer; its only sc-agent crate dependency is sc-agent-types, and it depends on no http, decision-schema, decision-backend or runner crate, checked by `cargo tree -p sc-agent-log` (with and without `--features testing`); both loggers take generic rows (serde_json::Map).
+- [ ] A8-14 sc-agent-log: rows refused at write or lost by the writer are returned once as log.rows_lost from flush(), with the latest failure as ErrorDetail; never lost silently.
+- [ ] A8-15 REQ-SAG-0002: every LogError returned by a public sc-agent-log function carries the id and message of each lower-layer cause (sc-observability error or io error), kept as its source and in ErrorDetail, never dropped or replaced; test log_error_keeps_lower_layer_cause injects an sc-observability failure and an io failure (unwritable <log_root>) and asserts the returned LogError exposes that cause's id and message through source() and ErrorDetail.
+- [ ] A8-16 REQ-SAG-0002: LogError implements ErrorId with 13 distinct log.* ids; clippy with the workspace denies (panic, unwrap_used, expect_used, indexing_slicing) passes for sc-agent-log.
+- [ ] A8-17 REQ-SAG-0009/0010: cargo tree -p sc-agent-log shows no tokio; no sleep call (git runs via Command::output()).
+- [ ] A8-18 REQ-SAG-0010: sc-agent-log source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
+- [ ] A8-19 sc-agent-log: feature `testing` (not default) exposes sc_agent_log::testing::MemoryLog, a sc_observability::v2::LogSink registered through SinkRegistration::typed with file and console sinks off; GeneralLogger and SessionLogger built from it write no file, and records() (after its flush) returns each event's level, target, action and fields in write order.
 
 ## Notes
 
@@ -247,3 +305,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 - Q2/Q3 host and repo edge cases: assistant decisions (owner: IDC).
 - Q4 general log: <log_root>/logs/<cli>.log.jsonl per CLI, sc-observability default level and retention; <log_root> default ~/.sc-agent (owner; REQ-SAG-0003).
 No open questions.
+
+Plan hardening round 1 (2026-11-10): added sc_agent_log::testing::MemoryLog behind feature `testing` (PLAN-CRIT-010). Checked sc-observability 1.5.0 source (cargo registry): no public in-memory sink exists (RecordingEventSink is #[cfg(test)]-private), so MemoryLog implements sc_observability::v2::LogSink and is registered with v2::LoggerBuilder::register_sink(SinkRegistration::typed(..)).

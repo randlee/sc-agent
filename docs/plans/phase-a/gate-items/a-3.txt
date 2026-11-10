@@ -1,21 +1,25 @@
-# Sprint A-3: sc-treesitter
+# Sprint A-3: sc-treesitter, tsq and sc-treesitter-py
 
 ## Description
 
-Build sc-treesitter as a stand-alone library with PyO3 and CLI support types for querying any grammar. Governing records: REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303. Code to copy from sc-agent-ref: see design.
+Build sc-treesitter as a stand-alone library with PyO3 bindings (crates/sc-treesitter-py) and the tsq binary (non-default feature cli) for querying any grammar. Governing records: REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0003 (tsq log). Code to copy from sc-agent-ref: see design.
 
 ## Acceptance criteria
 
-- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
-- [ ] cargo tree -p sc-treesitter lists no sc-agent crate (REQ-SAG-0301); no agent or decision-model code.
-- [ ] A caller-written query runs against Python source and against Rust source through the same run_query call (REQ-SAG-0302, first release).
-- [ ] Every id from languages() runs through the same run_query call; adding a grammar adds a table row only, no API change (REQ-SAG-0302).
-- [ ] languages() lists the loaded grammars and queries() lists the predefined queries (python/branches, rust/match-arms) (REQ-SAG-0303 support).
-- [ ] A caller-written query runs through the PyO3 bindings (crates/sc-treesitter-py over feature python, module sc_treesitter) and returns its matches as Capture objects (REQ-SAG-0303).
-- [ ] All 19 Error variants (the owner's 17 plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message (REQ-SAG-0002).
-- [ ] An injected lowest-layer failure (non-UTF-8 source) reaches the PyO3 entry point with id treesitter.not_utf8 and its message (REQ-SAG-0002).
-- [ ] Clippy passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code (REQ-SAG-0002).
-- [ ] No git, no sc-sha; no u32 clamping of positions (PositionOverflow instead).
-- [ ] Second wave (C# as csharp, Go) is a later sprint that adds table rows, queries and samples with no API change (REQ-SAG-0302).
-- [ ] The library writes no log (REQ-SAG-0301); `cargo tree -p sc-treesitter --no-default-features --features grammar-python,grammar-rust` lists no sc-observability.
-- [ ] REQ-SAG-0010: sc-treesitter and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a, 34 copy steps incl. the tsq rows), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
+- [ ] REQ-SAG-0301: `cargo tree -p sc-treesitter -e normal,build` lists no sc-agent or sc-decision crate, with default features and with `--features cli`; the crate has no agent or decision-model code.
+- [ ] REQ-SAG-0302 same call: sc-treesitter `run_query` runs one caller-written query against Python source and against Rust source (first release).
+- [ ] REQ-SAG-0302 every id: every id from `languages()` runs through the same `run_query` call; adding a grammar adds a `GRAMMARS` row and a test sample only, no API change.
+- [ ] REQ-SAG-0303 listings: sc-treesitter `languages()` lists the loaded grammars and `queries()` lists the predefined queries (python/branches, rust/match-arms).
+- [ ] REQ-SAG-0303 PyO3: a caller-written query runs through crates/sc-treesitter-py (module sc_treesitter, feature python) and returns its matches as Capture objects.
+- [ ] REQ-SAG-0303 tsq listings: `tsq languages` prints `["python","rust"]` and `tsq queries --language python` lists `branches`.
+- [ ] tsq query: `tsq query <language> <query> <file>` runs a predefined query and prints its captures as JSON (exit 0); every failure prints one stderr line {id, message} with a treesitter.* id, exit 1, empty stdout.
+- [ ] REQ-SAG-0002 errors: all 19 sc-treesitter Error variants (the owner's 17 plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message.
+- [ ] REQ-SAG-0002 lowest-layer PyO3: an injected non-UTF-8 source reaches the sc-treesitter-py entry point as TreesitterError with id treesitter.not_utf8 and its message.
+- [ ] REQ-SAG-0002 lowest-layer tsq: a non-UTF-8 file reaches tsq's stderr as treesitter.not_utf8 with its message; a failed stdout write is treesitter.write.
+- [ ] REQ-SAG-0002 clippy: `cargo clippy -p sc-treesitter -p sc-treesitter-py --all-features --all-targets -- -D warnings` passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code.
+- [ ] Positions: no git, no sc-sha; no u32 clamping of positions (PositionOverflow instead).
+- [ ] REQ-SAG-0003 tsq.log: a tsq run writes its own general log `~/.sc-agent/logs/tsq.log.jsonl` (one `tsq.command` event per command), a file separate from decide's.
+- [ ] Stand-alone library: the sc-treesitter library writes no log (REQ-SAG-0301); `cli` is not a default feature and `[[bin]] tsq` has `required-features = ["cli"]`, so `cargo tree -p sc-treesitter -e normal` (default features) lists no sc-observability and no clap.
+- [ ] REQ-SAG-0009: `cargo tree -p sc-treesitter -e normal` and `cargo tree -p sc-treesitter --features cli -e normal` list no tokio crate.
+- [ ] REQ-SAG-0010: sc-treesitter (library and tsq) and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.

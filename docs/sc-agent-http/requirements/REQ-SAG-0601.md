@@ -26,7 +26,7 @@ Definitions: A busy response is an HTTP 429, 502 or 529. A send is one transmiss
 - When `Retry-After` is absent or invalid, the holdoffs MUST be 1, 2, 4 and 8 seconds, doubling after that and capped at 30 seconds, each with up to 250 milliseconds of jitter.
 - Attempts MUST start only within a 90-second budget per request; an attempt already in flight keeps its own request timeout.
 - A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.
-- When sends or budget run out, the result MUST be `HttpError::ProviderBusy` with the reason (`sends` or `budget`), the number of attempts and the last `retry_after_seconds`.
+- When sends or budget run out after a busy response, the result MUST be `HttpError::ProviderBusy` with the reason (`sends` or `budget`), the number of attempts and the last `retry_after_seconds`.
 
 **MUST NOT statements:**
 
@@ -45,7 +45,7 @@ Providers signal overload with busy responses and expect clients to back off. Ho
 - [ ] With the maximum set to 2, the same request is sent 2 times.
 - [ ] A busy response with `Retry-After: 3` holds the request off 3 seconds; `Retry-After: 99` holds it off 30 seconds; `Retry-After: abc` falls back to 1, 2, 4, 8 seconds.
 - [ ] Cancelling a held-off request ends its wait at once and returns a cancelled result.
-- [ ] A send that times out every time is sent 5 times with the default configuration and ends with the timeout error.
+- [ ] A send that times out is resent unchanged and counts toward the maximum number of sends; no attempt starts after the 90-second budget, and a request whose last attempt timed out ends with the timeout error.
 - [ ] A 402 response is returned after one send with the remote error id and message.
 - [ ] A workspace search finds no `sleep(` call.
 

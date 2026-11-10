@@ -3,7 +3,7 @@
 # Sprint A-2: sc-decision-schema
 - id: `a-2` (bead `agt-4p2.2`)
 - branch: `sprint/a-2-sc-decision-schema`
-- depends on: agt-4p2.5
+- depends on: a-5
 - copy script: `docs/plans/phase-a/copy/a-2.sh`
 
 ## Description
@@ -11,6 +11,26 @@
 Build sc-decision-schema: Jev API types (the one request form), the sync Decision trait, the per-question sc-sha digest. Governing records: REQ-SAG-0201, REQ-SAG-0202, REQ-SAG-0006, ADR-SAG-0001; anchor ANC-001. Code to copy from sc-agent-ref: see design.
 
 ## Design
+
+```yaml
+sprint:
+  id: a-2
+  closure_type: contract            # a-2 is the contract of the decision layer: Backend, Decision, DecisionRequest/DecisionResult, DecisionError
+  target_boundary: sc-decision-schema
+  owned_paths: [crates/sc-decision-schema/**]
+  must_follow:                      # a-1 (sc-agent-types) precedes a-5 through a-4; no separate edge
+    - sprint: a-5
+      artifact: sc_agent_http::{HttpRequest, HttpResponse, HttpError} (crates/sc-agent-http/src/request.rs + src/error.rs)
+      trigger: dev-push             # starts once a-5 pushed those files right after its copy commit; merges forward before each round; no wait for QA or PR merge
+  requirements: [REQ-SAG-0201, REQ-SAG-0202, REQ-SAG-0006, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0504, REQ-SAG-0901]
+  adrs: [ADR-SAG-0001, ADR-SAG-0004]
+  does_not_close:
+    - "REQ-SAG-0901 resend up to max_sends: a-9 (sc-decision-runner) acceptance REQ-SAG-0901 AC2/AC3; a-2 only defines decision.schema_mismatch"
+    - "REQ-SAG-0202 digest recorded with the response in the session row: a-9 acceptance REQ-SAG-0202"
+    - "REQ-SAG-0504 end to end (decide names the line, field and reason of a bad batch line): a-10; a-2 supplies only the field path and serde message"
+    - "REQ-SAG-0701 cancel/decide_stream behaviour: a-9 (runner boundary) and a-10 (end-to-end parallel batch); a-2 defines only the trait and its doc contract"
+    - "DecisionRequest::validate is called before encoding by a-6 and a-7 (their acceptance), not by a-2"
+```
 
 # Sprint A-2 design: sc-decision-schema (bead agt-4p2.2)
 
@@ -175,7 +195,13 @@ pub struct DecisionRequest {
     pub long_context: bool,            // TypeSafe-Danger-Zone-Long-Context: true
 }
 impl From<SystemOneRequest> for DecisionRequest {}
-impl DecisionRequest { pub fn needs_images_header(&self) -> bool; }
+impl DecisionRequest {
+    pub fn needs_images_header(&self) -> bool;
+    /// Every `Asset.part` names exactly one `ImagePart` (by `name`), no two `ImagePart`s share a name,
+    /// and no `ImagePart` is unreferenced. Err = DecisionError::ImageParts { detail } naming the
+    /// asset id / part name at fault. Backends (a-6, a-7) call it before encoding.
+    pub fn validate(&self) -> Result<(), DecisionError>;
+}
 #[derive(Clone, PartialEq, Eq)]
 pub struct ImagePart { pub name: String, pub format: ImageFormat, pub bytes: Vec<u8> }   // Debug: name, format, byte length
 
@@ -190,13 +216,21 @@ pub struct DecisionResult {
 }
 
 /// Sync decision API, implemented by sc-decision-runner. Object-safe; no tokio; no associated error.
+///
+/// Cancel contract (both methods): cancelling `cancel` ends every unfinished request at once with
+/// `DecisionError::Cancelled { sends }` — queued, held off, and also a request whose send is in
+/// flight (it does not wait for the transport to return; a reply arriving later is discarded and
+/// produces no second result). Exactly one result per request, always.
 pub trait Decision: Send + Sync {
+    /// One request; position 0. The implementation must not run the send on the caller's thread,
+    /// so cancel is immediate here too.
     fn decide(&self, request: DecisionRequest, cancel: &CancelToken) -> DecisionResult;
     /// Results arrive fastest first; a failed request is returned in its result and the stream
-    /// continues; cancelling ends every unfinished request with DecisionError::Cancelled.
+    /// continues. `requests` is owned and `'static` (callers pass e.g. `Box::new(vec.into_iter())`)
+    /// because the implementation pulls it on its own feeder thread.
     fn decide_stream<'a>(
         &'a self,
-        requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'a>,
+        requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>,
         cancel: &CancelToken,
     ) -> Box<dyn Iterator<Item = DecisionResult> + Send + 'a>;
 }
@@ -250,6 +284,9 @@ pub enum DecisionError {
     DuplicateKey { key: String },                                      // "decision.duplicate_key"
     /// Serialising a body or building multipart failed.
     Encode { message: String },                                        // "decision.encode"
+    /// DecisionRequest::validate: an Asset.part with no (or more than one) matching ImagePart, or an
+    /// ImagePart no asset references; `detail` names the asset id / part name.
+    ImageParts { detail: String },                                     // "decision.image_parts"
     /// sc-sha failed; cause = ErrorDetail::foreign(sha code, ..).
     Digest(sc_sha::ShaError),                                          // "decision.digest"
     /// HTTP 400 with the documented body.
@@ -273,7 +310,7 @@ pub enum DecisionError {
 impl ErrorId for DecisionError {}   // cause(): Http -> http detail; Backend/SchemaMismatch -> detail; Digest -> sha
 ```
 
-13 variants. No unsupported-input variant: every input is passed to the provider and a rejection is the provider's error (REQ-SAG-0901). A session-log write failure is never a DecisionError: it never replaces a decision result (A-9). Rule: wrapping keeps the lower value unchanged, so every id and message reaches the top.
+14 variants. No unsupported-input variant: every input is passed to the provider and a rejection is the provider's error (REQ-SAG-0901). A session-log write failure is never a DecisionError: it never replaces a decision result (A-9). Rule: wrapping keeps the lower value unchanged, so every id and message reaches the top.
 
 ## 6. Dependencies
 
@@ -285,31 +322,40 @@ impl ErrorId for DecisionError {}   // cause(): Http -> http detail; Backend/Sch
 - sc-agent-http (path; HttpRequest, HttpResponse, HttpError) — A-5
 - Not needed: thiserror, sc-llm-provider (an LlmError arrives as ErrorDetail), base64, ulid, sha2, ureq.
 
-## 7. Tests
+## 7. Tests (each names the acceptance line it proves)
 
-- tests/typesafe_examples.rs + tests/fixtures/typesafe/*.json (from openapi.json): every request example (noul with/without criteria and object instructions, choice, score, box, assets with data_base64 and part, null instructions) and every response example (four answers, box confidence null and number) round-trips byte-identical (compact). (REQ-SAG-0201 AC1)
-- ModelMetadataList, HttpBadRequestError (string and object detail), HttpValidationError round-trip.
-- 0.123456789 and 1.7 come back unchanged (REQ-SAG-0007).
-- Strands Decider `latency_ms` and Laya `usage.truncated` kept in `extra`.
-- Duplicate question id -> RequestParse naming the key; unknown request field -> RequestParse; a score question without `criteria` -> RequestParse whose path is `questions.<id>` and whose message names `criteria`; try_from_pairs duplicate -> DuplicateKey.
-- Digest: same request twice -> equal; change model / state / assets / long_context / a part byte / question q -> q changes; change question r -> q unchanged; 3 questions -> 3 digests in order (REQ-SAG-0202 AC1-3).
-- DecisionError: every id distinct and `^decision\.[a-z_]+$`; Display = detail(); `Http(Network)` detail has cause id `http.network` with its message; `Backend` with a two-level ErrorDetail keeps both levels.
-- `Decision` and `Backend` are object-safe (`Box<dyn Decision>`, `Arc<dyn Backend>` compile).
-- CI grep (workspace): no `sha2`/`Sha256::` outside sc-sha use; no `.round(`; no `sleep(`.
+- `tests/typesafe_examples.rs` + `tests/fixtures/typesafe/*.json` (every request and response example in openapi.json, incl. assets with data_base64 and part, null instructions, box confidence null and number; ModelMetadataList; 400 string/object and 422 bodies) -> AC "REQ-SAG-0201 AC1" and the round-trip clause of AC "ANC-001".
+- `extra_fields_kept` (Strands Decider `latency_ms`, Laya `usage.truncated` in `extra`) -> AC "REQ-SAG-0201 AC1" (non-TypeSafe servers round-trip).
+- `exact_floats` (0.123456789, 1.7) -> AC "REQ-SAG-0007".
+- `request_parse_errors` (duplicate question id, unknown field, score without `criteria` -> path `questions.<id>`; try_from_pairs duplicate -> DuplicateKey) -> AC "REQ-SAG-0504 support".
+- `validate_image_parts` (asset part with no ImagePart; two ImageParts of one name; unreferenced ImagePart; a matching set is Ok) -> AC "DecisionRequest::validate".
+- `digests` (same twice equal; model / state / assets / long_context / a part byte / question q each change q; question r leaves q; 3 questions -> 3 in order) -> AC "REQ-SAG-0202".
+- `error_ids` (14 ids distinct, `^decision\.[a-z_]+$`; Display = detail(); `Http(Network)` cause `http.network`; two-level `Backend` detail kept) -> AC "REQ-SAG-0002".
+- `object_safety` (`Box<dyn Decision>`, `Arc<dyn Backend>` from an in-test backend) -> AC "Backend/Decision shape" and AC "ADR-SAG-0001".
+- `public_items` (lists the crate's public items) -> AC "ANC-001" and AC "REQ-SAG-0006 AC1".
+
+## 8. Required validation
+
+- `cargo build -p sc-decision-schema`
+- `cargo clippy -p sc-decision-schema --all-targets -- -D warnings` with the workspace lints (a-1's `[workspace.lints]` and clippy.toml disallowed-methods)
+- `cargo test -p sc-decision-schema`
+- `cargo tree -p sc-decision-schema -e normal`: sc-agent crates are only sc-agent-types and sc-agent-http (plus their own); no tokio, no sc-decision-* backend, no sc-llm-provider, no sc-decision-runner
+- `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n 'sha2|Sha256::' crates/` (workspace) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
 
 ## Acceptance criteria
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-2.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
-- [ ] Every request and response example in the TypeSafe API docs/openapi.json, for noul, choice, score and box (plus assets, ModelMetadataList, 400 and 422 bodies), round-trips byte-identical through sc-decision-schema types (REQ-SAG-0201 AC1).
-- [ ] REQ-SAG-0504 support: SystemOneRequest::from_json failures are decision.request_parse with the field path and the full serde message (test: score without criteria).
-- [ ] No crate other than sc-decision-schema defines a type that maps to a Jev API field (REQ-SAG-0201 AC2).
-- [ ] ANC-001: sc-decision-schema holds only the code needed to send and receive the decision API and nothing else (no HTTP client or transport, retries, cache, logging, report formatting or CLI code), with no exception; a test lists every public item of sc-decision-schema and fails on any item outside the TypeSafe request, response, answer and error types, the Backend and Decision traits (with DecisionRequest/DecisionResult), the question digest and DecisionError; every TypeSafe documentation example for POST /v1/systemone and GET /v1/models round-trips through these types.
-- [ ] No type, field or constant named for or used only by a consumer application or a mock backend (REQ-SAG-0006 AC1).
-- [ ] Two digests of the same information and question are equal; changing model, state, assets, an image part, long_context or the question changes it; changing another question does not; three questions give three digests (REQ-SAG-0202 AC1-3); SHA-256 only through sc-sha (REQ-SAG-0202 AC4).
-- [ ] 0.123456789 is returned as 0.123456789; no rounding in the crate (REQ-SAG-0007).
-- [ ] Backend is encode(&DecisionRequest) -> Result<HttpRequest, DecisionError> and decode(HttpResponse, &DecisionRequest) -> Result<SystemOneResponse, DecisionError> over sc-agent-http types; Decision has no associated error and returns DecisionResult {session_id, position, digests, outcome: Result<SystemOneResponse, DecisionError>}; both object-safe, sync, (ADR-SAG-0001, owner-decision-trait).
-- [ ] REQ-SAG-0002: DecisionError implements ErrorId with 13 distinct decision.* ids (no unsupported-input variant); Http wraps HttpError unchanged; an LlmError chain arrives as ErrorDetail in Backend or SchemaMismatch with every id and message kept; clippy with the workspace denies passes; no sleep.
-- [ ] ADR-SAG-0004: sc-decision-schema sits in the decision-schema layer and its only sc-agent crate dependencies are the lower-layer crates sc-agent-types and sc-agent-http (its other dependencies are the external crates serde, serde_json and sc-sha); it depends on no decision backend, sc-llm-provider or runner crate, checked by `cargo tree -p sc-decision-schema`.
+- [ ] REQ-SAG-0201 AC1: every request and response example in the TypeSafe API docs/openapi.json, for noul, choice, score and box (plus assets, ModelMetadataList, 400 and 422 bodies), round-trips byte-identical through sc-decision-schema types.
+- [ ] REQ-SAG-0504 support: sc-decision-schema's SystemOneRequest::from_json failures are decision.request_parse with the field path and the full serde message (test: score without criteria).
+- [ ] REQ-SAG-0201 AC2: no crate other than sc-decision-schema defines a type that maps to a Jev API field.
+- [ ] ANC-001: sc-decision-schema holds only the code needed to send and receive the decision API and nothing else (no HTTP client or transport, retries, cache, logging, report formatting or CLI code), with no exception; a test lists every public item of sc-decision-schema and fails on any item outside the TypeSafe request, response, answer and error types, the Backend and Decision traits (with DecisionRequest/DecisionResult and DecisionRequest::validate), the question digest and DecisionError; every TypeSafe documentation example for POST /v1/systemone and GET /v1/models round-trips through these types.
+- [ ] REQ-SAG-0006 AC1: sc-decision-schema has no type, field or constant named for or used only by a consumer application or a mock backend (Haiku, Luna); the public-item test checks it.
+- [ ] REQ-SAG-0202 AC1-4: sc-decision-schema's question_digests gives equal digests for the same information and question; changing model, state, assets, an image part, long_context or the question changes it; changing another question does not; three questions give three digests; SHA-256 only through sc-sha (workspace search finds no sha2/Sha256:: use).
+- [ ] REQ-SAG-0007: sc-decision-schema returns 0.123456789 as 0.123456789; no rounding in the crate.
+- [ ] Backend/Decision shape: sc-decision-schema's Backend is encode(&DecisionRequest) -> Result<HttpRequest, DecisionError> and decode(HttpResponse, &DecisionRequest) -> Result<SystemOneResponse, DecisionError> over sc-agent-http types; Decision has no associated error, decide_stream takes `Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>`, and both methods return DecisionResult {session_id, position, digests, outcome: Result<SystemOneResponse, DecisionError>}; the Decision doc comment states the cancel contract (every unfinished request, in-flight sends included, ends at once with decision.cancelled; a late reply gives no second result); both traits object-safe and sync (ADR-SAG-0001, owner-decision-trait).
+- [ ] DecisionRequest::validate: sc-decision-schema returns decision.image_parts naming the asset/part when an Asset.part has no or more than one matching ImagePart or an ImagePart is unreferenced, and Ok for a matching set.
+- [ ] REQ-SAG-0002: sc-decision-schema's DecisionError implements ErrorId with 14 distinct decision.* ids (incl. decision.image_parts; no unsupported-input variant); Http wraps HttpError unchanged; an LlmError chain arrives as ErrorDetail in Backend or SchemaMismatch with every id and message kept; clippy with the workspace denies passes.
+- [ ] ADR-SAG-0004: sc-decision-schema sits in the decision-schema layer and its only sc-agent crate dependencies are the lower-layer crates sc-agent-types and sc-agent-http (its other dependencies are the external crates serde, serde_json, serde_path_to_error and sc-sha); it depends on no decision backend, sc-llm-provider or runner crate, checked by `cargo tree -p sc-decision-schema -e normal`.
 - [ ] ADR-SAG-0001: the Backend trait is defined in sc-decision-schema and is the one trait every decision backend (Jev, local runners, Haiku, Luna) implements; a compile-time test builds `Arc<dyn Backend>` from a test backend (object safety).
 - [ ] REQ-SAG-0010: no call to std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function in sc-decision-schema source; enforced by the workspace clippy disallowed-methods rule.
 - [ ] REQ-SAG-0009: sc-decision-schema's Cargo.toml has no tokio dependency; `cargo tree -p sc-decision-schema` lists no tokio crate (check).
@@ -321,3 +367,4 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7):
 - Digest input: everything sent (long-context flag, every image part, model, state, assets) plus the single question, per the owner's '100% of information sent' rule (REQ-SAG-0202).
 - decide_stream correlation: each DecisionResult carries session_id and the input position (REQ-SAG-0701).
 No open questions.
+Hardening round 1 (2026-11-09, decisions.md): PLAN-CRIT-001 decide_stream takes a 'static boxed iterator; PLAN-CRIT-002 Decision doc states the in-flight cancel contract; PLAN-CRIT-014 DecisionRequest::validate + DecisionError::ImageParts (14 variants); PLAN-CRIT-010 follow-up: no test double in sc-decision-schema (ANC-001 keeps it to types and traits); the scripted test backend is private to a-9 (crates/sc-decision-runner/tests/support/).

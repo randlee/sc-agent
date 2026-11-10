@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Sprint A-3 (bead agt-4p2.3): sc-treesitter library.
-# Copies the old sc-treesitter library code (sc-agent-ref @ dce239a) into crates/sc-treesitter/.
+# Sprint A-3 (bead agt-4p2.3): sc-treesitter library and the tsq binary (feature `cli`).
+# Copies the old sc-treesitter library and CLI code (sc-agent-ref @ dce239a) into crates/sc-treesitter/.
 # Usage: bash docs/plans/phase-a/copy/a-3.sh   (TARGET=<dir> for a dry run)
 #
 # What this script does NOT do (the developer does it; see the bead design):
@@ -12,7 +12,11 @@
 #   - It does not rewrite the copied tests: they still call the old `run(..., path, ...)` helper,
 #     `error.code()` strings and SubjectsDocument accessors; they must be ported to the new API.
 #   - It does not strip doc comments that mention sc/subjects/1, query_sha256, Phase A or git.
-#   - It copies nothing for the CLI binary (cli.rs, main.rs, tests/cli.rs): that is Sprint A-10 (a-10.sh).
+#   - It adds no [[bin]]/[features] to Cargo.toml and does not replace the CLI's JevError,
+#     ScAgentErrorResponse, Rev, `extract` subcommand, `--rev`, git_io, mimalloc or the
+#     `message()`/`value_parser_error`/`usage_error` mapping; it does not rename `extract` to `query`
+#     or turn its flags into the positional `query <language> <query> <file>` form.
+#   - It does not port the copied CLI tests (they still assert the old error envelope / python+rust order).
 #   - It adds no C# or Go grammar rows or queries (second wave).
 . "$(dirname "$0")/lib.sh"
 
@@ -52,3 +56,20 @@ copy_lines "$S/src/render.rs" 6 21 "$D/src/lib.rs"
 # the Refusal/lite-gate half is not copied.
 copy_file  "$S/assets/queries/rust/match-arms.scm" "$D/assets/queries/rust/match-arms.scm"
 copy_lines "$S/assets/queries/python/branches.scm" 2 5 "$D/assets/queries/python/branches.scm"
+
+# ---- tsq binary, feature `cli` (src/cli.rs, src/main.rs, tests/cli.rs; moved from a-10.sh) ----
+copy_lines "$S/src/cli/mod.rs" 11 12   "$D/src/cli.rs"     # clap imports
+copy_lines "$S/src/cli/mod.rs" 36 77   "$D/src/cli.rs"     # Cli, Command, ExtractArgs (language, query, captures)
+copy_lines "$S/src/cli/mod.rs" 87 144  "$D/src/cli.rs"     # path arg, QueriesArgs, Captures, Parsed, parse()
+copy_lines "$S/src/cli/mod.rs" 201 235 "$D/src/cli.rs"     # parse_captures, tests: cli_definition_is_consistent
+copy_lines "$S/src/cli/mod.rs" 257 265 "$D/src/cli.rs"     # test: captures_are_trimmed_and_ordered
+copy_lines "$S/src/main.rs" 8 9     "$D/src/main.rs"       # io / ExitCode imports
+copy_lines "$S/src/main.rs" 25 35   "$D/src/main.rs"       # main()
+copy_lines "$S/src/main.rs" 50 77   "$D/src/main.rs"       # run(): languages, queries dispatch
+copy_lines "$S/src/main.rs" 80 83   "$D/src/main.rs"       # captures -> Option<Vec<&str>>
+copy_lines "$S/src/main.rs" 98 103  "$D/src/main.rs"       # json_line()
+copy_lines "$S/tests/cli.rs" 12 12   "$D/tests/cli.rs"     # use std::path::Path
+copy_lines "$S/tests/cli.rs" 20 22   "$D/tests/cli.rs"     # binary()
+copy_lines "$S/tests/cli.rs" 33 37   "$D/tests/cli.rs"     # run() (drop isolate_git / deadline)
+copy_lines "$S/tests/cli.rs" 54 62   "$D/tests/cli.rs"     # error_json(), trim_newline()
+copy_lines "$S/tests/cli.rs" 441 465 "$D/tests/cli.rs"     # languages + queries listing test

@@ -10,9 +10,11 @@
 #   - write sc-agent-config's AgentConfig/ExtraModel/LocalRunner types, load() and catalog();
 #   - add the OPENROUTER/TOGETHER/NOUS variable constants and env_var(Provider);
 #   - rename ResolvedApiKey to ApiKey; change try_new(BackendKeyId, String) to try_new(&str var, String);
-#     drop redact_error() and JevError::map_detail; replace JevError with SecretsError::{KeyMissing, KeyMalformed};
-#   - drop the ANTHROPIC_KEYCHAIN_SERVICE constant, dotenv, keyring, whoami and every *_logged function;
-#   - write resolve(Provider, &impl EnvSource) and resolve_var(&str, &impl EnvSource);
+#     drop redact_error() and JevError::map_detail; replace JevError with
+#     SecretsError::{KeyMissing, KeyMalformed, DotenvRead, KeyringRead, KeyringTimeout};
+#   - drop the ANTHROPIC_KEYCHAIN_SERVICE constant and every *_logged function (the copied .env parser and
+#     keyring reader stay: lookup order is process env, repo-root .env, keyring, REQ-SAG-0401);
+#   - write resolve(Provider, &KeySources) and resolve_var(&str, &KeySources);
 #   - port the copied unit tests from BackendKeyId::ALL / JevError to Provider::ALL / SecretsError,
 #     and drop redact_error_covers_every_text_field (not copied).
 . "$(dirname "$0")/lib.sh"

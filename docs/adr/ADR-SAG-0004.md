@@ -31,7 +31,7 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. Each crate defines its own error union, which wraps the error of the layer below it; an error from a crate that is not below (such as an LLM error inside a decision error) is carried as its id, message and cause chain.
+Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decide` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decide` CLI. `sc-agent-py` is a thin PyO3 layer over the `decide` library. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. `sc-agent-types` defines the `ErrorId` trait and `ErrorDetail` (id, message, cause) that every sc-agent crate's error union uses; `sc-treesitter` defines its own. Each crate defines its own error union, which wraps the error of the layer below it; an error from a crate that is not below (such as an LLM error inside a decision error) is carried as its id, message and cause chain.
 
 **Key Principles:**
 
@@ -39,6 +39,7 @@ Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` 
 - `sc-decision-runner` launches decision models only.
 - There is no shared error type for all crates; `HttpError` is wrapped by `LlmError` and by `DecisionError`, and an `LlmError` reaches `DecisionError` as its id, message and cause chain.
 - `sc-agent-log` takes generic rows, so it needs no decision types; the runner builds decision rows.
+- Backends are chosen and wired in one place, the `decide` library; `sc-agent-py` adds no wiring of its own.
 
 ### Rationale
 
