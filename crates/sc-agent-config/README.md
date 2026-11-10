@@ -11,9 +11,9 @@ overrides such as `SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000`).
                                "model": "convaiinnovations/laya" } } }
 ```
 
-A runner's optional `key_env` names the variable holding its key (Laya's is
-`LAYA_API_KEY`); sc-agent-secrets resolves it. Credential names are quoted only
-inside sc-agent-secrets (REQ-SAG-0401).
+A runner's optional `key_env` names the variable holding its key (such as
+Laya's own key variable); sc-agent-secrets resolves it, and only on a loopback
+host. Credential variable names live only in sc-agent-secrets (REQ-SAG-0401).
 
 | Key | Default | Bound |
 |---|---|---|

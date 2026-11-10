@@ -145,10 +145,10 @@ fn sources<'a>(
     }
 }
 
-fn repo_with_dotenv(text: &str) -> tempfile::TempDir {
-    let repo = tempfile::tempdir().unwrap();
-    fs::write(repo.path().join(".env"), text).unwrap();
-    repo
+fn repo_with_dotenv(text: &str) -> std::io::Result<tempfile::TempDir> {
+    let repo = tempfile::tempdir()?;
+    fs::write(repo.path().join(".env"), text)?;
+    Ok(repo)
 }
 
 fn assert_found(resolved: &ResolvedKey, expected: &str, source: KeySource) {
@@ -161,7 +161,7 @@ fn assert_found(resolved: &ResolvedKey, expected: &str, source: KeySource) {
 fn every_provider_resolves_env_then_dotenv_then_keyring() {
     for provider in Provider::ALL.iter().copied() {
         let var = env_var(provider);
-        let repo = repo_with_dotenv(&format!("{var}={OTHER}\n"));
+        let repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
         let keyring = MapKeyring::new([(var, "sk-keyring-only")]);
 
         // Env wins over .env and keyring; .env does not override a set variable.
@@ -193,7 +193,7 @@ fn every_provider_resolves_env_then_dotenv_then_keyring() {
 fn no_key_anywhere_is_key_missing_with_recovery() {
     for provider in Provider::ALL.iter().copied() {
         let var = env_var(provider);
-        let repo = repo_with_dotenv("UNRELATED=value\n");
+        let repo = repo_with_dotenv("UNRELATED=value\n").unwrap();
         let keyring = MapKeyring::default();
         let env = MapEnv::default();
         let error = resolve(provider, &sources(&env, Some(repo.path()), &keyring)).unwrap_err();
@@ -236,7 +236,7 @@ fn malformed_key_is_key_malformed_without_key_bytes() {
 #[test]
 fn blank_env_value_skips_dotenv_and_reads_keyring() {
     let var = env_var(Provider::OpenAi);
-    let repo = repo_with_dotenv(&format!("{var}={OTHER}\n"));
+    let repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
     let env = MapEnv::with([(var, "  ")]);
     let keyring = MapKeyring::new([(var, SECRET)]);
     let found = resolve(
@@ -259,7 +259,7 @@ fn blank_env_value_skips_dotenv_and_reads_keyring() {
 #[test]
 fn no_repo_root_reads_no_dotenv() {
     let var = env_var(Provider::TypeSafe);
-    let _repo = repo_with_dotenv(&format!("{var}={OTHER}\n"));
+    let _repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
     let env = MapEnv::default();
     let keyring = MapKeyring::default();
     let error = resolve(Provider::TypeSafe, &sources(&env, None, &keyring)).unwrap_err();
@@ -301,7 +301,7 @@ fn resolve_var_reads_a_configured_variable() {
     assert_found(&found, SECRET, KeySource::Env);
 
     let custom: VarName = "MY_RUNNER_TOKEN".parse().unwrap();
-    let repo = repo_with_dotenv(&format!("MY_RUNNER_TOKEN={OTHER}\n"));
+    let repo = repo_with_dotenv(&format!("MY_RUNNER_TOKEN={OTHER}\n")).unwrap();
     let empty = MapEnv::default();
     let found = resolve_var(&custom, &sources(&empty, Some(repo.path()), &keyring)).unwrap();
     assert_found(&found, OTHER, KeySource::DotEnv);

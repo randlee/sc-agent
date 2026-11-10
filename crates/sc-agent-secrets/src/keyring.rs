@@ -293,7 +293,7 @@ mod tests {
     /// A deadline long enough that only the read finishing ends the wait.
     const LONG: Duration = Duration::from_secs(60);
 
-    /// Waits (by yielding, no sleep) until the gate's stuck mark clears.
+    /// Waits by yielding (never a timed pause) until the stuck mark clears.
     fn wait_until_unstuck(gate: &ReadGate) {
         let mut spins = 0_u64;
         while gate.is_stuck() {
@@ -305,7 +305,7 @@ mod tests {
 
     /// A read that never answers returns a typed error at the
     /// deadline instead of hanging. The blocked reader waits on a channel, so
-    /// the test depends on no sleep: it ends when the test releases the gate.
+    /// the test depends on no timed pause: it ends when the test releases the gate.
     #[test]
     fn a_blocked_keyring_read_times_out_with_a_typed_error() {
         let gate = ReadGate::new();

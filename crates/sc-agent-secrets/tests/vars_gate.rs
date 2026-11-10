@@ -12,12 +12,12 @@ use sc_agent_secrets::ALL_VARS;
 
 /// Every `(file, name)` where `name` from [`ALL_VARS`] appears as `"name"` under `root`,
 /// skipping the `exempt` directory and any `target` directory.
-fn quoted_names(root: &Path, exempt: &Path) -> Vec<(PathBuf, &'static str)> {
+fn quoted_names(root: &Path, exempt: &Path) -> std::io::Result<Vec<(PathBuf, &'static str)>> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
-        for entry in fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
+        for entry in fs::read_dir(&dir)? {
+            let path = entry?.path();
             if path == exempt || path.file_name().is_some_and(|name| name == "target") {
                 continue;
             }
@@ -37,7 +37,7 @@ fn quoted_names(root: &Path, exempt: &Path) -> Vec<(PathBuf, &'static str)> {
         }
     }
     found.sort();
-    found
+    Ok(found)
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn credential_names_are_literals_only_in_sc_agent_secrets() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let crates = manifest.parent().unwrap();
     assert_eq!(crates.file_name().unwrap(), "crates");
-    let found = quoted_names(crates, manifest);
+    let found = quoted_names(crates, manifest).unwrap();
     assert!(
         found.is_empty(),
         "credential variable names outside crates/sc-agent-secrets: {found:?}"
@@ -67,7 +67,7 @@ fn the_gate_finds_a_planted_literal() {
         )
         .unwrap();
         fs::write(other.join("lib.rs"), format!("let v = \"{name}\";")).unwrap();
-        let found = quoted_names(root.path(), &exempt);
+        let found = quoted_names(root.path(), &exempt).unwrap();
         assert_eq!(found, [(other.join("lib.rs"), *name)]);
     }
 }

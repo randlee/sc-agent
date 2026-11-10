@@ -2,7 +2,7 @@
 //!
 //! [`load`] reads `<config_dir>/default.json`, merges an optional
 //! `local.json` and applies `SC_AGENT__*` environment overrides
-//! (`SC_AGENT__MAX_SENDS=2`, `SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000`).
+//! (`SC_AGENT__MAX_SENDS=2`, `SC_AGENT__LOCAL_RUNNERS__<NAME>__PORT=<port>`).
 //! Every value is checked at load (REQ-SAG-0013): a bad value is
 //! [`AgentConfigError::Invalid`] with its key path, such as
 //! `local_runners.laya.host`.

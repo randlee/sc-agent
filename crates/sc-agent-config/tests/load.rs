@@ -24,33 +24,48 @@ fn env(pairs: &[(&str, &str)]) -> Env {
         .collect()
 }
 
-fn dir_with(default_json: &str) -> tempfile::TempDir {
-    let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("default.json"), default_json).unwrap();
-    dir
-}
+/// Fixtures that unwrap or panic on a broken temp dir or an unexpected result.
+///
+/// Clippy treats only `#[test]` functions and `#[cfg(test)]` items as test
+/// code (where clippy.toml allows unwrap and panic); these helpers are test
+/// code, so they live in a `#[cfg(test)]` module.
+#[cfg(test)]
+mod support {
+    use std::fs;
 
-fn load_json(default_json: &str) -> Result<AgentConfig, AgentConfigError> {
-    let dir = dir_with(default_json);
-    load(dir.path().to_path_buf(), Vec::new())
-}
+    use sc_agent_config::{AgentConfig, AgentConfigError, load};
+    use sc_agent_types::ErrorId;
 
-/// Asserts `json` fails as config.invalid at `path`.
-fn assert_invalid(json: &str, path: &str) -> String {
-    match load_json(json) {
-        Err(AgentConfigError::Invalid { path: got, message }) => {
-            assert_eq!(got, path, "{json}: {message}");
-            let error = AgentConfigError::Invalid {
-                path: got,
-                message: message.clone(),
-            };
-            assert_eq!(error.id(), "config.invalid");
-            assert!(error.to_string().contains(path));
-            message
+    pub(crate) fn dir_with(default_json: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("default.json"), default_json).unwrap();
+        dir
+    }
+
+    pub(crate) fn load_json(default_json: &str) -> Result<AgentConfig, AgentConfigError> {
+        let dir = dir_with(default_json);
+        load(dir.path().to_path_buf(), Vec::new())
+    }
+
+    /// Asserts `json` fails as config.invalid at `path`.
+    pub(crate) fn assert_invalid(json: &str, path: &str) -> String {
+        match load_json(json) {
+            Err(AgentConfigError::Invalid { path: got, message }) => {
+                assert_eq!(got, path, "{json}: {message}");
+                let error = AgentConfigError::Invalid {
+                    path: got,
+                    message: message.clone(),
+                };
+                assert_eq!(error.id(), "config.invalid");
+                assert!(error.to_string().contains(path));
+                message
+            }
+            other => panic!("{json}: expected config.invalid at {path}, got {other:?}"),
         }
-        other => panic!("{json}: expected config.invalid at {path}, got {other:?}"),
     }
 }
+
+use support::{assert_invalid, dir_with, load_json};
 
 /// A runner entry with `fields` added to the minimal valid set.
 fn runner(fields: &str) -> String {
@@ -402,7 +417,8 @@ fn every_value_bound_is_checked_at_load_with_its_path() {
     );
     let message = assert_invalid(
         r#"{ "models": { "": { "line": "haiku", "released": "2026-12-01" } } }"#,
-        "models",
+        // The empty key itself ends the path.
+        "models.",
     );
     assert!(message.contains("types.invalid_model_id"), "{message}");
 
