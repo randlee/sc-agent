@@ -22,6 +22,7 @@ sprint:
     - sprint: a-5
       artifact: sc_agent_http::{HttpRequest, HttpResponse, HttpError, LogContext (re-export of sc-agent-log's)} (crates/sc-agent-http/src/request.rs + src/error.rs + lib.rs re-export)
       trigger: dev-push             # starts once a-5 pushed those files right after its copy commit; merges forward before each round; no wait for QA or PR merge
+  # NFR-SAG-0001 (session logging) excluded: this crate writes no session rows.
   requirements: [REQ-SAG-0201, REQ-SAG-0202, REQ-SAG-0006, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0504, REQ-SAG-0901, REQ-SAG-0701, REQ-SAG-0104, REQ-SAG-0014]
   adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
@@ -53,7 +54,7 @@ Not copied: the old Jev question/answer/request/response types (wrong shapes aga
 
 ## 2. Required edits after copying
 
-- src/map.rs: module doc and `use` lines (BTreeSet, fmt, PhantomData, serde de/ser). `try_from_pairs` returns `Result<Self, DecisionError>` with `DuplicateKey { key }`. Remove `keys()` and `is_empty()`. Doc-test path `sc_decision_schema::OrderedMap`.
+- src/map.rs: module doc and `use` lines (BTreeSet, fmt, PhantomData, serde de/ser). `try_from_pairs` returns `Result<Self, DecisionError>` with `DuplicateKey { key }`. Remove `keys()`; keep `is_empty()` (clippy len_without_is_empty; used by needs_images_header) (REQ-QA-003). Doc-test path `sc_decision_schema::OrderedMap`.
 - src/digest.rs: the fragment becomes crate-private `QuestionDigest::of_text(text: &str) -> Result<Self, sc_sha::ShaError>`; the copied `unreachable!()` arm is deleted and replaced by `Err(error) => Err(error)` (no panic path, no `#[allow]`). sc-sha 1.8.0 has one hashing entry, `calculate_hash(HashInput::TextFileBytes { utf8_file_bytes: text.as_bytes() })`, and its one error `ShaError::InvalidUtf8` cannot occur for the bytes of a `&str`; the crate-private `question_digests` maps it to `DecisionError::Encode { message: "sc-sha refused the digest input: <error>" }`, so `DecisionRequest::new` (already fallible) stays total and no public variant or empty-digest state exists for it. Comment: compact serde_json escapes CR inside strings, so sc-sha's CRLF normalisation never alters the digest input.
 
 ## 3. Exact Rust surface (bodies elided)
@@ -269,7 +270,7 @@ pub trait Backend: Send + Sync + fmt::Debug {
 #[serde(try_from = "String", into = "String")]
 pub struct QuestionDigest(String);
 impl QuestionDigest { pub(crate) fn of_text(text: &str) -> Result<Self, sc_sha::ShaError>; pub fn as_str(&self) -> &str; }
-/// Accepts exactly 64 lowercase hex chars (sc_sha::TemplateSha256::from_hex plus a lowercase check);
+/// Accepts exactly 64 lowercase hex chars, checked directly (same result and ShaError::InvalidDigestHex as TemplateSha256::from_hex plus a lowercase check);
 /// else sc_sha::ShaError::InvalidDigestHex.
 impl TryFrom<String> for QuestionDigest { type Error = sc_sha::ShaError; }
 impl From<QuestionDigest> for String {}
@@ -298,7 +299,7 @@ hashed with `QuestionDigest::of_text`. The information is model, state, assets, 
 #[non_exhaustive]
 pub enum DecisionError {
     /// Request text is not a SystemOneRequest. `path` = the serde_path_to_error field path (e.g.
-    /// `questions.q1`, `.` at the root); `message` = the full serde_json message with line/column
+    /// `questions.q1`; a missing root field gives `.`, an unknown root field gives its own name); `message` = the full serde_json message with line/column
     /// (e.g. "missing field `criteria`").
     RequestParse { path: String, message: String },                    // "decision.request_parse"
     /// A body of HTTP `status` is not the expected SystemOneResponse | ModelMetadataList.
@@ -366,12 +367,12 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - `cargo clippy -p sc-decision-schema --all-targets -- -D warnings` with the workspace lints (a-1's `[workspace.lints]` and clippy.toml disallowed-methods)
 - `cargo test -p sc-decision-schema`
 - `cargo tree -p sc-decision-schema -e normal`: sc-agent crates are only sc-agent-types and sc-agent-http (plus their own); no tokio, no sc-decision-* backend, no sc-llm-provider, no sc-decision-runner
-- `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n 'sha2|Sha256::' crates/` (workspace) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
+- `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n '\bsha2\b|Sha256::' crates/` (word-bounded: the digest-input key `sha256` is not a match) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
 
 ## Acceptance criteria
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-2.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
-- [ ] REQ-SAG-0201 AC1: every request and response example in the TypeSafe API docs/openapi.json, for noul, choice, score and box (plus assets, ModelMetadataList, 400 and 422 bodies), round-trips byte-identical through sc-decision-schema types.
+- [ ] REQ-SAG-0201 AC1: every request and response example in the TypeSafe API docs/openapi.json, for noul, choice, score and box (plus assets, ModelMetadataList, 400 and 422 bodies), round-trips byte-identical through sc-decision-schema types, in the document's own top-level key order (docs-order examples are fixtures verbatim; examples built from alphabetised schema property examples are written in schema order and say so).
 - [ ] REQ-SAG-0504 support: sc-decision-schema's SystemOneRequest::from_json failures are decision.request_parse with the field path and the full serde message (test: score without criteria).
 - [ ] REQ-SAG-0201 AC2: no crate other than sc-decision-schema defines a type that maps to a Jev API field.
 - [ ] ANC-001: sc-decision-schema holds only the code needed to send and receive the decision API and nothing else (no HTTP client or transport, retries, cache, logging, report formatting or CLI code), with no exception; a test lists every public item of sc-decision-schema and fails on any item outside the TypeSafe request, response, answer and error types, the Backend and Decision traits (with DecisionRequest and its constructor/accessors, MAX_IMAGES/MAX_IMAGE_BYTES, and DecisionResult), the question digest and DecisionError; every TypeSafe documentation example for POST /v1/systemone and GET /v1/models round-trips through these types.
@@ -397,3 +398,5 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7):
 No open questions.
 Hardening round 1 (2026-11-09, decisions.md): PLAN-CRIT-001 decide_stream takes a 'static boxed iterator; PLAN-CRIT-002 Decision doc states the in-flight cancel contract; PLAN-CRIT-014 DecisionRequest::validate + DecisionError::ImageParts (14 variants); PLAN-CRIT-010 follow-up: no test double in sc-decision-schema (ANC-001 keeps it to types and traits); the scripted test backend is private to a-9 (crates/sc-decision-runner/tests/support/).
 Round 2 (2026-11-09, round2.md): RBP-F002 DecisionRequest private + new() (TryFrom<SystemOneRequest>, not From, since From cannot refuse a body whose asset names a part; validate removed); RBP-F008 sc-sha 1.8.0 calculate_hash fails only on InvalidUtf8, impossible for &str -> of_text infallible, decision.digest dropped, digests computed in new() so DecisionResult.digests is never empty; RBP-F012 QuestionDigest validating Deserialize; REQ-SAG-0014 image limits -> decision.limits; RBP-F001 cause_detail; RBP-F005 recovery for request_parse; RBP-F013 Display id: message; RBP-F014 open traits; RBP-F017 AsRef<str>; REQ-QA-006 REQ-SAG-0104/0701; ARCH-005 ADR-SAG-0002.
+- QA-1 (2026-11-10): ModelMetadata.release_date stays a String (wire field). sc-agent-types::ReleaseDate is a generic ordering key, not a Jev API type, so REQ-SAG-0201 AC2 holds (REQ-QA-010).
+- QA-1 fix round decisions: count inline image assets toward REQ-SAG-0014 limits; LimitKind enum; non_exhaustive wire enums; DecisionResult/ImagePart constructors; Asset.kind optional (openapi v0.2.0); Box confidence required-nullable; refuse duplicate part names and a part named `request`; long_context stays a bool (owner signature).- QA-1 fix round surface (code at cd155c3): SystemOneRequest::new(model, state, questions, assets), SystemOneResponse::new(model, answers, usage, extra), ModelMetadataList::new(models) (each carries a private key-order field, so outside struct literals no longer compile); DecisionResult::new(session_id, position, digests, outcome); ImagePart::new(name, format, bytes); LimitKind { Images, ImageBytes }; from_json keeps the document's key order (src/key_order.rs); plain Deserialize does not; PartialEq ignores key order.

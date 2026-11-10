@@ -65,8 +65,8 @@ pub enum DecisionError {
     },
     /// `DecisionRequest::new`: a REQ-SAG-0014 limit exceeded.
     Limits {
-        /// `"images"` (part count) or `"image_bytes"` (bytes of one part).
-        what: &'static str,
+        /// Which limit.
+        what: LimitKind,
         /// The limit.
         max: u64,
     },
@@ -214,9 +214,59 @@ impl ErrorId for DecisionError {
             Self::RequestParse { .. } => Some(
                 "fix the field named in `path` (see the TypeSafe API docs for its shape) and send again",
             ),
+            Self::DuplicateKey { .. } => Some("give every key of the object once"),
+            Self::Encode { .. } => Some(
+                "report this as a bug: a parsed request or reply always serialises; check values set in code",
+            ),
+            Self::ImageParts { .. } => Some(
+                "give every image part a distinct name other than `request`, named by exactly one asset's `part`",
+            ),
+            Self::Limits { .. } => Some(
+                "send at most 20 images per request, each at most 20 MiB; split larger work across requests",
+            ),
+            Self::ApiBadRequest { .. } => Some(
+                "fix the request as the API's `detail` says (see the TypeSafe API docs) and send again",
+            ),
+            Self::ApiValidation { .. } => {
+                Some("fix each field named in `loc` as its `msg` says and send again")
+            }
+            Self::SchemaMismatch { .. } => Some(
+                "the provider kept replying outside the schema; try another model or backend, or raise max_sends",
+            ),
+            Self::Shutdown { .. } => Some("start a new decision runner and send the request again"),
             Self::Http(error) => error.recovery(),
-            _ => None,
+            Self::ResponseParse { .. }
+            | Self::ApiStatus { .. }
+            | Self::Backend { .. }
+            | Self::Cancelled { .. } => None,
         }
+    }
+}
+
+/// Which REQ-SAG-0014 limit a [`DecisionError::Limits`] names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The number of images in one request ([`MAX_IMAGES`](crate::MAX_IMAGES)).
+    Images,
+    /// The bytes of one image ([`MAX_IMAGE_BYTES`](crate::MAX_IMAGE_BYTES)).
+    ImageBytes,
+}
+
+impl LimitKind {
+    /// The limit's name: `"images"` or `"image_bytes"`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Images => "images",
+            Self::ImageBytes => "image_bytes",
+        }
+    }
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
