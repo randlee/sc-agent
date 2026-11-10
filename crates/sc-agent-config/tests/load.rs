@@ -395,13 +395,14 @@ fn config_errors_follow_the_error_contract() {
         assert!(std::error::Error::source(error).is_none());
     }
     // Every variant says what to do next, and the advice fits the failure.
-    let expected = [
-        ["HOME", "USERPROFILE on Windows", "config_dir"],
-        ["1 MiB", "shrink", "config file"],
-        ["rename", "runner", "rename the runner"],
-        ["fix the value", "SC_AGENT__", "local.json"],
-        ["loopback", "key_env", "remove"],
+    let expected: [&[&str]; 5] = [
+        &["HOME", "USERPROFILE on Windows", "log_root", "config_dir"],
+        &["1 MiB", "shrink", "config file"],
+        &["rename the runner"],
+        &["fix the value", "SC_AGENT__", "default.json", "local.json"],
+        &["loopback", "key_env", "remove"],
     ];
+    assert_eq!(expected.len(), others.len(), "one row per variant");
     for (error, words) in others.iter().zip(expected) {
         let recovery = error.recovery().unwrap_or_default();
         for word in words {
