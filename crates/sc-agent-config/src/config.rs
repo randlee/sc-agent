@@ -1,7 +1,10 @@
 //! Configuration types, bounds and [`load`].
 
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::fmt;
+use std::marker::PhantomData;
 use std::net::IpAddr;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroUsize};
 use std::ops::RangeInclusive;
@@ -10,8 +13,9 @@ use std::time::Duration;
 
 use sc_agent_types::{Catalog, ModelId, ReleaseDate, ShortName, VarName};
 use sc_config::{AppName, ConfigError, Loader};
-use serde::de::Error as _;
+use serde::de::{Error as _, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
+use serde_path_to_error::Segment;
 
 use crate::error::AgentConfigError;
 
@@ -35,6 +39,18 @@ pub const MAX_WORKERS: usize = 64;
 /// The 90 s resend budget makes more sends pointless.
 pub const MAX_MAX_SENDS: u32 = 10;
 
+/// Most `models` entries a config may hold: 64 (REQ-SAG-0013).
+pub const MAX_MODELS: usize = 64;
+
+/// Most `local_runners` entries a config may hold: 64 (REQ-SAG-0013).
+pub const MAX_LOCAL_RUNNERS: usize = 64;
+
+/// Largest `default.json` or `local.json` read: 1 MiB.
+///
+/// sc-config 0.2.0 reads each file whole (`std::fs::read`, no limit), so
+/// [`load`] checks the size first. A real config is a few kilobytes.
+pub const MAX_CONFIG_FILE_BYTES: u64 = 1024 * 1024;
+
 /// A local runner's request timeout when `request_timeout_secs` is absent (REQ-SAG-0015).
 pub const DEFAULT_RUNNER_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -55,8 +71,8 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct AgentConfig {
-    /// Extra catalog rows keyed by model id (REQ-SAG-0102).
-    #[serde(default)]
+    /// Extra catalog rows keyed by model id, at most [`MAX_MODELS`] (REQ-SAG-0102).
+    #[serde(default, deserialize_with = "models_in_bounds")]
     pub models: BTreeMap<ModelId, ExtraModel>,
     /// The log root; absent means [`default_dir`] (REQ-SAG-0003, REQ-SAG-0005).
     #[serde(default)]
@@ -70,9 +86,9 @@ pub struct AgentConfig {
         deserialize_with = "max_sends_in_bounds"
     )]
     pub max_sends: NonZeroU32,
-    /// Local decision runners keyed by runner name (REQ-SAG-0801).
-    #[serde(default)]
-    pub local_runners: BTreeMap<String, LocalRunner>,
+    /// Local decision runners keyed by runner name, at most [`MAX_LOCAL_RUNNERS`] (REQ-SAG-0801).
+    #[serde(default, deserialize_with = "runners_in_bounds")]
+    pub local_runners: BTreeMap<RunnerName, LocalRunner>,
 }
 
 impl Default for AgentConfig {
@@ -128,6 +144,63 @@ pub struct ExtraModel {
     pub line: ShortName,
     /// The release date; the newest model of a line is its latest.
     pub released: ReleaseDate,
+}
+
+/// Why [`RunnerName::try_from`] refuses a built-in short name; [`load`] maps it to `config.runner_name`.
+const RUNNER_NAME_IS_SHORT_NAME: &str = "runner name must not be a built-in short name";
+
+/// A local runner's name: the `local_runners` key (REQ-SAG-0801).
+///
+/// Non-empty and not a built-in short name (ASCII case-insensitive), so
+/// `decide` can tell a runner from a model line by name. A short name is
+/// refused while the config is deserialized; [`load`] reports it as
+/// [`AgentConfigError::RunnerName`] with the key path.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
+#[serde(try_from = "String")]
+pub struct RunnerName(String);
+
+impl RunnerName {
+    /// Returns the name.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for RunnerName {
+    type Error = &'static str;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        if text.is_empty() {
+            return Err("runner name must not be empty");
+        }
+        if ShortName::ALL
+            .iter()
+            .any(|short| short.as_str().eq_ignore_ascii_case(&text))
+        {
+            return Err(RUNNER_NAME_IS_SHORT_NAME);
+        }
+        Ok(Self(text))
+    }
+}
+
+impl AsRef<str> for RunnerName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Derived `Ord`/`Eq` on the inner `String` agree with `str`, so maps can be searched by `&str`.
+impl Borrow<str> for RunnerName {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for RunnerName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
 }
 
 /// One local decision runner (REQ-SAG-0801); its name is the map key.
@@ -250,6 +323,58 @@ fn is_hostname(text: &str) -> bool {
         })
 }
 
+fn models_in_bounds<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<ModelId, ExtraModel>, D::Error> {
+    deserializer.deserialize_map(BoundedMap::new("models", MAX_MODELS))
+}
+
+fn runners_in_bounds<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<RunnerName, LocalRunner>, D::Error> {
+    deserializer.deserialize_map(BoundedMap::new("local_runners", MAX_LOCAL_RUNNERS))
+}
+
+/// Reads a JSON object into a map, refusing it before the entry after `limit`.
+struct BoundedMap<K, V> {
+    key: &'static str,
+    limit: usize,
+    entries: PhantomData<fn() -> (K, V)>,
+}
+
+impl<K, V> BoundedMap<K, V> {
+    const fn new(key: &'static str, limit: usize) -> Self {
+        Self {
+            key,
+            limit,
+            entries: PhantomData,
+        }
+    }
+}
+
+impl<'de, K: Deserialize<'de> + Ord, V: Deserialize<'de>> Visitor<'de> for BoundedMap<K, V> {
+    type Value = BTreeMap<K, V>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "an object of at most {} entries", self.limit)
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
+        let mut map = BTreeMap::new();
+        while let Some(key) = access.next_key::<K>()? {
+            if map.len() >= self.limit {
+                return Err(A::Error::custom(format!(
+                    "{} must have at most {} entries",
+                    self.key, self.limit
+                )));
+            }
+            let value = access.next_value::<V>()?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+}
+
 const fn default_workers() -> NonZeroUsize {
     DEFAULT_WORKERS
 }
@@ -335,16 +460,20 @@ pub fn default_dir() -> Result<PathBuf, AgentConfigError> {
 ///
 /// With no `default.json` the result is [`AgentConfig::default`], unless an
 /// `SC_AGENT__` variable is set or a `local.json` exists: then the missing
-/// file is an error, so an override is never silently ignored.
+/// file is an error, so an override is never silently ignored (the
+/// `local.json` case is an accepted decision, bead agt-4p2.4 notes).
 ///
 /// # Errors
 ///
+/// - [`AgentConfigError::FileTooLarge`] when `default.json` or `local.json`
+///   is larger than [`MAX_CONFIG_FILE_BYTES`] (checked before reading).
 /// - [`AgentConfigError::Load`] when sc-config fails (unreadable file, bad
 ///   JSON, an override it cannot apply, or a missing `default.json` with an
 ///   override present).
 /// - [`AgentConfigError::Invalid`] when a value fails its type or bound,
-///   including unknown keys; `path` names the key, such as `workers` or
-///   `local_runners.laya.host`.
+///   including unknown keys and more than [`MAX_MODELS`] models or
+///   [`MAX_LOCAL_RUNNERS`] runners; `path` names the key, such as `workers`
+///   or `local_runners.laya.host`.
 /// - [`AgentConfigError::RunnerName`] when a runner is named like a short name.
 /// - [`AgentConfigError::KeyOnPlainHttp`] when a runner with `key_env` has a
 ///   host that is not loopback.
@@ -359,6 +488,9 @@ pub fn load(
         .any(|(name, _)| name.as_encoded_bytes().starts_with(prefix.as_bytes()));
     // An unreadable directory counts as "local.json may exist": the error is kept.
     let has_local = config_dir.join("local.json").try_exists().unwrap_or(true);
+    for file in ["default.json", "local.json"] {
+        check_file_size(&config_dir.join(file))?;
+    }
     let value = match Loader::new(app, config_dir, environment).load::<serde_json::Value>() {
         Ok(value) => value,
         Err(ConfigError::MissingDefault { .. }) if !has_override && !has_local => {
@@ -366,27 +498,45 @@ pub fn load(
         }
         Err(error) => return Err(error.into()),
     };
-    let config: AgentConfig =
-        serde_path_to_error::deserialize(value).map_err(|error| AgentConfigError::Invalid {
-            path: error.path().to_string(),
-            message: error.into_inner().to_string(),
-        })?;
+    let config: AgentConfig = serde_path_to_error::deserialize(value).map_err(invalid)?;
     check_runners(&config)?;
     Ok(config)
 }
 
-/// The runner checks serde cannot express.
+/// Refuses a config file over [`MAX_CONFIG_FILE_BYTES`]; a missing or unreadable one is sc-config's to report.
+fn check_file_size(path: &std::path::Path) -> Result<(), AgentConfigError> {
+    match std::fs::metadata(path) {
+        Ok(metadata) if metadata.len() > MAX_CONFIG_FILE_BYTES => {
+            Err(AgentConfigError::FileTooLarge {
+                file: path.to_path_buf(),
+                bytes: metadata.len(),
+            })
+        }
+        Ok(_) | Err(_) => Ok(()),
+    }
+}
+
+/// Maps a deserialization failure to `config.invalid`, or `config.runner_name` for a short-name runner key.
+fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigError {
+    let path = error.path().to_string();
+    let message = error.inner().to_string();
+    if message == RUNNER_NAME_IS_SHORT_NAME {
+        let segments: Vec<&Segment> = error.path().iter().collect();
+        if let [Segment::Map { key: field }, Segment::Map { key: name }] = segments.as_slice()
+            && field == "local_runners"
+        {
+            return AgentConfigError::RunnerName {
+                name: name.clone(),
+                path,
+            };
+        }
+    }
+    AgentConfigError::Invalid { path, message }
+}
+
+/// The runner check serde cannot express: no key over plain http off the machine.
 fn check_runners(config: &AgentConfig) -> Result<(), AgentConfigError> {
     for (name, runner) in &config.local_runners {
-        if ShortName::ALL
-            .iter()
-            .any(|short| short.as_str().eq_ignore_ascii_case(name))
-        {
-            return Err(AgentConfigError::RunnerName {
-                name: name.clone(),
-                path: format!("local_runners.{name}"),
-            });
-        }
         if runner.key_env.is_some() && !runner.host.is_loopback() {
             return Err(AgentConfigError::KeyOnPlainHttp {
                 path: format!("local_runners.{name}.key_env"),

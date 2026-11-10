@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use sc_agent_config::{
     AgentConfig, AgentConfigError, DEFAULT_MAX_SENDS, DEFAULT_RUNNER_LOAD_TIMEOUT,
-    DEFAULT_RUNNER_REQUEST_TIMEOUT, DEFAULT_WORKERS, MAX_MAX_SENDS, MAX_WORKERS, RunnerKind,
-    default_dir, load,
+    DEFAULT_RUNNER_REQUEST_TIMEOUT, DEFAULT_WORKERS, MAX_CONFIG_FILE_BYTES, MAX_LOCAL_RUNNERS,
+    MAX_MAX_SENDS, MAX_MODELS, MAX_WORKERS, RunnerKind, RunnerName, default_dir, load,
 };
 use sc_agent_types::{ErrorId, ModelChoice, ShortName};
 
@@ -228,7 +228,11 @@ fn local_runners_load_by_name_from_the_file() {
         runner(r#""key_env": "MY_RUNNER_TOKEN""#)
     );
     let config = load_json(&json).unwrap();
-    let names: Vec<&str> = config.local_runners.keys().map(String::as_str).collect();
+    let names: Vec<&str> = config
+        .local_runners
+        .keys()
+        .map(RunnerName::as_str)
+        .collect();
     assert_eq!(names, ["box", "gen", "laya", "mapi"]);
 
     let laya = config.local_runners.get("laya").unwrap();
@@ -336,6 +340,11 @@ fn config_errors_follow_the_error_contract() {
     );
     assert!(std::error::Error::source(&error).is_some());
     assert_eq!(error.detail().cause.as_deref(), Some(&cause));
+    let recovery = error.recovery().unwrap();
+    assert!(
+        recovery.contains("JSON"),
+        "sc-config's advice for CFG.PARSE: {recovery}"
+    );
 
     // claude-haiku-5-5 is a built-in haiku; putting it on the sonnet line conflicts.
     let config = load_json(
@@ -347,9 +356,15 @@ fn config_errors_follow_the_error_contract() {
     assert_display_is_id_and_message(&error);
     assert_eq!(error.cause_detail().unwrap().id, "types.model_on_two_lines");
     assert!(std::error::Error::source(&error).is_some());
+    let recovery = error.recovery().unwrap();
+    assert!(recovery.contains("different id"), "{recovery}");
 
     let others = [
         AgentConfigError::HomeUnknown,
+        AgentConfigError::FileTooLarge {
+            file: PathBuf::from("/cfg/default.json"),
+            bytes: 2_000_000,
+        },
         AgentConfigError::RunnerName {
             name: "haiku".to_owned(),
             path: "local_runners.haiku".to_owned(),
@@ -368,6 +383,7 @@ fn config_errors_follow_the_error_contract() {
         ids,
         [
             "config.home_unknown",
+            "config.file_too_large",
             "config.runner_name",
             "config.invalid",
             "config.key_on_plain_http",
@@ -378,10 +394,86 @@ fn config_errors_follow_the_error_contract() {
         assert!(error.cause_detail().is_none());
         assert!(std::error::Error::source(error).is_none());
     }
-    assert!(others.first().unwrap().recovery().is_none());
-    for error in others.iter().skip(1) {
-        assert!(error.recovery().is_some_and(|text| !text.is_empty()));
+    // Every variant says what to do next, and the advice fits the failure.
+    let expected = [
+        ["HOME", "log_root", "config_dir"],
+        ["1 MiB", "shrink", "config file"],
+        ["rename", "runner", "rename the runner"],
+        ["fix the value", "SC_AGENT__", "local.json"],
+        ["loopback", "key_env", "remove"],
+    ];
+    for (error, words) in others.iter().zip(expected) {
+        let recovery = error.recovery().unwrap_or_default();
+        for word in words {
+            assert!(recovery.contains(word), "{}: {recovery}", error.id());
+        }
+        assert_eq!(error.detail().recovery.as_deref(), Some(recovery));
     }
+}
+
+/// REQ-SAG-0013: at most 64 models and 64 runners; one more is config.invalid at the map.
+#[test]
+fn models_and_runners_are_capped_at_64_entries() {
+    assert_eq!((MAX_MODELS, MAX_LOCAL_RUNNERS), (64, 64));
+    let models = |count: usize| {
+        let entries: Vec<String> = (0..count)
+            .map(|index| {
+                format!(r#""extra-{index}": {{ "line": "haiku", "released": "2001-01-01" }}"#)
+            })
+            .collect();
+        format!(r#"{{ "models": {{ {} }} }}"#, entries.join(", "))
+    };
+    assert_eq!(load_json(&models(64)).unwrap().models.len(), 64);
+    let message = assert_invalid(&models(65), "models");
+    assert!(message.contains("at most 64"), "{message}");
+
+    let runners = |count: usize| {
+        let entries: Vec<String> = (0..count)
+            .map(|index| format!(r#""runner-{index}": {}"#, runner("")))
+            .collect();
+        format!(r#"{{ "local_runners": {{ {} }} }}"#, entries.join(", "))
+    };
+    assert_eq!(load_json(&runners(64)).unwrap().local_runners.len(), 64);
+    let message = assert_invalid(&runners(65), "local_runners");
+    assert!(message.contains("at most 64"), "{message}");
+}
+
+/// A config file over 1 MiB is refused before sc-config reads it; exactly 1 MiB loads.
+#[test]
+fn an_oversized_config_file_is_refused_before_reading() {
+    let limit = usize::try_from(MAX_CONFIG_FILE_BYTES).unwrap();
+    let padded = |len: usize| format!("{{}}{}", " ".repeat(len - 2));
+    for file in ["default.json", "local.json"] {
+        let dir = dir_with("{}");
+        fs::write(dir.path().join(file), padded(limit + 1)).unwrap();
+        let error = load(dir.path().to_path_buf(), Vec::new()).unwrap_err();
+        assert_eq!(error.id(), "config.file_too_large", "{file}");
+        let AgentConfigError::FileTooLarge { file: got, bytes } = &error else {
+            unreachable!("checked by id")
+        };
+        assert_eq!(got, &dir.path().join(file));
+        assert_eq!(*bytes, MAX_CONFIG_FILE_BYTES + 1);
+
+        fs::write(dir.path().join(file), padded(limit)).unwrap();
+        assert_eq!(
+            load(dir.path().to_path_buf(), Vec::new()).unwrap(),
+            AgentConfig::default()
+        );
+    }
+}
+
+/// RunnerName refuses an empty name and a short name; other names round-trip.
+#[test]
+fn runner_name_validates_at_deserialization() {
+    assert_eq!(
+        RunnerName::try_from("laya".to_owned()).unwrap().as_str(),
+        "laya"
+    );
+    assert!(RunnerName::try_from("Sonnet".to_owned()).is_err());
+    assert!(RunnerName::try_from(String::new()).is_err());
+    let json = format!(r#"{{ "local_runners": {{ "": {} }} }}"#, runner(""));
+    let message = assert_invalid(&json, "local_runners.");
+    assert!(message.contains("must not be empty"), "{message}");
 }
 
 fn assert_display_is_id_and_message(error: &AgentConfigError) {

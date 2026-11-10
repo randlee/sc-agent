@@ -1,6 +1,7 @@
 //! The error type of sc-agent-config.
 
 use std::fmt;
+use std::path::PathBuf;
 
 use sc_agent_types::{ErrorDetail, ErrorId, TypesError};
 
@@ -18,6 +19,13 @@ pub enum AgentConfigError {
     Catalog(TypesError),
     /// There is no home directory, so `~/.sc-agent` cannot be located.
     HomeUnknown,
+    /// `default.json` or `local.json` is larger than `MAX_CONFIG_FILE_BYTES` (1 MiB).
+    FileTooLarge {
+        /// The file.
+        file: PathBuf,
+        /// Its size in bytes.
+        bytes: u64,
+    },
     /// A local runner is named like a built-in short name.
     RunnerName {
         /// The runner name.
@@ -47,6 +55,7 @@ impl ErrorId for AgentConfigError {
             Self::Load(_) => "config.load",
             Self::Catalog(_) => "config.catalog",
             Self::HomeUnknown => "config.home_unknown",
+            Self::FileTooLarge { .. } => "config.file_too_large",
             Self::RunnerName { .. } => "config.runner_name",
             Self::Invalid { .. } => "config.invalid",
             Self::KeyOnPlainHttp { .. } => "config.key_on_plain_http",
@@ -60,6 +69,10 @@ impl ErrorId for AgentConfigError {
             Self::HomeUnknown => {
                 "no home directory is known, so ~/.sc-agent cannot be located".to_owned()
             }
+            Self::FileTooLarge { file, bytes } => format!(
+                "{} is {bytes} bytes, more than the 1 MiB a config file may have",
+                file.display()
+            ),
             Self::RunnerName { name, path } => {
                 format!("{path}: local runner `{name}` is named like a built-in short name")
             }
@@ -75,6 +88,7 @@ impl ErrorId for AgentConfigError {
             Self::Load(inner) => Some(ErrorDetail::foreign(inner.code(), inner)),
             Self::Catalog(inner) => Some(inner.detail()),
             Self::HomeUnknown
+            | Self::FileTooLarge { .. }
             | Self::RunnerName { .. }
             | Self::Invalid { .. }
             | Self::KeyOnPlainHttp { .. } => None,
@@ -88,7 +102,17 @@ impl ErrorId for AgentConfigError {
             ),
             Self::KeyOnPlainHttp { .. } => Some("use a loopback host or remove key_env"),
             Self::RunnerName { .. } => Some("rename the runner"),
-            Self::Load(_) | Self::Catalog(_) | Self::HomeUnknown => None,
+            // sc-config's own advice for its error code (files, JSON, overrides).
+            Self::Load(inner) => Some(inner.recovery()),
+            Self::Catalog(inner) => Some(inner.recovery().unwrap_or(
+                "keep the model under the line its id already has, or choose a different id",
+            )),
+            Self::HomeUnknown => Some(
+                "set HOME, or set log_root in the config and pass an explicit config_dir to load",
+            ),
+            Self::FileTooLarge { .. } => {
+                Some("shrink the config file below 1 MiB; a real config is a few kilobytes")
+            }
         }
     }
 }
@@ -105,6 +129,7 @@ impl std::error::Error for AgentConfigError {
             Self::Load(inner) => Some(inner),
             Self::Catalog(inner) => Some(inner),
             Self::HomeUnknown
+            | Self::FileTooLarge { .. }
             | Self::RunnerName { .. }
             | Self::Invalid { .. }
             | Self::KeyOnPlainHttp { .. } => None,
