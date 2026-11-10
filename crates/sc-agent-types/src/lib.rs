@@ -6,7 +6,7 @@
 //!   and how a caller picks a model ([`ModelChoice`]);
 //! - the providers that serve models ([`Provider`]), separate from model ids (REQ-SAG-0103);
 //! - session ids ([`SessionId`], a ULID) and environment-variable names ([`VarName`]);
-//! - cooperative cancellation without sleeping ([`CancelToken`]);
+//! - cooperative cancellation with deadline waits and wake hooks ([`CancelToken`]);
 //! - the one error convention of the workspace ([`ErrorId`], [`ErrorDetail`]).
 //!
 //! It does no I/O, reads no files and depends on no runtime: only `serde` and `ulid`.

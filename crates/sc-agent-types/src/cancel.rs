@@ -1,7 +1,7 @@
 //! Cooperative cancellation: [`CancelToken`], its waits and its wake hooks.
 //!
 //! Std-only and runtime-free: a holdoff waits on a condition variable with a deadline and
-//! wakes at once on cancel; nothing sleeps.
+//! wakes at once on cancel; nothing blocks on a fixed delay.
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -96,7 +96,7 @@ impl CancelToken {
     /// Blocks until the token is cancelled or `deadline` passes, whichever is first.
     ///
     /// Returns [`Wait::Cancelled`] at once if the token is already cancelled. This waits on a
-    /// condition variable; it does not sleep or poll.
+    /// condition variable; it does not poll.
     #[must_use]
     pub fn wait_until(&self, deadline: Instant) -> Wait {
         let mut state = self.0.lock();
