@@ -9,7 +9,7 @@ use sc_agent_types::ModelId;
 use sc_decision_systemone::BaseUrl;
 use serde::de::DeserializeOwned;
 
-use crate::error::LocalError;
+use crate::error::{LocalError, ParseCause};
 use crate::{Generic, Laya, Mapika, Strands};
 
 pub(crate) mod sealed {
@@ -38,8 +38,9 @@ pub trait LocalDaemon: sealed::Sealed + Send + Sync + fmt::Debug {
 
     /// What the probe reply says about the daemon and the configured `model`.
     ///
-    /// A [`LocalError::ProbeStatus`] from here carries the body as received; the key is
-    /// redacted from it by [`LocalBackend::discover`](crate::LocalBackend::discover) and
+    /// The result carries reply text as received (bodies, parse messages, model names); the
+    /// key is redacted from all of it by
+    /// [`LocalBackend::discover`](crate::LocalBackend::discover) and
     /// [`LocalBackend::wait_until_loaded`](crate::LocalBackend::wait_until_loaded), which know
     /// it. A caller using this method directly redacts it itself.
     ///
@@ -177,10 +178,10 @@ pub(crate) fn parse<T: DeserializeOwned>(
     path: &'static str,
     response: &HttpResponse,
 ) -> Result<T, LocalError> {
-    serde_json::from_slice(response.body()).map_err(|source| LocalError::ProbeParse {
+    serde_json::from_slice(response.body()).map_err(|error| LocalError::ProbeParse {
         daemon,
         path,
-        source,
+        source: ParseCause::Json(error),
     })
 }
 

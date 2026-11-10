@@ -19,7 +19,7 @@ mod tests {
     use sc_agent_http::{HttpError, LogContext, Method, NetworkKind};
     use sc_agent_types::ErrorId;
     use sc_decision_local::{
-        Availability, DaemonKind, LocalBackend, LocalError, LocalTimeouts, ModelState,
+        Availability, DaemonKind, LocalBackend, LocalError, LocalTimeouts, ModelState, ParseCause,
     };
     use sc_decision_schema::{Backend, DecisionError};
     use sc_decision_systemone::SystemOneBackend;
@@ -279,6 +279,94 @@ mod tests {
         assert!(matches!(result, Err(LocalError::ProbeStatus { ref body, .. }) if *body == bytes));
     }
 
+    /// REQ-SAG-0401: a health field that echoes the attached key reaches no error text; the
+    /// ProbeParse cause keeps its id and the redacted serde_json message (REQ-SAG-0002).
+    #[test]
+    fn test_probe_parse_cause_redacts_attached_key() {
+        let echo = format!(r#"{{"status":"ok","loaded":"{SECRET}"}}"#);
+        let (result, _) = discover(DaemonKind::Laya, Some(key()), Ok(json(200, &echo)));
+        let error = result.expect_err("loaded is not a list");
+        assert!(matches!(
+            error,
+            LocalError::ProbeParse {
+                source: ParseCause::Redacted(_),
+                ..
+            }
+        ));
+        let cause = error.detail().cause.expect("cause");
+        assert_eq!(cause.id, "serde_json.data");
+        assert!(
+            cause
+                .message
+                .contains("invalid type: string \"[redacted]\""),
+            "{}",
+            cause.message
+        );
+        let source = std::error::Error::source(&error).expect("source");
+        let mut texts = vec![
+            error.to_string(),
+            format!("{error:?}"),
+            format!("{:?}", error.detail()),
+            source.to_string(),
+        ];
+        texts.push(format!("{source:?}"));
+        for text in texts {
+            assert!(!text.contains(SECRET), "{text}");
+        }
+
+        // A generic daemon's model list goes through the same rule.
+        let models = format!(r#"{{"models":"{SECRET}"}}"#);
+        let (result, _) = discover(DaemonKind::Generic, Some(key()), Ok(json(200, &models)));
+        let error = result.expect_err("models is not a list");
+        assert_eq!(error.id(), "local.decision");
+        let text = format!("{error:?} {:?}", error.detail());
+        assert!(!text.contains(SECRET), "{text}");
+        assert!(text.contains("[redacted]"), "{text}");
+
+        // Loaded and served names echoed back are redacted too (they reach log records).
+        let loaded = format!(r#"{{"status":"ok","loaded":["{SECRET}"]}}"#);
+        let (result, _) = discover(DaemonKind::Laya, Some(key()), Ok(json(200, &loaded)));
+        assert_eq!(result.expect("up").loaded, vec!["[redacted]".to_owned()]);
+        let served =
+            format!(r#"{{"models":[{{"name":"{SECRET}","description":"d","release_date":"r"}}]}}"#);
+        let (result, _) = discover(DaemonKind::Generic, Some(key()), Ok(json(200, &served)));
+        assert!(matches!(
+            result,
+            Err(LocalError::ModelNotServed { ref served, .. }) if *served == vec!["[redacted]".to_owned()]
+        ));
+    }
+
+    /// Without an attached key the ProbeParse cause is the serde_json error, unchanged.
+    #[test]
+    fn test_probe_parse_keeps_raw_source_without_key() {
+        // Strands Decider has no auth: a configured key is not attached.
+        let (result, transport) = discover(DaemonKind::Strands, Some(key()), Ok(json(200, "{")));
+        assert!(
+            transport
+                .requests()
+                .pop()
+                .expect("probe")
+                .secret()
+                .is_none()
+        );
+        let error = result.expect_err("parse");
+        let LocalError::ProbeParse {
+            source: ParseCause::Json(ref lower),
+            ..
+        } = error
+        else {
+            panic!("expected the raw serde_json source, got {error:?}");
+        };
+        assert_eq!(
+            error.detail().cause.map(|cause| cause.message),
+            Some(lower.to_string())
+        );
+        assert!(
+            std::error::Error::source(&error)
+                .is_some_and(|source| source.downcast_ref::<serde_json::Error>().is_some())
+        );
+    }
+
     /// AC 7, AC 14: a daemon that is not listening is local.http with cause http.network and
     /// the lower message unchanged.
     #[test]
@@ -347,7 +435,9 @@ mod tests {
             LocalError::ProbeParse {
                 daemon: DaemonKind::Strands,
                 path: "/health",
-                source: serde_json::from_str::<serde_json::Value>("{").expect_err("eof"),
+                source: ParseCause::Json(
+                    serde_json::from_str::<serde_json::Value>("{").expect_err("eof"),
+                ),
             },
             LocalError::ModelNotServed {
                 daemon: DaemonKind::Mapika,

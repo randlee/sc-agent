@@ -16,7 +16,7 @@ use sc_decision_systemone::{BaseUrl, SystemOneBackend};
 use serde_json::{Map, Value};
 
 use crate::daemon::{Availability, DaemonKind, LocalDaemon, ModelState};
-use crate::error::LocalError;
+use crate::error::{LocalError, redact_string};
 
 /// The log target of every record this crate writes.
 const TARGET: &str = "sc_decision_local";
@@ -298,30 +298,26 @@ impl LocalBackend {
 
     /// Builds the probe, sends it once and reads the reply.
     ///
-    /// When the probe carried the key, a [`LocalError::ProbeStatus`] body has it redacted.
+    /// When the probe carried the key, every copy of it in the reply text the result carries
+    /// (error bodies and messages, loaded and served model names) is redacted.
     fn probe_once(&self, transport: &dyn Transport) -> Result<Availability, LocalError> {
         let request = self.daemon.probe(&self.base, self.key.as_ref())?;
         let response = transport.send(&request)?;
-        let attached = self.key.as_ref().filter(|_| request.secret().is_some());
-        self.daemon
-            .availability(&response, &self.model)
-            .map_err(|error| match (error, attached) {
-                (
-                    LocalError::ProbeStatus {
-                        daemon,
-                        path,
-                        status,
-                        body,
-                    },
-                    Some(key),
-                ) => LocalError::ProbeStatus {
-                    daemon,
-                    path,
-                    status,
-                    body: redact_body(key, body),
-                },
-                (error, _) => error,
-            })
+        let result = self.daemon.availability(&response, &self.model);
+        match self.key.as_ref().filter(|_| request.secret().is_some()) {
+            Some(key) => match result {
+                Ok(availability) => Ok(Availability {
+                    loaded: availability
+                        .loaded
+                        .into_iter()
+                        .map(|name| redact_string(key, name))
+                        .collect(),
+                    ..availability
+                }),
+                Err(error) => Err(error.redact(key)),
+            },
+            None => result,
+        }
     }
 
     /// `daemon` and `model`, the first fields of every record.
@@ -379,14 +375,6 @@ fn load_deadline(start: Instant, load_timeout: Duration) -> Instant {
     // `start + MAX_LOAD_WAIT` fits on every supported platform; if it ever did not, the wait
     // ends after one probe rather than never.
     start.checked_add(bound).unwrap_or(start)
-}
-
-/// `body` with every copy of `key` replaced by `[redacted]`; unchanged bytes when it has none.
-fn redact_body(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
-    match key.redact_text(&String::from_utf8_lossy(&body)) {
-        std::borrow::Cow::Owned(redacted) => redacted.into_bytes(),
-        std::borrow::Cow::Borrowed(_) => body,
-    }
 }
 
 /// How a load wait ended.

@@ -48,7 +48,7 @@ pub use backend::{LOAD_POLL_INTERVAL, LocalBackend, LocalTimeouts, MAX_LOAD_WAIT
 #[doc(inline)]
 pub use daemon::{Availability, DaemonKind, LocalDaemon, ModelState};
 #[doc(inline)]
-pub use error::LocalError;
+pub use error::{LocalError, ParseCause};
 #[doc(inline)]
 pub use generic::Generic;
 #[doc(inline)]
