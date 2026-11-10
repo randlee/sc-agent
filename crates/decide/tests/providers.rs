@@ -540,8 +540,10 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0012 with `workers: 2` (REQ-QA-004). Two workers take the first two
-    /// requests; the second one's send is held until the `http.busy` record of the 429 is
-    /// written, which happens after the pause is recorded (QA-001). So the third request is
+    /// requests; the 429 of send 0 is returned only once send 1 has entered the transport (so
+    /// both first sends start before any pause exists), and send 1 is held until the
+    /// `http.busy` record of the 429 is written, which happens after the pause is recorded
+    /// (QA-001). So the third request is
     /// admitted only once the pause holds, and it and the resend are both sent at exactly the
     /// pause end, on a ManualClock only the test moves.
     #[test]

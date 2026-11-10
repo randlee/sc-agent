@@ -447,12 +447,15 @@ pub fn notify_log() -> (sc_agent_log::GeneralLogger, Arc<Notify>) {
 }
 
 /// A transport that stamps each send with the test's ManualClock and answers from `replies`
-/// (the last repeats). Send 1 can be held until `hold_second` returns.
+/// (the last repeats). With `hold_second`, send 0 does not return until send 1 has entered
+/// (both first sends are certainly started before any pause exists), and send 1 is held
+/// until `hold_second` returns.
 #[derive(Clone)]
 pub struct ClockedTransport {
     clock: sc_agent_http::testing::ManualClock,
     replies: Arc<Vec<HttpResponse>>,
     sends: Arc<Mutex<Vec<Instant>>>,
+    entered: Arc<std::sync::Condvar>,
     hold_second: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
@@ -466,6 +469,7 @@ impl ClockedTransport {
             clock,
             replies: Arc::new(replies),
             sends: Arc::default(),
+            entered: Arc::default(),
             hold_second,
         }
     }
@@ -481,7 +485,17 @@ impl Transport for ClockedTransport {
         let index = {
             let mut sends = self.sends.lock().expect("lock");
             sends.push(self.clock.now());
-            sends.len() - 1
+            let index = sends.len() - 1;
+            self.entered.notify_all();
+            if index == 0 && self.hold_second.is_some() {
+                let (sends, timeout) = self
+                    .entered
+                    .wait_timeout_while(sends, HANG_GUARD, |sends| sends.len() < 2)
+                    .expect("wait");
+                assert!(!timeout.timed_out(), "send 1 never started");
+                drop(sends);
+            }
+            index
         };
         if index == 1
             && let Some(hold) = &self.hold_second
