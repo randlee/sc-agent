@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "sc-treesitter"
+version = "0.1.0"
+description = "Load tree-sitter grammars and run any query against them."
+requires-python = ">=3.10"
+license = "MIT"
+
+[tool.maturin]
+module-name = "sc_treesitter"
