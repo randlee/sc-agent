@@ -112,10 +112,16 @@ fn injected_general_only() {
         .len(),
         1
     );
-    assert!(
-        !root.path().join("logs").exists(),
-        "no default general file"
-    );
+    // Session logs live under logs/ too: only the general log file must be absent.
+    let general_files = std::fs::read_dir(root.path().join("logs"))
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "jsonl"))
+                .count()
+        })
+        .unwrap_or(0);
+    assert_eq!(general_files, 0, "no default general file");
 }
 
 /// A8-12: dropping loggers built on an injected logger never shuts it down.

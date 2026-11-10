@@ -38,7 +38,8 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
-    return sorted(log_root.rglob("sessions.jsonl")) if log_root.exists() else []
+    root = log_root / "logs"
+    return sorted(root.rglob("sessions.jsonl")) if root.exists() else []
 
 
 def session_rows(log_root: pathlib.Path) -> list[dict]:
@@ -183,6 +184,7 @@ def test_only_a_general_log_callable_keeps_the_default_session_log(env, args):
     files = session_files(log_root)
     assert len(files) == 1
     assert files[0].parts[-3:] == ("role", "proj", "sessions.jsonl")
+    assert (log_root / "logs") in files[0].parents
     assert not (log_root / "logs" / "sc-agent-py.log.jsonl").exists()
 
 

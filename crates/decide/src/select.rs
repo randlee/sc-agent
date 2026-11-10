@@ -358,7 +358,7 @@ pub fn general_logger(context: &Context) -> Result<GeneralLogger, DecideError> {
 }
 
 /// The session logger of `options`: the injected one, else
-/// `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl` (ADR-SAG-0002).
+/// `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl` (ADR-SAG-0002).
 ///
 /// As [`general_logger`]: open it, put it in `options.session`, close it after the send.
 ///

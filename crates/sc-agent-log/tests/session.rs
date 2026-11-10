@@ -11,7 +11,7 @@ use serde_json::{Map, json};
 use tempfile::TempDir;
 
 /// A8-09: rows for github.com/randlee/sc-agent, rust-developer, phase-b are in
-/// <log_root>/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl.
+/// <log_root>/logs/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl.
 #[test]
 fn rows_under_layout() {
     let root = TempDir::new().expect("temp");
@@ -21,7 +21,7 @@ fn rows_under_layout() {
     log.flush().expect("flush");
     let file = root
         .path()
-        .join("github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl");
+        .join("logs/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl");
     assert_eq!(log.path(), Some(file.as_path()));
     assert_eq!(events(&file).expect("rows").len(), 1);
 }

@@ -35,7 +35,7 @@ mod tests {
 
     /// AC: REQ-SAG-0003, ADR-SAG-0002. With no injected loggers, a send writes
     /// `<log_root>/logs/decide.log.jsonl` and its session row under
-    /// `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl`, identity fields first.
+    /// `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, identity fields first.
     #[test]
     fn default_logs_are_written_under_the_log_root() {
         let root = tempfile::tempdir().expect("root");
@@ -66,9 +66,7 @@ mod tests {
         let expected = repo
             .as_str()
             .split('/')
-            .fold(root.path().to_path_buf(), |path, segment| {
-                path.join(segment)
-            })
+            .fold(root.path().join("logs"), |path, segment| path.join(segment))
             .join("role/proj/sessions.jsonl");
         assert_eq!(rows[0], expected);
         let line = std::fs::read_to_string(&rows[0]).expect("rows");
@@ -168,6 +166,41 @@ mod tests {
         assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.runner");
         let result = delivered.expect("the result was handed out first");
         assert!(result.outcome.is_ok());
+    }
+
+    /// REQ-SAG-0003 0.2.0: with no log_root configured, the general log and the session log
+    /// both land under `<home>/.sc-agent/logs/` (here `log_root` is a tempdir standing in for
+    /// `~/.sc-agent`; `AgentConfig::log_root` falls back to `default_dir()`).
+    #[test]
+    fn every_log_lands_under_log_root_logs() {
+        let root = tempfile::tempdir().expect("root");
+        let dir = config_dir(&serde_json::json!({ "log_root": root.path() }).to_string());
+        let transport = ScriptedTransport::responses(vec![ok_noul()]);
+        let unused = MemoryLog::new().expect("log");
+        let mut ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport),
+            &unused,
+        );
+        ctx.general = None;
+        let mut options = options("jev", None, ctx, &unused);
+        options.session = None;
+        send(&options, request(NOUL), &CancelToken::new()).expect("send");
+        drop(options);
+        let logs = root.path().join("logs");
+        assert!(
+            logs.join("decide.log.jsonl").is_file(),
+            "general log under logs/"
+        );
+        let mut rows = Vec::new();
+        find(root.path(), "sessions.jsonl", &mut rows);
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].starts_with(&logs),
+            "session log under logs/: {}",
+            rows[0].display()
+        );
     }
 
     /// AC: ANC-007. One send, models and doctor write `decide.send`, `decide.models` and

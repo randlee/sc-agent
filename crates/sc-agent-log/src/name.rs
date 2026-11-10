@@ -7,7 +7,7 @@
 /// Longest slug or repo segment, in UTF-8 bytes.
 ///
 /// One directory name of the session log layout. 128 keeps the deepest layout
-/// (`<log_root>/<host>/<owner>/<repo>/<agent_role>/<project>/sessions.jsonl`) well under the
+/// (`<log_root>/logs/<host>/<owner>/<repo>/<agent_role>/<project>/sessions.jsonl`) well under the
 /// 255-byte name limit of common file systems and short enough for Windows paths; real host,
 /// owner, repo, role and project names are far shorter. Raising it lengthens every possible path.
 pub const MAX_SEGMENT_BYTES: usize = 128;

@@ -437,13 +437,12 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
     secs_in_bounds(deserializer, "load_timeout_secs", &RUNNER_LOAD_TIMEOUT_SECS)
 }
 
-/// Returns `~/.sc-agent`, the config directory and default log root.
+/// Returns `~/.sc-agent`, the config directory and default log root (REQ-SAG-0003).
 ///
-/// `~/.<app>` is the sc-agent convention for app `sc-agent`. sc-observability
-/// 1.5.0 itself defines no default directory: `LoggerConfig::default_for`
-/// takes the caller's log root (and `SC_LOG_ROOT` only when that is empty),
-/// so this function is where the default comes from. The home directory comes
-/// from [`std::env::home_dir`].
+/// The home directory joined with `.sc-agent` on every platform; the home
+/// directory comes from [`std::env::home_dir`]. Every log is written under
+/// `<log_root>/logs/`: general logs at `logs/<cli>.log.jsonl`, session logs at
+/// `logs/<repo>/<agent_role>/<project>/`.
 ///
 /// # Errors
 ///

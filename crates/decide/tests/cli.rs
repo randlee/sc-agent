@@ -182,7 +182,7 @@ mod tests {
 
     fn rows(home: &Path) -> usize {
         let mut files = Vec::new();
-        find_rows(&home.join(".sc-agent"), &mut files);
+        find_rows(&home.join(".sc-agent/logs"), &mut files);
         files
             .iter()
             .map(|file| std::fs::read_to_string(file).expect("rows").lines().count())
