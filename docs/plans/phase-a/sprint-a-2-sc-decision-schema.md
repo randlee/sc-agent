@@ -208,6 +208,7 @@ impl DecisionRequest {
     /// `ImagePart` by `name`, no two parts share a name, none is unreferenced (Err ImageParts { detail }
     /// naming the asset id / part name); then computes the question digests (Err Encode only if
     /// serde_json refuses the digest input).
+    /// Also refuses (ImageParts) a part named `request` (reserved) and two assets naming one part.
     pub fn new(body: SystemOneRequest, image_parts: Vec<ImagePart>, long_context: bool) -> Result<Self, DecisionError>;
     pub fn body(&self) -> &SystemOneRequest;
     pub fn image_parts(&self) -> &[ImagePart];
@@ -330,7 +331,7 @@ pub enum DecisionError {
     /// The reply does not match the required schema. The runner resends the request unchanged up to
     /// max_sends, then returns this, with what did not match in `detail` (REQ-SAG-0901).
     SchemaMismatch { backend: &'static str, detail: ErrorDetail },     // "decision.schema_mismatch"
-    /// The request did not finish before its CancelToken was cancelled (queued, held off or refused).
+    /// The request did not finish before its CancelToken was cancelled (queued, held off, or in flight).
     Cancelled { sends: u32 },                                          // "decision.cancelled"
     /// The runner stopped before the request finished (a worker thread could not start or stopped); reason kept.
     Shutdown { reason: String },                                       // "decision.shutdown"
@@ -374,7 +375,7 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - `rg -n 'sleep\(|\.round\(' crates/sc-decision-schema` finds nothing (AC REQ-SAG-0010, REQ-SAG-0007); `rg -n '\bsha2\b|Sha256::' crates/` (word-bounded: the digest-input key `sha256` is not a match) finds no use outside sc-sha (AC REQ-SAG-0202 AC4)
 
 // LimitKind (error.rs): #[non_exhaustive] pub enum LimitKind { Images, ImageBytes } with as_str() and Display.
-// Question, Answer, State, LocItem, AssetKind and ImageFormat are #[non_exhaustive].
+// Question, Answer, State, LocItem, AssetKind and ImageFormat are #[non_exhaustive].// SystemOneRequest, SystemOneResponse and ModelMetadataList implement PartialEq by hand (ignoring key_order) and use serde(remote) for the derived wire shape; the derive lines above show the wire fields only.
 
 ## Acceptance criteria
 
@@ -406,4 +407,5 @@ No open questions.
 Hardening round 1 (2026-11-09, decisions.md): PLAN-CRIT-001 decide_stream takes a 'static boxed iterator; PLAN-CRIT-002 Decision doc states the in-flight cancel contract; PLAN-CRIT-014 DecisionRequest::validate + DecisionError::ImageParts (14 variants); PLAN-CRIT-010 follow-up: no test double in sc-decision-schema (ANC-001 keeps it to types and traits); the scripted test backend is private to a-9 (crates/sc-decision-runner/tests/support/).
 Round 2 (2026-11-09, round2.md): RBP-F002 DecisionRequest private + new() (TryFrom<SystemOneRequest>, not From, since From cannot refuse a body whose asset names a part; validate removed); RBP-F008 sc-sha 1.8.0 calculate_hash fails only on InvalidUtf8, impossible for &str -> of_text infallible, decision.digest dropped, digests computed in new() so DecisionResult.digests is never empty; RBP-F012 QuestionDigest validating Deserialize; REQ-SAG-0014 image limits -> decision.limits; RBP-F001 cause_detail; RBP-F005 recovery for request_parse; RBP-F013 Display id: message; RBP-F014 open traits; RBP-F017 AsRef<str>; REQ-QA-006 REQ-SAG-0104/0701; ARCH-005 ADR-SAG-0002.
 - QA-1 (2026-11-10): ModelMetadata.release_date stays a String (wire field). sc-agent-types::ReleaseDate is a generic ordering key, not a Jev API type, so REQ-SAG-0201 AC2 holds (REQ-QA-010).
-- QA-1 fix round decisions: count inline image assets toward REQ-SAG-0014 limits; LimitKind enum; non_exhaustive wire enums; DecisionResult/ImagePart constructors; Asset.kind optional (openapi v0.2.0); Box confidence required-nullable; refuse duplicate part names and a part named `request`; long_context stays a bool (owner signature).- QA-1 fix round surface (code at cd155c3): SystemOneRequest::new(model, state, questions, assets), SystemOneResponse::new(model, answers, usage, extra), ModelMetadataList::new(models) (each carries a private key-order field, so outside struct literals no longer compile); DecisionResult::new(session_id, position, digests, outcome); ImagePart::new(name, format, bytes); LimitKind { Images, ImageBytes }; from_json keeps the document's key order (src/key_order.rs); plain Deserialize does not; PartialEq ignores key order.
+- QA-1 fix round decisions: count inline image assets toward REQ-SAG-0014 limits; LimitKind enum; non_exhaustive wire enums; DecisionResult/ImagePart constructors; Asset.kind optional (openapi v0.2.0); Box confidence required-nullable; refuse duplicate part names and a part named `request`; long_context stays a bool (owner signature).
+- QA-1 fix round surface (code at cd155c3): SystemOneRequest::new(model, state, questions, assets), SystemOneResponse::new(model, answers, usage, extra), ModelMetadataList::new(models) (each carries a private key-order field, so outside struct literals no longer compile); DecisionResult::new(session_id, position, digests, outcome); ImagePart::new(name, format, bytes); LimitKind { Images, ImageBytes }; from_json keeps the document's key order (src/key_order.rs); plain Deserialize does not; PartialEq ignores key order.
