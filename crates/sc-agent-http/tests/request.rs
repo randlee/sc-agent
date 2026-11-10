@@ -155,7 +155,9 @@ mod cases {
 
     #[test]
     fn plain_http_remote_without_key_allowed() {
-        let request = local("http://10.0.0.5/v1").with_header("content-type", "application/json");
+        let request = local("http://10.0.0.5/v1")
+            .with_header("content-type", "application/json")
+            .expect("not a credential header");
         assert!(request.secret().is_none());
         assert_eq!(send(&request), 1);
     }

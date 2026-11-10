@@ -62,43 +62,44 @@ impl ProviderReply {
     /// fragment of it can survive (REQ-SAG-0002).
     #[must_use]
     pub fn read(response: &HttpResponse, secret: Option<&ApiKey>) -> Self {
-        let scrub = |text: &str| match secret {
-            Some(key) => key.redact_text(text).into_owned(),
-            None => text.to_owned(),
+        let scrub = |text: String| match secret {
+            Some(key) => crate::redact::redact_owned(key, text),
+            None => text,
         };
         let bytes = response.body();
         let body = Body::read(bytes);
-        let message = match body.message.as_deref() {
-            Some(text) => scrub(text),
-            None => scrub(&String::from_utf8_lossy(bytes)),
-        };
-        let request_id = body
-            .request_id
-            .as_deref()
-            .or_else(|| response.header("request-id"))
-            .or_else(|| response.header("x-request-id"))
-            .map(scrub);
+        // The one lossy decode, only when the body is not a provider error shape.
+        let message = body
+            .message
+            .unwrap_or_else(|| String::from_utf8_lossy(bytes).into_owned());
+        let request_id = body.request_id.or_else(|| {
+            response
+                .header("request-id")
+                .or_else(|| response.header("x-request-id"))
+                .map(str::to_owned)
+        });
         Self {
             status: response.status(),
-            provider_type: body.provider_type.as_deref().map(scrub),
-            provider_code: body.provider_code.as_deref().map(scrub),
-            message,
-            param: body.param.as_deref().map(scrub),
-            request_id,
+            provider_type: body.provider_type.map(scrub),
+            provider_code: body.provider_code.map(scrub),
+            message: scrub(message),
+            param: body.param.map(scrub),
+            request_id: request_id.map(scrub),
             retry_after_seconds: RetryAfter::parse(response.header("retry-after"))
                 .map(RetryAfter::seconds),
         }
     }
 
-    /// This reply with `map` applied to every text field (redaction).
-    pub(crate) fn map_text(self, map: &impl Fn(&str) -> String) -> Self {
+    /// This reply with `map` applied to every text field (redaction); owned
+    /// text is moved through `map`.
+    pub(crate) fn map_text(self, map: &impl Fn(String) -> String) -> Self {
         Self {
             status: self.status,
-            provider_type: self.provider_type.as_deref().map(map),
-            provider_code: self.provider_code.as_deref().map(map),
-            message: map(&self.message),
-            param: self.param.as_deref().map(map),
-            request_id: self.request_id.as_deref().map(map),
+            provider_type: self.provider_type.map(map),
+            provider_code: self.provider_code.map(map),
+            message: map(self.message),
+            param: self.param.map(map),
+            request_id: self.request_id.map(map),
             retry_after_seconds: self.retry_after_seconds,
         }
     }

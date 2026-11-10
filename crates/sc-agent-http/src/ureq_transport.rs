@@ -9,6 +9,7 @@ use std::io::Read;
 use std::time::Duration;
 
 use sc_agent_secrets::ApiKey;
+use sc_agent_types::ErrorDetail;
 use ureq::http::Uri;
 use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
 use ureq::unversioned::transport::{DefaultConnector, NextTimeout};
@@ -121,14 +122,20 @@ impl Resolver for LookupResolver {
 #[derive(Debug, Clone)]
 pub struct UreqTransport {
     agent: ureq::Agent,
+    timeouts: Timeouts,
 }
 
 impl UreqTransport {
     /// A transport with one agent using `timeouts`.
+    ///
+    /// `timeouts` are checked at each send: a zero value or one over
+    /// [`Timeouts::MAX`] makes every send [`HttpError::InvalidRequest`],
+    /// without a connection.
     #[must_use]
     pub fn new(timeouts: Timeouts) -> Self {
         Self {
             agent: AgentConfig::production(timeouts).build(),
+            timeouts,
         }
     }
 }
@@ -142,6 +149,10 @@ impl Default for UreqTransport {
 
 impl Transport for UreqTransport {
     fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+        self.timeouts.validate()?;
+        if let Some(deadline) = request.deadline() {
+            crate::transport::check_duration("the request deadline", deadline)?;
+        }
         let mut outbound = build_outbound(request)?;
         if let Some(deadline) = request.deadline() {
             // Replaces the agent's request deadline for this send only.
@@ -171,11 +182,10 @@ fn build_outbound(request: &HttpRequest) -> Result<ureq::http::Request<&[u8]>, H
     // A request that cannot be built (bad header name or value) is
     // deterministic, so it is `http.invalid_request`, never resent. The http
     // builder's error names the problem, never the value.
-    builder
-        .body(request.body())
-        .map_err(|error| HttpError::InvalidRequest {
-            message: format!("http.builder: {error}"),
-        })
+    builder.body(request.body()).map_err(|error| {
+        HttpError::invalid_request("the HTTP builder refused a header name or value")
+            .with_cause(ErrorDetail::foreign("http.builder", &error))
+    })
 }
 
 /// The credential header value, marked sensitive so `Debug` of the built
@@ -186,13 +196,9 @@ fn build_outbound(request: &HttpRequest) -> Result<ureq::http::Request<&[u8]>, H
 /// so the error is defence in depth; its text never contains the key.
 fn secret_header_value(secret: &SecretHeader) -> Result<ureq::http::HeaderValue, HttpError> {
     let text = format!("{}{}", secret.prefix(), expose(secret.key()));
-    let mut value =
-        ureq::http::HeaderValue::from_str(&text).map_err(|_| HttpError::InvalidRequest {
-            message: format!(
-                "http.InvalidHeaderValue: the {} header value is not valid",
-                secret.name()
-            ),
-        })?;
+    let mut value = ureq::http::HeaderValue::from_str(&text).map_err(|_| {
+        HttpError::invalid_request(format!("the {} header value is not valid", secret.name()))
+    })?;
     value.set_sensitive(true);
     Ok(value)
 }
@@ -248,8 +254,8 @@ fn body_read_error(status: u16, error: &std::io::Error) -> HttpError {
             status,
             limit_bytes: MAX_RESPONSE_BYTES,
         },
-        Some(inner) => network(ureq_error_kind(inner), &foreign_id(inner), inner),
-        None => network(io_error_kind(error), &io_id(error), error),
+        Some(inner) => network(ureq_error_kind(inner), &foreign_id(inner), inner, true),
+        None => network(io_error_kind(error), &io_id(error), error, true),
     }
 }
 
@@ -258,7 +264,7 @@ fn body_read_error(status: u16, error: &std::io::Error) -> HttpError {
 /// An oversize body is `http.response_too_large` (status 0: ureq refused it
 /// before a status was read), the same rule as the streaming cap in
 /// [`read_response`]; everything else is `http.network` of
-/// [`ureq_error_kind`], with the ureq error's id and text in `message`.
+/// [`ureq_error_kind`], with the ureq error kept as the cause.
 fn ureq_error(error: ureq::Error) -> HttpError {
     if let ureq::Error::BodyExceedsLimit(_) = error {
         return HttpError::ResponseTooLarge {
@@ -266,18 +272,26 @@ fn ureq_error(error: ureq::Error) -> HttpError {
             limit_bytes: MAX_RESPONSE_BYTES,
         };
     }
-    network(ureq_error_kind(&error), &foreign_id(&error), &error)
+    network(ureq_error_kind(&error), &foreign_id(&error), &error, false)
 }
 
-/// `http.network` with `message` = `"<foreign id>: <foreign text>"`, the
-/// form [`HttpError`]'s `cause_detail` reads back. `attempts` is 1 (this
-/// send); the client sets the real count.
-fn network(kind: NetworkKind, id: &str, error: &dyn std::fmt::Display) -> HttpError {
-    HttpError::Network {
-        kind,
-        attempts: 1,
-        message: format!("{id}: {error}"),
-    }
+/// `http.network` in this layer's words, with `error` unchanged as the cause
+/// ([`ErrorDetail::foreign`] under `id`). `attempts` is 1 (this send); the
+/// client sets the real count.
+fn network(
+    kind: NetworkKind,
+    id: &str,
+    error: &(dyn std::error::Error + 'static),
+    reading_body: bool,
+) -> HttpError {
+    let what = match (reading_body, kind) {
+        (true, _) => "reading the response failed",
+        (false, NetworkKind::Timeout) => "the request timed out",
+        (false, NetworkKind::Connect) => "could not connect",
+        (false, NetworkKind::Tls) => "the TLS handshake failed",
+        (false, _) => "the transport failed",
+    };
+    HttpError::network(kind, 1, what).with_cause(ErrorDetail::foreign(id, error))
 }
 
 /// `io.<ErrorKind>`, the id of a foreign io error.
@@ -397,11 +411,13 @@ mod tests {
                 Endpoint::parse("https://x.invalid/").expect("https"),
                 Vec::new(),
             )
-            .with_header(name, value);
+            .with_header(name, value)
+            .expect("not a credential header");
             let error = build_outbound(&request).expect_err(name);
             assert_eq!(error.id(), "http.invalid_request", "{error:?}");
             let cause = error.cause_detail().expect("builder cause");
             assert_eq!(cause.id, "http.builder");
+            assert!(!cause.message.is_empty());
         }
     }
 

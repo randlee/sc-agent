@@ -136,11 +136,11 @@ impl Transport for ScriptedTransport {
             clock.advance(*per_send);
         }
         script.replies.pop_front().unwrap_or_else(|| {
-            Err(HttpError::Network {
-                kind: NetworkKind::Connect,
-                attempts: 1,
-                message: "script exhausted".to_owned(),
-            })
+            Err(HttpError::network(
+                NetworkKind::Connect,
+                1,
+                "script exhausted",
+            ))
         })
     }
 }

@@ -59,7 +59,8 @@ mod cases {
 
     fn post(endpoint: Endpoint, secret: Option<SecretHeader>) -> HttpRequest {
         let request = HttpRequest::new(Method::Post, endpoint, br#"{"q":1}"#.as_slice())
-            .with_header("content-type", "application/json");
+            .with_header("content-type", "application/json")
+            .expect("not a credential header");
         match secret {
             Some(secret) => request.with_secret(secret).expect("loopback carries a key"),
             None => request,
@@ -216,6 +217,7 @@ mod cases {
                 "content-type",
                 format!("multipart/form-data; boundary={boundary}"),
             )
+            .expect("not a credential header")
             .with_secret(api_key_header())
             .expect("loopback");
         let response = loopback().send(&request).expect("200");
@@ -289,5 +291,23 @@ mod cases {
         long_gate.open();
         assert_eq!(long.join().expect("sender"), Ok(200));
         long_server.join().expect("server");
+    }
+
+    /// RSH-004: UreqTransport refuses zero or over-long timeouts and
+    /// deadlines without opening a connection.
+    #[test]
+    fn invalid_timeouts_refused_without_connecting() {
+        let port = {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+            listener.local_addr().expect("addr").port()
+        };
+        let zero = UreqTransport::new(Timeouts::default().with_request(Duration::ZERO));
+        let error = zero
+            .send(&post(endpoint(port, "/x"), None))
+            .expect_err("zero request timeout");
+        assert_eq!(error.id(), "http.invalid_request", "{error:?}");
+        let long = post(endpoint(port, "/x"), None).with_deadline(Timeouts::MAX * 2);
+        let error = loopback().send(&long).expect_err("over-long deadline");
+        assert_eq!(error.id(), "http.invalid_request", "{error:?}");
     }
 }
