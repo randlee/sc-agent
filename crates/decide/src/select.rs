@@ -26,7 +26,7 @@ use sc_agent_types::{
     CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
 };
 use sc_decision_llm::LlmDecisionBackend;
-use sc_decision_local::{DaemonKind, LocalBackend, LocalTimeouts};
+use sc_decision_local::{DaemonKind, LocalBackend, LocalProbe, LocalTimeouts};
 use sc_decision_runner::{DecisionRunner, RunnerConfig};
 use sc_decision_schema::{
     Backend, Decision, DecisionError, DecisionRequest, DecisionResult, ModelMetadataList,
@@ -409,12 +409,8 @@ fn runner_key(
     Ok(Some(keys.require_var(var)?.key))
 }
 
-/// A `LocalBackend` for `runner`, with its REQ-SAG-0015 timeouts and the general log.
-fn local_backend(
-    runner: &LocalRunner,
-    context: &Context,
-    general: &GeneralLogger,
-) -> Result<LocalBackend, DecideError> {
+/// A `LocalBackend` for `runner`, with its REQ-SAG-0015 timeouts.
+fn local_backend(runner: &LocalRunner, context: &Context) -> Result<LocalBackend, DecideError> {
     let key = runner_key(runner, context)?;
     let backend = LocalBackend::new(
         DaemonKind::from(runner.kind),
@@ -424,12 +420,10 @@ fn local_backend(
         key,
     )
     .map_err(DecideError::from)?;
-    Ok(backend
-        .with_log(general.clone())
-        .with_timeouts(LocalTimeouts {
-            load: runner.load_timeout(),
-            request: runner.request_timeout(),
-        }))
+    Ok(backend.with_timeouts(LocalTimeouts {
+        load: runner.load_timeout(),
+        request: runner.request_timeout(),
+    }))
 }
 
 /// The backend a send uses.
@@ -488,7 +482,7 @@ fn backend(
     let (model, line) = match &options.model {
         ModelSelector::Runner(name) => {
             let runner = local_runner(config, name.as_str())?;
-            let backend = local_backend(runner, &options.context, general)?;
+            let backend = local_backend(runner, &options.context)?;
             return Ok(Chosen::Local {
                 name: name.clone(),
                 runner: runner.clone(),
@@ -647,14 +641,9 @@ impl Prepared {
         else {
             return Ok(Loaded::Ready);
         };
-        match wait_until_loaded(
-            backend,
-            &*self.probe,
-            &self.clock,
-            cancel,
-            runner.load_timeout(),
-            LogContext::NONE,
-        ) {
+        let probe = LocalProbe::new(backend, &*self.probe, self.clock.clone())
+            .with_log(self.general.clone());
+        match wait_until_loaded(&probe, cancel, runner.load_timeout(), LogContext::NONE) {
             Ok(()) => Ok(Loaded::Ready),
             Err(DecisionError::Cancelled { .. }) => Ok(Loaded::Cancelled),
             Err(error) => Err(DecideError::from(error)),
@@ -708,21 +697,19 @@ fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecideError> 
     Ok(())
 }
 
-/// `LocalBackend::wait_until_loaded` with the load timeout decide passes. In tests the timeout
+/// `LocalProbe::wait_until_loaded` with the load timeout decide passes. In tests the timeout
 /// is also recorded on the calling thread (`LOAD_TIMEOUT_PASSED`), so a test can prove the
 /// runner's configured `load_timeout_secs` is what reaches the wait, without waiting it out
 /// (QA-006).
 fn wait_until_loaded(
-    backend: &LocalBackend,
-    probe: &dyn Transport,
-    clock: &Clock,
+    probe: &LocalProbe<'_>,
     cancel: &CancelToken,
     load_timeout: std::time::Duration,
     ctx: LogContext,
 ) -> Result<(), DecisionError> {
     #[cfg(test)]
     LOAD_TIMEOUT_PASSED.with(|passed| passed.set(Some(load_timeout)));
-    backend.wait_until_loaded(probe, clock, cancel, load_timeout, ctx)
+    probe.wait_until_loaded(cancel, load_timeout, ctx)
 }
 
 #[cfg(test)]
@@ -1316,7 +1303,7 @@ mod tests {
     }
 
     /// REQ-SAG-0015 (QA-006): the runner's configured `load_timeout_secs` is the timeout that
-    /// reaches `LocalBackend::wait_until_loaded` (recorded by the crate-private seam); the
+    /// reaches `LocalProbe::wait_until_loaded` (recorded by the crate-private seam); the
     /// daemon reports the model loaded at once, so nothing waits.
     #[test]
     fn the_configured_load_timeout_reaches_the_load_wait() {

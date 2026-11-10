@@ -1,4 +1,4 @@
-//! ANC-007: LocalBackend::discover writes one `local.discover` record per call.
+//! ANC-007: LocalProbe::discover writes one `local.discover` record per call.
 //!
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
@@ -16,7 +16,8 @@ mod tests {
     use sc_agent_log::Level;
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_types::SessionId;
-    use sc_decision_local::{DaemonKind, LocalBackend, ModelState};
+    use sc_agent_types::testing::ManualClock;
+    use sc_decision_local::{DaemonKind, LocalBackend, LocalProbe, ModelState};
     use sc_decision_schema::Backend;
     use serde_json::json;
 
@@ -34,8 +35,7 @@ mod tests {
             port(8000),
             model(),
             Some(key()),
-        )?
-        .with_log(log.general());
+        )?;
         let transport = ScriptedTransport::new(vec![
             Ok(json(
                 200,
@@ -48,12 +48,12 @@ mod tests {
             )),
         ]);
         let session_id = SessionId::new();
+        let probe = LocalProbe::new(&backend, &transport, ManualClock::new().clock())
+            .with_log(log.general());
 
-        let up = backend.discover(&transport, LogContext::request(session_id, Some(0)))?;
+        let up = probe.discover(LogContext::request(session_id, Some(0)))?;
         assert_eq!(up.model, ModelState::Loaded);
-        let down = backend
-            .discover(&transport, LogContext::NONE)
-            .expect_err("down");
+        let down = probe.discover(LogContext::NONE).expect_err("down");
         assert_eq!(sc_agent_types::ErrorId::id(&down), "local.http");
 
         // Encode and decode write no local.* record.
@@ -102,7 +102,8 @@ mod tests {
             assert!(!text.contains(SECRET), "key in a record: {text}");
         }
         assert!(!format!("{backend:?}").contains(SECRET));
-        assert!(format!("{backend:?}").contains("log: \"<set>\""));
+        assert!(!format!("{probe:?}").contains(SECRET));
+        assert!(format!("{probe:?}").contains("log: true"));
         Ok(())
     }
 
@@ -119,19 +120,13 @@ mod tests {
             model(),
             None,
         )?;
-        let logged = LocalBackend::new(
-            DaemonKind::Mapika,
-            &host("127.0.0.1"),
-            port(8000),
-            model(),
-            None,
-        )?
-        .with_log(log.general());
-        let without = plain.discover(
-            &ScriptedTransport::responses(vec![reply.clone()]),
-            LogContext::NONE,
-        )?;
-        let with = logged.discover(&ScriptedTransport::responses(vec![reply]), LogContext::NONE)?;
+        let clock = ManualClock::new().clock();
+        let first = ScriptedTransport::responses(vec![reply.clone()]);
+        let second = ScriptedTransport::responses(vec![reply]);
+        let without = LocalProbe::new(&plain, &first, clock.clone()).discover(LogContext::NONE)?;
+        let with = LocalProbe::new(&plain, &second, clock)
+            .with_log(log.general())
+            .discover(LogContext::NONE)?;
         assert_eq!(without, with);
         assert_eq!(without.model, ModelState::Loaded);
         assert_eq!(log.records()?.len(), 1, "only the logged backend wrote");

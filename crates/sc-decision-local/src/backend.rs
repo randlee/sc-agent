@@ -1,30 +1,26 @@
-//! [`LocalBackend`]: a [`SystemOneBackend`] at a configured runner, plus discovery and load wait.
+//! [`LocalBackend`]: a [`SystemOneBackend`] at a configured runner, and the sans-IO halves of
+//! its probe (build the request, read the reply). The probe I/O is [`LocalProbe`]'s.
+//!
+//! [`LocalProbe`]: crate::LocalProbe
 
 use std::fmt;
 use std::net::Ipv6Addr;
 use std::num::NonZeroU16;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use sc_agent_config::RunnerHost;
-use sc_agent_http::{HttpError, HttpRequest, HttpResponse, LogContext, Transport};
-use sc_agent_log::{GeneralLogger, Level};
+use sc_agent_http::{HttpError, HttpRequest, HttpResponse, LogContext};
 use sc_agent_secrets::ApiKey;
-use sc_agent_types::{CancelToken, Clock, ErrorId, ModelId, Wait};
+use sc_agent_types::ModelId;
 use sc_decision_schema::{Backend, DecisionError, DecisionRequest, SystemOneResponse};
 use sc_decision_systemone::{BaseUrl, SystemOneBackend};
-use serde_json::{Map, Value};
 
-use crate::daemon::{Availability, DaemonKind, LocalDaemon, ModelState};
+use crate::daemon::{Availability, DaemonKind, LocalDaemon};
 use crate::error::{LocalError, redact_string};
 
-/// The log target of every record this crate writes.
-const TARGET: &str = "sc_decision_local";
-
-/// The `DecisionError::Backend` name of this crate.
-const BACKEND_NAME: &str = "local";
-
-/// How often [`LocalBackend::wait_until_loaded`] probes the daemon.
+/// How often [`LocalProbe::wait_until_loaded`](crate::LocalProbe::wait_until_loaded) probes
+/// the daemon.
 pub const LOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// The longest load wait: a larger `load_timeout` (up to `Duration::MAX`) is clamped to it, so
@@ -50,11 +46,11 @@ pub struct LocalTimeouts {
 /// The arguments come from a config `local_runners` entry (REQ-SAG-0801); this crate reads no
 /// config and has no built-in host or port. As a [`Backend`] it encodes and decodes exactly as
 /// [`SystemOneBackend`] (ADR-SAG-0001) and is used through the runner like any backend, as
-/// `Arc<dyn Backend>`. [`Self::discover`] and [`Self::wait_until_loaded`] probe the daemon on
-/// the caller's transport.
+/// `Arc<dyn Backend>`. It does no I/O and reads no clock (ADR-SAG-0001): the daemon probe is
+/// built by [`Self::probe_request`] and read by [`Self::read_probe`], and
+/// [`LocalProbe`](crate::LocalProbe) sends it on the caller's transport and clock.
 ///
-/// `Debug` prints the daemon, base, model, timeouts and whether a key and a logger are set,
-/// never the key.
+/// `Debug` prints the daemon, base, model, timeouts and whether a key is set, never the key.
 ///
 /// # Examples
 ///
@@ -76,7 +72,6 @@ pub struct LocalBackend {
     model: ModelId,
     key: Option<ApiKey>,
     backend: SystemOneBackend,
-    log: Option<GeneralLogger>,
     timeouts: Option<LocalTimeouts>,
     /// Set by the first 2xx decode and never cleared: a one-way latch. An atomic because
     /// [`Backend`] takes `&self` and the backend is shared as `Arc<dyn Backend>` across the
@@ -94,7 +89,6 @@ impl fmt::Debug for LocalBackend {
             .field("base", &self.base)
             .field("model", &self.model)
             .field("key", &set_or_unset(self.key.is_some()))
-            .field("log", &set_or_unset(self.log.is_some()))
             .field("timeouts", &self.timeouts)
             .field("served_once", &self.served_once.load(Ordering::Acquire))
             .finish()
@@ -110,11 +104,11 @@ impl LocalBackend {
     ///
     /// decide passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and
     /// `runner.model` of a `LocalRunner`; host and port are checked at config load, so no
-    /// check is repeated here. An IPv6 host is written in brackets. No logger and no timeouts
-    /// until [`Self::with_log`] and [`Self::with_timeouts`].
+    /// check is repeated here. An IPv6 host is written in brackets. No timeouts until
+    /// [`Self::with_timeouts`].
     ///
     /// A key on a plain-http host that is not loopback is accepted here and refused in
-    /// [`Backend::encode`] and [`Self::discover`], before any send (REQ-SAG-0013).
+    /// [`Backend::encode`] and [`Self::probe_request`], before any send (REQ-SAG-0013).
     ///
     /// # Errors
     ///
@@ -141,26 +135,17 @@ impl LocalBackend {
             model,
             key,
             backend,
-            log: None,
             timeouts: None,
             served_once: AtomicBool::new(false),
         })
-    }
-
-    /// This backend writing its `local.*` records to the caller's `log` (REQ-SAG-0008).
-    #[must_use]
-    pub fn with_log(self, log: GeneralLogger) -> Self {
-        Self {
-            log: Some(log),
-            ..self
-        }
     }
 
     /// This backend with the runner's REQ-SAG-0015 `timeouts`.
     ///
     /// For a kind that loads its model on the first request (Laya), requests encoded before
     /// the first 2xx reply carry the deadline `load + request`. Without timeouts no deadline
-    /// is set. [`Self::wait_until_loaded`] takes its load timeout as an argument.
+    /// is set. [`LocalProbe::wait_until_loaded`](crate::LocalProbe::wait_until_loaded) takes
+    /// its load timeout as an argument.
     #[must_use]
     pub fn with_timeouts(self, timeouts: LocalTimeouts) -> Self {
         Self {
@@ -181,139 +166,42 @@ impl LocalBackend {
         self.daemon.kind()
     }
 
-    /// Whether the daemon is up and where the configured model stands.
-    ///
-    /// Sends the daemon kind's probe once on `transport` (no resend: this is not a decision)
-    /// and, with a logger set, writes one `local.discover` record carrying `ctx`: `daemon`,
-    /// `model`, and `loaded` and `state` on Ok or `error` (the [`LocalError`] id) on Err. A
-    /// log write error is ignored; it never changes the result. `transport` is the caller's
-    /// probe transport (`UreqTransport::new(Timeouts::probe())`), so a probe is never waited
-    /// on for the decision timeout.
+    /// The configured model.
+    #[must_use]
+    pub fn model(&self) -> &ModelId {
+        &self.model
+    }
+
+    /// The daemon kind's probe request (sans-IO): the one GET that tells whether the daemon is
+    /// up and what it has loaded, with the key attached as Bearer by kinds that check it.
     ///
     /// # Errors
     ///
-    /// [`LocalError::Http`] when the probe cannot be built or the daemon is not listening
-    /// (cause `http.network`); otherwise as [`LocalDaemon::availability`].
-    pub fn discover(
+    /// [`LocalError::Http`] when the probe URL is invalid, or when a key would go to a
+    /// plain-http host that is not loopback (`http.key_on_plain_http`, REQ-SAG-0013).
+    pub fn probe_request(&self) -> Result<HttpRequest, LocalError> {
+        self.daemon.probe(&self.base, self.key.as_ref())
+    }
+
+    /// What the transport's `reply` to `request` (from [`Self::probe_request`]) says about the
+    /// daemon and the configured model (sans-IO).
+    ///
+    /// A transport error is redacted of the probe's key exactly as
+    /// `HttpClient::send_once` redacts its errors
+    /// ([`HttpError::redacted_for`]). When the probe carried the key, every copy of it in the
+    /// reply text the result carries (error bodies and messages, loaded and served model names)
+    /// is redacted too.
+    ///
+    /// # Errors
+    ///
+    /// [`LocalError::Http`] for a transport error (a daemon that is not listening is cause
+    /// `http.network`); otherwise as [`LocalDaemon::availability`].
+    pub fn read_probe(
         &self,
-        transport: &dyn Transport,
-        ctx: LogContext,
+        request: &HttpRequest,
+        reply: Result<HttpResponse, HttpError>,
     ) -> Result<Availability, LocalError> {
-        let result = self.probe_once(transport);
-        if let Some(log) = &self.log {
-            let mut fields = self.base_fields();
-            match &result {
-                Ok(availability) => {
-                    fields.insert("loaded".into(), loaded_field(availability));
-                    fields.insert("state".into(), availability.model.as_str().into());
-                }
-                Err(error) => {
-                    fields.insert("error".into(), error.id().into());
-                }
-            }
-            // A failed write is counted and reported by sc-agent-log's flush; discovery
-            // still returns its own result.
-            let _ = log.write(Level::Info, TARGET, "local.discover", ctx, fields);
-        }
-        result
-    }
-
-    /// Waits for the configured model to load before the first decision (REQ-SAG-0015).
-    ///
-    /// Probes the daemon on `transport` (the caller's probe transport) every
-    /// [`LOAD_POLL_INTERVAL`], waiting between probes with [`CancelToken::wait_until`]. Returns
-    /// Ok when a probe reports [`ModelState::Loaded`], and at once for
-    /// [`ModelState::LoadsOnDemand`] (the first request loads it, see [`Self::with_timeouts`])
-    /// and [`ModelState::Unlisted`] (the daemon cannot tell). A connect failure (Strands
-    /// Decider listens only after loading) or [`ModelState::NotReady`] means not loaded yet:
-    /// polling goes on. With a logger set, writes one `local.load_wait` record per probe
-    /// (`phase: "poll"`, `poll`, `waited_ms`, `state` or `error`) and one at the end
-    /// (`phase: "end"`, `outcome`, `polls`, `waited_ms`).
-    ///
-    /// `load_timeout` is clamped to [`MAX_LOAD_WAIT`]. The deadline is checked after each
-    /// probe, and the last probe is sent at the deadline, so the wait can end later than
-    /// `load_timeout` by at most one probe's duration (bounded by the probe transport's
-    /// request timeout, 10 s for `Timeouts::probe()`).
-    ///
-    /// # Errors
-    ///
-    /// - [`DecisionError::Backend`] (`backend: "local"`) with the
-    ///   [`LocalError::LoadTimeout`] detail once `load_timeout` has passed without the model
-    ///   loaded;
-    /// - [`DecisionError::Cancelled`] (`sends: 0`) when `cancel` fires; no probe follows;
-    /// - [`DecisionError::Backend`] with the error's detail at once for any other probe error
-    ///   ([`LocalError::ModelNotServed`], [`LocalError::ProbeStatus`],
-    ///   [`LocalError::ProbeParse`], an invalid probe request).
-    pub fn wait_until_loaded(
-        &self,
-        transport: &dyn Transport,
-        clock: &Clock,
-        cancel: &CancelToken,
-        load_timeout: Duration,
-        ctx: LogContext,
-    ) -> Result<(), DecisionError> {
-        let start = clock.now();
-        let deadline = load_deadline(start, load_timeout);
-        let mut polls: u64 = 0;
-        let outcome = loop {
-            if cancel.is_cancelled() {
-                break LoadOutcome::Cancelled;
-            }
-            let probe = self.probe_once(transport);
-            polls += 1;
-            self.log_poll(
-                ctx,
-                polls,
-                clock.now().saturating_duration_since(start),
-                &probe,
-            );
-            match probe {
-                Ok(availability) => match availability.model {
-                    ModelState::Loaded | ModelState::LoadsOnDemand | ModelState::Unlisted => {
-                        break LoadOutcome::Ready;
-                    }
-                    ModelState::NotReady => {}
-                },
-                Err(LocalError::Http(HttpError::Network { .. })) => {}
-                Err(error) => break LoadOutcome::Failed(error),
-            }
-            let now = clock.now();
-            if now >= deadline {
-                break LoadOutcome::Failed(LocalError::LoadTimeout {
-                    runner: self.base.to_string(),
-                    waited: now.duration_since(start),
-                });
-            }
-            let next = now
-                .checked_add(LOAD_POLL_INTERVAL)
-                .map_or(deadline, |next| next.min(deadline));
-            if clock.wait_until(cancel, next) == Wait::Cancelled {
-                break LoadOutcome::Cancelled;
-            }
-        };
-        self.log_load_end(
-            ctx,
-            polls,
-            clock.now().saturating_duration_since(start),
-            &outcome,
-        );
-        match outcome {
-            LoadOutcome::Ready => Ok(()),
-            LoadOutcome::Cancelled => Err(DecisionError::Cancelled { sends: 0 }),
-            LoadOutcome::Failed(error) => Err(DecisionError::Backend {
-                backend: BACKEND_NAME,
-                detail: error.detail(),
-            }),
-        }
-    }
-
-    /// Builds the probe, sends it once and reads the reply.
-    ///
-    /// When the probe carried the key, every copy of it in the reply text the result carries
-    /// (error bodies and messages, loaded and served model names) is redacted.
-    fn probe_once(&self, transport: &dyn Transport) -> Result<Availability, LocalError> {
-        let request = self.daemon.probe(&self.base, self.key.as_ref())?;
-        let response = transport.send(&request)?;
+        let response = reply.map_err(|error| LocalError::Http(error.redacted_for(request)))?;
         let result = self.daemon.availability(&response, &self.model);
         match self.key.as_ref().filter(|_| request.secret().is_some()) {
             Some(key) => match result {
@@ -330,83 +218,6 @@ impl LocalBackend {
             None => result,
         }
     }
-
-    /// `daemon` and `model`, the first fields of every record.
-    fn base_fields(&self) -> Map<String, Value> {
-        let mut fields = Map::new();
-        fields.insert("daemon".into(), self.daemon.kind().as_str().into());
-        fields.insert("model".into(), self.model.as_str().into());
-        fields
-    }
-
-    fn log_poll(
-        &self,
-        ctx: LogContext,
-        poll: u64,
-        waited: Duration,
-        probe: &Result<Availability, LocalError>,
-    ) {
-        let Some(log) = &self.log else { return };
-        let mut fields = self.base_fields();
-        fields.insert("phase".into(), "poll".into());
-        fields.insert("poll".into(), poll.into());
-        fields.insert("waited_ms".into(), millis(waited).into());
-        match probe {
-            Ok(availability) => {
-                fields.insert("state".into(), availability.model.as_str().into());
-            }
-            Err(error) => {
-                fields.insert("error".into(), error.id().into());
-            }
-        }
-        // Ignored as in `discover`: the wait's result does not depend on the log.
-        let _ = log.write(Level::Info, TARGET, "local.load_wait", ctx, fields);
-    }
-
-    fn log_load_end(&self, ctx: LogContext, polls: u64, waited: Duration, outcome: &LoadOutcome) {
-        let Some(log) = &self.log else { return };
-        let mut fields = self.base_fields();
-        let outcome = match outcome {
-            LoadOutcome::Ready => "loaded",
-            LoadOutcome::Cancelled => "cancelled",
-            LoadOutcome::Failed(error) => error.id(),
-        };
-        fields.insert("phase".into(), "end".into());
-        fields.insert("outcome".into(), outcome.into());
-        fields.insert("polls".into(), polls.into());
-        fields.insert("waited_ms".into(), millis(waited).into());
-        let _ = log.write(Level::Info, TARGET, "local.load_wait", ctx, fields);
-    }
-}
-
-/// The deadline of a load wait started at `start`: `load_timeout` clamped to
-/// [`MAX_LOAD_WAIT`], so it is always finite.
-fn load_deadline(start: Instant, load_timeout: Duration) -> Instant {
-    let bound = load_timeout.min(MAX_LOAD_WAIT);
-    // `start + MAX_LOAD_WAIT` fits on every supported platform; if it ever did not, the wait
-    // ends after one probe rather than never.
-    start.checked_add(bound).unwrap_or(start)
-}
-
-/// How a load wait ended.
-enum LoadOutcome {
-    Ready,
-    Cancelled,
-    Failed(LocalError),
-}
-
-fn millis(duration: Duration) -> u64 {
-    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
-}
-
-fn loaded_field(availability: &Availability) -> Value {
-    Value::Array(
-        availability
-            .loaded
-            .iter()
-            .map(|name| Value::String(name.clone()))
-            .collect(),
-    )
 }
 
 impl Backend for LocalBackend {
@@ -453,24 +264,5 @@ impl Backend for LocalBackend {
             self.served_once.store(true, Ordering::Release);
         }
         decoded
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_load_deadline_is_finite_for_huge_timeouts() {
-        let start = Clock::system().now();
-        assert_eq!(load_deadline(start, Duration::MAX) - start, MAX_LOAD_WAIT);
-        assert_eq!(
-            load_deadline(start, MAX_LOAD_WAIT + Duration::from_secs(1)) - start,
-            MAX_LOAD_WAIT
-        );
-        assert_eq!(
-            load_deadline(start, Duration::from_millis(1500)) - start,
-            Duration::from_millis(1500)
-        );
     }
 }
