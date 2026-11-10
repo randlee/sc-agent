@@ -1,28 +1,44 @@
-use std::collections::BTreeMap;
+//! [`ModelId`], the built-in model rows ([`MODELS`]) and their descriptor.
+
+use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::error::JevError;
+use crate::{ReleaseDate, ShortName, TypesError};
 
-/// A model string this build does not know.
+/// A provider-neutral model id, such as `claude-haiku-5-5` (REQ-SAG-0103).
 ///
-/// The field is private and there is no public constructor. The only ways to
-/// get one are [`ModelId::from_str`] (which returns the known variant for a
-/// known string, so [`ModelId::Other`] never holds a known string and the
-/// derived `PartialEq` and `Hash` stay correct) and `Deserialize`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UnknownModel(Arc<str>);
+/// It is non-empty and has no control characters. It names no provider: each provider maps
+/// it to its own id. The field is private; the ways to get one are [`FromStr`], serde and the
+/// built-in [`MODELS`] rows.
+///
+/// # Examples
+///
+/// ```
+/// use sc_agent_types::ModelId;
+///
+/// let id: ModelId = "claude-haiku-5-5".parse().unwrap();
+/// assert_eq!(id.as_str(), "claude-haiku-5-5");
+/// assert!("".parse::<ModelId>().is_err());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelId(Cow<'static, str>);
 
-impl UnknownModel {
-    /// The model string.
+impl ModelId {
+    /// The model id text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// A model id from a literal the crate knows is valid (the built-in rows).
+    pub(crate) const fn from_static(text: &'static str) -> Self {
+        Self(Cow::Borrowed(text))
+    }
 }
+
 impl fmt::Display for ModelId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
@@ -30,21 +46,33 @@ impl fmt::Display for ModelId {
 }
 
 impl FromStr for ModelId {
-    type Err = JevError;
+    type Err = TypesError;
 
-    /// Parses a model string: the known variant when the catalog has it,
-    /// else [`ModelId::Other`].
+    /// Parses any non-empty text with no control characters; the catalog is not consulted.
     ///
     /// # Errors
     ///
-    /// `INPUT_INVALID` when the text is empty or has a control character.
+    /// [`TypesError::InvalidModelId`] when the text is empty or has a control character.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         if text.is_empty() || text.chars().any(char::is_control) {
-            return Err(JevError::input_invalid(format!(
-                "model id {text:?} must be non-empty with no control characters; use a non-empty model string or an alias such as haiku"
-            )));
+            return Err(TypesError::InvalidModelId {
+                text: text.to_owned(),
+            });
         }
-        Ok(Self::known(text).unwrap_or_else(|| Self::Other(UnknownModel(Arc::from(text)))))
+        Ok(Self(Cow::Owned(text.to_owned())))
+    }
+}
+
+impl AsRef<str> for ModelId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+// The derived Eq, Ord and Hash on `Cow<str>` agree with those of `str`, as `Borrow` requires.
+impl Borrow<str> for ModelId {
+    fn borrow(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -60,110 +88,110 @@ impl<'de> Deserialize<'de> for ModelId {
         text.parse().map_err(serde::de::Error::custom)
     }
 }
-/// One row of [`MODELS`].
-#[derive(Debug, Clone, Copy)]
+
+/// One row of [`MODELS`]: a model id, the line it belongs to and its published release date.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelDescriptor {
-    model: &'static str,
-    family: ModelFamily,
-    alias: &'static str,
-    released: &'static str,
+    model: ModelId,
+    line: ShortName,
+    released: ReleaseDate,
 }
 
 impl ModelDescriptor {
-    /// The model string of this row, without parsing it.
-    #[must_use]
-    pub const fn model_str(&self) -> &'static str {
-        self.model
-    }
-
     /// The model of this row.
-    ///
-    /// # Panics
-    ///
-    /// Never for a `MODELS` row: `test_known_models_roundtrip` proves every
-    /// row string is a valid model string (M-PANIC-ON-BUG).
     #[must_use]
-    pub fn model(&self) -> ModelId {
-        self.model
-            .parse()
-            .expect("MODELS rows are valid model strings (test_known_models_roundtrip)")
+    pub const fn model(&self) -> &ModelId {
+        &self.model
     }
 
-    /// The model family.
+    /// The line this row belongs to.
     #[must_use]
-    pub const fn family(&self) -> ModelFamily {
-        self.family
+    pub const fn line(&self) -> ShortName {
+        self.line
     }
 
-    /// The alias this row answers to (`"jev"`, `"haiku"`, `"luna"`,
-    /// `"sonnet"`, `"opus"`, `"fable"`, `"terra"`, `"sol"`, `"astra"`).
+    /// The model's published release date.
     #[must_use]
-    pub const fn alias(&self) -> &'static str {
-        self.alias
-    }
-
-    /// Release date, `YYYY-MM-DD`.
-    #[must_use]
-    pub const fn released(&self) -> &'static str {
+    pub const fn released(&self) -> ReleaseDate {
         self.released
     }
 }
 
-/// The known models. Per alias, the newest `released` row is the default.
+// One const per built-in row, so the catalog can seed every line from a row of its own.
+// Dates are the published release dates (research/model-dates.md, checked 2026-11-09);
+// jev-1.13.0's date was supplied by the owner (docs.typesafe.ai publishes none).
+pub(crate) const JEV_1_13_0: ModelDescriptor = row(
+    ModelId::from_static("jev-1.13.0"),
+    ShortName::Jev,
+    ReleaseDate::ymd(2026, 9, 15),
+);
+pub(crate) const JEV_1_14_0: ModelDescriptor = row(
+    ModelId::from_static("jev-1.14.0"),
+    ShortName::Jev,
+    ReleaseDate::ymd(2026, 10, 14),
+);
+pub(crate) const CLAUDE_HAIKU_5_5: ModelDescriptor = row(
+    ModelId::from_static("claude-haiku-5-5"),
+    ShortName::Haiku,
+    ReleaseDate::ymd(2026, 10, 7),
+);
+pub(crate) const CLAUDE_SONNET_5_5: ModelDescriptor = row(
+    ModelId::from_static("claude-sonnet-5-5"),
+    ShortName::Sonnet,
+    ReleaseDate::ymd(2026, 9, 28),
+);
+pub(crate) const CLAUDE_OPUS_5_5: ModelDescriptor = row(
+    ModelId::from_static("claude-opus-5-5"),
+    ShortName::Opus,
+    ReleaseDate::ymd(2026, 9, 22),
+);
+pub(crate) const CLAUDE_FABLE_5_2: ModelDescriptor = row(
+    ModelId::from_static("claude-fable-5-2"),
+    ShortName::Fable,
+    ReleaseDate::ymd(2026, 11, 9),
+);
+pub(crate) const GPT_6_LUNA: ModelDescriptor = row(
+    ModelId::from_static("gpt-6-luna"),
+    ShortName::Luna,
+    ReleaseDate::ymd(2026, 9, 22),
+);
+pub(crate) const GPT_6_1_TERRA: ModelDescriptor = row(
+    ModelId::from_static("gpt-6.1-terra"),
+    ShortName::Terra,
+    ReleaseDate::ymd(2026, 10, 26),
+);
+pub(crate) const GPT_6_1_SOL: ModelDescriptor = row(
+    ModelId::from_static("gpt-6.1-sol"),
+    ShortName::Sol,
+    ReleaseDate::ymd(2026, 9, 29),
+);
+pub(crate) const GPT_6_ASTRA: ModelDescriptor = row(
+    ModelId::from_static("gpt-6-astra"),
+    ShortName::Astra,
+    ReleaseDate::ymd(2026, 9, 3),
+);
+
+/// The built-in models. Per line, the newest `released` row is the default.
 ///
-/// Only `jev`, `haiku` and `luna` are selectable as `--backend`; the other
-/// aliases are definitions for future agent work (agt-akp). Models added
-/// after this build go in `~/.sc-agent/models.toml` ([`ModelAliases::with_file_model`]);
-/// a local freshness test tells maintainers when this table is behind
-/// (randlee/sc-agent#48).
+/// Models released after this build are added through the global config
+/// ([`Catalog::with_config_model`](crate::Catalog::with_config_model)), with no rebuild.
 pub static MODELS: &[ModelDescriptor] = &[
-    row("jev-1.13.0", ModelFamily::TypeSafeJev, "jev", "2026-06-01"),
-    row("jev-1.14.0", ModelFamily::TypeSafeJev, "jev", "2026-10-22"),
-    row(
-        "claude-haiku-5-5",
-        ModelFamily::AnthropicClaude,
-        "haiku",
-        "2026-09-01",
-    ),
-    row(
-        "claude-sonnet-5-5",
-        ModelFamily::AnthropicClaude,
-        "sonnet",
-        "2026-09-01",
-    ),
-    row(
-        "claude-opus-5-5",
-        ModelFamily::AnthropicClaude,
-        "opus",
-        "2026-09-01",
-    ),
-    row(
-        "claude-fable-5-1",
-        ModelFamily::AnthropicClaude,
-        "fable",
-        "2026-10-01",
-    ),
-    row("gpt-6-luna", ModelFamily::OpenAiGpt, "luna", "2026-08-01"),
-    row(
-        "gpt-6.1-terra",
-        ModelFamily::OpenAiGpt,
-        "terra",
-        "2026-10-01",
-    ),
-    row("gpt-6.1-sol", ModelFamily::OpenAiGpt, "sol", "2026-10-01"),
-    row("gpt-6-astra", ModelFamily::OpenAiGpt, "astra", "2026-08-01"),
+    JEV_1_13_0,
+    JEV_1_14_0,
+    CLAUDE_HAIKU_5_5,
+    CLAUDE_SONNET_5_5,
+    CLAUDE_OPUS_5_5,
+    CLAUDE_FABLE_5_2,
+    GPT_6_LUNA,
+    GPT_6_1_TERRA,
+    GPT_6_1_SOL,
+    GPT_6_ASTRA,
 ];
 
-const fn row(
-    model: &'static str,
-    family: ModelFamily,
-    alias: &'static str,
-    released: &'static str,
-) -> ModelDescriptor {
+const fn row(model: ModelId, line: ShortName, released: ReleaseDate) -> ModelDescriptor {
     ModelDescriptor {
         model,
-        family,
-        alias,
+        line,
         released,
     }
 }
