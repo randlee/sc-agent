@@ -263,3 +263,104 @@ pub fn send(
     })?;
     Ok(delivered.expect("decide::send hands out one result"))
 }
+
+/// How long a test waits for a forced ordering event before it fails instead of hanging.
+/// A guard only: no assertion depends on how long anything took.
+pub const HANG_GUARD: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// A transport whose sends block until the test releases them, with bounded waits.
+///
+/// Like `sc_agent_http::testing::BlockingTransport`, but `wait_started` gives up after
+/// [`HANG_GUARD`] (and releases every send), so a broken ordering fails the test instead of
+/// hanging it. Clones share one gate.
+#[derive(Clone)]
+pub struct Gate {
+    inner: Arc<(Mutex<GateState>, std::sync::Condvar)>,
+}
+
+struct GateState {
+    reply: HttpResponse,
+    started: usize,
+    released: bool,
+}
+
+impl Gate {
+    pub fn new(reply: HttpResponse) -> Self {
+        Self {
+            inner: Arc::new((
+                Mutex::new(GateState {
+                    reply,
+                    started: 0,
+                    released: false,
+                }),
+                std::sync::Condvar::new(),
+            )),
+        }
+    }
+
+    /// Waits until `sends` sends have entered `send`; panics (after releasing) past the guard.
+    pub fn wait_started(&self, sends: usize) {
+        let (lock, condvar) = &*self.inner;
+        let state = lock.lock().expect("lock");
+        let (mut state, timeout) = condvar
+            .wait_timeout_while(state, HANG_GUARD, |state| state.started < sends)
+            .expect("wait");
+        if timeout.timed_out() {
+            state.released = true;
+            condvar.notify_all();
+            panic!("only {} of {sends} sends started", state.started);
+        }
+    }
+
+    /// Lets every blocked and later send return.
+    pub fn release(&self) {
+        let (lock, condvar) = &*self.inner;
+        lock.lock().expect("lock").released = true;
+        condvar.notify_all();
+    }
+
+    /// Sends that have entered `send`.
+    pub fn sends(&self) -> usize {
+        self.inner.0.lock().expect("lock").started
+    }
+}
+
+impl Transport for Gate {
+    fn send(&self, _request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+        let (lock, condvar) = &*self.inner;
+        let mut state = lock.lock().expect("lock");
+        state.started += 1;
+        condvar.notify_all();
+        let (state, _) = condvar
+            .wait_timeout_while(state, HANG_GUARD, |state| !state.released)
+            .expect("wait");
+        Ok(state.reply.clone())
+    }
+}
+
+/// Waits for `child` to exit, at most [`HANG_GUARD`]; past it the test fails (the waiting
+/// thread is left behind, so the test never hangs).
+pub fn finish(child: std::process::Child) -> std::process::Output {
+    let pid = child.id();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(child.wait_with_output());
+    });
+    receiver
+        .recv_timeout(HANG_GUARD)
+        .unwrap_or_else(|_| panic!("child {pid} did not exit within the hang guard"))
+        .expect("wait")
+}
+
+/// Runs `command` (stdin closed, output captured), bounded by [`HANG_GUARD`].
+pub fn run_bounded(command: &mut std::process::Command) -> std::process::Output {
+    use std::process::Stdio;
+    finish(
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn"),
+    )
+}

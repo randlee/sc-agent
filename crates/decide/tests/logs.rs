@@ -81,6 +81,95 @@ mod tests {
         assert_eq!(fields["agent_role"], "role");
     }
 
+    /// AC: REQ-SAG-0003 (QA-001). With no injected loggers, the batch path has written the
+    /// general log and the session rows by the time `send_batch` returns, even while a runner
+    /// worker is still alive and holds its logger handles (the CI failure: detached workers
+    /// keep the last handle, so a drop never flushes). One send is held in a
+    /// bounded `Gate` transport and cancelled, so that worker outlives the call deterministically;
+    /// the files are read before the transport is released.
+    #[test]
+    fn default_logs_are_written_when_a_batch_returns() {
+        let root = tempfile::tempdir().expect("root");
+        let dir = config_dir(&serde_json::json!({ "log_root": root.path() }).to_string());
+        let transport = crate::common::Gate::new(ok_noul());
+        let unused = MemoryLog::new().expect("log");
+        let mut ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport.clone()),
+            &unused,
+        );
+        ctx.general = None;
+        let mut options = options("jev", None, ctx, &unused);
+        options.session = None;
+        let cancel = CancelToken::new();
+        let canceller = {
+            let (transport, cancel) = (transport.clone(), cancel.clone());
+            std::thread::spawn(move || {
+                transport.wait_started(1);
+                cancel.cancel();
+            })
+        };
+        let mut count = 0;
+        decide::send_batch(&options, vec![request(NOUL)], &cancel, &mut |_| {
+            count += 1;
+            Ok(())
+        })
+        .expect("batch");
+        canceller.join().expect("canceller");
+        drop(options);
+        assert_eq!(count, 1);
+        // The blocked worker still holds the runner's logger handles here.
+        let general = std::fs::read_to_string(root.path().join("logs/decide.log.jsonl"))
+            .expect("the general log exists when send_batch returns");
+        assert!(general.contains("decide.send"), "{general}");
+        let mut rows = Vec::new();
+        find(root.path(), "sessions.jsonl", &mut rows);
+        assert_eq!(rows.len(), 1);
+        let text = std::fs::read_to_string(&rows[0]).expect("rows");
+        assert_eq!(text.lines().count(), 1);
+        transport.release();
+    }
+
+    /// AC: REQ-SAG-0002 (QA-006). A single send whose session log cannot be flushed still
+    /// hands out its completed result, then returns `decide.runner`.
+    #[test]
+    fn a_session_flush_failure_keeps_the_result() {
+        let log = MemoryLog::new().expect("log");
+        let dir = config_dir("{}");
+        let transport = ScriptedTransport::responses(vec![ok_noul()]);
+        let ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport),
+            &log,
+        );
+        let options = options("jev", None, ctx, &log);
+        // A refused row (a reserved identity key) is a lost row the next flush reports.
+        let session = options.session.clone().expect("session");
+        let mut payload = serde_json::Map::new();
+        payload.insert("repo".into(), "spoofed".into());
+        assert!(
+            session
+                .write(sc_agent_types::SessionId::new(), payload)
+                .is_err()
+        );
+        let mut delivered = None;
+        let error = decide::send(
+            &options,
+            request(NOUL),
+            &CancelToken::new(),
+            &mut |result| {
+                delivered = Some(result);
+                Ok(())
+            },
+        )
+        .expect_err("the flush reports the lost row");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.runner");
+        let result = delivered.expect("the result was handed out first");
+        assert!(result.outcome.is_ok());
+    }
+
     /// AC: ANC-007. One send, models and doctor write `decide.send`, `decide.models` and
     /// `decide.doctor` to the injected general log, with `http.send` from the shared client;
     /// no record holds a key value.

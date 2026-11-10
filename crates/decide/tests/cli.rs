@@ -12,19 +12,13 @@ mod common;
 #[test]
 fn help_lists_send_models_and_doctor() {
     let decide = env!("CARGO_BIN_EXE_decide");
-    let output = std::process::Command::new(decide)
-        .arg("--help")
-        .output()
-        .expect("run");
+    let output = common::run_bounded(std::process::Command::new(decide).arg("--help"));
     assert!(output.status.success());
     let text = String::from_utf8_lossy(&output.stdout);
     for command in ["send", "models", "doctor"] {
         assert!(text.contains(command), "{text}");
     }
-    let output = std::process::Command::new(decide)
-        .args(["send", "--help"])
-        .output()
-        .expect("run");
+    let output = common::run_bounded(std::process::Command::new(decide).args(["send", "--help"]));
     assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
 }
 
@@ -40,17 +34,21 @@ mod tests {
 
     use serde_json::Value;
 
-    use crate::common::{NOUL, NOUL_RESPONSE};
+    use std::sync::{Arc, Condvar, Mutex};
+
+    use crate::common::{HANG_GUARD, NOUL, NOUL_RESPONSE, finish, run_bounded};
 
     const DECIDE: &str = env!("CARGO_BIN_EXE_decide");
 
     /// What the loopback daemon does with `POST /v1/systemone`.
-    #[derive(Clone, Copy)]
+    #[derive(Clone)]
     enum Mode {
         /// Accept and never answer (the connection is held open).
         Hang,
         /// Answer 200 with [`NOUL_RESPONSE`].
         Answer,
+        /// Answer 200 once the test opens the gate (bounded by `HANG_GUARD`).
+        AnswerAfter(Arc<(Mutex<bool>, Condvar)>),
     }
 
     /// A Mapika-style daemon on 127.0.0.1: `/health` says loaded; each systemone request is
@@ -65,13 +63,14 @@ mod tests {
                 let sender = sender.clone();
                 let stream_copy = stream.try_clone().expect("clone");
                 held.push(stream_copy);
-                std::thread::spawn(move || serve(stream, mode, &sender));
+                let mode = mode.clone();
+                std::thread::spawn(move || serve(stream, &mode, &sender));
             }
         });
         (port, receiver)
     }
 
-    fn serve(stream: TcpStream, mode: Mode, sender: &mpsc::Sender<()>) {
+    fn serve(stream: TcpStream, mode: &Mode, sender: &mpsc::Sender<()>) {
         let mut reader = BufReader::new(stream.try_clone().expect("clone"));
         let mut writer = stream;
         loop {
@@ -111,6 +110,14 @@ mod tests {
                         return;
                     }
                     Mode::Answer => NOUL_RESPONSE,
+                    Mode::AnswerAfter(gate) => {
+                        let (lock, condvar) = &**gate;
+                        let open = lock.lock().expect("lock");
+                        let _ = condvar
+                            .wait_timeout_while(open, HANG_GUARD, |open| !*open)
+                            .expect("wait");
+                        NOUL_RESPONSE
+                    }
                 }
             };
             let reply = format!(
@@ -191,7 +198,7 @@ mod tests {
         let (port, sends) = loopback(Mode::Answer);
         let home = home(port);
         let file = batch_file(home.path(), 1);
-        let output = decide(
+        let output = run_bounded(&mut decide(
             home.path(),
             &[
                 "send",
@@ -203,9 +210,7 @@ mod tests {
                 "role",
                 file.to_str().expect("utf-8"),
             ],
-        )
-        .output()
-        .expect("run");
+        ));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
         assert_eq!(detail["id"], "decide.log");
@@ -225,7 +230,7 @@ mod tests {
         let path = home.path().join("bad.jsonl");
         let bad = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"score"}}}"#;
         std::fs::write(&path, format!("{NOUL}\n{bad}\n{NOUL}\n")).expect("batch");
-        let output = decide(
+        let output = run_bounded(&mut decide(
             home.path(),
             &[
                 "send",
@@ -238,9 +243,7 @@ mod tests {
                 "role",
                 path.to_str().expect("utf-8"),
             ],
-        )
-        .output()
-        .expect("run");
+        ));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
         assert_eq!(detail["id"], "decide.request_invalid");
@@ -263,7 +266,7 @@ mod tests {
         let (port, _sends) = loopback(Mode::Answer);
         let home = home(port);
         let file = batch_file(home.path(), 3);
-        let output = decide(
+        let output = run_bounded(&mut decide(
             home.path(),
             &[
                 "send",
@@ -276,9 +279,7 @@ mod tests {
                 "role",
                 file.to_str().expect("utf-8"),
             ],
-        )
-        .output()
-        .expect("run");
+        ));
         assert_eq!(
             output.status.code(),
             Some(0),
@@ -307,9 +308,13 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0701 output. A closed stdout makes decide cancel and report `decide.write`.
+    ///
+    /// Ordered: the runner answers only after the test has closed decide's stdout (and seen
+    /// the send arrive), so the first write always meets a closed pipe.
     #[test]
     fn a_closed_stdout_is_decide_write() {
-        let (port, _sends) = loopback(Mode::Answer);
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let (port, sends) = loopback(Mode::AnswerAfter(Arc::clone(&gate)));
         let home = home(port);
         let file = batch_file(home.path(), 3);
         let mut child = decide(
@@ -331,7 +336,15 @@ mod tests {
         .spawn()
         .expect("spawn");
         drop(child.stdout.take());
-        let output = child.wait_with_output().expect("wait");
+        sends
+            .recv_timeout(HANG_GUARD)
+            .expect("a request reached the runner");
+        {
+            let (lock, condvar) = &*gate;
+            *lock.lock().expect("lock") = true;
+            condvar.notify_all();
+        }
+        let output = finish(child);
         assert_eq!(output.status.code(), Some(1));
         assert_eq!(stderr_detail(&output)["id"], "decide.write");
     }
@@ -373,7 +386,7 @@ mod tests {
                 .status()
                 .expect("kill");
             assert!(status.success());
-            let output = child.wait_with_output().expect("wait");
+            let output = finish(child);
             assert_eq!(
                 output.status.code(),
                 Some(130),
@@ -437,9 +450,17 @@ mod tests {
         .spawn()
         .expect("spawn");
         let held_stdin = child.stdin.take().expect("stdin");
-        let mut writer = std::fs::OpenOptions::new()
-            .write(true)
-            .open(&fifo)
+        // Opening the FIFO's write end blocks until decide opens it to read; bounded.
+        let (opened, writer) = mpsc::channel();
+        {
+            let fifo = fifo.clone();
+            std::thread::spawn(move || {
+                let _ = opened.send(std::fs::OpenOptions::new().write(true).open(&fifo));
+            });
+        }
+        let mut writer = writer
+            .recv_timeout(HANG_GUARD)
+            .expect("decide opened its config")
             .expect("fifo");
         write!(
             writer,
@@ -452,14 +473,7 @@ mod tests {
             .status()
             .expect("kill");
         assert!(status.success());
-        let (sender, receiver) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = sender.send(child.wait_with_output());
-        });
-        let output = receiver
-            .recv_timeout(Duration::from_secs(10))
-            .expect("decide exits on SIGTERM while stdin is open")
-            .expect("wait");
+        let output = finish(child);
         drop(held_stdin);
         assert_eq!(
             output.status.code(),

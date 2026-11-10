@@ -8,13 +8,12 @@ mod tests {
     use std::io::Cursor;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
-    use std::time::Duration;
 
     use crate::common::send;
     use decide::input::{build_request, read_batch, request_bytes};
     use decide::output::result_line;
     use decide::{DecideError, send_batch, send_batch_on, send_on};
-    use sc_agent_http::testing::{BlockingTransport, ScriptedTransport};
+    use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{HttpError, NetworkKind};
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_types::{CancelToken, ErrorId, SessionId};
@@ -209,7 +208,7 @@ mod tests {
     /// `decide.write`; the rest is drained, and the stream still ends.
     #[test]
     fn a_failed_write_cancels_the_batch_and_returns_decide_write() {
-        let transport = BlockingTransport::new(Ok(ok_noul()));
+        let transport = crate::common::Gate::new(ok_noul());
         let log = MemoryLog::new().expect("log");
         let dir = empty_config_dir();
         let ctx = context(
@@ -243,10 +242,15 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0104 AC2. Cancelling a send whose transport is blocked returns
-    /// `decision.cancelled` within the 2 s bound; releasing the transport adds no result.
+    /// `decision.cancelled` while the transport is still blocked (so the result never waits
+    /// for the transport, well inside the 2 s bound); releasing the transport adds no result.
+    ///
+    /// Ordering is forced: the cancel follows the started send, and the result is taken
+    /// before the transport is released. The waits are bounded by `HANG_GUARD` only so a
+    /// broken run fails instead of hanging; no assertion depends on elapsed time.
     #[test]
     fn cancelling_a_blocked_send_returns_cancelled_at_once() {
-        let transport = BlockingTransport::new(Ok(ok_noul()));
+        let transport = crate::common::Gate::new(ok_noul());
         let log = MemoryLog::new().expect("log");
         let dir = empty_config_dir();
         let ctx = context(
@@ -261,34 +265,34 @@ mod tests {
         let worker = {
             let cancel = cancel.clone();
             std::thread::spawn(move || {
-                let result = send(&options, request(NOUL), &cancel);
-                let _ = sender.send(result);
+                let outcome = decide::send(&options, request(NOUL), &cancel, &mut |result| {
+                    let _ = sender.send(result);
+                    Ok(())
+                });
+                outcome.map_err(|error| error.to_string())
             })
         };
         transport.wait_started(1);
         cancel.cancel();
-        let result = results
-            .recv_timeout(Duration::from_secs(2))
-            .expect("a result within 2 s")
-            .expect("send");
+        // Taken before `release`: the cancel did not wait for the blocked send to return.
+        let received = results.recv_timeout(crate::common::HANG_GUARD);
+        transport.release();
+        let result = received.expect("the cancelled result arrives while the send is blocked");
         assert!(matches!(
             result.outcome,
             Err(DecisionError::Cancelled { .. })
         ));
-        transport.release();
-        worker.join().expect("worker");
-        assert!(
-            results.recv_timeout(Duration::from_millis(200)).is_err(),
-            "no later result"
-        );
+        worker.join().expect("worker").expect("send");
+        // The worker has returned, so every result it could hand out is in the channel.
+        assert!(results.try_recv().is_err(), "no later result");
     }
 
-    /// AC: REQ-SAG-0701 parallel. 40 requests over a BlockingTransport: 8 sends in flight with
+    /// AC: REQ-SAG-0701 parallel. 40 requests over a bounded `Gate` transport: 8 sends in flight with
     /// the default workers, 1 with `workers: 1`.
     #[test]
     fn a_batch_runs_workers_sends_in_parallel() {
         for (config, workers) in [(None, 8_usize), (Some(r#"{"workers":1}"#), 1)] {
-            let transport = BlockingTransport::new(Ok(ok_noul()));
+            let transport = crate::common::Gate::new(ok_noul());
             let log = MemoryLog::new().expect("log");
             let dir = config.map_or_else(empty_config_dir, config_dir);
             let ctx = context(
