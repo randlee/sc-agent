@@ -11,10 +11,10 @@ use std::fmt;
 
 use sc_agent_types::{CancelToken, SessionId};
 
-use crate::DecisionError;
 use crate::digest::{QuestionDigest, question_digests};
+use crate::error::{DecisionError, LimitKind};
 use crate::map::OrderedMap;
-use crate::request::{ImageFormat, Question, SystemOneRequest};
+use crate::request::{Asset, AssetKind, ImageFormat, Question, SystemOneRequest};
 use crate::response::SystemOneResponse;
 
 /// The most image parts one request may carry (REQ-SAG-0014).
@@ -36,7 +36,7 @@ pub const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 /// let body = SystemOneRequest::from_json(
 ///     r#"{"model":"m","state":"see the image","questions":{"q":{"type":"box"}},"assets":{"img":{"type":"image","format":"png","part":"img1"}}}"#,
 /// )?;
-/// let part = ImagePart { name: "img1".to_owned(), format: ImageFormat::Png, bytes: vec![0x89, b'P'] };
+/// let part = ImagePart::new("img1", ImageFormat::Png, vec![0x89, b'P']);
 /// let request = DecisionRequest::new(body, vec![part], false)?;
 /// assert!(request.needs_images_header());
 /// assert_eq!(request.digests().len(), 1);
@@ -53,14 +53,20 @@ pub struct DecisionRequest {
 impl DecisionRequest {
     /// A request of `body`, its multipart `image_parts` and the long-context header flag.
     ///
+    /// `long_context` is a plain `bool` deliberately: the owner fixed this signature in the
+    /// plan (one header, on or off).
+    ///
     /// # Errors
     ///
     /// Checked in this order:
     ///
-    /// - [`DecisionError::Limits`] with `what = "images"` when there are more than
-    ///   [`MAX_IMAGES`] parts, or `what = "image_bytes"` when a part has more than
-    ///   [`MAX_IMAGE_BYTES`] bytes;
-    /// - [`DecisionError::ImageParts`], naming the asset id or part name, when an
+    /// - [`DecisionError::Limits`] with [`LimitKind::Images`] when the request has more than
+    ///   [`MAX_IMAGES`] images (image assets, inline or by part, plus any part no asset
+    ///   names), or [`LimitKind::ImageBytes`] when one image has more than
+    ///   [`MAX_IMAGE_BYTES`] bytes (a part's bytes, or an inline asset's decoded
+    ///   `data_base64`);
+    /// - [`DecisionError::ImageParts`], naming the asset id or part name, when a part is
+    ///   named `request` (reserved for the JSON body), two assets name one part, an
     ///   `Asset.part` names no part or more than one, two parts share a name, or a part is
     ///   referenced by no asset;
     /// - [`DecisionError::Encode`] when the question digests cannot be computed (serde_json
@@ -70,7 +76,7 @@ impl DecisionRequest {
         image_parts: Vec<ImagePart>,
         long_context: bool,
     ) -> Result<Self, DecisionError> {
-        check_limits(&image_parts)?;
+        check_limits(&body, &image_parts)?;
         check_image_parts(&body, &image_parts)?;
         let digests = question_digests(&body, &image_parts, long_context)?;
         Ok(Self {
@@ -135,29 +141,79 @@ impl TryFrom<SystemOneRequest> for DecisionRequest {
     }
 }
 
-fn check_limits(image_parts: &[ImagePart]) -> Result<(), DecisionError> {
-    if image_parts.len() > MAX_IMAGES {
+/// The bytes `data_base64` decodes to: three per four characters, less the `=` padding.
+///
+/// Exact for valid base64; the provider refuses invalid base64 (this crate passes it on).
+fn decoded_len(data_base64: &str) -> usize {
+    let unpadded = data_base64.trim_end_matches('=').len();
+    unpadded / 4 * 3 + (unpadded % 4 * 3) / 4
+}
+
+/// Whether `asset` is an image: kind `image`, or no kind (image is the only kind).
+fn is_image(asset: &Asset) -> bool {
+    matches!(asset.kind, None | Some(AssetKind::Image))
+}
+
+fn check_limits(body: &SystemOneRequest, image_parts: &[ImagePart]) -> Result<(), DecisionError> {
+    let assets: Vec<&Asset> = body
+        .assets
+        .iter()
+        .flat_map(OrderedMap::iter)
+        .map(|(_, asset)| asset)
+        .filter(|asset| is_image(asset))
+        .collect();
+    // Every image is an image asset (inline or by part); a part no asset names is one more
+    // image (and refused later as unreferenced).
+    let unnamed_parts = image_parts
+        .iter()
+        .filter(|part| {
+            !assets
+                .iter()
+                .any(|asset| asset.part.as_deref() == Some(part.name.as_str()))
+        })
+        .count();
+    let images = assets
+        .len()
+        .saturating_add(unnamed_parts)
+        .max(image_parts.len());
+    if images > MAX_IMAGES {
         return Err(DecisionError::Limits {
-            what: "images",
+            what: LimitKind::Images,
             max: MAX_IMAGES as u64,
         });
     }
-    if image_parts
+    let inline_too_large = assets
         .iter()
-        .any(|part| part.bytes.len() > MAX_IMAGE_BYTES)
-    {
+        .filter(|asset| asset.part.is_none())
+        .filter_map(|asset| asset.data_base64.as_deref())
+        .any(|data| decoded_len(data) > MAX_IMAGE_BYTES);
+    let part_too_large = image_parts
+        .iter()
+        .any(|part| part.bytes.len() > MAX_IMAGE_BYTES);
+    if inline_too_large || part_too_large {
         return Err(DecisionError::Limits {
-            what: "image_bytes",
+            what: LimitKind::ImageBytes,
             max: MAX_IMAGE_BYTES as u64,
         });
     }
     Ok(())
 }
 
+/// The multipart part name that carries the JSON body (TypeSafe images guide).
+const RESERVED_PART: &str = "request";
+
 fn check_image_parts(
     body: &SystemOneRequest,
     image_parts: &[ImagePart],
 ) -> Result<(), DecisionError> {
+    if let Some(part) = image_parts.iter().find(|part| part.name == RESERVED_PART) {
+        return Err(DecisionError::ImageParts {
+            detail: format!(
+                "image part `{}` uses the name reserved for the JSON body; rename the part and its asset's `part`",
+                part.name
+            ),
+        });
+    }
     let mut parts_by_name: BTreeMap<&str, usize> = BTreeMap::new();
     for part in image_parts {
         *parts_by_name.entry(part.name.as_str()).or_default() += 1;
@@ -168,7 +224,15 @@ fn check_image_parts(
         .flat_map(OrderedMap::iter)
         .filter_map(|(id, asset)| asset.part.as_deref().map(|part| (id.as_str(), part)))
         .collect::<Vec<_>>();
+    let mut named_by: BTreeMap<&str, &str> = BTreeMap::new();
     for &(asset_id, part_name) in &referenced {
+        if let Some(first) = named_by.insert(part_name, asset_id) {
+            return Err(DecisionError::ImageParts {
+                detail: format!(
+                    "assets `{first}` and `{asset_id}` both name part `{part_name}`; each image part belongs to exactly one asset"
+                ),
+            });
+        }
         match parts_by_name.get(part_name).copied().unwrap_or(0) {
             0 => {
                 return Err(DecisionError::ImageParts {
@@ -196,7 +260,7 @@ fn check_image_parts(
     }
     if let Some(part) = image_parts
         .iter()
-        .find(|part| !referenced.iter().any(|&(_, name)| name == part.name))
+        .find(|part| !named_by.contains_key(part.name.as_str()))
     {
         return Err(DecisionError::ImageParts {
             detail: format!(
@@ -210,8 +274,10 @@ fn check_image_parts(
 
 /// One multipart image part: its part name, format and bytes.
 ///
-/// `Debug` shows the name, format and byte length, not the bytes.
+/// `Debug` shows the name, format and byte length, not the bytes. Build it with
+/// [`ImagePart::new`]; the fields stay readable.
 #[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ImagePart {
     /// The multipart part name an `Asset.part` refers to.
     pub name: String,
@@ -219,6 +285,18 @@ pub struct ImagePart {
     pub format: ImageFormat,
     /// The image bytes.
     pub bytes: Vec<u8>,
+}
+
+impl ImagePart {
+    /// An image part named `name` of `format` carrying `bytes`.
+    #[must_use]
+    pub fn new(name: impl Into<String>, format: ImageFormat, bytes: Vec<u8>) -> Self {
+        Self {
+            name: name.into(),
+            format,
+            bytes,
+        }
+    }
 }
 
 impl fmt::Debug for ImagePart {
@@ -235,8 +313,9 @@ impl fmt::Debug for ImagePart {
 /// One result of [`Decision::decide`] or [`Decision::decide_stream`].
 ///
 /// The decided response is [`SystemOneResponse`], the one response form (ADR-SAG-0001); there
-/// is no wrapper type.
+/// is no wrapper type. Build it with [`DecisionResult::new`]; the fields stay readable.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct DecisionResult {
     /// The session of this request, a ULID (REQ-SAG-0001).
     pub session_id: SessionId,
@@ -246,6 +325,27 @@ pub struct DecisionResult {
     pub digests: OrderedMap<String, QuestionDigest>,
     /// The decided response, or why there is none.
     pub outcome: Result<SystemOneResponse, DecisionError>,
+}
+
+impl DecisionResult {
+    /// The result of the request at `position` in session `session_id`.
+    ///
+    /// `digests` is the request's [`DecisionRequest::digests`] (cloned), so every result
+    /// carries one digest per question.
+    #[must_use]
+    pub fn new(
+        session_id: SessionId,
+        position: u64,
+        digests: OrderedMap<String, QuestionDigest>,
+        outcome: Result<SystemOneResponse, DecisionError>,
+    ) -> Self {
+        Self {
+            session_id,
+            position,
+            digests,
+            outcome,
+        }
+    }
 }
 
 /// The sync decision API, implemented by sc-decision-runner.

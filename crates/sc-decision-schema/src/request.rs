@@ -1,15 +1,25 @@
 //! The POST /v1/systemone request body: [`SystemOneRequest`] and its parts.
 //!
-//! Shapes follow the TypeSafe OpenAPI document (v0.2.0). Field order is the wire order and
-//! every object keeps its key order, so a parsed request serialises back byte-identical.
-//! Unknown fields are refused: a typo in a request names its field instead of being dropped.
+//! Shapes follow the TypeSafe OpenAPI document (v0.2.0). A request parsed by
+//! [`SystemOneRequest::from_json`] keeps its document's key order, so a documented example
+//! serialises back byte-identical; values inside `serde_json::Value` fields (state,
+//! instructions, criteria) keep their value, but a number's text may change (`1.50` comes
+//! back as `1.5`). Unknown fields are refused: a typo in a request names its field instead
+//! of being dropped.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::DecisionError;
+use crate::key_order::{self, KeyOrder, Ordered};
 use crate::map::OrderedMap;
 
-/// The POST /v1/systemone body. Field order is the wire order.
+/// The POST /v1/systemone body.
+///
+/// The pub fields deliberately mirror the wire spec (TypeSafe openapi.json v0.2.0): one field
+/// per JSON property, read and set directly. A request parsed by [`Self::from_json`] keeps the
+/// key order of its document, nested objects included, and serialises back in it; one built
+/// by [`Self::new`] serialises in schema order (`model`, `state`, `questions`, `assets`).
+/// Equality compares the fields only, not the key order.
 ///
 /// # Examples
 ///
@@ -22,8 +32,8 @@ use crate::map::OrderedMap;
 /// assert_eq!(request.to_json()?, text);
 /// # Ok::<(), sc_decision_schema::DecisionError>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct SystemOneRequest {
     /// The model name (GET /v1/models lists them).
     pub model: String,
@@ -34,33 +44,46 @@ pub struct SystemOneRequest {
     /// Images the state and questions refer to, by asset id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assets: Option<OrderedMap<String, Asset>>,
+    /// The key order of the parsed document; empty for a built request.
+    #[serde(skip)]
+    key_order: KeyOrder,
 }
 
 impl SystemOneRequest {
+    /// A request of these fields; it serialises in schema order.
+    #[must_use]
+    pub fn new(
+        model: impl Into<String>,
+        state: State,
+        questions: OrderedMap<String, Question>,
+        assets: Option<OrderedMap<String, Asset>>,
+    ) -> Self {
+        Self {
+            model: model.into(),
+            state,
+            questions,
+            assets,
+            key_order: KeyOrder::default(),
+        }
+    }
+
     /// Parses a request from JSON text, naming the failing field (REQ-SAG-0504).
+    ///
+    /// The document's key order is kept for [`Self::to_json`].
     ///
     /// # Errors
     ///
-    /// [`DecisionError::RequestParse`] with the field path (`.` at the root) and the full
-    /// serde_json message, including line and column, when `text` is not a request.
+    /// [`DecisionError::RequestParse`] with the field path (`.` at the root, or the unknown
+    /// field's name) and the full serde_json message, including line and column, when `text`
+    /// is not a request.
     pub fn from_json(text: &str) -> Result<Self, DecisionError> {
-        let mut deserializer = serde_json::Deserializer::from_str(text);
-        let request = serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
-            DecisionError::RequestParse {
-                path: error.path().to_string(),
-                message: error.inner().to_string(),
-            }
-        })?;
-        deserializer
-            .end()
-            .map_err(|error| DecisionError::RequestParse {
-                path: ".".to_owned(),
-                message: error.to_string(),
-            })?;
-        Ok(request)
+        key_order::parse(text.as_bytes()).map_err(|error| DecisionError::RequestParse {
+            path: error.path,
+            message: error.message,
+        })
     }
 
-    /// The request as compact JSON, in wire order.
+    /// The request as compact JSON, in its document's key order (schema order when built).
     ///
     /// # Errors
     ///
@@ -72,9 +95,51 @@ impl SystemOneRequest {
     }
 }
 
+impl PartialEq for SystemOneRequest {
+    fn eq(&self, other: &Self) -> bool {
+        self.model == other.model
+            && self.state == other.state
+            && self.questions == other.questions
+            && self.assets == other.assets
+    }
+}
+
+impl Ordered for SystemOneRequest {
+    fn wire_deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Self::deserialize(deserializer)
+    }
+
+    fn wire_serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        Self::serialize(self, serializer)
+    }
+
+    fn key_order(&self) -> &KeyOrder {
+        &self.key_order
+    }
+
+    fn set_key_order(&mut self, order: KeyOrder) {
+        self.key_order = order;
+    }
+}
+
+impl Serialize for SystemOneRequest {
+    /// Writes the document's key order (schema order when built).
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        key_order::serialize(self, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SystemOneRequest {
+    /// Parses in schema order without recording the key order; [`Self::from_json`] keeps it.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Self::deserialize(deserializer)
+    }
+}
+
 /// What the questions are asked about: a string, an object or an array.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum State {
     /// Plain text.
     Text(String),
@@ -91,6 +156,7 @@ pub enum State {
 /// `Some(Value::Null)` (or `Some(None)` for noul criteria).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[non_exhaustive]
 pub enum Question {
     /// A yes/no question; the answer is the probability of yes.
     Noul {
@@ -146,6 +212,8 @@ pub enum Question {
 }
 
 /// What yes (`true`) and no (`false`) mean for a noul question.
+///
+/// The pub fields deliberately mirror the wire spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NoulCriteria {
@@ -168,12 +236,15 @@ pub struct NoulCriteria {
 }
 
 /// One image the request refers to: inline (`data_base64`) or a multipart part (`part`).
+///
+/// The pub fields deliberately mirror the wire spec; every property is optional in
+/// openapi.json v0.2.0, `type` included.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Asset {
-    /// The asset kind (`"image"`).
-    #[serde(rename = "type")]
-    pub kind: AssetKind,
+    /// The asset kind (`"image"`, the only kind); absent when the document omits it.
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<AssetKind>,
     /// The image format.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<ImageFormat>,
@@ -188,6 +259,7 @@ pub struct Asset {
 /// The kind of an [`Asset`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum AssetKind {
     /// An image.
     Image,
@@ -196,6 +268,7 @@ pub enum AssetKind {
 /// The format of an image asset or part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ImageFormat {
     /// PNG.
     Png,

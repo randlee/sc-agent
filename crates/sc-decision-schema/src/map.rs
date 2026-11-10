@@ -5,6 +5,7 @@
 //! keeps that order through a round trip and refuses a key given twice, both when parsing
 //! and when built from pairs.
 
+use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::marker::PhantomData;
@@ -75,13 +76,36 @@ impl<K, V> OrderedMap<K, V> {
     }
 }
 
-impl<K: PartialEq, V> OrderedMap<K, V> {
-    /// The value of `key`, if present.
+impl<K, V> OrderedMap<K, V> {
+    /// The value of `key`, if present; `key` may be any borrowed form (`map.get("q1")`).
     #[must_use]
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + PartialEq,
+    {
         self.0
             .iter()
-            .find_map(|(candidate, value)| (candidate == key).then_some(value))
+            .find_map(|(candidate, value)| (candidate.borrow() == key).then_some(value))
+    }
+}
+
+/// The pairs of an [`OrderedMap`] as `(&key, &value)`, in order.
+type PairRefs<'a, K, V> =
+    std::iter::Map<std::slice::Iter<'a, (K, V)>, fn(&'a (K, V)) -> (&'a K, &'a V)>;
+
+fn pair_refs<K, V>((key, value): &(K, V)) -> (&K, &V) {
+    (key, value)
+}
+
+impl<'a, K, V> IntoIterator for &'a OrderedMap<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = PairRefs<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
+            .iter()
+            .map(pair_refs as fn(&'a (K, V)) -> (&'a K, &'a V))
     }
 }
 

@@ -9,14 +9,10 @@ mod tests {
 
     use sc_agent_http::{HttpError, NetworkKind};
     use sc_agent_types::{ErrorDetail, ErrorId};
-    use sc_decision_schema::{DecisionError, HttpBadRequestError, HttpValidationError};
+    use sc_decision_schema::{DecisionError, HttpBadRequestError, HttpValidationError, LimitKind};
 
     fn network() -> HttpError {
-        HttpError::Network {
-            kind: NetworkKind::Connect,
-            attempts: 1,
-            message: "connection refused".to_owned(),
-        }
+        HttpError::network(NetworkKind::Connect, 1, "connection refused")
     }
 
     fn llm_chain() -> ErrorDetail {
@@ -49,7 +45,7 @@ mod tests {
             detail: "image part `p` is referenced by no asset".to_owned(),
         },
         DecisionError::Limits {
-            what: "images",
+            what: LimitKind::Images,
             max: 20,
         },
         DecisionError::ApiBadRequest {
@@ -154,6 +150,44 @@ mod tests {
         );
         // Display is this level only.
         assert!(!error.to_string().contains("the provider is busy"));
+    }
+
+    /// RBP-F004: these variants carry a static recovery hint, kept out of the message.
+    #[test]
+    fn recovery_hints() {
+        for error in every_variant() {
+            if let DecisionError::Http(inner) = &error {
+                assert_eq!(
+                    error.recovery(),
+                    inner.recovery(),
+                    "decision.http forwards a-5's"
+                );
+                continue;
+            }
+            let expected = matches!(
+                error.id(),
+                "decision.request_parse"
+                    | "decision.duplicate_key"
+                    | "decision.encode"
+                    | "decision.image_parts"
+                    | "decision.limits"
+                    | "decision.api_bad_request"
+                    | "decision.api_validation"
+                    | "decision.schema_mismatch"
+                    | "decision.shutdown"
+            );
+            match error.recovery() {
+                Some(recovery) => {
+                    assert!(expected, "{}: unexpected recovery", error.id());
+                    assert!(!recovery.is_empty());
+                    assert!(!error.message().contains(recovery), "{}", error.id());
+                    assert!(!error.to_string().contains(recovery), "{}", error.id());
+                }
+                None => assert!(!expected, "{}: no recovery", error.id()),
+            }
+        }
+        assert_eq!(LimitKind::Images.as_str(), "images");
+        assert_eq!(LimitKind::ImageBytes.to_string(), "image_bytes");
     }
 
     #[test]
