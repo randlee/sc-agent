@@ -68,4 +68,75 @@ mod tests {
         assert!(cancel.is_cancelled());
         assert!(watch.interrupted());
     }
+
+    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. `on_interrupt` during a `send_batch` over a
+    /// blocked transport cancels the token; every unfinished request ends `decision.cancelled`
+    /// and the session log holds one row per started request.
+    #[test]
+    fn an_interrupt_during_a_batch_cancels_every_unfinished_request() {
+        use sc_agent_http::HttpResponse;
+        use sc_agent_http::testing::BlockingTransport;
+        use sc_agent_log::testing::MemoryLog;
+        use sc_agent_log::{Repo, SessionIdentity, Slug};
+        use sc_decision_schema::DecisionError;
+
+        let dir = tempfile::tempdir().expect("dir");
+        let transport = BlockingTransport::new(Ok(HttpResponse::new(200, Vec::new(), Vec::new())));
+        let log = MemoryLog::new().expect("log");
+        let context = crate::Context {
+            service: "decide",
+            config_dir: Some(dir.path().to_path_buf()),
+            environment: Some(vec![("TYPESAFE_API_KEY".into(), "ts-signal-test".into())]),
+            keyring: None,
+            transport: Some(Arc::new(transport.clone())),
+            general: Some(log.general()),
+        };
+        let identity =
+            SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "proj", "role")
+                .expect("identity");
+        let options = crate::SendOptions {
+            model: crate::ModelSelector::Short(sc_agent_types::ShortName::Jev),
+            provider: None,
+            project: Slug::new("project", "proj").expect("slug"),
+            agent_role: Slug::new("agent_role", "role").expect("slug"),
+            context,
+            session: Some(log.session(identity)),
+        };
+        let json = br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
+        let requests = (0..12)
+            .map(|_| crate::input::build_request(json, &[], false, None).expect("request"))
+            .collect();
+        let cancel = CancelToken::new();
+        let interrupted = Arc::new(AtomicBool::new(false));
+        let handler = {
+            let (cancel, interrupted, transport) =
+                (cancel.clone(), Arc::clone(&interrupted), transport.clone());
+            std::thread::spawn(move || {
+                transport.wait_started(8);
+                on_interrupt(&cancel, &interrupted);
+            })
+        };
+        let mut results = Vec::new();
+        crate::send_batch(&options, requests, &cancel, &mut |result| {
+            results.push(result);
+            Ok(())
+        })
+        .expect("batch");
+        handler.join().expect("handler");
+        transport.release();
+        assert!(interrupted.load(Ordering::Acquire));
+        assert_eq!(results.len(), 12);
+        assert!(
+            results
+                .iter()
+                .all(|result| matches!(result.outcome, Err(DecisionError::Cancelled { .. })))
+        );
+        let rows = log
+            .records()
+            .expect("records")
+            .into_iter()
+            .filter(|record| record.action == "session.row")
+            .count();
+        assert_eq!(rows, 12, "one row per started request");
+    }
 }
