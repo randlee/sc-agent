@@ -16,6 +16,11 @@ sc-agent-log = { path = "../sc-agent-log" }
 sc-agent-secrets = { path = "../sc-agent-secrets" }
 sc-agent-types = { path = "../sc-agent-types" }
 serde_json = "1"
+# Exact pin: the transport depends on ureq 3.5 config APIs (Agent::config_builder,
+# timeout_connect / timeout_global, Agent::configure_request for the per-request
+# deadline, unversioned::resolver for LookupResolver) and on how 3.5 reports
+# errors (io::Error kinds, Error::Timeout). A ureq upgrade is a reviewed change
+# that re-runs tests/ureq.rs, not a semver float. Advisories: CI cargo-deny job.
 ureq = "=3.5.1"
 
 [dev-dependencies]

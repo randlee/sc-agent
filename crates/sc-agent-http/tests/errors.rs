@@ -68,19 +68,13 @@ mod cases {
                 attempts: 1,
                 reply: Box::new(reply(429, "quota")),
             },
-            HttpError::Network {
-                kind: NetworkKind::Timeout,
-                attempts: 2,
-                message: "ureq.Timeout.Global: timeout: global".to_owned(),
-            },
+            HttpError::network(NetworkKind::Timeout, 2, "the request timed out"),
             HttpError::ResponseTooLarge {
                 status: 200,
                 limit_bytes: 8 * 1024 * 1024,
             },
             Endpoint::parse("http://x.test/").expect_err("http refused"),
-            HttpError::InvalidRequest {
-                message: "http.builder: invalid HTTP header name".to_owned(),
-            },
+            HttpError::invalid_request("the HTTP builder refused a header name or value"),
             HttpError::KeyOnPlainHttp {
                 host: "10.0.0.5".to_owned(),
             },
@@ -143,7 +137,10 @@ mod cases {
                 expected = expected.with_recovery(recovery);
             }
             assert_eq!(error.detail(), expected);
-            assert!(std::error::Error::source(error).is_none());
+            assert_eq!(
+                std::error::Error::source(error).is_some(),
+                error.cause_detail().is_some()
+            );
         }
         let with_recovery: HashSet<&str> = errors
             .iter()
@@ -164,17 +161,32 @@ mod cases {
     /// from every error text, Debug output and log event.
     #[test]
     fn key_never_leaks() {
-        let echo = HttpError::Network {
-            kind: NetworkKind::Other,
-            attempts: 1,
-            message: format!("io.Other: proxy echoed Authorization: Bearer {KEY}"),
-        };
+        let echo = HttpError::network(
+            NetworkKind::Other,
+            1,
+            format!("proxy echoed Authorization: Bearer {KEY}"),
+        )
+        .with_cause(ErrorDetail::new(
+            "io.Other",
+            format!("echo {KEY}"),
+            Some(ErrorDetail::new(
+                "foreign.source",
+                format!("inner {KEY}"),
+                None,
+            )),
+        ));
         let error = send_err(
             Arc::new(ScriptedTransport::new(vec![Err(echo)])),
             &keyed_request(),
         );
         assert!(!rendered(&error).contains(KEY), "{}", rendered(&error));
         assert!(error.message().contains("Bearer [redacted]"));
+        let cause = error.cause_detail().expect("cause kept");
+        assert_eq!(cause.message, "echo [redacted]");
+        assert_eq!(
+            cause.cause.map(|inner| inner.message),
+            Some("inner [redacted]".to_owned())
+        );
 
         let busy_body = format!(
             r#"{{"error":{{"type":"overloaded","message":"key {KEY} is busy","code":"{KEY}"}}}}"#
@@ -243,12 +255,8 @@ mod cases {
         let transport = UreqTransport::new(Timeouts::probe());
         let direct = transport.send(&request).expect_err("closed port");
         let error = send_err(Arc::new(transport), &request);
-        let HttpError::Network { message, .. } = &error else {
-            panic!("{error:?}");
-        };
+        assert!(matches!(error, HttpError::Network { .. }), "{error:?}");
         let cause = error.detail().cause.expect("lower-layer cause");
-        let (id, text) = message.split_once(": ").expect("id: message");
-        assert_eq!((cause.id.as_str(), cause.message.as_str()), (id, text));
         assert!(
             cause.id.starts_with("io.") || cause.id.starts_with("ureq."),
             "{cause:?}"
@@ -257,19 +265,26 @@ mod cases {
         if cfg!(unix) {
             assert_eq!(cause.id, "io.ConnectionRefused");
         }
-        // The client adds only the send count; the transport's text is unchanged.
+        // This layer's message does not repeat the cause; the chain carries it.
+        assert!(!error.message().contains(&cause.message), "{error}");
+        // source() exposes the same cause.
+        let source = std::error::Error::source(&error).expect("source");
+        assert_eq!(
+            source.to_string(),
+            format!("{}: {}", cause.id, cause.message)
+        );
+        // The client adds only the send count; the transport's cause is unchanged.
         assert_eq!(direct.cause_detail(), error.cause_detail());
-        assert!(error.to_string().contains(&cause.message));
     }
 
     /// The returned value is the redacted error, also for a refused resend.
     #[test]
     fn refused_resend_is_redacted() {
-        let echo = HttpError::Network {
-            kind: NetworkKind::Timeout,
-            attempts: 1,
-            message: format!("ureq.Timeout.Global: {KEY}"),
-        };
+        let echo = HttpError::network(
+            NetworkKind::Timeout,
+            1,
+            format!("ureq.Timeout.Global: {KEY}"),
+        );
         let transport = ScriptedTransport::new(vec![Err(echo)]);
         let memory = MemoryLog::new().expect("memory log");
         let client = HttpClient::new(

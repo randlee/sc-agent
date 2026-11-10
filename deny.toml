@@ -1,0 +1,31 @@
+# cargo-deny: dependency advisories and licenses (RSH-002, CI job `deny`).
+# Run locally: cargo deny check advisories licenses
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec advisory DB: every vulnerability and unsound advisory fails the job;
+# an unmaintained crate is reported for the whole graph. No ignores.
+version = 2
+unmaintained = "all"
+yanked = "deny"
+
+[licenses]
+version = 2
+# Permissive licenses in today's graph; a new license needs a reviewed edit here.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
