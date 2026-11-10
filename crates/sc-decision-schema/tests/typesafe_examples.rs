@@ -157,6 +157,38 @@ mod tests {
         );
     }
 
+    /// REQ-QA-012: serde alone gives schema order for all three root types; `from_json` keeps
+    /// the document's order.
+    #[test]
+    fn serde_parse_uses_schema_order() {
+        let request = r#"{"questions":{"q":{"type":"noul"}},"state":"s","model":"m"}"#;
+        let schema: SystemOneRequest = serde_json::from_str(request).expect("serde");
+        assert_eq!(
+            schema.to_json().expect("encode"),
+            r#"{"model":"m","state":"s","questions":{"q":{"type":"noul"}}}"#
+        );
+        let kept = SystemOneRequest::from_json(request).expect("from_json");
+        assert_eq!(kept.to_json().expect("encode"), request);
+
+        let response = r#"{"usage":{"output_tokens":1,"input_tokens":2},"answers":{"q":{"noul":0.5,"type":"noul"}},"model":"m"}"#;
+        let schema: SystemOneResponse = serde_json::from_str(response).expect("serde");
+        assert_eq!(
+            serde_json::to_string(&schema).expect("encode"),
+            r#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":2,"output_tokens":1}}"#
+        );
+        let kept = SystemOneResponse::from_json(200, response.as_bytes()).expect("from_json");
+        assert_eq!(serde_json::to_string(&kept).expect("encode"), response);
+
+        let models = fixture("property_examples_models");
+        let schema: ModelMetadataList = serde_json::from_str(&models).expect("serde");
+        assert_eq!(
+            serde_json::to_string(&schema).expect("encode"),
+            fixture("models")
+        );
+        let kept = ModelMetadataList::from_json(200, models.as_bytes()).expect("from_json");
+        assert_eq!(serde_json::to_string(&kept).expect("encode"), models);
+    }
+
     /// QA-004: `Asset.type` is optional in openapi.json v0.2.0.
     #[test]
     fn asset_kind_is_optional() {

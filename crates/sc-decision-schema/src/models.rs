@@ -10,6 +10,11 @@ use crate::key_order::{self, KeyOrder, Ordered};
 /// The pub field deliberately mirrors the wire spec. A list parsed by [`Self::from_json`]
 /// serialises back in its document's key order. Equality ignores the key order.
 ///
+/// Parsing directly with serde (`serde_json::from_str`, `serde_json::from_slice`,
+/// `serde_json::from_value` and the like) does not keep the document's key order: the value
+/// serialises in schema order. `from_json` is the entry point for byte-identical round
+/// trips (REQ-SAG-0201 AC1).
+///
 /// # Examples
 ///
 /// ```
