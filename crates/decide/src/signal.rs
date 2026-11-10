@@ -3,13 +3,15 @@
 //! The `ctrlc` crate (feature `termination`) installs the handler and starts and owns the one
 //! handler thread; decide's source starts no thread, uses no tokio and no `unsafe`.
 //!
-//! Two phases. Before [`SignalWatch::start_run`] decide is reading its input (a file, stdin or
-//! a FIFO, where a read can block forever) and nothing has been sent, so an interrupt exits
-//! the process at once with [`EXIT_INTERRUPTED`] (RSH-001). After it, an interrupt cancels the
-//! run's token: unfinished requests end `decision.cancelled`, are printed, and the session log
-//! is flushed before `main` exits 130. A second or later interrupt changes nothing: the cancel
-//! is idempotent and the drain is already bounded, so every exit after a run starts goes
-//! through the flush (REQ-SAG-0011).
+//! Two phases. Before [`SignalWatch::logs_opened`] no logger is open: decide is parsing,
+//! loading its configuration or reading its input (a file, stdin or a FIFO, where a read can
+//! block forever), nothing has been sent and nothing logged, so an interrupt exits the process
+//! at once with [`EXIT_INTERRUPTED`] (RSH-001). From `logs_opened` on (just before `send`,
+//! `send --batch`, `models` or `doctor` opens its general log), every interrupt only cancels
+//! the token: unfinished requests end `decision.cancelled` and are printed, and the general and
+//! session logs are flushed and closed before `main` exits 130, so no record is lost
+//! (REQ-SAG-0011, NFR-SAG-0001). A second or later interrupt changes nothing more: the cancel
+//! is idempotent and every wait is bounded (models and doctor use the probe timeouts).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -27,8 +29,8 @@ pub const EXIT_INTERRUPTED: i32 = 130;
 struct State {
     /// Interrupts received.
     interrupts: AtomicU32,
-    /// Whether requests may be in flight (`start_run` was called).
-    running: AtomicBool,
+    /// Whether a logger may be open (`logs_opened` was called).
+    logs_open: AtomicBool,
 }
 
 /// What the handler does with one interrupt.
@@ -36,7 +38,7 @@ struct State {
 enum Action {
     /// Cancel the token (again, for a later interrupt) and let `main` drain, flush and exit 130.
     Cancel,
-    /// Exit the process now with 130: only before the run starts, when nothing was sent.
+    /// Exit the process now with 130: only before any logger is open.
     Exit,
 }
 
@@ -53,10 +55,10 @@ impl SignalWatch {
         self.state.interrupts.load(Ordering::Acquire) > 0
     }
 
-    /// The input is read and the run starts: from now on every interrupt cancels and lets the
-    /// run drain and flush; none exits at once.
-    pub fn start_run(&self) {
-        self.state.running.store(true, Ordering::Release);
+    /// Called just before the first logger opens: from now on every interrupt cancels and lets
+    /// the operation drain, flush and close its logs; none exits at once.
+    pub fn logs_opened(&self) {
+        self.state.logs_open.store(true, Ordering::Release);
     }
 }
 
@@ -80,12 +82,12 @@ pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
     Ok(watch)
 }
 
-/// What the handler does: count the interrupt, cancel the token, and exit now only before the
-/// run starts.
+/// What the handler does: count the interrupt, cancel the token, and exit now only while no
+/// logger is open.
 fn on_interrupt(cancel: &CancelToken, state: &State) -> Action {
     state.interrupts.fetch_add(1, Ordering::AcqRel);
     cancel.cancel();
-    if state.running.load(Ordering::Acquire) {
+    if state.logs_open.load(Ordering::Acquire) {
         Action::Cancel
     } else {
         Action::Exit
@@ -96,9 +98,10 @@ fn on_interrupt(cancel: &CancelToken, state: &State) -> Action {
 mod tests {
     use super::*;
 
-    /// RSH-001: while the input is read, an interrupt exits at once.
+    /// RSH-001: before any logger is open (the input is still being read), an interrupt exits
+    /// at once.
     #[test]
-    fn an_interrupt_while_reading_exits_at_once() {
+    fn an_interrupt_before_the_logs_open_exits_at_once() {
         let cancel = CancelToken::new();
         let watch = SignalWatch {
             state: Arc::new(State::default()),
@@ -154,7 +157,7 @@ mod tests {
         let watch = SignalWatch {
             state: Arc::new(State::default()),
         };
-        watch.start_run();
+        watch.logs_opened();
         let interrupting = Arc::new(InterruptAt {
             sends: std::sync::atomic::AtomicUsize::new(0),
             cancel: cancel.clone(),
@@ -242,5 +245,50 @@ mod tests {
         assert_eq!(results.len(), 12);
         assert!(all_cancelled(&results));
         assert_eq!(rows, 12, "one row per started request, flushed");
+    }
+
+    /// REQ-SAG-0011, NFR-SAG-0001: an interrupt after the logs open (here before `models`
+    /// sends anything) does not exit; the operation sees the cancel, writes its
+    /// `decide.models` record and flushes the general log it opened. Ordered by construction:
+    /// the interrupt is delivered, then the operation runs on the cancelled token.
+    #[test]
+    fn an_interrupt_after_the_logs_open_still_flushes_the_general_log() {
+        let root = tempfile::tempdir().expect("root");
+        let dir = tempfile::tempdir().expect("config");
+        std::fs::write(
+            dir.path().join("default.json"),
+            serde_json::json!({ "log_root": root.path() }).to_string(),
+        )
+        .expect("default.json");
+        let cancel = CancelToken::new();
+        let watch = SignalWatch {
+            state: Arc::new(State::default()),
+        };
+        watch.logs_opened();
+        assert_eq!(
+            on_interrupt(&cancel, &watch.state),
+            Action::Cancel,
+            "no exit"
+        );
+        let mut context = crate::Context::new("decide");
+        context.config_dir = Some(dir.path().to_path_buf());
+        context.repo_root = Some(dir.path().to_path_buf());
+        context.environment = Some(vec![(
+            sc_agent_secrets::TYPESAFE_API_KEY.into(),
+            "ts-signal-test".into(),
+        )]);
+        let transport = sc_agent_http::testing::ScriptedTransport::new(Vec::new());
+        context.transport = Some(Arc::new(transport.clone()));
+        let options = crate::ModelsOptions {
+            runner: None,
+            context,
+        };
+        let error = crate::models(&options, &cancel).expect_err("cancelled");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.decision");
+        assert_eq!(transport.sends(), 0, "nothing was sent after the interrupt");
+        let general = std::fs::read_to_string(root.path().join("logs/decide.log.jsonl"))
+            .expect("the general log was flushed");
+        assert!(general.contains("decide.models"), "{general}");
+        assert!(watch.interrupted());
     }
 }

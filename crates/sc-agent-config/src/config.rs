@@ -439,8 +439,11 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
 
 /// Returns `~/.sc-agent`, the config directory and default log root.
 ///
-/// This is sc-observability's standard default log root for app `sc-agent`
-/// (`~/.<app>`). The home directory comes from [`std::env::home_dir`].
+/// `~/.<app>` is the sc-agent convention for app `sc-agent`. sc-observability
+/// 1.5.0 itself defines no default directory: `LoggerConfig::default_for`
+/// takes the caller's log root (and `SC_LOG_ROOT` only when that is empty),
+/// so this function is where the default comes from. The home directory comes
+/// from [`std::env::home_dir`].
 ///
 /// # Errors
 ///

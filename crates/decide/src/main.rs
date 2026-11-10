@@ -5,7 +5,7 @@
 //! (REQ-SAG-0011).
 //!
 //! The binary opens its general and session loggers itself and closes them explicitly before
-//! it returns. Worker threads of the runner are never joined, so the last logger handle may
+//! it returns; once it starts opening them, every interrupt takes that close path. Worker threads of the runner are never joined, so the last logger handle may
 //! outlive `main`; the explicit close is the flush barrier that puts every record and row on
 //! disk. A close failure (lost rows) is reported as one `decide.log` line on stderr and does
 //! not change the exit code.
@@ -68,6 +68,7 @@ fn run(
     match cli.command {
         Command::Send(args) => run_send(args, cancel, watch, stdin, stdout),
         Command::Models(args) => {
+            watch.logs_opened();
             let (context, general) = context_with_general()?;
             let options = ModelsOptions {
                 runner: args.runner,
@@ -80,6 +81,7 @@ fn run(
             Ok(ExitCode::SUCCESS)
         }
         Command::Doctor => {
+            watch.logs_opened();
             let (context, general) = context_with_general()?;
             let options = DoctorOptions { context };
             let report = doctor(&options, cancel);
@@ -115,7 +117,7 @@ fn run_send(
         .map(str::parse::<Provider>)
         .transpose()?;
     // The whole input is read and checked before anything is sent (REQ-SAG-0504); until
-    // `start_run` an interrupt exits at once, so a blocked stdin or FIFO read cannot swallow it.
+    // `logs_opened` an interrupt exits at once, so a blocked stdin or FIFO read cannot swallow it.
     let input = if args.batch {
         Input::Batch(if args.input == "-" {
             read_batch(&mut BufReader::new(stdin))?
@@ -133,6 +135,8 @@ fn run_send(
             None,
         )?))
     };
+    // From here an interrupt cancels and the run drains, flushes and closes the logs.
+    watch.logs_opened();
     let (context, general) = context_with_general()?;
     let mut options = SendOptions {
         model,
@@ -151,7 +155,6 @@ fn run_send(
         }
     };
     options.session = Some(session.clone());
-    watch.start_run();
     let outcome = match input {
         Input::Batch(requests) => {
             let mut all_ok = true;
