@@ -230,10 +230,10 @@ fn test_session_id_is_ulid() {
     );
     assert_ne!(SessionId::new(), SessionId::new());
 
-    let uuid = "3f2b8a9e-6c1d-4e7a-9b25-0d4c1a7e5f10";
+    let uuid_text = "3f2b8a9e-6c1d-4e7a-9b25-0d4c1a7e5f10";
     let lowercase = "01arz3ndektsv4rrffq69g5fav";
     for bad in [
-        uuid,
+        uuid_text,
         lowercase,
         "",
         "nope",
