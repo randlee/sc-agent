@@ -117,8 +117,38 @@ impl SystemOneBackend {
         let status = response.status();
         if is_success(status) {
             ModelMetadataList::from_json(status, response.body())
+                .map_err(|error| self.redact(error))
         } else {
-            Err(refusal(status, response.into_body()))
+            Err(refusal(status, self.redacted(response.into_body())))
+        }
+    }
+
+    /// `body` with every copy of the attached key replaced by `[redacted]`; every other byte
+    /// is kept (REQ-SAG-0002 0.2.0: only the attached key is replaced).
+    fn redacted(&self, body: Vec<u8>) -> Vec<u8> {
+        match &self.key {
+            Some(key) => redact_bytes(key, body),
+            None => body,
+        }
+    }
+
+    /// A parse error whose serde message may quote the body, with the attached key redacted
+    /// from it; the id is unchanged.
+    fn redact(&self, error: DecisionError) -> DecisionError {
+        match (&self.key, error) {
+            (
+                Some(key),
+                DecisionError::ResponseParse {
+                    status,
+                    expected,
+                    message,
+                },
+            ) => DecisionError::ResponseParse {
+                status,
+                expected,
+                message: key.redact_text(&message).into_owned(),
+            },
+            (_, error) => error,
         }
     }
 
@@ -191,8 +221,9 @@ impl Backend for SystemOneBackend {
         let status = response.status();
         if is_success(status) {
             SystemOneResponse::from_json(status, response.body())
+                .map_err(|error| self.redact(error))
         } else {
-            Err(refusal(status, response.into_body()))
+            Err(refusal(status, self.redacted(response.into_body())))
         }
     }
 }
@@ -201,7 +232,35 @@ const fn is_success(status: u16) -> bool {
     matches!(status, 200..=299)
 }
 
-/// The error for a non-2xx final reply of HTTP `status` with `body`.
+/// `body` with every copy of `key` replaced by `[redacted]`, every other byte unchanged.
+///
+/// A key is visible ASCII (sc-agent-secrets) and an ASCII byte is never part of an invalid
+/// UTF-8 sequence, so every copy of the key lies inside one valid UTF-8 chunk: redacting each
+/// valid chunk and copying the invalid bytes as they are is exact.
+fn redact_bytes(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
+    let mut out: Option<Vec<u8>> = None;
+    let mut written = 0;
+    let mut offset = 0;
+    for chunk in body.utf8_chunks() {
+        let valid = chunk.valid();
+        if let std::borrow::Cow::Owned(redacted) = key.redact_text(valid) {
+            let out = out.get_or_insert_with(|| Vec::with_capacity(body.len()));
+            out.extend_from_slice(body.get(written..offset).unwrap_or_default());
+            out.extend_from_slice(redacted.as_bytes());
+            written = offset + valid.len();
+        }
+        offset += valid.len() + chunk.invalid().len();
+    }
+    match out {
+        Some(mut out) => {
+            out.extend_from_slice(body.get(written..).unwrap_or_default());
+            out
+        }
+        None => body,
+    }
+}
+
+/// The error for a non-2xx final reply of HTTP `status` with `body` (already redacted).
 fn refusal(status: u16, body: Vec<u8>) -> DecisionError {
     match status {
         400 => match serde_json::from_slice::<HttpBadRequestError>(&body) {

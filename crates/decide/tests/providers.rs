@@ -161,6 +161,105 @@ mod tests {
         assert!(levels[2].1.contains("invalid x-api-key"), "{levels:?}");
     }
 
+    /// REQ-SAG-0002 0.2.0 (attached-key redaction), end to end: a provider that echoes the
+    /// attached key in a 400, 422 or 503 body (TypeSafe, and a keyed local runner) yields a
+    /// result whose error has the same id, `[redacted]` where the key was, and the rest of
+    /// the provider's text whole.
+    #[test]
+    fn an_echoed_key_is_redacted_from_every_refusal() {
+        let cases = [
+            (
+                400,
+                format!(r#"{{"detail":"key {TYPESAFE_KEY} is not valid here"}}"#),
+                "decision.api_bad_request",
+            ),
+            (
+                422,
+                format!(
+                    r#"{{"detail":[{{"loc":["header","authorization"],"msg":"rejected {TYPESAFE_KEY} as malformed","type":"value_error"}}]}}"#
+                ),
+                "decision.api_validation",
+            ),
+            (
+                503,
+                format!("upstream refused Bearer {TYPESAFE_KEY}; retry later"),
+                "decision.api_status",
+            ),
+        ];
+        for (status, body, id) in cases {
+            let transport = ScriptedTransport::responses(vec![json_response(status, &body)]);
+            let log = MemoryLog::new().expect("log");
+            let dir = empty_config_dir();
+            let ctx = context(
+                dir.path(),
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+                Arc::new(transport),
+                &log,
+            );
+            let result = send(
+                &options("jev", None, ctx, &log),
+                request(NOUL),
+                &CancelToken::new(),
+            )
+            .expect("send");
+            let line = String::from_utf8(decide::output::result_line(&result).expect("line"))
+                .expect("utf-8");
+            let error = result.outcome.expect_err("refused");
+            assert_eq!(sc_agent_types::ErrorId::id(&error), id, "{status}");
+            assert!(
+                !line.contains(TYPESAFE_KEY),
+                "{status}: the key leaked: {line}"
+            );
+            assert!(line.contains("[redacted]"), "{status}: {line}");
+            let rest = body.replace(TYPESAFE_KEY, "[redacted]");
+            let kept = match status {
+                400 => "is not valid here",
+                422 => "as malformed",
+                _ => "; retry later",
+            };
+            assert!(
+                rest.contains(kept) && line.contains(kept),
+                "{status}: {line}"
+            );
+        }
+
+        // A keyed local runner (loopback, so the key is allowed) encodes through
+        // SystemOneBackend: the same redaction applies.
+        let dir = config_dir(&format!(
+            r#"{{"local_runners":{{"dec":{{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","key_env":"{}"}}}}}}"#,
+            sc_agent_secrets::LAYA_API_KEY
+        ));
+        let runner_key = "laya-decide-test-secret-0005";
+        let transport = ScriptedTransport::responses(vec![
+            json_response(200, r#"{"ok":true,"model":"jev-latest"}"#),
+            json_response(503, &format!("loading, key {runner_key} accepted later")),
+        ]);
+        let log = MemoryLog::new().expect("log");
+        let ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::LAYA_API_KEY, runner_key)],
+            Arc::new(transport),
+            &log,
+        );
+        let result = send(
+            &options("dec", None, ctx, &log),
+            request(NOUL),
+            &CancelToken::new(),
+        )
+        .expect("send");
+        let line =
+            String::from_utf8(decide::output::result_line(&result).expect("line")).expect("utf-8");
+        assert!(!line.contains(runner_key), "the runner key leaked: {line}");
+        assert!(
+            line.contains("loading, key [redacted] accepted later"),
+            "{line}"
+        );
+        assert_eq!(
+            sc_agent_types::ErrorId::id(&result.outcome.expect_err("503")),
+            "decision.api_status"
+        );
+    }
+
     /// AC: REQ-SAG-0602. An Anthropic 429 with the quota body ends with
     /// `http.quota_exhausted` after one send, with the remote message and its recovery.
     #[test]
