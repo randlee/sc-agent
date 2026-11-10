@@ -3,7 +3,7 @@
 # Sprint A-6: sc-decision-systemone and sc-decision-local
 - id: `a-6` (bead `agt-4p2.6`)
 - branch: `sprint/a-6-decision-backends`
-- depends on: a-2
+- depends on: a-2, a-4, a-5, a-8
 - copy script: `docs/plans/phase-a/copy/a-6.sh`
 
 ## Description
@@ -24,22 +24,23 @@ sprint:
       artifact: sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, ModelMetadataList, DecisionError} (crates/sc-decision-schema/src/)
       trigger: dev-push
     - sprint: a-5
-      artifact: sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe} and sc_agent_http::testing::ScriptedTransport (feature `testing`)
+      artifact: sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe, HttpRequest::with_secret, HttpRequest::with_deadline} and sc_agent_http::testing::ScriptedTransport (feature `testing`)
       trigger: dev-push
     - sprint: a-4
-      artifact: sc_agent_config::RunnerKind (closed enum) and sc_agent_secrets::ApiKey
+      artifact: sc_agent_config::{RunnerKind (closed enum), RunnerHost} and sc_agent_secrets::ApiKey
       trigger: dev-push
     - sprint: a-8
       artifact: sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`)
       trigger: dev-push
-  requirements: [REQ-SAG-0201, REQ-SAG-0801, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0401, REQ-SAG-0601]
+  requirements: [REQ-SAG-0201, REQ-SAG-0801, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0401, REQ-SAG-0601]
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
     - "Discovery is a library capability of sc-decision-local; no decide or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
-    - "A decision sent end to end through SystemOneBackend or LocalBackend (REQ-SAG-0201 via decide send, local runners from config via decide): a-10 acceptance."
+    - "REQ-SAG-0201 end to end (a decision sent through decide send over SystemOneBackend, or over LocalBackend for a local runner from config): a-10 acceptance."
     - "decide models over SystemOneBackend::models_request/decode_models: a-10 acceptance."
     - "Busy resend and holdoff for these backends (REQ-SAG-0601): a-5 (sc-agent-http) and a-9 (runner); this sprint only shows 503 is a final reply."
     - "Rejecting an unknown local runner kind, bad host, port 0 or bad key_env (REQ-SAG-0013): a-4 at config load (RunnerKind is closed, so this crate has no unknown-kind error)."
+    - "Per-runner load and request timeouts in config with longer defaults (REQ-SAG-0015), and calling wait_until_loaded before a local runner's first decision: a-4 (config) and a-10 (decide)."
     - "Building the probe transport with UreqTransport::new(Timeouts::probe()) for discover and decide models: a-10 (the caller owns the transport)."
 ```
 
@@ -102,13 +103,15 @@ impl SystemOneBackend {
     pub fn new(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError>;   // Http(InvalidEndpoint)
     /// A configured local runner's base, e.g. "http://127.0.0.1:8000"; http or https (Endpoint::parse_local).
     pub fn local(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError>;
-    pub fn models_request(&self) -> HttpRequest;                                    // GET /v1/models, Bearer if key
+    /// GET /v1/models; Bearer if key, attached with `HttpRequest::with_secret(..)?` (a-5; http.key_on_plain_http -> DecisionError::Http).
+    pub fn models_request(&self) -> Result<HttpRequest, DecisionError>;
     pub fn decode_models(&self, response: HttpResponse) -> Result<ModelMetadataList, DecisionError>;
 }
 impl Backend for SystemOneBackend {
     /// JSON when request.image_parts() is empty, else multipart/form-data (part "request" application/json
     /// first, then one part per image: name = ImagePart.name, image/png or image/jpeg; boundary "sc-agent-<ULID>").
-    /// Headers: Content-Type; Bearer secret header when key is Some; TypeSafe-Danger-Zone-Images: true when
+    /// Headers: Content-Type; Bearer secret header when key is Some, attached with `HttpRequest::with_secret(..)?`
+    /// (a-5 refuses a key on a plain-http non-loopback endpoint: DecisionError::Http(http.key_on_plain_http)); TypeSafe-Danger-Zone-Images: true when
     /// needs_images_header(); TypeSafe-Danger-Zone-Long-Context: true when long_context.
     fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError>;
     /// 2xx -> SystemOneResponse::from_json; 400 -> ApiBadRequest (ApiStatus if another shape);
@@ -140,6 +143,7 @@ mod sealed { pub trait Sealed {} }   // private module: only this crate implemen
 /// kinds below; a new daemon is added inside this crate as a DaemonKind variant (DaemonKind::daemon is the extension path).
 pub trait LocalDaemon: sealed::Sealed + Send + Sync + fmt::Debug {
     fn kind(&self) -> DaemonKind;
+    /// Bearer (Laya, Generic, when a key is set) via `HttpRequest::with_secret(..)?` -> LocalError::Http.
     fn probe(&self, base: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError>;
     fn availability(&self, response: &HttpResponse, model: &ModelId) -> Result<Availability, LocalError>;
 }
@@ -172,28 +176,58 @@ pub enum ModelState { Loaded, LoadsOnDemand, NotReady, Unlisted }
 /// A System One backend at http://{host}:{port} with discovery; arguments come from a config
 /// `local_runners` entry (A-4). This crate reads no config and hard-codes no host or port.
 /// Debug is written by hand (GeneralLogger has no Debug): it prints daemon, base, model, `key: <set|unset>`, `log: <set|unset>`.
-pub struct LocalBackend { daemon: Box<dyn LocalDaemon>, base: String, model: ModelId, key: Option<ApiKey>, backend: SystemOneBackend, log: Option<GeneralLogger> }
+pub struct LocalBackend { daemon: Box<dyn LocalDaemon>, base: String, model: ModelId, key: Option<ApiKey>, backend: SystemOneBackend, log: Option<GeneralLogger>,
+    timeouts: Option<LocalTimeouts>, served_once: AtomicBool }
+/// REQ-SAG-0015: local runners get their own, longer timeouts, and model loading does not count toward the request timeout.
+/// Values come from the caller (a-10 from config, a-4); this crate has no default and reads no config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalTimeouts { pub load: Duration, pub request: Duration }
+pub const LOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 impl fmt::Debug for LocalBackend { /* as above */ }
 impl LocalBackend {
     /// base = http://{host}:{port}; the backend is SystemOneBackend::local(base, key). No logger until with_log.
+    /// A key on a plain-http non-loopback host (e.g. 10.0.0.5) is refused by `HttpRequest::with_secret` (a-5,
+    /// `http.key_on_plain_http`) inside encode, surfaced as DecisionError::Http before any send (REQ-SAG-0013).
     /// decide passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and `runner.model` from a LocalRunner.
     /// host and port are already validated at config load (a-4 RunnerHost: hostname or IP only; NonZeroU16), so new checks neither.
     pub fn new(kind: DaemonKind, host: &RunnerHost, port: NonZeroU16, model: ModelId, key: Option<ApiKey>) -> Result<Self, LocalError>;
     /// The caller's GeneralLogger (default or injected, REQ-SAG-0008); discover writes to it.
     pub fn with_log(self, log: GeneralLogger) -> Self;
+    /// REQ-SAG-0015 timeouts for this runner, used for the load-on-first-request deadline (encode). Without them no
+    /// deadline is set. wait_until_loaded takes its load_timeout as an argument (the caller passes timeouts.load).
+    pub fn with_timeouts(self, timeouts: LocalTimeouts) -> Self;
     /// Sends the probe once (no busy resend) and, when a logger is set, writes one `local.discover` record
     /// carrying `ctx`. `transport` is the caller's probe transport, built with
     /// `UreqTransport::new(Timeouts::probe())` (connect 5 s, request 10 s; a-5), so a /health answer is never
     /// waited on for the 120 s decision timeout.
     pub fn discover(&self, transport: &dyn Transport, ctx: LogContext) -> Result<Availability, LocalError>;
+    /// REQ-SAG-0015: wait for the configured model to load before the first decision, so loading never counts toward
+    /// the request timeout. Polls the daemon's probe on `transport` (the caller's Timeouts::probe() transport) every
+    /// LOAD_POLL_INTERVAL, waiting between polls with `cancel.wait_until(next_poll)` (a-1; no sleep).
+    /// Ok when a poll reports ModelState::Loaded, or at once for Generic Unlisted (cannot tell) and for kinds that load
+    /// on the first request (Laya: ModelState::LoadsOnDemand, see encode). A connect failure (Strands binds only
+    /// after load) or Mapika NotReady means "not loaded yet": keep polling.
+    /// Err: DecisionError::Backend { backend: "local", detail: LocalError::LoadTimeout{..}.detail() } once `load`
+    /// has passed; DecisionError::Cancelled { sends: 0 } when cancel fires (`Wait::Cancelled`); ModelNotServed,
+    /// ProbeStatus and ProbeParse end the wait at once as DecisionError::Backend with that detail.
+    /// Writes one `local.load_wait` record per poll (state or error id, waited_ms) and one at the end (outcome);
+    /// its polls do not also write local.discover.
+    pub fn wait_until_loaded(&self, transport: &dyn Transport, cancel: &CancelToken, load_timeout: Duration, ctx: LogContext) -> Result<(), DecisionError>;
 }
-impl Backend for LocalBackend { /* encode/decode (with ctx) delegate to SystemOneBackend; decode writes no local.* record */ }
+impl Backend for LocalBackend {
+    /// Delegates to SystemOneBackend::encode. For a load-on-first-request kind (Laya) with timeouts set, every request
+    /// encoded before the first 2xx reply is marked `.with_deadline(timeouts.load + timeouts.request)` (a-5), so the
+    /// on-demand checkpoint load fits inside that request's deadline; after the first 2xx (`served_once`) requests carry
+    /// no deadline override. Parallel first requests are all marked (none can be cut off by another's load).
+    fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError>;
+    /// Delegates to SystemOneBackend::decode with ctx; a 2xx sets `served_once`. Writes no local.* record.
+    fn decode(&self, response: HttpResponse, request: &DecisionRequest, ctx: &LogContext) -> Result<SystemOneResponse, DecisionError>;
+}
 ```
+
+Load on first request, per kind (REQ-SAG-0015): Laya loads checkpoints on demand (section 2), so wait_until_loaded returns Ok at once on LoadsOnDemand and the first request gets the load + request deadline. Strands Decider and Mapika/decider load at start (Strands is unreachable until loaded; Mapika reports `ok: false`), so wait_until_loaded polls. Generic: a listed model is Loaded; Unlisted returns Ok at once.
 
 Open or sealed, per public trait this sprint touches: `LocalDaemon` sealed (above). `Backend` (a-2) is open, implemented here by SystemOneBackend and LocalBackend. `ErrorId` (a-1) is open to workspace crates, implemented by LocalError; `detail()` is not overridden.
-
-```rust
-```
 
 ## 5. Error enum (full, sc-decision-local; ErrorId, Display prints `<id>: <message>` only (chain via source()/detail()), no thiserror)
 
@@ -208,8 +242,10 @@ pub enum LocalError {
     ProbeStatus { daemon: DaemonKind, path: &'static str, status: u16, body: Vec<u8> },  // "local.probe_status"
     ProbeParse { daemon: DaemonKind, path: &'static str, message: String },            // "local.probe_parse" (full serde message)
     ModelNotServed { daemon: DaemonKind, model: ModelId, served: Vec<String> },        // "local.model_not_served"
+    /// REQ-SAG-0015: the model was not loaded within the load timeout. runner = the base (http://host:port).
+    LoadTimeout { runner: String, waited: Duration },                                  // "local.load_timeout"
 }
-impl ErrorId for LocalError {}   // 5 ids; cause_detail(): Http -> HttpError detail, Decision -> DecisionError detail; recovery(): ModelNotServed -> Some("load the configured model on the daemon, or set the runner's model to one it serves")
+impl ErrorId for LocalError {}   // 6 ids; cause_detail(): Http -> HttpError detail, Decision -> DecisionError detail; recovery(): ModelNotServed -> Some("load the configured model on the daemon, or set the runner's model to one it serves"), LoadTimeout -> Some("raise the runner's load timeout or check that the daemon is loading the model")
 ```
 
 Log record (ANC-007): every `discover` call with a logger set writes exactly one record, `GeneralLogger::write(Level::Info, "sc_decision_local", "local.discover", ctx, fields)` (the caller's `LogContext`, `LogContext::NONE` when there is no session; a-8 carries session_id and position on the event); fields `daemon` (`DaemonKind::as_str`), `model` (configured), and either `loaded` (the daemon's loaded-model list) and `state` (ModelState) on Ok, or `error` (the LocalError id, e.g. `local.http`) on Err. Never a key, header value or body. A log write error is ignored (counted by sc-agent-log) and never changes the discover result. Sending the probe is logged by sc-agent-http only when a caller sends through HttpClient (`http.send`, a-5); this crate is sans-IO and logs no send. sc-decision-systemone writes no records: it only builds and reads HTTP values, and its sends are logged by sc-agent-http.
@@ -219,7 +255,7 @@ Log record (ANC-007): every `discover` call with a logger set writes exactly one
 ## 6. Dependencies
 
 sc-decision-systemone: sc-decision-schema (A-2), sc-agent-http (A-5), sc-agent-secrets (A-4; ApiKey), sc-agent-types (ErrorId); serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }; ulid = "1" (multipart boundary).
-sc-decision-local: sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types (ModelId, ErrorId), sc-agent-config (RunnerKind, RunnerHost), sc-agent-log (GeneralLogger, Level) (all path); serde = { version = "1", features = ["derive"] }, serde_json (as above).
+sc-decision-local: sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types (ModelId, ErrorId), sc-agent-config (RunnerKind, RunnerHost), sc-agent-types also for CancelToken and Wait, sc-agent-log (GeneralLogger, Level) (all path); serde = { version = "1", features = ["derive"] }, serde_json (as above).
 Dev-dependencies: sc-agent-http with feature `testing` (ScriptedTransport, a-5) in both crates; sc-agent-log with feature `testing` (MemoryLog, a-8) in sc-decision-local. No hand-rolled transport or logger fakes. Neither crate needs a fake Backend, so a-2's ScriptedBackend is not used.
 Both: workspace package and lints; no tokio, no thiserror.
 
@@ -246,10 +282,16 @@ sc-decision-systemone (tests/encode.rs, tests/decode.rs):
 sc-decision-local (tests/discovery.rs, over ScriptedTransport):
 - Strands, Mapika, Laya, Generic availability rows of section 3 (incl. Laya bearer only with a key, Generic 404 -> Unlisted, 500 -> local.probe_status, health not JSON -> local.probe_parse) -> AC 7.
 - ScriptedTransport returns HttpError::Network -> local.http with cause http.network and the lower message; SystemOneBackend's DecisionError::Http chain likewise -> AC 7, AC 14.
-- Each RunnerKind maps to its DaemonKind; LocalError has 5 distinct ids; ModelNotServed has a non-empty recovery() -> AC 12.
+- Each RunnerKind maps to its DaemonKind; LocalError has 6 distinct ids; ModelNotServed has a non-empty recovery() -> AC 12.
 - `LocalBackend::new(DaemonKind::Laya, &RunnerHost::try_from("127.0.0.1".to_owned())?, NonZeroU16::new(8000).unwrap(), model, None)` (test code) encodes POST http://127.0.0.1:8000/v1/systemone and decodes like SystemOneBackend -> AC 8, AC 9.
 - Compile test: `Arc<dyn sc_decision_schema::Backend>` from SystemOneBackend and LocalBackend -> AC 9, AC 15.
 - tests/log.rs: `let log = MemoryLog::new()?; let backend = LocalBackend::new(..)?.with_log(log.general());` runs one discover that succeeds (Laya loaded) and one that fails (Network), one with `LogContext::request(session_id, Some(0))` and one with `LogContext::NONE`; `log.records()?` (MemoryRecord, write order) holds exactly two records with `target == "sc_decision_local"` and `action == "local.discover"`, whose `fields` carry daemon, model, the first record's session_id (the second has none) and loaded/state or error, and no key text -> AC 17.
+- LocalBackend for host 10.0.0.5 with `Some(key)`: encode fails at `HttpRequest::with_secret` with DecisionError::Http, cause id `http.key_on_plain_http`, and the ScriptedTransport records no send -> AC 20.
+- tests/load_wait.rs (ScriptedTransport; real 1 s poll interval, each test under 5 s; cancel/timeout outcomes read through a channel bounded at 5 s):
+  - Mapika `{"ok":false}`, `{"ok":false}`, then `{"ok":true,"model":m}` -> Ok after 3 probes (loaded on the 3rd, after 2 not-loaded polls); local.load_wait records in order -> AC 21.
+  - Mapika never ready, load_timeout 2 s -> DecisionError::Backend with cause id local.load_timeout and waited >= 2 s -> AC 22.
+  - Cancel from another thread after the first poll -> decision.cancelled within the bound, no further probe -> AC 23.
+  - Laya `loaded: []` -> Ok with one probe; the next encode carries deadline load + request, and after a 2xx decode the following encode carries none -> AC 24.
 - Decode keeps a probability of 0.123456789 unchanged (no rounding) -> AC 18.
 - Two multipart encodes use different boundaries, each "sc-agent-" + a ULID that parses with `ulid::Ulid::from_string` -> AC 19.
 
@@ -266,15 +308,19 @@ sc-decision-local (tests/discovery.rs, over ScriptedTransport):
 - [ ] LocalBackend and SystemOneBackend implement the Backend trait imported from sc-decision-schema (no crate defines its own Backend trait) (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest, &LogContext)) and are usable as Arc<dyn Backend> (owner-local-decision-crate).
 - [ ] REQ-SAG-0401: sc-decision-systemone and sc-decision-local take keys as sc_agent_secrets::ApiKey (credential variable names TYPESAFE_API_KEY, LAYA_API_KEY come from sc-agent-secrets); no test, Debug output or log record prints a key.
 - [ ] REQ-SAG-0601: sc-decision-systemone: SystemOneBackend::decode returns a 503 from Laya or Mapika/decider as a final reply (decision.api_status with its body), not a busy signal.
-- [ ] REQ-SAG-0002: sc-decision-local: LocalError implements ErrorId with 5 distinct local.* ids (no unknown-kind error: RunnerKind is closed and checked at config load, a-4); wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.
-- [ ] ADR-SAG-0004: `cargo tree -p sc-decision-systemone -e normal --depth 1` lists exactly sc-decision-schema, sc-agent-http, sc-agent-secrets and sc-agent-types as sc-agent dependencies, and `cargo tree -p sc-decision-local -e normal --depth 1` lists exactly sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types, sc-agent-config and sc-agent-log; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` contains no sc-llm-provider, sc-decision-llm, sc-decision-runner or decide. No live API calls in tests. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner. sc-decision-local's dependency on sc-decision-systemone is that allowed local-over-systemone edge; sc-decision-systemone does not depend on sc-decision-local.
+- [ ] REQ-SAG-0002: sc-decision-local: LocalError implements ErrorId with 6 distinct local.* ids (no unknown-kind error: RunnerKind is closed and checked at config load, a-4); wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.
+- [ ] ADR-SAG-0004: `cargo tree -p sc-decision-systemone -e normal --depth 1` lists exactly sc-decision-schema, sc-agent-http, sc-agent-secrets and sc-agent-types as sc-agent dependencies (sc-decision-systemone has no error union, under the ADR-SAG-0004 exemption for crates whose functions all return the trait-fixed DecisionError), and `cargo tree -p sc-decision-local -e normal --depth 1` lists exactly sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types, sc-agent-config and sc-agent-log; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` contains no sc-llm-provider, sc-decision-llm, sc-decision-runner or decide. No live API calls in tests. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner.
 - [ ] REQ-SAG-0002: a test makes the ScriptedTransport fail and asserts the returned LocalError and SystemOne DecisionError chains carry the lower HttpError's id and message.
 - [ ] ADR-SAG-0001: every decision backend this sprint adds implements the Backend trait defined in the sc-decision-schema crate: SystemOneBackend (sc-decision-systemone) and LocalBackend (sc-decision-local) are each `impl sc_decision_schema::Backend`, and a compile-time test builds `Arc<dyn sc_decision_schema::Backend>` from both.
 - [ ] REQ-SAG-0009: neither sc-decision-systemone nor sc-decision-local depends on tokio; `cargo tree -p sc-decision-systemone -p sc-decision-local` lists no tokio crate.
 - [ ] ANC-007: the existing sc-agent library code in sc-decision-local is updated to write log records: LocalBackend::with_log takes the caller's GeneralLogger and each LocalBackend::discover(transport, ctx) call writes one `local.discover` record (daemon, model, the caller's LogContext session_id and position, loaded models and state, or the error id; never a key) (REQ-SAG-0008: the logger is the caller's, default or injected); a test builds `MemoryLog::new()?` (a-8's sc_agent_log::testing), passes `log.general()` to LocalBackend::with_log, runs one successful and one failed discover, and finds both records in `log.records()?` by `action == "local.discover"`.
 - [ ] REQ-SAG-0007: sc-decision-systemone: SystemOneBackend::decode returns a probability of 0.123456789 as 0.123456789; no rounding, normalizing or clamping.
 - [ ] REQ-SAG-0001: sc-decision-systemone: the multipart boundary is "sc-agent-" + a fresh ULID (ulid crate) per encode; a test parses it and sees two encodes differ.
-- [ ] Error unions: sc-decision-systemone defines no error union of its own; every public function returns the DecisionError fixed by the Backend trait (the exemption recorded in ADR-SAG-0004); sc-decision-local defines LocalError with ids local.*.
+- [ ] REQ-SAG-0013: sc-decision-local: LocalBackend::new takes the validated RunnerHost and NonZeroU16 port (a-4); a LocalBackend for plain-http host 10.0.0.5 with a key fails in encode at HttpRequest::with_secret (a-5) with DecisionError::Http carrying `http.key_on_plain_http`, before any send.
+- [ ] REQ-SAG-0015: sc-decision-local: LocalBackend::wait_until_loaded polls the probe every 1 s (CancelToken::wait_until, no sleep) and returns Ok once the daemon reports the configured model loaded; a test with a daemon not loaded for 2 polls returns Ok on the 3rd, so model loading is waited out before any decision request and does not count toward its timeout.
+- [ ] REQ-SAG-0015: sc-decision-local: when load_timeout passes without the model loaded, wait_until_loaded returns decision.backend with cause local.load_timeout (runner, waited); a test checks it.
+- [ ] REQ-SAG-0015: sc-decision-local: cancelling the CancelToken during wait_until_loaded returns decision.cancelled without another probe; a test checks it.
+- [ ] REQ-SAG-0015: sc-decision-local: for Laya (loads on the first request) wait_until_loaded returns Ok at once and requests encoded before the first 2xx carry HttpRequest::with_deadline(load + request) (a-5), using the runner's own LocalTimeouts; a test checks the deadline is set and then cleared.
 
 ## Notes
 
@@ -289,3 +335,5 @@ Plan review round 2 (2026-11-09): ARCH-003 sc-decision-systemone cites the ADR-S
 a-1/a-4 contract folded in: LocalBackend::new takes &RunnerHost and NonZeroU16 (validated at load); RunnerKind -> DaemonKind; no unknown-kind check; Display prints `<id>: <message>` only; recovery() provided by ErrorId.
 
 Backend::decode takes ctx: &LogContext (a-2); discover takes ctx: LogContext by value, written via GeneralLogger::write(.., ctx, fields) (a-8).
+Round 3: REQ-SAG-0013 added (validated RunnerHost/NonZeroU16; http.key_on_plain_http surfaced as DecisionError::Http, test AC 20); REQ-SAG-0201 end to end -> a-10.
+Round 4: with_secret(..)? at every secret attach (encode, models_request now Result, probe); REQ-SAG-0015 wait_until_loaded + LocalTimeouts + Laya first-request deadline + LoadTimeout (local.load_timeout, 6 ids), AC 21-24. wait_until_loaded returns DecisionError (LoadTimeout as Backend detail, cancel as Cancelled{sends:0}). Needs from others: a-5 HttpRequest::with_deadline(Duration), a-4/a-10 the per-runner load/request timeouts in config.

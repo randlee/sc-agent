@@ -23,7 +23,7 @@ sprint:
     - sprint: a-1
       artifact: "sc_agent_types::{Provider, ModelId, ShortName, ReleaseDate, Catalog, ModelChoice, VarName, TypesError, ErrorId, ErrorDetail} + workspace root Cargo.toml + clippy.toml"
       trigger: dev-push
-  requirements: [REQ-SAG-0002, REQ-SAG-0003, REQ-SAG-0005, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0102, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801]
+  requirements: [REQ-SAG-0002, REQ-SAG-0003, REQ-SAG-0005, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0102, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801]
   adrs: [ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0102 end to end (decide resolves a model added to ~/.sc-agent/default.json): a-10"
@@ -33,6 +33,7 @@ sprint:
     - "REQ-SAG-0003/0005 log files written under log_root: a-8 (sc-agent-log) and a-10 (decide)"
     - "REQ-SAG-0401 the key is read only at the transport (the single ApiKey::as_str site): a-5"
     - "ADR-SAG-0002 the <repo>/<agent_role>/<project>/ session-log layout under log_root: a-8; a-4 supplies only the root"
+    - "REQ-SAG-0015 applying the runner timeouts to local sends and model loads: a-6 (sc-decision-local)"
     - "REQ-SAG-0013 runner-config use (a-6 maps RunnerKind to DaemonKind and builds http://host:port; a-9 sizes its queue from workers with checked arithmetic)"
 ```
 
@@ -131,7 +132,7 @@ pub fn resolve_var(var: &VarName, sources: &KeySources<'_>) -> Result<ResolvedKe
 
 // ===== sc-agent-config =====
 mod config; mod error;
-pub use config::{default_dir, load, AgentConfig, ExtraModel, LocalRunner, RunnerHost, RunnerKind, APP_NAME, DEFAULT_MAX_SENDS, DEFAULT_WORKERS, MAX_MAX_SENDS, MAX_WORKERS};
+pub use config::{default_dir, load, AgentConfig, ExtraModel, LocalRunner, RunnerHost, RunnerKind, APP_NAME, DEFAULT_MAX_SENDS, DEFAULT_RUNNER_LOAD_TIMEOUT, DEFAULT_RUNNER_REQUEST_TIMEOUT, DEFAULT_WORKERS, MAX_MAX_SENDS, MAX_WORKERS, RUNNER_LOAD_TIMEOUT_SECS, RUNNER_REQUEST_TIMEOUT_SECS};
 pub use error::AgentConfigError;
 
 pub const APP_NAME: &str = "sc-agent";                      // env prefix SC_AGENT__
@@ -167,7 +168,21 @@ pub struct LocalRunner {
     /// Resolved with sc_agent_secrets::resolve_var. Local runners are plain http (A-6 builds http://host:port),
     /// so load() refuses key_env unless host.is_loopback() (REQ-SAG-0013: no key over plain http off the machine).
     #[serde(default)] pub key_env: Option<VarName>,
+    /// REQ-SAG-0015: per-runner request timeout, 10..=3600 s (deserialize_with = "request_timeout_in_bounds"); None -> 300 s.
+    #[serde(default, deserialize_with = "request_timeout_in_bounds")] pub request_timeout_secs: Option<NonZeroU32>,
+    /// REQ-SAG-0015: per-runner model-load timeout, 10..=7200 s (deserialize_with = "load_timeout_in_bounds"); None -> 600 s.
+    #[serde(default, deserialize_with = "load_timeout_in_bounds")] pub load_timeout_secs: Option<NonZeroU32>,
 }
+impl LocalRunner {
+    /// request_timeout_secs, else DEFAULT_RUNNER_REQUEST_TIMEOUT (300 s).
+    #[must_use] pub fn request_timeout(&self) -> Duration;
+    /// load_timeout_secs, else DEFAULT_RUNNER_LOAD_TIMEOUT (600 s).
+    #[must_use] pub fn load_timeout(&self) -> Duration;
+}
+pub const DEFAULT_RUNNER_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);   // REQ-SAG-0015
+pub const DEFAULT_RUNNER_LOAD_TIMEOUT: Duration = Duration::from_secs(600);      // REQ-SAG-0015
+pub const RUNNER_REQUEST_TIMEOUT_SECS: RangeInclusive<u32> = 10..=3600;          // REQ-SAG-0015 bounds
+pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;             // REQ-SAG-0015 bounds
 /// Closed set of daemon kinds (REQ-SAG-0013); sc-decision-local maps each to its DaemonKind (A-6).
 /// Closed so both crates match exhaustively; a new daemon adds a variant here and in A-6.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -213,7 +228,7 @@ Example `default.json`:
   "models": { "claude-haiku-5-6": { "line": "haiku", "released": "2026-12-01" } },
   "local_runners": { "laya": { "kind": "laya", "host": "127.0.0.1", "port": 8000, "model": "convaiinnovations/laya", "key_env": "LAYA_API_KEY" } } }
 ```
-Invalid values (empty model id, `workers: 0` or 65, `max_sends: 11`, unknown short name, bad date, unknown `kind`, a host with a path or '@', port 0, a key_env like `lower-case`) fail at load as `config.invalid` with the key path; the message carries the serde/TypesError text. `log_root` is optional (default `~/.sc-agent`, the `<log_root>` of ADR-SAG-0002). An unknown `kind` is now a load error, not a later `local.unknown_daemon`.
+Invalid values (empty model id, `workers: 0` or 65, `max_sends: 11`, unknown short name, bad date, unknown `kind`, a host with a path or '@', port 0, a key_env like `lower-case`, request_timeout_secs outside 10..=3600, load_timeout_secs outside 10..=7200) fail at load as `config.invalid` with the key path; the message carries the serde/TypesError text. `log_root` is optional (default `~/.sc-agent`, the `<log_root>` of ADR-SAG-0002). An unknown `kind` is now a load error, not a later `local.unknown_daemon`.
 
 ## 4. Full error enums (new; ErrorId from A-1, Display = "<id>: <message>", no thiserror, never key bytes)
 
@@ -270,7 +285,7 @@ impl From<sc_agent_types::TypesError> for AgentConfigError {}
 - Tests (each names the acceptance line it proves; the acceptance list holds the assertions):
   - secrets `tests/resolve.rs` (MapEnv, MapKeyring, tempdir `.env`; process env never mutated): proves AC "REQ-SAG-0401: resolve(p, sources)...", "Never log or print a key" and the secrets half of "REQ-SAG-0002" (incl. non-empty recovery() for secrets.key_missing). Extra cases not in an acceptance line: a blank env value skips `.env` and goes to the keyring; `repo_root: None` reads no `.env`; an unreadable `.env` -> secrets.dotenv_read; a failing keyring -> secrets.keyring_read with no secret bytes; `resolve_var(&LAYA_API_KEY.parse::<VarName>()?, ..)`; `ALL_VARS` holds every `env_var(p)` and LAYA_API_KEY; `ApiKey`, `MapEnv`, `ProcessEnv` are Send + Sync.
   - secrets `tests/vars_gate.rs`: proves AC "REQ-SAG-0401: ... appear as string literals only in crates/sc-agent-secrets" (walks the workspace `crates/` tree from `CARGO_MANIFEST_DIR/../..` and fails on any ALL_VARS literal outside crates/sc-agent-secrets).
-  - config `tests/load.rs` (tempdir + explicit environment Vec, never the process env): proves AC "REQ-SAG-0102 AC1/AC2", "REQ-SAG-0102" (keys and overrides), "REQ-SAG-0601", "REQ-SAG-0701", "REQ-SAG-0801 (config part)", "REQ-SAG-0003", "A missing default.json..." and the config half of "REQ-SAG-0002". "REQ-SAG-0013" (bounds), "ADR-SAG-0002". Extra cases: local.json overrides default.json; an unknown key -> config.invalid with its path.
+  - config `tests/load.rs` (tempdir + explicit environment Vec, never the process env): proves AC "REQ-SAG-0102 AC1/AC2", "REQ-SAG-0102" (keys and overrides), "REQ-SAG-0601", "REQ-SAG-0701", "REQ-SAG-0801 (config part)", "REQ-SAG-0003", "A missing default.json..." and the config half of "REQ-SAG-0002". "REQ-SAG-0013" (bounds), "REQ-SAG-0015" (runner timeouts), "ADR-SAG-0002". Extra cases: local.json overrides default.json; an unknown key -> config.invalid with its path.
 
 ## Required validation (run at each push; the acceptance list is the one acceptance list)
 
@@ -314,6 +329,9 @@ No tokio (keyring's sync Secret Service backend) and no sc-observability.
 - [ ] REQ-SAG-0013: sc-agent-config: load() rejects workers outside 1..=64, max_sends outside 1..=10, a runner host that is not a hostname or IP (a path, '@', ':', whitespace, empty), an unknown kind, port 0 and a key_env not matching ^[A-Z_][A-Z0-9_]{0,127}$, each as config.invalid whose path names the key (e.g. local_runners.laya.host) (tempdir tests, one per bound).
 - [ ] REQ-SAG-0013: sc-agent-config: a runner with key_env whose host is not loopback (127.0.0.0/8, ::1, localhost) is config.key_on_plain_http at load, path local_runners.<name>.key_env; the same runner on 127.0.0.1 loads (tests).
 - [ ] ADR-SAG-0002: sc-agent-config: AgentConfig::log_root() is the <log_root> of the ADR-SAG-0002 layout (configured value, else ~/.sc-agent) (test); the <repo>/<agent_role>/<project>/ directories under it are a-8's.
+- [ ] REQ-SAG-0015: sc-agent-config: a local_runners entry without request_timeout_secs or load_timeout_secs gives LocalRunner::request_timeout() = 300 s and load_timeout() = 600 s (test).
+- [ ] REQ-SAG-0015: sc-agent-config: request_timeout_secs/load_timeout_secs set on one runner change only that runner's request_timeout()/load_timeout(); a second runner in the same file keeps 300 s/600 s (test).
+- [ ] REQ-SAG-0015: sc-agent-config: request_timeout_secs outside 10..=3600 (9, 3601) and load_timeout_secs outside 10..=7200 (9, 7201) are config.invalid at load with path local_runners.<name>.request_timeout_secs / .load_timeout_secs; the bounds themselves (10, 3600, 7200) load (tests).
 
 ## Notes
 

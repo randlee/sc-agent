@@ -24,6 +24,7 @@ Definitions: The key path is the dotted path of a configuration key within its f
 - A runner `kind` MUST be one of the known kinds.
 - A port MUST be within 1..=65535.
 - `key_env` MUST match the environment-variable name pattern.
+- The per-runner `request_timeout_secs` and `load_timeout_secs` MUST be within the bounds REQ-SAG-0015 states.
 - Every bound in this requirement MUST be checked when configuration is loaded, and a failed check MUST name the key path in its error.
 
 **MUST NOT statements:**
@@ -50,6 +51,7 @@ A bad value found at load time names the key to fix; found later it fails mid-ba
 
 **Related:**
 
+- REQ-SAG-0015
 - REQ-SAG-0801
 - REQ-SAG-0401
 - REQ-SAG-0002

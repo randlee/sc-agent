@@ -3,7 +3,7 @@
 # Sprint A-7: sc-llm-provider and sc-decision-llm
 - id: `a-7` (bead `agt-4p2.7`)
 - branch: `sprint/a-7-llm-provider`
-- depends on: a-2
+- depends on: a-2, a-4, a-5, a-8
 - copy script: `docs/plans/phase-a/copy/a-7.sh`
 
 ## Description
@@ -127,6 +127,8 @@ pub struct LlmResponse {
     pub usage: Usage,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Maps the provider wire's usage fields (Anthropic `usage.input_tokens/output_tokens`, Chat `prompt_tokens/completion_tokens`).
+/// Not a Jev-API-mapped type (the Jev usage is sc_decision_schema::Usage), so it is outside REQ-SAG-0201 AC2.
 pub struct Usage { pub input_tokens: u64, pub output_tokens: u64 }
 
 // src/provider.rs
@@ -156,7 +158,8 @@ impl LlmClient {
     pub fn with_log(self, log: GeneralLogger) -> Self;
     pub fn provider(&self) -> LlmProvider;
     pub fn wire(&self) -> Wire;
-    /// Sans-IO: the POST to send (JSON body, headers, secret header).
+    /// Sans-IO: the POST to send (JSON body, headers, secret header attached with `HttpRequest::with_secret(..)?`, a-5;
+    /// every built-in endpoint is https, so http.key_on_plain_http can only come from a with_endpoint override -> LlmError::Http).
     pub fn encode(&self, request: &LlmRequest) -> Result<HttpRequest, LlmError>;
     /// Sans-IO: read a final reply. Non-2xx -> ApiStatus with ProviderReply::read(&response, Some(&key)).
     /// With a logger set, every 2xx reply whose envelope decodes (usage read, including truncated, refused
@@ -166,7 +169,7 @@ impl LlmClient {
     pub fn http_error(&self, error: HttpError) -> LlmError;
     /// GET {base}/v1/models with the credential header (decide doctor). The caller sends it on a probe
     /// transport (`UreqTransport::new(Timeouts::probe())`, connect 5 s, request 10 s; a-5), not the 120 s decision one.
-    pub fn models_request(&self) -> HttpRequest;
+    pub fn models_request(&self) -> Result<HttpRequest, LlmError>;   // secret via with_secret(..)? -> LlmError::Http
     /// The provider's model ids (`data[].id`, or a top-level array of `{id}`); non-2xx -> ApiStatus.
     pub fn decode_models(&self, response: HttpResponse) -> Result<Vec<String>, LlmError>;
 }
@@ -352,6 +355,7 @@ Estimated size: sc-llm-provider about 350 lines of code, sc-decision-llm about 3
 - [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio or ureq; no sleep call.
 - [ ] REQ-SAG-0201: sc-decision-llm imports every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema and defines none of its own; sc-llm-provider uses no decision types.
 - [ ] ANC-007: the existing sc-agent library code in sc-llm-provider and sc-decision-llm is updated to write log records: LlmClient::with_log and LlmDecisionBackend::with_log take the caller's GeneralLogger (REQ-SAG-0008: default or injected); LlmClient::decode(request, response, ctx) writes one `llm.usage` record (provider, model, input and output tokens, the LogContext session_id and position) per decoded reply and LlmDecisionBackend::decode writes one `llm.schema_mismatch` record (provider, model, cause id) per schema mismatch it returns, both carrying the LogContext passed to Backend::decode, never a prompt, body or key (sends are logged by sc-agent-http as http.send); a test in each crate builds `MemoryLog::new()?` (a-8's sc_agent_log::testing), passes `log.general()` to with_log, decodes one reply (and in sc-decision-llm one schema mismatch), and finds those records in `log.records()?` by `action`.
+- [ ] REQ-SAG-0201: sc_llm_provider::Usage maps provider wire fields (Anthropic usage input/output_tokens, OpenAI-compatible prompt/completion_tokens); it is not a Jev-API-mapped type (the Jev Usage is sc_decision_schema::Usage) and is excluded from REQ-SAG-0201 AC2.
 
 ## Notes
 
@@ -368,3 +372,5 @@ Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usag
 Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
 a-1 contract folded in: Catalog::resolve is infallible (no error arm); Display prints `<id>: <message>` only; cause_detail()/recovery() from ErrorId.
 Resolved: a-2 Backend::decode takes ctx: &LogContext; LlmDecisionBackend passes it to LlmClient::decode, so llm.usage and llm.schema_mismatch carry it. LogContext/GeneralLogger::write(.., ctx, fields)/may_start+SendPermit+send_once match a-5/a-8.
+Round 3 (REQ-QA-R2-007): sc_llm_provider::Usage is a provider-wire type, excluded from REQ-SAG-0201 AC2 (new acceptance line).
+Round 4: HttpRequest::with_secret(..)? at the secret attach in encode and models_request (now Result<HttpRequest, LlmError>; a-10 callers add ?).

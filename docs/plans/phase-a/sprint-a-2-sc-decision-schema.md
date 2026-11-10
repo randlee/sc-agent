@@ -54,7 +54,7 @@ Not copied: the old Jev question/answer/request/response types (wrong shapes aga
 ## 2. Required edits after copying
 
 - src/map.rs: module doc and `use` lines (BTreeSet, fmt, PhantomData, serde de/ser). `try_from_pairs` returns `Result<Self, DecisionError>` with `DuplicateKey { key }`. Remove `keys()` and `is_empty()`. Doc-test path `sc_decision_schema::OrderedMap`.
-- src/digest.rs: the fragment becomes `QuestionDigest::of_text`, infallible. sc-sha 1.8.0's `calculate_hash` has one error, `ShaError::InvalidUtf8`, which the bytes of a `&str` cannot produce; the copied `unreachable!()` arm stays with that comment (clippy `unreachable` is not in the workspace denies; no `#[allow]` needed). Comment: compact serde_json escapes CR inside strings, so sc-sha's CRLF normalisation never alters the digest input.
+- src/digest.rs: the fragment becomes crate-private `QuestionDigest::of_text(text: &str) -> Result<Self, sc_sha::ShaError>`; the copied `unreachable!()` arm is deleted and replaced by `Err(error) => Err(error)` (no panic path, no `#[allow]`). sc-sha 1.8.0 has one hashing entry, `calculate_hash(HashInput::TextFileBytes { utf8_file_bytes: text.as_bytes() })`, and its one error `ShaError::InvalidUtf8` cannot occur for the bytes of a `&str`; the crate-private `question_digests` maps it to `DecisionError::Encode { message: "sc-sha refused the digest input: <error>" }`, so `DecisionRequest::new` (already fallible) stays total and no public variant or empty-digest state exists for it. Comment: compact serde_json escapes CR inside strings, so sc-sha's CRLF normalisation never alters the digest input.
 
 ## 3. Exact Rust surface (bodies elided)
 
@@ -268,13 +268,13 @@ pub trait Backend: Send + Sync + fmt::Debug {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct QuestionDigest(String);
-impl QuestionDigest { pub fn of_text(text: &str) -> Self; pub fn as_str(&self) -> &str; }
+impl QuestionDigest { pub(crate) fn of_text(text: &str) -> Result<Self, sc_sha::ShaError>; pub fn as_str(&self) -> &str; }
 /// Accepts exactly 64 lowercase hex chars (sc_sha::TemplateSha256::from_hex plus a lowercase check);
 /// else sc_sha::ShaError::InvalidDigestHex.
 impl TryFrom<String> for QuestionDigest { type Error = sc_sha::ShaError; }
 impl From<QuestionDigest> for String {}
 impl AsRef<str> for QuestionDigest {}
-pub(crate) fn question_digests(body: &SystemOneRequest, image_parts: &[ImagePart], long_context: bool) -> Result<OrderedMap<String, QuestionDigest>, DecisionError>; // Err only Encode
+pub(crate) fn question_digests(body: &SystemOneRequest, image_parts: &[ImagePart], long_context: bool) -> Result<OrderedMap<String, QuestionDigest>, DecisionError>; // Err only Encode (serde_json, or the unreachable-by-contract ShaError)
 ```
 
 `HttpRequest`/`HttpResponse`/`HttpError`/`LogContext` (re-export) are sc-agent-http's (A-5); `SessionId`, `CancelToken`, `ErrorId`, `ErrorDetail` are sc-agent-types' (A-1).
@@ -334,7 +334,7 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 // recovery(): RequestParse -> "fix the field named in `path` (see the TypeSafe API docs for its shape) and send again"; others None (Http forwards a-5's)
 ```
 
-14 variants (decision.digest is gone: hashing a `&str` cannot fail in sc-sha 1.8.0; decision.limits is new). No unsupported-input variant: every input is passed to the provider and a rejection is the provider's error (REQ-SAG-0901). A session-log write failure is never a DecisionError: it never replaces a decision result (A-9). Rule: wrapping keeps the lower value unchanged, so every id and message reaches the top.
+14 variants (decision.digest is gone: sc-sha 1.8.0 cannot fail on `&str` bytes, and the type-level Err is folded into decision.encode; decision.limits is new). No unsupported-input variant: every input is passed to the provider and a rejection is the provider's error (REQ-SAG-0901). A session-log write failure is never a DecisionError: it never replaces a decision result (A-9). Rule: wrapping keeps the lower value unchanged, so every id and message reaches the top.
 
 ## 6. Dependencies
 
@@ -354,7 +354,7 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - `request_parse_errors` (duplicate question id, unknown field, score without `criteria` -> path `questions.<id>`; try_from_pairs duplicate -> DuplicateKey) -> AC "REQ-SAG-0504 support".
 - `new_checks_image_parts` (asset part with no ImagePart; two ImageParts of one name; unreferenced ImagePart; a matching set is Ok; TryFrom of a body whose asset names a part is Err) -> AC "DecisionRequest::new".
 - `new_checks_limits` (21 images; one image of MAX_IMAGE_BYTES + 1) -> AC "REQ-SAG-0014".
-- `digest_deserialize_validates` (63 chars, uppercase, non-hex refused; of_text output round-trips) -> AC "ADR-SAG-0002".
+- `digest_deserialize_validates` (63 chars, uppercase, non-hex refused; a digest from DecisionRequest::digests round-trips) -> AC "ADR-SAG-0002".
 - `digests` (same twice equal; model / state / assets / long_context / a part byte / question q each change q; question r leaves q; 3 questions -> 3 in order) -> AC "REQ-SAG-0202".
 - `error_ids` (14 ids distinct, `^decision\.[a-z_]+$`; Display = `id: message`; `Http(Network)` cause_detail `http.network`; two-level `Backend` detail kept; request_parse recovery non-empty) -> AC "REQ-SAG-0002".
 - `object_safety` (`Box<dyn Decision>`, `Arc<dyn Backend>` from an in-test backend) -> AC "Backend/Decision shape" and AC "ADR-SAG-0001".
@@ -382,7 +382,7 @@ impl ErrorId for DecisionError {}   // cause_detail(): Http -> http detail; Back
 - [ ] DecisionRequest::new: sc-decision-schema's DecisionRequest has private fields and is built only by DecisionRequest::new (or TryFrom<SystemOneRequest> = new with no parts), which returns decision.image_parts naming the asset/part when an Asset.part has no or more than one matching ImagePart or an ImagePart is unreferenced, and Ok for a matching set; DecisionRequest has no public validate.
 - [ ] REQ-SAG-0014: sc-decision-schema's DecisionRequest::new refuses more than 20 image parts or a part over 20 MiB with decision.limits naming the limit (what, max); the request and batch size limits are a-10's.
 - [ ] ADR-SAG-0002: sc-decision-schema's QuestionDigest serialises as the 64-lowercase-hex JSON string the session rows carry and its Deserialize refuses any other string (63 chars, uppercase, non-hex).
-- [ ] REQ-SAG-0002: sc-decision-schema's DecisionError implements ErrorId with 14 distinct decision.* ids (incl. decision.image_parts and decision.limits; no decision.digest, since QuestionDigest::of_text cannot fail; no unsupported-input variant), Display is `id: message`, cause_detail() carries the lower detail and decision.request_parse has a non-empty recovery(); Http wraps HttpError unchanged; an LlmError chain arrives as ErrorDetail in Backend or SchemaMismatch with every id and message kept; clippy with the workspace denies passes.
+- [ ] REQ-SAG-0002: sc-decision-schema's DecisionError implements ErrorId with 14 distinct decision.* ids (incl. decision.image_parts and decision.limits; no decision.digest: digest.rs has no unreachable!/panic arm and sc-sha's type-level error is mapped to decision.encode; no unsupported-input variant), Display is `id: message`, cause_detail() carries the lower detail and decision.request_parse has a non-empty recovery(); Http wraps HttpError unchanged; an LlmError chain arrives as ErrorDetail in Backend or SchemaMismatch with every id and message kept; clippy with the workspace denies passes.
 - [ ] ADR-SAG-0004: sc-decision-schema sits in the decision-schema layer and its only sc-agent crate dependencies are the lower-layer crates sc-agent-types and sc-agent-http (its other dependencies are the external crates serde, serde_json, serde_path_to_error and sc-sha 1.8); it depends on no decision backend, sc-llm-provider or runner crate, checked by `cargo tree -p sc-decision-schema -e normal`.
 - [ ] ADR-SAG-0001: the Backend trait is defined in sc-decision-schema and is the one trait every decision backend (Jev, local runners, Haiku, Luna) implements; a compile-time test builds `Arc<dyn Backend>` from a test backend (object safety).
 - [ ] REQ-SAG-0010: no call to std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function in sc-decision-schema source; enforced by the workspace clippy disallowed-methods rule.

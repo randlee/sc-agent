@@ -1,0 +1,44 @@
+{
+  "agent": "arch-qa",
+  "branch": "main",
+  "scope": {"phase": "a", "sprint": "phase-a-plan"},
+  "commit": "98b2162",
+  "verdict": "PASS",
+  "blocking": 0,
+  "important": 0,
+  "findings": [
+    {
+      "id": "ARCH-009",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0004",
+      "severity": "MINOR",
+      "file": "docs/plans/phase-a/plan.md",
+      "line": 27,
+      "description": "The boundary map row for sc-decision-local lists allowed sc-agent dependencies as types, secrets, log, http and schema. The a-6 sprint doc (line 222) and ADR-SAG-0004 add sc-decision-systemone and sc-agent-config (RunnerKind, RunnerHost). The sc-decision-runner row lists config, so the plan's map is also inconsistent in what it shows per row. The a-6 doc and the ADR are consistent with each other, so this is not an ADR violation. The Sprints table 'Depends on' column (a-6, a-7, a-9 show a-2 only) is narrower than the 'Every must_follow edge' table, which is the authoritative one.",
+      "remediation": "Add sc-decision-systemone and config to the sc-decision-local row. State that the edge table, not the 'Depends on' column, is authoritative for start conditions."
+    },
+    {
+      "id": "ARCH-010",
+      "rule": "RULE-ADR-PLAN",
+      "adr": "ADR-SAG-0005",
+      "severity": "MINOR",
+      "file": "docs/plans/phase-a/sprint-a-3-sc-treesitter.md",
+      "line": 450,
+      "description": "Open question 1 still calls the PyO3 placement an 'assistant decision shown to the owner at architecture review'. ADR-SAG-0005 is now Approved and records the decision, so the line is stale. a-3's design (lines 45, 50) and its ADR-SAG-0005 acceptance line (445) match the ADR.",
+      "remediation": "Replace the line with a reference to ADR-SAG-0005 as approved."
+    }
+  ],
+  "adr_checks": [
+    {"adr": "ADR-SAG-0001", "source": "docs/adr/ADR-SAG-0001.md:12", "listed_in_sprint_doc": true, "result": "upheld", "evidence_refs": ["docs/adr/ADR-SAG-0001.md:33", "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:26", "docs/plans/phase-a/sprint-a-6-decision-backends.md:259-262", "docs/plans/phase-a/sprint-a-7-llm-provider.md:347"]},
+    {"adr": "ADR-SAG-0002", "source": "docs/adr/ADR-SAG-0002.md:12", "listed_in_sprint_doc": true, "result": "upheld", "evidence_refs": ["docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:26,384", "docs/plans/phase-a/sprint-a-4-config-secrets.md:27,316", "docs/plans/phase-a/sprint-a-8-sc-agent-log.md:26", "docs/plans/phase-a/sprint-a-9-decision-runner.md:35,275", "docs/plans/phase-a/sprint-a-10-clis-python.md:33,533"]},
+    {"adr": "ADR-SAG-0003", "source": "docs/adr/ADR-SAG-0003.md:12", "listed_in_sprint_doc": false, "result": "not-applicable", "evidence_refs": ["docs/plans/phase-a/plan.md:127"]},
+    {"adr": "ADR-SAG-0004", "source": "docs/adr/ADR-SAG-0004.md:12", "listed_in_sprint_doc": true, "result": "upheld", "evidence_refs": ["docs/plans/phase-a/plan.md:19-31", "docs/plans/phase-a/sprint-a-6-decision-backends.md:124,221-222", "docs/plans/phase-a/sprint-a-10-clis-python.md:366-380,400", "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md:386"]},
+    {"adr": "ADR-SAG-0005", "source": "docs/adr/ADR-SAG-0005.md:12", "listed_in_sprint_doc": true, "result": "upheld", "evidence_refs": ["docs/plans/phase-a/sprint-a-3-sc-treesitter.md:27,45,50,445", "docs/plans/phase-a/plan.md:31,88"]}
+  ],
+  "gate_artifact_checks": [
+    {"artifact": "docs/plans/phase-a/plan.md (boundary map, edge table, requirement ownership)", "status": "closed", "evidence_refs": ["docs/plans/phase-a/plan.md:19", "docs/plans/phase-a/plan.md:55", "docs/plans/phase-a/plan.md:83"], "notes": "The edge table covers every dev-push edge. The ownership table maps ADR-0001, 0002, 0004 and 0005 and the REQ records. ADR-SAG-0003 is stated as out of phase A (line 127)."},
+    {"artifact": ".claude/project/quality-policy.md", "status": "closed", "evidence_refs": [".claude/project/quality-policy.md:11-21", ".claude/project/quality-policy.md:96"], "notes": "The index docs are mapped to the Raptor record folders, so their absence is not a finding."}
+  ],
+  "merge_ready": true,
+  "notes": "Carried-forward status. ARCH-001: FIXED. ADR-SAG-0001, 0002, 0003, 0004 and 0005 are all Approved. ARCH-002: FIXED. The a-10 open-question lines are gone, and line 551 records that the owner approved the ADR-SAG-0004 amendment. ARCH-003: FIXED. ADR-SAG-0004 now has the trait-bound-error exemption (lines 34 and 43), and a-6 line 124 cites it. ARCH-004: FIXED. ADR-SAG-0005 covers sc-treesitter-py, the python/cli feature gates and the tsq placement, and a-3 lists it. ARCH-005: FIXED. ADR-SAG-0002 is in the adrs lists of a-2, a-4, a-8, a-9 and a-10, each with an acceptance line. ARCH-006: FIXED. The quality policy lines 11-21 and 96 map the index docs to the Raptor record folders. ARCH-007: FIXED. plan.md line 31 and a-3 agree that tsq is in sc-treesitter behind the non-default cli feature. ARCH-008: FIXED. ADR-SAG-0001 line 33 names DecisionRequest the one request form. The a-6 and a-7 wording 'SystemOneRequest unchanged' is compatible with that. ARCH-009 and ARCH-010 are new and minor. Per the plan QA policy this is PASS with minor fixes required and no re-QA."
+}

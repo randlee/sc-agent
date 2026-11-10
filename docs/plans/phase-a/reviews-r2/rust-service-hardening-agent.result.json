@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "data": {
+    "status": "findings",
+    "reviewed_branch": "main",
+    "reviewed_commit": "98b2162",
+    "review_mode": "doc_review",
+    "service_indicators_found": ["ureq =3.5.1 (sc-agent-http)", "worker-pool threads with Condvar queue (sc-decision-runner)", "ctrlc signal handler (decide)", "no tokio/axum/hyper/reqwest by design"],
+    "topics_reviewed": ["config_validation", "timeouts", "retries", "graceful_shutdown", "backpressure", "body_limits", "structured_tracing"],
+    "carried_findings": [
+      {"id": "RSH-001", "status": "fixed", "evidence": "a-5 lines 259-281, 391, 410: a timeout is resent under max_sends and the 90 s start budget. The owner decision is recorded. The worst case is documented as 210 s plus queue wait. Tests default_timeouts_which_resend and timeout_then_budget_ends_with_timeout cover it. Residual: I could not read the omitted-long lines 279 and 283, so I did not confirm that the duplicate-POST and billing risk is stated in the text."},
+      {"id": "RSH-002", "status": "fixed", "evidence": "a-5 line 173 and A5-23: request is one global deadline (ureq timeout_global). Timeouts::probe() (5 s / 10 s) is used for discover, models and doctor. Worst-case wall clock is documented (line 281). See new RSH-013 for the remaining per-runner knob."},
+      {"id": "RSH-003", "status": "fixed", "evidence": "a-5 lines 48, 245-273, A5-03 and A5-21: ProviderPause is shared per host across clones. Retry-After is clamped to 250 ms-30 s with 0-250 ms jitter. Tests cover retry_after_zero_floored, pause_is_per_host and pause_shared_by_clones."},
+      {"id": "RSH-004", "status": "fixed", "evidence": "a-10 lines 52, 58, 237-247, 523: decide::signal uses ctrlc (termination feature) to cancel the token. Unfinished requests end decision.cancelled, flush_session_log runs, and the exit code is 130."},
+      {"id": "RSH-005", "status": "fixed", "evidence": "a-10 lines 59, 431, 489, 524: recv_timeout(100 ms) then py.check_signals() with the GIL. KeyboardInterrupt or an on_result exception cancels the token, drains, and re-raises. Python test 6 covers it."},
+      {"id": "RSH-006", "status": "fixed", "evidence": "a-9 line 265 and test drop_mid_batch_one_row_per_started_job (line 232): Drop cancels the JobQueue, never the caller's token, joins no thread, bounds a lingering worker by the request deadline, and writes one row per submitted job."},
+      {"id": "RSH-007", "status": "fixed", "evidence": "a-4 lines 141-152, 216, 314: MAX_WORKERS 64 and MAX_MAX_SENDS 10 are checked at load as config.invalid with the key path. a-9 uses checked arithmetic for queue_capacity."},
+      {"id": "RSH-008", "status": "fixed", "evidence": "a-4 lines 164-200, 255, 314-315: RunnerHost, RunnerKind, NonZeroU16 port and VarName key_env are validated at load. A key_env on a non-loopback host is config.key_on_plain_http."},
+      {"id": "RSH-009", "status": "fixed", "evidence": "a-8 lines 157-179, 294: LogContext supplies session_id and position and sets correlation_id. a-9 line 235 test busy_records_carry_session and line 267 cover it."},
+      {"id": "RSH-010", "status": "fixed", "evidence": "a-5 A5-15 adds elapsed_ms. a-9 line 137 uses try_write (never blocks) on the cancel, orphan and abandon paths."},
+      {"id": "RSH-011", "status": "fixed", "evidence": "a-9 line 266: the result queue is bounded at queue_capacity and a worker blocks on a full queue. Test slow_consumer_blocks_workers."},
+      {"id": "RSH-012", "status": "fixed", "evidence": "a-10 lines 150-153 and 84: MAX_REQUEST_BYTES 8 MiB, MAX_BATCH_LINES 10,000, MAX_BATCH_BYTES 256 MiB, MAX_IMAGE_BYTES 20 MiB, all with typed LimitExceeded. a-2 line 200 adds MAX_IMAGES 20. REQ-SAG-0014 is covered. The 8 MiB response cap still bounds text kept whole in session rows."}
+    ],
+    "findings": [
+      {
+        "id": "RSH-013",
+        "topic": "timeouts",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-5-sc-agent-http.md",
+        "line": 379,
+        "issue": "Timeouts stays code-level: every send uses 10 s connect / 120 s request, with no per-runner or per-provider knob. A local runner that loads a checkpoint on demand (Laya, a-6) can exceed 120 s on its first call. Because of the 90 s start budget and max_sends, the timed-out request is resent at most a few times and then fails. An operator has no setting to change this.",
+        "recommendation": "Either add an optional request_timeout_secs per local_runners entry, validated at load with a minimum and a maximum, or record in the plan that 120 s is a deliberate fixed ceiling and the cold-start failure is accepted.",
+        "evidence": "a-5 line 379 (`Timeouts stays code-level`); a-4 LocalRunner fields (host, port, kind, model, key_env) have no timeout field; a-6 line 67 (Laya loads checkpoints on demand)."
+      }
+    ],
+    "summary": {
+      "total_findings": 1,
+      "by_severity": {"critical": 0, "important": 0, "minor": 1}
+    },
+    "notes": [
+      "All 12 round-1 findings are fixed in the designs. One new minor finding, RSH-013.",
+      "I had no shell tool, so I could not run git rev-parse to verify that HEAD is 98b2162 on main. The gitStatus snapshot lists 98b2162 as the latest commit on main. This was not independently verified.",
+      "Several long lines in a-5 (53, 279, 283) were omitted from the grep output, so I did not read them. The duplicate-POST billing risk statement (RSH-001) is unverified for that reason.",
+      "Out of assigned topics, still open: no cargo audit or cargo deny step appears in any sprint's validation list. ureq, sc-observability and pyo3 are exact pins. This is dependency hygiene and should be triaged separately.",
+      "Not reviewed in depth: the REQ-SAG-0011..0014 requirement files. I relied on the sprint documents' acceptance lists to confirm they match."
+    ]
+  },
+  "error": null
+}

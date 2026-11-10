@@ -24,7 +24,7 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 | sc-agent-log | config/secrets/log | GeneralLogger, SessionLogger, Level, LogError; testing::MemoryLog | types | a-8 |
 | sc-agent-http | http | HttpRequest, HttpResponse, HttpError, Transport, HttpClient, Attempts::may_start, ResendPolicy; testing::{ScriptedTransport, BlockingTransport} | types, secrets, log | a-5 |
 | sc-decision-schema | decision schema | Backend, Decision, DecisionRequest (+validate), DecisionResult, DecisionError, question_digests | types, http | a-2 |
-| sc-decision-systemone, sc-decision-local | decision backends | SystemOneBackend, LocalBackend (+with_log, discover) | types, secrets, log, http, schema | a-6 |
+| sc-decision-systemone, sc-decision-local (over sc-decision-systemone) | decision backends | SystemOneBackend, LocalBackend (+with_log, discover, wait_until_loaded) | systemone: types, secrets, http, schema; local: also config, log and sc-decision-systemone | a-6 |
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
 | sc-decision-runner | runner | DecisionRunner, RunnerConfig, RunnerError | types, config, log, http, schema | a-9 |
 | decide, sc-agent-py | top (decide library = composition root) | decide library API, decide CLI, Python module | all of the above | a-10 |
@@ -50,7 +50,7 @@ owned_paths are disjoint across all sprints; the workspace root Cargo.toml and c
 
 ## Every must_follow edge
 
-A sprint starts when every artifact it lists below has been pushed (dev-push).
+This table is authoritative for start conditions; the Sprints table's column lists the same sprints. A sprint starts when every artifact it lists has been pushed (dev-push).
 
 | Sprint | must_follow | Artifact (dev-push) |
 |---|---|---|
@@ -60,8 +60,8 @@ A sprint starts when every artifact it lists below has been pushed (dev-push).
 | a-5 | a-4 | sc_agent_secrets::ApiKey (crates/sc-agent-secrets) |
 | a-5 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} (crates/sc-agent-log) |
 | a-6 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, ModelMetadataList, DecisionError} (crates/sc-decision-schema/src/) |
-| a-6 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe} and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
-| a-6 | a-4 | sc_agent_config::RunnerKind (closed enum) and sc_agent_secrets::ApiKey |
+| a-6 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError, Endpoint, Transport, Timeouts::probe, HttpRequest::with_secret, HttpRequest::with_deadline} and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
+| a-6 | a-4 | sc_agent_config::{RunnerKind (closed enum), RunnerHost} and sc_agent_secrets::ApiKey |
 | a-6 | a-8 | sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`) |
 | a-7 | a-2 | sc_decision_schema::{Backend, DecisionRequest (private fields, DecisionRequest::new and accessors), ImagePart, SystemOneRequest, SystemOneResponse, Answer, DecisionError} (crates/sc-decision-schema/src/) |
 | a-7 | a-5 | sc_agent_http::{HttpRequest, HttpResponse, HttpError} (src/request.rs, src/error.rs), plus Endpoint, SecretHeader, ProviderReply, Timeouts::probe, HttpClient::{may_start, send_once}, SendPermit and sc_agent_http::testing::ScriptedTransport (feature `testing`) |
@@ -78,34 +78,35 @@ A sprint starts when every artifact it lists below has been pushed (dev-push).
 
 ## Requirement ownership
 
-The owner closes the record's acceptance; contributing sprints prove their boundary part and name the owner in does_not_close. REQ-SAG-0002, 0006, 0009, 0010 and ADR-SAG-0004 are checked in every sprint's required validation.
+The owner closes the record's acceptance; contributing sprints prove their boundary part and name the owner in does_not_close.
 
 | Record | Owner of acceptance | Sprints that contribute |
 |---|---|---|
 | ADR-SAG-0001 | a-10 (end to end) | a-2, a-5, a-6, a-7, a-9, a-10 |
 | ADR-SAG-0002 | a-10 (end to end) | a-2, a-4, a-8, a-9, a-10 |
-| ADR-SAG-0004 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| ADR-SAG-0004 | a-10 (end to end); every sprint checks its own Cargo.toml | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
 | ADR-SAG-0005 | a-3 | a-3 |
-| NFR-SAG-0001 | a-9 (last boundary) | a-8, a-9 |
+| NFR-SAG-0001 | a-8 (40,000-session logger test); a-9 and a-10 contribute | a-8, a-9, a-10 |
 | REQ-SAG-0001 | a-10 (end to end) | a-1, a-2, a-3, a-6, a-8, a-9, a-10 |
-| REQ-SAG-0002 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0002 | a-10 (end to end); every sprint checks its own crate | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
 | REQ-SAG-0003 | a-10 (end to end) | a-3, a-4, a-8, a-10 |
 | REQ-SAG-0004 | a-10 (end to end) | a-8, a-9, a-10 |
 | REQ-SAG-0005 | a-8 (last boundary) | a-4, a-8 |
-| REQ-SAG-0006 | every sprint (shared validation) | a-1, a-2, a-7 |
+| REQ-SAG-0006 | a-2 (sc-agent-types and sc-decision-schema checked in a-1 and a-2) | a-1, a-2, a-7 |
 | REQ-SAG-0007 | a-10 (end to end) | a-2, a-5, a-6, a-7, a-9, a-10 |
 | REQ-SAG-0008 | a-10 (end to end) | a-5, a-6, a-7, a-8, a-9, a-10 |
-| REQ-SAG-0009 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
-| REQ-SAG-0010 | every sprint (shared validation); end-to-end a-10 | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
-| REQ-SAG-0011 | a-10 (end to end) | a-10 |
+| REQ-SAG-0009 | a-10 (workspace); every sprint checks its own crate | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0010 | a-10 (workspace); every sprint checks its own crate | a-1, a-2, a-3, a-4, a-5, a-6, a-7, a-8, a-9, a-10 |
+| REQ-SAG-0011 | a-10 (end to end) | a-9, a-10 |
 | REQ-SAG-0012 | a-10 (end to end) | a-5, a-9, a-10 |
-| REQ-SAG-0013 | a-10 (end to end) | a-4, a-10 |
+| REQ-SAG-0013 | a-10 (end to end) | a-1, a-4, a-5, a-6, a-9, a-10 |
 | REQ-SAG-0014 | a-10 (end to end) | a-2, a-10 |
+| REQ-SAG-0015 | a-10 (end to end) | a-4, a-5, a-6, a-10 |
 | REQ-SAG-0101 | a-10 (end to end) | a-1, a-10 |
 | REQ-SAG-0102 | a-10 (end to end) | a-1, a-4, a-10 |
 | REQ-SAG-0103 | a-10 (end to end) | a-1, a-7, a-10 |
 | REQ-SAG-0104 | a-10 (end to end) | a-1, a-2, a-9, a-10 |
-| REQ-SAG-0201 | a-9 (last boundary) | a-2, a-6, a-7, a-9 |
+| REQ-SAG-0201 | a-10 (end to end) | a-2, a-6, a-7, a-9, a-10 |
 | REQ-SAG-0202 | a-9 (last boundary) | a-2, a-9 |
 | REQ-SAG-0301 | a-3 | a-3 |
 | REQ-SAG-0302 | a-3 | a-3 |
@@ -128,15 +129,15 @@ The owner closes the record's acceptance; contributing sprints prove their bound
 
 ## Sprints
 
-| Sprint | Doc | Branch | Depends on | Status |
+| Sprint | Doc | Branch | Depends on (every must_follow edge) | Status |
 |---|---|---|---|---|
 | a-1 | [Sprint A-1: sc-agent-types](sprint-a-1-sc-agent-types.md) | `sprint/a-1-sc-agent-types` | — | open |
 | a-2 | [Sprint A-2: sc-decision-schema](sprint-a-2-sc-decision-schema.md) | `sprint/a-2-sc-decision-schema` | a-5 | open |
 | a-3 | [Sprint A-3: sc-treesitter, tsq and sc-treesitter-py](sprint-a-3-sc-treesitter.md) | `sprint/a-3-sc-treesitter` | a-1 | open |
 | a-4 | [Sprint A-4: sc-agent-config and sc-agent-secrets](sprint-a-4-config-secrets.md) | `sprint/a-4-config-secrets` | a-1 | open |
-| a-5 | [Sprint A-5: sc-agent-http](sprint-a-5-sc-agent-http.md) | `sprint/a-5-sc-agent-http` | a-8, a-4 | open |
-| a-6 | [Sprint A-6: sc-decision-systemone and sc-decision-local](sprint-a-6-decision-backends.md) | `sprint/a-6-decision-backends` | a-2 | open |
-| a-7 | [Sprint A-7: sc-llm-provider and sc-decision-llm](sprint-a-7-llm-provider.md) | `sprint/a-7-llm-provider` | a-2 | open |
+| a-5 | [Sprint A-5: sc-agent-http](sprint-a-5-sc-agent-http.md) | `sprint/a-5-sc-agent-http` | a-4, a-8 | open |
+| a-6 | [Sprint A-6: sc-decision-systemone and sc-decision-local](sprint-a-6-decision-backends.md) | `sprint/a-6-decision-backends` | a-2, a-4, a-5, a-8 | open |
+| a-7 | [Sprint A-7: sc-llm-provider and sc-decision-llm](sprint-a-7-llm-provider.md) | `sprint/a-7-llm-provider` | a-2, a-4, a-5, a-8 | open |
 | a-8 | [Sprint A-8: sc-agent-log](sprint-a-8-sc-agent-log.md) | `sprint/a-8-sc-agent-log` | a-1 | open |
-| a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2 | open |
-| a-10 | [Sprint A-10: decide CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-7, a-6, a-9 | open |
+| a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2, a-4, a-5, a-8 | open |
+| a-10 | [Sprint A-10: decide CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | open |

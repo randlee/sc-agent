@@ -180,13 +180,16 @@
           "event": "retired",
           "replaced_by": "ANC-006",
           "reason": "the decision CLI is named decide, not sc-ai; scope rewritten to bead-level signals"
+        },
+        {
+          "at": "2026-11-10T05:47:12+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.3",
+          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3.",
+          "replaced": true
         }
       ],
       "exclude": [
-        {
-          "item": "agt-4p2.3",
-          "reason": "A-3 builds the sc-treesitter library and adds no CLI command; the tree-sitter CLI and its Python parity are sprint A-10."
-        },
         {
           "item": "agt-4p2.1",
           "reason": "sc-agent-types defines data types only; it adds no CLI command and no Python API function."
@@ -202,6 +205,10 @@
         {
           "item": "agt-4p2.6",
           "reason": "A-6 builds decision backends; it adds no CLI command and no Python API function."
+        },
+        {
+          "item": "agt-4p2.3",
+          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3."
         }
       ]
     },
@@ -384,6 +391,13 @@
           "item": "agt-4p2.10",
           "reason": "A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T05:47:04+00:00",
+          "event": "excluded",
+          "item": "agt-4p2.10",
+          "reason": "A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
+          "replaced": true
         }
       ],
       "exclude": [
@@ -393,7 +407,7 @@
         },
         {
           "item": "agt-4p2.10",
-          "reason": "A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait."
+          "reason": "A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait."
         }
       ]
     },

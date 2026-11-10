@@ -27,7 +27,7 @@ sprint:
   adrs: [ADR-SAG-0004, ADR-SAG-0005]
   does_not_close:
     - "REQ-SAG-0302 AC2 for C# (csharp) and Go is the second release and is outside phase A (recorded in plan.md); the AC stays unchecked in the record. Adding them is table rows, queries and samples with no API change."
-    - "REQ-SAG-0011: tsq installs no signal handler; it runs one short synchronous query and the default SIGINT/SIGTERM exit loses nothing (it writes no session log)."
+    - "tsq runs one short query and installs no signal handler (it writes no session log, so the default exit loses nothing)."
     - "REQ-SAG-0003 rotation/retention acceptance criteria: sc-observability's built-in policy, checked for the sc-agent logs in a-8; this sprint closes only 'tsq writes its own general log file'."
 ```
 
@@ -41,8 +41,8 @@ Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and
 
 Scope: this sprint is the library, its output types, error ids, JSON encoder and file reader, the PyO3 support types, `crates/sc-treesitter-py`, and the `tsq` binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, sc-observability, the non-default `cli` feature, section 3b). It is the single owner of `crates/sc-treesitter/Cargo.toml`; no other sprint edits this crate. Install: `cargo install sc-treesitter --features cli`.
 
-Decisions (assistant, 2026-11-09; owner reviews the placement at architecture review):
-- PyO3 placement: a separate crate `crates/sc-treesitter-py` builds the extension module; sc-treesitter stays an rlib with the support types behind `python` (section 3a).
+Decisions (2026-11-09; the crate set, the `python`/`cli` features and the tsq placement are decided in ADR-SAG-0005 (Approved)):
+- PyO3 placement: a separate crate `crates/sc-treesitter-py` builds the extension module; sc-treesitter stays an rlib with the support types behind `python` (section 3a); decided in ADR-SAG-0005 (Approved).
 - Output shape: flat captures sorted by (start_byte, name, end_byte), as copied; each capture is one part of a match.
 - Logging: the library logs nothing (stand-alone, REQ-SAG-0301); the `tsq` binary writes its own general log (REQ-SAG-0003, section 3b).
 - tsq (owner named it `tsq`): subcommands `languages`, `queries`, `query`; runs predefined queries only (REQ-SAG-0303: the CLI is a subset of PyO3). Exit 0 on success, 1 on any error.
@@ -290,12 +290,12 @@ pub enum Error {
     GrammarLoad { language: String, detail: String },                          // "treesitter.grammar_load"
     /// No predefined query by that name for the language.
     UnknownQuery { language: String, name: String },                           // "treesitter.unknown_query"
-    /// tree_sitter::QueryError, every field kept; kind = Debug of QueryErrorKind.
+    /// tree_sitter::QueryError, every field kept; kind = Debug of QueryErrorKind (display only; not a stable value to match on).
     QueryCompile { language: String, offset: usize, row: usize, column: usize, kind: String, detail: String }, // "treesitter.query_compile"
     /// Capture filter names a capture the query does not define.
     QueryCaptureInvalid { capture: String },                                   // "treesitter.query_capture_invalid"
     FileNotFound { path: std::path::PathBuf },                                 // "treesitter.file_not_found"
-    /// io error other than NotFound; kind = Debug of io::ErrorKind, detail = Display.
+    /// io error other than NotFound; kind = Debug of io::ErrorKind (display only), detail = Display.
     FileRead { path: std::path::PathBuf, kind: String, detail: String },       // "treesitter.file_read"
     /// Utf8Error::valid_up_to.
     NotUtf8 { path: Option<std::path::PathBuf>, byte_offset: usize },          // "treesitter.not_utf8"
@@ -309,11 +309,11 @@ pub enum Error {
     NoMatches { language: String, query: String },                             // "treesitter.no_matches"
     /// serde_json error Display.
     Encode { detail: String },                                                 // "treesitter.encode"
-    /// tsq argument error (section 3b); kind = Debug of clap ErrorKind, detail = clap's text.
+    /// tsq argument error (section 3b); kind = Debug of clap ErrorKind (display only), detail = clap's text.
     Usage { kind: String, detail: String },                                    // "treesitter.usage"
     /// PyO3 argument conversion failure (bindings only); detail = PyErr Display.
     Python { detail: String },                                                 // "treesitter.python"
-    /// `tsq` could not write stdout or stderr (section 3b); kind = Debug of io::ErrorKind, detail = Display.
+    /// `tsq` could not write stdout or stderr (section 3b); kind = Debug of io::ErrorKind (display only), detail = Display.
     Write { kind: String, detail: String },                                    // "treesitter.write"
     /// `tsq`'s general log could not start (section 3b); detail = the sc-observability error's code and message.
     Log { detail: String },                                                    // "treesitter.log"
@@ -447,7 +447,7 @@ tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
 ## Notes
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7); each decision is recorded once in the design:
-1. PyO3 placement: crates/sc-treesitter-py (module and wheel sc_treesitter / sc-treesitter); assistant decision shown to the owner at architecture review.
+1. PyO3 placement: crates/sc-treesitter-py (module and wheel sc_treesitter / sc-treesitter); decided in ADR-SAG-0005 (Approved).
 2. Output shape: flat sorted captures (assistant).
 3. Logging: none in the library (stand-alone); the tsq binary logs (this sprint, REQ-SAG-0003).
 4. C#/Go: a later sprint; one predefined query each, proposed by the assistant.

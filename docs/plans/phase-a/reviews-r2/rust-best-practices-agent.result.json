@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "data": {
+    "status": "findings",
+    "reviewed_branch": "main",
+    "reviewed_commit": "98b2162",
+    "review_mode": "doc_review",
+    "practice_mode": "all",
+    "practices_reviewed": ["RBP-001","RBP-002","RBP-003","RBP-004","RBP-005","RBP-006","RBP-007","RBP-008","RBP-009","RBP-010"],
+    "carried_dispositions": {
+      "RBP-F001": "fixed (ErrorId::cause_detail; A-1 adds an E0034 compile test through &dyn ErrorId)",
+      "RBP-F002": "fixed (A-7 now cites DecisionRequest with private fields and DecisionRequest::new; I did not open A-2 to confirm the constructor runs the image-part check)",
+      "RBP-F003": "fixed (A-9: Claim::win -> Option<Finish>; write_row takes Finish by value and returns RowWritten)",
+      "RBP-F004": "fixed (A-1: LineHasNoModel deleted, Latest is total, resolve is infallible)",
+      "RBP-F005": "fixed (ErrorId::recovery() plus ErrorDetail.recovery; per-sprint recovery text in A-2, A-4, A-5, A-6, A-10)",
+      "RBP-F006": "fixed (A-3: PositionOverflow deleted, saturating_add(1) under the 8 MiB bound, 18 variants)",
+      "RBP-F007": "fixed (A-7: LlmProvider enum, total Wire::of, UnsupportedProvider removed, LlmError has 8 variants)",
+      "RBP-F008": "still open, minor, see new finding RBP-F019",
+      "RBP-F009": "fixed (A-9 Job = Fresh/Prepared; A-5 may_start returns Start::Go(SendPermit), send_once consumes it and returns Next::{Done, ResendAt}; the last: None fallback is gone)",
+      "RBP-F010": "fixed (A-6 uses DaemonKind in Availability and ProbeStatus; typed SendOptions per the A-10 round-2 note; the earlier BackendName and ties points were not rechecked individually)",
+      "RBP-F011": "fixed (RunnerKind, RunnerHost, NonZeroU16, VarName key_env, ModelId in LocalBackend::new)",
+      "RBP-F012": "partly fixed: QuestionDigest now uses serde try_from/into. ReleaseDate day 1..=31 is unchanged (A-1:224), which is acceptable as an ordering-key-only type. See RBP-F020 for the missing doc line.",
+      "RBP-F013": "fixed for Display = id: message only and for serde_path_to_error key paths (config.invalid). The kind: String fields in A-3, A-4 and A-10 are kept but A-4 documents them as display-only; accepted. A-3 and A-10 should repeat the same note (folded into RBP-F020).",
+      "RBP-F014": "fixed (A-6 seals LocalDaemon with a private Sealed supertrait; A-4 marks EnvSource and KeyringSource as open; A-1 says detail() must not be overridden). Whether ErrorId, Backend, Decision and Transport each carry an explicit open/sealed line was not confirmed.",
+      "RBP-F015": "fixed (A-8: lost-row accounting under one Mutex, with a per-lock poison rationale)",
+      "RBP-F016": "accepted by the owner as a lint-level control (A-4 notes the lint is the accepted enforcement). No longer a finding.",
+      "RBP-F017": "fixed (ModelId AsRef/Borrow<str>, generic line_of, AsRef<str> on Slug and Repo)",
+      "RBP-F018": "accepted-skip (deliberately skipped as low priority, as instructed)"
+    },
+    "findings": [
+      {
+        "id": "RBP-F019",
+        "practice_id": "RBP-007",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-2-sc-decision-schema.md",
+        "line": 57,
+        "issue": "QuestionDigest::of_text is now infallible, which closes the dead DecisionError::Digest variant. But the design keeps the copied `unreachable!()` arm for ShaError::InvalidUtf8. That is a panic path in new code, and it conflicts with the owner's 'no panics' rule. The plan justifies it only with 'clippy unreachable is not in the workspace denies', so no lint will catch it.",
+        "recommendation": "Replace the arm with a non-panicking total form: map the impossible Err to a fixed fallback (for example hash the lossy bytes), or use a sc-sha entry point that takes &str or bytes and cannot fail. Alternatively add `clippy::unreachable` to the workspace denies and make this the one documented exception. Do not keep an unreachable!() with only a comment.",
+        "evidence": "A-2 section 2 digest.rs bullet: 'the copied `unreachable!()` arm stays with that comment (clippy `unreachable` is not in the workspace denies; no `#[allow]` needed)'."
+      },
+      {
+        "id": "RBP-F020",
+        "practice_id": "RBP-004",
+        "severity": "minor",
+        "file": "docs/plans/phase-a/sprint-a-1-sc-agent-types.md",
+        "line": 224,
+        "issue": "ReleaseDate accepts impossible calendar dates (day 1..=31 for every month). The comment gives no statement that it is an ordering key only. Separately, the `kind: String` fields in A-3 (lines 294 and 299) and A-10 (lines 305, 329, 334, 343) lack the 'display-only, not a stable format' note that A-4 added.",
+        "recommendation": "Add one doc line to ReleaseDate saying it is an ordering key and does not validate the calendar. Add the same display-only note to the A-3 and A-10 error docs, as A-4 line 236 does.",
+        "evidence": "A-1:224 'month 1..=12, day 1..=31'. A-3:294 and A-10:305 show `kind: String` with no stability note."
+      }
+    ],
+    "summary": {
+      "total_findings": 2,
+      "by_severity": { "critical": 0, "important": 0, "minor": 2 }
+    },
+    "notes": [
+      "HEAD check: .git/HEAD is refs/heads/main. I had no shell, so I did not resolve the commit hash. The docs I read carry round-2 markers consistent with 98b2162.",
+      "Verification was by targeted grep and partial reads of the sprint docs, not a full re-read of all ten sprints. The F002 and F010 dispositions above are inferred from cross-references. plan.md was not read.",
+      "No new important or critical issues found in the changed designs. SendPermit, Finish and LlmProvider are sound uses of the capability-token and newtype patterns.",
+      "Unsolicited observation: ErrorId::message and the recovery text still allocate Strings. This is the skipped F018 (accepted-skip)."
+    ]
+  },
+  "error": null
+}

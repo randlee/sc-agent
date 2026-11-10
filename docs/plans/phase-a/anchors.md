@@ -63,11 +63,11 @@ Scope: adds or changes an sc-ai command or the sc-agent Python API
 Deterministic check to pair with the development gate: each sc-ai subcommand has a matching Python API function, checked by a test that lists both
 
 Excluded from (not judged; the cell passes as `excluded`):
-- `agt-4p2.3`: A-3 builds the sc-treesitter library and adds no CLI command; the tree-sitter CLI and its Python parity are sprint A-10.
 - `agt-4p2.1`: sc-agent-types defines data types only; it adds no CLI command and no Python API function.
 - `agt-4p2.4`: A-4 builds config and secrets crates; it adds no CLI command and no Python API function.
 - `agt-4p2.5`: A-5 builds the HTTP transport crate; it adds no CLI command and no Python API function.
 - `agt-4p2.6`: A-6 builds decision backends; it adds no CLI command and no Python API function.
+- `agt-4p2.3`: Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3.
 
 Beads: anchor `agt-ug0`, plan questions `agt-ug0.1`, dev questions `agt-ug0.2`
 
@@ -121,7 +121,7 @@ Scope: adds or changes a decision backend, the Backend or Decision trait, or sc-
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.5`: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
-- `agt-4p2.10`: A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
+- `agt-4p2.10`: A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
 
 Beads: anchor `agt-7mi`, plan questions `agt-7mi.1`, dev questions `agt-7mi.2`
 

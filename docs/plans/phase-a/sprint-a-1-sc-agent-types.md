@@ -19,7 +19,7 @@ sprint:
   target_boundary: sc-agent-types
   owned_paths: [crates/sc-agent-types/**, Cargo.toml, clippy.toml]   # Cargo.toml and clippy.toml = the workspace root files
   must_follow: []
-  requirements: [REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601]
+  requirements: [REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601]
   adrs: [ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0101 end to end (decide --model <short name> resolves through the catalog built from the global config): a-10"
@@ -221,6 +221,8 @@ impl fmt::Display for Provider {}  impl Serialize for Provider {}  impl<'de> Des
 
 // src/release_date.rs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// An ordering key for "newest release wins", not a calendar date: it does not validate the calendar
+/// (day 1..=31 is accepted for every month, e.g. 2026-02-31).
 pub struct ReleaseDate { year: u16, month: u8, day: u8 }    // YYYY-MM-DD, month 1..=12, day 1..=31
 impl FromStr for ReleaseDate { type Err = TypesError; }     // InvalidReleaseDate
 impl fmt::Display for ReleaseDate {}  impl Serialize for ReleaseDate {}  impl<'de> Deserialize<'de> for ReleaseDate {}
@@ -343,6 +345,7 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 - [ ] ADR-SAG-0004: no sc-agent crate may depend on a higher layer (types; config, secrets and log; http; decision schema; decision backends over sc-llm-provider; runner); sc-agent-types is the bottom layer: its Cargo.toml declares no sc-agent crate dependency (only serde and ulid; dev serde_json), checked by `cargo tree -p sc-agent-types`.
 - [ ] REQ-SAG-0002: sc-agent-types: a test wraps a lower-layer error two levels deep (ErrorDetail::new with nested causes) and asserts the outermost ErrorDetail chain carries the id and message of every cause at every level.
 - [ ] sc-agent-types: ModelId implements AsRef<str> and Borrow<str>, and Catalog::line_of answers for a plain &str without parsing (test); VarName parses ^[A-Z_][A-Z0-9_]{0,127}$ and rejects anything else with types.invalid_var_name (test).
+- [ ] REQ-SAG-0013 (key_env pattern part): sc-agent-types: VarName accepts ^[A-Z_][A-Z0-9_]{0,127}$ and rejects anything else with types.invalid_var_name (tests/names.rs VarName test); a-4 applies it to key_env at load.
 
 ## Notes
 

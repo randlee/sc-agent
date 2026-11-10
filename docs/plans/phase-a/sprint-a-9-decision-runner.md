@@ -3,7 +3,7 @@
 # Sprint A-9: sc-decision-runner
 - id: `a-9` (bead `agt-4p2.9`)
 - branch: `sprint/a-9-decision-runner`
-- depends on: a-2
+- depends on: a-2, a-4, a-5, a-8
 - copy script: `docs/plans/phase-a/copy/a-9.sh`
 
 ## Description
@@ -31,7 +31,7 @@ sprint:
     - sprint: a-4
       artifact: sc_agent_config::{AgentConfig, DEFAULT_WORKERS}
       trigger: dev-push
-  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, NFR-SAG-0001]
+  requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0011, NFR-SAG-0001]
   adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0701 end to end (a parallel batch through decide --batch and sc-agent-py, against real backends): a-10; a-9 closes it at the runner boundary with scripted transports"
@@ -94,7 +94,8 @@ pub struct RunnerConfig {
     pub queue_capacity: NonZeroUsize,
 }
 impl RunnerConfig {
-    /// workers from AgentConfig.workers; queue_capacity = workers * 4.
+    /// workers from AgentConfig.workers (1..=64, checked at config load, REQ-SAG-0013);
+    /// queue_capacity = workers.checked_mul(FOUR) — never None for workers <= 64; `.unwrap_or(NonZeroUsize::MAX)` keeps it total without a panic path.
     pub fn from_config(config: &sc_agent_config::AgentConfig) -> Self;
 }
 impl Default for RunnerConfig { /* workers sc_agent_config::DEFAULT_WORKERS (8), queue_capacity 32 */ }
@@ -265,6 +266,8 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 - [ ] Abandon: dropping sc-decision-runner's result iterator mid-batch stops intake, cancels the JobQueue (never the caller's token), joins no thread (a worker blocked in a send lingers at most the transport request deadline) and writes exactly one row per job the feeder submitted (test drop_mid_batch_one_row_per_started_job).
 - [ ] Result queue bound: sc-decision-runner's result queue holds at most queue_capacity results and a worker blocks on a full queue (test slow_consumer_blocks_workers).
 - [ ] LogContext: sc-decision-runner passes each job's LogContext::request(session_id, Some(position)) to HttpClient::send_once and Backend::decode; two concurrent busy requests' http.busy records carry their own session_ids; runner.session_log_failed carries session_id and position.
+- [ ] REQ-SAG-0013: sc-decision-runner's RunnerConfig::from_config takes workers from AgentConfig.workers, which a-4 bounds to 1..=64 at load, and sets queue_capacity = workers.checked_mul(4) (test: workers 64 -> queue_capacity 256; workers 1 -> 4); the bound itself is a-4's acceptance.
+- [ ] REQ-SAG-0011: sc-decision-runner supplies the cancel path decide's signal handler (a-10) uses — cancelling the CancelToken ends every unfinished request with decision.cancelled and writes its one row (tests cancel_running_batch, cancel_in_flight_send, cancel_ends_holdoff_at_once); signal wiring is a-10's.
 - [ ] decide_stream signature: sc-decision-runner implements decide_stream with `requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>` (A-2) and pulls it on its feeder thread; a compile test passes `Box::new(vec.into_iter())` through `&dyn Decision`.
 - [ ] REQ-SAG-0601: sc-decision-runner resends a request whose HttpClient::send_once returns Next::ResendAt { at, pending } (HTTP 429, 502 or 529, classified by a-5), through HttpClient::may_resend, until max_sends (default 5, set in the HttpClient ResendPolicy) is reached, and sends the same encoded bytes each time (encode called once). Test: a ScriptedTransport answering 529 four times then 200 yields the answer; one answering 529 every time stops after max_sends sends. A held-off request waits in the JobQueue, not in a worker (with 1 worker a second request is answered during the first one's holdoff); the wait (ResendAt or Start::Wait) is a Condvar timed wait woken by a CancelToken::on_cancel hook; no sleep. Rows and general records on the cancel, orphan and abandon paths use try_write.
 - [ ] REQ-SAG-0601 AC4: sc-decision-runner: cancelling a held-off request ends its wait at once and returns decision.cancelled (decide_stream and decide).
