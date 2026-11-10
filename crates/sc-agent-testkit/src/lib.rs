@@ -10,7 +10,8 @@
 //! - [`Gate`] (opened by the test, opened on drop of its [`Opener`]) and [`Started`] (the
 //!   other thread signals it is inside): one-shot latches with bounded waits;
 //! - [`serve_once`]: a loopback server for one connection, with an accept deadline and
-//!   read/write timeouts;
+//!   read/write timeouts; [`serve_each`]: one for every connection until it is stopped, which
+//!   counts every connection made (the listen backlog included);
 //! - [`ChildGuard`]: a child process that is killed and reaped on drop.
 //!
 //! This crate depends on sc-agent-types only and is never a normal dependency of any crate.
@@ -38,6 +39,6 @@ pub use child::ChildGuard;
 #[doc(inline)]
 pub use latch::{Gate, Opener, Started};
 #[doc(inline)]
-pub use server::{Server, serve_once};
+pub use server::{Loopback, Server, serve_each, serve_once};
 #[doc(inline)]
 pub use wait::{HANG_GUARD, cancelled_within, join_within, recv_within};

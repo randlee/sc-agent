@@ -29,15 +29,13 @@ fn help_lists_send_models_and_doctor() {
 #[cfg(unix)]
 mod tests {
     use std::io::{BufRead, BufReader, Read, Write};
-    use std::net::{TcpListener, TcpStream};
+    use std::net::TcpStream;
     use std::path::{Path, PathBuf};
     use std::process::{Command, Output, Stdio};
-    use std::sync::mpsc;
-    use std::time::Duration;
+    use std::sync::{Mutex, mpsc};
 
+    use sc_agent_testkit::{ChildGuard, Gate, Loopback, recv_within, serve_each};
     use serde_json::Value;
-
-    use std::sync::{Arc, Condvar, Mutex};
 
     use crate::common::{HANG_GUARD, NOUL, NOUL_RESPONSE, finish, run_bounded};
 
@@ -51,26 +49,20 @@ mod tests {
         /// Answer 200 with [`NOUL_RESPONSE`].
         Answer,
         /// Answer 200 once the test opens the gate (bounded by `HANG_GUARD`).
-        AnswerAfter(Arc<(Mutex<bool>, Condvar)>),
+        AnswerAfter(Gate),
     }
 
-    /// A Mapika-style daemon on 127.0.0.1: `/health` says loaded; each systemone request is
+    /// A Mapika-style daemon on 127.0.0.1 (testkit `serve_each`: every read and write bounded,
+    /// the port held until it stops): `/health` says loaded; each systemone request is
     /// reported on the returned channel.
-    fn loopback(mode: Mode) -> (u16, mpsc::Receiver<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-        let port = listener.local_addr().expect("addr").port();
+    fn loopback(mode: Mode) -> (Loopback, mpsc::Receiver<()>) {
         let (sender, receiver) = mpsc::channel();
-        std::thread::spawn(move || {
-            let mut held = Vec::new();
-            for stream in listener.incoming().flatten() {
-                let sender = sender.clone();
-                let stream_copy = stream.try_clone().expect("clone");
-                held.push(stream_copy);
-                let mode = mode.clone();
-                std::thread::spawn(move || serve(stream, &mode, &sender));
-            }
+        let sender = Mutex::new(sender);
+        let server = serve_each(move |stream| {
+            let sender = sender.lock().expect("sender").clone();
+            serve(stream, &mode, &sender);
         });
-        (port, receiver)
+        (server, receiver)
     }
 
     fn serve(stream: TcpStream, mode: &Mode, sender: &mpsc::Sender<()>) {
@@ -107,18 +99,15 @@ mod tests {
                 let _ = sender.send(());
                 match mode {
                     Mode::Hang => {
-                        // Hold the connection: wait until the client goes away.
+                        // Hold the connection: wait until the client goes away (the read is
+                        // bounded by the stream's hang-guard timeout).
                         let mut rest = Vec::new();
                         let _ = reader.read_to_end(&mut rest);
                         return;
                     }
                     Mode::Answer => NOUL_RESPONSE,
                     Mode::AnswerAfter(gate) => {
-                        let (lock, condvar) = &**gate;
-                        let open = lock.lock().expect("lock");
-                        let _ = condvar
-                            .wait_timeout_while(open, HANG_GUARD, |open| !*open)
-                            .expect("wait");
+                        gate.wait_open();
                         NOUL_RESPONSE
                     }
                 }
@@ -206,8 +195,8 @@ mod tests {
     /// nothing is sent and no row is written.
     #[test]
     fn an_invalid_slug_is_refused_before_anything_is_sent() {
-        let (port, sends) = loopback(Mode::Answer);
-        let home = home(port);
+        let (runner, sends) = loopback(Mode::Answer);
+        let home = home(runner.port());
         let file = batch_file(home.path(), 1);
         let output = run_bounded(&mut decide(
             home.path(),
@@ -234,10 +223,8 @@ mod tests {
     /// AC: REQ-SAG-0504, end to end: a bad line stops decide before the runner is contacted.
     #[test]
     fn a_bad_batch_line_contacts_no_runner() {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-        listener.set_nonblocking(true).expect("nonblocking");
-        let port = listener.local_addr().expect("addr").port();
-        let home = home(port);
+        let runner = serve_each(|_| {});
+        let home = home(runner.port());
         let path = home.path().join("bad.jsonl");
         let bad = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"score"}}}"#;
         std::fs::write(&path, format!("{NOUL}\n{bad}\n{NOUL}\n")).expect("batch");
@@ -263,10 +250,7 @@ mod tests {
                 .as_str()
                 .is_some_and(|text| text.contains("line 2") && text.contains("criteria"))
         );
-        assert!(
-            listener.accept().is_err(),
-            "no connection reached the runner"
-        );
+        assert_eq!(runner.stop(), 0, "no connection reached the runner");
         assert!(output.stdout.is_empty());
     }
 
@@ -274,8 +258,8 @@ mod tests {
     /// JSONL line per request with its ULID and position; exit 0.
     #[test]
     fn a_batch_prints_one_line_per_request() {
-        let (port, _sends) = loopback(Mode::Answer);
-        let home = home(port);
+        let (runner, _sends) = loopback(Mode::Answer);
+        let home = home(runner.port());
         let file = batch_file(home.path(), 3);
         let output = run_bounded(&mut decide(
             home.path(),
@@ -330,52 +314,13 @@ mod tests {
     /// the send arrive), so the first write always meets a closed pipe.
     #[test]
     fn a_closed_stdout_is_decide_write() {
-        let gate = Arc::new((Mutex::new(false), Condvar::new()));
-        let (port, sends) = loopback(Mode::AnswerAfter(Arc::clone(&gate)));
-        let home = home(port);
+        let gate = Gate::new();
+        let opener = gate.opener();
+        let (runner, sends) = loopback(Mode::AnswerAfter(gate));
+        let home = home(runner.port());
         let file = batch_file(home.path(), 3);
-        let mut child = decide(
-            home.path(),
-            &[
-                "send",
-                "--batch",
-                "--model",
-                "dec",
-                "--project",
-                "proj",
-                "--agent-role",
-                "role",
-                file.to_str().expect("utf-8"),
-            ],
-        )
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn");
-        drop(child.stdout.take());
-        sends
-            .recv_timeout(HANG_GUARD)
-            .expect("a request reached the runner");
-        {
-            let (lock, condvar) = &*gate;
-            *lock.lock().expect("lock") = true;
-            condvar.notify_all();
-        }
-        let output = finish(child);
-        assert_eq!(output.status.code(), Some(1));
-        assert_eq!(stderr_detail(&output)["id"], "decide.write");
-    }
-
-    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
-    /// runner that never answers: every printed line is `decision.cancelled`, one session
-    /// row per started request is on disk, exit 130 both times.
-    #[test]
-    fn an_interrupt_cancels_flushes_and_exits_130() {
-        for signal in ["-INT", "-TERM"] {
-            let (port, sends) = loopback(Mode::Hang);
-            let home = home(port);
-            let file = batch_file(home.path(), 3);
-            let child = decide(
+        let mut child = ChildGuard::spawn(
+            decide(
                 home.path(),
                 &[
                     "send",
@@ -390,13 +335,45 @@ mod tests {
                 ],
             )
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("spawn");
+            .stderr(Stdio::piped()),
+        );
+        drop(child.take_stdout());
+        recv_within(&sends, HANG_GUARD);
+        opener.open();
+        let output = finish(child);
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(stderr_detail(&output)["id"], "decide.write");
+    }
+
+    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
+    /// runner that never answers: every printed line is `decision.cancelled`, one session
+    /// row per started request is on disk, exit 130 both times.
+    #[test]
+    fn an_interrupt_cancels_flushes_and_exits_130() {
+        for signal in ["-INT", "-TERM"] {
+            let (runner, sends) = loopback(Mode::Hang);
+            let home = home(runner.port());
+            let file = batch_file(home.path(), 3);
+            let child = ChildGuard::spawn(
+                decide(
+                    home.path(),
+                    &[
+                        "send",
+                        "--batch",
+                        "--model",
+                        "dec",
+                        "--project",
+                        "proj",
+                        "--agent-role",
+                        "role",
+                        file.to_str().expect("utf-8"),
+                    ],
+                )
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+            );
             for _ in 0..3 {
-                sends
-                    .recv_timeout(Duration::from_secs(20))
-                    .expect("the batch is in flight");
+                recv_within(&sends, HANG_GUARD);
             }
             let status = Command::new("kill")
                 .args([signal, &child.id().to_string()])
@@ -438,35 +415,34 @@ mod tests {
     /// open and never writes.
     #[test]
     fn sigterm_while_stdin_blocks_exits_130() {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-        listener.set_nonblocking(true).expect("nonblocking");
-        let port = listener.local_addr().expect("addr").port();
+        let runner = serve_each(|_| {});
+        let port = runner.port();
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
         let fifo = config.join("default.json");
         let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
         assert!(made.success());
-        let mut child = decide(
-            home.path(),
-            &[
-                "send",
-                "--batch",
-                "--model",
-                "dec",
-                "--project",
-                "proj",
-                "--agent-role",
-                "role",
-                "-",
-            ],
-        )
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn");
-        let held_stdin = child.stdin.take().expect("stdin");
+        let mut child = ChildGuard::spawn(
+            decide(
+                home.path(),
+                &[
+                    "send",
+                    "--batch",
+                    "--model",
+                    "dec",
+                    "--project",
+                    "proj",
+                    "--agent-role",
+                    "role",
+                    "-",
+                ],
+            )
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+        );
+        let held_stdin = child.take_stdin().expect("stdin");
         // Opening the FIFO's write end blocks until decide opens it to read; bounded.
         let (opened, writer) = mpsc::channel();
         {
@@ -475,10 +451,7 @@ mod tests {
                 let _ = opened.send(std::fs::OpenOptions::new().write(true).open(&fifo));
             });
         }
-        let mut writer = writer
-            .recv_timeout(HANG_GUARD)
-            .expect("decide opened its config")
-            .expect("fifo");
+        let mut writer = recv_within(&writer, HANG_GUARD).expect("fifo");
         write!(writer, "{}", config_json(&config, port)).expect("config");
         drop(writer);
         let status = Command::new("kill")
@@ -495,6 +468,6 @@ mod tests {
             String::from_utf8_lossy(&output.stderr)
         );
         assert!(output.stdout.is_empty());
-        assert!(listener.accept().is_err(), "nothing was sent");
+        assert_eq!(runner.stop(), 0, "nothing was sent");
     }
 }

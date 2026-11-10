@@ -24,7 +24,7 @@ impl Latch {
     }
 
     /// Whether the count reached `at_least` within `guard`.
-    fn wait(&self, at_least: usize, guard: Duration) -> bool {
+    fn reached(&self, at_least: usize, guard: Duration) -> bool {
         let (_count, timeout) = self
             .changed
             .wait_timeout_while(self.lock(), guard, |count| *count < at_least)
@@ -35,7 +35,7 @@ impl Latch {
 
 /// A gate a thread waits at until the test opens it. Clones share one gate.
 ///
-/// [`Self::wait`] is bounded by [`HANG_GUARD`]. Hold an [`Opener`] ([`Self::opener`]) on the
+/// [`Self::wait_open`] is bounded by [`HANG_GUARD`]. Hold an [`Opener`] ([`Self::opener`]) on the
 /// test side: it opens the gate when dropped, so a test that panics before it opens the gate
 /// never strands the thread waiting at it.
 ///
@@ -49,7 +49,7 @@ impl Latch {
 /// let gate = Gate::new();
 /// let opener = gate.opener();
 /// let waiting = gate.clone();
-/// let worker = thread::spawn(move || waiting.wait());
+/// let worker = thread::spawn(move || waiting.wait_open());
 /// opener.open();
 /// assert!(join_within(worker, HANG_GUARD).is_ok());
 /// ```
@@ -65,7 +65,7 @@ impl Gate {
         Self::default()
     }
 
-    /// Opens the gate: every waiting and later [`Self::wait`] returns.
+    /// Opens the gate: every waiting and later [`Self::wait_open`] returns.
     pub fn open(&self) {
         self.latch.add();
     }
@@ -87,9 +87,9 @@ impl Gate {
     ///
     /// When the gate is still closed after [`HANG_GUARD`].
     #[track_caller]
-    pub fn wait(&self) {
+    pub fn wait_open(&self) {
         assert!(
-            self.latch.wait(1, HANG_GUARD),
+            self.latch.reached(1, HANG_GUARD),
             "the gate was not opened within {HANG_GUARD:?}"
         );
     }
@@ -137,7 +137,7 @@ impl Drop for Opener {
 /// let started = Started::new();
 /// let inside = started.clone();
 /// let _worker = thread::spawn(move || inside.signal());
-/// started.wait();
+/// started.wait_for(1);
 /// assert_eq!(started.count(), 1);
 /// ```
 #[derive(Clone, Default)]
@@ -163,16 +163,6 @@ impl Started {
         *self.latch.lock()
     }
 
-    /// Waits for the first signal.
-    ///
-    /// # Panics
-    ///
-    /// When no signal came within [`HANG_GUARD`].
-    #[track_caller]
-    pub fn wait(&self) {
-        self.wait_for(1);
-    }
-
     /// Waits until at least `signals` signals have been given.
     ///
     /// # Panics
@@ -181,7 +171,7 @@ impl Started {
     #[track_caller]
     pub fn wait_for(&self, signals: usize) {
         assert!(
-            self.latch.wait(signals, HANG_GUARD),
+            self.latch.reached(signals, HANG_GUARD),
             "only {} of {signals} start signals within {HANG_GUARD:?}",
             self.count()
         );
@@ -207,7 +197,7 @@ mod tests {
         assert!(!gate.is_open());
         drop(gate.opener());
         assert!(gate.is_open());
-        gate.wait();
+        gate.wait_open();
     }
 
     #[test]

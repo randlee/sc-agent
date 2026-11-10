@@ -38,7 +38,7 @@ fn drop_mid_batch_one_row_per_started_job() {
     assert!(first.iter().all(|result| result.position < 3));
     assert!(blocking.wait_started(8), "sends started");
     blocked
-        .recv_timeout(FAILSAFE)
+        .recv_timeout(HANG_GUARD)
         .expect("the feeder submitted 11 and waits for the 12th");
     drop(stream);
     assert!(

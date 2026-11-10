@@ -1,7 +1,7 @@
 //! Shared test support: requests, replies, transports, a runner harness, failsafe waits.
 //!
 //! Nothing here sleeps or delays, and no helper measures time: every wait is on a forced
-//! ordering event (a gate, a channel, a `Condvar`) and is bounded by [`FAILSAFE`], which
+//! ordering event (a gate, a channel, a `Condvar`) and is bounded by [`HANG_GUARD`], which
 //! turns a hang into a failure and is never an assertion.
 
 pub mod scripted_backend;
@@ -11,7 +11,6 @@ use std::num::NonZeroU32;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
-use std::time::Duration;
 
 use sc_agent_http::{HttpClient, HttpError, HttpRequest, HttpResponse, ResendPolicy, Transport};
 use sc_agent_log::testing::{MemoryLog, MemoryRecord};
@@ -22,8 +21,9 @@ use sc_decision_schema::{Backend, Decision, DecisionRequest, DecisionResult, Sys
 
 pub use scripted_backend::ScriptedBackend;
 
-/// Failsafe for waits that must finish (REQ-QA-018: 2 s); never a measurement.
-pub const FAILSAFE: Duration = Duration::from_secs(2);
+/// The hang guard of every wait that must finish (sc-agent-testkit's 60 s): reaching it
+/// fails the test; it is never a measurement, and no assertion depends on elapsed time.
+pub use sc_agent_testkit::HANG_GUARD;
 
 pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -134,7 +134,7 @@ impl Gate {
         state.0 += 1;
         condvar.notify_all();
         let (_state, timeout) = condvar
-            .wait_timeout_while(state, FAILSAFE * 5, |(_, open)| !*open)
+            .wait_timeout_while(state, HANG_GUARD, |(_, open)| !*open)
             .unwrap_or_else(PoisonError::into_inner);
         assert!(!timeout.timed_out(), "the gate was never opened");
     }
@@ -143,7 +143,7 @@ impl Gate {
     pub fn wait_inside(&self, sends: usize) {
         let (mutex, condvar) = &*self.inner;
         let (state, timeout) = condvar
-            .wait_timeout_while(lock(mutex), FAILSAFE, |(inside, _)| *inside < sends)
+            .wait_timeout_while(lock(mutex), HANG_GUARD, |(inside, _)| *inside < sends)
             .unwrap_or_else(PoisonError::into_inner);
         assert!(
             !timeout.timed_out(),
@@ -300,7 +300,7 @@ impl Harness {
     pub fn finish(self, dropped: &Receiver<()>) -> MemoryLog {
         drop(self.runner);
         dropped
-            .recv_timeout(FAILSAFE)
+            .recv_timeout(HANG_GUARD)
             .expect("every runner thread exited within the failsafe");
         self.log
     }
@@ -311,7 +311,7 @@ pub fn take(results: &Receiver<DecisionResult>, n: usize) -> Vec<DecisionResult>
     (0..n)
         .map(|index| {
             results
-                .recv_timeout(FAILSAFE)
+                .recv_timeout(HANG_GUARD)
                 .unwrap_or_else(|error| panic!("result {index} of {n} not received: {error}"))
         })
         .collect()
@@ -321,7 +321,7 @@ pub fn take(results: &Receiver<DecisionResult>, n: usize) -> Vec<DecisionResult>
 pub fn drain(results: &Receiver<DecisionResult>) -> Vec<DecisionResult> {
     let mut all = Vec::new();
     loop {
-        match results.recv_timeout(FAILSAFE) {
+        match results.recv_timeout(HANG_GUARD) {
             Ok(result) => all.push(result),
             Err(mpsc::RecvTimeoutError::Disconnected) => return all,
             Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -402,7 +402,7 @@ impl Iterator for GatedInput {
     fn next(&mut self) -> Option<Self::Item> {
         if self.pulled == self.ready {
             let _ = self.blocked.send(());
-            let _ = self.open.recv_timeout(FAILSAFE * 30);
+            let _ = self.open.recv_timeout(HANG_GUARD);
         }
         self.pulled += 1;
         self.requests.next()

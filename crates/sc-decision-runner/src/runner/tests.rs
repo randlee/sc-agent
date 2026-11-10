@@ -235,8 +235,8 @@ impl sc_agent_http::Transport for ClockedTransport {
 /// one shared HttpClient; B, admitted while the pause holds, is held until exactly A's pause
 /// end. Deterministic: a ManualClock that only the test moves; one worker; the
 /// crate-private `paused` seam reports B's refused admission before the clock moves, and the
-/// clock then jumps to exactly the client's `not_before`. No real sleep; no wall-clock value
-/// is asserted (the real waits only bound how long the worker naps between clock reads).
+/// clock then jumps to exactly the client's `not_before`. No real sleep and no real-time wait:
+/// the held job parks on the manual clock and the advance wakes it.
 #[test]
 fn provider_pause_holds_other_jobs_until_exactly_its_end() {
     let clock = ManualClock::new();
@@ -284,7 +284,7 @@ fn provider_pause_holds_other_jobs_until_exactly_its_end() {
             }
         })
     };
-    let failsafe = Duration::from_secs(60);
+    let failsafe = sc_agent_testkit::HANG_GUARD;
     let (position, at) = paused
         .recv_timeout(failsafe)
         .expect("B's admission is refused by A's pause");
@@ -308,7 +308,7 @@ fn provider_pause_holds_other_jobs_until_exactly_its_end() {
     let all: Vec<DecisionResult> = (0..2)
         .map(|_| results.recv_timeout(failsafe).expect("a result"))
         .collect();
-    consumer.join().expect("consumer");
+    sc_agent_testkit::join_within(consumer, sc_agent_testkit::HANG_GUARD).expect("consumer");
     assert!(all.iter().all(|result| result.outcome.is_ok()), "{all:?}");
     let sends = transport.sends.lock().expect("lock");
     let b_first = sends
@@ -379,13 +379,13 @@ fn the_feeder_is_uncounted_when_it_closes_the_results() {
         fn next(&mut self) -> Option<DecisionRequest> {
             if self.left.is_empty() {
                 let _ = self.blocked.send(());
-                let _ = self.open.recv_timeout(Duration::from_secs(60));
+                let _ = self.open.recv_timeout(sc_agent_testkit::HANG_GUARD);
                 return None;
             }
             self.left.pop()
         }
     }
-    let failsafe = Duration::from_secs(60);
+    let failsafe = sc_agent_testkit::HANG_GUARD;
     let ok = HttpResponse::new(
         200,
         vec![],
@@ -455,7 +455,7 @@ fn the_feeder_is_uncounted_when_it_closes_the_results() {
 fn a_worker_is_uncounted_when_it_closes_the_results() {
     use std::sync::Condvar;
 
-    let failsafe = Duration::from_secs(60);
+    let failsafe = sc_agent_testkit::HANG_GUARD;
     let gate = Arc::new((Mutex::new((false, false)), Condvar::new()));
     struct HeldFirst {
         gate: Arc<(Mutex<(bool, bool)>, Condvar)>,
@@ -473,7 +473,7 @@ fn a_worker_is_uncounted_when_it_closes_the_results() {
                 state.0 = true;
                 condvar.notify_all();
                 let (state, timeout) = condvar
-                    .wait_timeout_while(state, Duration::from_secs(60), |state| !state.1)
+                    .wait_timeout_while(state, sc_agent_testkit::HANG_GUARD, |state| !state.1)
                     .expect("wait");
                 assert!(!timeout.timed_out(), "never released");
                 drop(state);

@@ -73,10 +73,11 @@ fn busy_every_time_stops_at_max_sends() {
     assert_eq!(harness.rows()[0].fields["sends"], 5);
 }
 
-/// REQ-SAG-0601: a held-off request waits in the queue, not in a worker: with one
-/// worker, a second request is answered during the first one's holdoff. Forced order
-/// (QA-R2-008): request 0's busy reply is held until the input iterator returned `None`, so
-/// request 1 is certainly queued when request 0 is held off.
+/// REQ-SAG-0601: a held-off request waits in the queue, not in the worker: with one worker,
+/// request 1 is sent and answered while request 0's 1 s holdoff runs. The runner's clock is a
+/// ManualClock, so the holdoff cannot end before the test moves the clock; request 1's answer
+/// arrives with the clock still frozen, then the test moves it past the holdoff and request 0
+/// is resent and answered.
 #[test]
 fn holdoff_frees_the_worker() {
     let (input, input_ended) = EndSignal::new(requests(2));
@@ -93,18 +94,21 @@ fn holdoff_frees_the_worker() {
         };
         Ok(if index == 0 && first {
             lock(&input_ended)
-                .recv_timeout(FAILSAFE)
+                .recv_timeout(HANG_GUARD)
                 .expect("the input ended before request 0 is held off");
             busy("1")
         } else {
             ok()
         })
     });
-    let harness = Harness::new(
+    let clock = sc_agent_http::testing::ManualClock::new();
+    let frozen = clock.now();
+    let harness = Harness::with_clock(
         Arc::new(host_per_request()),
         Arc::new(transport),
         config(1),
         5,
+        clock.clone(),
     );
     let runner = Arc::clone(&harness.runner);
     let (results_to, results) = std::sync::mpsc::channel();
@@ -113,10 +117,19 @@ fn holdoff_frees_the_worker() {
             let _ = results_to.send(result);
         }
     });
-    let all = take(&results, 2);
-    assert_eq!(all[0].position, 1, "answered during the holdoff");
-    assert_eq!(all[1].position, 0);
-    assert!(all.iter().all(|result| result.outcome.is_ok()));
+    let first = take(&results, 1);
+    assert_eq!(first[0].position, 1, "answered during the holdoff");
+    assert_eq!(clock.now(), frozen, "the holdoff has not ended");
+    assert_eq!(*lock(&order), vec![0, 1]);
+    clock.advance(std::time::Duration::from_secs(2));
+    let second = take(&results, 1);
+    assert_eq!(second[0].position, 0);
+    assert!(
+        first
+            .iter()
+            .chain(&second)
+            .all(|result| result.outcome.is_ok())
+    );
     assert_eq!(*lock(&order), vec![0, 1, 0]);
 }
 
@@ -184,11 +197,11 @@ fn decide_cancel_during_holdoff() {
     let cancel = CancelToken::new();
     let result = harness.decide(request("m0"), &cancel);
     on_busy
-        .recv_timeout(FAILSAFE)
+        .recv_timeout(HANG_GUARD)
         .expect("the busy reply was sent");
     cancel.cancel();
     let result = result
-        .recv_timeout(FAILSAFE * 30)
+        .recv_timeout(HANG_GUARD)
         .expect("the cancelled result (hang guard)");
     assert_eq!(
         clock.now(),

@@ -215,7 +215,7 @@ fn test_a_drop_during_the_hook_waits_for_it_to_finish() {
         token.set_trace(Arc::new(move |event| match event {
             CancelEvent::HookTaken => {
                 taken.open();
-                release.wait();
+                release.wait_open();
             }
             CancelEvent::DropWaiting => {
                 let _ = events.lock().expect("events").send("drop waiting");
@@ -232,7 +232,7 @@ fn test_a_drop_during_the_hook_waits_for_it_to_finish() {
     }));
     let canceller_token = token.clone();
     let canceller = thread::spawn(move || canceller_token.cancel());
-    taken.wait();
+    taken.wait_open();
     let dropper = thread::spawn(move || {
         drop(hook);
         let _ = events.send("drop returned");

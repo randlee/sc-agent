@@ -458,6 +458,33 @@ impl<T> BoundedQueue<T> {
         }
     }
 
+    /// [`Self::pop`] bounded by `guard` (tests): `None` when nothing happened within it.
+    #[cfg(test)]
+    pub(crate) fn pop_within(&self, seen: u64, guard: std::time::Duration) -> Option<Popped<T>> {
+        let (mut state, timeout) = self
+            .not_empty
+            .wait_timeout_while(self.lock(), guard, |state| {
+                state.items.is_empty()
+                    && !state.closed
+                    && !state.discarded
+                    && state.generation == seen
+            })
+            .unwrap_or_else(PoisonError::into_inner);
+        if timeout.timed_out() {
+            return None;
+        }
+        if let Some(item) = state.items.pop_front() {
+            drop(state);
+            self.not_full.notify_one();
+            return Some(Popped::Item(item));
+        }
+        Some(if state.closed || state.discarded {
+            Popped::Finished
+        } else {
+            Popped::Interrupted
+        })
+    }
+
     /// Wakes every waiting pop without closing the queue. Never blocks beyond the lock.
     pub(crate) fn interrupt(&self) {
         {

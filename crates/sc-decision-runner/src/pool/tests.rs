@@ -6,12 +6,13 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use sc_agent_testkit::{HANG_GUARD, join_within};
+use sc_agent_types::Clock;
+use sc_agent_types::testing::ManualClock;
 
 use super::*;
-
-/// Failsafe for waits that must finish; never a measurement.
-const FAILSAFE: Duration = Duration::from_secs(60);
 
 /// A barrier that gives up instead of hanging: `arrive` is true only when
 /// `parties` threads were inside it at the same moment.
@@ -39,7 +40,7 @@ impl Rendezvous {
         }
         let (arrived, _) = self
             .all_here
-            .wait_timeout_while(arrived, FAILSAFE, |count| *count < self.parties)
+            .wait_timeout_while(arrived, HANG_GUARD, |count| *count < self.parties)
             .unwrap_or_else(PoisonError::into_inner);
         *arrived >= self.parties
     }
@@ -98,12 +99,20 @@ fn pool_with_stops<A: Send + 'static>(
     run: impl Fn(usize) -> Step<usize, A> + Send + Sync + 'static,
     skipped: impl Fn(usize, Skipped) -> A + Send + Sync + 'static,
 ) -> (Pool<Closures<A>>, mpsc::Receiver<(usize, Stopped)>) {
+    pool_on(ManualClock::new().clock(), workers, queue, run, skipped)
+}
+
+/// [`pool_with_stops`] whose job queue runs on `clock`.
+fn pool_on<A: Send + 'static>(
+    clock: Clock,
+    workers: usize,
+    queue: usize,
+    run: impl Fn(usize) -> Step<usize, A> + Send + Sync + 'static,
+    skipped: impl Fn(usize, Skipped) -> A + Send + Sync + 'static,
+) -> (Pool<Closures<A>>, mpsc::Receiver<(usize, Stopped)>) {
     let (stops, stopped) = mpsc::channel();
     let workers = NonZeroUsize::new(workers).expect("workers");
-    let jobs = Arc::new(JobQueue::new(
-        queue,
-        sc_agent_types::testing::ManualClock::new().clock(),
-    ));
+    let jobs = Arc::new(JobQueue::new(queue, clock));
     let results = Arc::new(BoundedQueue::new(queue, workers.get()));
     let work = Arc::new(Closures {
         run: Box::new(run),
@@ -118,7 +127,7 @@ fn pool_with_stops<A: Send + 'static>(
 /// The stop reason of each of `workers` workers, by index, within the failsafe.
 fn stops(stopped: &mpsc::Receiver<(usize, Stopped)>, workers: usize) -> Vec<Stopped> {
     let mut all: Vec<(usize, Stopped)> = (0..workers)
-        .map(|_| stopped.recv_timeout(FAILSAFE).expect("a worker stopped"))
+        .map(|_| stopped.recv_timeout(HANG_GUARD).expect("a worker stopped"))
         .collect();
     all.sort_by_key(|(worker, _)| *worker);
     assert_eq!(
@@ -134,17 +143,17 @@ fn drain<A: Send + 'static>(mut pool: Pool<Closures<A>>) -> Vec<A> {
     let collector = thread::Builder::new()
         .spawn(move || {
             let mut all = Vec::new();
-            while let Some(answer) = pool.recv() {
+            while let Some(answer) = pool.recv_within(HANG_GUARD) {
                 all.push(answer);
             }
-            pool.join();
+            pool.join_workers();
             let _ = send.send(all);
         })
         .expect("collector");
     let all = receive
-        .recv_timeout(FAILSAFE)
+        .recv_timeout(HANG_GUARD)
         .expect("the pool finished within the failsafe");
-    collector.join().expect("collector joined");
+    join_within(collector, HANG_GUARD).expect("collector joined");
     all
 }
 
@@ -198,7 +207,7 @@ fn cancel_skips_queued_jobs_and_refuses_new_ones() {
     for job in 0..4 {
         assert!(pool.submit(job).is_ok());
     }
-    assert_eq!(on_start.recv_timeout(FAILSAFE), Ok(0), "a worker started");
+    assert_eq!(on_start.recv_timeout(HANG_GUARD), Ok(0), "a worker started");
     pool.cancel();
     assert_eq!(pool.submit(9), Err(9), "submits are refused after cancel");
     assert!(hold.arrive());
@@ -247,13 +256,16 @@ fn a_panicking_job_is_answered_and_the_worker_survives() {
 fn a_held_job_frees_its_worker() {
     let (release, on_release) = mpsc::channel::<()>();
     let on_release = Mutex::new(on_release);
-    let pool = pool_of(
+    let clock = ManualClock::new();
+    let frozen = clock.now();
+    let (pool, _stops) = pool_on(
+        clock.clock(),
         1,
         4,
         move |job| match job {
-            // Held until a far instant; answered only after job 1 ran.
+            // Held an hour past the clock, which never moves: answered only as cancelled.
             0 => Step::HoldOff {
-                until: Instant::now() + Duration::from_secs(3600),
+                until: frozen + Duration::from_secs(3600),
                 job: 100,
             },
             100 => Step::Done(job),
@@ -261,7 +273,7 @@ fn a_held_job_frees_its_worker() {
                 let _ = on_release
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner)
-                    .recv_timeout(FAILSAFE);
+                    .recv_timeout(HANG_GUARD);
                 Step::Done(other)
             }
         },
@@ -270,7 +282,7 @@ fn a_held_job_frees_its_worker() {
     assert!(pool.submit(0).is_ok());
     assert!(pool.submit(1).is_ok());
     release.send(()).expect("release");
-    let first = pool.recv();
+    let first = pool.recv_within(HANG_GUARD);
     assert_eq!(first, Some(1), "job 1 ran while job 0 was held");
     pool.cancel();
     let rest = drain(pool);
@@ -284,10 +296,7 @@ fn a_held_job_frees_its_worker() {
 fn dropping_a_pool_never_cancels_its_queue() {
     let (stops_to, stopped) = mpsc::channel();
     let workers = NonZeroUsize::new(4).expect("workers");
-    let jobs = Arc::new(JobQueue::new(
-        8,
-        sc_agent_types::testing::ManualClock::new().clock(),
-    ));
+    let jobs = Arc::new(JobQueue::new(8, ManualClock::new().clock()));
     let results = Arc::new(BoundedQueue::new(8, workers.get()));
     let work = Arc::new(Closures {
         run: Box::new(Step::Done),
@@ -307,7 +316,7 @@ fn dropping_a_pool_never_cancels_its_queue() {
     }
     pool.close_input();
     for _ in 0..4 {
-        assert!(pool.recv().is_some());
+        assert!(pool.recv_within(HANG_GUARD).is_some());
     }
     drop(pool);
     assert!(!jobs.is_cancelled(), "Pool::drop must not cancel the queue");
@@ -351,7 +360,7 @@ fn a_panic_outside_run_does_not_stall_the_other_workers() {
         "job 0's worker died; the rest finished"
     );
     let (worker, why) = stopped
-        .recv_timeout(FAILSAFE)
+        .recv_timeout(HANG_GUARD)
         .expect("the surviving worker stopped");
     assert!(worker < 2);
     assert_eq!(why, Stopped::InputEnded);

@@ -159,26 +159,33 @@ impl<W: Work> Pool<W> {
         self.jobs.cancel();
     }
 
-    /// The next answer; `None` once every worker exited and the results drained.
+    /// Joins the worker threads, each within the testkit's hang guard. Call after
+    /// [`Self::recv_within`] returned `None`.
     #[cfg(test)]
-    pub(crate) fn recv(&self) -> Option<W::Answer> {
-        loop {
-            let seen = self.results.generation();
-            match self.results.pop(seen) {
-                crate::queue::Popped::Item(answer) => return Some(answer),
-                crate::queue::Popped::Interrupted => {}
-                crate::queue::Popped::Finished => return None,
-            }
-        }
-    }
-
-    /// Joins the worker threads. Call after [`Self::recv`] returned `None`.
-    #[cfg(test)]
-    pub(crate) fn join(&mut self) {
+    pub(crate) fn join_workers(&mut self) {
         for handle in std::mem::take(&mut self.handles) {
             // A worker catches its job's panic, so a join error is a bug in the worker
             // loop itself; the test then sees missing answers.
-            let _ = handle.join();
+            let _ = sc_agent_testkit::join_within(handle, sc_agent_testkit::HANG_GUARD);
+        }
+    }
+
+    /// The next answer, bounded by `guard`; `None` once every worker exited and the results
+    /// drained.
+    ///
+    /// # Panics
+    ///
+    /// When neither an answer nor the end came within `guard`.
+    #[cfg(test)]
+    pub(crate) fn recv_within(&self, guard: std::time::Duration) -> Option<W::Answer> {
+        loop {
+            let seen = self.results.generation();
+            match self.results.pop_within(seen, guard) {
+                Some(crate::queue::Popped::Item(answer)) => return Some(answer),
+                Some(crate::queue::Popped::Interrupted) => {}
+                Some(crate::queue::Popped::Finished) => return None,
+                None => panic!("no answer and no end within {guard:?}"),
+            }
         }
     }
 

@@ -235,7 +235,7 @@ mod tests {
             })
         })
         .expect_err("write failed");
-        releaser.join().expect("releaser");
+        sc_agent_testkit::join_within(releaser, sc_agent_testkit::HANG_GUARD).expect("releaser");
         assert_eq!(error.id(), "decide.write");
         assert!(cancel.is_cancelled(), "the token is cancelled");
         assert_eq!(calls, 1, "no result is handed out after the failure");
@@ -282,7 +282,9 @@ mod tests {
             result.outcome,
             Err(DecisionError::Cancelled { .. })
         ));
-        worker.join().expect("worker").expect("send");
+        sc_agent_testkit::join_within(worker, sc_agent_testkit::HANG_GUARD)
+            .expect("worker")
+            .expect("send");
         // The worker has returned, so every result it could hand out is in the channel.
         assert!(results.try_recv().is_err(), "no later result");
     }
@@ -320,7 +322,11 @@ mod tests {
                 Ok(())
             })
             .expect("batch");
-            assert_eq!(observer.join().expect("observer"), workers);
+            assert_eq!(
+                sc_agent_testkit::join_within(observer, sc_agent_testkit::HANG_GUARD)
+                    .expect("observer"),
+                workers
+            );
             assert_eq!(count, 40);
             assert_eq!(transport.sends(), 40);
         }
@@ -437,8 +443,18 @@ mod tests {
         };
         let local_run = run(local_options);
         let typesafe_run = run(typesafe_options);
-        assert_eq!(local_run.join().expect("local").expect("batch"), 5);
-        assert_eq!(typesafe_run.join().expect("typesafe").expect("batch"), 5);
+        assert_eq!(
+            sc_agent_testkit::join_within(local_run, sc_agent_testkit::HANG_GUARD)
+                .expect("local")
+                .expect("batch"),
+            5
+        );
+        assert_eq!(
+            sc_agent_testkit::join_within(typesafe_run, sc_agent_testkit::HANG_GUARD)
+                .expect("typesafe")
+                .expect("batch"),
+            5
+        );
         let local_sends = local.requests();
         assert_eq!(
             local_sends[0].endpoint().as_str(),

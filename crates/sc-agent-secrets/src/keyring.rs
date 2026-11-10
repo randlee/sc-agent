@@ -392,12 +392,12 @@ mod tests {
             std::thread::spawn(move || {
                 gate.run(&clock, SHORT, move || {
                     started.signal();
-                    release.wait();
+                    release.wait_open();
                     1_u8
                 })
             })
         };
-        started.wait();
+        started.wait_for(1);
         assert!(manual.wait_for_waiters(1), "the caller waits on the clock");
         manual.advance(SHORT);
         assert_eq!(
@@ -438,13 +438,13 @@ mod tests {
                     .spawn(move || {
                         gate.run(&clock, SHORT, move || {
                             started.signal();
-                            release.wait();
+                            release.wait_open();
                         })
                     })
                     .expect("spawn a caller")
             })
             .collect();
-        started.wait();
+        started.wait_for(1);
         assert!(
             manual.wait_for_waiters(1),
             "the first caller waits on the clock"

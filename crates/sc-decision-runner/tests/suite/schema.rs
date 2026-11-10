@@ -63,7 +63,9 @@ fn cancel_ends_schema_resends() {
     });
     let harness = Harness::new(Arc::new(backend), Arc::new(transport.clone()), config(1), 5);
     let result = harness.decide(request("m0"), &cancel);
-    let result = result.recv_timeout(FAILSAFE).expect("result within 2 s");
+    let result = result
+        .recv_timeout(HANG_GUARD)
+        .expect("the result (hang guard)");
     assert!(
         matches!(result.outcome, Err(DecisionError::Cancelled { sends: 1 })),
         "{result:?}"
