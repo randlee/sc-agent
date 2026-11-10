@@ -5,6 +5,7 @@
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-10  
 **Owner:** Rand Lee  
+**Revision:** 0.2.0 (2026-11-10, owner): <log_root> defaults to ~/.sc-agent on every platform, and every log is written under <log_root>/logs/.  
 
 ---
 
