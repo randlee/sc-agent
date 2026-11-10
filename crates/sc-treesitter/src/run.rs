@@ -1,4 +1,35 @@
+//! Running one query against one source with one grammar.
+
+use std::path::Path;
+
 use tree_sitter::{Node, Parser, Point, Query, QueryCursor, StreamingIterator};
+
+use crate::{Error, MAX_SOURCE_BYTES, grammar};
+
+/// One captured node of one query match.
+///
+/// Lines are 1-based and inclusive; bytes are 0-based, `end_byte` exclusive.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(
+    feature = "python",
+    pyo3::pyclass(frozen, get_all, skip_from_py_object, module = "sc_treesitter")
+)]
+#[non_exhaustive]
+pub struct Capture {
+    /// The capture name, without the `@`.
+    pub name: String,
+    /// The captured source text.
+    pub text: String,
+    /// 1-based first line.
+    pub start_line: usize,
+    /// 1-based last line, inclusive.
+    pub end_line: usize,
+    /// 0-based first byte.
+    pub start_byte: usize,
+    /// 0-based end byte, exclusive.
+    pub end_byte: usize,
+}
+
 struct RawCapture<'a> {
     name: &'a str,
     start_byte: usize,
@@ -6,46 +37,101 @@ struct RawCapture<'a> {
     start: Point,
     end: Point,
 }
-pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
-    let path = &input.path;
-    let rev = input.rev.clone();
-    let blob_sha = &input.blob_sha;
-    if input.query.is_empty() {
-        return Err(JevError::query_invalid(
-            PRODUCER_NAME,
-            "query text is empty",
-        ));
-    }
-    let Ok(source) = std::str::from_utf8(input.source) else {
-        return Err(JevError::input_invalid("source is not UTF-8"));
-    };
 
-    let grammar = grammar::lookup(input.language)?;
-    let info = &grammar.info;
-    let language = (grammar.load)();
-    let mut parser = Parser::new();
-    parser.set_language(&language).map_err(|error| {
-        JevError::extraction_failed(format!("grammar for {} failed to load: {error}", info.id))
+/// Runs any query against any loaded grammar; captures sorted by (start_byte, name, end_byte).
+///
+/// Names starting with `_` are helpers and never returned; `captures` is an allow-list of
+/// capture names to return. `path` is used only in error details.
+///
+/// # Examples
+///
+/// ```
+/// # #[cfg(feature = "grammar-rust")] {
+/// let captures = sc_treesitter::run_query(
+///     "rust",
+///     "(function_item name: (identifier) @name)",
+///     b"fn main() {}\n",
+///     None,
+///     None,
+/// )?;
+/// assert_eq!(captures[0].text, "main");
+/// assert_eq!(captures[0].start_line, 1);
+/// # }
+/// # Ok::<(), sc_treesitter::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// - [`Error::InputTooLarge`] when `source` is over [`MAX_SOURCE_BYTES`];
+/// - [`Error::NotUtf8`] when `source` is not UTF-8;
+/// - [`Error::UnknownLanguage`] / [`Error::GrammarUnavailable`] for a language not compiled in;
+/// - [`Error::GrammarLoad`] when tree-sitter rejects the grammar;
+/// - [`Error::QueryCompile`] when the query does not compile;
+/// - [`Error::QueryCaptureInvalid`] when `captures` names a capture the query lacks;
+/// - [`Error::ParseFailed`] when the parser returns no tree;
+/// - [`Error::NoMatches`] when nothing is captured;
+/// - [`Error::SyntaxError`] when an `ERROR` or `MISSING` node lies inside a captured span.
+pub fn run_query(
+    language: &str,
+    query: &str,
+    source: &[u8],
+    path: Option<&Path>,
+    captures: Option<&[&str]>,
+) -> Result<Vec<Capture>, Error> {
+    let owned_path = || path.map(Path::to_path_buf);
+    if source.len() > MAX_SOURCE_BYTES {
+        return Err(Error::InputTooLarge {
+            path: owned_path(),
+            bytes: source.len() as u64,
+            limit: MAX_SOURCE_BYTES as u64,
+        });
+    }
+    let source = std::str::from_utf8(source).map_err(|error| Error::NotUtf8 {
+        path: owned_path(),
+        byte_offset: error.valid_up_to(),
     })?;
-    let query = Query::new(&language, input.query)
-        .map_err(|error| JevError::query_invalid(PRODUCER_NAME, error.to_string()))?;
+
+    let grammar = grammar::lookup(language)?;
+    let tree_language = (grammar.load)();
+    let mut parser = Parser::new();
+    parser
+        .set_language(&tree_language)
+        .map_err(|error| Error::GrammarLoad {
+            language: grammar.id.to_owned(),
+            detail: error.to_string(),
+        })?;
+    let compiled = Query::new(&tree_language, query).map_err(|error| Error::QueryCompile {
+        language: grammar.id.to_owned(),
+        offset: error.offset,
+        row: error.row,
+        column: error.column,
+        kind: format!("{:?}", error.kind),
+        detail: error.message,
+    })?;
+    let capture_names = compiled.capture_names();
+    if let Some(allow) = captures
+        && let Some(undefined) = allow.iter().find(|name| !capture_names.contains(name))
+    {
+        return Err(Error::QueryCaptureInvalid {
+            capture: (*undefined).to_owned(),
+        });
+    }
     let tree = parser
         .parse(source, None)
-        .ok_or_else(|| JevError::extraction_failed("parser returned no tree"))?;
+        .ok_or_else(|| Error::ParseFailed {
+            language: grammar.id.to_owned(),
+        })?;
 
-    let capture_names = query.capture_names();
     let mut found = Vec::new();
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut matches = cursor.matches(&compiled, tree.root_node(), source.as_bytes());
     while let Some(query_match) = matches.next() {
         for capture in query_match.captures() {
-            let index = capture.index as usize;
-            debug_assert!(
-                index < capture_names.len(),
-                "tree-sitter capture index is always inside the query"
-            );
-            let name = capture_names[index];
-            if !capture_allowed(name, input.captures) {
+            // tree-sitter guarantees the index is inside the query; skip it otherwise.
+            let Some(&name) = capture_names.get(capture.index as usize) else {
+                continue;
+            };
+            if !capture_allowed(name, captures) {
                 continue;
             }
             found.push(RawCapture {
@@ -57,10 +143,12 @@ pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
             });
         }
     }
-    drop(matches);
 
     if found.is_empty() {
-        return Err(JevError::ExtractionEmpty);
+        return Err(Error::NoMatches {
+            language: grammar.id.to_owned(),
+            query: query.to_owned(),
+        });
     }
 
     found.sort_by(|left, right| {
@@ -72,25 +160,39 @@ pub fn extract(input: &ExtractInput<'_>) -> Result<SubjectsDocument, JevError> {
 
     let root = tree.root_node();
     if root.has_error() {
-        let parse_error_line = found
+        let earliest = found
             .iter()
-            .filter_map(|capture| error_line_inside(root, capture.start_byte, capture.end_byte))
+            .filter_map(|capture| error_inside(root, capture.start_byte, capture.end_byte))
             .min();
-        if let Some(line) = parse_error_line {
-            return Err(JevError::extraction_parse_error(
-                path.as_str().to_owned(),
-                line,
-            ));
+        if let Some((row, column, node_kind)) = earliest {
+            return Err(Error::SyntaxError {
+                path: owned_path(),
+                row,
+                column,
+                node_kind,
+            });
         }
     }
-        let text = source
-            .get(capture.start_byte..capture.end_byte)
-            .ok_or_else(|| {
-                JevError::extraction_invalid(format!(
-                    "subject bytes {}..{} are not on UTF-8 character boundaries",
-                    capture.start_byte, capture.end_byte
-                ))
-            })?;
+
+    let mut out = Vec::with_capacity(found.len());
+    for capture in found {
+        // Node boundaries in validated UTF-8 are character boundaries; skip one otherwise.
+        let Some(text) = source.get(capture.start_byte..capture.end_byte) else {
+            continue;
+        };
+        let (start_line, end_line) = inclusive_lines(capture.start, capture.end);
+        out.push(Capture {
+            name: capture.name.to_owned(),
+            text: text.to_owned(),
+            start_line,
+            end_line,
+            start_byte: capture.start_byte,
+            end_byte: capture.end_byte,
+        });
+    }
+    Ok(out)
+}
+
 fn capture_allowed(name: &str, captures: Option<&[&str]>) -> bool {
     if name.starts_with('_') {
         return false;
@@ -101,21 +203,25 @@ fn capture_allowed(name: &str, captures: Option<&[&str]>) -> bool {
     }
 }
 
-fn inclusive_lines(start: Point, end: Point) -> Result<(u32, u32), JevError> {
-    let start_line = u32_from_usize("start line", start.row.saturating_add(1))?;
+/// 1-based inclusive lines of a node spanning `start..end`.
+///
+/// A node ending at column 0 of a later row ends on the previous line. Rows are below 8 Mi
+/// (the source is at most [`MAX_SOURCE_BYTES`]), so `saturating_add` never saturates.
+fn inclusive_lines(start: Point, end: Point) -> (usize, usize) {
+    let start_line = start.row.saturating_add(1);
     let end_row = if end.column == 0 && end.row > start.row {
         end.row
     } else {
         end.row.saturating_add(1)
     };
-    let end_line = u32_from_usize("end line", end_row.max(start_line as usize))?;
-    Ok((start_line, end_line))
+    (start_line, end_row.max(start_line))
 }
-/// Returns the first line of an `ERROR` or `MISSING` node inside `start..end`.
+
+/// Returns `(row, column, kind)` of the earliest `ERROR` or `MISSING` node inside `start..end`.
 ///
 /// A `MISSING` node is zero-width; one at the span end still counts.
-fn error_line_inside(root: Node<'_>, start: usize, end: usize) -> Option<u32> {
-    let mut found = None;
+fn error_inside(root: Node<'_>, start: usize, end: usize) -> Option<(usize, usize, String)> {
+    let mut found: Option<(usize, usize, String)> = None;
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         let node_start = node.start_byte();
@@ -129,9 +235,16 @@ fn error_line_inside(root: Node<'_>, start: usize, end: usize) -> Option<u32> {
             node.is_error() && node_start >= start && node_start < end && node_end <= end
         };
         if inside {
-            let line =
-                u32::try_from(node.start_position().row.saturating_add(1)).unwrap_or(u32::MAX);
-            found = Some(found.map_or(line, |previous: u32| previous.min(line)));
+            let position = node.start_position();
+            let kind = if node.is_missing() {
+                format!("MISSING {}", node.kind())
+            } else {
+                node.kind().to_owned()
+            };
+            let candidate = (position.row, position.column, kind);
+            if found.as_ref().is_none_or(|previous| candidate < *previous) {
+                found = Some(candidate);
+            }
         }
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
@@ -145,10 +258,21 @@ fn error_line_inside(root: Node<'_>, start: usize, end: usize) -> Option<u32> {
     }
     found
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "rust")]
+    #[cfg(feature = "grammar-rust")]
+    use crate::query_source;
+
+    fn texts(captures: &[Capture]) -> Vec<&str> {
+        captures
+            .iter()
+            .map(|capture| capture.text.as_str())
+            .collect()
+    }
+
+    #[cfg(feature = "grammar-rust")]
     #[test]
     fn test_tree_sitter_rust_match_arms() {
         let source = r#"
@@ -160,126 +284,263 @@ fn classify(value: Transition) -> &'static str {
 }
 "#;
         let query = query_source("rust", "match-arms").expect("match-arms");
-        let document =
-            run("rust", query, source.as_bytes(), "src/classify.rs", None).expect("rust");
-        let arms: Vec<&str> = document
-            .subjects()
-            .iter()
-            .map(|subject| subject.text())
-            .collect();
-        assert_eq!(arms, vec!["Transition::GiveBack", "Transition::Keep"]);
-        assert!(
-            document
-                .subjects()
-                .iter()
-                .all(|subject| subject.capture() == "arm")
+        let captures = run_query("rust", query, source.as_bytes(), None, None).expect("rust");
+        assert_eq!(
+            texts(&captures),
+            vec!["Transition::GiveBack", "Transition::Keep"]
         );
-        assert_eq!(document.producer().mode(), PRODUCER_MODE);
-        assert_eq!(document.producer().grammar(), "tree-sitter-rust");
-        assert_eq!(document.producer().grammar_version(), "0.24.2");
+        assert!(captures.iter().all(|capture| capture.name == "arm"));
+        assert_eq!(captures[0].start_line, 4);
+        assert_eq!(captures[1].start_line, 5);
     }
-    #[cfg(feature = "python")]
+
+    #[cfg(feature = "grammar-python")]
     #[test]
-    fn test_tree_sitter_same_line_ids_are_unique_and_stable() {
+    fn test_tree_sitter_same_line_captures_are_stable_and_byte_ordered() {
         let source = b"return Refusal(\"give-back\")\n";
         let query = "(return_statement (call function: (identifier) @arm arguments: (argument_list (string) @refusal)))\n";
-        let once = run("python", query, source, "same.py", None).expect("once");
-        let twice = run("python", query, source, "same.py", None).expect("twice");
+        let once = run_query("python", query, source, None, None).expect("once");
+        let twice = run_query("python", query, source, None, None).expect("twice");
         assert_eq!(once, twice);
-        assert_eq!(once.subjects().len(), 2);
-        assert_eq!(
-            once.subjects()[0].span().start_line(),
-            once.subjects()[1].span().start_line()
-        );
-        assert_eq!(once.subjects()[0].id(), "same.py:1");
-        assert_eq!(once.subjects()[1].id(), "same.py:1:1");
-        assert!(once.subjects()[0].span().start_byte() < once.subjects()[1].span().start_byte());
-        let ids: BTreeSet<&str> = once.subjects().iter().map(|subject| subject.id()).collect();
-        assert_eq!(ids.len(), once.subjects().len());
+        assert_eq!(once.len(), 2);
+        assert_eq!(once[0].start_line, once[1].start_line);
+        assert!(once[0].start_byte < once[1].start_byte);
+        assert_eq!(texts(&once), ["Refusal", "\"give-back\""]);
     }
 
-    #[cfg(feature = "python")]
+    /// AC: REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
     #[test]
     fn test_tree_sitter_parse_error_is_typed() {
-        let error = run("python", "(ERROR) @broken\n", b"def (\n", "broken.py", None)
+        let path = Path::new("broken.py");
+        let error = run_query("python", "(ERROR) @broken\n", b"def (\n", Some(path), None)
             .expect_err("syntax error must fail");
-        assert_eq!(error.code(), "EXTRACTION_PARSE_ERROR");
+        assert_eq!(error.id(), "treesitter.syntax_error");
         match error {
-            JevError::ExtractionParseError { path, line, .. } => {
-                assert_eq!(path, "broken.py");
-                assert!(line >= 1, "line {line}");
+            Error::SyntaxError {
+                path: Some(found),
+                row,
+                node_kind,
+                ..
+            } => {
+                assert_eq!(found, path);
+                assert_eq!(row, 0);
+                assert_eq!(node_kind, "ERROR");
             }
-            other => panic!("unexpected {}", other.code()),
+            other => panic!("unexpected {other}"),
         }
     }
 
+    /// AC: REQ-SAG-0002 errors.
     #[test]
     fn test_tree_sitter_unknown_language_is_typed() {
-        let error = run("cobol", "(identifier) @name\n", b"x\n", "a.py", None).expect_err("cobol");
-        assert_eq!(error.code(), "LANGUAGE_UNAVAILABLE");
-        match error {
-            JevError::LanguageUnavailable { language, .. } => assert_eq!(language, "cobol"),
-            other => panic!("unexpected {}", other.code()),
-        }
+        let error =
+            run_query("cobol", "(identifier) @name\n", b"x\n", None, None).expect_err("cobol");
+        assert_eq!(error.id(), "treesitter.unknown_language");
+        assert!(matches!(error, Error::UnknownLanguage { language } if language == "cobol"));
     }
 
-    #[cfg(feature = "python")]
+    #[cfg(feature = "grammar-python")]
     #[test]
     fn test_matches_mode_duplicate_captures() {
         let query = "(binary_operator left: (identifier) @name right: (identifier) @name)\n";
-        let document =
-            run("python", query, b"value = left + right\n", "dup.py", None).expect("dup");
-        assert_eq!(document.producer().mode().as_str(), "matches");
-        let names: Vec<&str> = document
-            .subjects()
+        let captures =
+            run_query("python", query, b"value = left + right\n", None, None).expect("dup");
+        let names: Vec<&str> = captures
             .iter()
-            .filter(|subject| subject.capture() == "name")
-            .map(|subject| subject.text())
+            .filter(|capture| capture.name == "name")
+            .map(|capture| capture.text.as_str())
             .collect();
         assert_eq!(names, vec!["left", "right"]);
     }
-    #[cfg(feature = "python")]
+
+    /// AC: REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
     #[test]
-    fn empty_extraction_is_typed() {
-        let error = run(
-            "python",
-            "(class_definition) @name\n",
-            b"pass\n",
-            "empty.py",
-            None,
-        )
-        .expect_err("no class");
-        assert_eq!(error.code(), "EXTRACTION_EMPTY");
+    fn empty_result_is_no_matches() {
+        let query = "(class_definition) @name\n";
+        let error = run_query("python", query, b"pass\n", None, None).expect_err("no class");
+        assert_eq!(error.id(), "treesitter.no_matches");
+        assert_eq!(
+            error,
+            Error::NoMatches {
+                language: "python".to_owned(),
+                query: query.to_owned()
+            }
+        );
+        // An empty query compiles to zero patterns and matches nothing.
+        let empty = run_query("python", "", b"pass\n", None, None).expect_err("empty");
+        assert!(matches!(empty, Error::NoMatches { .. }));
     }
 
-    #[cfg(feature = "python")]
+    /// AC: REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
     #[test]
-    fn invalid_query_is_typed() {
-        let error = run("python", "((( \n", b"pass\n", "bad.py", None).expect_err("query");
-        assert_eq!(error.code(), "QUERY_INVALID");
+    fn invalid_query_is_query_compile() {
+        let error = run_query(
+            "python",
+            "(identifier) @a\n(nope) @b\n",
+            b"pass\n",
+            None,
+            None,
+        )
+        .expect_err("query");
+        assert_eq!(error.id(), "treesitter.query_compile");
+        match error {
+            Error::QueryCompile {
+                language,
+                offset,
+                row,
+                column,
+                kind,
+                detail,
+            } => {
+                assert_eq!(language, "python");
+                assert_eq!((row, column), (1, 1));
+                assert_eq!(offset, 17);
+                assert_eq!(kind, "NodeType");
+                assert!(detail.contains("nope"), "{detail}");
+            }
+            other => panic!("unexpected {other}"),
+        }
     }
-    #[cfg(feature = "python")]
+
+    /// AC: REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
     #[test]
-    fn missing_node_inside_subject_is_a_parse_error() {
+    fn missing_node_inside_capture_is_a_syntax_error() {
         // tree-sitter-python recovers `def f(:` with a zero-width MISSING ")"
         // and no ERROR node, so only the is_missing rule catches it.
         let source = b"def f(:\n  pass\n";
-        let error = run(
-            "python",
-            "(function_definition) @def\n",
-            source,
-            "missing.py",
-            None,
-        )
-        .expect_err("MISSING node must fail");
-        assert_eq!(error, JevError::extraction_parse_error("missing.py", 1));
+        let error = run_query("python", "(function_definition) @def\n", source, None, None)
+            .expect_err("MISSING node must fail");
+        assert_eq!(
+            error,
+            Error::SyntaxError {
+                path: None,
+                row: 0,
+                column: 6,
+                node_kind: "MISSING )".to_owned(),
+            }
+        );
     }
 
-    #[cfg(feature = "python")]
+    #[cfg(feature = "grammar-python")]
     #[test]
     fn clean_source_skips_the_error_walk_and_succeeds() {
-        let document =
-            run("python", "(identifier) @name\n", b"a = b\n", "ok.py", None).expect("clean source");
-        assert_eq!(document.subjects().len(), 2);
+        let captures =
+            run_query("python", "(identifier) @name\n", b"a = b\n", None, None).expect("clean");
+        assert_eq!(texts(&captures), ["a", "b"]);
+    }
+
+    /// AC: REQ-SAG-0302 same call.
+    #[cfg(all(feature = "grammar-python", feature = "grammar-rust"))]
+    #[test]
+    fn python_and_rust_through_the_same_call() {
+        // One caller-written query shape, one call, two grammars.
+        let calls = [
+            (
+                "python",
+                "(function_definition name: (identifier) @name)",
+                "def hello():\n    pass\n",
+            ),
+            (
+                "rust",
+                "(function_item name: (identifier) @name)",
+                "fn hello() {}\n",
+            ),
+        ];
+        for (language, query, source) in calls {
+            let captures = run_query(language, query, source.as_bytes(), None, None)
+                .unwrap_or_else(|error| panic!("{language}: {error}"));
+            assert_eq!(texts(&captures), ["hello"], "{language}");
+            assert_eq!(captures[0].start_line, 1);
+        }
+    }
+
+    /// Per-language sample: (id, query, source, expected first capture text).
+    /// A new grammar adds a row here.
+    const SAMPLES: &[(&str, &str, &str, &str)] = &[
+        ("python", "(identifier) @id", "answer = 42\n", "answer"),
+        ("rust", "(identifier) @id", "fn answer() {}\n", "answer"),
+    ];
+
+    /// AC: REQ-SAG-0302 every id.
+    #[test]
+    fn every_loaded_language_runs_through_run_query() {
+        let mut ran = 0;
+        for id in crate::languages() {
+            let (_, query, source, expected) = SAMPLES
+                .iter()
+                .find(|sample| sample.0 == id)
+                .unwrap_or_else(|| panic!("no sample for loaded language {id}"));
+            let captures = run_query(id, query, source.as_bytes(), None, None)
+                .unwrap_or_else(|error| panic!("{id}: {error}"));
+            assert_eq!(captures[0].text, *expected, "{id}");
+            ran += 1;
+        }
+        assert_eq!(ran, crate::languages().len());
+    }
+
+    /// AC: REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
+    #[test]
+    fn helper_captures_are_hidden_and_allow_list_is_checked() {
+        let query = "(assignment left: (identifier) @_lhs right: (integer) @value)\n";
+        let captures = run_query("python", query, b"x = 1\n", None, None).expect("run");
+        assert_eq!(texts(&captures), ["1"]);
+        assert!(captures.iter().all(|capture| capture.name == "value"));
+
+        let allowed = run_query("python", query, b"x = 1\n", None, Some(&["value"])).expect("ok");
+        assert_eq!(allowed, captures);
+
+        let error = run_query("python", query, b"x = 1\n", None, Some(&["value", "nope"]))
+            .expect_err("undefined capture");
+        assert_eq!(error.id(), "treesitter.query_capture_invalid");
+        assert_eq!(
+            error,
+            Error::QueryCaptureInvalid {
+                capture: "nope".to_owned()
+            }
+        );
+    }
+
+    /// AC: Positions, REQ-SAG-0002 errors.
+    #[cfg(feature = "grammar-python")]
+    #[test]
+    fn not_utf8_too_large_and_last_line_positions() {
+        let path = Path::new("bad.py");
+        let error = run_query(
+            "python",
+            "(identifier) @id",
+            b"ab = 1\n\xff\n",
+            Some(path),
+            None,
+        )
+        .expect_err("not utf8");
+        assert_eq!(
+            error,
+            Error::NotUtf8 {
+                path: Some(path.to_path_buf()),
+                byte_offset: 7
+            }
+        );
+
+        let big = vec![b' '; MAX_SOURCE_BYTES + 1];
+        let error = run_query("python", "(identifier) @id", &big, None, None).expect_err("big");
+        assert_eq!(
+            error,
+            Error::InputTooLarge {
+                path: None,
+                bytes: (MAX_SOURCE_BYTES + 1) as u64,
+                limit: MAX_SOURCE_BYTES as u64
+            }
+        );
+
+        let source = b"a = 1\nb = 2\nlast = [\n  3,\n]";
+        let captures = run_query("python", "(list) @list", source, None, None).expect("multi-line");
+        assert_eq!(captures.len(), 1);
+        assert_eq!((captures[0].start_line, captures[0].end_line), (3, 5));
+        assert_eq!(captures[0].end_byte, source.len());
     }
 }

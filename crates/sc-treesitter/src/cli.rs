@@ -1,12 +1,17 @@
-use clap::error::{ContextKind, ContextValue, ErrorKind};
+//! `tsq` argument parsing.
+//!
+//! Every clap error other than the help and version displays becomes
+//! [`sc_treesitter::Error::Usage`] (id `treesitter.usage`).
+
+use clap::error::ErrorKind;
 use clap::{Args, Parser, Subcommand};
+
 #[derive(Debug, Parser)]
 #[command(
-    name = "sc-treesitter",
-    bin_name = "sc-treesitter",
+    name = "tsq",
+    bin_name = "tsq",
     version,
-    about = "Tree-sitter producer for sc/subjects/1 documents.",
-    after_help = NOTES
+    about = "Run predefined tree-sitter queries."
 )]
 pub(crate) struct Cli {
     /// The command to run.
@@ -14,26 +19,48 @@ pub(crate) struct Cli {
     pub(crate) command: Command,
 }
 
-/// `sc-treesitter` commands.
+/// `tsq` commands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
-    /// Parse one source blob and print its sc/subjects/1 document.
-    Extract(ExtractArgs),
-    /// Print the compiled-in language ids as a JSON array.
+    /// Print the loaded grammars as a JSON array of language ids.
     Languages,
-    /// Print the bundled queries as a JSON array.
+    /// Print the predefined queries as a JSON array of {language, query}.
     Queries(QueriesArgs),
+    /// Run a predefined query on a file and print its captures as JSON.
+    Query(QueryArgs),
 }
 
-/// Arguments of `sc-treesitter extract`.
+impl Command {
+    /// The subcommand name, for the general log.
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::Languages => "languages",
+            Self::Queries(_) => "queries",
+            Self::Query(_) => "query",
+        }
+    }
+}
+
+/// Arguments of `tsq queries`.
 #[derive(Debug, Args)]
-pub(crate) struct ExtractArgs {
-    /// Grammar id (see `sc-treesitter languages`).
+pub(crate) struct QueriesArgs {
+    /// Only list queries for this language.
     #[arg(long, value_name = "L", allow_hyphen_values = true)]
+    pub(crate) language: Option<String>,
+}
+
+/// Arguments of `tsq query`.
+#[derive(Debug, Args)]
+pub(crate) struct QueryArgs {
+    /// Grammar id (see `tsq languages`).
+    #[arg(value_name = "LANGUAGE")]
     pub(crate) language: String,
-    /// Bundled query name (see `sc-treesitter queries`).
-    #[arg(long, value_name = "Q", allow_hyphen_values = true)]
+    /// Predefined query name (see `tsq queries`).
+    #[arg(value_name = "QUERY")]
     pub(crate) query: String,
+    /// Source file to query.
+    #[arg(value_name = "FILE")]
+    pub(crate) file: std::path::PathBuf,
     /// Comma-separated allow-list of capture names.
     #[arg(
         long,
@@ -42,17 +69,6 @@ pub(crate) struct ExtractArgs {
         value_parser = parse_captures
     )]
     pub(crate) captures: Option<Captures>,
-    /// Source path: repo-relative, or absolute inside the repository.
-    #[arg(value_name = PATH_VALUE_NAME)]
-    pub(crate) path: String,
-}
-
-/// Arguments of `sc-treesitter queries`.
-#[derive(Debug, Args)]
-pub(crate) struct QueriesArgs {
-    /// Only list queries for this language.
-    #[arg(long, value_name = "L", allow_hyphen_values = true)]
-    pub(crate) language: Option<String>,
 }
 
 /// Non-empty `--captures` allow-list, in the order given.
@@ -79,10 +95,9 @@ pub(crate) enum Parsed {
 ///
 /// # Errors
 ///
-/// [`JevError::InputInvalid`] for every clap error other than the help and
-/// version displays; a value parser's own [`JevError`] (always
-/// `INPUT_INVALID` here) is returned as is.
-pub(crate) fn parse<I, T>(args: I) -> Result<Parsed, JevError>
+/// [`sc_treesitter::Error::Usage`] for every clap error other than the help and version
+/// displays; `kind` is the clap error kind and `detail` clap's rendered text.
+pub(crate) fn parse<I, T>(args: I) -> Result<Parsed, sc_treesitter::Error>
 where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,
@@ -97,26 +112,24 @@ where
         {
             Ok(Parsed::Print(error.render().to_string()))
         }
-        Err(error) => Err(value_parser_error(&error).unwrap_or_else(|| usage_error(&error))),
+        Err(error) => Err(sc_treesitter::Error::Usage {
+            kind: format!("{:?}", error.kind()),
+            detail: error.render().to_string(),
+        }),
     }
 }
+
 /// `--captures` value parser: comma-separated, trimmed, no empty names.
-fn parse_captures(value: &str) -> Result<Captures, JevError> {
+fn parse_captures(value: &str) -> Result<Captures, String> {
     if value.is_empty() {
-        return Err(JevError::input_invalid_field(
-            "--captures",
-            "--captures requires a comma-separated allow-list",
-        ));
+        return Err("--captures requires a comma-separated allow-list".to_owned());
     }
     value
         .split(',')
         .map(|part| {
             let name = part.trim();
             if name.is_empty() {
-                Err(JevError::input_invalid_field(
-                    "--captures",
-                    "--captures contains an empty name",
-                ))
+                Err("--captures contains an empty name".to_owned())
             } else {
                 Ok(name.to_owned())
             }
@@ -129,18 +142,49 @@ fn parse_captures(value: &str) -> Result<Captures, JevError> {
 mod tests {
     use super::*;
 
+    /// AC: tsq query.
     #[test]
     fn cli_definition_is_consistent() {
         use clap::CommandFactory;
         Cli::command().debug_assert();
     }
 
-
+    /// AC: tsq query.
     #[test]
     fn captures_are_trimmed_and_ordered() {
         let parsed = parse_captures(" b ,a").expect("captures");
         assert_eq!(parsed.names().collect::<Vec<_>>(), ["b", "a"]);
         assert!(parse_captures("").is_err());
         assert!(parse_captures("a,,b").is_err());
+    }
+
+    #[test]
+    fn bad_captures_and_missing_positional_are_usage_errors() {
+        let error = parse([
+            "tsq",
+            "query",
+            "rust",
+            "match-arms",
+            "f.rs",
+            "--captures",
+            "a,,b",
+        ])
+        .expect_err("empty capture name");
+        assert_eq!(error.id(), "treesitter.usage");
+        assert!(error.message().contains("empty name"), "{error}");
+
+        let error = parse(["tsq", "query", "rust"]).expect_err("missing positionals");
+        assert!(matches!(
+            error,
+            sc_treesitter::Error::Usage { ref kind, .. } if kind == "MissingRequiredArgument"
+        ));
+    }
+
+    #[test]
+    fn help_and_version_are_printed() {
+        assert!(
+            matches!(parse(["tsq", "--help"]), Ok(Parsed::Print(text)) if text.contains("tsq"))
+        );
+        assert!(matches!(parse(["tsq", "--version"]), Ok(Parsed::Print(_))));
     }
 }

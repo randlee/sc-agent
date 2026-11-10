@@ -1,89 +1,118 @@
+//! The grammar table: every tree-sitter grammar this build can load.
+//!
+//! Adding a grammar is one [`GRAMMARS`] row, one [`KNOWN_LANGUAGES`] entry, its queries and a
+//! test sample; the public API does not change.
+
+use crate::Error;
 use crate::query::QueryInfo;
 
-/// One grammar compiled into this build.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct LanguageInfo {
-    /// CLI language id (`--language`).
-    pub id: &'static str,
-    /// Grammar crate name recorded in `producer.grammar`.
-    pub grammar: &'static str,
-    /// Pinned grammar crate version recorded in `producer.grammar_version`.
-    pub grammar_version: &'static str,
-}
-
-/// A compiled-in grammar: metadata, loader, and its query assets.
+/// A compiled-in grammar: its id, loader, and predefined queries.
 pub(crate) struct Grammar {
-    pub(crate) info: LanguageInfo,
+    pub(crate) id: &'static str,
     pub(crate) load: fn() -> tree_sitter::Language,
     pub(crate) queries: &'static [QueryInfo],
 }
 
-#[cfg(feature = "python")]
+/// Every language id this crate version can be built with, compiled in or not.
+pub(crate) const KNOWN_LANGUAGES: &[&str] = &["python", "rust"];
+
+#[cfg(feature = "grammar-python")]
 fn load_python() -> tree_sitter::Language {
     tree_sitter_python::LANGUAGE.into()
 }
 
-#[cfg(feature = "rust")]
+#[cfg(feature = "grammar-rust")]
 fn load_rust() -> tree_sitter::Language {
     tree_sitter_rust::LANGUAGE.into()
 }
 
-/// Every grammar compiled into this build, in CLI order.
+/// Every grammar compiled into this build, in listing order.
 static GRAMMARS: &[Grammar] = &[
-    #[cfg(feature = "python")]
+    #[cfg(feature = "grammar-python")]
     Grammar {
-        info: LanguageInfo {
-            id: "python",
-            grammar: "tree-sitter-python",
-            grammar_version: "0.25.0",
-        },
+        id: "python",
         load: load_python,
         queries: crate::query::PYTHON,
     },
-    #[cfg(feature = "rust")]
+    #[cfg(feature = "grammar-rust")]
     Grammar {
-        info: LanguageInfo {
-            id: "rust",
-            grammar: "tree-sitter-rust",
-            grammar_version: "0.24.2",
-        },
+        id: "rust",
         load: load_rust,
         queries: crate::query::RUST,
     },
 ];
 
-/// Returns the grammars compiled into this build, in CLI order.
+/// Returns the ids of the grammars compiled into this build, in listing order.
 ///
 /// # Examples
 ///
 /// ```
-/// let ids: Vec<&str> = sc_treesitter::languages().map(|info| info.id).collect();
-/// assert!(ids.iter().all(|id| sc_treesitter::language(id).is_ok()));
+/// let ids: Vec<&str> = sc_treesitter::languages().collect();
+/// for id in &ids {
+///     assert!(sc_treesitter::queries(Some(id)).is_ok());
+/// }
 /// ```
-pub fn languages() -> impl ExactSizeIterator<Item = &'static LanguageInfo> {
-    GRAMMARS.iter().map(|grammar| &grammar.info)
+pub fn languages() -> impl ExactSizeIterator<Item = &'static str> {
+    GRAMMARS.iter().map(|grammar| grammar.id)
 }
 
-/// Returns the pinned grammar named `id`.
+/// Single lookup into [`GRAMMARS`] by language id.
 ///
-/// # Errors
-///
-/// Returns [`JevError::LanguageUnavailable`] when `id` is not a compiled-in
-/// grammar. Disabling the Cargo feature for a grammar makes that id unavailable.
-pub fn language(id: &str) -> Result<&'static LanguageInfo, JevError> {
-    lookup(id).map(|grammar| &grammar.info)
-}
-
-/// Single lookup into [`GRAMMARS`] by CLI id.
-pub(crate) fn lookup(id: &str) -> Result<&'static Grammar, JevError> {
+/// [`Error::GrammarUnavailable`] for a known id whose feature is off, otherwise
+/// [`Error::UnknownLanguage`].
+pub(crate) fn lookup(id: &str) -> Result<&'static Grammar, Error> {
     GRAMMARS
         .iter()
-        .find(|grammar| grammar.info.id == id)
-        .ok_or_else(|| JevError::language_unavailable(crate::PRODUCER_NAME, id))
+        .find(|grammar| grammar.id == id)
+        .ok_or_else(|| {
+            if KNOWN_LANGUAGES.contains(&id) {
+                Error::GrammarUnavailable {
+                    language: id.to_owned(),
+                }
+            } else {
+                Error::UnknownLanguage {
+                    language: id.to_owned(),
+                }
+            }
+        })
 }
 
 /// Every compiled-in grammar, for listing queries.
 pub(crate) fn all() -> &'static [Grammar] {
     GRAMMARS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_loaded_language_is_known() {
+        for id in languages() {
+            assert!(KNOWN_LANGUAGES.contains(&id), "{id}");
+        }
+    }
+
+    #[test]
+    fn unknown_id_is_unknown_language() {
+        assert!(matches!(
+            lookup("cobol"),
+            Err(Error::UnknownLanguage { language }) if language == "cobol"
+        ));
+    }
+
+    /// AC: REQ-SAG-0302 every id (built with `--no-default-features --features grammar-python`).
+    #[cfg(all(feature = "grammar-python", not(feature = "grammar-rust")))]
+    #[test]
+    fn known_language_without_its_feature_is_grammar_unavailable() {
+        assert_eq!(languages().collect::<Vec<_>>(), ["python"]);
+        let error = lookup("rust").err().expect("rust is not compiled in");
+        assert_eq!(
+            error,
+            Error::GrammarUnavailable {
+                language: "rust".to_owned()
+            }
+        );
+        assert_eq!(error.id(), "treesitter.grammar_unavailable");
+    }
 }
