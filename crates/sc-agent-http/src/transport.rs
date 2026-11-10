@@ -1,57 +1,52 @@
 //! The [`Transport`] trait and transport [`Timeouts`].
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use sc_agent_types::JevError;
-
+use crate::error::HttpError;
 use crate::request::{HttpRequest, HttpResponse};
 
 /// Sends one HTTP request, once.
 ///
-/// Open on purpose (ADR-SAG-0006): backends take a transport at
-/// construction, and tests supply their own. Object-safe and `Send + Sync`.
+/// Open trait: test doubles and callers' own transports implement it
+/// (ADR-SAG-0001). Object-safe and `Send + Sync`.
 ///
-/// Calling `send` directly bypasses busy retry **and** redaction. Production
-/// code calls only [`send_and_parse`](crate::send_and_parse) (built on
-/// [`send_with_busy_retry`](crate::send_with_busy_retry)),
-/// which adds both. A transport other than
-/// [`UreqTransport`](crate::UreqTransport) cannot read the key in
-/// [`HttpRequest::secret`]; it sees only the header name,
-/// [`SecretHeader::redacted`](crate::SecretHeader::redacted) and
-/// (with `test-util`) `SecretHeader::matches`.
+/// Calling `send` directly bypasses the busy and quota classification, the
+/// resend schedule and redaction; production sends go through
+/// [`HttpClient::send_once`](crate::HttpClient::send_once). A transport
+/// other than [`UreqTransport`](crate::UreqTransport) cannot read the key in
+/// [`HttpRequest::secret`]; it sees only the header name and
+/// [`SecretHeader::redacted`](crate::SecretHeader::redacted).
 pub trait Transport: Send + Sync {
     /// Sends `request` and returns the response, whatever its status.
     ///
     /// # Errors
     ///
-    /// Returns [`JevError::NetworkError`] when the connection, the send or
-    /// the body read fails or times out, and [`JevError::ResponseInvalid`]
-    /// when the body exceeds the transport cap. HTTP statuses, including busy
-    /// and error statuses, are `Ok`.
-    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, JevError>;
+    /// Every HTTP status is `Ok`; only transport failures are `Err`:
+    /// [`HttpError::Network`] when the connection, the send or the body read
+    /// fails or times out, [`HttpError::ResponseTooLarge`] when the body
+    /// exceeds the transport cap, [`HttpError::InvalidRequest`] when a header
+    /// cannot be built.
+    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError>;
 }
 
 impl<T: Transport + ?Sized> Transport for &T {
-    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, JevError> {
+    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         (**self).send(request)
     }
 }
 
-impl<T: Transport + ?Sized> Transport for std::sync::Arc<T> {
-    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, JevError> {
+impl<T: Transport + ?Sized> Transport for Arc<T> {
+    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
         (**self).send(request)
     }
 }
 
-/// Connect and whole-request deadlines of a transport (ADR-SAG-0007).
+/// Connect and whole-request deadlines of a transport.
 ///
-/// The request deadline covers the send and the full body read. The defaults
-/// are 10 s connect and 120 s request.
-///
-/// The bounds are enforced here so every backend gets them (RSH-002):
-/// [`Timeouts::new`] clamps the connect deadline to 1 ms through 10 s and
-/// the request deadline to 1 ms through 120 s. Callers that must report a
-/// bad value (such as the Jev config) check their own range first.
+/// `connect`: TCP + TLS connect (ureq `timeout_connect`). `request`: one
+/// global deadline for the whole send, connect, headers and body read
+/// included (ureq `timeout_global`), so a slow-drip body cannot exceed it.
 ///
 /// # Examples
 ///
@@ -61,68 +56,70 @@ impl<T: Transport + ?Sized> Transport for std::sync::Arc<T> {
 /// use sc_agent_http::Timeouts;
 ///
 /// let timeouts = Timeouts::default();
-/// assert_eq!(timeouts.connect(), Duration::from_secs(10));
-/// assert_eq!(timeouts.request(), Duration::from_secs(120));
+/// assert_eq!(timeouts.connect, Duration::from_secs(10));
+/// assert_eq!(timeouts.request, Duration::from_secs(120));
+/// let runner = timeouts.with_request(Duration::from_secs(300));
+/// assert_eq!((runner.connect, runner.request), (Duration::from_secs(10), Duration::from_secs(300)));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Timeouts {
-    connect: Duration,
-    request: Duration,
-}
-
-impl Timeouts {
-    /// Default TCP connect deadline.
-    pub const DEFAULT_CONNECT: Duration = Duration::from_secs(10);
-
-    /// Default deadline for one request, including the response body.
-    pub const DEFAULT_REQUEST: Duration = Duration::from_secs(120);
-
-    /// Smallest accepted deadline, for connect and request alike.
-    pub const MIN: Duration = Duration::from_millis(1);
-
-    /// Largest accepted connect deadline.
-    pub const MAX_CONNECT: Duration = Duration::from_secs(10);
-
-    /// Largest accepted request deadline.
-    pub const MAX_REQUEST: Duration = Duration::from_secs(120);
-
-    /// Timeouts with the given connect and request deadlines, clamped to
-    /// 1 ms through 10 s (connect) and 1 ms through 120 s (request).
-    #[must_use]
-    pub const fn new(connect: Duration, request: Duration) -> Self {
-        Self {
-            connect: clamp(connect, Self::MAX_CONNECT),
-            request: clamp(request, Self::MAX_REQUEST),
-        }
-    }
-
-    /// TCP connect deadline.
-    #[must_use]
-    pub const fn connect(self) -> Duration {
-        self.connect
-    }
-
-    /// Deadline for one request, including the response body.
-    #[must_use]
-    pub const fn request(self) -> Duration {
-        self.request
-    }
-}
-
-/// `value` limited to `Timeouts::MIN..=max` (`Ord::clamp` is not `const`).
-const fn clamp(value: Duration, max: Duration) -> Duration {
-    // `Duration` has no const comparison operators; compare nanoseconds.
-    if value.as_nanos() < Timeouts::MIN.as_nanos() {
-        Timeouts::MIN
-    } else if value.as_nanos() > max.as_nanos() {
-        max
-    } else {
-        value
-    }
+    /// TCP + TLS connect deadline.
+    pub connect: Duration,
+    /// Deadline for the whole send, connect, headers and body read included.
+    pub request: Duration,
 }
 
 impl Default for Timeouts {
+    /// Connect 10 s, request 120 s: decision and LLM sends.
     fn default() -> Self {
-        Self::new(Self::DEFAULT_CONNECT, Self::DEFAULT_REQUEST)
+        Self {
+            connect: Duration::from_secs(10),
+            request: Duration::from_secs(120),
+        }
+    }
+}
+
+impl Timeouts {
+    /// Connect 5 s, request 10 s: discovery, `decide models`, `decide doctor`
+    /// and health probes.
+    #[must_use]
+    pub const fn probe() -> Self {
+        Self {
+            connect: Duration::from_secs(5),
+            request: Duration::from_secs(10),
+        }
+    }
+
+    /// Same connect timeout, this request deadline (REQ-SAG-0015: a local
+    /// runner's own request timeout; one `UreqTransport` per local runner is
+    /// built with `Timeouts::default().with_request(runner.request_timeout)`).
+    #[must_use]
+    pub const fn with_request(self, request: Duration) -> Self {
+        Self {
+            connect: self.connect,
+            request,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn probe_timeouts() {
+        let probe = Timeouts::probe();
+        assert_eq!(
+            (probe.connect, probe.request),
+            (Duration::from_secs(5), Duration::from_secs(10))
+        );
+    }
+
+    #[test]
+    fn timeouts_with_request() {
+        let base = Timeouts::probe();
+        let changed = base.with_request(Duration::from_secs(300));
+        assert_eq!(changed.connect, base.connect);
+        assert_eq!(changed.request, Duration::from_secs(300));
     }
 }

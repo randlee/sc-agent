@@ -143,16 +143,17 @@ pub enum HttpError {
         /// The last reply's valid `Retry-After`, as sent and unrounded
         /// (REQ-SAG-0007).
         retry_after_seconds: Option<f64>,
-        /// The last busy reply.
-        last: ProviderReply,
+        /// The last busy reply (boxed: it keeps the error small on the
+        /// `Ok` path, clippy `result_large_err`).
+        last: Box<ProviderReply>,
     },
     /// Busy status whose body marks quota, credit or spend exhaustion
     /// (REQ-SAG-0602). Returned after the send that got it, never resent.
     QuotaExhausted {
         /// Sends made, the first included.
         attempts: u32,
-        /// What the provider said.
-        reply: ProviderReply,
+        /// What the provider said (boxed, as `ProviderBusy::last`).
+        reply: Box<ProviderReply>,
     },
     /// Transport failure.
     ///
@@ -169,7 +170,8 @@ pub enum HttpError {
     },
     /// The body exceeded the 8 MiB read cap.
     ResponseTooLarge {
-        /// The reply's HTTP status.
+        /// The reply's HTTP status (0 when the transport refused the body
+        /// before the status was read).
         status: u16,
         /// The cap, in bytes.
         limit_bytes: u64,
@@ -209,11 +211,11 @@ impl HttpError {
                 reason,
                 attempts,
                 retry_after_seconds,
-                last: last.map_text(map),
+                last: Box::new(last.map_text(map)),
             },
             Self::QuotaExhausted { attempts, reply } => Self::QuotaExhausted {
                 attempts,
-                reply: reply.map_text(map),
+                reply: Box::new(reply.map_text(map)),
             },
             Self::Network {
                 kind,

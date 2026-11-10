@@ -124,33 +124,12 @@ impl fmt::Display for ProviderReply {
 
 #[cfg(test)]
 mod tests {
-    use sc_agent_secrets::{EnvSource, KeySources, KeyringSource, SecretsError, resolve_var};
-
     use super::*;
 
     const KEY: &str = "sk-big-body-secret-0123456789";
 
-    struct OneVar;
-    impl EnvSource for OneVar {
-        fn var(&self, name: &str) -> Option<String> {
-            (name == "TEST_KEY").then(|| KEY.to_owned())
-        }
-    }
-    struct NoKeyring;
-    impl KeyringSource for NoKeyring {
-        fn password(&self, _: &str, _: &str) -> Result<Option<String>, SecretsError> {
-            Ok(None)
-        }
-    }
-
     fn key() -> ApiKey {
-        let var = "TEST_KEY".parse().expect("var name");
-        let sources = KeySources {
-            env: &OneVar,
-            repo_root: None,
-            keyring: &NoKeyring,
-        };
-        resolve_var(&var, &sources).expect("key").key
+        crate::test_key::key(KEY)
     }
 
     /// A body far over any old read cut, with the key at many offsets:
