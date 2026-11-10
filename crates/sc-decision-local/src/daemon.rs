@@ -3,12 +3,13 @@
 use std::fmt;
 
 use sc_agent_config::RunnerKind;
-use sc_agent_http::{Endpoint, HttpRequest, HttpResponse, Method, SecretHeader};
+use sc_agent_http::{HttpRequest, HttpResponse, Method, SecretHeader};
 use sc_agent_secrets::ApiKey;
 use sc_agent_types::ModelId;
+use sc_decision_systemone::BaseUrl;
 use serde::de::DeserializeOwned;
 
-use crate::error::LocalError;
+use crate::error::{LocalError, ParseCause};
 use crate::{Generic, Laya, Mapika, Strands};
 
 pub(crate) mod sealed {
@@ -33,9 +34,15 @@ pub trait LocalDaemon: sealed::Sealed + Send + Sync + fmt::Debug {
     ///
     /// [`LocalError::Http`] when the probe URL is invalid, or when a key is attached to a
     /// plain-http host that is not loopback (`http.key_on_plain_http`).
-    fn probe(&self, base: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError>;
+    fn probe(&self, base: &BaseUrl, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError>;
 
     /// What the probe reply says about the daemon and the configured `model`.
+    ///
+    /// The result carries reply text as received (bodies, parse messages, model names); the
+    /// key is redacted from all of it by
+    /// [`LocalBackend::discover`](crate::LocalBackend::discover) and
+    /// [`LocalBackend::wait_until_loaded`](crate::LocalBackend::wait_until_loaded), which know
+    /// it. A caller using this method directly redacts it itself.
     ///
     /// # Errors
     ///
@@ -152,9 +159,12 @@ impl ModelState {
 }
 
 /// `GET {base}{path}`, with the Bearer key when `key` is set.
-pub(crate) fn get(base: &str, path: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
-    let base = base.strip_suffix('/').unwrap_or(base);
-    let endpoint = Endpoint::parse_local(&format!("{base}{path}"))?;
+pub(crate) fn get(
+    base: &BaseUrl,
+    path: &str,
+    key: Option<&ApiKey>,
+) -> Result<HttpRequest, LocalError> {
+    let endpoint = base.join(path)?;
     let request = HttpRequest::new(Method::Get, endpoint, Vec::new());
     Ok(match key {
         Some(key) => request.with_secret(SecretHeader::bearer(key.clone()))?,
@@ -171,7 +181,7 @@ pub(crate) fn parse<T: DeserializeOwned>(
     serde_json::from_slice(response.body()).map_err(|error| LocalError::ProbeParse {
         daemon,
         path,
-        message: error.to_string(),
+        source: ParseCause::Json(error),
     })
 }
 
@@ -192,5 +202,5 @@ pub(crate) fn probe_status(
 /// The liveness path of Strands Decider, Laya and Mapika/decider.
 pub(crate) const HEALTH_PATH: &str = "/health";
 
-/// The model-list path of a generic daemon.
-pub(crate) const MODELS_PATH: &str = "/v1/models";
+/// The model-list path of a generic daemon (the System One path).
+pub(crate) const MODELS_PATH: &str = sc_decision_systemone::MODELS_PATH;

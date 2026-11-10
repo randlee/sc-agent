@@ -4,6 +4,7 @@ use sc_agent_http::{HttpRequest, HttpResponse};
 use sc_agent_secrets::ApiKey;
 use sc_agent_types::ModelId;
 use sc_decision_schema::ModelMetadataList;
+use sc_decision_systemone::BaseUrl;
 
 use crate::daemon::{
     Availability, DaemonKind, LocalDaemon, MODELS_PATH, ModelState, get, probe_status, sealed,
@@ -27,7 +28,7 @@ impl LocalDaemon for Generic {
     }
 
     /// `GET {base}/v1/models`, with the Bearer key when one is configured.
-    fn probe(&self, base: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
+    fn probe(&self, base: &BaseUrl, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
         get(base, MODELS_PATH, key)
     }
 

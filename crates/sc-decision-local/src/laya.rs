@@ -3,6 +3,7 @@
 use sc_agent_http::{HttpRequest, HttpResponse};
 use sc_agent_secrets::ApiKey;
 use sc_agent_types::ModelId;
+use sc_decision_systemone::BaseUrl;
 use serde::Deserialize;
 
 use crate::daemon::{
@@ -36,7 +37,7 @@ impl LocalDaemon for Laya {
     }
 
     /// `GET {base}/health`, with the Bearer key when one is configured.
-    fn probe(&self, base: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
+    fn probe(&self, base: &BaseUrl, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError> {
         get(base, HEALTH_PATH, key)
     }
 

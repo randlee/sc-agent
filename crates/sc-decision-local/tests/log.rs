@@ -2,9 +2,11 @@
 //!
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
-// Each test binary uses part of the shared helpers.
 #[cfg(test)]
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "each test binary uses only part of the shared helpers"
+)]
 mod support;
 
 #[cfg(test)]
@@ -104,24 +106,35 @@ mod tests {
         Ok(())
     }
 
-    /// Without a logger, discover writes nothing and returns the same result.
+    /// A backend without a logger discovers as one with a logger: the log never changes the
+    /// result.
     #[test]
-    fn test_discover_without_logger_writes_nothing() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_discover_result_does_not_depend_on_logger() -> Result<(), Box<dyn std::error::Error>> {
+        let reply = json(200, r#"{"ok":true,"model":"jev-latest"}"#);
         let log = MemoryLog::new()?;
-        let backend = LocalBackend::new(
+        let plain = LocalBackend::new(
             DaemonKind::Mapika,
             &host("127.0.0.1"),
             port(8000),
             model(),
             None,
         )?;
-        let transport =
-            ScriptedTransport::responses(vec![json(200, r#"{"ok":true,"model":"jev-latest"}"#)]);
-        assert_eq!(
-            backend.discover(&transport, LogContext::NONE)?.model,
-            ModelState::Loaded
-        );
-        assert!(log.records()?.is_empty());
+        let logged = LocalBackend::new(
+            DaemonKind::Mapika,
+            &host("127.0.0.1"),
+            port(8000),
+            model(),
+            None,
+        )?
+        .with_log(log.general());
+        let without = plain.discover(
+            &ScriptedTransport::responses(vec![reply.clone()]),
+            LogContext::NONE,
+        )?;
+        let with = logged.discover(&ScriptedTransport::responses(vec![reply]), LogContext::NONE)?;
+        assert_eq!(without, with);
+        assert_eq!(without.model, ModelState::Loaded);
+        assert_eq!(log.records()?.len(), 1, "only the logged backend wrote");
         Ok(())
     }
 }

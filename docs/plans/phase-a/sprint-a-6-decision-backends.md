@@ -32,7 +32,7 @@ sprint:
     - sprint: a-8
       artifact: sc_agent_log::{GeneralLogger, Level, LogContext} and sc_agent_log::testing::MemoryLog (feature `testing`)
       trigger: dev-push
-  requirements: [REQ-SAG-0201, REQ-SAG-0801, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0401, REQ-SAG-0601]
+  requirements: [REQ-SAG-0201, REQ-SAG-0801, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0011, REQ-SAG-0014]  # 0011: cancel ends a load wait (decision.cancelled); 0014: limits enforced in a-2 DecisionRequest::new, consumed by multipart encode
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
     - "Discovery is a library capability of sc-decision-local; no decide or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
@@ -82,7 +82,7 @@ Busy: Laya and Mapika/decider answer 503 when full. REQ-SAG-0601 defines busy as
 | `strands` | `GET {base}/health` | 200 | `[model, checkpoint]` | equal to either -> `Loaded`; else `local.model_not_served` |
 | `laya` | `GET {base}/health`, Bearer if a key is configured | 200 | `loaded` | in `loaded` -> `Loaded`; else `LoadsOnDemand`; `loaded` absent -> `Unlisted` |
 | `mapika` | `GET {base}/health` | 200 | `[model]` | `ok` true and equal -> `Loaded`; `ok` false -> `NotReady`; else `local.model_not_served` |
-| `generic` | `GET {base}/v1/models`, Bearer if a key is configured | any HTTP answer | `models[].name` | listed -> `Loaded`; else `local.model_not_served`; 404/405 -> `Unlisted` |
+| `generic` | `GET {base}/v1/models`, Bearer if a key is configured | any 2xx | `models[].name` | listed -> `Loaded`; else `local.model_not_served`; 404/405 -> `Unlisted`; other status -> `local.probe_status`; a 2xx that is not a ModelMetadataList -> `local.decision` (ResponseParse) |
 
 Down = the probe's transport error, returned as `LocalError::Http(HttpError)` (id `local.http`, cause `http.network`). Any other status -> `ProbeStatus`. Discovery is one GET through `Transport::send`, sent once (not a decision, no busy resend, nothing to wait on).
 
@@ -100,7 +100,8 @@ pub const TYPESAFE_BASE_URL: &str = "https://api.typesafe.ai";
 pub struct SystemOneBackend { systemone: Endpoint, models: Endpoint, key: Option<ApiKey> }
 impl SystemOneBackend {
     /// `base` has no trailing path, e.g. TYPESAFE_BASE_URL. https only (Endpoint::parse).
-    pub fn new(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError>;   // Http(InvalidEndpoint)
+    pub fn new(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError>;   // Http(InvalidEndpoint); also refuses a query or fragment
+    pub fn at(base: &BaseUrl, key: Option<ApiKey>) -> Result<Self, DecisionError>;
     /// A configured local runner's base, e.g. "http://127.0.0.1:8000"; http or https (Endpoint::parse_local).
     pub fn local(base: &str, key: Option<ApiKey>) -> Result<Self, DecisionError>;
     /// GET /v1/models; Bearer if key, attached with `HttpRequest::with_secret(..)?` (a-5; http.key_on_plain_http -> DecisionError::Http).
@@ -121,7 +122,7 @@ impl Backend for SystemOneBackend {
 }
 /// Writes the parts in `request.image_parts()` order. DecisionRequest is valid by construction (a-2
 /// DecisionRequest::new), so neither crate checks part names or calls a validator.
-fn multipart_body(request: &DecisionRequest, boundary: &str) -> Result<Vec<u8>, DecisionError>;   // private
+fn body(json: &str, parts: &[ImagePart], boundary: &str) -> Vec<u8>;   // private, infallible; part names escaped (" -> %22, CR -> %0D, LF -> %0A) and also sent as filename
 ```
 
 No error enum of its own, under the ADR-SAG-0004 exemption (amended 2026-11-09): a crate whose public functions all return the error type fixed by a trait it implements needs no union; every sc-decision-systemone failure is a `DecisionError` (the Backend trait fixes it); an invalid base URL is the A-5 `HttpError::InvalidEndpoint` wrapped as `DecisionError::Http`.
@@ -144,7 +145,7 @@ mod sealed { pub trait Sealed {} }   // private module: only this crate implemen
 pub trait LocalDaemon: sealed::Sealed + Send + Sync + fmt::Debug {
     fn kind(&self) -> DaemonKind;
     /// Bearer (Laya, Generic, when a key is set) via `HttpRequest::with_secret(..)?` -> LocalError::Http.
-    fn probe(&self, base: &str, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError>;
+    fn probe(&self, base: &BaseUrl, key: Option<&ApiKey>) -> Result<HttpRequest, LocalError>;
     fn availability(&self, response: &HttpResponse, model: &ModelId) -> Result<Availability, LocalError>;
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -240,7 +241,7 @@ pub enum LocalError {
     /// SystemOneBackend::new or decode_models failed; wrapped unchanged.
     Decision(DecisionError),                                                            // "local.decision"
     ProbeStatus { daemon: DaemonKind, path: &'static str, status: u16, body: Vec<u8> },  // "local.probe_status"
-    ProbeParse { daemon: DaemonKind, path: &'static str, message: String },            // "local.probe_parse" (full serde message)
+    ProbeParse { daemon: DaemonKind, path: &'static str, source: ParseCause },        // "local.probe_parse"; ParseCause::{Json(serde_json::Error) (no key attached), Redacted(ErrorDetail) (key attached; serde_json.<category> id, message with the key redacted)}
     ModelNotServed { daemon: DaemonKind, model: ModelId, served: Vec<String> },        // "local.model_not_served"
     /// REQ-SAG-0015: the model was not loaded within the load timeout. runner = the base (http://host:port).
     LoadTimeout { runner: String, waited: Duration },                                  // "local.load_timeout"
@@ -294,6 +295,8 @@ sc-decision-local (tests/discovery.rs, over ScriptedTransport):
   - Laya `loaded: []` -> Ok with one probe; the next encode carries deadline load + request, and after a 2xx decode the following encode carries none -> AC 24.
 - Decode keeps a probability of 0.123456789 unchanged (no rounding) -> AC 18.
 - Two multipart encodes use different boundaries, each "sc-agent-" + a ULID that parses with `ulid::Ulid::from_string` -> AC 19.
+// sc-decision-systemone::BaseUrl (QA-1 RBP-F004): https(&str) / local(&str) -> Result<Self, HttpError> (no query or fragment), as_str(), join(path) -> Result<Endpoint, HttpError>, Display; pub const SYSTEMONE_PATH, MODELS_PATH.
+// sc-decision-local: pub const MAX_LOAD_WAIT: Duration = 86 400 s (load_timeout clamp; the wait overshoots by at most one probe timeout); local.load_wait records carry phase "poll" | "end".
 
 ## Acceptance criteria
 
@@ -337,3 +340,5 @@ a-1/a-4 contract folded in: LocalBackend::new takes &RunnerHost and NonZeroU16 (
 Backend::decode takes ctx: &LogContext (a-2); discover takes ctx: LogContext by value, written via GeneralLogger::write(.., ctx, fields) (a-8).
 Round 3: REQ-SAG-0013 added (validated RunnerHost/NonZeroU16; http.key_on_plain_http surfaced as DecisionError::Http, test AC 20); REQ-SAG-0201 end to end -> a-10.
 Round 4: with_secret(..)? at every secret attach (encode, models_request now Result, probe); REQ-SAG-0015 wait_until_loaded + LocalTimeouts + Laya first-request deadline + LoadTimeout (local.load_timeout, 6 ids), AC 21-24. wait_until_loaded returns DecisionError (LoadTimeout as Backend detail, cancel as Cancelled{sends:0}). Needs from others: a-5 HttpRequest::with_deadline(Duration), a-4/a-10 the per-runner load/request timeouts in config.
+- QA-1 (2026-11-10) surface additions accepted: ModelState::as_str (log field), LocalBackend::base(), LocalBackend::kind(), Display for DaemonKind. sc-agent-types is a normal dependency of sc-decision-systemone per AC 13. Health kinds (Strands, Laya, Mapika) are up only on 200.
+- QA-1 fix round (code at 56776e4): ProbeStatus/ProbeParse recovery text; ProbeStatus body kept whole (REQ-SAG-0002) with the key redacted when one was attached; with a key attached, the Generic model-list parse message, ModelNotServed.served and Availability.loaded are redacted too (REQ-SAG-0401); escape_name returns Cow; LocalBackend::new returns LocalError::Http(http.invalid_endpoint) for a bad base.

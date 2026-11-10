@@ -4,9 +4,11 @@
 //! 5 s, and outcomes that must arrive in time are read through a channel bounded at 5 s.
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
-// Each test binary uses part of the shared helpers.
 #[cfg(test)]
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "each test binary uses only part of the shared helpers"
+)]
 mod support;
 
 #[cfg(test)]
@@ -80,6 +82,7 @@ mod tests {
             .iter()
             .map(|record| {
                 (
+                    record.fields.get("phase").cloned(),
                     record.fields.get("poll").cloned(),
                     record.fields.get("state").cloned(),
                     record.fields.get("outcome").cloned(),
@@ -89,10 +92,25 @@ mod tests {
         assert_eq!(
             summary,
             vec![
-                (Some(json!(1)), Some(json!("not_ready")), None),
-                (Some(json!(2)), Some(json!("not_ready")), None),
-                (Some(json!(3)), Some(json!("loaded")), None),
-                (None, None, Some(json!("loaded"))),
+                (
+                    Some(json!("poll")),
+                    Some(json!(1)),
+                    Some(json!("not_ready")),
+                    None
+                ),
+                (
+                    Some(json!("poll")),
+                    Some(json!(2)),
+                    Some(json!("not_ready")),
+                    None
+                ),
+                (
+                    Some(json!("poll")),
+                    Some(json!(3)),
+                    Some(json!("loaded")),
+                    None
+                ),
+                (Some(json!("end")), None, None, Some(json!("loaded"))),
             ]
         );
         let last = records.last().expect("end record");
@@ -169,6 +187,48 @@ mod tests {
         assert!(elapsed >= Duration::from_secs(2));
         assert!(cause.recovery.is_some());
         assert_eq!(transport.sends(), 3, "probes at 0, 1 and 2 s");
+        Ok(())
+    }
+
+    /// A timeout that is not a whole number of polls: the last probe is at the deadline
+    /// (0, 1 and 1.5 s), so the wait ends before 2 s after 3 probes.
+    #[test]
+    fn test_timeout_between_polls_probes_at_deadline() -> Result<(), Box<dyn std::error::Error>> {
+        let transport = ScriptedTransport::responses(vec![json(200, NOT_READY); 5]);
+        let receiver = spawn_wait(
+            loopback(DaemonKind::Mapika, None),
+            Arc::new(transport.clone()),
+            CancelToken::new(),
+            Duration::from_millis(1500),
+        );
+        let (result, elapsed) = receiver.recv_timeout(BOUND)?;
+        let error = result.expect_err("timed out");
+        assert_eq!(
+            error.detail().cause.map(|cause| cause.id),
+            Some("local.load_timeout".to_owned())
+        );
+        assert_eq!(transport.sends(), 3);
+        assert!(elapsed >= Duration::from_millis(1500), "{elapsed:?}");
+        assert!(elapsed < Duration::from_secs(2), "{elapsed:?}");
+        Ok(())
+    }
+
+    /// A load timeout of Duration::MAX does not overflow the deadline: the wait still ends
+    /// on a loaded model.
+    #[test]
+    fn test_huge_load_timeout_is_clamped() -> Result<(), Box<dyn std::error::Error>> {
+        let transport = ScriptedTransport::responses(vec![json(200, READY)]);
+        loopback(DaemonKind::Mapika, None).wait_until_loaded(
+            &transport,
+            &CancelToken::new(),
+            Duration::MAX,
+            LogContext::NONE,
+        )?;
+        assert_eq!(transport.sends(), 1);
+        assert_eq!(
+            sc_decision_local::MAX_LOAD_WAIT,
+            Duration::from_secs(86_400)
+        );
         Ok(())
     }
 

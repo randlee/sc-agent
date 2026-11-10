@@ -2,9 +2,11 @@
 //!
 //! AC n = the nth acceptance line of the a-6 sprint doc.
 
-// Each test binary uses part of the shared helpers.
 #[cfg(test)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared with decode.rs; this binary uses every helper today, but a helper added for decode.rs alone must not fail this build"
+)]
 mod support;
 
 #[cfg(test)]
@@ -250,6 +252,39 @@ mod tests {
                 .as_str(),
             "http://127.0.0.1:8000/v1/models"
         );
+    }
+
+    /// RBP-F004: the base is validated once (BaseUrl) and every endpoint is joined onto it.
+    #[test]
+    fn test_base_url_validated_once() {
+        let base = sc_decision_systemone::BaseUrl::local("http://decider.lan:9000/").expect("base");
+        assert_eq!(base.as_str(), "http://decider.lan:9000");
+        let backend = SystemOneBackend::at(&base, None).expect("backend");
+        assert_eq!(
+            backend
+                .encode(&request(NOUL, false))
+                .expect("encode")
+                .endpoint()
+                .as_str(),
+            "http://decider.lan:9000/v1/systemone"
+        );
+        assert_eq!(
+            backend
+                .models_request()
+                .expect("models")
+                .endpoint()
+                .as_str(),
+            "http://decider.lan:9000/v1/models"
+        );
+        for refused in [
+            "https://api.typesafe.ai/?key=x",
+            "https://api.typesafe.ai#frag",
+        ] {
+            let error = SystemOneBackend::new(refused, None).expect_err("refused");
+            let cause = error.detail().cause.expect("cause");
+            assert_eq!(cause.id, "http.invalid_endpoint");
+            assert!(!cause.message.contains("key=x"), "{}", cause.message);
+        }
     }
 
     /// A key to a plain-http host that is not loopback is refused before any send.

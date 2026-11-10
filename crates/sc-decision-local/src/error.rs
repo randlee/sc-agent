@@ -1,10 +1,12 @@
 //! [`LocalError`]: construction and discovery errors of sc-decision-local, with `local.*` ids.
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::time::Duration;
 
 use sc_agent_http::HttpError;
+use sc_agent_secrets::ApiKey;
 use sc_agent_types::{ErrorDetail, ErrorId, ModelId};
 use sc_decision_schema::DecisionError;
 
@@ -12,6 +14,7 @@ use crate::daemon::DaemonKind;
 
 const MODEL_NOT_SERVED_RECOVERY: &str =
     "load the configured model on the daemon, or set the runner's model to one it serves";
+const PROBE_RECOVERY: &str = "check that the runner's kind matches the daemon at its host and port";
 const LOAD_TIMEOUT_RECOVERY: &str =
     "raise the runner's load timeout or check that the daemon is loading the model";
 
@@ -42,6 +45,10 @@ pub enum LocalError {
     /// `SystemOneBackend::local` or the model-list decode failed; wrapped unchanged.
     Decision(DecisionError),
     /// The probe got an HTTP status the daemon kind does not answer when up.
+    ///
+    /// The body is kept whole (REQ-SAG-0002); when the probe carried the runner's key,
+    /// [`LocalBackend::discover`](crate::LocalBackend::discover) has replaced every copy of
+    /// it in the body with `[redacted]`.
     ProbeStatus {
         /// The daemon kind probed.
         daemon: DaemonKind,
@@ -49,7 +56,7 @@ pub enum LocalError {
         path: &'static str,
         /// The reply's HTTP status.
         status: u16,
-        /// The reply body, unchanged.
+        /// The reply body, whole, with the attached key redacted.
         body: Vec<u8>,
     },
     /// The probe reply body is not the daemon kind's documented shape.
@@ -58,8 +65,8 @@ pub enum LocalError {
         daemon: DaemonKind,
         /// The probed path.
         path: &'static str,
-        /// The full serde_json message.
-        message: String,
+        /// Why the body did not parse; returned by `source()` and `cause_detail()`.
+        source: ParseCause,
     },
     /// The daemon is up but does not serve the configured model.
     ModelNotServed {
@@ -104,11 +111,9 @@ impl ErrorId for LocalError {
                 "the {daemon} daemon answered GET {path} with HTTP {status}: {}",
                 String::from_utf8_lossy(body)
             ),
-            Self::ProbeParse {
-                daemon,
-                path,
-                message,
-            } => format!("the {daemon} daemon's GET {path} body is not understood: {message}"),
+            Self::ProbeParse { daemon, path, .. } => {
+                format!("the {daemon} daemon's GET {path} body is not the shape that kind answers")
+            }
             Self::ModelNotServed {
                 daemon,
                 model,
@@ -128,10 +133,10 @@ impl ErrorId for LocalError {
         match self {
             Self::Http(error) => Some(error.detail()),
             Self::Decision(error) => Some(error.detail()),
-            Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. }
-            | Self::ModelNotServed { .. }
-            | Self::LoadTimeout { .. } => None,
+            Self::ProbeParse { source, .. } => Some(source.detail()),
+            Self::ProbeStatus { .. } | Self::ModelNotServed { .. } | Self::LoadTimeout { .. } => {
+                None
+            }
         }
     }
 
@@ -139,11 +144,124 @@ impl ErrorId for LocalError {
         match self {
             Self::ModelNotServed { .. } => Some(MODEL_NOT_SERVED_RECOVERY),
             Self::LoadTimeout { .. } => Some(LOAD_TIMEOUT_RECOVERY),
-            Self::Http(_)
-            | Self::Decision(_)
-            | Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. } => None,
+            Self::ProbeStatus { .. } | Self::ProbeParse { .. } => Some(PROBE_RECOVERY),
+            Self::Http(_) | Self::Decision(_) => None,
         }
+    }
+}
+
+/// The cause of a [`LocalError::ProbeParse`].
+///
+/// A serde_json message can quote a value from the reply body. When the probe carried the
+/// runner's key, the cause is stored as [`ParseCause::Redacted`]: the same id
+/// (`serde_json.<category>`) and message with every copy of the key replaced by
+/// `[redacted]` (REQ-SAG-0401). Otherwise the serde_json error is kept unchanged.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ParseCause {
+    /// The serde_json error, unchanged (no key was attached to the probe).
+    Json(serde_json::Error),
+    /// The serde_json error as data, with the attached key redacted from its message.
+    Redacted(ErrorDetail),
+}
+
+impl ParseCause {
+    /// The cause as data: id `serde_json.<category>` (`syntax`, `data`, `eof`, `io`) and the
+    /// message.
+    #[must_use]
+    pub fn detail(&self) -> ErrorDetail {
+        match self {
+            Self::Json(error) => ErrorDetail::foreign(json_error_id(error), error),
+            Self::Redacted(detail) => detail.clone(),
+        }
+    }
+
+    fn as_error(&self) -> &(dyn Error + 'static) {
+        match self {
+            Self::Json(error) => error,
+            Self::Redacted(detail) => detail,
+        }
+    }
+}
+
+/// `serde_json.<category>`, e.g. `serde_json.syntax`.
+fn json_error_id(error: &serde_json::Error) -> String {
+    format!("serde_json.{:?}", error.classify()).to_lowercase()
+}
+
+impl LocalError {
+    /// This error with every copy of `key` in its text replaced by `[redacted]`, for an error
+    /// read from a reply to a probe that carried `key`.
+    ///
+    /// Covers the ProbeStatus body, the ProbeParse cause, a model-list parse message and the
+    /// served model names; the other variants hold no reply text.
+    pub(crate) fn redact(self, key: &ApiKey) -> Self {
+        match self {
+            Self::ProbeStatus {
+                daemon,
+                path,
+                status,
+                body,
+            } => Self::ProbeStatus {
+                daemon,
+                path,
+                status,
+                body: redact_bytes(key, body),
+            },
+            Self::ProbeParse {
+                daemon,
+                path,
+                source,
+            } => {
+                let detail = source.detail();
+                let id = detail.id;
+                let message = key.redact_text(&detail.message).into_owned();
+                Self::ProbeParse {
+                    daemon,
+                    path,
+                    source: ParseCause::Redacted(ErrorDetail::new(id, message, None)),
+                }
+            }
+            Self::Decision(DecisionError::ResponseParse {
+                status,
+                expected,
+                message,
+            }) => Self::Decision(DecisionError::ResponseParse {
+                status,
+                expected,
+                message: redact_string(key, message),
+            }),
+            Self::ModelNotServed {
+                daemon,
+                model,
+                served,
+            } => Self::ModelNotServed {
+                daemon,
+                model,
+                served: served
+                    .into_iter()
+                    .map(|name| redact_string(key, name))
+                    .collect(),
+            },
+            other => other,
+        }
+    }
+}
+
+/// `text` with every copy of `key` replaced by `[redacted]`.
+pub(crate) fn redact_string(key: &ApiKey, text: String) -> String {
+    match key.redact_text(&text) {
+        Cow::Owned(redacted) => redacted,
+        Cow::Borrowed(_) => text,
+    }
+}
+
+/// `body` with every copy of `key` replaced by `[redacted]`; the bytes unchanged when it has
+/// none (a body that is not UTF-8 is only rewritten, lossily, when it holds the key).
+fn redact_bytes(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
+    match key.redact_text(&String::from_utf8_lossy(&body)) {
+        Cow::Owned(redacted) => redacted.into_bytes(),
+        Cow::Borrowed(_) => body,
     }
 }
 
@@ -170,10 +288,10 @@ impl Error for LocalError {
         match self {
             Self::Http(error) => Some(error),
             Self::Decision(error) => Some(error),
-            Self::ProbeStatus { .. }
-            | Self::ProbeParse { .. }
-            | Self::ModelNotServed { .. }
-            | Self::LoadTimeout { .. } => None,
+            Self::ProbeParse { source, .. } => Some(source.as_error()),
+            Self::ProbeStatus { .. } | Self::ModelNotServed { .. } | Self::LoadTimeout { .. } => {
+                None
+            }
         }
     }
 }

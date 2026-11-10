@@ -1,5 +1,7 @@
 //! multipart/form-data bodies for requests with image parts (RFC 7578).
 
+use std::borrow::Cow;
+
 use sc_decision_schema::{ImageFormat, ImagePart};
 
 /// The boundary prefix; a fresh ULID follows it on every encode (REQ-SAG-0001).
@@ -28,7 +30,7 @@ pub(crate) fn body(json: &str, parts: &[ImagePart], boundary: &str) -> Vec<u8> {
             &mut out,
             boundary,
             &name,
-            Some(&name),
+            Some(&*name),
             content_type(part.format),
         );
         out.extend_from_slice(&part.bytes);
@@ -69,10 +71,21 @@ const fn content_type(format: ImageFormat) -> &'static str {
     }
 }
 
-fn escape_name(name: &str) -> String {
-    name.replace('"', "%22")
-        .replace('\r', "%0D")
-        .replace('\n', "%0A")
+/// `name` with `"`, CR and LF percent-escaped; borrowed when it has none of them.
+fn escape_name(name: &str) -> Cow<'_, str> {
+    if !name.contains(['"', '\r', '\n']) {
+        return Cow::Borrowed(name);
+    }
+    let mut escaped = String::with_capacity(name.len() + 8);
+    for ch in name.chars() {
+        match ch {
+            '"' => escaped.push_str("%22"),
+            '\r' => escaped.push_str("%0D"),
+            '\n' => escaped.push_str("%0A"),
+            other => escaped.push(other),
+        }
+    }
+    Cow::Owned(escaped)
 }
 
 #[cfg(test)]
@@ -87,7 +100,10 @@ mod tests {
     #[test]
     fn test_escape_name_keeps_header_line_whole() {
         assert_eq!(escape_name("a\"b\r\nc"), "a%22b%0D%0Ac");
-        assert_eq!(escape_name("door-photo"), "door-photo");
+        assert!(matches!(
+            escape_name("door-photo"),
+            Cow::Borrowed("door-photo")
+        ));
     }
 
     #[test]
