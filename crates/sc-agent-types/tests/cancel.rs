@@ -3,7 +3,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -31,22 +31,36 @@ fn test_cancel_token_is_send_and_sync() {
     assert_send_sync::<CancelHook>();
 }
 
-/// A token cancelled on another thread ends `wait_until` with `Cancelled` well before the
-/// deadline.
+/// Iterations of the mid-wait cancel test, each with its own token.
+const WAITS: usize = 200;
+/// How long the cancelling side waits (on a token nobody cancels) before it cancels, so the
+/// waiter has almost certainly parked in `wait_until`. A deadline wait, not a sleep.
+const PARK_DELAY: Duration = Duration::from_millis(2);
+
+/// A token cancelled on another thread while `wait_until` is parked ends the wait with
+/// `Cancelled` well before the deadline.
 #[test]
 fn test_cancel_from_another_thread_ends_wait_at_once() {
-    let token = CancelToken::new();
-    let waiter = token.clone();
-    let (started, wait_started) = mpsc::channel();
-    let start = Instant::now();
-    let handle = thread::spawn(move || {
-        started.send(()).expect("signal start");
-        waiter.wait_until(Instant::now() + LONG)
-    });
-    wait_started.recv().expect("waiter started");
-    token.cancel();
-    assert_eq!(handle.join().expect("waiter thread"), Wait::Cancelled);
-    assert!(start.elapsed() < PROMPT, "took {:?}", start.elapsed());
+    let delay = CancelToken::new();
+    for _ in 0..WAITS {
+        let token = CancelToken::new();
+        let waiter = token.clone();
+        let (started, wait_started) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let start = Instant::now();
+            started.send(()).expect("signal start");
+            (waiter.wait_until(start + LONG), start.elapsed())
+        });
+        wait_started.recv().expect("waiter started");
+        assert_eq!(
+            delay.wait_until(Instant::now() + PARK_DELAY),
+            Wait::DeadlineReached
+        );
+        token.cancel();
+        let (wait, elapsed) = handle.join().expect("waiter thread");
+        assert_eq!(wait, Wait::Cancelled);
+        assert!(elapsed < PROMPT, "took {elapsed:?}");
+    }
 }
 
 #[test]
@@ -157,4 +171,91 @@ fn test_clones_share_the_flag() {
     assert!(!other.is_cancelled());
     assert_eq!(token.wait_until(Instant::now() + LONG), Wait::Cancelled);
     assert!(format!("{token:?}").contains("cancelled: true"));
+}
+
+/// Iterations of the cancel-versus-drop race; each runs cancel and drop at the same moment.
+const RACES: usize = 2000;
+
+/// REQ-SAG-0104 "never after its CancelHook is dropped", under concurrency: `cancel()` on one
+/// thread races `drop(hook)` on another. Once drop returns, the hook has either finished or
+/// will never run, so its side effect never appears later.
+#[test]
+fn test_hook_never_runs_after_its_drop_returns() {
+    let mut ran = 0;
+    let mut late = 0;
+    for _ in 0..RACES {
+        let token = CancelToken::new();
+        let effect = Arc::new(AtomicUsize::new(0));
+        let hook_effect = Arc::clone(&effect);
+        let hook = token.on_cancel(Arc::new(move || {
+            // Widen the window between "taken by cancel" and "side effect" (no sleep).
+            for _ in 0..64 {
+                thread::yield_now();
+            }
+            hook_effect.store(1, Ordering::SeqCst);
+        }));
+        let start = Arc::new(Barrier::new(2));
+        let canceller_start = Arc::clone(&start);
+        let canceller_token = token.clone();
+        let canceller = thread::spawn(move || {
+            canceller_start.wait();
+            canceller_token.cancel();
+        });
+        start.wait();
+        drop(hook);
+        let seen_at_drop = effect.load(Ordering::SeqCst);
+        canceller.join().expect("canceller thread");
+        let seen_after = effect.load(Ordering::SeqCst);
+        if seen_after != seen_at_drop {
+            late += 1;
+        }
+        ran += seen_after;
+    }
+    assert_eq!(
+        late, 0,
+        "{late} of {RACES} hooks ran after their drop returned"
+    );
+    // Not a requirement, only a sign the race was exercised: report how often the hook won.
+    eprintln!("hook ran before drop in {ran} of {RACES} races");
+}
+
+/// A hook that drops its own `CancelHook` while it runs returns instead of waiting for itself.
+#[test]
+fn test_hook_dropping_its_own_handle_does_not_deadlock() {
+    let token = CancelToken::new();
+    let own: Arc<Mutex<Option<CancelHook>>> = Arc::new(Mutex::new(None));
+    let (ran_count, ran) = counter();
+    let hook_own = Arc::clone(&own);
+    let hook = token.on_cancel(Arc::new(move || {
+        drop(hook_own.lock().expect("own handle").take());
+        ran();
+    }));
+    *own.lock().expect("own handle") = Some(hook);
+
+    let canceller = token.clone();
+    let (done, finished) = mpsc::channel();
+    thread::spawn(move || {
+        canceller.cancel();
+        done.send(()).expect("signal done");
+    });
+    finished
+        .recv_timeout(PROMPT)
+        .expect("cancel finished (no self-deadlock)");
+    assert_eq!(ran_count.load(Ordering::SeqCst), 1);
+    assert!(own.lock().expect("own handle").is_none());
+}
+
+/// A panicking hook does not leave a later drop waiting forever.
+#[test]
+fn test_drop_after_a_panicking_hook_returns() {
+    let token = CancelToken::new();
+    let hook = token.on_cancel(Arc::new(|| panic!("hook failed")));
+    let canceller = token.clone();
+    assert!(thread::spawn(move || canceller.cancel()).join().is_err());
+    let (done, finished) = mpsc::channel();
+    thread::spawn(move || {
+        drop(hook);
+        done.send(()).expect("signal done");
+    });
+    finished.recv_timeout(PROMPT).expect("drop returned");
 }

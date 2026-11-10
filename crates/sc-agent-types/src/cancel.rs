@@ -6,6 +6,7 @@
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
+use std::thread::{self, ThreadId};
 use std::time::Instant;
 
 /// A hook run once on cancel.
@@ -32,17 +33,33 @@ type Hook = Arc<dyn Fn() + Send + Sync>;
 #[derive(Clone, Default)]
 pub struct CancelToken(Arc<Inner>);
 
+// Why the fields are laid out this way:
+// - `cancelled` is set while `state` is locked, and `wait_until` checks it under the same lock
+//   before parking on `wake`, so a waiter cannot check, miss the `notify_all` and then park.
+// - `cancelled` is also an atomic so `is_cancelled` is lock-free: work loops poll it often.
+// - The hook list, the running hook and both condition variables share the one `state` Mutex:
+//   cancel, registration, drop and waiting all decide on one consistent view, and a condvar
+//   must always be paired with the mutex that guards the state it signals.
+// - A poisoned lock is recovered (`PoisonError::into_inner`), not propagated: the state is a
+//   flag, a list and an `Option`, each left consistent at every unlock, so a panic elsewhere
+//   cannot leave it half-written, and cancellation must keep working after it.
 #[derive(Default)]
 struct Inner {
     cancelled: AtomicBool,
     state: Mutex<Hooks>,
+    /// Signalled once, on cancel: wakes every `wait_until`.
     wake: Condvar,
+    /// Signalled each time a running hook finishes: wakes a `CancelHook::drop` waiting for it.
+    hook_done: Condvar,
 }
 
 #[derive(Default)]
 struct Hooks {
     next: u64,
-    hooks: Vec<(u64, Hook)>,
+    /// Registered hooks that have not started. `cancel` takes them one at a time.
+    pending: Vec<(u64, Hook)>,
+    /// The hook `cancel` is running now, outside the lock, and the thread running it.
+    running: Option<(u64, ThreadId)>,
 }
 
 /// How a [`CancelToken::wait_until`] ended.
@@ -70,19 +87,29 @@ impl CancelToken {
 
     /// Requests cancellation. Idempotent.
     ///
-    /// The first call wakes every [`Self::wait_until`] and runs every registered hook once.
-    /// No hook runs while the token's lock is held.
+    /// The first call wakes every [`Self::wait_until`] and then runs every registered hook
+    /// once, one at a time, on the calling thread. No hook runs while the token's lock is
+    /// held. A later call returns at once, even while the first is still running hooks.
     pub fn cancel(&self) {
-        let hooks = {
-            let mut state = self.0.lock();
+        {
+            let _state = self.0.lock();
             if self.0.cancelled.swap(true, Ordering::AcqRel) {
                 return;
             }
-            let hooks = std::mem::take(&mut state.hooks);
             self.0.wake.notify_all();
-            hooks
-        };
-        for (_, hook) in hooks {
+        }
+        loop {
+            // Take the next hook and mark it running in the same critical section, so a
+            // concurrent `CancelHook::drop` either removes it first or sees it running.
+            let hook = {
+                let mut state = self.0.lock();
+                let Some((id, hook)) = state.pending.pop() else {
+                    return;
+                };
+                state.running = Some((id, thread::current().id()));
+                hook
+            };
+            let _done = HookDone(&self.0);
             hook();
         }
     }
@@ -119,10 +146,13 @@ impl CancelToken {
 
     /// Registers `wake` to run once on cancel, or at once if the token is already cancelled.
     ///
-    /// `wake` must not block. It runs on the thread that calls [`Self::cancel`] (or this
-    /// method), outside the token's lock, so it may register or drop other hooks. Dropping the
-    /// returned [`CancelHook`] deregisters it; a dropped hook never runs (`CancelHook` is
-    /// `#[must_use]`).
+    /// `wake` must not block and must not panic: hooks run one after another on the thread
+    /// that calls [`Self::cancel`] (or on this thread, if already cancelled), and a blocked
+    /// hook holds up the others and any thread dropping its [`CancelHook`]. It runs outside
+    /// the token's lock, so it may register hooks or drop any `CancelHook`, its own included.
+    ///
+    /// Dropping the returned `CancelHook` deregisters it. Once the drop returns, the hook has
+    /// either finished or will never run (`CancelHook` is `#[must_use]`).
     pub fn on_cancel(&self, wake: Arc<dyn Fn() + Send + Sync>) -> CancelHook {
         let id = {
             let mut state = self.0.lock();
@@ -131,7 +161,7 @@ impl CancelToken {
             } else {
                 let id = state.next;
                 state.next = state.next.wrapping_add(1);
-                state.hooks.push((id, wake.clone()));
+                state.pending.push((id, wake.clone()));
                 Some(id)
             }
         };
@@ -169,6 +199,12 @@ impl fmt::Debug for CancelToken {
 }
 
 /// A hook registered with [`CancelToken::on_cancel`]; dropping it deregisters the hook.
+///
+/// When the drop returns, the hook has finished or will never run. If `cancel` is running the
+/// hook on another thread at that moment, the drop waits for it to finish. If the drop happens
+/// on the thread running the hook (the hook drops its own `CancelHook`, directly or through
+/// something it drops), it returns at once instead of waiting for itself: the hook is then
+/// finishing on that same thread and does not run again.
 #[derive(Debug)]
 #[must_use = "dropping a CancelHook deregisters its hook at once"]
 pub struct CancelHook {
@@ -178,8 +214,34 @@ pub struct CancelHook {
 
 impl Drop for CancelHook {
     fn drop(&mut self) {
-        if let Some(inner) = self.token.upgrade() {
-            inner.lock().hooks.retain(|(id, _)| *id != self.id);
+        let Some(inner) = self.token.upgrade() else {
+            return;
+        };
+        let mut state = inner.lock();
+        if let Some(index) = state.pending.iter().position(|(id, _)| *id == self.id) {
+            // Not started: removed under the lock, so `cancel` can no longer take it.
+            drop(state.pending.swap_remove(index));
+            return;
         }
+        let me = thread::current().id();
+        let _state = inner
+            .hook_done
+            .wait_while(state, |state| {
+                state
+                    .running
+                    .is_some_and(|(id, thread)| id == self.id && thread != me)
+            })
+            .unwrap_or_else(PoisonError::into_inner);
+    }
+}
+
+/// Clears `running` and wakes waiting drops when a hook returns, or unwinds on a panic, so a
+/// drop never waits on a hook that has stopped.
+struct HookDone<'a>(&'a Inner);
+
+impl Drop for HookDone<'_> {
+    fn drop(&mut self) {
+        self.0.lock().running = None;
+        self.0.hook_done.notify_all();
     }
 }
