@@ -798,4 +798,51 @@ mod cases {
         }
         assert_eq!(transport.sends(), 0);
     }
+
+    /// A transport whose timeouts are out of bounds is refused before anything happens:
+    /// `send_once` returns `http.invalid_request`, logs no `http.send`, and the transport is
+    /// never called (no attempt is used up).
+    #[test]
+    fn an_invalid_transport_timeout_is_refused_before_logging() {
+        let memory = MemoryLog::new().expect("log");
+        let transport = sc_agent_http::UreqTransport::new(sc_agent_http::Timeouts {
+            connect: Duration::ZERO,
+            request: Duration::from_secs(10),
+        });
+        let client = HttpClient::new(
+            Arc::new(transport),
+            ResendPolicy::default(),
+            memory.general(),
+        );
+        let request = sc_agent_http::HttpRequest::new(
+            sc_agent_http::Method::Get,
+            sc_agent_http::Endpoint::parse_local("http://127.0.0.1:9/never").expect("endpoint"),
+            Vec::new(),
+        );
+        let start = client
+            .may_start(&request, sc_agent_http::Attempts::new(), Instant::now())
+            .expect("admitted");
+        let sc_agent_http::Start::Go(permit) = start else {
+            panic!("an unpaused host starts at once");
+        };
+        let error = client
+            .send_once(
+                &request,
+                permit,
+                sc_agent_http::LogContext::NONE,
+                &Instant::now,
+            )
+            .expect_err("refused");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "http.invalid_request");
+        let actions: Vec<String> = memory
+            .records()
+            .expect("records")
+            .into_iter()
+            .map(|record| record.action)
+            .collect();
+        assert!(
+            actions.iter().all(|action| action != "http.send"),
+            "nothing is logged as sent: {actions:?}"
+        );
+    }
 }
