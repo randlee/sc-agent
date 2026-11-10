@@ -80,10 +80,17 @@ impl Default for Timeouts {
 }
 
 impl Timeouts {
-    /// Longest accepted connect timeout, request timeout or per-request
-    /// deadline: one hour (a local model load plus its request fits; a typo
-    /// such as a value in milliseconds does not).
+    /// Longest accepted connect or request timeout: one hour (the largest
+    /// configurable request timeout; a typo such as a value in milliseconds
+    /// does not fit).
     pub const MAX: Duration = Duration::from_secs(3600);
+
+    /// Longest accepted per-request deadline
+    /// ([`HttpRequest::with_deadline`](crate::HttpRequest::with_deadline)):
+    /// three hours, the largest load timeout (7200 s) plus the largest
+    /// request timeout (3600 s) for a load-on-first-request daemon's first
+    /// request (REQ-SAG-0015).
+    pub const DEADLINE_MAX: Duration = Duration::from_secs(10_800);
 
     /// `self` when both timeouts are in `(0, MAX]`.
     ///
@@ -95,8 +102,8 @@ impl Timeouts {
     /// [`HttpError::InvalidRequest`] when `connect` or `request` is zero or
     /// longer than [`Self::MAX`].
     pub fn validate(self) -> Result<Self, HttpError> {
-        check_duration("the connect timeout", self.connect)?;
-        check_duration("the request timeout", self.request)?;
+        check_duration("the connect timeout", self.connect, Self::MAX)?;
+        check_duration("the request timeout", self.request, Self::MAX)?;
         Ok(self)
     }
 
@@ -122,15 +129,14 @@ impl Timeouts {
     }
 }
 
-/// `Ok` when `value` is in `(0, Timeouts::MAX]`; `what` names it in the error.
-pub(crate) fn check_duration(what: &str, value: Duration) -> Result<(), HttpError> {
+/// `Ok` when `value` is in `(0, max]`; `what` names it in the error.
+pub(crate) fn check_duration(what: &str, value: Duration, max: Duration) -> Result<(), HttpError> {
     if value.is_zero() {
         return Err(HttpError::invalid_request(format!("{what} is zero")));
     }
-    if value > Timeouts::MAX {
+    if value > max {
         return Err(HttpError::invalid_request(format!(
-            "{what} of {value:?} is over the {:?} maximum",
-            Timeouts::MAX
+            "{what} of {value:?} is over the {max:?} maximum"
         )));
     }
     Ok(())
