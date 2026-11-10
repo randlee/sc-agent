@@ -8,7 +8,7 @@
 
 ## Description
 
-Separate general and session loggers on sc-observability, injectable with defaults; general log one file per CLI under <log_root>/logs/; session JSONL appended to one sessions.jsonl per <log_root>/<repo>/<agent_role>/<project>/, kept indefinitely; <log_root> defaults to ~/.sc-agent. Records: REQ-SAG-0003, 0004, 0005, 0008, NFR-SAG-0001, ADR-SAG-0002.
+Separate general and session loggers on sc-observability, injectable with defaults; general log one file per CLI under <log_root>/logs/; session JSONL appended to one sessions.jsonl per <log_root>/logs/<repo>/<agent_role>/<project>/, kept indefinitely; <log_root> defaults to ~/.sc-agent. Records: REQ-SAG-0003, 0004, 0005, 0008, NFR-SAG-0001, ADR-SAG-0002.
 
 ## Design
 
@@ -40,7 +40,7 @@ Copy script: `docs/plans/phase-a/copy/a-8.sh` (dry run 2026-11-09, reconciliatio
 
 ## Shape in one paragraph
 
-Two separate loggers, both `sc-observability` 1.5.0 v2 `Logger`s. `GeneralLogger` is the general log: default is sc-observability's built-in file sink at `<log_root>/logs/<service>.log.jsonl`, one file per CLI (`decide`; `sc-agent-py` for the Python API), with its default `RetainedLogPolicy` and level (rotation and retention are sc-observability's, REQ-SAG-0003). `<log_root>` is `AgentConfig::log_root()` (A-4), default `~/.sc-agent`, sc-observability's standard root for app sc-agent. `SessionLogger` writes one JSONL row per call into `<log_root>/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per directory, appended by every run and process and never rotated (REQ-SAG-0005), through a registered `JsonlFileSink` whose policy never rotates or prunes (concurrent appends are sc-observability's); its built-in file sink is off. Every session row's `fields{}` begins with `session_id`, `repo`, `project`, `agent_role` (agent role and agent name are one field, REQ-SAG-0004). Both loggers take generic rows (`serde_json::Map`); callers build the payload (the runner builds the decision row, A-9; sc-agent-http writes its events through an injected `GeneralLogger`, A-5). Either logger can be an injected `Arc<sc_observability::v2::Logger>`; what is not injected gets the default. A write a caller cannot act on (a log failure must never change a send or decision outcome) is still counted: `flush()` reports every refused or lost row once.
+Two separate loggers, both `sc-observability` 1.5.0 v2 `Logger`s. `GeneralLogger` is the general log: default is sc-observability's built-in file sink at `<log_root>/logs/<service>.log.jsonl`, one file per CLI (`decide`; `sc-agent-py` for the Python API), with its default `RetainedLogPolicy` and level (rotation and retention are sc-observability's, REQ-SAG-0003). `<log_root>` is `AgentConfig::log_root()` (A-4), default `~/.sc-agent`, `<home>/.sc-agent` on every platform (owner decision 2026-11-10). `SessionLogger` writes one JSONL row per call into `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per directory, appended by every run and process and never rotated (REQ-SAG-0005), through a registered `JsonlFileSink` whose policy never rotates or prunes (concurrent appends are sc-observability's); its built-in file sink is off. Every session row's `fields{}` begins with `session_id`, `repo`, `project`, `agent_role` (agent role and agent name are one field, REQ-SAG-0004). Both loggers take generic rows (`serde_json::Map`); callers build the payload (the runner builds the decision row, A-9; sc-agent-http writes its events through an injected `GeneralLogger`, A-5). Either logger can be an injected `Arc<sc_observability::v2::Logger>`; what is not injected gets the default. A write a caller cannot act on (a log failure must never change a send or decision outcome) is still counted: `flush()` reports every refused or lost row once.
 
 ## 1. Copy list (source `sc-agent-ref@dce239a` -> `crates/sc-agent-log/`)
 
@@ -110,7 +110,7 @@ pub struct SessionIdentity { pub repo: Repo, pub project: Slug, pub agent_role: 
 impl SessionIdentity {
     /// Validates project and agent_role as slugs; InvalidSlug, never a rewrite.
     pub fn new(repo: Repo, project: &str, agent_role: &str) -> Result<Self, LogError>;
-    /// `<log_root>/<repo>/<agent_role>/<project>` (REQ-SAG-0005).
+    /// `<log_root>/logs/<repo>/<agent_role>/<project>` (REQ-SAG-0005).
     pub fn dir(&self, log_root: &Path) -> PathBuf;
 }
 
@@ -324,7 +324,7 @@ Corrections after dev round 1 / QA-1 (2026-11-10; code at bf05150 follows these)
 - repo.rs git(): no #[expect(clippy::disallowed_methods)] — clippy.toml does not disallow Command::new.
 - C5: a-8.sh copies log_event into src/session.rs (copy commit); it is then moved into Writer::event.
 - testing::MemoryLog also has `pub fn logger(&self) -> Arc<Logger>` (inject into Loggers::open) and `pub fn events(&self) -> Result<Vec<LogEvent>, LogError>` (whole events, for correlation_id checks).
-- Slug also rejects '.' and '..' (keeps <log_root>/<repo>/<agent_role>/<project> inside its directory).
+- Slug also rejects '.' and '..' (keeps <log_root>/logs/<repo>/<agent_role>/<project> inside its directory).
 - Required validation grep: `grep -rniE "rotat|prune" crates/sc-agent-log/src` may match only never_rotate(), its policy fields and their comments.
 
 ## Acceptance criteria
@@ -337,7 +337,7 @@ Corrections after dev round 1 / QA-1 (2026-11-10; code at bf05150 follows these)
 - [ ] A8-06 REQ-SAG-0004 AC2: sc-agent-log: outside git, folder work on host m5 gives repo = local/m5/work.
 - [ ] A8-07 REQ-SAG-0004 AC3: sc-agent-log: project and agent_role are the only caller inputs of SessionIdentity::new besides the detected Repo (no agent_name anywhere in sc-agent-log); the CLI/PyO3 end-to-end check is a-10's.
 - [ ] A8-08 REQ-SAG-0004 AC4: sc-agent-log: SessionIdentity::new with project "Phase B" returns log.invalid_slug and no row or file is written.
-- [ ] A8-09 REQ-SAG-0005 AC: sc-agent-log: SessionLogger rows for repo github.com/randlee/sc-agent, agent_role rust-developer, project phase-b are in <log_root>/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl; every later run and every concurrent logger with that identity appends to the same file (test).
+- [ ] A8-09 REQ-SAG-0005 AC: sc-agent-log: SessionLogger rows for repo github.com/randlee/sc-agent, agent_role rust-developer, project phase-b are in <log_root>/logs/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl; every later run and every concurrent logger with that identity appends to the same file (test).
 - [ ] A8-10 ADR-SAG-0002 / REQ-SAG-0001: sc-agent-log: every SessionLogger row's fields carry session_id, repo, project and agent_role (one field for role and name); session_id parses as a ULID.
 - [ ] A8-11 NFR-SAG-0001: sc-agent-log: 40,000 SessionLogger writes with distinct session_id give 40,000 rows in one file.
 - [ ] A8-12 REQ-SAG-0008 AC1-3: sc-agent-log: Loggers::open with no injection -> both default files written; injected session logger -> rows there, general log default; injected general logger -> general log there, rows in the default session file. An injected logger is never shut down by sc-agent-log.

@@ -110,11 +110,13 @@ struct Shared {
     http: HttpClient,
     session: SessionLogger,
     general: GeneralLogger,
-    now: Clock,          // Instant::now; crate-private test seam (src/runner/tests.rs uses sc_agent_http::testing::ManualClock), passed to may_start/may_resend/send_once
+    now: Clock,          // Instant::now unless with_clock; test seam (sc_agent_http::testing::ManualClock), passed to may_start/may_resend/send_once
 }
 type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 impl DecisionRunner {
     pub fn new(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig) -> Self;
+    /// `new` with an explicit clock `now`, read for every admission, holdoff and send instead of Instant::now. A seam for callers' tests (decide's `Context.clock`, ManualClock): with a clock only the test moves, a holdoff or provider pause cannot elapse on its own.
+    pub fn with_clock(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig, now: Arc<dyn Fn() -> Instant + Send + Sync>) -> Self;
     /// Flushes the session log; RunnerError::SessionLog(log.rows_lost | log.flush) when any row was refused or lost.
     pub fn flush_session_log(&self) -> Result<(), RunnerError>;
 }
@@ -189,7 +191,7 @@ General log (`GeneralLogger::write`, target `sc_decision_runner`): `runner.strea
 
 Results carry `DecisionError` (A-2), with the runner-level failures in it: `Cancelled { sends }` for every request not finished when the token is cancelled (queued, held off, refused at submit, or in flight — returned at once, the late reply discarded), `Shutdown { reason }` when no worker could start or a worker stopped (a caught panic's payload text kept). `Http`, `SchemaMismatch` (after `max_sends` mismatching replies), `Backend` and the decode errors pass through unchanged.
 
-The crate's own union covers its one fallible method:
+The crate's own union covers its two failures: `DecisionRunner::flush_session_log` (`SessionLog`) and a `RunnerConfig` that is out of bounds (`InvalidConfig`, from `RunnerConfig::new` and `from_config`):
 
 ```rust
 #[derive(Debug)]
@@ -197,8 +199,10 @@ The crate's own union covers its one fallible method:
 pub enum RunnerError {
     /// The session log could not be flushed or lost rows (LogError kept unchanged: log.flush, log.rows_lost).
     SessionLog(LogError),                       // "runner.session_log"
+    /// A RunnerConfig out of bounds: `workers` is 0 or over `max` (MAX_WORKERS).
+    InvalidConfig { workers: usize, max: usize },   // "runner.invalid_config"; recovery "set `workers` to a value from 1 to 64"
 }
-impl ErrorId for RunnerError {}                // cause_detail() = LogError detail; source() = Some(inner); Display = `id: message`
+impl ErrorId for RunnerError {}                // cause_detail() = LogError detail for SessionLog, None for InvalidConfig; source() = Some(inner) for SessionLog; Display = `id: message`
 ```
 
 Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-1); `catch_unwind` around backend and transport calls is the only panic handling.
@@ -225,7 +229,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 | `static_iterator_accepted` (compile test: `Box::new(vec.into_iter())` passed to `decide_stream` through `&dyn Decision`) | decide_stream signature |
 | `busy_four_then_ok`, `busy_every_time_stops_at_max_sends`, `same_bytes_each_send` | REQ-SAG-0601 resend |
 | `holdoff_frees_the_worker` | REQ-SAG-0601 resend (wait in the queue) |
-| `cancel_ends_holdoff_at_once`, `decide_cancel_during_holdoff` | REQ-SAG-0601 AC4 |
+| `cancel_ends_holdoff_at_once`, `decide_cancel_during_holdoff` (resend suite, on a frozen ManualClock the test never moves, so the holdoff cannot elapse and the Cancelled result can only come from the cancel) | REQ-SAG-0601 AC4 |
 | `busy_quota_network_passed_through` | REQ-SAG-0601/0602 |
 | `schema_mismatch_resent_once`, `cancel_ends_schema_resends` | REQ-SAG-0901 AC2 |
 | `schema_mismatch_after_max_sends`, `busy_twice_then_mismatch_stops_at_five` | REQ-SAG-0901 AC3 |
@@ -235,6 +239,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 | `two_backends_one_runner` | ADR-SAG-0001 |
 | `lower_errors_reach_the_top`, `panic_in_backend_is_a_result`, `session_log_failure_keeps_result` | REQ-SAG-0002 |
 | `dropping_the_stream_does_not_cancel_the_token` | Token ownership |
+| `every_runner_thread_is_uncounted_when_the_results_close`, `the_feeder_is_uncounted_when_it_closes_the_results` (crate-private `live_at_close` and `on_close` seams read `live_threads` inside the last producer's `producer_done`, the moment the result queue closes: 0 for workers 1, 2, 4, and when the feeder is forced to be the last producer) | `runner.stream.end` live_threads |
 | `drop_mid_batch_one_row_per_started_job` (20 requests, BlockingTransport, drop after 3 results, release; MemoryLog rows: one per job the feeder submitted, no duplicate session_id) | Abandon |
 | `slow_consumer_blocks_workers` (workers 2, queue_capacity 8, consumer reads nothing: transport calls stop at 8 + 2 — the next call does not arrive within an `mpsc::recv_timeout(500 ms)`; one read lets the next send through) | Result queue bound |
 | `provider_pause_holds_other_jobs` (workers 2; A gets 529 `Retry-After: 1`; B's next send reaches the transport no earlier than A's pause end) | REQ-SAG-0012 (runner side) |
