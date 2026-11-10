@@ -55,7 +55,7 @@ mod tests {
         assert!(result.outcome.is_ok());
         drop(options);
 
-        let general = root.path().join("logs/decide.log.jsonl");
+        let general = root.path().join("logs").join("decide.log.jsonl");
         let text = std::fs::read_to_string(&general).expect("general log");
         assert!(text.contains("decide.send"), "{text}");
 
@@ -67,7 +67,9 @@ mod tests {
             .as_str()
             .split('/')
             .fold(root.path().join("logs"), |path, segment| path.join(segment))
-            .join("role/proj/sessions.jsonl");
+            .join("role")
+            .join("proj")
+            .join("sessions.jsonl");
         assert_eq!(rows[0], expected);
         let line = std::fs::read_to_string(&rows[0]).expect("rows");
         let row: Value = serde_json::from_str(line.lines().next().expect("a row")).expect("json");
@@ -118,7 +120,7 @@ mod tests {
         drop(options);
         assert_eq!(count, 1);
         // The blocked worker still holds the runner's logger handles here.
-        let general = std::fs::read_to_string(root.path().join("logs/decide.log.jsonl"))
+        let general = std::fs::read_to_string(root.path().join("logs").join("decide.log.jsonl"))
             .expect("the general log exists when send_batch returns");
         assert!(general.contains("decide.send"), "{general}");
         let mut rows = Vec::new();
@@ -168,9 +170,10 @@ mod tests {
         assert!(result.outcome.is_ok());
     }
 
-    /// REQ-SAG-0003 0.2.0: with no log_root configured, the general log and the session log
-    /// both land under `<home>/.sc-agent/logs/` (here `log_root` is a tempdir standing in for
-    /// `~/.sc-agent`; `AgentConfig::log_root` falls back to `default_dir()`).
+    /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `log_root` configured (a tempdir), the
+    /// general log lands at `<log_root>/logs/decide.log.jsonl` and the session log under
+    /// `<log_root>/logs/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
+    /// (`<home>/.sc-agent`) is sc-agent-config's `default_dir`, tested there.
     #[test]
     fn every_log_lands_under_log_root_logs() {
         let root = tempfile::tempdir().expect("root");

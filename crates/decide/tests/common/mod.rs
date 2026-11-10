@@ -139,7 +139,11 @@ pub fn anthropic_noul() -> HttpResponse {
 /// The TypeSafe fixtures of sc-decision-schema (openapi.json v0.2.0 examples).
 pub fn fixture(name: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../sc-decision-schema/tests/fixtures/typesafe")
+        .join("..")
+        .join("sc-decision-schema")
+        .join("tests")
+        .join("fixtures")
+        .join("typesafe")
         .join(format!("{name}.json"));
     std::fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("{path:?}: {error}"))

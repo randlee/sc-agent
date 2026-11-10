@@ -445,3 +445,112 @@ fn the_feeder_is_uncounted_when_it_closes_the_results() {
         "live threads when the feeder closed the results"
     );
 }
+
+/// QA-004 / QA-003 (round 3), the workers' side (M10a): a worker is forced to be the last
+/// producer. Request 0's send is held in the transport until the feeder has exited (the test
+/// waits until only the two workers are left as producers; the idle worker cannot exit while
+/// request 0 runs). Then the send is released, both workers exit, and the closing
+/// `producer_done` is a worker's. The seam must read 0 there.
+#[test]
+fn a_worker_is_uncounted_when_it_closes_the_results() {
+    use std::sync::Condvar;
+
+    let failsafe = Duration::from_secs(60);
+    let gate = Arc::new((Mutex::new((false, false)), Condvar::new()));
+    struct HeldFirst {
+        gate: Arc<(Mutex<(bool, bool)>, Condvar)>,
+        ok: HttpResponse,
+    }
+    impl sc_agent_http::Transport for HeldFirst {
+        fn send(
+            &self,
+            request: &HttpRequest,
+        ) -> Result<sc_agent_http::HttpResponse, sc_agent_http::HttpError> {
+            let body: serde_json::Value = serde_json::from_slice(request.body()).expect("json");
+            if body["model"] == "held" {
+                let (lock, condvar) = &*self.gate;
+                let mut state = lock.lock().expect("lock");
+                state.0 = true;
+                condvar.notify_all();
+                let (state, timeout) = condvar
+                    .wait_timeout_while(state, Duration::from_secs(60), |state| !state.1)
+                    .expect("wait");
+                assert!(!timeout.timed_out(), "never released");
+                drop(state);
+            }
+            Ok(self.ok.clone())
+        }
+    }
+    let ok = HttpResponse::new(
+        200,
+        vec![],
+        br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#
+            .to_vec(),
+    );
+    let log = MemoryLog::new().expect("log");
+    let http = HttpClient::new(
+        Arc::new(HeldFirst {
+            gate: Arc::clone(&gate),
+            ok,
+        }),
+        ResendPolicy::default(),
+        log.general(),
+    );
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
+            .expect("identity");
+    let runner = DecisionRunner::new(
+        Arc::new(OneHost),
+        http,
+        log.session(identity),
+        log.general(),
+        RunnerConfig::new(2).expect("two workers"),
+    );
+    let model = |name: &str| {
+        let body = SystemOneRequest::from_json(&format!(
+            r#"{{"model":"{name}","state":"s","questions":{{"q":{{"type":"noul"}}}}}}"#
+        ))
+        .expect("body");
+        DecisionRequest::try_from(body).expect("request")
+    };
+    let stream = runner.decide_stream(
+        Box::new(vec![model("held"), model("free")].into_iter()),
+        &CancelToken::new(),
+    );
+    {
+        let (lock, condvar) = &*gate;
+        let (state, timeout) = condvar
+            .wait_timeout_while(lock.lock().expect("lock"), failsafe, |state| !state.0)
+            .expect("wait");
+        assert!(!timeout.timed_out(), "the held send started");
+        drop(state);
+    }
+    let results = runner
+        .shared
+        .last_results
+        .lock()
+        .expect("lock")
+        .clone()
+        .expect("the run's result queue");
+    assert_eq!(
+        results.wait_producers_at_most(2, failsafe),
+        2,
+        "the feeder exited; both workers are still producers"
+    );
+    assert!(runner.shared.live_at_close.lock().expect("lock").is_empty());
+    {
+        let (lock, condvar) = &*gate;
+        lock.lock().expect("lock").1 = true;
+        condvar.notify_all();
+    }
+    let all: Vec<DecisionResult> = stream.collect();
+    assert_eq!(all.len(), 2);
+    assert!(all.iter().all(|result| result.outcome.is_ok()));
+    assert_eq!(results.wait_producers_at_most(0, failsafe), 0);
+    let seen = runner.shared.live_at_close.lock().expect("lock").clone();
+    assert_eq!(
+        seen,
+        vec![0],
+        "live threads when a worker closed the results"
+    );
+}

@@ -180,11 +180,12 @@ mod tests {
     /// types, so a broken scanner cannot pass vacuously.
     #[test]
     fn only_sc_decision_schema_maps_the_jev_api() {
-        let schema_hits: Vec<String> = rust_files(&crates_dir().join("sc-decision-schema/src"))
-            .iter()
-            .flat_map(|path| jev_types(&std::fs::read_to_string(path).expect("read")))
-            .map(|(line, _)| line)
-            .collect();
+        let schema_hits: Vec<String> =
+            rust_files(&crates_dir().join("sc-decision-schema").join("src"))
+                .iter()
+                .flat_map(|path| jev_types(&std::fs::read_to_string(path).expect("read")))
+                .map(|(line, _)| line)
+                .collect();
         for expected in ["SystemOneRequest", "SystemOneResponse"] {
             assert!(
                 schema_hits.iter().any(|line| line.contains(expected)),

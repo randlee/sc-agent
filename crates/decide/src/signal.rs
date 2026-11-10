@@ -287,7 +287,7 @@ mod tests {
         let error = crate::models(&options, &cancel).expect_err("cancelled");
         assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.decision");
         assert_eq!(transport.sends(), 0, "nothing was sent after the interrupt");
-        let general = std::fs::read_to_string(root.path().join("logs/decide.log.jsonl"))
+        let general = std::fs::read_to_string(root.path().join("logs").join("decide.log.jsonl"))
             .expect("the general log was flushed");
         assert!(general.contains("decide.models"), "{general}");
         assert!(watch.interrupted());

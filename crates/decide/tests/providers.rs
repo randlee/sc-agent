@@ -447,7 +447,8 @@ mod tests {
     /// Runs `requests` requests as one batch over `transport` on a frozen ManualClock and a
     /// notifying general log; once the `http.busy` record is written (after the pause is
     /// recorded) it reads the exact pause end, moves the clock to exactly it, and returns
-    /// `(busy_at, not_before)`. No real time is read for any assertion.
+    /// `(busy_at, not_before)`. No real time is read for any assertion; the batch thread is
+    /// joined through a channel bounded by `HANG_GUARD` (QA-005).
     fn paused_batch(
         clock: &sc_agent_http::testing::ManualClock,
         transport: ClockedTransport,
@@ -488,7 +489,15 @@ mod tests {
             .expect("the 429 recorded a host pause");
         let not_before = busy_at + Duration::from_millis(paused_ms);
         clock.advance(not_before - busy_at);
-        let ok = worker.join().expect("batch").expect("send_batch");
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done.send(worker.join());
+        });
+        let ok = finished
+            .recv_timeout(crate::common::HANG_GUARD)
+            .expect("the batch finished within the hang guard")
+            .expect("batch")
+            .expect("send_batch");
         assert_eq!(ok, requests);
         (busy_at, not_before)
     }
@@ -502,6 +511,12 @@ mod tests {
     /// single worker admits the other request only after the 429 is handled. The test reads the
     /// exact pause end from the `http.busy` record and moves the clock to exactly it: every
     /// later send is stamped with exactly that instant.
+    ///
+    /// Scope (rust-qa QA-001): this decide test checks the pause end to end on the injected
+    /// clock, but it does not force the paused admission to happen while the clock is still
+    /// frozen: neither the runner nor `HttpClient` writes a record when an admission is held, so
+    /// nothing marks that moment. The forced proof that a first send waits for the pause
+    /// (mutant M4b) is the runner test `provider_pause_holds_other_jobs_until_exactly_its_end`.
     #[test]
     fn a_retry_after_pauses_every_send_to_the_host() {
         for (seconds, floor) in [
@@ -543,9 +558,14 @@ mod tests {
     /// requests; the 429 of send 0 is returned only once send 1 has entered the transport (so
     /// both first sends start before any pause exists), and send 1 is held until the
     /// `http.busy` record of the 429 is written, which happens after the pause is recorded
-    /// (QA-001). So the third request is
-    /// admitted only once the pause holds, and it and the resend are both sent at exactly the
-    /// pause end, on a ManualClock only the test moves.
+    /// (QA-001). So the third request is admitted only once the pause holds, and it and the
+    /// resend are both sent at exactly the pause end, on a ManualClock only the test moves.
+    ///
+    /// Scope (rust-qa QA-001): this decide test checks the pause end to end on the injected
+    /// clock, but it does not force the paused admission to happen while the clock is still
+    /// frozen: neither the runner nor `HttpClient` writes a record when an admission is held, so
+    /// nothing marks that moment. The forced proof that a first send waits for the pause
+    /// (mutant M4b) is the runner test `provider_pause_holds_other_jobs_until_exactly_its_end`.
     #[test]
     fn with_two_workers_a_request_admitted_after_the_429_waits_the_pause() {
         for seconds in ["1", "0"] {
@@ -581,6 +601,44 @@ mod tests {
                 "the third request and the resend wait for exactly the pause end"
             );
         }
+    }
+
+    /// rust-qa QA-004: `Context.clock` reaches the runner (`DecisionRunner::with_clock`). The
+    /// transport moves the ManualClock 91 s during the first send, which a busy reply follows:
+    /// on the injected clock the 90 s start budget is then used up, so the request ends at once
+    /// as `http.provider_busy` with reason `budget` after that one send. On the real clock the
+    /// budget would not be touched and the request would be resent.
+    #[test]
+    fn the_context_clock_reaches_the_runner() {
+        let clock = sc_agent_http::testing::ManualClock::new(std::time::Instant::now());
+        let transport = ScriptedTransport::responses(vec![retry_after("1"), ok_noul()])
+            .with_send_duration(clock.clone(), Duration::from_secs(91));
+        let log = MemoryLog::new().expect("log");
+        let dir = empty_config_dir();
+        let mut ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(transport.clone()),
+            &log,
+        );
+        let reading = clock.clone();
+        ctx.clock = Some(Arc::new(move || reading.now()));
+        let result = send(
+            &options("jev", None, ctx, &log),
+            request(NOUL),
+            &CancelToken::new(),
+        )
+        .expect("send");
+        let error = result.outcome.expect_err("the budget is used up");
+        let DecisionError::Http(sc_agent_http::HttpError::ProviderBusy {
+            reason, attempts, ..
+        }) = error
+        else {
+            panic!("not http.provider_busy: {error:?}");
+        };
+        assert_eq!(reason, sc_agent_http::BusyReason::Budget);
+        assert_eq!(attempts, 1);
+        assert_eq!(transport.sends(), 1, "no resend after the budget ran out");
     }
 
     /// AC: REQ-SAG-0013. Bound violations fail before any send with `decide.config`.

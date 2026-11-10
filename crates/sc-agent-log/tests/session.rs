@@ -21,7 +21,13 @@ fn rows_under_layout() {
     log.flush().expect("flush");
     let file = root
         .path()
-        .join("logs/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl");
+        .join("logs")
+        .join("github.com")
+        .join("randlee")
+        .join("sc-agent")
+        .join("rust-developer")
+        .join("phase-b")
+        .join("sessions.jsonl");
     assert_eq!(log.path(), Some(file.as_path()));
     assert_eq!(events(&file).expect("rows").len(), 1);
 }

@@ -44,7 +44,11 @@ mod tests {
     #[test]
     fn every_request_fixture_is_sent() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../sc-decision-schema/tests/fixtures/typesafe");
+            .join("..")
+            .join("sc-decision-schema")
+            .join("tests")
+            .join("fixtures")
+            .join("typesafe");
         let mut names: Vec<String> = std::fs::read_dir(dir)
             .expect("fixtures")
             .map(|entry| {
