@@ -1,114 +1,179 @@
-/// Parses a vendor reply. Error details carry no provider name; the caller
-/// labels them.
-pub(crate) fn parse_vendor(kind: ProviderKind, body: &[u8]) -> Result<VendorReply, JevError> {
-    let value: Value = serde_json::from_slice(body).map_err(|_| {
-        JevError::response_invalid_because(ResponseInvalidCause::NotJson, "reply is not JSON")
-    })?;
-    let object = value.as_object().ok_or_else(|| {
-        JevError::response_invalid_because(ResponseInvalidCause::NotJson, "reply is not JSON")
-    })?;
+//! Reply envelopes of the two wires.
+
+use serde_json::{Map, Value};
+
+use crate::{LlmError, LlmProvider, Usage, Wire};
+
+/// What a 2xx reply envelope says, before the output is checked.
+#[derive(Debug)]
+pub(crate) struct Envelope {
+    /// The model as the provider reports it.
+    pub(crate) model: String,
+    /// The reply text, when the reply has any text content.
+    pub(crate) text: Option<String>,
+    /// `stop_reason` (Anthropic) or `finish_reason` (Chat), verbatim.
+    pub(crate) stop_reason: Option<String>,
+    /// The refusal text, when the model refused (an empty string when it gave none).
+    pub(crate) refusal: Option<String>,
+    /// The reply stopped at the token cap.
+    pub(crate) truncated: bool,
+    /// The provider's counters.
+    pub(crate) usage: Usage,
+}
+
+/// Parses a 2xx reply body of `wire`.
+///
+/// # Errors
+///
+/// [`LlmError::ReplyInvalid`] when the body is not JSON, not the wire's envelope, or a usage
+/// counter is negative. The message is serde's or names the field, never body bytes.
+pub(crate) fn decode_envelope(
+    provider: LlmProvider,
+    wire: Wire,
+    body: &[u8],
+) -> Result<Envelope, LlmError> {
+    let invalid = |message: String| LlmError::ReplyInvalid { provider, message };
+    let value: Value =
+        serde_json::from_slice(body).map_err(|error| invalid(format!("not JSON: {error}")))?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid("the reply is not a JSON object".to_owned()))?;
+    let model = object
+        .get("model")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("the reply has no `model` string".to_owned()))?
+        .to_owned();
     let usage = object.get("usage").and_then(Value::as_object);
-    let (text, non_text_blocks, input_tokens) = match kind {
-        ProviderKind::Anthropic => parse_anthropic(object, usage)?,
-        ProviderKind::OpenAi => parse_openai(object, usage)?,
-    };
+    match wire {
+        Wire::AnthropicMessages => decode_anthropic(object, usage, model).map_err(invalid),
+        Wire::ChatCompletions => decode_chat(object, usage, model).map_err(invalid),
+    }
+}
+
+/// Anthropic Messages: text blocks concatenated, `stop_reason` `max_tokens` / `refusal`.
+fn decode_anthropic(
+    object: &Map<String, Value>,
+    usage: Option<&Map<String, Value>>,
+    model: String,
+) -> Result<Envelope, String> {
+    let blocks = object
+        .get("content")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "the reply has no `content` array".to_owned())?;
+    let mut text = String::new();
+    let mut saw_text = false;
+    for block in blocks.iter().filter_map(Value::as_object) {
+        if block.get("type").and_then(Value::as_str) == Some("text")
+            && let Some(piece) = block.get("text").and_then(Value::as_str)
+        {
+            text.push_str(piece);
+            saw_text = true;
+        }
+    }
     let stop_reason = object
         .get("stop_reason")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    let status = object
-        .get("status")
-        .and_then(Value::as_str)
-        .map(str::to_owned);
-    let truncation = truncation_reason(object, stop_reason.as_deref(), status.as_deref());
-    if text.is_none() && truncation.is_none() {
-        return Err(JevError::response_invalid_because(
-            ResponseInvalidCause::NotJson,
-            "reply has no text",
-        ));
-    }
-    Ok(VendorReply {
-        text: text.unwrap_or_default(),
-        input_tokens,
-        non_text_blocks,
+    let refusal = (stop_reason.as_deref() == Some("refusal")).then(|| text.clone());
+    Ok(Envelope {
+        model,
+        truncated: stop_reason.as_deref() == Some("max_tokens"),
+        text: saw_text.then_some(text),
         stop_reason,
-        status,
-        truncation,
+        refusal,
+        usage: Usage {
+            input_tokens: counter(usage, "input_tokens")?,
+            output_tokens: counter(usage, "output_tokens")?,
+        },
     })
 }
-fn parse_anthropic(
+
+/// Chat Completions: the first choice's `message.content`, `finish_reason` `length`,
+/// `message.refusal` non-null.
+fn decode_chat(
     object: &Map<String, Value>,
     usage: Option<&Map<String, Value>>,
-) -> Result<(Option<String>, u64, u64), JevError> {
-    let mut text = String::new();
-    let mut non_text_blocks = 0_u64;
-    let mut saw_text = false;
-    for block in object
-        .get("content")
+    model: String,
+) -> Result<Envelope, String> {
+    let choice = object
+        .get("choices")
         .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        let Some(block) = block.as_object() else {
-            continue;
-        };
-        match block.get("type").and_then(Value::as_str) {
-            Some("text") => {
-                if let Some(piece) = block.get("text").and_then(Value::as_str) {
-                    text.push_str(piece);
-                    saw_text = true;
-                }
-            }
-            Some(kind) if kind.ends_with("tool_use") => {
-                non_text_blocks = non_text_blocks.saturating_add(1)
-            }
-            _ => {}
-        }
-    }
-    let input_tokens = usage_i64(usage, "input_tokens")
-        .saturating_add(usage_i64(usage, "cache_creation_input_tokens"))
-        .saturating_add(usage_i64(usage, "cache_read_input_tokens"));
-    Ok((
-        saw_text.then_some(text),
-        non_text_blocks,
-        nonneg(input_tokens)?,
-    ))
-}
-fn truncation_reason(
-    object: &Map<String, Value>,
-    stop_reason: Option<&str>,
-    status: Option<&str>,
-) -> Option<String> {
-    if stop_reason == Some("max_tokens") {
-        return Some("reply truncated at max_tokens (stop_reason=max_tokens)".to_owned());
-    }
-    if let Some(status) =
-        status.filter(|status| matches!(*status, "incomplete" | "max_tokens" | "max_output_tokens"))
-    {
-        return Some(format!("reply truncated at max_tokens (status={status})"));
-    }
-    let incomplete = object
-        .get("incomplete_details")
-        .and_then(|value| value.get("reason"))
-        .and_then(Value::as_str);
-    if incomplete == Some("max_output_tokens") {
-        return Some(
-            "reply truncated at max_tokens (incomplete_details.reason=max_output_tokens)"
-                .to_owned(),
-        );
-    }
-    None
+        .and_then(|choices| choices.first())
+        .and_then(Value::as_object)
+        .ok_or_else(|| "the reply has no `choices[0]` object".to_owned())?;
+    let message = choice
+        .get("message")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "the reply has no `choices[0].message` object".to_owned())?;
+    let stop_reason = choice
+        .get("finish_reason")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let refusal = match message.get("refusal") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(text)) => Some(text.clone()),
+        Some(other) => Some(other.to_string()),
+    };
+    Ok(Envelope {
+        model,
+        truncated: stop_reason.as_deref() == Some("length"),
+        text: message
+            .get("content")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        stop_reason,
+        refusal,
+        usage: Usage {
+            input_tokens: counter(usage, "prompt_tokens")?,
+            output_tokens: counter(usage, "completion_tokens")?,
+        },
+    })
 }
 
 /// A usage counter; a provider that omits one reports zero tokens for it.
-fn usage_i64(usage: Option<&Map<String, Value>>, key: &str) -> i64 {
-    usage
-        .and_then(|object| object.get(key))
-        .and_then(Value::as_i64)
-        .unwrap_or_default()
+fn counter(usage: Option<&Map<String, Value>>, key: &str) -> Result<u64, String> {
+    let Some(value) = usage.and_then(|object| object.get(key)) else {
+        return Ok(0);
+    };
+    match value.as_i64() {
+        Some(count) => {
+            u64::try_from(count).map_err(|_| format!("usage `{key}` is negative ({count})"))
+        }
+        None => value
+            .as_u64()
+            .ok_or_else(|| format!("usage `{key}` is not an integer")),
+    }
 }
 
-fn nonneg(value: i64) -> Result<u64, JevError> {
-    u64::try_from(value)
-        .map_err(|_| JevError::response_invalid("provider input_tokens is negative"))
+/// The model ids of a models-list body: `data[].id`, or a top-level array of `{id}`.
+pub(crate) fn decode_model_ids(
+    provider: LlmProvider,
+    body: &[u8],
+) -> Result<Vec<String>, LlmError> {
+    let invalid = |message: String| LlmError::ReplyInvalid { provider, message };
+    let value: Value =
+        serde_json::from_slice(body).map_err(|error| invalid(format!("not JSON: {error}")))?;
+    let entries = match &value {
+        Value::Array(entries) => entries,
+        Value::Object(object) => object
+            .get("data")
+            .and_then(Value::as_array)
+            .ok_or_else(|| invalid("the models list has no `data` array".to_owned()))?,
+        _ => {
+            return Err(invalid(
+                "the models list is not an object or array".to_owned(),
+            ));
+        }
+    };
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            entry
+                .get("id")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| invalid(format!("models entry {index} has no `id` string")))
+        })
+        .collect()
 }

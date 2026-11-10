@@ -1,6 +1,22 @@
-/// What a model's reply text parses to before a variant validates it.
-#[derive(Debug, Clone, Deserialize)]
-pub struct LlmOutput {
+//! The schema check: the model's JSON -> one Jev answer per question.
+//!
+//! A provider's strict mode is not trusted: every rule of the required schema
+//! ([`crate::schema`]) is checked again here. Values pass through unrounded and unchecked for
+//! range or sum (REQ-SAG-0007).
+
+use serde_json::{Map, Value};
+
+use sc_decision_schema::{
+    Answer, BoxCoordinates, OrderedMap, Question, SystemOneRequest, SystemOneResponse, Usage,
+};
+use sc_llm_provider::LlmResponse;
+
+use crate::DecisionLlmError;
+use crate::schema::score_keys;
+
+/// What a model's reply parses to before each answer is checked.
+#[derive(Debug, Clone)]
+pub(crate) struct LlmOutput {
     answers: Map<String, Value>,
 }
 
@@ -9,106 +25,253 @@ impl LlmOutput {
     ///
     /// # Errors
     ///
-    /// `RESPONSE_INVALID` when the text is not JSON ("LLM reply is not
-    /// JSON") or has no `answers` object ("LLM answer ids differ from the
-    /// question ids").
-    pub fn parse(text: &str) -> Result<Self, JevError> {
-        let value: Value = serde_json::from_str(text).map_err(|_| {
-            JevError::response_invalid_because(
-                ResponseInvalidCause::NotJson,
-                "LLM reply is not JSON",
-            )
-        })?;
-        match value {
-            Value::Object(mut object) => match object.remove("answers") {
-                Some(Value::Object(answers)) => Ok(Self { answers }),
-                _ => Err(ids_differ()),
-            },
-            _ => Err(ids_differ()),
-        }
+    /// [`DecisionLlmError::AnswerInvalid`] (no question) when the text is not JSON;
+    /// [`DecisionLlmError::AnswerIds`] when it has no `answers` object.
+    pub(crate) fn parse(text: &str, question_ids: &[&str]) -> Result<Self, DecisionLlmError> {
+        let value: Value =
+            serde_json::from_str(text).map_err(|error| DecisionLlmError::AnswerInvalid {
+                question: String::new(),
+                message: format!("the reply is not JSON: {error}"),
+            })?;
+        Self::from_value(value, question_ids)
     }
 
-    /// The raw `answers` object.
-    #[must_use]
-    pub fn answers(&self) -> &Map<String, Value> {
-        &self.answers
-    }
-
-    pub(crate) fn into_answers(self) -> Map<String, Value> {
-        self.answers
-    }
-}
-
-pub(crate) fn ids_differ() -> JevError {
-    JevError::response_invalid("LLM answer ids differ from the question ids")
-}
-    /// Validates a parsed reply against `payload` and returns typed answers.
+    /// The `answers` object of an already parsed reply.
     ///
     /// # Errors
     ///
-    /// `RESPONSE_INVALID`; see `llm::v1::parse_output` for the cases.
-    pub fn answers(
-        output: LlmOutput,
-        payload: &PayloadBundle,
-    ) -> Result<DecisionAnswers, JevError> {
-        let answers = output.into_answers();
-        let questions = payload.question_choices();
-        let expected: BTreeSet<&str> = questions.keys().map(QuestionId::as_str).collect();
-        if expected != id_set(&answers) {
-            return Err(ids_differ());
+    /// [`DecisionLlmError::AnswerIds`], every question missing, when there is no `answers`
+    /// object.
+    pub(crate) fn from_value(
+        value: Value,
+        question_ids: &[&str],
+    ) -> Result<Self, DecisionLlmError> {
+        match value {
+            Value::Object(mut object) => match object.remove("answers") {
+                Some(Value::Object(answers)) => Ok(Self { answers }),
+                _ => Err(ids_differ(question_ids, &[])),
+            },
+            _ => Err(ids_differ(question_ids, &[])),
         }
-        let mut typed = DecisionAnswers::new();
-        for (id, choices) in questions {
-            let key = id.as_str();
-            let item = answers
+    }
+}
+
+fn ids_differ(missing: &[&str], extra: &[&str]) -> DecisionLlmError {
+    DecisionLlmError::AnswerIds {
+        missing: missing.iter().map(|id| (*id).to_owned()).collect(),
+        extra: extra.iter().map(|id| (*id).to_owned()).collect(),
+    }
+}
+
+/// Checks `reply` against the required schema of `request` and returns its answers in
+/// request order, with the provider-reported model and usage.
+///
+/// # Errors
+///
+/// [`DecisionLlmError::AnswerIds`] when the answer ids differ from the question ids;
+/// [`DecisionLlmError::AnswerInvalid`] when the reply is not JSON or one answer lacks a field,
+/// has a wrong type, an extra field, or a choice outside the criteria.
+pub(crate) fn answers(
+    request: &SystemOneRequest,
+    reply: &LlmResponse,
+) -> Result<SystemOneResponse, DecisionLlmError> {
+    let ids: Vec<&str> = request
+        .questions
+        .iter()
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let output = match &reply.json {
+        Some(value) => LlmOutput::from_value(value.clone(), &ids)?,
+        None => LlmOutput::parse(&reply.text, &ids)?,
+    };
+    let missing: Vec<&str> = ids
+        .iter()
+        .copied()
+        .filter(|id| !output.answers.contains_key(*id))
+        .collect();
+    let extra: Vec<&str> = output
+        .answers
+        .keys()
+        .map(String::as_str)
+        .filter(|key| !ids.contains(key))
+        .collect();
+    if !missing.is_empty() || !extra.is_empty() {
+        return Err(ids_differ(&missing, &extra));
+    }
+    let mut typed = Vec::with_capacity(ids.len());
+    for (id, question) in request.questions.iter() {
+        let item = output
+            .answers
+            .get(id)
+            .and_then(Value::as_object)
+            .ok_or_else(|| invalid(id, "the answer is not an object"))?;
+        typed.push((id.clone(), answer(id, question, item)?));
+    }
+    Ok(SystemOneResponse {
+        model: reply.model.clone(),
+        answers: ordered("", typed)?,
+        usage: Usage {
+            input_tokens: reply.usage.input_tokens,
+            output_tokens: reply.usage.output_tokens,
+            extra: Map::new(),
+        },
+        extra: Map::new(),
+    })
+}
+
+/// `pairs` as an [`OrderedMap`]; keys come from the request or the criteria, so a duplicate
+/// cannot occur, and one is reported as an invalid answer rather than a panic.
+fn ordered<V>(
+    question: &str,
+    pairs: Vec<(String, V)>,
+) -> Result<OrderedMap<String, V>, DecisionLlmError> {
+    OrderedMap::try_from_pairs(pairs).map_err(|error| invalid(question, &error.to_string()))
+}
+
+fn invalid(question: &str, message: &str) -> DecisionLlmError {
+    DecisionLlmError::AnswerInvalid {
+        question: question.to_owned(),
+        message: message.to_owned(),
+    }
+}
+
+/// The fields of one answer: every `allowed` field present, nothing else.
+fn fields<'a>(
+    id: &str,
+    item: &'a Map<String, Value>,
+    allowed: &[&str],
+) -> Result<Vec<&'a Value>, DecisionLlmError> {
+    if let Some(extra) = item.keys().find(|key| !allowed.contains(&key.as_str())) {
+        return Err(invalid(id, &format!("unexpected field `{extra}`")));
+    }
+    allowed
+        .iter()
+        .map(|name| {
+            item.get(*name)
+                .ok_or_else(|| invalid(id, &format!("missing field `{name}`")))
+        })
+        .collect()
+}
+
+fn number(id: &str, field: &str, value: &Value) -> Result<f64, DecisionLlmError> {
+    match value {
+        Value::Number(number) => number
+            .as_f64()
+            .ok_or_else(|| invalid(id, &format!("`{field}` is not a finite number"))),
+        _ => Err(invalid(id, &format!("`{field}` is not a number"))),
+    }
+}
+
+/// An object with a number under exactly each of `keys`, in `keys` order.
+fn probabilities(
+    id: &str,
+    value: &Value,
+    keys: &[String],
+) -> Result<OrderedMap<String, f64>, DecisionLlmError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid(id, "`probabilities` is not an object"))?;
+    if let Some(extra) = object.keys().find(|key| !keys.contains(key)) {
+        return Err(invalid(
+            id,
+            &format!("`probabilities` has `{extra}`, which is not an option"),
+        ));
+    }
+    let pairs = keys
+        .iter()
+        .map(|key| {
+            let value = object
                 .get(key)
-                .and_then(Value::as_object)
-                .ok_or_else(|| bad_answer(key))?;
-            let choice = item.get("choice").and_then(Value::as_str).unwrap_or("");
-            if !choices.iter().any(|label| label.as_str() == choice) {
-                return Err(bad_answer(key));
+                .ok_or_else(|| invalid(id, &format!("`probabilities` has no `{key}`")))?;
+            Ok((
+                key.clone(),
+                number(id, &format!("probabilities.{key}"), value)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, DecisionLlmError>>()?;
+    ordered(id, pairs)
+}
+
+fn answer(
+    id: &str,
+    question: &Question,
+    item: &Map<String, Value>,
+) -> Result<Answer, DecisionLlmError> {
+    match question {
+        Question::Noul { .. } => match fields(id, item, &["noul"])?.as_slice() {
+            [noul] => Ok(Answer::Noul {
+                noul: number(id, "noul", noul)?,
+            }),
+            _ => Err(invalid(id, "unexpected field count")),
+        },
+        Question::Choice { criteria, .. } => {
+            let keys: Vec<String> = criteria.iter().map(|(key, _)| key.clone()).collect();
+            match fields(id, item, &["choice", "confidence", "probabilities"])?.as_slice() {
+                [choice, confidence, probs] => {
+                    let choice = choice
+                        .as_str()
+                        .ok_or_else(|| invalid(id, "`choice` is not a string"))?;
+                    if !keys.iter().any(|key| key == choice) {
+                        return Err(invalid(
+                            id,
+                            &format!("choice `{choice}` is not one of the criteria"),
+                        ));
+                    }
+                    Ok(Answer::Choice {
+                        choice: choice.to_owned(),
+                        confidence: number(id, "confidence", confidence)?,
+                        probabilities: probabilities(id, probs, &keys)?,
+                    })
+                }
+                _ => Err(invalid(id, "unexpected field count")),
             }
-            let confidence = item.get("confidence").ok_or_else(|| bad_answer(key))?;
-            if !is_number(confidence) {
-                return Err(not_a_number());
-            }
-            let probabilities = item
-                .get("probabilities")
-                .and_then(Value::as_object)
-                .ok_or_else(|| bad_answer(key))?;
-            let expected_labels: BTreeSet<&str> = choices.iter().map(ChoiceId::as_str).collect();
-            if expected_labels != id_set(probabilities) {
-                return Err(bad_answer(key));
-            }
-            if !probabilities.values().all(is_number) {
-                return Err(not_a_number());
-            }
-            let mut answer = Map::new();
-            answer.insert("choice".to_owned(), Value::String(choice.to_owned()));
-            answer.insert("confidence".to_owned(), confidence.clone());
-            answer.insert(
-                "probabilities".to_owned(),
-                Value::Object(probabilities.clone()),
-            );
-            let answer: QuestionAnswer =
-                serde_json::from_value(Value::Object(answer)).map_err(|error| {
-                    JevError::response_invalid(format!("answer {key} is invalid: {error}"))
-                })?;
-            typed.insert(id.clone(), answer);
         }
-        Ok(typed)
+        Question::Score { criteria, .. } => {
+            let keys = score_keys(criteria.len());
+            match fields(id, item, &["score", "confidence", "probabilities"])?.as_slice() {
+                [score, confidence, probs] => Ok(Answer::Score {
+                    score: number(id, "score", score)?,
+                    confidence: number(id, "confidence", confidence)?,
+                    legend: ordered(
+                        id,
+                        keys.iter().cloned().zip(criteria.iter().cloned()).collect(),
+                    )?,
+                    probabilities: probabilities(id, probs, &keys)?,
+                }),
+                _ => Err(invalid(id, "unexpected field count")),
+            }
+        }
+        Question::Box { .. } => match fields(id, item, &["box", "confidence"])?.as_slice() {
+            [edges, confidence] => {
+                let edges = edges
+                    .as_object()
+                    .ok_or_else(|| invalid(id, "`box` is not an object"))?;
+                let edge = |name: &str| {
+                    let value = edges
+                        .get(name)
+                        .ok_or_else(|| invalid(id, &format!("`box` has no `{name}`")))?;
+                    number(id, &format!("box.{name}"), value)
+                };
+                if let Some(extra) = edges
+                    .keys()
+                    .find(|key| !["top", "bottom", "left", "right"].contains(&key.as_str()))
+                {
+                    return Err(invalid(id, &format!("`box` has unexpected `{extra}`")));
+                }
+                Ok(Answer::Box {
+                    coordinates: BoxCoordinates {
+                        top: edge("top")?,
+                        bottom: edge("bottom")?,
+                        left: edge("left")?,
+                        right: edge("right")?,
+                    },
+                    confidence: match confidence {
+                        Value::Null => None,
+                        other => Some(number(id, "confidence", other)?),
+                    },
+                })
+            }
+            _ => Err(invalid(id, "unexpected field count")),
+        },
     }
-
-    fn is_number(value: &Value) -> bool {
-        matches!(value, Value::Number(_))
-    }
-
-    fn bad_answer(id: &str) -> JevError {
-        JevError::response_invalid(format!(
-            "LLM answer {id} needs a criterion choice and a probability per criterion"
-        ))
-    }
-
-    fn not_a_number() -> JevError {
-        JevError::response_invalid("LLM confidence or probability is not a number")
-    }
+}
