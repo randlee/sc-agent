@@ -1,67 +1,116 @@
 {
-  "phase": "a",
-  "integration_branch": "integrate/phase-a",
-  "models": {
-    "rust-developer": "opus",
-    "rust-qa-agent": "opus",
-    "req-qa": "sonnet",
-    "arch-qa": "sonnet",
-    "rust-best-practices-agent": "sonnet",
-    "rust-service-hardening-agent": "sonnet",
-    "flaky-test-qa": "sonnet",
-    "cursor-quality-mgr": "sonnet"
+ "phase": "a",
+ "integration_branch": "integrate/phase-a",
+ "models": {
+  "rust-developer": "opus",
+  "rust-qa-agent": "opus",
+  "req-qa": "sonnet",
+  "arch-qa": "sonnet",
+  "rust-best-practices-agent": "sonnet",
+  "rust-service-hardening-agent": "sonnet",
+  "flaky-test-qa": "sonnet",
+  "cursor-quality-mgr": "sonnet"
+ },
+ "sprints": {
+  "a-1": {
+   "bead": "agt-4p2.1",
+   "branch": "sprint/a-1-sc-agent-types",
+   "pr": 5,
+   "dev_task": "ad09d121a9c9a70b6",
+   "head": "3a56829",
+   "status": "fix-1"
   },
-  "sprints": {
-    "a-1": {
-      "bead": "agt-4p2.1",
-      "branch": "sprint/a-1-sc-agent-types",
-      "pr": 5,
-      "dev_task": "ad09d121a9c9a70b6",
-      "head": "3a56829",
-      "status": "fix-1"
-    },
-    "a-3": {
-      "bead": "agt-4p2.3",
-      "branch": "sprint/a-3-sc-treesitter",
-      "dev_task": "a7d62949cb66d65bf",
-      "status": "dev"
-    },
-    "a-4": {
-      "bead": "agt-4p2.4",
-      "branch": "sprint/a-4-config-secrets",
-      "dev_task": "a0baa005c3b4308a6",
-      "status": "dev"
-    },
-    "a-8": {
-      "bead": "agt-4p2.8",
-      "branch": "sprint/a-8-sc-agent-log",
-      "dev_task": "a311177d693ca6400",
-      "status": "dev"
-    }
+  "a-3": {
+   "bead": "agt-4p2.3",
+   "branch": "sprint/a-3-sc-treesitter",
+   "dev_task": "a7d62949cb66d65bf",
+   "status": "dev"
   },
-  "qa_rounds": [
-    {
-      "sprint": "a-1",
-      "qa_pass": "qa-1",
-      "commit": "3a56829",
-      "reviewers": {
-        "req-qa": "adfe4c0fbea82dd17",
-        "arch-qa": "a5dc9799b837205e6",
-        "rust-qa-agent": "a2e5885b6c8b5663d",
-        "rust-best-practices-agent": "a65f4ad1caa1ab31b",
-        "rust-service-hardening-agent": "a9a76bcc63dd1b7a4"
-      },
-      "verdict": "FAIL",
-      "enforcer_task": "afe30aef64f2ba9d1",
-      "pr_comment": "https://github.com/randlee/sc-agent/pull/5#issuecomment-6760724153",
-      "open_findings": [
-        "REQ-QA-001",
-        "QA-001",
-        "RBP-F001",
-        "RBP-F002",
-        "RBP-F003"
-      ],
-      "next_action": "triage_and_fix"
-    }
-  ]
+  "a-4": {
+   "bead": "agt-4p2.4",
+   "branch": "sprint/a-4-config-secrets",
+   "dev_task": "a0baa005c3b4308a6",
+   "status": "dev"
+  },
+  "a-8": {
+   "bead": "agt-4p2.8",
+   "branch": "sprint/a-8-sc-agent-log",
+   "dev_task": "a311177d693ca6400",
+   "status": "dev"
+  }
+ },
+ "qa_rounds": [
+  {
+   "sprint": "a-1",
+   "qa_pass": "qa-1",
+   "commit": "3a56829",
+   "reviewers": {
+    "req-qa": "adfe4c0fbea82dd17",
+    "arch-qa": "a5dc9799b837205e6",
+    "rust-qa-agent": "a2e5885b6c8b5663d",
+    "rust-best-practices-agent": "a65f4ad1caa1ab31b",
+    "rust-service-hardening-agent": "a9a76bcc63dd1b7a4"
+   },
+   "verdict": "FAIL",
+   "enforcer_task": "afe30aef64f2ba9d1",
+   "pr_comment": "https://github.com/randlee/sc-agent/pull/5#issuecomment-6760724153",
+   "open_findings": [
+    "REQ-QA-001",
+    "QA-001",
+    "RBP-F001",
+    "RBP-F002",
+    "RBP-F003"
+   ],
+   "next_action": "triage_and_fix"
+  },
+  {
+   "sprint": "a-1",
+   "qa_pass": "qa-2",
+   "commit": "5066236",
+   "verdict": "PASS",
+   "enforcer_task": "a40c1d182c38fd2a3",
+   "pr": 5,
+   "next_action": "merge"
+  },
+  {
+   "sprint": "a-3",
+   "qa_pass": "qa-2",
+   "commit": "99688e1",
+   "verdict": "PASS",
+   "enforcer_task": "afbf7f3bf648bf539",
+   "pr": 7,
+   "pr_comment": "https://github.com/randlee/sc-agent/pull/7#issuecomment-6761030247",
+   "next_action": "merge after a-1, retarget"
+  },
+  {
+   "sprint": "a-4",
+   "qa_pass": "qa-4",
+   "commit": "ac375a4",
+   "verdict": "PASS",
+   "enforcer_task": "aa7d8ecc47cd95de1",
+   "pr": 6,
+   "pr_comment": "https://github.com/randlee/sc-agent/pull/6#issuecomment-6761143098",
+   "next_action": "merge after a-1, retarget"
+  },
+  {
+   "sprint": "a-8",
+   "qa_pass": "qa-1",
+   "commit": "bf05150",
+   "verdict": "FAIL",
+   "enforcer_task": "a81e9c41079086d47",
+   "pr": 8,
+   "pr_comment": "https://github.com/randlee/sc-agent/pull/8#issuecomment-6760962267",
+   "next_action": "qa-2 at 95011c7 found QA-004; fix in progress"
+  },
+  {
+   "sprint": "a-8",
+   "qa_pass": "qa-3",
+   "commit": "086b888",
+   "verdict": "PASS",
+   "enforcer_task": "a16681d4a8ed4ff5a",
+   "pr": 8,
+   "pr_comment": "https://github.com/randlee/sc-agent/pull/8#issuecomment-6761192540",
+   "next_action": "merge after a-1, retarget"
+  }
+ ]
 }
