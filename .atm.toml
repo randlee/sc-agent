@@ -1,22 +1,27 @@
-# ATM configuration for sc-agent (Synaptic Canvas agent runtime).
+# ATM configuration for sc-agent (Synaptic Canvas agent assets).
 #
 # Runtime identity (see `atm help identity`):
 #   export ATM_IDENTITY=ai-lead ATM_TEAM=sc-ai
 #
-# Register the team on the ATM daemon before first use, for example:
+# Register the team on the ATM daemon before first use:
 #   atm teams add-member sc-ai ai-lead --agent-type lead --model opus \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
-#   atm teams add-member sc-ai tai --agent-type developer --model gpt-5.6-terra-medium \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
-#   atm teams add-member sc-ai lai --agent-type developer --model gpt-5.6-luna-medium \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
-#   atm teams add-member sc-ai sai --agent-type developer --model gpt-5.6-sol-medium \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#     --home-dir "$HOME/github/sc-agent"
 #   atm teams add-member sc-ai ai-qa --agent-type qa --model sonnet \
-#     --home-dir "<path-to-primary-checkout>" --backend herdr --session default
+#     --home-dir "$HOME/github/sc-agent"
+#   atm teams add-member sc-ai tai --agent-type dev --model gpt-6.1-terra \
+#     --home-dir "$HOME/github/sc-agent"
+#   atm teams add-member sc-ai lai --agent-type dev --model gpt-6-luna \
+#     --home-dir "$HOME/github/sc-agent"
+#   atm teams add-member sc-ai sai --agent-type dev --model gpt-6.1-sol \
+#     --home-dir "$HOME/github/sc-agent"
+#   (then, per codex member: atm teams update-member sc-ai <name> --harness codex-cli)
 #
-# Orchestration: pass `--var lead=ai-lead` and dispatch QA to `ai-qa` (quality-mgr role;
-# prompt file remains `.claude/agents/quality-mgr.md`).
+# Orchestration: pass `--var lead=ai-lead` and dispatch QA to `ai-qa`
+# (quality-mgr role; prompt file remains `.claude/agents/quality-mgr.md`).
+#
+# Codex panes run with --no-daemon: under codex 0.16x the shared app-server
+# does not inherit the pane environment, so ATM_IDENTITY/BEADS_ACTOR arrive
+# empty and the agent cannot identify itself.
 
 [atm]
 default_team = "sc-ai"
@@ -31,11 +36,13 @@ layout = "even-horizontal"
 [[rmux.windows.panes]]
 name = "ai-lead"
 model = "opus"
+dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "ai-lead", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows.panes]]
 name = "ai-qa"
 model = "sonnet"
+dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "ai-qa", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows]]
@@ -44,15 +51,18 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "tai"
-command = "codex -c features.hooks=true -m gpt-5.6-terra-medium --yolo"
+command = "codex --no-daemon -c features.hooks=true --model gpt-6.1-terra --yolo"
+dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "tai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows.panes]]
 name = "lai"
-command = "codex -c features.hooks=true -m gpt-5.6-luna-medium --yolo"
+command = "codex --no-daemon -c features.hooks=true --model gpt-6-luna --yolo"
+dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "lai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows.panes]]
 name = "sai"
-command = "codex -c features.hooks=true -m gpt-5.6-sol-medium --yolo"
+command = "codex --no-daemon -c features.hooks=true --model gpt-6.1-sol --yolo"
+dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "sai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
