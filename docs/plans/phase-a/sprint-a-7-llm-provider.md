@@ -111,6 +111,7 @@ pub enum Part<'a> {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role { User, Assistant }
+impl Role { pub const fn as_str(self) -> &'static str; }
 #[derive(Debug, Clone, PartialEq)]
 pub enum Output {
     Text,
@@ -292,18 +293,19 @@ pub enum DecisionLlmError {
     Llm(LlmError),                                                   // "decision_llm.llm"
     /// State, questions or schema could not be serialized.
     Encode { message: String },                                      // "decision_llm.encode" (also: unsupported question type, asset with no image)
-    InvalidMaxTokens { max_tokens: u32 },                            // "decision_llm.invalid_max_tokens"
-    Invariant { message: String },                                   // "decision_llm.invariant" (never a mismatch)
     /// The model's answer ids differ from the question ids.
     /// `extra` lists at most MAX_LISTED_IDS (8); extra_count is the full count.
     AnswerIds { missing: Vec<String>, extra: Vec<String>, extra_count: usize },   // "decision_llm.answer_ids"
     /// One answer lacks a required field, has a wrong type, or a choice outside the criteria.
     AnswerInvalid { question: String, message: String },             // "decision_llm.answer_invalid"
+    InvalidMaxTokens { max_tokens: u32 },                            // "decision_llm.invalid_max_tokens"
+    Invariant { message: String },                                   // "decision_llm.invariant" (never a mismatch)
 }
 impl ErrorId for DecisionLlmError {}
 impl From<LlmError> for DecisionLlmError {}
 ```
 
+impl DecisionLlmError { pub const MAX_MODEL_TEXT_BYTES: usize = 64; pub const MAX_LISTED_IDS: usize = 8; }
 LlmError 7 variants, DecisionLlmError 6 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
 
 ## 5. Config keys
