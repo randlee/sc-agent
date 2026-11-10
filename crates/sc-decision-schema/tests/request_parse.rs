@@ -97,6 +97,12 @@ mod tests {
             .expect("distinct");
         assert_eq!(map.len(), 2);
         assert_eq!(map.get(&"a".to_owned()), Some(&2));
+        assert_eq!(map.get("a"), Some(&2), "borrowed key");
+        let mut pairs = Vec::new();
+        for (key, value) in &map {
+            pairs.push((key.as_str(), *value));
+        }
+        assert_eq!(pairs, [("z", 1), ("a", 2)]);
         assert_eq!(
             serde_json::to_string(&map).expect("encode"),
             r#"{"z":1,"a":2}"#

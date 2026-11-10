@@ -11,9 +11,12 @@
 //! - [`QuestionDigest`]: the per-question sc-sha digest of everything sent (REQ-SAG-0202).
 //! - [`DecisionError`]: the one error type, with stable `decision.*` ids (REQ-SAG-0002).
 //!
-//! Every type round-trips byte-identical through serde_json: key order is kept
-//! ([`OrderedMap`], serde_json `preserve_order`) and floats print exactly (`float_roundtrip`,
-//! REQ-SAG-0007). The crate does no I/O, holds no HTTP client, retry, cache or log code, and
+//! Round trips: every documented TypeSafe example, and any compact JSON whose numbers are in
+//! their shortest form, parses with `from_json` and serialises back byte-identical (the
+//! document's key order is kept, [`OrderedMap`], serde_json `preserve_order`). Any other
+//! document comes back compact; a number keeps its value exactly (`float_roundtrip`,
+//! REQ-SAG-0007), but not always its text (`1.50` comes back as `1.5`, `1e3` as `1000.0` in
+//! a typed float field). The crate does no I/O, holds no HTTP client, retry, cache or log code, and
 //! starts no runtime (ANC-001, REQ-SAG-0009). It sits above sc-agent-types and sc-agent-http
 //! and below every decision backend and the runner (ADR-SAG-0004).
 #![forbid(unsafe_code)]
@@ -24,6 +27,7 @@ mod backend;
 mod decision;
 mod digest;
 mod error;
+mod key_order;
 mod map;
 mod models;
 mod request;
@@ -40,7 +44,7 @@ pub use decision::{
 #[doc(inline)]
 pub use digest::QuestionDigest;
 #[doc(inline)]
-pub use error::DecisionError;
+pub use error::{DecisionError, LimitKind};
 #[doc(inline)]
 pub use map::OrderedMap;
 #[doc(inline)]

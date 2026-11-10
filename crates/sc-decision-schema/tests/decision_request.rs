@@ -9,8 +9,8 @@
 mod tests {
     use sc_agent_types::ErrorId;
     use sc_decision_schema::{
-        DecisionError, DecisionRequest, ImageFormat, ImagePart, MAX_IMAGE_BYTES, MAX_IMAGES,
-        QuestionDigest, SystemOneRequest,
+        DecisionError, DecisionRequest, ImageFormat, ImagePart, LimitKind, MAX_IMAGE_BYTES,
+        MAX_IMAGES, QuestionDigest, SystemOneRequest,
     };
 
     fn body(text: &str) -> SystemOneRequest {
@@ -18,11 +18,7 @@ mod tests {
     }
 
     fn part(name: &str, bytes: &[u8]) -> ImagePart {
-        ImagePart {
-            name: name.to_owned(),
-            format: ImageFormat::Png,
-            bytes: bytes.to_vec(),
-        }
+        ImagePart::new(name, ImageFormat::Png, bytes.to_vec())
     }
 
     /// A body whose assets name parts `names`, one asset per name.
@@ -132,20 +128,16 @@ mod tests {
         let parts = refs.iter().map(|name| part(name, b"x")).collect();
         match DecisionRequest::new(body_with_parts(&refs), parts, false) {
             Err(DecisionError::Limits { what, max }) => {
-                assert_eq!((what, max), ("images", 20));
+                assert_eq!((what, max), (LimitKind::Images, 20));
             }
             other => panic!("expected Limits, got {other:?}"),
         }
 
-        let big = ImagePart {
-            name: "p1".to_owned(),
-            format: ImageFormat::Jpg,
-            bytes: vec![0; MAX_IMAGE_BYTES + 1],
-        };
+        let big = ImagePart::new("p1", ImageFormat::Jpg, vec![0; MAX_IMAGE_BYTES + 1]);
         let error = DecisionRequest::new(body_with_parts(&["p1"]), vec![big], false)
             .expect_err("too large");
         assert!(
-            matches!(error, DecisionError::Limits { what: "image_bytes", max } if max == 20 * 1024 * 1024),
+            matches!(error, DecisionError::Limits { what: LimitKind::ImageBytes, max } if max == 20 * 1024 * 1024),
             "{error:?}"
         );
         assert_eq!(error.id(), "decision.limits");
@@ -156,6 +148,98 @@ mod tests {
         let mut parts: Vec<ImagePart> = refs.iter().map(|name| part(name, b"x")).collect();
         parts[0].bytes = vec![7; MAX_IMAGE_BYTES];
         DecisionRequest::new(body_with_parts(&refs), parts, false).expect("at the limits");
+    }
+
+    /// A body with one inline (`data_base64`) image asset per entry of `data`.
+    fn body_with_inline(data: &[String]) -> SystemOneRequest {
+        let assets = data
+            .iter()
+            .enumerate()
+            .map(|(index, data)| {
+                format!(r#""img{index}":{{"type":"image","format":"png","data_base64":"{data}"}}"#)
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        body(&format!(
+            r#"{{"model":"m","state":"s","questions":{{"q":{{"type":"box"}}}},"assets":{{{assets}}}}}"#
+        ))
+    }
+
+    /// REQ-QA-001: inline images count toward both limits.
+    #[test]
+    fn new_checks_limits_inline() {
+        let small = vec!["AAAA".to_owned(); MAX_IMAGES + 1];
+        match DecisionRequest::try_from(body_with_inline(&small)) {
+            Err(DecisionError::Limits { what, max }) => {
+                assert_eq!((what, max), (LimitKind::Images, 20));
+            }
+            other => panic!("expected Limits images, got {other:?}"),
+        }
+        DecisionRequest::try_from(body_with_inline(&small[..MAX_IMAGES])).expect("20 inline");
+
+        // Inline and by-part images are counted together: 19 inline + 2 parts = 21.
+        let mut text = body_with_inline(&small[..MAX_IMAGES - 1])
+            .to_json()
+            .expect("encode");
+        text = text.replacen(
+            r#""assets":{"#,
+            r#""assets":{"pa":{"type":"image","part":"pa"},"pb":{"type":"image","part":"pb"},"#,
+            1,
+        );
+        let error =
+            DecisionRequest::new(body(&text), vec![part("pa", b"a"), part("pb", b"b")], false)
+                .expect_err("21 images");
+        assert!(
+            matches!(
+                error,
+                DecisionError::Limits {
+                    what: LimitKind::Images,
+                    ..
+                }
+            ),
+            "{error:?}"
+        );
+
+        // A decoded inline image over 20 MiB; exactly 20 MiB is accepted.
+        let over = "A".repeat((MAX_IMAGE_BYTES + 3) / 3 * 4);
+        let error = DecisionRequest::try_from(body_with_inline(&[over])).expect_err("too large");
+        assert!(
+            matches!(error, DecisionError::Limits { what: LimitKind::ImageBytes, max } if max == 20 * 1024 * 1024),
+            "{error:?}"
+        );
+        // 20 MiB = 3 * 6990506 + 2 bytes: 6990506 full groups and one group of two bytes
+        // (`AAA=` padded, `AAA` unpadded).
+        let groups = "A".repeat(MAX_IMAGE_BYTES / 3 * 4);
+        for exact in [format!("{groups}AAA="), format!("{groups}AAA")] {
+            DecisionRequest::try_from(body_with_inline(&[exact])).expect("exactly 20 MiB");
+        }
+        let over = format!("{groups}AAAA");
+        DecisionRequest::try_from(body_with_inline(&[over])).expect_err("20 MiB + 1");
+    }
+
+    /// The images guide refuses two assets naming one part, and a part named `request`.
+    #[test]
+    fn new_checks_part_ownership_and_reserved_name() {
+        let text = r#"{"model":"m","state":"s","questions":{"q":{"type":"box"}},"assets":{"a1":{"type":"image","part":"p1"},"a2":{"type":"image","part":"p1"}}}"#;
+        let detail = image_parts_detail(DecisionRequest::new(
+            body(text),
+            vec![part("p1", b"a")],
+            false,
+        ));
+        assert!(
+            detail.contains("`a1`") && detail.contains("`a2`") && detail.contains("`p1`"),
+            "{detail}"
+        );
+
+        let detail = image_parts_detail(DecisionRequest::new(
+            body_with_parts(&["request"]),
+            vec![part("request", b"a")],
+            false,
+        ));
+        assert!(
+            detail.contains("image part `request`") && detail.contains("reserved"),
+            "{detail}"
+        );
     }
 
     #[test]
@@ -218,7 +302,7 @@ mod tests {
         let request = DecisionRequest::new(body(text), parts, long_context).expect("request");
         request
             .digests()
-            .get(&id.to_owned())
+            .get(id)
             .cloned()
             .unwrap_or_else(|| panic!("no digest for {id}"))
     }

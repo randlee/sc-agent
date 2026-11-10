@@ -43,11 +43,7 @@ pub fn request(json: &str, long_context: bool) -> DecisionRequest {
 
 /// The one place tests build an `ImagePart` (a-2 adds `ImagePart::new`).
 pub fn image_part(name: &str, format: ImageFormat, bytes: Vec<u8>) -> ImagePart {
-    ImagePart {
-        name: name.to_owned(),
-        format,
-        bytes,
-    }
+    ImagePart::new(name, format, bytes)
 }
 
 /// The value of header `name` (ASCII case-insensitive) in `headers`.
