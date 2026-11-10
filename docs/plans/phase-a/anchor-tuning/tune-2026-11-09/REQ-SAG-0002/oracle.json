@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0002",
+  "authority_citations": [
+    "REQ-SAG-0002 v2 (locked): Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Scope: adds or changes an error type or a public function's return type.",
+    "phase-a-intent v1"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass",
+      "probe": "fixture_pass",
+      "item": {
+        "title": "HttpError::Network wraps ureq",
+        "text": "HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Approved pass fixture: the error type keeps the lower-layer ureq error and its id and message are asserted."
+    },
+    {
+      "case_id": "fixture-fail",
+      "probe": "fixture_fail",
+      "item": {
+        "title": "Backend error mapping",
+        "text": "The backend maps every lower-layer failure to a new error with the message \"request failed\", dropping the original error."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Approved fail fixture: dropping the original error is ruled out by 'must carry the id and message of each lower-layer error'."
+    },
+    {
+      "case_id": "compliant",
+      "probe": "compliant",
+      "item": {
+        "title": "Add DecisionError to sc-decision-schema",
+        "text": "Add a DecisionError enum to sc-decision-schema, returned by Decider::decide(). The Http and Schema variants hold the HttpError or SchemaError that caused them as their source, and DecisionError exposes that source error's id and message through its error chain. A unit test builds an HttpError, wraps it, and asserts the DecisionError chain reports the HttpError's id and message."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "New public error type whose lower-layer-caused variants keep the cause's id and message, as the anchor requires."
+    },
+    {
+      "case_id": "silent",
+      "probe": "silent",
+      "item": {
+        "title": "Add HttpError enum",
+        "text": "Introduce an HttpError enum in sc-agent-http with variants Network, Timeout and Status, returned by HttpClient::send(). Document each variant in rustdoc and add it to the crate's public exports."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Adds a public error type (in scope) but says nothing about carrying lower-layer errors; silence is not addressing and not a conflict."
+    },
+    {
+      "case_id": "topical-only",
+      "probe": "topical_only",
+      "item": {
+        "title": "Improve HTTP error handling",
+        "text": "Improve error handling across sc-agent-http so that failures are reported clearly to callers. Change HttpClient::send() to return Result<Response, HttpError> instead of panicking."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Changes a public return type (in scope) and names the error-handling topic, but never says lower-layer errors' id and message are kept, so the obligation is not carried."
+    },
+    {
+      "case_id": "conflicting",
+      "probe": "conflicting",
+      "item": {
+        "title": "Simplify the HTTP error type",
+        "text": "Simplify sc-agent-http errors: every public function returns a single opaque HttpError(String) holding only a short human-readable summary. Lower-layer ureq and serde errors are logged and then discarded."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Discarding the lower-layer errors means the returned error cannot carry their id and message, which the anchor requires."
+    },
+    {
+      "case_id": "irrelevant",
+      "probe": "irrelevant",
+      "item": {
+        "title": "README install section",
+        "text": "Add a README section describing how to install the sc-agent CLI with cargo install, with a short example invocation."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "Documentation only; no error type or public return type is touched."
+    },
+    {
+      "case_id": "boundary",
+      "probe": "boundary",
+      "item": {
+        "title": "Refactor private body reader",
+        "text": "Refactor the private helper fn read_body() inside sc-agent-http into two smaller private functions. No public function signature, public return type, or error type changes."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "Scope covers error types and public functions' return types; a private refactor that changes neither is outside the anchor."
+    },
+    {
+      "case_id": "exception",
+      "probe": "exception",
+      "item": {
+        "title": "Add ConfigError",
+        "text": "Add a ConfigError enum to sc-agent-types, returned by Config::load(). The Parse variant wraps the toml parse error that caused it and carries that error's id and message. The MissingField variant is raised by sc-agent's own validation when a required field is absent; it has no lower-layer cause, so it carries only its own id and message."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "The anchor obliges carrying each lower-layer error that caused an error; an error originating in sc-agent with no lower-layer cause has nothing to carry, so this is compliant."
+    }
+  ]
+}

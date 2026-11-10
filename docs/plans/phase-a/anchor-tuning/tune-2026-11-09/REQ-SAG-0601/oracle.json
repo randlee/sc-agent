@@ -1,0 +1,149 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0601",
+  "authority_citations": [
+    "REQ-SAG-0601 v2 statement: A request that receives an HTTP 429, 502 or 529 response must be resent until a configurable maximum number of sends, 5 by default, is reached.",
+    "REQ-SAG-0601 v2 quote: A request that receives a busy response MUST be resent unchanged.",
+    "REQ-SAG-0601 v2 scope: adds or changes busy-response handling, resend, holdoff or the runner queue",
+    "REQ-SAG-0601 v2 fixtures.pass[0] and fixtures.fail[0]",
+    "phase-a-intent v1: shared HTTP layer is in plan scope"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass-1",
+      "probe": "fixture_pass",
+      "item": {
+        "title": "Busy resend",
+        "text": "A request answered 429 is resent unchanged until max_sends (default 5) is reached, then returns http.provider_busy."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Approved pass fixture of the locked anchor: resend of a busy response up to a configurable max_sends with default 5."
+    },
+    {
+      "case_id": "fixture-fail-1",
+      "probe": "fixture_fail",
+      "item": {
+        "title": "Busy handling",
+        "text": "A 429 response is returned to the caller at once and never resent."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Approved fail fixture: never resending a 429 is irreconcilable with the statement's must-resend rule; it does not carry the directive."
+    },
+    {
+      "case_id": "compliant-1",
+      "probe": "compliant",
+      "item": {
+        "title": "Shared HTTP busy resend",
+        "text": "The shared HTTP client treats HTTP 429, 502 and 529 as busy responses. A busy request is resent unchanged until it has been sent max_sends times; max_sends is configurable and defaults to 5. When the limit is reached the client returns http.provider_busy. The holdoff between sends is applied in the runner queue."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "States every element of the statement: the three statuses, resend, configurable maximum number of sends, default 5."
+    },
+    {
+      "case_id": "silent-1",
+      "probe": "silent",
+      "item": {
+        "title": "Runner queue and send path",
+        "text": "Implement the shared HTTP send path for TypeSafe requests and the runner queue that dispatches a batch of decision requests in parallel, with per-request timeouts and session logging of every send."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Changes the send path and the runner queue (named in scope) but says nothing about busy responses or resend; silence is not conflict."
+    },
+    {
+      "case_id": "topical-1",
+      "probe": "topical_only",
+      "item": {
+        "title": "Provider error handling",
+        "text": "The HTTP layer will handle busy and rate-limit responses from providers gracefully so that consumers see fewer failures."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Names the topic (busy responses) but carries none of the directive's specific content: no resend, no maximum number of sends, no default; a vague intent neither carries nor breaks the rule."
+    },
+    {
+      "case_id": "conflicting-1",
+      "probe": "conflicting",
+      "item": {
+        "title": "Fail fast on overload",
+        "text": "On HTTP 529 or 502 the client fails fast: the error is surfaced to the caller immediately and the request is not retried; retrying is left to consumer code."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "The statement requires 502 and 529 responses to be resent by the layer; never resending them cannot be reconciled with it and the directive is absent."
+    },
+    {
+      "case_id": "irrelevant-1",
+      "probe": "irrelevant",
+      "item": {
+        "title": "DecisionId newtype",
+        "text": "Define the DecisionId newtype in sc-agent-types with a serde representation as a lowercase UUID string and Display/FromStr implementations."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "A type definition unrelated to busy-response handling, resend, holdoff or the runner queue."
+    },
+    {
+      "case_id": "boundary-1",
+      "probe": "boundary",
+      "item": {
+        "title": "Send limit exhaustion",
+        "text": "Busy responses (HTTP 429, 502, 529) are resent with holdoff from the runner queue. A request is sent at most max_sends times (configurable, default 5): if the fifth send is also answered busy, the request is not sent a sixth time and the call returns http.provider_busy."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Boundary of the limit: stopping after the fifth send at the default is exactly 'until a configurable maximum number of sends, 5 by default, is reached'."
+    },
+    {
+      "case_id": "exception-1",
+      "probe": "exception",
+      "item": {
+        "title": "Non-busy errors",
+        "text": "Busy responses (HTTP 429, 502 and 529) are resent until max_sends, configurable with default 5, is reached. Other errors such as HTTP 400, 401 and 500 are not busy responses and are returned to the caller immediately without resend."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "The statement only governs 429, 502 and 529; not resending other statuses is outside it and does not conflict, while the busy rule is carried."
+    }
+  ]
+}

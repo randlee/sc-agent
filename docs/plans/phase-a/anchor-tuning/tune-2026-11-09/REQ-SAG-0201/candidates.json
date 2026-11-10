@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0201",
+  "candidates": {
+    "relevant": {
+      "rel-a": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, with the area it governs in `anchor.scope`). Does the work in `item.text` fall inside `anchor.scope`: does it add, change, define, or use a Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone or GET /v1/models)? Judge subject overlap only, not whether the item obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds, changes, defines, or uses a type, struct, or field that is sent to or received from the TypeSafe Jev API.",
+          "no": "The item works on something else, such as logging, internal bookkeeping, or a type that is never sent to or received from any TypeSafe endpoint.",
+          "unclear": "The item text is too vague to tell whether any type it touches maps to the TypeSafe Jev API."
+        }
+      },
+      "rel-b": {
+        "type": "choice",
+        "instructions": "Read `anchor.statement` and `anchor.scope`, then `item.text`. Does the item plan work on the thing the anchor governs, as `anchor.scope` describes it? An item that names a type but states that the type is never sent to or received from the API the anchor names is outside the scope. Judge overlap only; do not judge compliance or conflict.",
+        "criteria": {
+          "yes": "The item plans, changes, or depends on something that falls within `anchor.scope`.",
+          "no": "The item is about a different part of the system, or about something the item text says lies outside what the anchor governs.",
+          "unclear": "The item text is too vague to tell whether it falls within `anchor.scope`."
+        }
+      },
+      "rel-c": {
+        "type": "choice",
+        "instructions": "Is `item.text` within the scope given in `anchor.scope` for the directive in `anchor.statement`? Answer about subject matter only.",
+        "criteria": {
+          "yes": "The item touches types or fields of the API named in `anchor.statement`.",
+          "no": "The item touches no type or field of the API named in `anchor.statement`.",
+          "unclear": "It is impossible to tell from the item text."
+        }
+      }
+    },
+    "addressed": {
+      "add-a": {
+        "type": "choice",
+        "instructions": "Does `item.text` state that the Jev API types it adds, changes, or uses are defined in the `sc-decision-schema` crate, as `anchor.statement` requires? Count it when the item puts or keeps those types in sc-decision-schema, or imports them from sc-decision-schema. A generic mention of Jev types, serialization, or consistency without naming sc-decision-schema as their home does not count. Judge presence of this placement only, not conflict.",
+        "criteria": {
+          "yes": "The item explicitly places, keeps, or imports its Jev API types in or from sc-decision-schema.",
+          "no": "The item does not say the Jev API types live in sc-decision-schema, or it places them somewhere else.",
+          "unclear": "The item mentions sc-decision-schema but it cannot be told whether its Jev API types are defined there."
+        }
+      },
+      "add-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` explicitly carry out the specific directive in `anchor.statement`? Look for the directive's concrete content in the item: here, the named crate where the types must be defined. A mention of the same topic without that concrete content does not count. Judge presence only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item text includes the directive's concrete content as a step, constraint, or stated design.",
+          "no": "The item text is silent about the directive's concrete content, or does something else instead.",
+          "unclear": "The item alludes to the directive's content but it cannot be told whether it is carried out."
+        }
+      },
+      "add-c": {
+        "type": "choice",
+        "instructions": "`anchor.statement` names one crate where every Jev API type must be defined. Does `item.text` say its Jev API types are defined in, or come from, that crate?",
+        "criteria": {
+          "yes": "Yes, the item names that crate as where its Jev API types are defined or imported from.",
+          "no": "No, the item does not say so, or says another crate defines them.",
+          "unclear": "The item's wording leaves it undecidable."
+        }
+      }
+    },
+    "contradicted": {
+      "con-a": {
+        "type": "choice",
+        "instructions": "Does `item.text` define, declare, or keep a Rust type that maps to a TypeSafe Jev API field in any crate other than `sc-decision-schema`, which `anchor.statement` rules out? A temporary, private, or mirror copy outside sc-decision-schema still counts. Silence about where types live is not a conflict, and types that are never sent to or received from the API do not count. Judge conflict only.",
+        "criteria": {
+          "yes": "The item defines or keeps a Jev API type (struct, enum, or mirror of an API field) in a crate other than sc-decision-schema.",
+          "no": "The item defines no Jev API type outside sc-decision-schema, whether or not it mentions the directive.",
+          "unclear": "The item may define a Jev API type outside sc-decision-schema, but the text is too ambiguous to tell."
+        }
+      },
+      "con-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` plan something that `anchor.statement` rules out? The statement allows no exception, so a temporary or stop-gap departure still conflicts. Silence about the directive is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states a plan or design that cannot be reconciled with the directive, including a temporary one.",
+          "no": "Nothing in the item conflicts with the directive, whether or not the directive is mentioned.",
+          "unclear": "The item is ambiguous enough that it might or might not conflict with the directive."
+        }
+      },
+      "con-c": {
+        "type": "choice",
+        "instructions": "`anchor.statement` names the only crate allowed to define Jev API types. Does `item.text` define such a type somewhere else?",
+        "criteria": {
+          "yes": "Yes, the item defines a Jev API type in another crate.",
+          "no": "No, the item defines none elsewhere, or does not discuss it.",
+          "unclear": "The text cannot settle it."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {"bundle_id": "b-aaa", "roles": {"relevant": "rel-a", "addressed": "add-a", "contradicted": "con-a"}},
+    {"bundle_id": "b-bbb", "roles": {"relevant": "rel-b", "addressed": "add-b", "contradicted": "con-b"}},
+    {"bundle_id": "b-ccc", "roles": {"relevant": "rel-c", "addressed": "add-c", "contradicted": "con-c"}},
+    {"bundle_id": "b-aab", "roles": {"relevant": "rel-a", "addressed": "add-a", "contradicted": "con-b"}},
+    {"bundle_id": "b-bab", "roles": {"relevant": "rel-b", "addressed": "add-a", "contradicted": "con-b"}},
+    {"bundle_id": "b-baa", "roles": {"relevant": "rel-b", "addressed": "add-a", "contradicted": "con-a"}}
+  ]
+}

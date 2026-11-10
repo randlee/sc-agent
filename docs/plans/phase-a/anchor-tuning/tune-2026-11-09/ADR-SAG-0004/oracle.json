@@ -1,0 +1,84 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "ADR-SAG-0004",
+  "authority_citations": [
+    "ADR-SAG-0004 v2 (locked, kind prohibition): No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner. Scope: adds or changes a crate dependency in a Cargo.toml.",
+    "ADR-SAG-0004 v2 approved fixtures (pass and fail).",
+    "phase-a-intent v1: low-level sc-agent libraries sc-agent-types, sc-decision-schema with the decision trait, and the shared HTTP layer."
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass-1",
+      "probe": "fixture_pass",
+      "item": {"title": "Pin sc-agent-http dependencies", "text": "sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Approved pass fixture. It states a closed set of sc-agent dependencies for sc-agent-http, all in lower layers (types; secrets and log), and excludes dependence on the top-layer runner, so it states the restriction and nothing conflicts."
+    },
+    {
+      "case_id": "fixture-fail-1",
+      "probe": "fixture_fail",
+      "item": {"title": "Let sc-agent-types name DecisionRequest", "text": "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Approved fail fixture. sc-agent-types is the bottom layer and sc-decision-schema is the decision-schema layer above it; the item adds a dependency the statement prohibits and does not state the restriction."
+    },
+    {
+      "case_id": "compliant-1",
+      "probe": "compliant",
+      "item": {"title": "Create sc-decision-local", "text": "Create the sc-decision-local backend crate. Its Cargo.toml lists only sc-decision-schema and sc-agent-types as sc-agent dependencies, both in lower layers; it does not depend on sc-decision-runner or on any other backend."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Paraphrased compliance: a backend crate depends only on the decision-schema and types layers below it and explicitly excludes the runner layer above it."
+    },
+    {
+      "case_id": "silent-1",
+      "probe": "silent",
+      "item": {"title": "Shared session ID in log records", "text": "Add sc-agent-types as a dependency of sc-agent-log so log records can carry the shared SessionId type."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Adds an sc-agent crate dependency (in scope). sc-agent-log (config/secrets/log layer) depending on sc-agent-types (bottom layer) is a downward dependency, so nothing conflicts; the item says nothing about the layering restriction, so it does not state it. Prohibition gating ignores the compliance role."
+    },
+    {
+      "case_id": "topical-only-1",
+      "probe": "topical_only",
+      "item": {"title": "Layer diagram", "text": "Draw a diagram of the sc-agent crate layers, from sc-agent-types at the bottom to sc-decision-runner at the top, for the architecture overview."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "Mentions the layering topic but adds or changes no Cargo.toml dependency, which is the anchor's scope; the prohibition does not govern documentation work."
+    },
+    {
+      "case_id": "conflicting-1",
+      "probe": "conflicting",
+      "item": {"title": "HTTP status in log records", "text": "Make sc-agent-log depend on sc-agent-http so log records can include the HTTP status type."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "sc-agent-log is in the config/secrets/log layer and sc-agent-http is the layer above it, so this upward dependency is prohibited."
+    },
+    {
+      "case_id": "irrelevant-1",
+      "probe": "irrelevant",
+      "item": {"title": "Config parser error tests", "text": "Write unit tests for the TOML parse error messages produced by sc-agent-config."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "Test work inside one crate; no Cargo.toml dependency is added or changed."
+    },
+    {
+      "case_id": "boundary-same-layer-1",
+      "probe": "boundary",
+      "item": {"title": "Secrets reads config", "text": "sc-agent-secrets adds sc-agent-config as a dependency to read the keychain service name."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "sc-agent-config and sc-agent-secrets are in the same layer (config, secrets and log); the statement prohibits only dependencies on a higher layer, so a same-layer dependency does not conflict. The item does not state the restriction."
+    },
+    {
+      "case_id": "exception-claimed-1",
+      "probe": "exception",
+      "item": {"title": "Temporary schema dependency", "text": "As a documented temporary exception until the decision trait moves down a layer, sc-agent-http adds sc-decision-schema to its [dependencies]."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "The statement allows no exception. sc-agent-http (http layer) depending on sc-decision-schema (decision-schema layer above it) is an upward dependency regardless of the temporary framing."
+    }
+  ]
+}

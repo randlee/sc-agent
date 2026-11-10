@@ -1,0 +1,92 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0201",
+  "authority_citations": [
+    "REQ-SAG-0201 v2 (locked): Every Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models) must be defined in the sc-decision-schema crate. Scope: adds or changes a type that maps to a TypeSafe API field.",
+    "REQ-SAG-0201 v2 fixtures (pass and fail)",
+    "phase-a-intent v1: define sc-decision-schema with the decision trait; every TypeSafe API request and response sent through sc-agent with minimum code"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass-1",
+      "probe": "fixture_pass",
+      "item": {"title": "Fixture pass", "text": "sc-decision-llm imports SystemOneRequest and SystemOneResponse from sc-decision-schema and defines no Jev-shaped type of its own."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Locked pass fixture of REQ-SAG-0201: Jev API types come from sc-decision-schema and no other crate defines one."
+    },
+    {
+      "case_id": "fixture-fail-1",
+      "probe": "fixture_fail",
+      "item": {"title": "Fixture fail", "text": "sc-decision-systemone defines its own JevAnswer struct mirroring the TypeSafe choice answer."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Locked fail fixture: a Jev answer type defined outside sc-decision-schema breaks 'must be defined in the sc-decision-schema crate'."
+    },
+    {
+      "case_id": "compliant-1",
+      "probe": "compliant",
+      "item": {"title": "Sprint A2: Jev schema types", "text": "Add the SystemOneRequest, SystemOneResponse, ChoiceAnswer and ModelInfo structs for POST /v1/systemone and GET /v1/models to the sc-decision-schema crate, generated from the TypeSafe API spec. sc-agent-http and sc-decision-llm depend on sc-decision-schema and use these types; they define no Jev API types themselves."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "The item places every Jev API type for both named endpoints in sc-decision-schema, exactly what REQ-SAG-0201 requires."
+    },
+    {
+      "case_id": "silent-1",
+      "probe": "silent",
+      "item": {"title": "Sprint A3: Jev request serialization", "text": "Implement serde serialization for the Jev request and response sent to POST /v1/systemone, including the choice answer and confidence fields, and add round-trip tests against recorded TypeSafe responses."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "The item works on types that map to Jev API fields (in scope) but never says which crate defines them; REQ-SAG-0201's placement rule is absent, and silence is not a conflict."
+    },
+    {
+      "case_id": "topical-only-1",
+      "probe": "topical_only",
+      "item": {"title": "Sprint A4: shared HTTP client", "text": "Build the shared HTTP client in sc-agent-http that sends Jev decision requests to POST /v1/systemone with retries and timeouts. Keep the Jev API types consistent and well documented."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "The item depends on Jev API types and mentions them generically, but does not state that they are defined in sc-decision-schema; nothing in it defines a type elsewhere, so no conflict."
+    },
+    {
+      "case_id": "conflicting-1",
+      "probe": "conflicting",
+      "item": {"title": "Sprint A5: self-contained HTTP layer", "text": "In sc-agent-http, define private SystemOneRequest and ModelsResponse structs for the Jev endpoints so the HTTP layer has no dependency on sc-decision-schema."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Jev API types defined in sc-agent-http instead of sc-decision-schema directly break REQ-SAG-0201."
+    },
+    {
+      "case_id": "irrelevant-1",
+      "probe": "irrelevant",
+      "item": {"title": "Sprint A6: log rotation", "text": "Add daily rotation and gzip compression of session log files in the sc-agent logging module, with a configurable retention of 30 days."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "Log-file rotation adds or changes no type that maps to a TypeSafe API field, so the item is outside REQ-SAG-0201's scope."
+    },
+    {
+      "case_id": "boundary-internal-type",
+      "probe": "boundary",
+      "item": {"title": "Sprint A7: batch progress", "text": "In sc-decision-runner, add a BatchProgress struct that counts completed, pending and failed decisions for the progress display. It is internal to the runner and is never serialized to or from any TypeSafe API endpoint."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "REQ-SAG-0201 governs only Rust types that map to a field of the TypeSafe Jev API; a new type outside sc-decision-schema that maps to no API field is outside its scope."
+    },
+    {
+      "case_id": "boundary-field-change",
+      "probe": "boundary",
+      "item": {"title": "Sprint A8: response field update", "text": "Add the new `reasoning` field that POST /v1/systemone now returns to the SystemOneResponse struct in sc-decision-schema, and update the crates that read the response to use it."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Changing a Jev API type is in scope ('adds or changes a type that maps to a TypeSafe API field'); the change stays in sc-decision-schema, as REQ-SAG-0201 requires."
+    },
+    {
+      "case_id": "exception-temporary-copy",
+      "probe": "exception",
+      "item": {"title": "Sprint A9: early Luna backend", "text": "As a temporary shortcut until sc-decision-schema is ready, sc-decision-llm defines its own SystemOneResponse struct for POST /v1/systemone; it will be moved into sc-decision-schema in a later sprint."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "REQ-SAG-0201 says 'Every' Jev API type and states no temporary or staged exception; a self-declared temporary definition outside sc-decision-schema still breaks it."
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-001",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001218Z-fixture_ANC-001_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-001",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ANC-001_fail_1.json"
+      },
+      {
+        "anchor_id": "ADR-SAG-0001",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0001_pass_1.json"
+      },
+      {
+        "anchor_id": "ADR-SAG-0001",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0001_fail_1.json"
+      },
+      {
+        "anchor_id": "ADR-SAG-0004",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0004_pass_1.json"
+      },
+      {
+        "anchor_id": "ADR-SAG-0004",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0004_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0002",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_REQ-SAG-0002_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0002",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "The backend maps every lower-layer failure to a new error with the message \"request failed\", dropping the original error.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0002_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0006",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-decision-schema contains only TypeSafe API types; no type names plan-anchor or judge-jev.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0006_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0006",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0006_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0009",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "`cargo tree -p sc-decision-runner` lists no tokio crate with default features.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0009_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0009",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-agent-http adds reqwest with its default tokio runtime as a required dependency.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0009_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0010",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0010_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0010",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0010_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0201",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-decision-llm imports SystemOneRequest and SystemOneResponse from sc-decision-schema and defines no Jev-shaped type of its own.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0201_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0201",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-decision-systemone defines its own JevAnswer struct mirroring the TypeSafe choice answer.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0201_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0601",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "A request answered 429 is resent unchanged until max_sends (default 5) is reached, then returns http.provider_busy.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0601_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0601",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "A 429 response is returned to the caller at once and never resent.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0601_fail_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0701",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-decision-runner sends a batch's requests across `workers` threads (default 8) and returns each result as it finishes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0701_pass_1.json"
+      },
+      {
+        "anchor_id": "REQ-SAG-0701",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "The runner sends the batch's requests one after another on the caller's thread.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0701_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_ANC-006_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "decide gains a `models` subcommand with no Python equivalent.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_ANC-006_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "judged": 22,
+    "pass": true,
+    "path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures",
+    "run_path": "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures",
+    "runs": [
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001218Z-fixture_ANC-001_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ANC-001_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0001_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0001_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0004_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_ADR-SAG-0004_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001219Z-fixture_REQ-SAG-0002_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0002_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0006_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0006_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0009_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0009_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0010_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0010_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001220Z-fixture_REQ-SAG-0201_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0201_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0601_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0601_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0701_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_REQ-SAG-0701_fail_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_ANC-006_pass_1.json",
+      "docs/plans/phase-a/anchor-tuning/check-fixtures-2026-11-09/fixtures/plan-20261110T001221Z-fixture_ANC-006_fail_1.json"
+    ]
+  },
+  "error": null
+}

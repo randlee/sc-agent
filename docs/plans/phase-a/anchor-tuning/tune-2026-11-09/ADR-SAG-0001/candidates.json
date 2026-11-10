@@ -1,0 +1,195 @@
+{
+ "schema": "plan-anchor/tune-candidates/1",
+ "gate": "planning",
+ "anchor_id": "ADR-SAG-0001",
+ "candidates": {
+  "relevant": {
+   "rel_a": {
+    "type": "choice",
+    "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, with the area it governs in `anchor.scope`). Does the work in `item.text` add, change, review, or depend on something inside `anchor.scope` or the subject of `anchor.statement`? Judge subject overlap only, not obedience.",
+    "criteria": {
+     "yes": "The item adds, changes, reviews, or depends on a thing named in `anchor.scope` or `anchor.statement`.",
+     "no": "The item concerns a different component or activity that `anchor.scope` and `anchor.statement` do not name.",
+     "unclear": "The item text is too vague to tell which component it touches."
+    }
+   },
+   "rel_b": {
+    "type": "choice",
+    "instructions": "Is the planning item in `item.text` about the same part of the system that `anchor.statement` and `anchor.scope` govern? Answer about subject matter only; whether the item follows the anchor is a separate question.",
+    "criteria": {
+     "yes": "The item works on, or relies on, a component or activity covered by `anchor.scope` or `anchor.statement`.",
+     "no": "The item works only on components or activities outside `anchor.scope` and `anchor.statement`.",
+     "unclear": "It cannot be told from `item.text` which part of the system is involved."
+    }
+   },
+   "rel_c": {
+    "type": "choice",
+    "instructions": "Would carrying out `item.text` require deciding anything about the subject named in `anchor.statement` or listed in `anchor.scope` (for example adding, changing, or describing one of those things)? Judge overlap only.",
+    "criteria": {
+     "yes": "Yes: the item adds, changes, describes, or depends on one of those things.",
+     "no": "No: the item can be done entirely without touching any of those things.",
+     "unclear": "The item is too vague to tell."
+    }
+   },
+   "rel_cur": {
+    "criteria": {
+     "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+     "unclear": "The item text is too vague to tell what part of the system it touches.",
+     "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+    },
+    "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+    "type": "choice"
+   }
+  },
+  "addressed": {
+   "add_a": {
+    "type": "choice",
+    "instructions": "Does `item.text` explicitly state the specific obligation in `anchor.statement` (for this anchor: that the decision backend is an implementation of the named trait in the named crate)? A mention of the topic, of traits in general, or of design work does not count; the item must say the obligation itself.",
+    "criteria": {
+     "yes": "`item.text` explicitly says the thing it adds or changes satisfies the obligation in `anchor.statement` (e.g. it implements the named trait from the named crate).",
+     "no": "`item.text` does not state the obligation: it is silent about it, mentions only the topic, or describes a different approach.",
+     "unclear": "`item.text` uses wording that might or might not mean the obligation, and it cannot be told which."
+    }
+   },
+   "add_b": {
+    "type": "choice",
+    "instructions": "Read `anchor.statement` and identify its concrete requirement. Does `item.text` contain that concrete requirement as a step, constraint, or stated design, in any wording? Generic references to the same area without the concrete requirement are not enough.",
+    "criteria": {
+     "yes": "The concrete requirement of `anchor.statement` appears in `item.text` as a step, constraint, or stated design.",
+     "no": "The concrete requirement is absent from `item.text` (silence, topic-only mention, or a different approach).",
+     "unclear": "`item.text` contains something close to the requirement but it is genuinely ambiguous whether it is the requirement."
+    }
+   },
+   "add_c": {
+    "type": "choice",
+    "instructions": "Does `item.text` plan for exactly what `anchor.statement` requires, by naming the required element (for this anchor, the required trait and crate) and committing the item to it?",
+    "criteria": {
+     "yes": "The item names the required element and commits to it.",
+     "no": "The item does not name the required element, or commits to something else.",
+     "unclear": "The item names something resembling the required element but the commitment is ambiguous."
+    }
+   },
+   "add_cur": {
+    "criteria": {
+     "no": "The item text is silent about the directive: it neither includes the directive's specific content nor references it.",
+     "unclear": "The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.",
+     "yes": "The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point."
+    },
+    "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+    "type": "choice"
+   }
+  },
+  "contradicted": {
+   "con_a": {
+    "type": "choice",
+    "instructions": "Does `item.text` state a plan or design that cannot be reconciled with `anchor.statement`, for example using a different trait or call path than the one required, or declaring itself an exception the anchor does not grant? Saying nothing about the requirement is silence, not conflict.",
+    "criteria": {
+     "yes": "`item.text` states a design, approach, or exception that is incompatible with `anchor.statement`.",
+     "no": "Nothing stated in `item.text` is incompatible with `anchor.statement`, including when the item is silent about it.",
+     "unclear": "`item.text` states something that might be incompatible, but it is ambiguous."
+    }
+   },
+   "con_b": {
+    "type": "choice",
+    "instructions": "If the work in `item.text` were done exactly as written, would it break the rule in `anchor.statement`? Only count what the item actually states; an item that omits the rule does not break it.",
+    "criteria": {
+     "yes": "Doing the item as written would break the rule (it states an approach the rule forbids or excludes).",
+     "no": "Doing the item as written would not break the rule, or the item states nothing about it.",
+     "unclear": "The item's wording leaves it genuinely ambiguous whether the rule would be broken."
+    }
+   },
+   "con_c": {
+    "type": "choice",
+    "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples: the anchor requires a shared trait and the item uses its own trait or calls the component directly; the anchor admits no exception and the item claims one. Silence is not a contradiction.",
+    "criteria": {
+     "yes": "The item states an approach that the anchor statement rules out or replaces.",
+     "no": "The item states no approach that the anchor statement rules out, whether or not it mentions the anchor.",
+     "unclear": "The item's stated approach might or might not be ruled out by the anchor statement."
+    }
+   },
+   "con_cur": {
+    "criteria": {
+     "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+     "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+     "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+    },
+    "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.",
+    "type": "choice"
+   }
+  }
+ },
+ "bundles": [
+  {
+   "bundle_id": "diag-a",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "add_a",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "diag-b",
+   "roles": {
+    "relevant": "rel_b",
+    "addressed": "add_b",
+    "contradicted": "con_b"
+   }
+  },
+  {
+   "bundle_id": "diag-c",
+   "roles": {
+    "relevant": "rel_c",
+    "addressed": "add_c",
+    "contradicted": "con_c"
+   }
+  },
+  {
+   "bundle_id": "cur-add-a",
+   "roles": {
+    "relevant": "rel_cur",
+    "addressed": "add_a",
+    "contradicted": "con_cur"
+   }
+  },
+  {
+   "bundle_id": "cur-add-b",
+   "roles": {
+    "relevant": "rel_cur",
+    "addressed": "add_b",
+    "contradicted": "con_cur"
+   }
+  },
+  {
+   "bundle_id": "cur-add-a-con-a",
+   "roles": {
+    "relevant": "rel_cur",
+    "addressed": "add_a",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "rela-add-a-con-c",
+   "roles": {
+    "relevant": "rel_a",
+    "addressed": "add_a",
+    "contradicted": "con_c"
+   }
+  },
+  {
+   "bundle_id": "relb-add-b-con-a",
+   "roles": {
+    "relevant": "rel_b",
+    "addressed": "add_b",
+    "contradicted": "con_a"
+   }
+  },
+  {
+   "bundle_id": "relc-add-a-con-b",
+   "roles": {
+    "relevant": "rel_c",
+    "addressed": "add_a",
+    "contradicted": "con_b"
+   }
+  }
+ ]
+}

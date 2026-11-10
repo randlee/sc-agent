@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "error": null,
+  "data": {
+    "accepted": true,
+    "selected_bundle": "all-c2",
+    "decision": {
+      "status": "sealed",
+      "question_set_sha256": "cef17313ad7e3d31b2fc17aed571921f3c8c735a5b119cdd5b5e066c43118562",
+      "reason_code": "TOURNAMENT.SEALED"
+    },
+    "tie_needs_choice": false,
+    "co_leaders": [],
+    "semantic_score": {
+      "exact_role_cells": 54,
+      "total_role_cells": 54,
+      "exact_semantic_verdicts": 18,
+      "total_semantic_verdicts": 18,
+      "stable_cases": 9,
+      "total_cases": 9,
+      "regressions": 0
+    },
+    "oracle_sha256": "bf2eca51069994848a1f9cab85b5fe902a07df5c54736ee97d72a0ea9d615be8",
+    "result_vars": "/Volumes/Extreme Pro/github/sc-agent/docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0701/tournament-1/result_vars.json",
+    "results": "/Volumes/Extreme Pro/github/sc-agent/docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0701/tournament-1/results.jsonl",
+    "calls": 90,
+    "failed_calls": [],
+    "retries": 0
+  }
+}

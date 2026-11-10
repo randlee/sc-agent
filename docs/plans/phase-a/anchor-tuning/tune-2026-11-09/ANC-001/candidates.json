@@ -1,0 +1,312 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "ANC-001",
+  "candidates": {
+    "relevant": {
+      "rel-scope-change": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor with its governed area in `anchor.scope`. Does the work in `item.text` add, remove, or change code inside the area named in `anchor.scope` (here: code in crates/sc-decision-schema)? Only an item that itself modifies that area counts. An item that only uses, imports, or depends on that area while leaving it unmodified does not count. Judge whether the item modifies the scoped area only; do not judge whether it obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds, removes, or changes code in the area named by anchor.scope.",
+          "no": "The item modifies some other area, or only uses or depends on the scoped area and leaves it unmodified.",
+          "unclear": "The item text does not say where its code changes land, so it cannot be told whether the scoped area is modified."
+        }
+      },
+      "rel-touch-crate": {
+        "type": "choice",
+        "instructions": "`anchor.scope` names the code this anchor governs. Read `item.text` and decide: will carrying out this item put new code into, or edit existing code in, that governed code? Using the governed crate as a dependency from another crate, without editing it, is not touching it. Answer about where the item's code changes go, not about whether they are acceptable.",
+        "criteria": {
+          "yes": "Carrying out the item writes or edits code in the code governed by anchor.scope.",
+          "no": "The item's code changes all land outside the governed code, including items that only consume it unchanged.",
+          "unclear": "The item does not make clear which code its changes land in."
+        }
+      },
+      "rel-subject-scope": {
+        "type": "choice",
+        "instructions": "Decide whether the anchor applies to this planning item. The anchor applies only when the item does what `anchor.scope` describes. For this anchor that means the item adds or changes code in crates/sc-decision-schema. Mentioning that crate, reading from it, or building on its types in a different crate is not enough when the item leaves the crate itself unchanged. Judge applicability only.",
+        "criteria": {
+          "yes": "The item does what anchor.scope describes: it adds or changes code in the governed crate.",
+          "no": "The item does not add or change code in the governed crate, even if it mentions or depends on it.",
+          "unclear": "The item is too vague to tell whether it adds or changes code in the governed crate."
+        }
+      }
+    },
+    "addressed": {
+      "addr-states-limit": {
+        "type": "choice",
+        "instructions": "`anchor.statement` requires crates/sc-decision-schema to hold only the code needed to send and receive the decision API, and nothing beyond that minimum. Does `item.text` state that limit for the code it plans in that crate, without carving out an exception? Counting forms: saying the crate gets only decision request/response/answer/error types and the decision traits, or saying explicitly that transport, caching, logging, formatting, or CLI code stays out of it. Merely adding permitted types without stating the limit does not count, nor does deferring the question of crate size. Judge whether the limit is stated and kept, not whether other code conflicts.",
+        "criteria": {
+          "yes": "The item explicitly limits what it puts in the crate to the decision-API minimum, and states no exception.",
+          "no": "The item states no such limit, defers it, states it only with an exception, or describes adding extra code.",
+          "unclear": "The item gestures at keeping the crate small but in words too vague to tell whether it limits the crate to the decision-API minimum."
+        }
+      },
+      "addr-commit-minimum": {
+        "type": "choice",
+        "instructions": "Does `item.text` commit to the directive in `anchor.statement` - that the crate holds only the minimum code needed to send and receive the decision API? Look for an explicit commitment in the item: words such as 'only', 'nothing else', or a stated list of what is excluded. Silence about the limit is no. Promising to look at the crate's size later is no. Stating the limit but making an exception to it is no, because the directive allows nothing beyond the minimum. Judge the presence of this commitment only.",
+        "criteria": {
+          "yes": "The item explicitly commits the crate to only the decision-API minimum, with no exception.",
+          "no": "The item makes no such commitment, postpones it, makes an exception to it, or plans extra code in the crate.",
+          "unclear": "Some wording might be a commitment to minimal crate contents, but it is too vague to decide."
+        }
+      },
+      "addr-baseline-strict": {
+        "type": "choice",
+        "instructions": "Does `item.text` explicitly carry out or preserve the directive given in `anchor.statement`? The directive's specific content here is a limit: only the code needed to send and receive the decision API, nothing beyond. The item must contain that limit itself, in its own words or the user's, as a constraint or step. Doing permitted work without stating the limit does not count. A limit stated together with an exception does not preserve the directive. Judge presence of the directive only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item contains the directive's limit, stated without exception, as a step, constraint, or stated starting point.",
+          "no": "The item is silent about the limit, defers it, states it with an exception, or plans code beyond it.",
+          "unclear": "The item alludes to the limit but it is not possible to tell whether the limit itself is included."
+        }
+      }
+    },
+    "contradicted": {
+      "con-extra-code": {
+        "type": "choice",
+        "instructions": "`anchor.statement` forbids crates/sc-decision-schema from holding any code beyond the minimum needed to send and receive the decision API. Does `item.text` plan to put such extra code into that crate - for example an HTTP client or transport, retries, a cache, logging, report formatting, or CLI code - or explicitly allow an exception for it? Decision request, response, answer and error types and the decision traits are permitted. Silence about the limit is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item places, or explicitly allows, code beyond the decision-API minimum inside the crate.",
+          "no": "Everything the item puts in the crate is decision-API code, or the item puts nothing in the crate.",
+          "unclear": "The item adds something to the crate whose relation to sending or receiving the decision API cannot be determined."
+        }
+      },
+      "con-ruled-out": {
+        "type": "choice",
+        "instructions": "Does `item.text` propose something that `anchor.statement` rules out? This directive rules out any code in the crate that is not needed to send or receive the decision API, and it allows no exceptions. A plan that adds transport, caching, logging, formatting, CLI or other non-API code to the crate, even 'for convenience' or as 'one exception', conflicts. Adding only API types or the decision traits does not conflict, and neither does saying nothing about the limit. Judge conflict only.",
+        "criteria": {
+          "yes": "The item plans code in the crate that the directive rules out, including as a stated exception.",
+          "no": "Nothing the item plans for the crate is ruled out by the directive, whether or not the directive is mentioned.",
+          "unclear": "The item is ambiguous about whether something it adds to the crate is needed for the decision API."
+        }
+      },
+      "con-baseline-exception": {
+        "type": "choice",
+        "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or a different approach than the one it requires? Examples of contradiction: the anchor limits a crate to a minimum and the item adds code beyond that minimum; the item grants itself an exception to the anchor; the anchor forbids a dependency and the item adds it. Silence about the directive is not a contradiction. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states a plan, approach, exception, or decision that cannot be reconciled with the directive.",
+          "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+          "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "b01",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b02",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b03",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b04",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b05",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b06",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b07",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b08",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b09",
+      "roles": {
+        "relevant": "rel-scope-change",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b10",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b11",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b12",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b13",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b14",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b15",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b16",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b17",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b18",
+      "roles": {
+        "relevant": "rel-touch-crate",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b19",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b20",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b21",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-states-limit",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b22",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b23",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b24",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-commit-minimum",
+        "contradicted": "con-baseline-exception"
+      }
+    },
+    {
+      "bundle_id": "b25",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-extra-code"
+      }
+    },
+    {
+      "bundle_id": "b26",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-ruled-out"
+      }
+    },
+    {
+      "bundle_id": "b27",
+      "roles": {
+        "relevant": "rel-subject-scope",
+        "addressed": "addr-baseline-strict",
+        "contradicted": "con-baseline-exception"
+      }
+    }
+  ]
+}

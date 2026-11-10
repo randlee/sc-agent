@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261110T001219Z-fixture_ADR-SAG-0004_pass_1",
+  "gate": "plan",
+  "created_at": "2026-11-10T00:12:19+00:00",
+  "anchors_path": "docs/plans/phase-a/anchors.json",
+  "plan": "phase-a",
+  "item": {
+    "id": "fixture:ADR-SAG-0004:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 120,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "ADR-SAG-0004",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0004",
+      "statement": "No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.",
+      "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "record ADR-SAG-0004",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.96,
+            "no": 0.02,
+            "unclear": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1047,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 120,
+      "item_shortened": false,
+      "request_bytes": 3143
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": true
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0010",
+  "candidates": {
+    "relevant": {
+      "rel-scope": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, `anchor.scope`). Does the work described in `item.text` add or change Rust source code in an sc-agent crate, the area named in `anchor.scope`? Any Rust code in an sc-agent crate counts whatever its topic, including types, HTTP, runners and tests. Documentation-only work, CI configuration, and scripts or code in other languages or outside the sc-agent crates do not count. Judge scope only; do not judge whether the item obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds or changes Rust source, including test code, in an sc-agent crate.",
+          "no": "The item changes only documentation, configuration, or code that is not Rust source in an sc-agent crate.",
+          "unclear": "The item text does not say enough to tell whether it adds or changes Rust source in an sc-agent crate."
+        }
+      },
+      "rel-within": {
+        "type": "choice",
+        "instructions": "`anchor.scope` names the work the anchor governs: adding or changing Rust source in an sc-agent crate. Does `item.text` describe work within that scope? Count any Rust code in an sc-agent crate (library code, runners, clients, types or tests), whether or not it involves waiting or timing. Work that touches only documents, CI files, or non-Rust or non-sc-agent code is outside the scope. Judge whether the item is within scope only.",
+        "criteria": {
+          "yes": "The described work writes or edits Rust code inside an sc-agent crate.",
+          "no": "The described work writes or edits no Rust code inside an sc-agent crate (for example docs only, CI files, or a script in another language).",
+          "unclear": "The item text is too vague to tell whether Rust code in an sc-agent crate is written or edited."
+        }
+      },
+      "rel-require": {
+        "type": "choice",
+        "instructions": "Would completing the work in `item.text` require writing or editing Rust source code inside one of the sc-agent crates (the scope in `anchor.scope`)? The topic of the code does not matter; any sc-agent Rust code, including tests, counts. Files that are not Rust source in an sc-agent crate, such as Markdown, YAML or Python tooling, do not count. Answer only whether the work lands in that scope.",
+        "criteria": {
+          "yes": "Completing the item requires writing or editing Rust source in an sc-agent crate.",
+          "no": "Completing the item requires no Rust source changes in an sc-agent crate.",
+          "unclear": "It cannot be told from the item text whether Rust source in an sc-agent crate changes."
+        }
+      }
+    },
+    "addressed": {
+      "add-explicit": {
+        "type": "choice",
+        "instructions": "`anchor.statement` forbids sc-agent source code from calling any sleep function. Does `item.text` explicitly carry that constraint forward? Count it only when the item states that no sleep function is called or names the non-sleep mechanism it uses instead of sleeping (for example waiting on a cancellation token's wait_until, or a lint that forbids sleep calls). An item that is silent about how it waits, that merely waits or retries, or that uses some other call without saying it avoids sleeping does not count. Judge explicit presence of the constraint only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item explicitly states that no sleep function is used, or names a non-sleep waiting mechanism or a lint adopted to avoid sleeping.",
+          "no": "The item does not state the no-sleep constraint and names no mechanism adopted to avoid sleeping, including items that are silent about waiting or that call a sleep function.",
+          "unclear": "The item hints at avoiding sleep but it is not possible to tell whether it commits to doing so."
+        }
+      },
+      "add-commit": {
+        "type": "choice",
+        "instructions": "Does `item.text` contain an explicit commitment matching `anchor.statement`, namely that the sc-agent code will not sleep? Look for wording such as 'no sleep calls', a rule or lint forbidding sleep, or a named replacement for sleeping such as CancelToken::wait_until. Mentioning delays, retries, holdoffs or timeouts without that commitment does not count, and an item that sleeps does not count. Judge only whether the commitment is written in the item.",
+        "criteria": {
+          "yes": "The item writes down the no-sleep commitment or a named replacement for sleeping.",
+          "no": "The item writes down no such commitment, whatever else it says about waiting, retries or timeouts.",
+          "unclear": "The item contains wording that may or may not be a no-sleep commitment."
+        }
+      },
+      "add-present": {
+        "type": "choice",
+        "instructions": "Is the directive in `anchor.statement` (no calls to std::thread::sleep, tokio::time::sleep or any other sleep function) present in `item.text` as a stated constraint or as an explicit design choice made to honour it? A non-sleep wait that the item names as its way of waiting (such as wait_until on a cancellation token) counts as such a choice. Silence, generic talk of waiting or backoff, or an unrelated timeout do not count. Judge presence of the directive only, not conflict.",
+        "criteria": {
+          "yes": "The directive is present as a stated constraint or as a named non-sleep way of waiting.",
+          "no": "The directive is absent: the item is silent about it or mentions waiting only generically.",
+          "unclear": "Something in the item might be the directive but it is not possible to tell."
+        }
+      }
+    },
+    "contradicted": {
+      "con-call": {
+        "type": "choice",
+        "instructions": "`anchor.statement` forbids sc-agent Rust source from calling std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function. Does `item.text` call, plan to call, or allow such a sleep call in sc-agent Rust source? Any code in an sc-agent crate counts, including tests; an exemption the item claims for itself does not remove the conflict, because the anchor grants none. Not a conflict: silence about sleeping, waiting without saying how, a timeout that bounds an operation, waiting on a cancellation token or deadline signal, and sleep calls in code that is not sc-agent Rust source (such as a Python script). Judge conflict only.",
+        "criteria": {
+          "yes": "The item calls, plans or allows a sleep function in sc-agent Rust source.",
+          "no": "The item makes, plans and allows no sleep call in sc-agent Rust source.",
+          "unclear": "The item describes a wait in sc-agent Rust source in terms that might or might not be a sleep call."
+        }
+      },
+      "con-names": {
+        "type": "choice",
+        "instructions": "Does `item.text` put a sleep call into sc-agent Rust source, which `anchor.statement` rules out? A sleep call is std::thread::sleep, std::thread::sleep_until, tokio::time::sleep, or any other function that suspends the thread or task for a duration or until an instant. Test code in an sc-agent crate is included and no exemption exists. tokio::time::timeout, a cancellation token's wait_until, an unspecified wait, and code outside the sc-agent Rust crates are not sleep calls in sc-agent source. Silence is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item uses or plans a sleep call in sc-agent Rust source, including tests, with or without a claimed exemption.",
+          "no": "The item uses or plans no sleep call in sc-agent Rust source.",
+          "unclear": "The item's waiting mechanism in sc-agent Rust source is described ambiguously enough that it may be a sleep call."
+        }
+      },
+      "con-rule": {
+        "type": "choice",
+        "instructions": "`anchor.statement` is a prohibition on sleep calls in sc-agent source code. Does the plan in `item.text` break it, by sleeping (std::thread::sleep, sleep_until, tokio::time::sleep or any equivalent) in Rust code of an sc-agent crate, tests included, or by declaring such sleeping acceptable? Only an actual or permitted sleep call in sc-agent Rust source breaks it. Items that do not mention sleeping, that wait by an unstated or non-sleep means, that bound work with a timeout, or that sleep only in non-Rust tooling outside the crates do not break it. Judge conflict only.",
+        "criteria": {
+          "yes": "The item sleeps, or declares sleeping acceptable, in sc-agent Rust source.",
+          "no": "The item does not sleep in sc-agent Rust source and does not declare it acceptable.",
+          "unclear": "It is not possible to tell whether the item's wait in sc-agent Rust source is a sleep."
+        }
+      },
+      "con-named": {
+        "type": "choice",
+        "instructions": "`anchor.statement` forbids sc-agent Rust source from calling std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function. Does `item.text` name or describe a sleep call that it makes, plans or permits in sc-agent Rust source? Test code in an sc-agent crate counts, and an exemption the item claims for itself does not remove the conflict. An item that says it will wait, back off or hold off without naming how it waits does not name a sleep call; neither does tokio::time::timeout, waiting on a cancellation token, silence, or sleeping in code that is not sc-agent Rust source (such as a Python script). Judge conflict only.",
+        "criteria": {
+          "yes": "The item names a sleep function, or explicitly describes sleeping, as something it does or permits in sc-agent Rust source.",
+          "no": "The item names and describes no sleep call in sc-agent Rust source, including when it waits without saying how.",
+          "unclear": "The item names a function in sc-agent Rust source whose behaviour cannot be told, so it might be a sleep function."
+        }
+      },
+      "con-stated": {
+        "type": "choice",
+        "instructions": "Judge only what `item.text` states. Does it state that sc-agent Rust code (tests included) will call std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or another sleep function, or that such a call is allowed, which `anchor.statement` rules out? Do not infer a sleep from an unstated waiting mechanism: 'waits out the holdoff' or 'retries after a delay' without a named sleep is not a conflict. tokio::time::timeout and cancellation-token waits are not sleep functions. Sleep calls outside sc-agent Rust source are not a conflict. Silence is not a conflict.",
+        "criteria": {
+          "yes": "The item states a sleep call, or permission for one, in sc-agent Rust source.",
+          "no": "The item states no sleep call and no permission for one in sc-agent Rust source.",
+          "unclear": "The item states a call in sc-agent Rust source that might be a sleep function, but the text does not show which."
+        }
+      },
+      "con-explicit": {
+        "type": "choice",
+        "instructions": "Does `item.text` explicitly plan a sleep in sc-agent Rust source, the thing `anchor.statement` prohibits? A sleep is a call to std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other function that pauses for a duration or until an instant. Code in an sc-agent crate counts whatever its purpose, tests included, and a claimed exemption still counts because the anchor grants none. A wait whose mechanism the item does not state, a timeout bounding an operation, a cancellation-token wait, and sleeps in non-Rust tooling outside the crates are not explicit sleeps in sc-agent source. Judge conflict only.",
+        "criteria": {
+          "yes": "The item explicitly plans or permits a sleep call in sc-agent Rust source.",
+          "no": "The item explicitly plans and permits no sleep call in sc-agent Rust source, including when its waiting mechanism is unstated.",
+          "unclear": "The item explicitly names a call in sc-agent Rust source that may or may not be a sleep function."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "r2-b1",
+      "roles": {
+        "relevant": "rel-within",
+        "addressed": "add-commit",
+        "contradicted": "con-named"
+      }
+    },
+    {
+      "bundle_id": "r2-b2",
+      "roles": {
+        "relevant": "rel-within",
+        "addressed": "add-commit",
+        "contradicted": "con-stated"
+      }
+    },
+    {
+      "bundle_id": "r2-b3",
+      "roles": {
+        "relevant": "rel-within",
+        "addressed": "add-commit",
+        "contradicted": "con-explicit"
+      }
+    },
+    {
+      "bundle_id": "r2-b4",
+      "roles": {
+        "relevant": "rel-scope",
+        "addressed": "add-explicit",
+        "contradicted": "con-named"
+      }
+    }
+  ]
+}

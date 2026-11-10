@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0009",
+  "candidates": {
+    "relevant": {
+      "rel_scope": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, `anchor.scope`). The anchor governs only the crates it names in `anchor.statement` and only the kind of work named in `anchor.scope`. Does the work in `item.text` fall inside that scope: does it add, change, choose, or verify the dependencies or runtime of one of the crates the statement names? Work on a crate the statement does not name is outside the scope even if it mentions the same libraries. Work on a named crate that changes no dependency or runtime is outside the scope. Judge scope overlap only, not whether the item obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds, changes, chooses, or verifies a dependency or the runtime of a crate named in the anchor statement.",
+          "no": "The item concerns a crate the statement does not name, or it changes no dependency or runtime of a named crate.",
+          "unclear": "The item text does not say which crate it changes or whether it changes any dependency or runtime."
+        }
+      },
+      "rel_crate_first": {
+        "type": "choice",
+        "instructions": "First identify which crate or crates `item.text` works on. Then compare them with the crates listed in `anchor.statement`; a crate outside that list (for example an application or command-line binary) is not governed. Finally check whether the work is the kind described in `anchor.scope` (adding, changing, selecting, or checking dependencies, including the execution or async-runtime mechanism that determines dependencies). Answer whether the item is governed by the anchor. Do not judge whether it complies.",
+        "criteria": {
+          "yes": "A listed crate is affected and the work is of the kind described in the anchor scope.",
+          "no": "No listed crate is affected, or the work on a listed crate is of a different kind than the anchor scope (for example renaming, documentation, or logic changes with no dependency or runtime impact).",
+          "unclear": "The text is too vague to tell which crate is affected or what kind of change is made."
+        }
+      },
+      "rel_short": {
+        "type": "choice",
+        "instructions": "Is `item.text` within the area that `anchor.scope` describes, for one of the crates enumerated in `anchor.statement`? Items that add, change, decide on, or check the dependencies or execution runtime of an enumerated crate are within it. Items about other crates, or about enumerated crates without touching their dependencies or runtime, are not. Judge applicability only.",
+        "criteria": {
+          "yes": "The item deals with dependencies or the execution runtime of an enumerated crate.",
+          "no": "The item deals with a crate that is not enumerated, or with something other than dependencies or runtime.",
+          "unclear": "It is not possible to tell from the text which crate or what kind of change is involved."
+        }
+      }
+    },
+    "addressed": {
+      "add_explicit": {
+        "type": "choice",
+        "instructions": "Does `item.text` itself state the specific constraint in `anchor.statement`, here that the crates involved do not depend on tokio with its default features (for example: no tokio dependency, tokio only with default-features = false, or a check that the dependency tree has no tokio with default features)? Only an explicit statement of that constraint counts. Merely adding other dependencies, or mentioning async runtimes or tokio without stating the constraint, does not count. Judge presence of the constraint only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item explicitly states or checks that tokio is absent or used without its default features.",
+          "no": "The item does not state that constraint: it is silent about tokio, mentions a runtime choice without the constraint, or adds tokio with default features.",
+          "unclear": "The item refers to tokio's features or presence in a way that cannot be read either as stating the constraint or as not stating it."
+        }
+      },
+      "add_restate": {
+        "type": "choice",
+        "instructions": "Read `anchor.statement` and reduce it to its specific requirement. Does `item.text` contain that requirement as a step, constraint, or check, in any wording? A plan that merely refrains from violating the requirement without saying so does not contain it. A plan that does the forbidden thing does not contain it. Judge presence only.",
+        "criteria": {
+          "yes": "The item text contains the anchor's specific requirement as a step, constraint, or check.",
+          "no": "The item text does not contain the requirement, whether it is silent, only topical, or does the opposite.",
+          "unclear": "The item text partly echoes the requirement but it cannot be told whether the requirement itself is included."
+        }
+      },
+      "add_tokio": {
+        "type": "choice",
+        "instructions": "The anchor in `anchor.statement` forbids depending on tokio with its default features. Does `item.text` explicitly preserve that rule, by saying that no tokio dependency is added, that tokio's default features stay disabled, or by verifying that no tokio with default features is in the dependency tree? Answer only about whether the rule is explicitly carried in the text.",
+        "criteria": {
+          "yes": "The item explicitly keeps tokio out, keeps tokio's default features disabled, or verifies that.",
+          "no": "The item does not explicitly carry the rule; this includes items silent about tokio, items that only discuss runtime options, and items that add tokio with default features.",
+          "unclear": "The item mentions tokio's features in a way that cannot be read either way."
+        }
+      }
+    },
+    "contradicted": {
+      "con_commit": {
+        "type": "choice",
+        "instructions": "Does `item.text` commit to something that `anchor.statement` forbids for the crates it names, here a dependency (direct or through a named crate such as reqwest with its default runtime) on tokio with its default features? Only a concrete commitment counts. Silence, an open comparison of options that has not chosen the forbidden dependency, or tokio used only with default-features = false is not a conflict. Work on a crate the statement does not name cannot conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item commits a named crate to depend on tokio with its default features, directly or through another dependency that enables them.",
+          "no": "The item makes no such commitment for a named crate: it is silent, leaves the choice open, uses tokio without default features, or concerns a crate the statement does not name.",
+          "unclear": "The item commits a named crate to a dependency whose tokio default features cannot be determined from the text."
+        }
+      },
+      "con_irreconcilable": {
+        "type": "choice",
+        "instructions": "Does `item.text` state a plan or decision that cannot be reconciled with `anchor.statement`, given the crates the statement names? A contradiction is a stated plan that does the forbidden thing to a named crate. Silence about the rule, an undecided option, or work on a crate the statement does not name is not a contradiction. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states a plan for a named crate that does what the anchor statement forbids.",
+          "no": "No stated plan for a named crate does what the anchor forbids, including when the item is silent, undecided, or about another crate.",
+          "unclear": "The item states a plan for a named crate whose wording might or might not do what the anchor forbids."
+        }
+      },
+      "con_tokio": {
+        "type": "choice",
+        "instructions": "For the crates listed in `anchor.statement`, does `item.text` make one of them depend on tokio with tokio's default features enabled (for example a required `tokio` entry without `default-features = false`, `features = [\"full\"]`, or a dependency described as bringing its default tokio runtime)? Considering options without choosing, using tokio with `default-features = false`, or adding tokio to a crate not listed is not this. Judge only whether such a dependency is planned.",
+        "criteria": {
+          "yes": "A listed crate is planned to depend on tokio with its default features.",
+          "no": "No listed crate is planned to depend on tokio with its default features.",
+          "unclear": "A listed crate gains a dependency on tokio, or on a crate that may enable it, but the text does not show whether tokio's default features are enabled."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {"bundle_id": "B1", "roles": {"relevant": "rel_scope", "addressed": "add_explicit", "contradicted": "con_commit"}},
+    {"bundle_id": "B2", "roles": {"relevant": "rel_crate_first", "addressed": "add_restate", "contradicted": "con_irreconcilable"}},
+    {"bundle_id": "B3", "roles": {"relevant": "rel_short", "addressed": "add_tokio", "contradicted": "con_tokio"}},
+    {"bundle_id": "B4", "roles": {"relevant": "rel_scope", "addressed": "add_tokio", "contradicted": "con_tokio"}},
+    {"bundle_id": "B5", "roles": {"relevant": "rel_crate_first", "addressed": "add_explicit", "contradicted": "con_commit"}},
+    {"bundle_id": "B6", "roles": {"relevant": "rel_short", "addressed": "add_explicit", "contradicted": "con_irreconcilable"}}
+  ]
+}

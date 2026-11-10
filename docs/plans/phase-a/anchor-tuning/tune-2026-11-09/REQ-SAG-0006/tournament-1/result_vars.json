@@ -1,0 +1,1258 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "tune",
+    "gate": "planning",
+    "accepted": true,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "semantic_score": {
+      "exact_role_cells": 60,
+      "total_role_cells": 60,
+      "exact_semantic_verdicts": 20,
+      "total_semantic_verdicts": 20,
+      "stable_cases": 10,
+      "total_cases": 10,
+      "regressions": 0
+    },
+    "confidence_diagnostics": {
+      "threshold": 0.8,
+      "cells_at_or_above_threshold": 52,
+      "total_cells": 60,
+      "minimum": 0.28,
+      "p10": 0.721,
+      "median": 1.0,
+      "mean": 0.9345
+    },
+    "tuning_history_before_sha256": "ef2bba5c0edfafbc33538f5ca925f9f45243372b1aebb8ed252bdaf7ab05014d",
+    "tuning_history_after": {
+      "schema": "plan-anchor/tuning-history/2",
+      "history_id": "phase-a-REQ-SAG-0006-planning",
+      "events": [
+        {
+          "event_index": 1,
+          "previous_event_sha256": null,
+          "event": "question_set_sealed",
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "authority": {
+            "intent_id": "phase-a-intent",
+            "intent_version": 1,
+            "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+            "anchor_id": "REQ-SAG-0006",
+            "anchor_version": 2,
+            "anchor_record_sha256": "58a517471221165f0b7423717a2704c8f1b8e8eb7d39a2a1bce57e64fc0bcfb9"
+          },
+          "oracle": {
+            "sha256": "6e331e0a2a4e86e0751a7bafc38016365c893a62a6281ff0989d5aaaff0027b6",
+            "case_ids": [
+              "fixture-pass",
+              "fixture-fail",
+              "compliant",
+              "silent",
+              "topical-only",
+              "conflicting",
+              "irrelevant",
+              "boundary-generic-name",
+              "boundary-field",
+              "exception-feature-gated"
+            ],
+            "case_count": 10,
+            "repeat_count": 2
+          },
+          "candidate": {
+            "candidate_id": "b-mixed",
+            "question_sha256": "82e44df958888cb0c17513455ebaebc380679a1c55d7cddbab56e3e764d2bd2a"
+          },
+          "evidence": {
+            "canonical_request_sha256": [
+              "25413490ee874f34adf788e25722d66fda3470cf573ca077b681b9e0153dc9fe",
+              "25413490ee874f34adf788e25722d66fda3470cf573ca077b681b9e0153dc9fe",
+              "f24f717fdb21b32ecdea8c6805e9d74fef7133ae4783c2201746a13f9721fae7",
+              "f24f717fdb21b32ecdea8c6805e9d74fef7133ae4783c2201746a13f9721fae7",
+              "ed23aada2a7f3b32b418ebcbffb97ac59968b3975288f6b8df5ac966be798e11",
+              "ed23aada2a7f3b32b418ebcbffb97ac59968b3975288f6b8df5ac966be798e11",
+              "c6f08c256980c1949dab3c85463b175e6fac555ee9f0aa94a008103554da5f77",
+              "c6f08c256980c1949dab3c85463b175e6fac555ee9f0aa94a008103554da5f77",
+              "4dbffeeeec17afa2e21fe87f89df363bcc60e5f8c80bcccae4d4319b5a48e722",
+              "4dbffeeeec17afa2e21fe87f89df363bcc60e5f8c80bcccae4d4319b5a48e722",
+              "3f89d4d0566dd11bcae28588a79384a40f82675a28b7b2b3aba0c6799406c08e",
+              "3f89d4d0566dd11bcae28588a79384a40f82675a28b7b2b3aba0c6799406c08e",
+              "4b7b169b2fe55b4013f193173b26b169079cc272d34b18080fb90179dd05f0ea",
+              "4b7b169b2fe55b4013f193173b26b169079cc272d34b18080fb90179dd05f0ea",
+              "5a9104c3a91cd7b631264c500df891d53430b79fd129b9ed634bfd7ef82cdf83",
+              "5a9104c3a91cd7b631264c500df891d53430b79fd129b9ed634bfd7ef82cdf83",
+              "298e5592a2f95dd2c7e1476f1d4b6c2965d088f6873fc0b156713a756b7a600f",
+              "298e5592a2f95dd2c7e1476f1d4b6c2965d088f6873fc0b156713a756b7a600f",
+              "675b06fc75ddf8b33f02e38f66105629dc2e0e32d0b009b38646f38b2fda4f96",
+              "675b06fc75ddf8b33f02e38f66105629dc2e0e32d0b009b38646f38b2fda4f96"
+            ],
+            "raw_response_sha256": [
+              "edbf342ff6e6caeacbfebed0564636ce0c7315a806c3af2e84480ca47ce051a0",
+              "e0197d2ab3e055e6cdaf2562175a1014fcaa139ccc67e153ce755c69d2818d03",
+              "7f3d3db3f702af6bb0e20d87709cd0329aff27dfa47409cf4bb522bfb6728371",
+              "7f3d3db3f702af6bb0e20d87709cd0329aff27dfa47409cf4bb522bfb6728371",
+              "a82acaab9d61d5c1fe0eb2f3655496cf78821c4cdc31013cbe25f8101f9348d8",
+              "a82acaab9d61d5c1fe0eb2f3655496cf78821c4cdc31013cbe25f8101f9348d8",
+              "e96ebed827d52f470af1e3dd785514928371d185b2b0b1a137f88203cebf07d7",
+              "e96ebed827d52f470af1e3dd785514928371d185b2b0b1a137f88203cebf07d7",
+              "51c99cfafb048474710391a79d8de3ed4f768638c3e435559aca9548d5d24347",
+              "b7d9135872e3c10334937a13fc597af09fde631d8d75b289e1f26db2b2a77c62",
+              "044c5cb152a342e2256713e2197894e01eef2290872dfa25d802d15b58f4c4c8",
+              "044c5cb152a342e2256713e2197894e01eef2290872dfa25d802d15b58f4c4c8",
+              "fffda9d9b8e77ad00c4f73547e3b9f149de6d6a45f8d498065a65c077c91c877",
+              "fffda9d9b8e77ad00c4f73547e3b9f149de6d6a45f8d498065a65c077c91c877",
+              "75d71a6dc024ae0e3735bebb0e760e3f504f30379c827eea8942350f6ff0d20d",
+              "2058eb9514955ede35910bd98785c989565b11201b80723d38b727783c36cdb3",
+              "eb6906b82068afd7e98c3e024244de2d6359dda004efdd1162527322a94435ab",
+              "eb6906b82068afd7e98c3e024244de2d6359dda004efdd1162527322a94435ab",
+              "7ce071d9f09c6482b4b888071e6039350981d3268c83fc4168db961fce5d26b8",
+              "7ce071d9f09c6482b4b888071e6039350981d3268c83fc4168db961fce5d26b8"
+            ],
+            "run_ids": [
+              "914e84a1938f1a0b",
+              "91483da625f43973",
+              "d8ae293424b6abc2",
+              "c821aef1f7d7a63b",
+              "a10cf5b9dcdb75f7",
+              "aaf710afecffb068",
+              "0ed56f7e938fc514",
+              "a76c8f44dee86c08",
+              "8e7ff6bfb3bd0708",
+              "e4480481b4e9c3c7",
+              "d9bcad2126956659",
+              "65ee8a9c16f7c26c",
+              "d45a37858d9258f6",
+              "7871e46505326bd8",
+              "f82303124caad208",
+              "a3d81d9bfec90aae",
+              "bee8b052f9c31615",
+              "c7da3d2b4351abf8",
+              "9b30b77342e73fce",
+              "166d8e137b3c38bf"
+            ]
+          },
+          "score": {
+            "exact_role_cells": 60,
+            "total_role_cells": 60,
+            "exact_semantic_verdicts": 20,
+            "total_semantic_verdicts": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "regressions": 0,
+            "confidence": {
+              "threshold": 0.8,
+              "cells_at_or_above_threshold": 52,
+              "total_cells": 60,
+              "minimum": 0.28,
+              "p10": 0.721,
+              "median": 1.0,
+              "mean": 0.9345
+            }
+          },
+          "decision": {
+            "status": "sealed",
+            "question_set_sha256": "82e44df958888cb0c17513455ebaebc380679a1c55d7cddbab56e3e764d2bd2a",
+            "reason_code": "TOURNAMENT.SEALED"
+          },
+          "supersedes": null
+        }
+      ]
+    },
+    "tuning_history_after_sha256": "95ffaa304ea562ad3463fb2b1a7d69daede2942b356ec6bab7dedf8455bd25e3",
+    "production_semantics_unchanged": true,
+    "authority_citations": [
+      "REQ-SAG-0006 v2 (locked, prohibition): No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.",
+      "REQ-SAG-0006 quote: `sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.",
+      "REQ-SAG-0006 scope: adds or changes a type in sc-agent-types or sc-decision-schema",
+      "phase-a-intent v1: define the low-level sc-agent libraries sc-agent-types, sc-decision-schema and the shared HTTP layer."
+    ],
+    "oracle_sha256": "6e331e0a2a4e86e0751a7bafc38016365c893a62a6281ff0989d5aaaff0027b6",
+    "sealed_question_set": {
+      "digest": "82e44df958888cb0c17513455ebaebc380679a1c55d7cddbab56e3e764d2bd2a",
+      "questions": {
+        "addressed": {
+          "type": "choice",
+          "instructions": "`anchor.statement` forbids putting any type, field or constant specific to plan-anchor, judge-jev or another consumer application into sc-agent-types or sc-decision-schema. Does `item.text` explicitly state that restriction, for example by saying the crates hold no consumer-specific or plan-anchor/judge-jev types, or that such types stay in the consumer's own crate? Only an explicit statement of the restriction counts. Merely adding generic types, describing the crates, or being silent is not stating it. Judge presence of the stated restriction only, not whether the item breaks it.",
+          "criteria": {
+            "yes": "The item explicitly states that sc-agent-types or sc-decision-schema hold no types, fields or constants specific to plan-anchor, judge-jev or other consumer applications.",
+            "no": "The item does not state the restriction: it is silent about consumer-specific types, only adds or describes types, or adds consumer-specific types.",
+            "unclear": "The item contains wording that partly restates the restriction, but it cannot be told whether it excludes consumer-specific types."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "`anchor.statement` forbids any type, field or constant in sc-agent-types or sc-decision-schema that is specific to plan-anchor, judge-jev or another application built on sc-agent. Does `item.text` plan to add or keep such content in either crate? This includes whole types, single fields, constants, mocks and test helpers, and content behind a cargo feature or used only in tests; the anchor grants no exception. A type is not forbidden just because its name sounds like a judging concept: a type that mirrors the TypeSafe API or is useful to every consumer is allowed. Silence about the rule is not a contradiction. Judge conflict only.",
+          "criteria": {
+            "yes": "The item places in sc-agent-types or sc-decision-schema a type, field or constant that exists for plan-anchor, judge-jev or another specific consumer application.",
+            "no": "Everything the item adds to these crates is generic or mirrors the TypeSafe API, or the item adds nothing to them.",
+            "unclear": "The item adds something to these crates and it cannot be told whether it is specific to one consumer application."
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan work on the contents (types, fields, constants) of sc-agent-types or sc-decision-schema, the crates `anchor.statement` restricts? Judge overlap only.",
+          "criteria": {
+            "yes": "It plans, adds or changes contents of either crate.",
+            "no": "It concerns something else and touches neither crate's contents.",
+            "unclear": "It is too vague to tell which crates it touches."
+          }
+        }
+      }
+    },
+    "candidate_rankings": [
+      {
+        "rank": 1,
+        "bundle_id": "b-mixed",
+        "roles": {
+          "relevant": "rel-short",
+          "addressed": "add-explicit",
+          "contradicted": "con-adds-forbidden"
+        },
+        "question_sha256": "f77c5208b9d254802e04a348e0412cf838f609e96959e58512b723dca212b90c",
+        "semantic_accepted": true,
+        "complete": true,
+        "exact_role_cells": 60,
+        "total_role_cells": 60,
+        "exact_semantic_verdicts": 20,
+        "total_semantic_verdicts": 20,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 52,
+          "total_cells": 60,
+          "minimum": 0.28,
+          "p10": 0.721,
+          "median": 1.0,
+          "mean": 0.9345
+        },
+        "complexity_bytes": 2672,
+        "selected": true,
+        "co_leader": false,
+        "reason": "Selected: top lexicographic rank among semantically accepted bundles.",
+        "mismatches": []
+      },
+      {
+        "rank": 2,
+        "bundle_id": "b-explicit",
+        "roles": {
+          "relevant": "rel-scope",
+          "addressed": "add-explicit",
+          "contradicted": "con-adds-forbidden"
+        },
+        "question_sha256": "f4b40bd61a35c9975750cfda5ff149510f6e81d701aa3d4a12590e98dea27b01",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 59,
+        "total_role_cells": 60,
+        "exact_semantic_verdicts": 19,
+        "total_semantic_verdicts": 20,
+        "stable_cases": 9,
+        "total_cases": 10,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 52,
+          "total_cells": 60,
+          "minimum": 0.02,
+          "p10": 0.646,
+          "median": 1.0,
+          "mean": 0.9172
+        },
+        "complexity_bytes": 3127,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: unstable across repeats; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: unstable across repeats",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 3,
+        "bundle_id": "b-subject",
+        "roles": {
+          "relevant": "rel-subject",
+          "addressed": "add-restates",
+          "contradicted": "con-purpose"
+        },
+        "question_sha256": "4c8644fb7e4d155ac3fb9ef2d488544f4f41cf860907a37289ed4658a49bf0f1",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 57,
+        "total_role_cells": 60,
+        "exact_semantic_verdicts": 19,
+        "total_semantic_verdicts": 20,
+        "stable_cases": 9,
+        "total_cases": 10,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 54,
+          "total_cells": 60,
+          "minimum": 0.25,
+          "p10": 0.889,
+          "median": 1.0,
+          "mean": 0.94
+        },
+        "complexity_bytes": 2395,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-generic-name: addressed yes, expected no; topical-only: contradicted unclear, expected no; topical-only: unstable across repeats; topical-only: verdict underspecified, expected satisfied; 1 regression(s) against the baseline: topical-only.",
+        "mismatches": [
+          "boundary-generic-name: addressed yes, expected no",
+          "topical-only: contradicted unclear, expected no",
+          "topical-only: unstable across repeats",
+          "topical-only: verdict underspecified, expected satisfied",
+          "1 regression(s) against the baseline: topical-only"
+        ]
+      },
+      {
+        "rank": 4,
+        "bundle_id": "baseline",
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "question_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 56,
+        "total_role_cells": 60,
+        "exact_semantic_verdicts": 20,
+        "total_semantic_verdicts": 20,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 48,
+          "total_cells": 60,
+          "minimum": 0.24,
+          "p10": 0.458,
+          "median": 1.0,
+          "mean": 0.8818
+        },
+        "complexity_bytes": 2554,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-generic-name: addressed yes, expected no; silent: addressed yes, expected no.",
+        "mismatches": [
+          "boundary-generic-name: addressed yes, expected no",
+          "silent: addressed yes, expected no"
+        ]
+      },
+      {
+        "rank": 5,
+        "bundle_id": "b-short",
+        "roles": {
+          "relevant": "rel-short",
+          "addressed": "add-short",
+          "contradicted": "con-short"
+        },
+        "question_sha256": "9ad08bed6f93094389e194bd43599e875c8833832002a22b42964a62754fc26c",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 56,
+        "total_role_cells": 60,
+        "exact_semantic_verdicts": 20,
+        "total_semantic_verdicts": 20,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 52,
+          "total_cells": 60,
+          "minimum": 0.43,
+          "p10": 0.729,
+          "median": 1.0,
+          "mean": 0.9427
+        },
+        "complexity_bytes": 1547,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary-generic-name: addressed yes, expected no; fixture-pass: addressed no, expected yes; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "boundary-generic-name: addressed yes, expected no",
+          "fixture-pass: addressed no, expected yes",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      }
+    ],
+    "acceptance_table": [
+      {
+        "case_id": "fixture-pass",
+        "probe": "fixture_pass",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.42,
+            "contradicted": 1.0,
+            "relevant": 0.55
+          },
+          {
+            "addressed": 0.38,
+            "contradicted": 1.0,
+            "relevant": 0.64
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "underspecified",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Approved pass fixture of REQ-SAG-0006: it is about the content of sc-decision-schema, explicitly states the exclusion of plan-anchor/judge-jev types, and adds nothing forbidden."
+      },
+      {
+        "case_id": "fixture-fail",
+        "probe": "fixture_fail",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Approved fail fixture: a type specific to plan-anchor is added to sc-agent-types, which the statement forbids; the item does not state the exclusion."
+      },
+      {
+        "case_id": "compliant",
+        "probe": "compliant",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Adds types to sc-decision-schema (scope), restates the prohibition explicitly, and the added types are TypeSafe API types, not consumer-specific."
+      },
+      {
+        "case_id": "silent",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Adds generic types to sc-agent-types (in scope) but never mentions the consumer-type exclusion; the added types are not specific to any consumer, so nothing conflicts."
+      },
+      {
+        "case_id": "topical-only",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.74,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.73,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Touches which types live in the two crates (topic of the anchor) without stating the consumer-specific exclusion; shared error and retry types are generic, so no conflict."
+      },
+      {
+        "case_id": "conflicting",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Puts types specific to judge-jev and plan-anchor into sc-decision-schema, exactly what REQ-SAG-0006 forbids."
+      },
+      {
+        "case_id": "irrelevant",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "CI caching neither adds nor changes any type in sc-agent-types or sc-decision-schema; outside the anchor's scope."
+      },
+      {
+        "case_id": "boundary-generic-name",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.37,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.28,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "A type whose name sounds like a judging concept but that mirrors the TypeSafe API response is not specific to a consumer, so it is allowed; the item does not state the general exclusion rule, so addressed is no."
+      },
+      {
+        "case_id": "boundary-field",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "The statement covers fields and constants, not only whole types: a plan-anchor field and a judge-jev constant in sc-agent-types are forbidden."
+      },
+      {
+        "case_id": "exception-feature-gated",
+        "probe": "exception",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "REQ-SAG-0006 grants no exception for test-only or feature-gated code (its summary names Jev-mock types explicitly); a judge-jev mock type in sc-agent-types is forbidden."
+      }
+    ],
+    "evidence": {
+      "out_dir": "tournament-1",
+      "results_path": "tournament-1/results.jsonl",
+      "oracle_path": "tournament-1/oracle.frozen.json",
+      "oracle_frozen_before_first_jev_call": true,
+      "calls": 100,
+      "failed_calls": [],
+      "missing_calls": [],
+      "retries": 0,
+      "max_parallel_evaluators": 4,
+      "repeat_requests_byte_identical": true,
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "b-explicit": {
+          "relevant": "rel-scope",
+          "addressed": "add-explicit",
+          "contradicted": "con-adds-forbidden"
+        },
+        "b-subject": {
+          "relevant": "rel-subject",
+          "addressed": "add-restates",
+          "contradicted": "con-purpose"
+        },
+        "b-short": {
+          "relevant": "rel-short",
+          "addressed": "add-short",
+          "contradicted": "con-short"
+        },
+        "b-mixed": {
+          "relevant": "rel-short",
+          "addressed": "add-explicit",
+          "contradicted": "con-adds-forbidden"
+        }
+      },
+      "role_rankings": {
+        "addressed": [
+          {
+            "candidate_id": "add-explicit",
+            "bundles": [
+              "b-explicit",
+              "b-mixed"
+            ],
+            "exact_cells": 40,
+            "total_cells": 40,
+            "stable_cases": 20,
+            "total_cases": 20
+          },
+          {
+            "candidate_id": "add-restates",
+            "bundles": [
+              "b-subject"
+            ],
+            "exact_cells": 18,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "add-short",
+            "bundles": [
+              "b-short"
+            ],
+            "exact_cells": 16,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 16,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          }
+        ],
+        "contradicted": [
+          {
+            "candidate_id": "con-adds-forbidden",
+            "bundles": [
+              "b-explicit",
+              "b-mixed"
+            ],
+            "exact_cells": 40,
+            "total_cells": 40,
+            "stable_cases": 20,
+            "total_cases": 20
+          },
+          {
+            "candidate_id": "con-short",
+            "bundles": [
+              "b-short"
+            ],
+            "exact_cells": 20,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 20,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "con-purpose",
+            "bundles": [
+              "b-subject"
+            ],
+            "exact_cells": 19,
+            "total_cells": 20,
+            "stable_cases": 9,
+            "total_cases": 10
+          }
+        ],
+        "relevant": [
+          {
+            "candidate_id": "rel-short",
+            "bundles": [
+              "b-short",
+              "b-mixed"
+            ],
+            "exact_cells": 40,
+            "total_cells": 40,
+            "stable_cases": 20,
+            "total_cases": 20
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 20,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "rel-subject",
+            "bundles": [
+              "b-subject"
+            ],
+            "exact_cells": 20,
+            "total_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10
+          },
+          {
+            "candidate_id": "rel-scope",
+            "bundles": [
+              "b-explicit"
+            ],
+            "exact_cells": 19,
+            "total_cells": 20,
+            "stable_cases": 9,
+            "total_cases": 10
+          }
+        ]
+      },
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "run_ids_all": [
+        "02a139d315ddc2ad",
+        "02fa7f9fe3363ab2",
+        "09111335b1bd8652",
+        "0ed56f7e938fc514",
+        "12a391c0adcd066c",
+        "15d514e4f7d786c9",
+        "166d8e137b3c38bf",
+        "19177f796add2914",
+        "23d9d30f908b251c",
+        "29a83de93153601b",
+        "2ddf41b426ae3b43",
+        "338c1cca2fa4be60",
+        "36808e8eaacca7ce",
+        "3db0536030609250",
+        "3ead5e6bbd573d21",
+        "40768fc108fe60d1",
+        "42d7852a05a8c05d",
+        "44fa71fc9b4ef721",
+        "46c63006a998c699",
+        "4a101d8cfc0a88b6",
+        "4a597edb0c8d9653",
+        "4a76cb5bd840a586",
+        "4beeb26a9743f5e9",
+        "4d8da6a9130957d4",
+        "4da577ac546d9b38",
+        "4db51cd241f79a1a",
+        "4f96f88ca1a73716",
+        "51a96ae79e4c2a91",
+        "5670bd4f17600470",
+        "5941f5351cec0ae7",
+        "5a1df2a13e2f1e60",
+        "5f7d82b4c5dc1c99",
+        "60f9bd3805f6d23e",
+        "6149976dfa163c39",
+        "628380bd88ae8abb",
+        "6418116844b5bcc9",
+        "65ee8a9c16f7c26c",
+        "66ffcc7a7cf2ee8b",
+        "69c2a843f490ff90",
+        "6d3ae110a44c767f",
+        "7871e46505326bd8",
+        "7935d4f859a5cc10",
+        "8315b6c0fbf37e7d",
+        "8642e71263bd1b74",
+        "87ec2ec1ba9cbcf4",
+        "88853b3160ef5c41",
+        "89417fe1d07e0ed5",
+        "89e65050fd8f5981",
+        "8ae5cee6687031e4",
+        "8e7ff6bfb3bd0708",
+        "91483da625f43973",
+        "914e84a1938f1a0b",
+        "931b88c73794a682",
+        "998c07abb72c9788",
+        "9b1a9dc7576243ac",
+        "9b30b77342e73fce",
+        "9f3ff3cc0d6e033a",
+        "a10cf5b9dcdb75f7",
+        "a3d81d9bfec90aae",
+        "a76c8f44dee86c08",
+        "a8507f0caea9f3cb",
+        "aaf710afecffb068",
+        "abd50e4d8f18f99c",
+        "af6ae3d1792db15a",
+        "affc6652332317f0",
+        "bb01b31f36efadf7",
+        "bba4e2cd462d0385",
+        "bc2207a405958c63",
+        "bee8b052f9c31615",
+        "c4f8cca0b7d87b24",
+        "c6485ab584fb1119",
+        "c7da3d2b4351abf8",
+        "c821aef1f7d7a63b",
+        "c8a9ecded1340ed9",
+        "d1d9d0e064814f21",
+        "d31c3425a7530e31",
+        "d45a37858d9258f6",
+        "d4b8e387521d56f2",
+        "d69477c27b0219e6",
+        "d71704bb9d0658ca",
+        "d8ae293424b6abc2",
+        "d9bcad2126956659",
+        "dcd97f7f169e6f89",
+        "e0d346d438d41d3e",
+        "e1d0fd367f2caad9",
+        "e4480481b4e9c3c7",
+        "e4cdb68b0ecfc2d9",
+        "e7631ec2027cdfdd",
+        "ea8b8eae8f5df43b",
+        "ed014f0b953e75b7",
+        "ed689ee071b502d8",
+        "edc3deddd55960a5",
+        "eee13390a3b32134",
+        "f465e5838e07d730",
+        "f4db16e00f854a44",
+        "f6bf77cbb4b0471c",
+        "f82303124caad208",
+        "fc7a9681960346da",
+        "fe16d1734e436ab5",
+        "febc689cb1e63f53"
+      ],
+      "tie": null
+    },
+    "explanation": "5 role-complete bundles (baseline included) x 10 frozen oracle cases x 2 repeats: 100 calls, 0 retries. Bundle b-mixed is the top-ranked semantically accepted set: 60/60 role cells, 20/20 threshold-0 verdicts, 10/10 stable cases, zero regressions against the baseline. Confidence is diagnostic only; production review keeps the 0.6 threshold.",
+    "planner_action": "Write sealed_question_set.questions as the anchor's plan-questions override after validating this result; store tuning_history_after byte-identical. Do not use tournament confidence in production review.",
+    "question_action": null,
+    "sealed_question_set_digest_before": null,
+    "sealed_question_set_digest_after": "82e44df958888cb0c17513455ebaebc380679a1c55d7cddbab56e3e764d2bd2a",
+    "authority_recommendations": []
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 2903,
+    "tool_calls": 100,
+    "retry_count": 0,
+    "correlation_id": "tune-plan-REQ-SAG-0006",
+    "jev_run_ids": [
+      "02a139d315ddc2ad",
+      "02fa7f9fe3363ab2",
+      "09111335b1bd8652",
+      "0ed56f7e938fc514",
+      "12a391c0adcd066c",
+      "15d514e4f7d786c9",
+      "166d8e137b3c38bf",
+      "19177f796add2914",
+      "23d9d30f908b251c",
+      "29a83de93153601b",
+      "2ddf41b426ae3b43",
+      "338c1cca2fa4be60",
+      "36808e8eaacca7ce",
+      "3db0536030609250",
+      "3ead5e6bbd573d21",
+      "40768fc108fe60d1",
+      "42d7852a05a8c05d",
+      "44fa71fc9b4ef721",
+      "46c63006a998c699",
+      "4a101d8cfc0a88b6",
+      "4a597edb0c8d9653",
+      "4a76cb5bd840a586",
+      "4beeb26a9743f5e9",
+      "4d8da6a9130957d4",
+      "4da577ac546d9b38",
+      "4db51cd241f79a1a",
+      "4f96f88ca1a73716",
+      "51a96ae79e4c2a91",
+      "5670bd4f17600470",
+      "5941f5351cec0ae7",
+      "5a1df2a13e2f1e60",
+      "5f7d82b4c5dc1c99",
+      "60f9bd3805f6d23e",
+      "6149976dfa163c39",
+      "628380bd88ae8abb",
+      "6418116844b5bcc9",
+      "65ee8a9c16f7c26c",
+      "66ffcc7a7cf2ee8b",
+      "69c2a843f490ff90",
+      "6d3ae110a44c767f",
+      "7871e46505326bd8",
+      "7935d4f859a5cc10",
+      "8315b6c0fbf37e7d",
+      "8642e71263bd1b74",
+      "87ec2ec1ba9cbcf4",
+      "88853b3160ef5c41",
+      "89417fe1d07e0ed5",
+      "89e65050fd8f5981",
+      "8ae5cee6687031e4",
+      "8e7ff6bfb3bd0708",
+      "91483da625f43973",
+      "914e84a1938f1a0b",
+      "931b88c73794a682",
+      "998c07abb72c9788",
+      "9b1a9dc7576243ac",
+      "9b30b77342e73fce",
+      "9f3ff3cc0d6e033a",
+      "a10cf5b9dcdb75f7",
+      "a3d81d9bfec90aae",
+      "a76c8f44dee86c08",
+      "a8507f0caea9f3cb",
+      "aaf710afecffb068",
+      "abd50e4d8f18f99c",
+      "af6ae3d1792db15a",
+      "affc6652332317f0",
+      "bb01b31f36efadf7",
+      "bba4e2cd462d0385",
+      "bc2207a405958c63",
+      "bee8b052f9c31615",
+      "c4f8cca0b7d87b24",
+      "c6485ab584fb1119",
+      "c7da3d2b4351abf8",
+      "c821aef1f7d7a63b",
+      "c8a9ecded1340ed9",
+      "d1d9d0e064814f21",
+      "d31c3425a7530e31",
+      "d45a37858d9258f6",
+      "d4b8e387521d56f2",
+      "d69477c27b0219e6",
+      "d71704bb9d0658ca",
+      "d8ae293424b6abc2",
+      "d9bcad2126956659",
+      "dcd97f7f169e6f89",
+      "e0d346d438d41d3e",
+      "e1d0fd367f2caad9",
+      "e4480481b4e9c3c7",
+      "e4cdb68b0ecfc2d9",
+      "e7631ec2027cdfdd",
+      "ea8b8eae8f5df43b",
+      "ed014f0b953e75b7",
+      "ed689ee071b502d8",
+      "edc3deddd55960a5",
+      "eee13390a3b32134",
+      "f465e5838e07d730",
+      "f4db16e00f854a44",
+      "f6bf77cbb4b0471c",
+      "f82303124caad208",
+      "fc7a9681960346da",
+      "fe16d1734e436ab5",
+      "febc689cb1e63f53"
+    ],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

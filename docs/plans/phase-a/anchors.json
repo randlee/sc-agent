@@ -17,11 +17,15 @@
       "scope": "adds or changes code in crates/sc-decision-schema",
       "deterministic_check": "every public item in crates/sc-decision-schema maps to a TypeSafe API request or response field, or to the decision trait",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code."
+        ],
+        "fail": [
+          "sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -64,6 +68,13 @@
           "item": "agt-4p2.7",
           "reason": "ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -315,11 +326,15 @@
       "scope": "adds or changes a decision backend, the Backend or Decision trait, or sc-decision-runner",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema."
+        ],
+        "fail": [
+          "The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -348,6 +363,13 @@
           "item": "agt-4p2.5",
           "reason": "A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -371,11 +393,15 @@
       "scope": "adds or changes a crate dependency in a Cargo.toml",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner."
+        ],
+        "fail": [
+          "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -397,6 +423,13 @@
             "plan_questions": "agt-mud.1",
             "dev_questions": "agt-mud.2"
           }
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -414,11 +447,15 @@
       "scope": "adds or changes an error type or a public function's return type",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message."
+        ],
+        "fail": [
+          "The backend maps every lower-layer failure to a new error with the message \"request failed\", dropping the original error."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -440,6 +477,13 @@
             "plan_questions": "agt-t70.1",
             "dev_questions": "agt-t70.2"
           }
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -457,11 +501,15 @@
       "scope": "adds or changes a type in sc-agent-types or sc-decision-schema",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-decision-schema contains only TypeSafe API types; no type names plan-anchor or judge-jev."
+        ],
+        "fail": [
+          "sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -497,6 +545,13 @@
           "item": "agt-4p2.6",
           "reason": "REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-6 adds no type to either.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -524,11 +579,15 @@
       "scope": "adds or changes dependencies of a low-level sc-agent crate",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "`cargo tree -p sc-decision-runner` lists no tokio crate with default features."
+        ],
+        "fail": [
+          "sc-agent-http adds reqwest with its default tokio runtime as a required dependency."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -557,6 +616,13 @@
           "item": "agt-4p2.3",
           "reason": "sc-treesitter is not in REQ-SAG-0009's list of low-level crates (types, config, secrets, log, http, decision schema, decision backends, runner); it stands alone under REQ-SAG-0301.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -580,11 +646,15 @@
       "scope": "adds or changes Rust source in an sc-agent crate",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls."
+        ],
+        "fail": [
+          "The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -606,6 +676,13 @@
             "plan_questions": "agt-6dm.1",
             "dev_questions": "agt-6dm.2"
           }
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -623,11 +700,15 @@
       "scope": "adds or changes a type that maps to a TypeSafe API field",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-decision-llm imports SystemOneRequest and SystemOneResponse from sc-decision-schema and defines no Jev-shaped type of its own."
+        ],
+        "fail": [
+          "sc-decision-systemone defines its own JevAnswer struct mirroring the TypeSafe choice answer."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -656,6 +737,13 @@
           "item": "agt-4p2.1",
           "reason": "sc-agent-types defines no type that maps to a TypeSafe API field; those are sprint A-2 (sc-decision-schema).",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -679,11 +767,15 @@
       "scope": "adds or changes busy-response handling, resend, holdoff or the runner queue",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "A request answered 429 is resent unchanged until max_sends (default 5) is reached, then returns http.provider_busy."
+        ],
+        "fail": [
+          "A 429 response is returned to the caller at once and never resent."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -719,6 +811,13 @@
           "item": "agt-4p2.7",
           "reason": "A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:10+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -746,11 +845,15 @@
       "scope": "adds or changes batch handling in sc-decision-runner or decide",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-decision-runner sends a batch's requests across `workers` threads (default 8) and returns each result as it finishes."
+        ],
+        "fail": [
+          "The runner sends the batch's requests one after another on the caller's thread."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -779,6 +882,13 @@
           "item": "agt-4p2.4",
           "reason": "A-4 delivers only the workers setting; the parallel batch run is built in A-9.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-10T00:12:10+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ],
       "exclude": [
@@ -802,11 +912,15 @@
       "scope": "adds or changes a decide subcommand or a function in the sc-agent Python bindings",
       "deterministic_check": "each decide subcommand has a matching Python API function, checked by a test that lists both",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both."
+        ],
+        "fail": [
+          "decide gains a `models` subcommand with no Python equivalent."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -828,6 +942,13 @@
             "plan_questions": "agt-frw.1",
             "dev_questions": "agt-frw.2"
           }
+        },
+        {
+          "at": "2026-11-10T00:12:10+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     }

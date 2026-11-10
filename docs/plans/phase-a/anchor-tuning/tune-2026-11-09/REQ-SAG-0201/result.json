@@ -1,0 +1,1426 @@
+{
+  "schema_version": "1.0.0",
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "acceptance_table": [
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "fixture-pass-1",
+        "expected_roles": {
+          "addressed": "yes",
+          "contradicted": "no",
+          "relevant": "yes"
+        },
+        "expected_verdict": "satisfied",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 0.94
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 0.96
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "fixture_pass",
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "rationale": "Locked pass fixture of REQ-SAG-0201: Jev API types come from sc-decision-schema and no other crate defines one.",
+        "regression": false,
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "fixture-fail-1",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "yes",
+          "relevant": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.94,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.92,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "fixture_fail",
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "rationale": "Locked fail fixture: a Jev answer type defined outside sc-decision-schema breaks 'must be defined in the sc-decision-schema crate'.",
+        "regression": false,
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "compliant-1",
+        "expected_roles": {
+          "addressed": "yes",
+          "contradicted": "no",
+          "relevant": "yes"
+        },
+        "expected_verdict": "satisfied",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "compliant",
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "rationale": "The item places every Jev API type for both named endpoints in sc-decision-schema, exactly what REQ-SAG-0201 requires.",
+        "regression": false,
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "silent-1",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "no",
+          "relevant": "yes"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.64,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.67,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "silent",
+        "production_verdicts_at_threshold": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "rationale": "The item works on types that map to Jev API fields (in scope) but never says which crate defines them; REQ-SAG-0201's placement rule is absent, and silence is not a conflict.",
+        "regression": false,
+        "semantic_verdicts": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "topical-only-1",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "no",
+          "relevant": "yes"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.64,
+            "relevant": 0.7
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.72,
+            "relevant": 0.64
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "topical_only",
+        "production_verdicts_at_threshold": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "rationale": "The item depends on Jev API types and mentions them generically, but does not state that they are defined in sc-decision-schema; nothing in it defines a type elsewhere, so no conflict.",
+        "regression": false,
+        "semantic_verdicts": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "conflicting-1",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "yes",
+          "relevant": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "conflicting",
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "rationale": "Jev API types defined in sc-agent-http instead of sc-decision-schema directly break REQ-SAG-0201.",
+        "regression": false,
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "irrelevant-1",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "no",
+          "relevant": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "probe": "irrelevant",
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "rationale": "Log-file rotation adds or changes no type that maps to a TypeSafe API field, so the item is outside REQ-SAG-0201's scope.",
+        "regression": false,
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "boundary-internal-type",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "no",
+          "relevant": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_confidence": [
+          {
+            "addressed": 0.77,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.79,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "probe": "boundary",
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "rationale": "REQ-SAG-0201 governs only Rust types that map to a field of the TypeSafe Jev API; a new type outside sc-decision-schema that maps to no API field is outside its scope.",
+        "regression": false,
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": true,
+        "case_id": "boundary-field-change",
+        "expected_roles": {
+          "addressed": "yes",
+          "contradicted": "no",
+          "relevant": "yes"
+        },
+        "expected_verdict": "satisfied",
+        "observed_confidence": [
+          {
+            "addressed": 0.98,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "boundary",
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "rationale": "Changing a Jev API type is in scope ('adds or changes a type that maps to a TypeSafe API field'); the change stays in sc-decision-schema, as REQ-SAG-0201 requires.",
+        "regression": false,
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true
+      },
+      {
+        "accepted": true,
+        "baseline_exact": false,
+        "case_id": "exception-temporary-copy",
+        "expected_roles": {
+          "addressed": "no",
+          "contradicted": "yes",
+          "relevant": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "probe": "exception",
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "rationale": "REQ-SAG-0201 says 'Every' Jev API type and states no temporary or staged exception; a self-declared temporary definition outside sc-decision-schema still breaks it.",
+        "regression": false,
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true
+      }
+    ],
+    "accepted": true,
+    "authority_citations": [
+      "REQ-SAG-0201 v2 (locked): Every Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models) must be defined in the sc-decision-schema crate. Scope: adds or changes a type that maps to a TypeSafe API field.",
+      "REQ-SAG-0201 v2 fixtures (pass and fail)",
+      "phase-a-intent v1: define sc-decision-schema with the decision trait; every TypeSafe API request and response sent through sc-agent with minimum code"
+    ],
+    "authority_recommendations": [],
+    "candidate_rankings": [
+      {
+        "bundle_id": "b-aab",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2275,
+        "confidence": {
+          "cells_at_or_above_threshold": 52,
+          "mean": 0.9535,
+          "median": 1.0,
+          "minimum": 0.64,
+          "p10": 0.765,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 60,
+        "exact_semantic_verdicts": 20,
+        "mismatches": [],
+        "question_sha256": "66a031a95852c2451bb46fad14189e59e8b69ab2442bc65a1d3cafcdfaeaaff1",
+        "rank": 1,
+        "reason": "Selected: top lexicographic rank among semantically accepted bundles.",
+        "regressions": 0,
+        "roles": {
+          "addressed": "add-a",
+          "contradicted": "con-b",
+          "relevant": "rel-a"
+        },
+        "selected": true,
+        "semantic_accepted": true,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "baseline",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2554,
+        "confidence": {
+          "cells_at_or_above_threshold": 45,
+          "mean": 0.8705,
+          "median": 0.97,
+          "minimum": 0.3,
+          "p10": 0.55,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 58,
+        "exact_semantic_verdicts": 20,
+        "mismatches": [
+          "exception-temporary-copy: addressed yes, expected no"
+        ],
+        "question_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+        "rank": 2,
+        "reason": "Rejected: exception-temporary-copy: addressed yes, expected no.",
+        "regressions": 0,
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "b-ccc",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 1209,
+        "confidence": {
+          "cells_at_or_above_threshold": 54,
+          "mean": 0.9418,
+          "median": 1.0,
+          "minimum": 0.42,
+          "p10": 0.804,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 58,
+        "exact_semantic_verdicts": 20,
+        "mismatches": [
+          "silent-1: contradicted unclear, expected no",
+          "1 regression(s) against the baseline: silent-1"
+        ],
+        "question_sha256": "71d065dab92096489f5c0883c4fe9ae2db1e2393b6a4ff8c5a7336da9c19e8ce",
+        "rank": 3,
+        "reason": "Rejected: silent-1: contradicted unclear, expected no; 1 regression(s) against the baseline: silent-1.",
+        "regressions": 1,
+        "roles": {
+          "addressed": "add-c",
+          "contradicted": "con-c",
+          "relevant": "rel-c"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "b-bab",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2140,
+        "confidence": {
+          "cells_at_or_above_threshold": 51,
+          "mean": 0.9197,
+          "median": 1.0,
+          "minimum": 0.31,
+          "p10": 0.672,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 58,
+        "exact_semantic_verdicts": 18,
+        "mismatches": [
+          "fixture-pass-1: relevant no, expected yes",
+          "fixture-pass-1: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass-1"
+        ],
+        "question_sha256": "757067a08dc4047b993ed246d5d0f6ad5765f26b7349f7184a1de5fb8f4574b3",
+        "rank": 4,
+        "reason": "Rejected: fixture-pass-1: relevant no, expected yes; fixture-pass-1: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass-1.",
+        "regressions": 1,
+        "roles": {
+          "addressed": "add-a",
+          "contradicted": "con-b",
+          "relevant": "rel-b"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "b-bbb",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2011,
+        "confidence": {
+          "cells_at_or_above_threshold": 50,
+          "mean": 0.9002,
+          "median": 0.98,
+          "minimum": 0.3,
+          "p10": 0.596,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 58,
+        "exact_semantic_verdicts": 18,
+        "mismatches": [
+          "fixture-pass-1: relevant no, expected yes",
+          "fixture-pass-1: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass-1"
+        ],
+        "question_sha256": "5b7774da27d62bfbf2ca8b1194b545824502e07674969cdc64592a8623aaf71c",
+        "rank": 5,
+        "reason": "Rejected: fixture-pass-1: relevant no, expected yes; fixture-pass-1: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass-1.",
+        "regressions": 1,
+        "roles": {
+          "addressed": "add-b",
+          "contradicted": "con-b",
+          "relevant": "rel-b"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "b-aaa",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2492,
+        "confidence": {
+          "cells_at_or_above_threshold": 53,
+          "mean": 0.9415,
+          "median": 1.0,
+          "minimum": 0.4,
+          "p10": 0.781,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 56,
+        "exact_semantic_verdicts": 20,
+        "mismatches": [
+          "silent-1: contradicted unclear, expected no",
+          "topical-only-1: contradicted unclear, expected no",
+          "2 regression(s) against the baseline: silent-1, topical-only-1"
+        ],
+        "question_sha256": "d799382bdfb1cc8bc83e8a74ea8f8271c6b7cdf8be0ad220c03cc526ee949085",
+        "rank": 6,
+        "reason": "Rejected: silent-1: contradicted unclear, expected no; topical-only-1: contradicted unclear, expected no; 2 regression(s) against the baseline: silent-1, topical-only-1.",
+        "regressions": 2,
+        "roles": {
+          "addressed": "add-a",
+          "contradicted": "con-a",
+          "relevant": "rel-a"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 10,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      },
+      {
+        "bundle_id": "b-baa",
+        "co_leader": false,
+        "complete": true,
+        "complexity_bytes": 2357,
+        "confidence": {
+          "cells_at_or_above_threshold": 52,
+          "mean": 0.9088,
+          "median": 1.0,
+          "minimum": 0.24,
+          "p10": 0.636,
+          "threshold": 0.8,
+          "total_cells": 60
+        },
+        "exact_role_cells": 55,
+        "exact_semantic_verdicts": 19,
+        "mismatches": [
+          "fixture-pass-1: relevant no, expected yes",
+          "fixture-pass-1: unstable across repeats",
+          "fixture-pass-1: verdict not_applicable, expected satisfied",
+          "silent-1: contradicted unclear, expected no",
+          "topical-only-1: contradicted unclear, expected no",
+          "3 regression(s) against the baseline: fixture-pass-1, silent-1, topical-only-1"
+        ],
+        "question_sha256": "ff676b94503c470612a02d2829d0c5e888a668f0436ff8f0f0d0f65bbc60453f",
+        "rank": 7,
+        "reason": "Rejected: fixture-pass-1: relevant no, expected yes; fixture-pass-1: unstable across repeats; fixture-pass-1: verdict not_applicable, expected satisfied; silent-1: contradicted unclear, expected no; topical-only-1: contradicted unclear, expected no; 3 regression(s) against the baseline: fixture-pass-1, silent-1, topical-only-1.",
+        "regressions": 3,
+        "roles": {
+          "addressed": "add-a",
+          "contradicted": "con-a",
+          "relevant": "rel-b"
+        },
+        "selected": false,
+        "semantic_accepted": false,
+        "stable_cases": 9,
+        "total_cases": 10,
+        "total_role_cells": 60,
+        "total_semantic_verdicts": 20
+      }
+    ],
+    "confidence_diagnostics": {
+      "cells_at_or_above_threshold": 52,
+      "mean": 0.9535,
+      "median": 1.0,
+      "minimum": 0.64,
+      "p10": 0.765,
+      "threshold": 0.8,
+      "total_cells": 60
+    },
+    "confidence_reference_threshold": 0.8,
+    "evidence": {
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "b-aaa": {
+          "addressed": "add-a",
+          "contradicted": "con-a",
+          "relevant": "rel-a"
+        },
+        "b-aab": {
+          "addressed": "add-a",
+          "contradicted": "con-b",
+          "relevant": "rel-a"
+        },
+        "b-baa": {
+          "addressed": "add-a",
+          "contradicted": "con-a",
+          "relevant": "rel-b"
+        },
+        "b-bab": {
+          "addressed": "add-a",
+          "contradicted": "con-b",
+          "relevant": "rel-b"
+        },
+        "b-bbb": {
+          "addressed": "add-b",
+          "contradicted": "con-b",
+          "relevant": "rel-b"
+        },
+        "b-ccc": {
+          "addressed": "add-c",
+          "contradicted": "con-c",
+          "relevant": "rel-c"
+        },
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        }
+      },
+      "calls": 140,
+      "failed_calls": [],
+      "max_parallel_evaluators": 4,
+      "missing_calls": [],
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "oracle_frozen_before_first_jev_call": true,
+      "oracle_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0201/tournament-1/oracle.frozen.json",
+      "out_dir": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0201/tournament-1",
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "repeat_requests_byte_identical": true,
+      "results_path": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0201/tournament-1/results.jsonl",
+      "retries": 0,
+      "role_rankings": {
+        "addressed": [
+          {
+            "bundles": [
+              "b-aaa",
+              "b-aab",
+              "b-bab",
+              "b-baa"
+            ],
+            "candidate_id": "add-a",
+            "exact_cells": 80,
+            "stable_cases": 40,
+            "total_cases": 40,
+            "total_cells": 80
+          },
+          {
+            "bundles": [
+              "b-bbb"
+            ],
+            "candidate_id": "add-b",
+            "exact_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          },
+          {
+            "bundles": [
+              "b-ccc"
+            ],
+            "candidate_id": "add-c",
+            "exact_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          },
+          {
+            "bundles": [
+              "baseline"
+            ],
+            "candidate_id": "current",
+            "exact_cells": 18,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          }
+        ],
+        "contradicted": [
+          {
+            "bundles": [
+              "b-bbb",
+              "b-aab",
+              "b-bab"
+            ],
+            "candidate_id": "con-b",
+            "exact_cells": 60,
+            "stable_cases": 30,
+            "total_cases": 30,
+            "total_cells": 60
+          },
+          {
+            "bundles": [
+              "b-aaa",
+              "b-baa"
+            ],
+            "candidate_id": "con-a",
+            "exact_cells": 32,
+            "stable_cases": 20,
+            "total_cases": 20,
+            "total_cells": 40
+          },
+          {
+            "bundles": [
+              "baseline"
+            ],
+            "candidate_id": "current",
+            "exact_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          },
+          {
+            "bundles": [
+              "b-ccc"
+            ],
+            "candidate_id": "con-c",
+            "exact_cells": 18,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          }
+        ],
+        "relevant": [
+          {
+            "bundles": [
+              "b-bbb",
+              "b-bab",
+              "b-baa"
+            ],
+            "candidate_id": "rel-b",
+            "exact_cells": 55,
+            "stable_cases": 29,
+            "total_cases": 30,
+            "total_cells": 60
+          },
+          {
+            "bundles": [
+              "b-aaa",
+              "b-aab"
+            ],
+            "candidate_id": "rel-a",
+            "exact_cells": 40,
+            "stable_cases": 20,
+            "total_cases": 20,
+            "total_cells": 40
+          },
+          {
+            "bundles": [
+              "baseline"
+            ],
+            "candidate_id": "current",
+            "exact_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          },
+          {
+            "bundles": [
+              "b-ccc"
+            ],
+            "candidate_id": "rel-c",
+            "exact_cells": 20,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_cells": 20
+          }
+        ]
+      },
+      "run_ids_all": [
+        "01e8c1c996e581be",
+        "03e51b8dca450719",
+        "064061ceb7bcadd0",
+        "08f530a22bd6a485",
+        "0a4d3171318f264d",
+        "0aa45ed1a82f789e",
+        "0c55fae18c09804c",
+        "0de027be693792d8",
+        "0f42901a5408bf8b",
+        "107f0bc95fa75e74",
+        "10cc069b1f9027c7",
+        "1354eab4d7ec0b50",
+        "15cbef4778d082ae",
+        "1618a1dba75139b2",
+        "169664d71d541a42",
+        "18e44f608b6e4870",
+        "1c35ce8b8b8ed73f",
+        "20f786ece8b3f98f",
+        "20fd2b6a247e2b26",
+        "2120d29802e0eeec",
+        "24b73fc4f1499143",
+        "2859cfe4f68fc1a0",
+        "2a80da6588334571",
+        "2aab888f08d1e589",
+        "2b25933e35888ded",
+        "31ec7a66641f84df",
+        "344e53dddca63811",
+        "3508919a72ec3a1d",
+        "37a6f1f453861819",
+        "37c62c73101eee5c",
+        "37e059de0022c181",
+        "3835587cc5726af0",
+        "3a4cd43775acfb73",
+        "3c1b0a38de40b2f4",
+        "3d2e468f6d45f9d9",
+        "4227825949906771",
+        "432d83a1d67e506e",
+        "4336c809c7205f97",
+        "459eb1c096c262de",
+        "474cd5355ea292a9",
+        "4b277c7134f379d3",
+        "4b5d2a653be69a0f",
+        "50021eccc727f332",
+        "50e39ac737afda9d",
+        "551962bcf554f5ff",
+        "58484538a1b660e6",
+        "5b0a27d7b8a42d15",
+        "5d08a00d79c78436",
+        "5e872d9648370fdb",
+        "606cde1155f84409",
+        "62448b74b02f776f",
+        "62e6edbc5c735d74",
+        "638eaf2a0e5b59a4",
+        "64248db730402715",
+        "64f2dc1a8925b0e4",
+        "65a1453ce5dfbc21",
+        "677a505fc8db4b3b",
+        "69f9379d71ce1aca",
+        "706a7661808bce6e",
+        "71a208b14a2919ef",
+        "736ae4cb9ee525ce",
+        "738021d81843bb9e",
+        "739d85d71cc8c1be",
+        "73c0c689b106a873",
+        "73e0180a022b13c3",
+        "74f817b912055715",
+        "76a176ff3956327d",
+        "79e59d884f9ee4ee",
+        "7a234688d3f6703c",
+        "7d709b93c5b1bc4f",
+        "7f82c4b022ec3391",
+        "8104344c8a4d2bb2",
+        "819b03fac9f7cdd9",
+        "81f1bb465dedee4b",
+        "82e67c219a76059e",
+        "83582efa57d3fb72",
+        "83b53cd29e2db514",
+        "8616445176c4a76b",
+        "86aed699908686b6",
+        "8beab55af77318b6",
+        "8d295c3a15d55364",
+        "8dca475121b4c8cd",
+        "8dda99f01f860220",
+        "8e03ef68efc445c3",
+        "8f30f1c0a9476429",
+        "94480c89dde6242f",
+        "94e29ac03383422b",
+        "96b05496e9cafbb0",
+        "97ed0bce93220049",
+        "9800713cc600b2a2",
+        "9d6e6d2f2cdbfc66",
+        "9e4b8956b8ead3e0",
+        "a351f85c26e3e1da",
+        "a55e6b84e50c9417",
+        "a9aa4f1107acbe7f",
+        "aa50e72e3acd0b09",
+        "ab8f2e6b61912690",
+        "ad6827e95bb1fa62",
+        "ae885cb5f9fb4751",
+        "aea011488e9c8f7e",
+        "b1b7d3ff5d74267b",
+        "b27ae1308e7c0eda",
+        "b2a6cda64b613863",
+        "b457d85ef473f1c1",
+        "b6edaa07837af1dc",
+        "b7b847b3147616be",
+        "badb6d4ac7cb03d6",
+        "bde04aa88abf8908",
+        "be1411f66afd09aa",
+        "bec50b9784d74ceb",
+        "c1a39682dab6c2ae",
+        "c6b564137451593f",
+        "cb6a0f2108e50547",
+        "cc5f48b1800702f6",
+        "cd3a063fcac86af4",
+        "ce32fd27988d3fc0",
+        "d0e8eb48af1e9cd8",
+        "d1a4d856172e49a5",
+        "d1d8eae581a0ff00",
+        "d42924e22d22b20a",
+        "dd5b2a7a35c80596",
+        "de8e9f47e0ebb1d7",
+        "e0456166fba95ee2",
+        "e1688924ac2149ab",
+        "e312f1bc356884b7",
+        "e73069d70a2ca64d",
+        "e7d8b3e49466ace8",
+        "ea3237690754fd9b",
+        "eac066c9043c9c05",
+        "eb4eacf0e72d8849",
+        "ecd5749f52ce18b5",
+        "ef3196a200d5467e",
+        "f22dcbe0b01b5ca2",
+        "f4c68278d952f1dd",
+        "f55914ffda971ab5",
+        "f5b639d132060062",
+        "fba64b7a2ef7e5ff",
+        "fd3f7af56e353cf4",
+        "fd79b64da3c3f672",
+        "ff97c957a458b27e"
+      ],
+      "tie": null
+    },
+    "explanation": "7 role-complete bundles (baseline included) x 10 frozen oracle cases x 2 repeats: 140 calls, 0 retries. Bundle b-aab is the top-ranked semantically accepted set: 60/60 role cells, 20/20 threshold-0 verdicts, 10/10 stable cases, zero regressions against the baseline. Confidence is diagnostic only; production review keeps the 0.6 threshold. Anchor-tuning rationale: the baseline addressed question answered yes for the self-declared temporary copy (exception-temporary-copy), a question defect against REQ-SAG-0201's unqualified 'Every'; add-a names sc-decision-schema as the required home and con-b states that the directive allows no temporary departure. Lowest selected-bundle cells (contradicted 0.64 on silent-1/topical-only-1, relevant 0.64 on topical-only-1) clear the 0.6 production threshold with little margin, so silent or vaguely worded plan items may still return underspecified in production; that is not grounds to retune.",
+    "gate": "planning",
+    "operation": "tune",
+    "oracle_sha256": "7d70a714d7a21827b71f7ad258ccac6f2e30b5f05a6d5ddaf2bf3f79ad0cdafd",
+    "planner_action": "Write sealed_question_set.questions as the anchor's plan-questions override after validating this result; store tuning_history_after byte-identical. Do not use tournament confidence in production review.",
+    "production_confidence_threshold": 0.6,
+    "production_semantics_unchanged": true,
+    "question_action": null,
+    "sealed_question_set": {
+      "digest": "fcad39f80c5a2eab2eeaf41a795266ab523f3541bc164c1e5629a052a25432f1",
+      "questions": {
+        "addressed": {
+          "criteria": {
+            "no": "The item does not say the Jev API types live in sc-decision-schema, or it places them somewhere else.",
+            "unclear": "The item mentions sc-decision-schema but it cannot be told whether its Jev API types are defined there.",
+            "yes": "The item explicitly places, keeps, or imports its Jev API types in or from sc-decision-schema."
+          },
+          "instructions": "Does `item.text` state that the Jev API types it adds, changes, or uses are defined in the `sc-decision-schema` crate, as `anchor.statement` requires? Count it when the item puts or keeps those types in sc-decision-schema, or imports them from sc-decision-schema. A generic mention of Jev types, serialization, or consistency without naming sc-decision-schema as their home does not count. Judge presence of this placement only, not conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Nothing in the item conflicts with the directive, whether or not the directive is mentioned.",
+            "unclear": "The item is ambiguous enough that it might or might not conflict with the directive.",
+            "yes": "The item states a plan or design that cannot be reconciled with the directive, including a temporary one."
+          },
+          "instructions": "Does `item.text` plan something that `anchor.statement` rules out? The statement allows no exception, so a temporary or stop-gap departure still conflicts. Silence about the directive is not a conflict. Judge conflict only.",
+          "type": "choice"
+        },
+        "relevant": {
+          "criteria": {
+            "no": "The item works on something else, such as logging, internal bookkeeping, or a type that is never sent to or received from any TypeSafe endpoint.",
+            "unclear": "The item text is too vague to tell whether any type it touches maps to the TypeSafe Jev API.",
+            "yes": "The item adds, changes, defines, or uses a type, struct, or field that is sent to or received from the TypeSafe Jev API."
+          },
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, with the area it governs in `anchor.scope`). Does the work in `item.text` fall inside `anchor.scope`: does it add, change, define, or use a Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone or GET /v1/models)? Judge subject overlap only, not whether the item obeys the anchor.",
+          "type": "choice"
+        }
+      }
+    },
+    "sealed_question_set_digest_after": "fcad39f80c5a2eab2eeaf41a795266ab523f3541bc164c1e5629a052a25432f1",
+    "sealed_question_set_digest_before": null,
+    "semantic_score": {
+      "exact_role_cells": 60,
+      "exact_semantic_verdicts": 20,
+      "regressions": 0,
+      "stable_cases": 10,
+      "total_cases": 10,
+      "total_role_cells": 60,
+      "total_semantic_verdicts": 20
+    },
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "tuning_history_after": {
+      "events": [
+        {
+          "authority": {
+            "anchor_id": "REQ-SAG-0201",
+            "anchor_record_sha256": "97f197426464d6d6413955fa4b3d3b3ec4fdf89ab038b1010004f2442453ed64",
+            "anchor_version": 2,
+            "intent_id": "phase-a-intent",
+            "intent_sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+            "intent_version": 1
+          },
+          "candidate": {
+            "candidate_id": "b-aab",
+            "question_sha256": "fcad39f80c5a2eab2eeaf41a795266ab523f3541bc164c1e5629a052a25432f1"
+          },
+          "decision": {
+            "question_set_sha256": "fcad39f80c5a2eab2eeaf41a795266ab523f3541bc164c1e5629a052a25432f1",
+            "reason_code": "TOURNAMENT.SEALED",
+            "status": "sealed"
+          },
+          "event": "question_set_sealed",
+          "event_index": 1,
+          "evidence": {
+            "canonical_request_sha256": [
+              "cded98470b8b756c8f1f5162431d8ed5b48ddc8ff6b629aabed967616a263591",
+              "cded98470b8b756c8f1f5162431d8ed5b48ddc8ff6b629aabed967616a263591",
+              "a856dfd9783be55c414d88b99a9c30365af72d6994f9b7ff76e82798ba4bee89",
+              "a856dfd9783be55c414d88b99a9c30365af72d6994f9b7ff76e82798ba4bee89",
+              "28b1de488f87aeb8ce2fddf044ead101c31c7226fbbfe1bbdec40469e78bb97a",
+              "28b1de488f87aeb8ce2fddf044ead101c31c7226fbbfe1bbdec40469e78bb97a",
+              "a1d194fb769c15d0d2fb1ce35d243680face5a1bca892674997b63e6a21fd835",
+              "a1d194fb769c15d0d2fb1ce35d243680face5a1bca892674997b63e6a21fd835",
+              "b7c5a8ee0c09ef2fb8a45f91012b620568125559047214bdafdd4b45fffbe570",
+              "b7c5a8ee0c09ef2fb8a45f91012b620568125559047214bdafdd4b45fffbe570",
+              "582d30c8e7c42aae51ef9fff41280a3aa752bf1fbf8615e9d0c39bab6fe74bd5",
+              "582d30c8e7c42aae51ef9fff41280a3aa752bf1fbf8615e9d0c39bab6fe74bd5",
+              "021f66cd3f28e9c4015f23afdb0b7bced6fc38f1934e770a5573948784c58c82",
+              "021f66cd3f28e9c4015f23afdb0b7bced6fc38f1934e770a5573948784c58c82",
+              "f074245047659eb0c7012befe17fb3bcb10a0ab4a534e3b3066ed42a87d984ac",
+              "f074245047659eb0c7012befe17fb3bcb10a0ab4a534e3b3066ed42a87d984ac",
+              "af639f93fdf56a78e1b039f9732281dff402583997fccf2297b85d6312a033ac",
+              "af639f93fdf56a78e1b039f9732281dff402583997fccf2297b85d6312a033ac",
+              "d8dc9393c3c6cc99a0fcb3fc070939793dc1f8c527d06d815440bc80b341722b",
+              "d8dc9393c3c6cc99a0fcb3fc070939793dc1f8c527d06d815440bc80b341722b"
+            ],
+            "raw_response_sha256": [
+              "3370d6191c5329ceb9c4db6bb5410c34f80a250a4177c05cde48a416beb8cb8d",
+              "c4ffb89d9e9550a4abe07fcccc259b6d4898e431319b0af9f7e1722969f3be2e",
+              "640eb2f12ab70455b38d85a17c781b2060b523615e506ce0d3c0b1ee068ef2c1",
+              "5727ad65269053863b1ca96cff07e8e6fac3092fcf9582a3afa11dbb8c199725",
+              "831410f68e0b6b43c065fb48cbe078280ee3198d314dc6f750f80f50fb033da7",
+              "831410f68e0b6b43c065fb48cbe078280ee3198d314dc6f750f80f50fb033da7",
+              "ef0a78cb6e56673ddbbfa958726ef078ffbefbf02a1ea765fa1e9188e83cffff",
+              "7e6881de1f0c12b08274ad330a86d8069da54fd2522a605d32acbfac83ab89f0",
+              "1a14587a79a87deb8a083e241d7ccb305931de2bfb08d158d815d567cfbe45f3",
+              "dcd24875090f87a3e097e82c414e9a0c4cccfdf5f21a79a334230793026e64ee",
+              "7f3d3db3f702af6bb0e20d87709cd0329aff27dfa47409cf4bb522bfb6728371",
+              "7f3d3db3f702af6bb0e20d87709cd0329aff27dfa47409cf4bb522bfb6728371",
+              "75812e6622f128a1016d2f0e7be2f55f89f6c1dc0822126de2272ee7e53c93f4",
+              "75812e6622f128a1016d2f0e7be2f55f89f6c1dc0822126de2272ee7e53c93f4",
+              "f813dc3e53bab8962b73b787e0315355f2f6cd3affb057955122504d6423388e",
+              "70a418d0bccd354823e4a51b77754fc27b8c2b3f2526539ae06185969ab0cfcf",
+              "17a428ad282913c7dd7ae2101498e77d4055e9de67426c059f8a9ae64981e9e9",
+              "367b534a6c5ec33d00f323cead574793a2ae43fd1ae37d971fc92bed3ebe135b",
+              "472b35df4a08d9c48ecf28ac1a6ef3b2a02930011453f86c38655697fe049bfe",
+              "472b35df4a08d9c48ecf28ac1a6ef3b2a02930011453f86c38655697fe049bfe"
+            ],
+            "run_ids": [
+              "64248db730402715",
+              "94480c89dde6242f",
+              "cb6a0f2108e50547",
+              "bec50b9784d74ceb",
+              "69f9379d71ce1aca",
+              "37c62c73101eee5c",
+              "9800713cc600b2a2",
+              "b27ae1308e7c0eda",
+              "ad6827e95bb1fa62",
+              "eac066c9043c9c05",
+              "d1a4d856172e49a5",
+              "0c55fae18c09804c",
+              "3835587cc5726af0",
+              "8104344c8a4d2bb2",
+              "7a234688d3f6703c",
+              "f55914ffda971ab5",
+              "e1688924ac2149ab",
+              "01e8c1c996e581be",
+              "d1d8eae581a0ff00",
+              "432d83a1d67e506e"
+            ]
+          },
+          "oracle": {
+            "case_count": 10,
+            "case_ids": [
+              "fixture-pass-1",
+              "fixture-fail-1",
+              "compliant-1",
+              "silent-1",
+              "topical-only-1",
+              "conflicting-1",
+              "irrelevant-1",
+              "boundary-internal-type",
+              "boundary-field-change",
+              "exception-temporary-copy"
+            ],
+            "repeat_count": 2,
+            "sha256": "7d70a714d7a21827b71f7ad258ccac6f2e30b5f05a6d5ddaf2bf3f79ad0cdafd"
+          },
+          "previous_event_sha256": null,
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "score": {
+            "confidence": {
+              "cells_at_or_above_threshold": 52,
+              "mean": 0.9535,
+              "median": 1.0,
+              "minimum": 0.64,
+              "p10": 0.765,
+              "threshold": 0.8,
+              "total_cells": 60
+            },
+            "exact_role_cells": 60,
+            "exact_semantic_verdicts": 20,
+            "regressions": 0,
+            "stable_cases": 10,
+            "total_cases": 10,
+            "total_role_cells": 60,
+            "total_semantic_verdicts": 20
+          },
+          "supersedes": null
+        }
+      ],
+      "history_id": "phase-a-REQ-SAG-0201-planning",
+      "schema": "plan-anchor/tuning-history/2"
+    },
+    "tuning_history_after_sha256": "cb4672849992d8f108bc10677f1764bed5b54aa9350987a0b209bddee30e0290",
+    "tuning_history_before_sha256": "d04e358cbe2e9cee857b01282587c4e5645e41802446bbe5e3ff348f07fe4406"
+  },
+  "error": null,
+  "metadata": {
+    "authoritative_sources_unchanged": true,
+    "correlation_id": "tune-plan-REQ-SAG-0201",
+    "duration_ms": 4142,
+    "jev_run_ids": [
+      "01e8c1c996e581be",
+      "03e51b8dca450719",
+      "064061ceb7bcadd0",
+      "08f530a22bd6a485",
+      "0a4d3171318f264d",
+      "0aa45ed1a82f789e",
+      "0c55fae18c09804c",
+      "0de027be693792d8",
+      "0f42901a5408bf8b",
+      "107f0bc95fa75e74",
+      "10cc069b1f9027c7",
+      "1354eab4d7ec0b50",
+      "15cbef4778d082ae",
+      "1618a1dba75139b2",
+      "169664d71d541a42",
+      "18e44f608b6e4870",
+      "1c35ce8b8b8ed73f",
+      "20f786ece8b3f98f",
+      "20fd2b6a247e2b26",
+      "2120d29802e0eeec",
+      "24b73fc4f1499143",
+      "2859cfe4f68fc1a0",
+      "2a80da6588334571",
+      "2aab888f08d1e589",
+      "2b25933e35888ded",
+      "31ec7a66641f84df",
+      "344e53dddca63811",
+      "3508919a72ec3a1d",
+      "37a6f1f453861819",
+      "37c62c73101eee5c",
+      "37e059de0022c181",
+      "3835587cc5726af0",
+      "3a4cd43775acfb73",
+      "3c1b0a38de40b2f4",
+      "3d2e468f6d45f9d9",
+      "4227825949906771",
+      "432d83a1d67e506e",
+      "4336c809c7205f97",
+      "459eb1c096c262de",
+      "474cd5355ea292a9",
+      "4b277c7134f379d3",
+      "4b5d2a653be69a0f",
+      "50021eccc727f332",
+      "50e39ac737afda9d",
+      "551962bcf554f5ff",
+      "58484538a1b660e6",
+      "5b0a27d7b8a42d15",
+      "5d08a00d79c78436",
+      "5e872d9648370fdb",
+      "606cde1155f84409",
+      "62448b74b02f776f",
+      "62e6edbc5c735d74",
+      "638eaf2a0e5b59a4",
+      "64248db730402715",
+      "64f2dc1a8925b0e4",
+      "65a1453ce5dfbc21",
+      "677a505fc8db4b3b",
+      "69f9379d71ce1aca",
+      "706a7661808bce6e",
+      "71a208b14a2919ef",
+      "736ae4cb9ee525ce",
+      "738021d81843bb9e",
+      "739d85d71cc8c1be",
+      "73c0c689b106a873",
+      "73e0180a022b13c3",
+      "74f817b912055715",
+      "76a176ff3956327d",
+      "79e59d884f9ee4ee",
+      "7a234688d3f6703c",
+      "7d709b93c5b1bc4f",
+      "7f82c4b022ec3391",
+      "8104344c8a4d2bb2",
+      "819b03fac9f7cdd9",
+      "81f1bb465dedee4b",
+      "82e67c219a76059e",
+      "83582efa57d3fb72",
+      "83b53cd29e2db514",
+      "8616445176c4a76b",
+      "86aed699908686b6",
+      "8beab55af77318b6",
+      "8d295c3a15d55364",
+      "8dca475121b4c8cd",
+      "8dda99f01f860220",
+      "8e03ef68efc445c3",
+      "8f30f1c0a9476429",
+      "94480c89dde6242f",
+      "94e29ac03383422b",
+      "96b05496e9cafbb0",
+      "97ed0bce93220049",
+      "9800713cc600b2a2",
+      "9d6e6d2f2cdbfc66",
+      "9e4b8956b8ead3e0",
+      "a351f85c26e3e1da",
+      "a55e6b84e50c9417",
+      "a9aa4f1107acbe7f",
+      "aa50e72e3acd0b09",
+      "ab8f2e6b61912690",
+      "ad6827e95bb1fa62",
+      "ae885cb5f9fb4751",
+      "aea011488e9c8f7e",
+      "b1b7d3ff5d74267b",
+      "b27ae1308e7c0eda",
+      "b2a6cda64b613863",
+      "b457d85ef473f1c1",
+      "b6edaa07837af1dc",
+      "b7b847b3147616be",
+      "badb6d4ac7cb03d6",
+      "bde04aa88abf8908",
+      "be1411f66afd09aa",
+      "bec50b9784d74ceb",
+      "c1a39682dab6c2ae",
+      "c6b564137451593f",
+      "cb6a0f2108e50547",
+      "cc5f48b1800702f6",
+      "cd3a063fcac86af4",
+      "ce32fd27988d3fc0",
+      "d0e8eb48af1e9cd8",
+      "d1a4d856172e49a5",
+      "d1d8eae581a0ff00",
+      "d42924e22d22b20a",
+      "dd5b2a7a35c80596",
+      "de8e9f47e0ebb1d7",
+      "e0456166fba95ee2",
+      "e1688924ac2149ab",
+      "e312f1bc356884b7",
+      "e73069d70a2ca64d",
+      "e7d8b3e49466ace8",
+      "ea3237690754fd9b",
+      "eac066c9043c9c05",
+      "eb4eacf0e72d8849",
+      "ecd5749f52ce18b5",
+      "ef3196a200d5467e",
+      "f22dcbe0b01b5ca2",
+      "f4c68278d952f1dd",
+      "f55914ffda971ab5",
+      "f5b639d132060062",
+      "fba64b7a2ef7e5ff",
+      "fd3f7af56e353cf4",
+      "fd79b64da3c3f672",
+      "ff97c957a458b27e"
+    ],
+    "planner_observation_trust": null,
+    "retry_count": 0,
+    "tool_calls": 140
+  }
+}

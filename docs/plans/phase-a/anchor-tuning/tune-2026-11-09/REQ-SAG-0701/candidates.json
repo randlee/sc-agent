@@ -1,0 +1,128 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0701",
+  "candidates": {
+    "relevant": {
+      "c1": {
+        "criteria": {
+          "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+          "unclear": "The item text is too vague to tell what part of the system it touches.",
+          "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+        },
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+        "type": "choice"
+      },
+      "c2": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, `anchor.scope`). The anchor governs how sc-decision-runner or decide handles a batch of decision requests: how a batch's requests are dispatched, scheduled or executed. Does the work in `item.text` plan, change, or depend on that batch handling? Judge subject overlap only; do not judge whether the item follows the anchor.",
+        "criteria": {
+          "yes": "The item plans, changes or depends on batch handling in sc-decision-runner or decide (batch types, dispatch, scheduling, worker or thread counts, batch throughput).",
+          "no": "The item is about another part of the system, such as the HTTP layer, schemas, secrets or parsing, and does not touch batch handling in sc-decision-runner or decide.",
+          "unclear": "The item text is too vague to tell whether it touches batch handling in sc-decision-runner or decide."
+        }
+      },
+      "c3": {
+        "type": "choice",
+        "instructions": "Is `item.text` about batch handling in sc-decision-runner or decide, the area named in `anchor.scope`? Answer about subject matter only, not about compliance or conflict.",
+        "criteria": {
+          "yes": "The item adds, changes or relies on how sc-decision-runner or decide processes a batch of decision requests.",
+          "no": "The item concerns something other than batch processing in sc-decision-runner or decide.",
+          "unclear": "The item does not say enough to tell which component or activity it concerns."
+        }
+      }
+    },
+    "addressed": {
+      "c1": {
+        "criteria": {
+          "no": "The item text is silent about the directive: it neither includes the directive's specific content nor references it.",
+          "unclear": "The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.",
+          "yes": "The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point."
+        },
+        "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+        "type": "choice"
+      },
+      "c2": {
+        "type": "choice",
+        "instructions": "`anchor.statement` requires that the requests of one batch are sent in parallel across a configurable number of worker threads, 8 by default. Does `item.text` state this: that a batch's requests are sent in parallel (concurrently) across multiple workers or threads whose number is configurable, with a default of 8? Any wording counts (a `workers` setting, a pool size, a concurrency limit). Judge only whether this content is present in the item; do not judge whether something else in the item conflicts with it.",
+        "criteria": {
+          "yes": "The item states parallel or concurrent dispatch of a batch's requests across a configurable number of workers or threads with default 8, in any wording.",
+          "no": "The item does not state parallel dispatch across a configurable worker count: it is silent about how requests are dispatched, mentions only speed, performance or concurrency in general terms, or describes serial or single-worker dispatch.",
+          "unclear": "The item mentions parallel dispatch of a batch's requests, but it cannot be told whether the worker count is configurable or what its default is."
+        }
+      },
+      "c3": {
+        "type": "choice",
+        "instructions": "Does `item.text` include the directive's specific content, namely that the requests of one batch are sent in parallel across a configurable number of worker threads, 8 by default? Look for that content as a step, constraint or design decision in the item. Mentioning batches, speed or concurrency without that content does not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item says a batch's requests go out in parallel over a configurable set of worker threads defaulting to 8.",
+          "no": "The item lacks that content: it is silent on dispatch, only alludes to throughput or concurrency, or plans a different dispatch method.",
+          "unclear": "The item mentions parallel workers for a batch but leaves out whether the count is configurable or its default."
+        }
+      }
+    },
+    "contradicted": {
+      "c1": {
+        "criteria": {
+          "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+          "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+          "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+        },
+        "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.",
+        "type": "choice"
+      },
+      "c2": {
+        "type": "choice",
+        "instructions": "`anchor.statement` requires that the requests of one batch are sent in parallel across a configurable number of worker threads, 8 by default. Does `item.text` plan batch handling that cannot be reconciled with this? Conflicts include sending a batch's requests one after another or on the caller's thread, limiting batches to a single worker, a fixed non-configurable worker count, a different default, or a condition under which batches run serially that the anchor does not allow. A caller choosing a particular worker count through the configurable setting is not a conflict. Silence about dispatch, or a vague mention of performance, is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states a batch-dispatch approach that rules out parallel sending across a configurable worker count with default 8, always or under some condition.",
+          "no": "Nothing in the item conflicts with the directive, including items that are silent about dispatch, only mention the topic, comply with it, or are about something else.",
+          "unclear": "The item describes batch dispatch in a way that might or might not rule out parallel sending across a configurable worker count with default 8."
+        }
+      },
+      "c3": {
+        "type": "choice",
+        "instructions": "The directive in `anchor.statement` is that the requests of one batch are sent in parallel across a configurable number of worker threads, 8 by default. Does anything in `item.text` go against it, for example serial dispatch, a single worker, a hard-coded worker count, or an exception that makes some batches serial? Using the configurable worker setting is compliance, not conflict. Silence is not conflict. Judge conflict only, not whether the directive is present.",
+        "criteria": {
+          "yes": "The item plans something the directive rules out, in all cases or in a stated exception.",
+          "no": "The item plans nothing the directive rules out.",
+          "unclear": "The item's dispatch plan is too ambiguous to tell whether it rules out the directive."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "all-c2",
+      "roles": {
+        "relevant": "c2",
+        "addressed": "c2",
+        "contradicted": "c2"
+      }
+    },
+    {
+      "bundle_id": "all-c3",
+      "roles": {
+        "relevant": "c3",
+        "addressed": "c3",
+        "contradicted": "c3"
+      }
+    },
+    {
+      "bundle_id": "c1-c2-c2",
+      "roles": {
+        "relevant": "c1",
+        "addressed": "c2",
+        "contradicted": "c2"
+      }
+    },
+    {
+      "bundle_id": "c2-c3-c3",
+      "roles": {
+        "relevant": "c2",
+        "addressed": "c3",
+        "contradicted": "c3"
+      }
+    }
+  ]
+}

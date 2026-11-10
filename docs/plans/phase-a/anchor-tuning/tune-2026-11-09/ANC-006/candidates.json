@@ -1,0 +1,99 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "ANC-006",
+  "candidates": {
+    "relevant": {
+      "rel-a": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, governing `anchor.scope`). The anchor concerns which operations the decide CLI and the sc-agent Python API offer. Does the work in `item.text` add, change, remove, or depend on a decide CLI subcommand or a function in the sc-agent Python API? Judge subject overlap only, not compliance.",
+        "criteria": {
+          "yes": "The item adds, changes, removes, or depends on a decide subcommand or an sc-agent Python API function.",
+          "no": "The item works on another part of the system (for example the HTTP layer, logging internals, or docs) and touches neither a decide subcommand nor an sc-agent Python API function.",
+          "unclear": "The item text is too vague to tell whether it touches a decide subcommand or a Python API function."
+        }
+      },
+      "rel-b": {
+        "type": "choice",
+        "instructions": "Read `anchor.scope`, which names the work the anchor governs, and `item.text`. Is the item work of that kind: does it add or change a decide subcommand, or add or change a function in the sc-agent Python bindings? Only decide whether the item falls inside the scope; do not decide whether it obeys `anchor.statement`.",
+        "criteria": {
+          "yes": "The item text names or describes a decide subcommand or an sc-agent Python function that it adds or changes.",
+          "no": "The item text describes no decide subcommand and no sc-agent Python function being added or changed.",
+          "unclear": "It cannot be told from the item text whether a decide subcommand or Python function is added or changed."
+        }
+      },
+      "rel-c": {
+        "type": "choice",
+        "instructions": "The state holds one planning item and one anchor, a directive quoted in `anchor.statement` with its area in `anchor.scope`. Does completing the item touch the subject of `anchor.statement` - the set of operations exposed by the decide CLI or by the sc-agent Python API? Judge subject matter only.",
+        "criteria": {
+          "yes": "The item plans or changes a decide CLI operation or an sc-agent Python API operation.",
+          "no": "The item plans nothing about decide CLI operations or sc-agent Python API operations.",
+          "unclear": "The item is too vague to tell which part of the system it touches."
+        }
+      }
+    },
+    "addressed": {
+      "add-a": {
+        "type": "choice",
+        "instructions": "The anchor requires that every operation available in the decide CLI is also available in the sc-agent Python API (`anchor.statement`). Does `item.text` explicitly provide for this: for each decide subcommand it adds or changes, does it plan a matching sc-agent Python API function, or does it state or keep a check that every decide subcommand has a Python equivalent? A general remark that the CLI and Python API should be consistent, without a concrete matching function or parity check, does not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item names a matching Python API function for each decide operation it adds or changes, or states or preserves a check that every decide subcommand has a Python API equivalent.",
+          "no": "The item gives no matching Python API function and no parity check; it is silent about Python availability or only mentions consistency in general terms.",
+          "unclear": "The item mentions Python availability but it cannot be told whether a matching function or parity check is planned."
+        }
+      },
+      "add-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` carry out the directive in `anchor.statement`? Count it as carried out only when the item text itself contains a concrete step for it: a named Python API equivalent of the decide operation, or a test or check that every decide subcommand has a Python API function. Topic mentions and design goals do not count. Judge presence of the directive only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item contains a concrete Python API equivalent or a CLI-to-Python parity check.",
+          "no": "The item contains neither a concrete Python API equivalent nor a parity check.",
+          "unclear": "The item alludes to Python availability but it is not possible to tell if a concrete equivalent or check is included."
+        }
+      },
+      "add-c": {
+        "type": "choice",
+        "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive in `anchor.statement` (decide CLI operations also available in the sc-agent Python API)? Look for the directive's specific content: a matching Python function for a decide operation, or a check that lists both. Offering extra Python-only functions is allowed and neither counts for nor against. A generic mention of the topic without that specific content does not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item text contains a matching Python function for its decide operations or a check that every decide subcommand has one.",
+          "no": "The item text is silent about Python equivalents of decide operations or mentions the topic only in general terms.",
+          "unclear": "The item text alludes to Python equivalents but it cannot be told whether one is actually planned."
+        }
+      }
+    },
+    "contradicted": {
+      "con-a": {
+        "type": "choice",
+        "instructions": "The anchor requires that every decide CLI operation is also available in the sc-agent Python API; the Python API may offer more than the CLI but not less. Does `item.text` plan a decide operation that is withheld from, missing from, or explicitly not provided in the Python API, or remove a Python function that a decide subcommand still needs? A Python-only function is not a conflict. Silence about Python is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states that a decide operation will have no Python API equivalent, is CLI-only, or loses its Python function.",
+          "no": "The item states no decide operation that lacks a Python equivalent; it is compliant, silent, Python-only, or unrelated.",
+          "unclear": "The item text might mean a decide operation lacks a Python equivalent, but it is ambiguous."
+        }
+      },
+      "con-b": {
+        "type": "choice",
+        "instructions": "Does `item.text` state a plan that cannot be reconciled with `anchor.statement` - for example a decide subcommand described as having no Python equivalent or as CLI-only? Adding Python functions the CLI does not have is allowed. An item that simply does not mention Python is silent, not in conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item text explicitly leaves a decide operation out of the Python API.",
+          "no": "Nothing in the item text leaves a decide operation out of the Python API.",
+          "unclear": "The item text is ambiguous about whether a decide operation is left out of the Python API."
+        }
+      },
+      "con-c": {
+        "type": "choice",
+        "instructions": "Does `item.text` propose something that `anchor.statement` rules out? Here that means making the sc-agent Python API offer less than the decide CLI: a decide operation stated to be CLI-only, to have no Python equivalent, or whose Python function is removed. The Python API offering more than the CLI is permitted. Silence about the directive is not a contradiction. Judge conflict only.",
+        "criteria": {
+          "yes": "The item text states a plan under which some decide CLI operation is not available in the Python API.",
+          "no": "No plan in the item text makes a decide CLI operation unavailable in the Python API, whether or not the directive is mentioned.",
+          "unclear": "The item text could be read as making a decide operation unavailable in Python, but it is ambiguous."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {"bundle_id": "bundle-a", "roles": {"relevant": "rel-a", "addressed": "add-a", "contradicted": "con-a"}},
+    {"bundle_id": "bundle-b", "roles": {"relevant": "rel-b", "addressed": "add-b", "contradicted": "con-b"}},
+    {"bundle_id": "bundle-c", "roles": {"relevant": "rel-c", "addressed": "add-c", "contradicted": "con-c"}}
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0006",
+  "candidates": {
+    "relevant": {
+      "rel-scope": {"type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, `anchor.scope`). The anchor restricts what may live in the sc-agent-types and sc-decision-schema crates. Does the work in `item.text` add, change, move or remove any type, field or constant in sc-agent-types or sc-decision-schema? Judge subject overlap only, not whether the item obeys the anchor.",
+        "criteria": {"yes": "The item adds, changes, moves or removes a type, field or constant in sc-agent-types or sc-decision-schema, or plans what those crates contain.",
+                     "no": "The item works only on other crates, tooling, CI, documentation or processes and does not touch the contents of sc-agent-types or sc-decision-schema.",
+                     "unclear": "The item is too vague to tell whether it touches the contents of sc-agent-types or sc-decision-schema."}},
+      "rel-subject": {"type": "choice",
+        "instructions": "Read `anchor.statement` and `anchor.scope`, then `item.text`. Is the item's work about the same subject the anchor governs, namely which types, fields and constants the shared crates sc-agent-types and sc-decision-schema contain? Answer about overlap of subject only; obeying or breaking the anchor does not matter here.",
+        "criteria": {"yes": "The item plans or changes contents of sc-agent-types or sc-decision-schema.",
+                     "no": "The item's work is about a different part of the system and leaves the contents of both crates untouched.",
+                     "unclear": "The item does not say enough to tell which crate or component it changes."}},
+      "rel-short": {"type": "choice",
+        "instructions": "Does `item.text` plan work on the contents (types, fields, constants) of sc-agent-types or sc-decision-schema, the crates `anchor.statement` restricts? Judge overlap only.",
+        "criteria": {"yes": "It plans, adds or changes contents of either crate.",
+                     "no": "It concerns something else and touches neither crate's contents.",
+                     "unclear": "It is too vague to tell which crates it touches."}}
+    },
+    "addressed": {
+      "add-explicit": {"type": "choice",
+        "instructions": "`anchor.statement` forbids putting any type, field or constant specific to plan-anchor, judge-jev or another consumer application into sc-agent-types or sc-decision-schema. Does `item.text` explicitly state that restriction, for example by saying the crates hold no consumer-specific or plan-anchor/judge-jev types, or that such types stay in the consumer's own crate? Only an explicit statement of the restriction counts. Merely adding generic types, describing the crates, or being silent is not stating it. Judge presence of the stated restriction only, not whether the item breaks it.",
+        "criteria": {"yes": "The item explicitly states that sc-agent-types or sc-decision-schema hold no types, fields or constants specific to plan-anchor, judge-jev or other consumer applications.",
+                     "no": "The item does not state the restriction: it is silent about consumer-specific types, only adds or describes types, or adds consumer-specific types.",
+                     "unclear": "The item contains wording that partly restates the restriction, but it cannot be told whether it excludes consumer-specific types."}},
+      "add-restates": {"type": "choice",
+        "instructions": "Does `item.text` restate the prohibition in `anchor.statement` in its own words? The prohibition is: no type, field or constant specific to plan-anchor, judge-jev or another consumer application in sc-agent-types or sc-decision-schema. Look for a sentence that excludes consumer-specific content from these crates. Adding only generic or API types without such a sentence is no. Adding consumer-specific types is no. Judge whether the prohibition is stated, not whether it is obeyed.",
+        "criteria": {"yes": "A sentence in the item excludes consumer-specific (plan-anchor, judge-jev or other consumer) types, fields or constants from the crates.",
+                     "no": "No sentence in the item excludes consumer-specific content from the crates.",
+                     "unclear": "A sentence seems to limit what the crates contain, but it is not possible to tell whether it excludes consumer-specific content."}},
+      "add-short": {"type": "choice",
+        "instructions": "Does `item.text` explicitly say that sc-agent-types or sc-decision-schema will contain no type, field or constant specific to plan-anchor, judge-jev or another consumer application? Silence, generic types and consumer-specific additions all count as no. Judge the explicit statement only.",
+        "criteria": {"yes": "The item explicitly says the crates exclude consumer-specific types, fields or constants.",
+                     "no": "The item does not say this.",
+                     "unclear": "The item's wording might say this but is ambiguous."}}
+    },
+    "contradicted": {
+      "con-adds-forbidden": {"type": "choice",
+        "instructions": "`anchor.statement` forbids any type, field or constant in sc-agent-types or sc-decision-schema that is specific to plan-anchor, judge-jev or another application built on sc-agent. Does `item.text` plan to add or keep such content in either crate? This includes whole types, single fields, constants, mocks and test helpers, and content behind a cargo feature or used only in tests; the anchor grants no exception. A type is not forbidden just because its name sounds like a judging concept: a type that mirrors the TypeSafe API or is useful to every consumer is allowed. Silence about the rule is not a contradiction. Judge conflict only.",
+        "criteria": {"yes": "The item places in sc-agent-types or sc-decision-schema a type, field or constant that exists for plan-anchor, judge-jev or another specific consumer application.",
+                     "no": "Everything the item adds to these crates is generic or mirrors the TypeSafe API, or the item adds nothing to them.",
+                     "unclear": "The item adds something to these crates and it cannot be told whether it is specific to one consumer application."}},
+      "con-purpose": {"type": "choice",
+        "instructions": "For each type, field or constant that `item.text` adds to or keeps in sc-agent-types or sc-decision-schema, ask whether it exists to serve plan-anchor, judge-jev or one other consumer application, which `anchor.statement` forbids. Test-only, mock and feature-gated content counts the same as other content. Generic or TypeSafe API types are allowed whatever they are called. Does the item contradict the anchor? Silence is not contradiction.",
+        "criteria": {"yes": "At least one addition to these crates serves a specific consumer application such as plan-anchor or judge-jev.",
+                     "no": "No addition to these crates serves a specific consumer application.",
+                     "unclear": "An addition's purpose is not stated well enough to tell whether it serves a specific consumer application."}},
+      "con-short": {"type": "choice",
+        "instructions": "Does `item.text` put a type, field or constant specific to plan-anchor, judge-jev or another consumer application (including mocks, test helpers and feature-gated content) into sc-agent-types or sc-decision-schema, as `anchor.statement` forbids? TypeSafe API and generic types are allowed. Silence is not a contradiction.",
+        "criteria": {"yes": "It adds consumer-specific content to either crate.",
+                     "no": "It adds no consumer-specific content to either crate.",
+                     "unclear": "It adds content whose consumer-specificity cannot be told."}}
+    }
+  },
+  "bundles": [
+    {"bundle_id": "b-explicit", "roles": {"relevant": "rel-scope", "addressed": "add-explicit", "contradicted": "con-adds-forbidden"}},
+    {"bundle_id": "b-subject", "roles": {"relevant": "rel-subject", "addressed": "add-restates", "contradicted": "con-purpose"}},
+    {"bundle_id": "b-short", "roles": {"relevant": "rel-short", "addressed": "add-short", "contradicted": "con-short"}},
+    {"bundle_id": "b-mixed", "roles": {"relevant": "rel-short", "addressed": "add-explicit", "contradicted": "con-adds-forbidden"}}
+  ]
+}

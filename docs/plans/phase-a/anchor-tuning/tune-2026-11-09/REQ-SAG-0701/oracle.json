@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0701",
+  "authority_citations": [
+    "REQ-SAG-0701 v2 (locked): sc-decision-runner must send the requests of one batch in parallel across a configurable number of worker threads, 8 by default.",
+    "phase-a-intent v1: a batch of decision requests runs in parallel behind the decision trait, and every send is session-logged."
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass",
+      "probe": "fixture_pass",
+      "item": {
+        "title": "Batch runner",
+        "text": "sc-decision-runner sends a batch's requests across `workers` threads (default 8) and returns each result as it finishes."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Approved pass fixture: parallel across a configurable `workers` count with default 8."
+    },
+    {
+      "case_id": "fixture-fail",
+      "probe": "fixture_fail",
+      "item": {
+        "title": "Batch runner",
+        "text": "The runner sends the batch's requests one after another on the caller's thread."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Approved fail fixture: serial dispatch on the caller's thread is ruled out by the directive and the directive's content is absent."
+    },
+    {
+      "case_id": "compliant",
+      "probe": "compliant",
+      "item": {
+        "title": "Decision runner batch execution",
+        "text": "Batch execution in sc-decision-runner: dispatch each batch's decision requests concurrently on a worker pool whose size is a `workers` setting that defaults to eight."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Paraphrase of the directive: concurrent pool, configurable size, default eight."
+    },
+    {
+      "case_id": "silent",
+      "probe": "silent",
+      "item": {
+        "title": "Batch type and logging",
+        "text": "Add a `Batch` type to sc-decision-runner that holds the decision requests and a batch ID, and write each result to the session log with the batch ID."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Touches batch handling in sc-decision-runner but says nothing about how requests are dispatched; silence is not conflict."
+    },
+    {
+      "case_id": "topical-only",
+      "probe": "topical_only",
+      "item": {
+        "title": "Batch throughput",
+        "text": "Improve batch throughput in sc-decision-runner so large decision runs finish faster."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_addressed",
+      "rationale": "Mentions the topic (batch speed) without the directive's specific content (parallel dispatch across a configurable worker count, default 8); nothing rules the directive out."
+    },
+    {
+      "case_id": "conflicting",
+      "probe": "conflicting",
+      "item": {
+        "title": "Single-worker batches",
+        "text": "Run each batch in sc-decision-runner through a single worker; parallel dispatch across workers is out of scope for phase A."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "A single worker with parallelism declared out of scope cannot be reconciled with parallel dispatch across workers."
+    },
+    {
+      "case_id": "irrelevant",
+      "probe": "irrelevant",
+      "item": {
+        "title": "HTTP retry spans",
+        "text": "Add OpenTelemetry span names to the retry loop in sc-agent-http so each retried TypeSafe request is traceable."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "sc-agent-http retry tracing does not plan, change or depend on batch handling in sc-decision-runner or decide."
+    },
+    {
+      "case_id": "boundary",
+      "probe": "boundary",
+      "item": {
+        "title": "Configurable workers",
+        "text": "sc-decision-runner sends batch requests in parallel across `workers` threads (default 8); a caller may set `workers` to 1 to get serial order while debugging."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "The worker count is configurable per the directive; a caller choosing 1 is a use of that configurability, and the default stays 8."
+    },
+    {
+      "case_id": "exception",
+      "probe": "exception",
+      "item": {
+        "title": "Logged batches serial",
+        "text": "sc-decision-runner sends batch requests in parallel across `workers` threads (default 8), except when session logging is enabled, in which case requests are sent one at a time."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "The directive has no exception, and per the intent every send is session-logged, so the carve-out makes batches serial in the normal case; the directive content is present but conflicted."
+    }
+  ]
+}

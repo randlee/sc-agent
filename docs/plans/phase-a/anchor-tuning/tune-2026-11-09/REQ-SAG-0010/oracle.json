@@ -1,0 +1,177 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0010",
+  "authority_citations": [
+    "REQ-SAG-0010 v2 (locked, prohibition): 'sc-agent source code MUST NOT call std::thread::sleep, std::thread::sleep_until, tokio::time::sleep or any other sleep function.'",
+    "REQ-SAG-0010 v2 scope: 'adds or changes Rust source in an sc-agent crate'",
+    "REQ-SAG-0010 v2 fixtures pass/fail"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass",
+      "probe": "fixture_pass",
+      "item": {
+        "title": "Holdoff waiting",
+        "text": "The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Approved pass fixture: runner code is sc-agent Rust source (scope), names a non-sleep wait and a lint forbidding sleep (addressed), calls no sleep (no conflict)."
+    },
+    {
+      "case_id": "fixture-fail",
+      "probe": "fixture_fail",
+      "item": {
+        "title": "Retry loop",
+        "text": "The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Approved fail fixture: calls std::thread::sleep, which the statement forbids by name."
+    },
+    {
+      "case_id": "compliant",
+      "probe": "compliant",
+      "item": {
+        "title": "sc-agent-http retry holdoff",
+        "text": "In sc-agent-http, implement the 429 retry holdoff by waiting on the request's CancelToken with wait_until(deadline), so cancellation ends the wait early. No sleep function is called anywhere in the crate."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "yes",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Rust source in an sc-agent crate; explicitly states no sleep call and a non-sleep wait mechanism; nothing forbidden."
+    },
+    {
+      "case_id": "silent",
+      "probe": "silent",
+      "item": {
+        "title": "Decision types",
+        "text": "Add the Decision, DecisionRequest and DecisionOutcome types to sc-agent-types with serde derives and round-trip unit tests."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "Adds Rust source in an sc-agent crate, so in scope; says nothing about sleeping or waiting; silence is not a conflict and a prohibition is met by refraining."
+    },
+    {
+      "case_id": "topical-only",
+      "probe": "topical_only",
+      "item": {
+        "title": "Retry-After handling",
+        "text": "Add a retry loop to sc-agent-http that waits out the server's Retry-After holdoff before resending the request, up to three attempts."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "In scope; mentions waiting but neither states the no-sleep constraint nor names a sleep function; waiting without saying how is not a call to a sleep function."
+    },
+    {
+      "case_id": "conflicting",
+      "probe": "conflicting",
+      "item": {
+        "title": "Exponential backoff",
+        "text": "Add exponential backoff to the sc-agent-http client: after each failed send, await tokio::time::sleep(backoff) and double the backoff before retrying."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Calls tokio::time::sleep, named in the statement as forbidden."
+    },
+    {
+      "case_id": "conflicting-sleep-until",
+      "probe": "conflicting",
+      "item": {
+        "title": "Batch pacing",
+        "text": "Pace the decision batch runner in sc-agent so each send starts on a fixed schedule: compute the next start Instant and call std::thread::sleep_until(next) before dispatching the next request."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Calls std::thread::sleep_until, named in the statement as forbidden."
+    },
+    {
+      "case_id": "irrelevant",
+      "probe": "irrelevant",
+      "item": {
+        "title": "Docs index",
+        "text": "Update the README and the docs/requirements index page to list REQ-SAG-0009 and REQ-SAG-0010 with one-line summaries."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "Documentation-only change; adds or changes no Rust source in an sc-agent crate, so outside the anchor scope."
+    },
+    {
+      "case_id": "boundary-python-script",
+      "probe": "boundary",
+      "item": {
+        "title": "CI polling helper",
+        "text": "Add a Python helper script under tools/ci/ that polls the GitHub checks API and calls time.sleep(10) between polls."
+      },
+      "expected_roles": {
+        "relevant": "no",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "not_applicable",
+      "rationale": "The prohibition governs sc-agent Rust source; a Python tooling script is outside the scope 'adds or changes Rust source in an sc-agent crate', so it neither falls under nor breaks the anchor."
+    },
+    {
+      "case_id": "boundary-timeout",
+      "probe": "boundary",
+      "item": {
+        "title": "Request deadline",
+        "text": "In sc-agent-http, wrap each send in tokio::time::timeout(request_deadline, send_future) so a hung request returns a Timeout error."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "no"
+      },
+      "expected_verdict": "satisfied",
+      "rationale": "In scope; tokio::time::timeout bounds an operation and is not a sleep function, so no forbidden call is made; the item does not state the no-sleep constraint."
+    },
+    {
+      "case_id": "exception-tests",
+      "probe": "exception",
+      "item": {
+        "title": "Slow-server test",
+        "text": "In sc-agent-http's integration tests, simulate a slow server by calling std::thread::sleep(Duration::from_millis(200)) in the mock handler; tests are exempt from the no-sleep rule."
+      },
+      "expected_roles": {
+        "relevant": "yes",
+        "addressed": "no",
+        "contradicted": "yes"
+      },
+      "expected_verdict": "contradicted",
+      "rationale": "Test code in an sc-agent crate is sc-agent Rust source; the statement grants no exception, so the claimed exemption does not apply and the std::thread::sleep call is forbidden."
+    }
+  ]
+}

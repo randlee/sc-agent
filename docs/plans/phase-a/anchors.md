@@ -28,7 +28,7 @@ Anchor: crates/sc-decision-schema must contain only the code necessary to send a
 
 > Has the absolute minimum code that is necessary to send/receive 100% of the decision api
 
-Said by Rand Lee, planning session, 2026-11-09T07:40:40Z. Status: locked. Version 1.
+Said by Rand Lee, planning session, 2026-11-09T07:40:40Z. Status: locked. Version 2.
 
 Summary: sc-decision-schema holds only minimum decision-API code
 
@@ -42,6 +42,10 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.7`: ANC-001 governs code in crates/sc-decision-schema; A-7 adds no code to that crate.
 
 Beads: anchor `agt-e49`, plan questions `agt-e49.1`, dev questions `agt-e49.2`
+
+Fixtures:
+- pass: sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code.
+- fail: sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client.
 
 ## ANC-002
 
@@ -108,7 +112,7 @@ Anchor: Every sc-agent decision backend must implement the Backend trait defined
 
 > Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response.
 
-Said by Rand Lee, record ADR-SAG-0001, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record ADR-SAG-0001, 2026-11-09. Status: locked. Version 2.
 
 Summary: Every decision backend implements Backend; callers use Decision
 
@@ -119,13 +123,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-7mi`, plan questions `agt-7mi.1`, dev questions `agt-7mi.2`
 
+Fixtures:
+- pass: The Jev, local-runner, Haiku and Luna backends each implement the Backend trait from sc-decision-schema.
+- fail: The Haiku backend defines its own LlmJudge trait and is called directly by the runner instead of through Backend.
+
 ## ADR-SAG-0004
 
 Anchor: No sc-agent crate's Cargo.toml must depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends; runner.
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record ADR-SAG-0004, 2026-11-09. Status: locked. Version 2.
 
 Summary: No crate depends on a crate above it in the layering
 
@@ -133,13 +141,17 @@ Scope: adds or changes a crate dependency in a Cargo.toml
 
 Beads: anchor `agt-mud`, plan questions `agt-mud.1`, dev questions `agt-mud.2`
 
+Fixtures:
+- pass: sc-agent-http depends only on sc-agent-types, sc-agent-secrets and sc-agent-log; no crate depends on sc-decision-runner.
+- fail: sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.
+
 ## REQ-SAG-0002
 
 Anchor: Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.
 
 > An error MUST carry the error id and message of every lower-layer error that caused it.
 
-Said by Rand Lee, record REQ-SAG-0002, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0002, 2026-11-09. Status: locked. Version 2.
 
 Summary: Each crate returns its own error union carrying lower errors
 
@@ -147,13 +159,17 @@ Scope: adds or changes an error type or a public function's return type
 
 Beads: anchor `agt-t70`, plan questions `agt-t70.1`, dev questions `agt-t70.2`
 
+Fixtures:
+- pass: HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message.
+- fail: The backend maps every lower-layer failure to a new error with the message "request failed", dropping the original error.
+
 ## REQ-SAG-0006
 
 Anchor: No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.
 
 > `sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.
 
-Said by Rand Lee, record REQ-SAG-0006, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0006, 2026-11-09. Status: locked. Version 2.
 
 Summary: No consumer-app or Jev-mock types in shared crates
 
@@ -165,13 +181,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
+Fixtures:
+- pass: sc-decision-schema contains only TypeSafe API types; no type names plan-anchor or judge-jev.
+- fail: sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate.
+
 ## REQ-SAG-0009
 
 Anchor: No low-level sc-agent crate (types, config, secrets, log, http, decision schema, decision backends, runner) must depend on tokio with its default features.
 
 > A program that does not use tokio MUST be able to use every low-level crate.
 
-Said by Rand Lee, record REQ-SAG-0009, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0009, 2026-11-09. Status: locked. Version 2.
 
 Summary: Low-level crates build and run without tokio
 
@@ -182,13 +202,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-wth`, plan questions `agt-wth.1`, dev questions `agt-wth.2`
 
+Fixtures:
+- pass: `cargo tree -p sc-decision-runner` lists no tokio crate with default features.
+- fail: sc-agent-http adds reqwest with its default tokio runtime as a required dependency.
+
 ## REQ-SAG-0010
 
 Anchor: sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.
 
 > sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.
 
-Said by Rand Lee, record REQ-SAG-0010, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0010, 2026-11-09. Status: locked. Version 2.
 
 Summary: No sleep calls in sc-agent source
 
@@ -196,13 +220,17 @@ Scope: adds or changes Rust source in an sc-agent crate
 
 Beads: anchor `agt-6dm`, plan questions `agt-6dm.1`, dev questions `agt-6dm.2`
 
+Fixtures:
+- pass: The runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.
+- fail: The retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.
+
 ## REQ-SAG-0201
 
 Anchor: Every Rust type that maps to a field of the TypeSafe Jev API (POST /v1/systemone, GET /v1/models) must be defined in the sc-decision-schema crate.
 
 > Every type that maps to the Jev API MUST be defined in `sc-decision-schema`.
 
-Said by Rand Lee, record REQ-SAG-0201, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0201, 2026-11-09. Status: locked. Version 2.
 
 Summary: Jev API types defined only in sc-decision-schema, built from the spec
 
@@ -213,13 +241,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-gc6`, plan questions `agt-gc6.1`, dev questions `agt-gc6.2`
 
+Fixtures:
+- pass: sc-decision-llm imports SystemOneRequest and SystemOneResponse from sc-decision-schema and defines no Jev-shaped type of its own.
+- fail: sc-decision-systemone defines its own JevAnswer struct mirroring the TypeSafe choice answer.
+
 ## REQ-SAG-0601
 
 Anchor: A request that receives an HTTP 429, 502 or 529 response must be resent until a configurable maximum number of sends, 5 by default, is reached.
 
 > A request that receives a busy response MUST be resent unchanged.
 
-Said by Rand Lee, record REQ-SAG-0601, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0601, 2026-11-09. Status: locked. Version 2.
 
 Summary: Busy resend: configurable sends, holdoff in the queue
 
@@ -231,13 +263,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-ebd`, plan questions `agt-ebd.1`, dev questions `agt-ebd.2`
 
+Fixtures:
+- pass: A request answered 429 is resent unchanged until max_sends (default 5) is reached, then returns http.provider_busy.
+- fail: A 429 response is returned to the caller at once and never resent.
+
 ## REQ-SAG-0701
 
 Anchor: sc-decision-runner must send the requests of one batch in parallel across a configurable number of worker threads, 8 by default.
 
 > `sc-decision-runner` MUST run the requests of one batch in parallel across workers.
 
-Said by Rand Lee, record REQ-SAG-0701, 2026-11-09. Status: locked. Version 1.
+Said by Rand Lee, record REQ-SAG-0701, 2026-11-09. Status: locked. Version 2.
 
 Summary: Batches run in parallel, fastest first, failures returned
 
@@ -248,13 +284,17 @@ Excluded from (not judged; the cell passes as `excluded`):
 
 Beads: anchor `agt-ocy`, plan questions `agt-ocy.1`, dev questions `agt-ocy.2`
 
+Fixtures:
+- pass: sc-decision-runner sends a batch's requests across `workers` threads (default 8) and returns each result as it finishes.
+- fail: The runner sends the batch's requests one after another on the caller's thread.
+
 ## ANC-006
 
 Anchor: Every operation available in the decide CLI must also be available in the sc-agent Python API.
 
 > I expect the python api may allow more flexibility than cli, NOT less.
 
-Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: locked. Version 1.
+Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: locked. Version 2.
 
 Summary: Python API offers every decide CLI operation
 
@@ -263,3 +303,7 @@ Scope: adds or changes a decide subcommand or a function in the sc-agent Python 
 Deterministic check to pair with the development gate: each decide subcommand has a matching Python API function, checked by a test that lists both
 
 Beads: anchor `agt-frw`, plan questions `agt-frw.1`, dev questions `agt-frw.2`
+
+Fixtures:
+- pass: Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.
+- fail: decide gains a `models` subcommand with no Python equivalent.

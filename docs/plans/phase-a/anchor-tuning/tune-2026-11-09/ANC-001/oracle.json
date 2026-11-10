@@ -1,0 +1,83 @@
+{
+  "schema": "plan-anchor/tune-oracle/1",
+  "gate": "planning",
+  "anchor_id": "ANC-001",
+  "authority_citations": [
+    "phase-a-intent v1 (sha256 5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c): success - every TypeSafe API request and response sent/received through sc-agent with the minimum code needed",
+    "ANC-001 v2 locked directive: statement 'crates/sc-decision-schema must contain only the code necessary to send and receive 100% of the decision API, with nothing beyond that minimum.'; scope 'adds or changes code in crates/sc-decision-schema'; approved pass/fail fixtures"
+  ],
+  "cases": [
+    {
+      "case_id": "fixture-pass",
+      "probe": "fixture_pass",
+      "item": {"title": "sc-decision-schema contents", "text": "sc-decision-schema defines only the TypeSafe request, response, answer and error types plus the Backend and Decision traits; it has no transport, logging or CLI code."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Approved ANC-001 pass fixture: the crate is limited to decision-API types and the decision traits, which is exactly the directive."
+    },
+    {
+      "case_id": "fixture-fail",
+      "probe": "fixture_fail",
+      "item": {"title": "sc-decision-schema contents", "text": "sc-decision-schema also holds a response cache, a plan-anchor report formatter and an HTTP client."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Approved ANC-001 fail fixture: cache, report formatter and HTTP client are code beyond the minimum needed to send/receive the decision API; no minimality limit is stated."
+    },
+    {
+      "case_id": "compliant",
+      "probe": "compliant",
+      "item": {"title": "Add decision request and response types", "text": "Add the decision request, response and answer-option structs to crates/sc-decision-schema, mapping each one field-for-field to the TypeSafe decision API. The crate gets nothing else in this item: no client, no retries, no caching, no logging."},
+      "expected_roles": {"relevant": "yes", "addressed": "yes", "contradicted": "no"},
+      "expected_verdict": "satisfied",
+      "rationale": "Changes code in the scoped crate, states the only-decision-API limit explicitly, and adds nothing beyond it."
+    },
+    {
+      "case_id": "silent",
+      "probe": "silent",
+      "item": {"title": "Add decision error types", "text": "Add the DecisionError enum and its variants to crates/sc-decision-schema, with Display implementations and doc comments."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "Adds code to the scoped crate (error types are decision-API types, so no conflict) but never states the minimality limit the directive requires the plan to carry."
+    },
+    {
+      "case_id": "topical-only",
+      "probe": "topical_only",
+      "item": {"title": "Add the Decision trait", "text": "Add the Decision trait to crates/sc-decision-schema. How much code the crate should hold overall will be revisited at the sprint review."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_addressed",
+      "rationale": "Touches the topic of the crate's size but defers it instead of committing to the only-the-minimum limit; the Decision trait itself is permitted, so no conflict."
+    },
+    {
+      "case_id": "conflicting",
+      "probe": "conflicting",
+      "item": {"title": "One-stop decision crate", "text": "Add the decision request types to crates/sc-decision-schema together with a retrying reqwest HTTP client and a disk-backed response cache, so consumers need only one dependency."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "Puts transport and caching code, which is beyond the minimum to send/receive the decision API, into the scoped crate; ANC-001 forbids this and INTENT puts caching out of scope."
+    },
+    {
+      "case_id": "irrelevant",
+      "probe": "irrelevant",
+      "item": {"title": "Tree-sitter grammar loader", "text": "Implement the grammar loader in crates/sc-treesitter that reads compiled grammars from the cache directory and reports missing languages."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "Adds no code to crates/sc-decision-schema; outside the anchor's scope."
+    },
+    {
+      "case_id": "boundary-consumer",
+      "probe": "boundary",
+      "item": {"title": "HTTP POST for decisions", "text": "In crates/sc-agent-http, implement the POST call for decision requests, importing the request and response types from sc-decision-schema as they are. sc-decision-schema is not modified by this item."},
+      "expected_roles": {"relevant": "no", "addressed": "no", "contradicted": "no"},
+      "expected_verdict": "not_applicable",
+      "rationale": "ANC-001 scope is 'adds or changes code in crates/sc-decision-schema'; this item only depends on the crate and explicitly leaves it unmodified, so the anchor does not govern it."
+    },
+    {
+      "case_id": "exception-carveout",
+      "probe": "exception",
+      "item": {"title": "Decision trait plus convenience cache", "text": "Add the Decision trait to crates/sc-decision-schema and keep the crate to decision-API code, with one exception: a small in-memory response cache is added there for convenience."},
+      "expected_roles": {"relevant": "yes", "addressed": "no", "contradicted": "yes"},
+      "expected_verdict": "contradicted",
+      "rationale": "ANC-001 allows no exceptions ('nothing beyond that minimum'); a carve-out for a cache does not preserve the directive and places non-minimum code in the crate."
+    }
+  ]
+}

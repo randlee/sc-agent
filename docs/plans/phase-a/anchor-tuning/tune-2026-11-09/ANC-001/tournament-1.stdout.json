@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "error": null,
+  "data": {
+    "accepted": true,
+    "selected_bundle": "b04",
+    "decision": {
+      "status": "sealed",
+      "question_set_sha256": "ffc851662f025671f7f5698d724bff16560d6252890599c144cd15fb982e7817",
+      "reason_code": "TOURNAMENT.SEALED"
+    },
+    "tie_needs_choice": false,
+    "co_leaders": [],
+    "semantic_score": {
+      "exact_role_cells": 54,
+      "total_role_cells": 54,
+      "exact_semantic_verdicts": 18,
+      "total_semantic_verdicts": 18,
+      "stable_cases": 9,
+      "total_cases": 9,
+      "regressions": 0
+    },
+    "oracle_sha256": "147ca8ab3488431c0261235681fbbbb88941251c7ea8488a533fb54560d358ce",
+    "result_vars": "tournament-1/result_vars.json",
+    "results": "tournament-1/results.jsonl",
+    "calls": 504,
+    "failed_calls": [],
+    "retries": 0
+  }
+}

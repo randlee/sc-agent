@@ -1,0 +1,7 @@
+2026-11-10T00:13:20.586979Z INFO compose.command started command started
+2026-11-10T00:13:20.587126Z INFO compose.resolve attempt resolve attempt
+2026-11-10T00:13:20.587249Z INFO compose.resolve resolved resolve completed
+2026-11-10T00:13:20.587467Z INFO compose.include_expand expanded include expansion completed
+2026-11-10T00:13:20.587652Z INFO compose.validate completed validation completed
+2026-11-10T00:13:20.587834Z INFO compose.render completed render completed
+2026-11-10T00:13:20.587993Z INFO compose.command completed command completed

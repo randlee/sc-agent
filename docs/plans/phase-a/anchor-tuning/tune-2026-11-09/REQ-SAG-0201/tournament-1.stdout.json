@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "error": null,
+  "data": {
+    "accepted": true,
+    "selected_bundle": "b-aab",
+    "decision": {
+      "status": "sealed",
+      "question_set_sha256": "fcad39f80c5a2eab2eeaf41a795266ab523f3541bc164c1e5629a052a25432f1",
+      "reason_code": "TOURNAMENT.SEALED"
+    },
+    "tie_needs_choice": false,
+    "co_leaders": [],
+    "semantic_score": {
+      "exact_role_cells": 60,
+      "total_role_cells": 60,
+      "exact_semantic_verdicts": 20,
+      "total_semantic_verdicts": 20,
+      "stable_cases": 10,
+      "total_cases": 10,
+      "regressions": 0
+    },
+    "oracle_sha256": "7d70a714d7a21827b71f7ad258ccac6f2e30b5f05a6d5ddaf2bf3f79ad0cdafd",
+    "result_vars": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0201/tournament-1/result_vars.json",
+    "results": "docs/plans/phase-a/anchor-tuning/tune-2026-11-09/REQ-SAG-0201/tournament-1/results.jsonl",
+    "calls": 140,
+    "failed_calls": [],
+    "retries": 0
+  }
+}

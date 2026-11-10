@@ -1,0 +1,144 @@
+{
+  "schema": "plan-anchor/tune-candidates/1",
+  "gate": "planning",
+  "anchor_id": "REQ-SAG-0002",
+  "candidates": {
+    "relevant": {
+      "r1": {
+        "type": "choice",
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor (`anchor.statement`, `anchor.scope`). The anchor says every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it; its scope is work that adds or changes an error type or a public function's return type. Does the work in `item.text` add or change an error type, or change the return type of a public sc-agent function? Judge subject overlap only, not whether the item obeys the anchor.",
+        "criteria": {
+          "yes": "The item adds or changes an error type, or changes what a public sc-agent function returns, including how it reports failure.",
+          "no": "The item changes no error type and no public function's return type, for example documentation, packaging, or a private refactor that leaves every public signature and error type unchanged.",
+          "unclear": "The item text is too vague to tell whether any error type or public return type changes."
+        }
+      },
+      "r2": {
+        "type": "choice",
+        "instructions": "Is the work in `item.text` inside `anchor.scope`? `anchor.scope` covers work that adds or changes an error type or changes the return type of a public function, which is the subject of `anchor.statement` (what errors returned by public sc-agent functions carry from lower-layer errors). Answer about subject overlap only; do not judge whether the item follows the anchor.",
+        "criteria": {
+          "yes": "The item defines, adds, changes, or depends on an error type or the return type of a public sc-agent function.",
+          "no": "The item touches neither an error type nor a public function's return type; private refactors with no public signature or error type change are outside the scope.",
+          "unclear": "It is not possible to tell from the item text whether an error type or a public return type is affected."
+        }
+      },
+      "r3": {
+        "type": "choice",
+        "instructions": "`anchor.statement` is about errors: every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Does `item.text` plan work that defines, adds, changes, or wraps an error type, or changes the return type of a public sc-agent function? Overlap of subject only; obedience is judged elsewhere.",
+        "criteria": {
+          "yes": "The item works on an error type or on a public function's return type, directly or as a clear prerequisite.",
+          "no": "The item works on something else (docs, build, private internals) and alters no error type and no public return type.",
+          "unclear": "The item is too vague to tell whether it touches an error type or a public return type."
+        }
+      }
+    },
+    "addressed": {
+      "a1": {
+        "type": "choice",
+        "instructions": "The anchor requires that every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Does `item.text` explicitly plan for its errors to carry the id and message of the lower-layer error that caused them, for example by wrapping or storing the source error, exposing it through the error chain, or asserting it in a test? An error that has no lower-layer cause has nothing to carry. A general promise of better or clearer error handling, without saying the lower-layer error is kept, does not count. Judge whether the obligation is present only, not whether the item conflicts with it.",
+        "criteria": {
+          "yes": "The item states that each error caused by a lower-layer error keeps that error, or its id and message, by wrapping it, holding it as a source or field, or asserting it in a test.",
+          "no": "The item does not say lower-layer errors are kept: it is silent about them, mentions error handling only in general terms, or discards them.",
+          "unclear": "The item mentions keeping some error information, but it is not possible to tell whether the lower-layer error's id and message are kept."
+        }
+      },
+      "a2": {
+        "type": "choice",
+        "instructions": "Obligation: every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Read `item.text` and decide whether it includes this obligation as a planned step or constraint: the lower-layer error is wrapped, stored, or chained so its id and message travel with the returned error. Errors created by sc-agent with no lower-layer cause need nothing carried. Naming error handling as a topic is not enough. Answer about presence of the obligation only.",
+        "criteria": {
+          "yes": "The item plans that errors caused by lower-layer errors keep the cause's id and message (wrapped, chained, stored, or tested).",
+          "no": "The item never states that the lower-layer error's id and message are kept, whether it is silent, generic, or drops them.",
+          "unclear": "The item gestures at preserving error details, but whether the lower-layer id and message are kept cannot be determined."
+        }
+      },
+      "a3": {
+        "type": "choice",
+        "instructions": "For every error the item defines or returns that is caused by a lower-layer error, does `item.text` say that the returned error carries the lower-layer error's id and message? This is the anchor's obligation: every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Wrapping the source error, holding it as a field or source, or a test asserting the chain all count. Clear reporting or better messages without keeping the lower-layer error do not count. Judge presence only, not conflict.",
+        "criteria": {
+          "yes": "The item explicitly keeps the lower-layer error (or its id and message) in each error it causes.",
+          "no": "The item does not say lower-layer errors are kept: silent, only generic, or the cause is dropped.",
+          "unclear": "Some preservation is mentioned, but the text does not let you tell whether the lower-layer id and message are carried."
+        }
+      }
+    },
+    "contradicted": {
+      "c1": {
+        "type": "choice",
+        "instructions": "The anchor requires that every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Does `item.text` plan something that would make a returned error lose the id or message of a lower-layer error that caused it, such as replacing it with a generic message, discarding it after logging, or exempting some caused errors from carrying it? Silence about lower-layer errors is not a conflict. An error with no lower-layer cause is not a conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item plans a design in which at least one error returned by a public function drops the id or message of a lower-layer error that caused it.",
+          "no": "Nothing in the item would drop a lower-layer error's id or message from a returned error, whether or not the item mentions lower-layer errors.",
+          "unclear": "The item describes how lower-layer errors are handled in words that could mean either keeping or dropping them."
+        }
+      },
+      "c2": {
+        "type": "choice",
+        "instructions": "Does `item.text` rule out or undo the anchor's requirement that every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it? Conflict means the plan states an approach under which a caused error is returned without the lower-layer error's id or message (for example a fixed generic message, an opaque string summary, or discarding the cause). Not mentioning the requirement is silence, not conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "The item states an approach that returns a caused error without the lower-layer error's id or message.",
+          "no": "The item states no approach that loses a lower-layer error's id or message; silence counts as no.",
+          "unclear": "The item's wording about lower-layer errors is ambiguous between keeping and dropping them."
+        }
+      },
+      "c3": {
+        "type": "choice",
+        "instructions": "Anchor: every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it. Would carrying out `item.text` as written produce a public sc-agent error that has lost the id or message of a lower-layer error that caused it? Only a stated plan to drop, replace, or discard the cause counts; an item that does not discuss lower-layer errors does not conflict. Judge conflict only.",
+        "criteria": {
+          "yes": "Following the item as written would drop or replace a lower-layer error's id or message in a returned error.",
+          "no": "Following the item would not drop any lower-layer error's id or message, including when the item is silent about it.",
+          "unclear": "The item says something about lower-layer errors that could be read as either keeping or dropping them."
+        }
+      }
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "b-111",
+      "roles": {
+        "relevant": "r1",
+        "addressed": "a1",
+        "contradicted": "c1"
+      }
+    },
+    {
+      "bundle_id": "b-222",
+      "roles": {
+        "relevant": "r2",
+        "addressed": "a2",
+        "contradicted": "c2"
+      }
+    },
+    {
+      "bundle_id": "b-333",
+      "roles": {
+        "relevant": "r3",
+        "addressed": "a3",
+        "contradicted": "c3"
+      }
+    },
+    {
+      "bundle_id": "b-123",
+      "roles": {
+        "relevant": "r1",
+        "addressed": "a2",
+        "contradicted": "c3"
+      }
+    },
+    {
+      "bundle_id": "b-231",
+      "roles": {
+        "relevant": "r2",
+        "addressed": "a3",
+        "contradicted": "c1"
+      }
+    },
+    {
+      "bundle_id": "b-312",
+      "roles": {
+        "relevant": "r3",
+        "addressed": "a1",
+        "contradicted": "c2"
+      }
+    }
+  ]
+}
