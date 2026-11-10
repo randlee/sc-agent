@@ -173,6 +173,7 @@ mod tests {
         let context = crate::Context {
             service: "decide",
             config_dir: Some(dir.path().to_path_buf()),
+            repo_root: Some(dir.path().to_path_buf()),
             environment: Some(vec![(
                 sc_agent_secrets::TYPESAFE_API_KEY.into(),
                 "ts-signal-test".into(),

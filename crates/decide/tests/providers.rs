@@ -9,11 +9,12 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
+    use crate::common::send;
     use decide::input::{
         BatchInput, MAX_IMAGE_BYTES, MAX_REQUEST_BYTES, build_batch, build_request, read_batch,
         request_bytes,
     };
-    use decide::{DecideError, load_config, send, send_batch};
+    use decide::{DecideError, load_config, send_batch};
     use sc_agent_http::HttpResponse;
     use sc_agent_http::testing::{BlockingTransport, ScriptedTransport};
     use sc_agent_log::testing::MemoryLog;

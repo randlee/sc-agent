@@ -161,10 +161,16 @@ fn run_send(
             })
             .map(|()| all_ok)
         }
-        Input::One(request) => send(&options, *request, cancel).and_then(|result| {
-            write_result(stdout, &result)?;
-            Ok(result.outcome.is_ok())
-        }),
+        Input::One(request) => {
+            // The result is printed as soon as it exists; a session-log flush failure after
+            // it is a command error (exit 1) printed after it, never instead (QA-006).
+            let mut success = false;
+            send(&options, *request, cancel, &mut |result| {
+                success = result.outcome.is_ok();
+                write_result(stdout, &result)
+            })
+            .map(|()| success)
+        }
     };
     drop(options);
     report_close(session.close());

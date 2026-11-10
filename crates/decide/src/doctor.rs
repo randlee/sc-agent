@@ -10,7 +10,8 @@ use serde_json::{Map, Value};
 
 use crate::DecideError;
 use crate::select::{
-    Context, LOG_TARGET, detected_keys, probe, probe_client, probe_setup, typesafe_backend,
+    Context, LOG_TARGET, detected_keys, flushed_result, probe, probe_client, probe_setup,
+    typesafe_backend,
 };
 
 /// One detected provider key: the provider and where its key was found, never the value.
@@ -75,7 +76,7 @@ pub struct DoctorOptions {
 /// `Config`, `Log`, `Secrets` (a key that is malformed or a source that fails), `Llm` and
 /// `Decision` (a request or reply), `Http` (a send).
 pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorReport, DecideError> {
-    let (config, general) = probe_setup(&options.context)?;
+    let (config, general, owned) = probe_setup(&options.context)?;
     let result = examine(&options.context, &config, &general, cancel);
     let count = |pick: fn(&DoctorReport) -> usize| {
         result
@@ -102,7 +103,7 @@ pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorRep
         LogContext::NONE,
         fields,
     );
-    result
+    flushed_result(result, &general, owned)
 }
 
 fn examine(

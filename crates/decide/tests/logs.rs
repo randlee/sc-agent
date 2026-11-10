@@ -9,7 +9,8 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    use decide::{Context, DoctorOptions, ModelsOptions, doctor, models, send};
+    use crate::common::send;
+    use decide::{Context, DoctorOptions, ModelsOptions, doctor, models};
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::Repo;
     use sc_agent_log::testing::MemoryLog;
@@ -163,6 +164,7 @@ mod tests {
         Context {
             service: "decide",
             config_dir: Some(dir.to_path_buf()),
+            repo_root: Some(dir.to_path_buf()),
             environment: Some(environment(&[(
                 sc_agent_secrets::TYPESAFE_API_KEY,
                 TYPESAFE_KEY,

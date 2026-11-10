@@ -423,14 +423,32 @@ fn send(
     let worker_cancel = cancel.clone();
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
-        let result = decide::send(&options, request, &worker_cancel);
+        let mut line = None;
+        let sent = decide::send(&options, request, &worker_cancel, &mut |result| {
+            line = Some(decide::output::result_text(&result)?);
+            Ok(())
+        });
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
-        let closed = close_loggers(general, session);
-        (
-            result.and_then(|result| decide::output::result_text(&result)),
-            closed,
-        )
+        let mut closed = close_loggers(general, session);
+        // A result that exists is returned; a flush failure after it is a warning, never a
+        // reason to drop the result (QA-006).
+        match (line, sent) {
+            (Some(line), Err(error)) => {
+                closed.insert(0, error);
+                (Ok(line), closed)
+            }
+            (Some(line), Ok(())) => (Ok(line), closed),
+            (None, Err(error)) => (Err(error), closed),
+            (None, Ok(())) => (
+                Err(DecideError::from(
+                    sc_decision_schema::DecisionError::Shutdown {
+                        reason: "decide::send returned without a result".to_owned(),
+                    },
+                )),
+                closed,
+            ),
+        }
     })?;
     Ok(line)
 }

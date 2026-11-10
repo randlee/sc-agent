@@ -46,8 +46,12 @@ pub(crate) const LOG_TARGET: &str = "decide";
 pub struct Context {
     /// The general-log service: `"decide"` or `"sc-agent-py"`.
     pub service: &'static str,
-    /// The configuration directory; `None` is `sc_agent_config::default_dir()`.
+    /// The configuration directory; `None` is [`CONFIG_DIR_VAR`] from the environment when
+    /// set, else `sc_agent_config::default_dir()` (`~/.sc-agent`).
     pub config_dir: Option<PathBuf>,
+    /// The git work-tree top whose `.env` is read for keys (REQ-SAG-0401); `None` is
+    /// `Repo::work_tree_root(cwd)`. Tests point it at a tempdir so no real `.env` is read.
+    pub repo_root: Option<PathBuf>,
     /// `SC_AGENT__` overrides and key lookup; `None` is `std::env::vars_os()`.
     pub environment: Option<Vec<(OsString, OsString)>>,
     /// The keyring read last for keys; `None` is the platform keyring.
@@ -65,6 +69,7 @@ impl Context {
         Self {
             service,
             config_dir: None,
+            repo_root: None,
             environment: None,
             keyring: None,
             transport: None,
@@ -87,6 +92,7 @@ impl fmt::Debug for Context {
             .debug_struct("Context")
             .field("service", &self.service)
             .field("config_dir", &self.config_dir)
+            .field("repo_root", &self.repo_root)
             .field("environment", &self.environment.as_ref().map(Vec::len))
             .field("keyring", &self.keyring.is_some())
             .field("transport", &self.transport.is_some())
@@ -181,15 +187,42 @@ pub struct ModelsOptions {
 ///
 /// [`DecideError::Config`] with the `AgentConfigError` (key path in `config.invalid`).
 pub fn load_config(context: &Context) -> Result<AgentConfig, DecideError> {
-    let dir = match &context.config_dir {
-        Some(dir) => dir.clone(),
-        None => sc_agent_config::default_dir()?,
-    };
+    let dir = config_dir(context)?;
     // `load` takes the environment by value (A-4), so this is the one copy.
     Ok(sc_agent_config::load(
         dir,
         context.environment().into_owned(),
     )?)
+}
+
+/// The variable naming a project-specific configuration directory (instead of
+/// `~/.sc-agent`); also the default log root when the configuration sets no `log_root`.
+pub const CONFIG_DIR_VAR: &str = "SC_AGENT_CONFIG_DIR";
+
+/// The configuration directory of `context`: the seam, else [`CONFIG_DIR_VAR`], else
+/// `~/.sc-agent`.
+fn config_dir(context: &Context) -> Result<PathBuf, DecideError> {
+    if let Some(dir) = &context.config_dir {
+        return Ok(dir.clone());
+    }
+    match context
+        .environment()
+        .iter()
+        .rev()
+        .find(|(name, _)| name.as_os_str() == CONFIG_DIR_VAR)
+    {
+        Some((_, dir)) if !dir.is_empty() => Ok(PathBuf::from(dir)),
+        _ => Ok(sc_agent_config::default_dir()?),
+    }
+}
+
+/// The log root: the configured `log_root`, else the [`CONFIG_DIR_VAR`] directory when set,
+/// else `~/.sc-agent` (REQ-SAG-0003).
+fn log_root(context: &Context, config: &AgentConfig) -> Result<PathBuf, DecideError> {
+    if config.log_root.is_some() || context.config_dir.is_some() {
+        return Ok(config.log_root()?);
+    }
+    config_dir(context)
 }
 
 /// The session identity of the working folder: `Repo::detect(cwd)`, `project`, `agent_role`.
@@ -256,7 +289,10 @@ impl<'c> Keys<'c> {
         let cwd = working_dir()?;
         Ok(Self {
             env: VarsEnv(context.environment()),
-            repo_root: Repo::work_tree_root(&cwd)?,
+            repo_root: match &context.repo_root {
+                Some(root) => Some(root.clone()),
+                None => Repo::work_tree_root(&cwd)?,
+            },
             keyring: context
                 .keyring
                 .clone()
@@ -323,7 +359,7 @@ fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger,
     match &context.general {
         Some(general) => Ok(general.clone()),
         None => {
-            let root = config.log_root()?;
+            let root = log_root(context, config)?;
             Ok(GeneralLogger::open_default(&root, context.service)?)
         }
     }
@@ -360,7 +396,7 @@ fn session_for(options: &SendOptions, config: &AgentConfig) -> Result<SessionLog
         Some(session) => Ok(session.clone()),
         None => {
             let identity = session_identity(&options.project, &options.agent_role)?;
-            let root = config.log_root()?;
+            let root = log_root(&options.context, config)?;
             Ok(SessionLogger::open_default(&root, identity)?)
         }
     }
@@ -571,6 +607,8 @@ fn runner(
 struct Prepared {
     runner: DecisionRunner,
     general: GeneralLogger,
+    /// Whether decide opened `general` (the context had none), so decide must flush it.
+    owns_general: bool,
     chosen: Chosen,
     probe: Arc<dyn Transport>,
     service: &'static str,
@@ -604,6 +642,7 @@ impl Prepared {
         Ok(Self {
             runner,
             general,
+            owns_general: context.general.is_none(),
             chosen,
             probe: probe_transport(context),
             service: context.service,
@@ -629,6 +668,16 @@ impl Prepared {
             Err(DecisionError::Cancelled { .. }) => Ok(Loaded::Cancelled),
             Err(error) => Err(DecideError::from(error)),
         }
+    }
+
+    /// Writes the `decide.send` record, then flushes a general logger decide opened: the
+    /// runner's detached workers may hold its last handle, so a drop would never flush, and
+    /// the file is created by the first write (QA-001). A lost row is returned after
+    /// `outcome`'s own error, never instead of a result already handed out.
+    fn finish(&self, tally: &Tally, outcome: Result<(), DecideError>) -> Result<(), DecideError> {
+        self.record(tally, outcome.as_ref().err());
+        let flushed = flush_owned(&self.general, self.owns_general);
+        outcome.and(flushed)
     }
 
     /// Writes the one `decide.send` record of this operation (never a key).
@@ -657,6 +706,15 @@ impl Prepared {
             fields,
         );
     }
+}
+
+/// Flushes `general` when decide opened it; the error (`log.rows_lost`, `log.flush`) as
+/// `decide.log`.
+fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecideError> {
+    if owned {
+        general.flush()?;
+    }
+    Ok(())
 }
 
 /// Result counts of one operation.
@@ -691,42 +749,42 @@ fn cancelled_before_send(request: &DecisionRequest, position: u64) -> DecisionRe
     )
 }
 
-/// Sends one request: always `Decision::decide` (CRIT-M3), then `flush_session_log`, and one
-/// `decide.send` record.
+/// Sends one request: always `Decision::decide` (CRIT-M3); `on_result` gets its result, then
+/// the session log (and a general log decide opened) is flushed, and one `decide.send`
+/// record is written.
 ///
-/// A failed decision is data in the returned result.
+/// A failed decision is data in the result. A flush failure after the result was handed out
+/// is returned after it, never instead of it (QA-006), as in [`send_batch`].
 ///
 /// # Errors
 ///
 /// Before any send: `Config`, `Types`, `Secrets`, `Log`, `Local`, `Llm`, `Decision` (a local
-/// runner that does not load), `NoProviderKey`, `UnknownRunner`. After the send:
-/// [`DecideError::Runner`] when the session log cannot be flushed.
+/// runner that does not load), `Runner` (`runner.invalid_config`), `NoProviderKey`,
+/// `UnknownRunner`. After it: `on_result`'s error, else [`DecideError::Runner`] when the
+/// session log cannot be flushed, else [`DecideError::Log`] when the general log lost rows.
 pub fn send(
     options: &SendOptions,
     request: DecisionRequest,
     cancel: &CancelToken,
-) -> Result<DecisionResult, DecideError> {
+    on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecideError>,
+) -> Result<(), DecideError> {
     let prepared = Prepared::new(options)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
-        Err(error) => {
-            prepared.record(&tally, Some(&error));
-            return Err(error);
-        }
+        Err(error) => return prepared.finish(&tally, Err(error)),
     };
     let result = match loaded {
         Loaded::Ready => send_on(&prepared.runner, request, cancel),
         Loaded::Cancelled => cancelled_before_send(&request, 0),
     };
     tally.add(&result);
+    let delivered = on_result(result);
     let flushed = prepared
         .runner
         .flush_session_log()
         .map_err(DecideError::from);
-    prepared.record(&tally, flushed.as_ref().err());
-    flushed?;
-    Ok(result)
+    prepared.finish(&tally, delivered.and(flushed))
 }
 
 /// Sends a batch: always `Decision::decide_stream` with an owned iterator (CRIT-M3), even
@@ -749,10 +807,7 @@ pub fn send_batch(
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
-        Err(error) => {
-            prepared.record(&tally, Some(&error));
-            return Err(error);
-        }
+        Err(error) => return prepared.finish(&tally, Err(error)),
     };
     let mut counted = |result: DecisionResult| {
         tally.add(&result);
@@ -773,9 +828,7 @@ pub fn send_batch(
         .runner
         .flush_session_log()
         .map_err(DecideError::from);
-    let result = outcome.and(flushed);
-    prepared.record(&tally, result.as_ref().err());
-    result
+    prepared.finish(&tally, outcome.and(flushed))
 }
 
 /// [`send`]'s core over any `Decision`: one `decide` call.
@@ -929,11 +982,24 @@ pub(crate) fn detected_keys(
     Ok(found)
 }
 
-/// The general logger and config of a probe-class operation.
-pub(crate) fn probe_setup(context: &Context) -> Result<(AgentConfig, GeneralLogger), DecideError> {
+/// The config and general logger of a probe-class operation, and whether decide opened the
+/// logger (then it must flush it, [`flush_owned`]).
+pub(crate) fn probe_setup(
+    context: &Context,
+) -> Result<(AgentConfig, GeneralLogger, bool), DecideError> {
     let config = load_config(context)?;
     let general = general_for(context, &config)?;
-    Ok((config, general))
+    Ok((config, general, context.general.is_none()))
+}
+
+/// `result`, unless a general logger decide opened lost rows (then that error).
+pub(crate) fn flushed_result<T>(
+    result: Result<T, DecideError>,
+    general: &GeneralLogger,
+    owned: bool,
+) -> Result<T, DecideError> {
+    let flushed = flush_owned(general, owned);
+    result.and_then(|value| flushed.map(|()| value))
 }
 
 /// GET /v1/models of TypeSafe or a configured runner, sent once with `Timeouts::probe()`
@@ -947,7 +1013,7 @@ pub fn models(
     options: &ModelsOptions,
     cancel: &CancelToken,
 ) -> Result<ModelMetadataList, DecideError> {
-    let (config, general) = probe_setup(&options.context)?;
+    let (config, general, owned) = probe_setup(&options.context)?;
     let result = list_models(options, &config, &general, cancel);
     let mut fields = Map::new();
     fields.insert("service".into(), options.context.service.into());
@@ -979,7 +1045,7 @@ pub fn models(
         LogContext::NONE,
         fields,
     );
-    result
+    flushed_result(result, &general, owned)
 }
 
 fn list_models(

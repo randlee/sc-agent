@@ -7,8 +7,9 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use crate::common::send;
     use decide::input::{build_request, read_batch};
-    use decide::{ModelsOptions, models, send, send_batch};
+    use decide::{ModelsOptions, models, send_batch};
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_types::CancelToken;

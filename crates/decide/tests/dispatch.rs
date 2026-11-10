@@ -10,9 +10,10 @@ mod tests {
     use std::sync::{Arc, Mutex, mpsc};
     use std::time::Duration;
 
+    use crate::common::send;
     use decide::input::{build_request, read_batch, request_bytes};
     use decide::output::result_line;
-    use decide::{DecideError, send, send_batch, send_batch_on, send_on};
+    use decide::{DecideError, send_batch, send_batch_on, send_on};
     use sc_agent_http::testing::{BlockingTransport, ScriptedTransport};
     use sc_agent_http::{HttpError, NetworkKind};
     use sc_agent_log::testing::MemoryLog;

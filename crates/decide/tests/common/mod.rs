@@ -71,6 +71,8 @@ pub fn context(
     Context {
         service: "decide",
         config_dir: Some(dir.to_path_buf()),
+        // No real `.env` is read (QA-011): the repo root is the tempdir config dir.
+        repo_root: Some(dir.to_path_buf()),
         environment: Some(environment(vars)),
         keyring: Some(Arc::new(MapKeyring::default())),
         transport: Some(transport),
@@ -244,4 +246,20 @@ impl std::io::Read for BlankLines {
         self.column += spaces;
         Ok(spaces)
     }
+}
+
+/// `decide::send` with the result returned: the one result it hands out, or the command
+/// error. A flush error after the result is returned as the error (tests that need the
+/// result after a flush failure call `decide::send` directly).
+pub fn send(
+    options: &SendOptions,
+    request: DecisionRequest,
+    cancel: &sc_agent_types::CancelToken,
+) -> Result<sc_decision_schema::DecisionResult, decide::DecideError> {
+    let mut delivered = None;
+    decide::send(options, request, cancel, &mut |result| {
+        delivered = Some(result);
+        Ok(())
+    })?;
+    Ok(delivered.expect("decide::send hands out one result"))
 }
