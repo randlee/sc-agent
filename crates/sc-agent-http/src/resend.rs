@@ -496,7 +496,8 @@ impl HttpClient {
     /// # Errors
     ///
     /// - [`HttpError::InvalidRequest`] before any send when the request's
-    ///   deadline is zero or over [`Timeouts::MAX`](crate::Timeouts::MAX);
+    ///   deadline is zero or over
+    ///   [`Timeouts::DEADLINE_MAX`](crate::Timeouts::DEADLINE_MAX);
     /// - [`HttpError::QuotaExhausted`] for a busy status whose body marks
     ///   quota exhaustion, after this send (REQ-SAG-0602);
     /// - [`HttpError::ProviderBusy`] for a busy reply on the last allowed
@@ -511,7 +512,11 @@ impl HttpClient {
         now: &dyn Fn() -> Instant,
     ) -> Result<Next, HttpError> {
         if let Some(deadline) = request.deadline() {
-            crate::transport::check_duration("the request deadline", deadline)?;
+            crate::transport::check_duration(
+                "the request deadline",
+                deadline,
+                crate::Timeouts::DEADLINE_MAX,
+            )?;
         }
         let SendPermit { mut attempts, last } = permit;
         let max_sends = self.policy.max_sends();

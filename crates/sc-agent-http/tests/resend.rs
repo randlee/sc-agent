@@ -737,7 +737,7 @@ mod cases {
     // RSH-004: a zero or over-long deadline is refused before any send.
     #[test]
     fn invalid_deadline_refused_before_send() {
-        for deadline in [Duration::ZERO, Duration::from_secs(3601)] {
+        for deadline in [Duration::ZERO, Duration::from_secs(10_801)] {
             let transport = ScriptedTransport::responses(vec![ok()]);
             let client = client(&transport, ResendPolicy::default());
             let request = request().with_deadline(deadline);
@@ -752,5 +752,48 @@ mod cases {
             );
             assert_eq!(transport.sends(), 0);
         }
+    }
+
+    // REQ-QA-007 / REQ-SAG-0015: a first-request deadline of the largest load
+    // timeout plus the largest request timeout (7200 + 3600 s) is accepted.
+    #[test]
+    fn deadline_max_accepted() {
+        for deadline in [Duration::from_secs(4200), Duration::from_secs(10_800)] {
+            let transport = ScriptedTransport::responses(vec![ok()]);
+            let client = client(&transport, ResendPolicy::default());
+            let request = request().with_deadline(deadline);
+            let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+            else {
+                panic!("fresh");
+            };
+            let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+            assert!(
+                matches!(result, Ok(Next::Done { .. })),
+                "{deadline:?}: {result:?}"
+            );
+            assert_eq!(transport.sends(), 1);
+        }
+        assert_eq!(
+            sc_agent_http::Timeouts::DEADLINE_MAX,
+            Duration::from_secs(10_800)
+        );
+    }
+
+    // REQ-QA-007: one second over DEADLINE_MAX is http.invalid_request, no send.
+    #[test]
+    fn deadline_over_max_refused() {
+        let transport = ScriptedTransport::responses(vec![ok()]);
+        let client = client(&transport, ResendPolicy::default());
+        let request = request().with_deadline(Duration::from_secs(10_801));
+        let Ok(Start::Go(permit)) = client.may_start(&request, Attempts::new(), Instant::now())
+        else {
+            panic!("fresh");
+        };
+        let result = client.send_once(&request, permit, LogContext::NONE, &Instant::now);
+        match result {
+            Err(error) => assert_eq!(sc_agent_types::ErrorId::id(&error), "http.invalid_request"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(transport.sends(), 0);
     }
 }

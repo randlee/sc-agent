@@ -468,7 +468,8 @@ impl HttpRequest {
     /// first request gets the load timeout plus the request timeout. Resends
     /// keep it unchanged.
     ///
-    /// The deadline must be in `(0, Timeouts::MAX]` (one hour); otherwise
+    /// The deadline must be in `(0, Timeouts::DEADLINE_MAX]` (three hours:
+    /// the largest load timeout plus the largest request timeout); otherwise
     /// [`HttpClient::send_once`](crate::HttpClient::send_once) and
     /// [`UreqTransport`](crate::UreqTransport) refuse the request with
     /// [`HttpError::InvalidRequest`] before any send.
