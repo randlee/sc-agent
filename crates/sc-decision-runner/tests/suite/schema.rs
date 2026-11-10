@@ -40,12 +40,7 @@ fn schema_mismatch_resent_once() {
             SystemOneResponse::from_json(response.status(), response.body())
         }
     }));
-    let harness = Harness::new(
-        backend.clone(),
-        Arc::new(transport.clone()),
-        config(1, 4),
-        5,
-    );
+    let harness = Harness::new(backend.clone(), Arc::new(transport.clone()), config(1), 5);
     let result = harness.runner.decide(request("m0"), &CancelToken::new());
     assert!(result.outcome.is_ok(), "{result:?}");
     assert_eq!(transport.sends(), 2);
@@ -66,12 +61,7 @@ fn cancel_ends_schema_resends() {
         token.cancel();
         Err(mismatch())
     });
-    let harness = Harness::new(
-        Arc::new(backend),
-        Arc::new(transport.clone()),
-        config(1, 4),
-        5,
-    );
+    let harness = Harness::new(Arc::new(backend), Arc::new(transport.clone()), config(1), 5);
     let result = harness.decide(request("m0"), &cancel);
     let result = result.recv_timeout(FAILSAFE).expect("result within 2 s");
     assert!(
@@ -90,7 +80,7 @@ fn schema_mismatch_after_max_sends() {
         let harness = Harness::new(
             Arc::new(never_matches()),
             Arc::new(transport.clone()),
-            config(1, 4),
+            config(1),
             max_sends,
         );
         let result = harness.runner.decide(request("m0"), &CancelToken::new());
@@ -118,7 +108,7 @@ fn busy_twice_then_mismatch_stops_at_five() {
     let harness = Harness::new(
         Arc::new(never_matches()),
         Arc::new(transport.clone()),
-        config(1, 4),
+        config(1),
         5,
     );
     let result = harness.runner.decide(request("m0"), &CancelToken::new());

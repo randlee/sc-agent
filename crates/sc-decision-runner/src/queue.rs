@@ -36,8 +36,12 @@ pub(crate) enum Taken<J> {
     Run(J),
     /// The queue is cancelled: answer this job as cancelled without running it.
     Cancelled(J),
-    /// No job is left and none can come: the worker exits.
-    Finished,
+    /// No job is left and none can come: the worker exits. `cancelled` is read under the
+    /// queue lock with that decision: whether the queue was cancelled or drained.
+    Finished {
+        /// The queue was cancelled (else the input ended and drained).
+        cancelled: bool,
+    },
 }
 
 /// A job held off until `until`; `seq` keeps equal instants first in, first out.
@@ -177,7 +181,7 @@ impl<J, F> JobQueue<J, F> {
                         Taken::Cancelled(job)
                     }
                     // A running job that is held later is taken as cancelled by its own worker.
-                    None => Taken::Finished,
+                    None => Taken::Finished { cancelled: true },
                 };
             }
             let now = (self.clock)();
@@ -200,7 +204,7 @@ impl<J, F> JobQueue<J, F> {
                 continue;
             }
             if state.closed && state.running == 0 {
-                return Taken::Finished;
+                return Taken::Finished { cancelled: false };
             }
             state = self
                 .changed

@@ -9,7 +9,8 @@
 use std::io;
 use std::num::NonZeroUsize;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
@@ -70,8 +71,8 @@ pub(crate) trait Work: Send + Sync + 'static {
     /// The answer for a job that is not run to the end; `None` when it was given elsewhere.
     fn skipped(&self, receipt: Self::Receipt, why: Skipped) -> Option<Self::Answer>;
 
-    /// A worker is about to exit.
-    fn stopped(&self, _why: Stopped) {}
+    /// Worker `worker` (0-based) is about to exit.
+    fn stopped(&self, _worker: usize, _why: Stopped) {}
 }
 
 /// The job queue type of a [`Work`].
@@ -81,14 +82,16 @@ pub(crate) type Jobs<W> = JobQueue<<W as Work>::Job, <W as Work>::InFlight>;
 pub(crate) struct Pool<W: Work> {
     jobs: Arc<Jobs<W>>,
     results: Arc<BoundedQueue<W::Answer>>,
-    handles: Mutex<Vec<JoinHandle<()>>>,
+    /// Detached on drop (never joined there); only the tests join.
+    handles: Vec<JoinHandle<()>>,
 }
 
 impl<W: Work> Pool<W> {
     /// Starts `workers` threads draining `jobs` into `results`.
     ///
     /// Each worker is one producer of `results` (counted in its `new`) and reports
-    /// [`BoundedQueue::producer_done`] when it exits.
+    /// [`BoundedQueue::producer_done`] when it exits. `live` counts the pool's threads
+    /// that are alive: up while a worker runs, down when it exits, a panic included.
     ///
     /// # Errors
     ///
@@ -99,22 +102,28 @@ impl<W: Work> Pool<W> {
         jobs: Arc<Jobs<W>>,
         results: Arc<BoundedQueue<W::Answer>>,
         work: Arc<W>,
+        live: Arc<AtomicUsize>,
     ) -> Result<Self, io::Error> {
         let mut handles = Vec::with_capacity(workers.get());
-        for started in 0..workers.get() {
+        for index in 0..workers.get() {
             let worker = Worker {
+                index,
                 jobs: Arc::clone(&jobs),
                 results: Arc::clone(&results),
                 work: Arc::clone(&work),
+                live: Arc::clone(&live),
             };
+            live.fetch_add(1, Ordering::AcqRel);
             let spawned = thread::Builder::new()
                 .name("sc-decision-worker".to_owned())
                 .spawn(move || worker.work());
             match spawned {
                 Ok(handle) => handles.push(handle),
                 Err(error) => {
+                    // The closure (and its worker) was dropped unrun.
+                    live.fetch_sub(1, Ordering::AcqRel);
                     jobs.cancel();
-                    for _ in started..workers.get() {
+                    for _ in index..workers.get() {
                         results.producer_done();
                     }
                     return Err(error);
@@ -124,7 +133,7 @@ impl<W: Work> Pool<W> {
         Ok(Self {
             jobs,
             results,
-            handles: Mutex::new(handles),
+            handles,
         })
     }
 
@@ -165,10 +174,8 @@ impl<W: Work> Pool<W> {
 
     /// Joins the worker threads. Call after [`Self::recv`] returned `None`.
     #[cfg(test)]
-    pub(crate) fn join(&self) {
-        let handles =
-            std::mem::take(&mut *self.handles.lock().unwrap_or_else(PoisonError::into_inner));
-        for handle in handles {
+    pub(crate) fn join(&mut self) {
+        for handle in std::mem::take(&mut self.handles) {
             // A worker catches its job's panic, so a join error is a bug in the worker
             // loop itself; the test then sees missing answers.
             let _ = handle.join();
@@ -183,31 +190,47 @@ impl<W: Work> Pool<W> {
 }
 
 impl<W: Work> Drop for Pool<W> {
+    /// Ends input and discards unread answers; never cancels the queue, so a pool whose
+    /// input already drained stops with `input_ended`. A run that must stop early calls
+    /// [`Pool::abandon`] first. Not joined: a running job may be an in-flight send.
     fn drop(&mut self) {
-        // Not joined: a running job may be an in-flight send. Handles are detached.
-        self.abandon();
-        self.handles
-            .get_mut()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clear();
+        self.jobs.close();
+        self.results.discard();
+        self.handles.clear();
     }
 }
 
 struct Worker<W: Work> {
+    index: usize,
     jobs: Arc<Jobs<W>>,
     results: Arc<BoundedQueue<W::Answer>>,
     work: Arc<W>,
+    live: Arc<AtomicUsize>,
 }
 
 /// Runs on every exit of a worker, a panic included: the last producer out closes the
-/// result queue, so the consumer cannot hang on a dead worker.
+/// result queue, so the consumer cannot hang on a dead worker; the live count goes down.
 struct Exit<A> {
     results: Arc<BoundedQueue<A>>,
+    live: Arc<AtomicUsize>,
 }
 
 impl<A> Drop for Exit<A> {
     fn drop(&mut self) {
         self.results.producer_done();
+        self.live.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// Marks a taken job done on every exit from its turn, unwinding included, so a panic
+/// outside the run function never leaves `running` counted (the others would wait).
+struct Turn<'a, J, F> {
+    jobs: &'a JobQueue<J, F>,
+}
+
+impl<J, F> Drop for Turn<'_, J, F> {
+    fn drop(&mut self) {
+        self.jobs.done();
     }
 }
 
@@ -215,13 +238,23 @@ impl<W: Work> Worker<W> {
     fn work(self) {
         let _exit = Exit {
             results: Arc::clone(&self.results),
+            live: Arc::clone(&self.live),
         };
-        let mut why = Stopped::InputEnded;
-        loop {
-            match self.jobs.take() {
-                Taken::Finished => break,
+        let why = loop {
+            let taken = self.jobs.take();
+            let _turn = match &taken {
+                Taken::Finished { .. } => None,
+                Taken::Run(_) | Taken::Cancelled(_) => Some(Turn { jobs: &*self.jobs }),
+            };
+            match taken {
+                Taken::Finished { cancelled } => {
+                    break if cancelled {
+                        Stopped::Cancelled
+                    } else {
+                        Stopped::InputEnded
+                    };
+                }
                 Taken::Cancelled(job) => {
-                    why = Stopped::Cancelled;
                     let receipt = self.work.receipt(&job);
                     drop(job);
                     self.answer(self.work.skipped(receipt, Skipped::Cancelled));
@@ -230,6 +263,7 @@ impl<W: Work> Worker<W> {
                     let receipt = self.work.receipt(&job);
                     match catch_unwind(AssertUnwindSafe(|| self.work.run(job))) {
                         Ok(Step::Done(answer)) => self.answer(Some(answer)),
+                        // Held before `_turn` marks the job done.
                         Ok(Step::HoldOff { until, job }) => self.jobs.hold(job, until),
                         Ok(Step::Discarded) => {}
                         Err(payload) => {
@@ -239,12 +273,8 @@ impl<W: Work> Worker<W> {
                     }
                 }
             }
-            self.jobs.done();
-        }
-        if self.jobs.is_cancelled() {
-            why = Stopped::Cancelled;
-        }
-        self.work.stopped(why);
+        };
+        self.work.stopped(self.index, why);
     }
 
     /// Pushes `answer`, blocking while the result queue is full. A refused push means the

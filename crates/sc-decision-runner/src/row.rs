@@ -4,11 +4,15 @@
 //! [`write_row`] consumes a `Finish`, and it returns the one [`RowWritten`]; only
 //! [`Finished::new`] consumes a `RowWritten`, and a `Finished` is the only thing a result
 //! queue or the result iterator yields. None of the three is `Clone`, and none can be
-//! built outside this module, so no path writes a row or a result without winning the
-//! claim, or twice.
+//! built outside this module (their one field is a private `()`), so no path writes a row
+//! or a result without winning the claim, or twice.
+//!
+//! `runner::finish` is the only caller of [`Claim::win`], [`write_row`] and
+//! [`Finished::new`]: it writes the row and builds the result from the same identity
+//! (session id, position, digests) and the same outcome, so a row and its result always
+//! describe the same request.
 
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use sc_agent_log::{GeneralLogger, Level, LogContext, SessionLogger};
 use sc_agent_types::{ErrorDetail, ErrorId, SessionId};
@@ -35,7 +39,7 @@ impl Claim {
         self.0
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
-            .then_some(Finish(PhantomData))
+            .then_some(Finish(()))
     }
 }
 
@@ -43,13 +47,13 @@ impl Claim {
 /// [`Claim::win`] makes one.
 #[derive(Debug)]
 #[must_use]
-pub(crate) struct Finish(PhantomData<Claim>);
+pub(crate) struct Finish(());
 
 /// Proof that the one row was written (or its failure logged). Not `Clone`, not `Copy`;
 /// only [`write_row`] makes one.
 #[derive(Debug)]
 #[must_use]
-pub(crate) struct RowWritten(PhantomData<Finish>);
+pub(crate) struct RowWritten(());
 
 /// A result whose row is written: the only item a result queue carries.
 #[derive(Debug)]
@@ -70,6 +74,41 @@ impl Finished {
     }
 }
 
+/// Sends made and schema resends of one request, as recorded in its row.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Tally {
+    /// Sends made, the first included (`Attempts::sends`).
+    pub(crate) sends: u32,
+    /// Resends after a schema mismatch.
+    pub(crate) schema_resends: u32,
+}
+
+/// The live [`Tally`] of one request, shared by every clone of its identity, so any path
+/// that answers it (worker, panic, cancel, orphan) reads the sends made so far.
+#[derive(Debug, Default)]
+pub(crate) struct Progress {
+    sends: AtomicU32,
+    schema_resends: AtomicU32,
+}
+
+impl Progress {
+    /// The tally now.
+    pub(crate) fn tally(&self) -> Tally {
+        Tally {
+            sends: self.sends.load(Ordering::Acquire),
+            schema_resends: self.schema_resends.load(Ordering::Acquire),
+        }
+    }
+
+    /// A send started; `sends` counts it.
+    pub(crate) fn send_started(&self, sends: u32, schema_resend: bool) {
+        self.sends.store(sends, Ordering::Release);
+        if schema_resend {
+            self.schema_resends.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+}
+
 /// Whether a row write may block on a full log queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -86,10 +125,8 @@ pub(crate) struct Row<'a> {
     pub(crate) position: u64,
     /// `request.body().model`.
     pub(crate) model: &'a str,
-    /// Sends made (`Attempts::sends`).
-    pub(crate) sends: u32,
-    /// Resends after a schema mismatch.
-    pub(crate) schema_resends: u32,
+    /// Sends made and schema resends.
+    pub(crate) tally: Tally,
     /// One digest per question.
     pub(crate) digests: &'a OrderedMap<String, QuestionDigest>,
     /// The result's outcome.
@@ -107,8 +144,11 @@ impl Row<'_> {
         let mut payload = Map::new();
         payload.insert("position".to_owned(), self.position.into());
         payload.insert("model".to_owned(), self.model.into());
-        payload.insert("sends".to_owned(), self.sends.into());
-        payload.insert("schema_resends".to_owned(), self.schema_resends.into());
+        payload.insert("sends".to_owned(), self.tally.sends.into());
+        payload.insert(
+            "schema_resends".to_owned(),
+            self.tally.schema_resends.into(),
+        );
         match self.outcome {
             Ok(response) => {
                 payload.insert("outcome".to_owned(), "ok".into());
@@ -127,8 +167,13 @@ impl Row<'_> {
 
 /// Writes the one row of `session_id`, consuming `proof`.
 ///
-/// A write failure never changes the result: the `SessionLogger` counts it (reported by
-/// its flush) and it is logged as `runner.session_log_failed` with `ctx`.
+/// A write failure never changes the result. A write the `SessionLogger` refuses is
+/// counted by it (reported once by its flush, so by
+/// [`DecisionRunner::flush_session_log`](crate::DecisionRunner::flush_session_log)) and
+/// logged as `runner.session_log_failed` with the request's `LogContext`. A payload that
+/// cannot be serialized never reaches the `SessionLogger`, so it is not counted there; it
+/// is only logged as `runner.session_log_failed` (in practice unreachable: `serde_json`
+/// turns non-finite floats into `null` rather than failing).
 pub(crate) fn write_row(
     session: &SessionLogger,
     general: &GeneralLogger,
@@ -170,5 +215,5 @@ pub(crate) fn write_row(
             ),
         };
     }
-    RowWritten(PhantomData)
+    RowWritten(())
 }

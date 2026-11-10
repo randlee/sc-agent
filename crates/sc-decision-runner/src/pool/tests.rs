@@ -52,6 +52,7 @@ type SkipFn<A> = dyn Fn(usize, Skipped) -> A + Send + Sync;
 struct Closures<A> {
     run: Box<RunFn<A>>,
     skipped: Box<SkipFn<A>>,
+    stops: Mutex<mpsc::Sender<(usize, Stopped)>>,
 }
 
 impl<A: Send + 'static> Work for Closures<A> {
@@ -71,6 +72,14 @@ impl<A: Send + 'static> Work for Closures<A> {
     fn skipped(&self, receipt: usize, why: Skipped) -> Option<A> {
         Some((self.skipped)(receipt, why))
     }
+
+    fn stopped(&self, worker: usize, why: Stopped) {
+        let _ = self
+            .stops
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .send((worker, why));
+    }
 }
 
 fn pool_of<A: Send + 'static>(
@@ -79,18 +88,45 @@ fn pool_of<A: Send + 'static>(
     run: impl Fn(usize) -> Step<usize, A> + Send + Sync + 'static,
     skipped: impl Fn(usize, Skipped) -> A + Send + Sync + 'static,
 ) -> Pool<Closures<A>> {
+    pool_with_stops(workers, queue, run, skipped).0
+}
+
+/// [`pool_of`], plus a channel of every worker's stop reason.
+fn pool_with_stops<A: Send + 'static>(
+    workers: usize,
+    queue: usize,
+    run: impl Fn(usize) -> Step<usize, A> + Send + Sync + 'static,
+    skipped: impl Fn(usize, Skipped) -> A + Send + Sync + 'static,
+) -> (Pool<Closures<A>>, mpsc::Receiver<(usize, Stopped)>) {
+    let (stops, stopped) = mpsc::channel();
     let workers = NonZeroUsize::new(workers).expect("workers");
     let jobs = Arc::new(JobQueue::new(queue, Arc::new(Instant::now)));
     let results = Arc::new(BoundedQueue::new(queue, workers.get()));
     let work = Arc::new(Closures {
         run: Box::new(run),
         skipped: Box::new(skipped),
+        stops: Mutex::new(stops),
     });
-    Pool::start(workers, jobs, results, work).expect("workers start")
+    let pool = Pool::start(workers, jobs, results, work, Arc::new(AtomicUsize::new(0)))
+        .expect("workers start");
+    (pool, stopped)
+}
+
+/// The stop reason of each of `workers` workers, by index, within the failsafe.
+fn stops(stopped: &mpsc::Receiver<(usize, Stopped)>, workers: usize) -> Vec<Stopped> {
+    let mut all: Vec<(usize, Stopped)> = (0..workers)
+        .map(|_| stopped.recv_timeout(FAILSAFE).expect("a worker stopped"))
+        .collect();
+    all.sort_by_key(|(worker, _)| *worker);
+    assert_eq!(
+        all.iter().map(|(worker, _)| *worker).collect::<Vec<_>>(),
+        (0..workers).collect::<Vec<_>>()
+    );
+    all.into_iter().map(|(_, why)| why).collect()
 }
 
 /// Every answer until the pool finishes; the failsafe turns a hang into a failure.
-fn drain<A: Send + 'static>(pool: Pool<Closures<A>>) -> Vec<A> {
+fn drain<A: Send + 'static>(mut pool: Pool<Closures<A>>) -> Vec<A> {
     let (send, receive) = mpsc::channel();
     let collector = thread::Builder::new()
         .spawn(move || {
@@ -236,4 +272,66 @@ fn a_held_job_frees_its_worker() {
     pool.cancel();
     let rest = drain(pool);
     assert_eq!(rest, vec![1100], "the held job is answered as cancelled");
+}
+
+/// QA-001: a pool whose input ended and drained stops with `input_ended`, even when it is
+/// dropped while its workers are still deciding to exit (the stop reason is read under the
+/// queue lock, and dropping a pool never cancels its queue).
+#[test]
+fn drained_pool_stops_with_input_ended_even_when_dropped() {
+    for _ in 0..200 {
+        let (pool, stopped) = pool_with_stops(4, 8, Step::Done, |job, _| job);
+        for job in 0..4 {
+            assert!(pool.submit(job).is_ok());
+        }
+        pool.close_input();
+        for _ in 0..4 {
+            assert!(pool.recv().is_some());
+        }
+        drop(pool);
+        assert_eq!(stops(&stopped, 4), vec![Stopped::InputEnded; 4]);
+    }
+}
+
+/// A cancelled pool stops with `cancelled`.
+#[test]
+fn cancelled_pool_stops_with_cancelled() {
+    let (pool, stopped) = pool_with_stops(2, 8, Step::Done, |job, _| job);
+    pool.cancel();
+    assert_eq!(stops(&stopped, 2), vec![Stopped::Cancelled; 2]);
+    drop(pool);
+}
+
+/// RSH-002: a panic outside the run function (here in `skipped`) kills only its worker:
+/// its job is still marked done, so the other workers drain the queue and exit.
+#[test]
+fn a_panic_outside_run_does_not_stall_the_other_workers() {
+    let (pool, stopped) = pool_with_stops(
+        2,
+        8,
+        |job| {
+            assert_ne!(job, 0, "run panics on job 0");
+            Step::Done(job)
+        },
+        |job, _| {
+            assert_ne!(job, 0, "skipped panics on job 0 too");
+            job
+        },
+    );
+    for job in 0..6 {
+        assert!(pool.submit(job).is_ok());
+    }
+    pool.close_input();
+    let mut answers = drain(pool);
+    answers.sort_unstable();
+    assert_eq!(
+        answers,
+        vec![1, 2, 3, 4, 5],
+        "job 0's worker died; the rest finished"
+    );
+    let (worker, why) = stopped
+        .recv_timeout(FAILSAFE)
+        .expect("the surviving worker stopped");
+    assert!(worker < 2);
+    assert_eq!(why, Stopped::InputEnded);
 }

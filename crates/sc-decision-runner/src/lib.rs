@@ -32,7 +32,7 @@ mod row;
 mod runner;
 
 #[doc(inline)]
-pub use config::RunnerConfig;
+pub use config::{JOBS_PER_WORKER, MAX_WORKERS, RunnerConfig};
 #[doc(inline)]
 pub use error::RunnerError;
 #[doc(inline)]

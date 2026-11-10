@@ -30,7 +30,7 @@ fn drop_mid_batch_one_row_per_started_job() {
             default_encode(request)
         }
     });
-    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(8, 32), 5);
+    let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(8), 5);
     let cancel = CancelToken::new();
     let mut stream = harness
         .runner
@@ -44,6 +44,17 @@ fn drop_mid_batch_one_row_per_started_job() {
         !cancel.is_cancelled(),
         "abandon never cancels the caller's token"
     );
+    // The dropping thread wrote the 8 in-flight orphans' rows before returning, while
+    // the transport is still blocked.
+    let orphans = rows_of(&harness.log)
+        .into_iter()
+        .filter(|row| row.fields["error"]["id"] == "decision.cancelled" && row.fields["sends"] == 1)
+        .count();
+    assert_eq!(
+        orphans, 8,
+        "one cancelled row per blocked send, before the release"
+    );
+    assert_eq!(blocking.sends(), 8, "still blocked");
     blocking.release();
     let log = harness.finish(&dropped);
     let rows = rows_of(&log);
@@ -86,7 +97,7 @@ fn slow_consumer_blocks_workers() {
     let harness = Harness::new(
         Arc::new(ScriptedBackend::new()),
         Arc::new(transport),
-        config(2, 8),
+        config(2),
         5,
     );
     let mut stream = harness
@@ -109,4 +120,62 @@ fn slow_consumer_blocks_workers() {
     );
     let rest: Vec<_> = stream.collect();
     assert_eq!(rest.len(), 19);
+}
+
+/// An iterator that reports each pull on a channel.
+struct Counted {
+    inner: std::vec::IntoIter<sc_decision_schema::DecisionRequest>,
+    pulls: mpsc::Sender<usize>,
+    pulled: usize,
+}
+
+impl Iterator for Counted {
+    type Item = sc_decision_schema::DecisionRequest;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.inner.next()?;
+        self.pulled += 1;
+        let _ = self.pulls.send(self.pulled);
+        Some(next)
+    }
+}
+
+/// QA-003 (job capacity): with 1 worker (capacity 4) and its send blocked, the feeder
+/// pulls 4 jobs plus the one it is blocked submitting, and no more until the queue moves.
+#[test]
+fn feeder_blocks_at_queue_capacity() {
+    let gate = Gate::default();
+    let held = gate.clone();
+    let (transport, _dropped) = FnTransport::new(move |_| {
+        held.pass();
+        Ok(ok())
+    });
+    let harness = Harness::new(
+        Arc::new(ScriptedBackend::new()),
+        Arc::new(transport),
+        config(1),
+        5,
+    );
+    let (pulls, on_pull) = mpsc::channel();
+    let requests = Counted {
+        inner: requests(12).into_iter(),
+        pulls,
+        pulled: 0,
+    };
+    let stream = harness
+        .runner
+        .decide_stream(Box::new(requests), &CancelToken::new());
+    gate.wait_inside(1);
+    for expected in 1..=5 {
+        assert_eq!(on_pull.recv_timeout(FAILSAFE), Ok(expected));
+    }
+    assert_eq!(
+        on_pull.recv_timeout(Duration::from_millis(500)).err(),
+        Some(RecvTimeoutError::Timeout),
+        "running 1 + ready 3 = capacity 4: the 5th waits in submit, the 6th is not pulled"
+    );
+    gate.open();
+    let results: Vec<_> = stream.collect();
+    assert_eq!(results.len(), 12);
+    assert!(results.iter().all(|result| result.outcome.is_ok()));
 }

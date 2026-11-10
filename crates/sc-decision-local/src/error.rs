@@ -256,12 +256,33 @@ pub(crate) fn redact_string(key: &ApiKey, text: String) -> String {
     }
 }
 
-/// `body` with every copy of `key` replaced by `[redacted]`; the bytes unchanged when it has
-/// none (a body that is not UTF-8 is only rewritten, lossily, when it holds the key).
+/// `body` with every copy of `key` replaced by `[redacted]`; every other byte unchanged
+/// (REQ-SAG-0002).
+///
+/// Works on the raw bytes, so a body that is not UTF-8 keeps its invalid bytes. A key is
+/// visible ASCII (sc-agent-secrets) and an ASCII byte is never part of an invalid UTF-8
+/// sequence, so every copy of the key lies inside one valid UTF-8 chunk: redacting each
+/// valid chunk and copying the invalid bytes as they are is exact.
 fn redact_bytes(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
-    match key.redact_text(&String::from_utf8_lossy(&body)) {
-        Cow::Owned(redacted) => redacted.into_bytes(),
-        Cow::Borrowed(_) => body,
+    let mut out: Option<Vec<u8>> = None;
+    let mut written = 0;
+    let mut offset = 0;
+    for chunk in body.utf8_chunks() {
+        let valid = chunk.valid();
+        if let Cow::Owned(redacted) = key.redact_text(valid) {
+            let out = out.get_or_insert_with(|| Vec::with_capacity(body.len()));
+            out.extend_from_slice(body.get(written..offset).unwrap_or_default());
+            out.extend_from_slice(redacted.as_bytes());
+            written = offset + valid.len();
+        }
+        offset += valid.len() + chunk.invalid().len();
+    }
+    match out {
+        Some(mut out) => {
+            out.extend_from_slice(body.get(written..).unwrap_or_default());
+            out
+        }
+        None => body,
     }
 }
 
