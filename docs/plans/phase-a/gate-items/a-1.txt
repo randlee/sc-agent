@@ -6,6 +6,7 @@ Build sc-agent-types. Governing records: REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-000
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-1.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0101 AC1: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) returns the newest model of its line across built-in and config rows (test).
 - [ ] REQ-SAG-0101 AC2: a specific catalog version id parses as ModelChoice::Version and resolves to itself (test).
 - [ ] REQ-SAG-0102 AC1/AC2: with_config_model adding a haiku model dated later than every built-in haiku makes haiku resolve to it with no rebuild; an equal date also makes it win; an earlier date changes nothing (tests). sc-agent-types reads no files (no std::fs use).

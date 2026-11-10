@@ -6,6 +6,7 @@ Global config loaded with sc-config (JSON) from ~/.sc-agent/: extra models, opti
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-4.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0102 AC1/AC2: a default.json models entry for a haiku model dated later than every built-in haiku makes AgentConfig::catalog()?.resolve(Latest(Haiku)) return it with no rebuild; an earlier date does not (tempdir tests).
 - [ ] REQ-SAG-0102: a user adds a model by editing JSON only; keys models, log_root (optional), workers, max_sends, local_runners load through sc-config 0.2.0 Loader with SC_AGENT__ env overrides (tests: SC_AGENT__MAX_SENDS=2, SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000).
 - [ ] REQ-SAG-0601: this sprint delivers only the max_sends setting (default 5; 2 via file or env gives 2; 0 rejected); resending on 429/502/529 is built in A-5 and A-9.

@@ -6,6 +6,7 @@ Two thin binaries and the Python API: decide (send one request or a JSONL batch 
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-10.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] tsq: languages lists the loaded grammars and queries lists the predefined queries (REQ-SAG-0303).
 - [ ] tsq: query <language> <query> <file> runs a predefined query and prints its captures as JSON; failures print one stderr line {id, message} with the treesitter.* id, exit 1.
 - [ ] tsq: a non-UTF-8 file (lowest-layer failure) reaches stderr as treesitter.not_utf8 with its message (REQ-SAG-0002); a failed stdout write is treesitter.write.

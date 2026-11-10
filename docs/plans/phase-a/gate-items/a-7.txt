@@ -6,6 +6,7 @@ sc-llm-provider and sc-decision-llm are sc-agent library crates. Anthropic Messa
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-7.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0103: a caller gives Provider and ModelId separately; one catalog id selects the same model through two providers, each sending its own id (OpenRouter anthropic/claude-haiku-5.5 for claude-haiku-5-5); catalog_model_id maps provider ids back; the OpenAI provider is named openai.
 - [ ] REQ-SAG-0502: sc-llm-provider encodes/decodes a request to a non-decision LLM on any configured provider (Anthropic Messages; Chat Completions for openai, OpenRouter, Together, Nous); a test sends a non-decision request for a model selected by short name through HttpClient over a scripted transport and returns its response.
 - [ ] JSON-schema output: Output::Json is sent as Anthropic output_config.format json_schema and as Chat Completions response_format json_schema (strict), and the reply text is returned parsed.

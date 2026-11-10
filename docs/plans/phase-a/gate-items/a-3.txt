@@ -6,6 +6,7 @@ Build sc-treesitter as a stand-alone library with PyO3 and CLI support types for
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] cargo tree -p sc-treesitter lists no sc-agent crate (REQ-SAG-0301); no agent or decision-model code.
 - [ ] A caller-written query runs against Python source and against Rust source through the same run_query call (REQ-SAG-0302, first release).
 - [ ] Every id from languages() runs through the same run_query call; adding a grammar adds a table row only, no API change (REQ-SAG-0302).

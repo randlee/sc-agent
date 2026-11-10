@@ -6,6 +6,7 @@ Sync ureq transport, HttpRequest/HttpResponse, busy resend and holdoff schedule 
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-5.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0601: default config, a request answered busy (429/502/529) every time is sent 5 times and ends http.provider_busy with reason sends and 5 attempts; with max_sends = 2 it is sent 2 times (no hard cap).
 - [ ] REQ-SAG-0601: Retry-After: 3 holds off exactly 3 s; Retry-After: 99 holds off 30 s; Retry-After: abc (and absent) falls back to 1, 2, 4, 8 s (then doubling, capped 30 s) each with at most 250 ms jitter; Retry-After is valid only as 1-32 ASCII digits with an optional fraction.
 - [ ] REQ-SAG-0601: no attempt starts after the 90 s budget (reason budget); ProviderBusy carries reason, attempts and the last retry_after_seconds unrounded (REQ-SAG-0007); a busy request is resent unchanged (same body bytes).

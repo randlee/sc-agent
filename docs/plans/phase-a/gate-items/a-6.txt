@@ -6,6 +6,7 @@ sc-decision-systemone and sc-decision-local are sc-agent library crates; each pr
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-6.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] SystemOneBackend encodes every DecisionRequest (JSON and multipart with image parts, images and long-context headers, Bearer when a key is set) to POST {base}/v1/systemone and decodes 200/400/422/other final replies into SystemOneResponse or the matching DecisionError, covering 100% of the request and response (REQ-SAG-0201).
 - [ ] GET /v1/models is encoded and decoded into ModelMetadataList (REQ-SAG-0201).
 - [ ] The same SystemOneRequest is sent unchanged to Jev, Strands Decider, Laya and Mapika/decider; no backend-specific request type exists (ADR-SAG-0001).

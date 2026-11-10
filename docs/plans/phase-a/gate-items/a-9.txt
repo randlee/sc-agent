@@ -6,6 +6,7 @@ Implements Decision for any Arc<dyn Backend> over an HttpClient: queue, workers,
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-9.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0701 AC1: a batch of 40 requests against a test transport that answers each after a delay finishes in about one eighth of the serial time with the default 8 workers (8 transport calls observed in flight at once).
 - [ ] REQ-SAG-0701 AC2: with workers = 1 the same batch runs one request at a time; workers come from AgentConfig.workers, default 8.
 - [ ] REQ-SAG-0701 AC3: a batch with one failing request returns that error tagged with its session ULID and returns every other result; results come back in finish order, each with its session ULID and input position.

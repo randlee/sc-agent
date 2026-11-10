@@ -6,6 +6,7 @@ Build sc-decision-schema: Jev API types (the one request form), the sync Decisio
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-2.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] Every request and response example in the TypeSafe API docs/openapi.json, for noul, choice, score and box (plus assets, ModelMetadataList, 400 and 422 bodies), round-trips byte-identical through sc-decision-schema types (REQ-SAG-0201 AC1).
 - [ ] REQ-SAG-0504 support: SystemOneRequest::from_json failures are decision.request_parse with the field path and the full serde message (test: score without criteria).
 - [ ] No crate other than sc-decision-schema defines a type that maps to a Jev API field (REQ-SAG-0201 AC2).

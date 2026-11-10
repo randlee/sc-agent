@@ -33,3 +33,8 @@ copy_lines crates/sc-agent-types/src/secret.rs   9 134  $T/src/api_key.rs
 copy_lines crates/sc-agent-types/src/secret.rs 136 194  $T/src/api_key.rs
 # MapEnv test double for the integration tests
 copy_lines $S/src/resolve.rs       305 348              $T/tests/resolve.rs
+copy_file  $S/src/dotenv.rs                             $T/src/dotenv.rs
+copy_lines $S/src/resolve.rs        44  59              $T/src/keyring.rs
+copy_lines $S/src/platform.rs       33 264              $T/src/keyring.rs
+copy_lines $S/src/platform.rs      265 413              $T/src/keyring.rs
+copy_lines $S/src/resolve.rs       350 400              $T/tests/resolve.rs

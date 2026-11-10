@@ -6,6 +6,7 @@ Separate general and session loggers on sc-observability, injectable with defaul
 
 ## Acceptance criteria
 
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-8.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0003 AC1: the general log rotates under sc-observability's RetainedLogPolicy (startup pass test), and no sc-agent-log source contains rotation or pruning code.
 - [ ] REQ-SAG-0003: each CLI writes its own general log <log_root>/logs/<cli>.log.jsonl; <log_root> defaults to ~/.sc-agent (A-4 AgentConfig::log_root).
 - [ ] REQ-SAG-0003 AC2: a session log file older than the retention age (mtime 8 days back) is still present after a new session writes and flushes in the same directory; session files never rotate (an over-64 MiB session file is not renamed).
