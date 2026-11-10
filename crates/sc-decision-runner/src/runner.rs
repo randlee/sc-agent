@@ -121,7 +121,15 @@ struct Shared {
     now: Clock,
     /// Runner threads (workers and feeders of every run) alive now.
     live_threads: Arc<AtomicUsize>,
+    /// Test seam (A-9 QA-002): called once, right after a run registers its cancel hook, with
+    /// the number of runner threads alive at that moment.
+    #[cfg(test)]
+    after_hook: Mutex<Option<AfterHook>>,
 }
+
+/// The `after_hook` test seam.
+#[cfg(test)]
+type AfterHook = Box<dyn FnOnce(usize) + Send>;
 
 impl DecisionRunner {
     /// A runner of `backend` sending through `http`, one row per result to `session`,
@@ -164,6 +172,8 @@ impl DecisionRunner {
                 general,
                 now,
                 live_threads: Arc::new(AtomicUsize::new(0)),
+                #[cfg(test)]
+                after_hook: Mutex::new(None),
             }),
             config,
         }
@@ -211,6 +221,17 @@ impl DecisionRunner {
                 results.interrupt();
             }))
         };
+        #[cfg(test)]
+        {
+            let seam = shared
+                .after_hook
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+            if let Some(seam) = seam {
+                seam(shared.live_threads.load(Ordering::Acquire));
+            }
+        }
         let feed = Arc::new(Feed::default());
         let work = Arc::new(RunnerWork {
             shared: Arc::clone(&shared),

@@ -117,3 +117,56 @@ fn job_log_context_is_session_and_position() {
         crate::row::Tally::default()
     );
 }
+
+/// A-9 QA-002: the cancel hook is registered before the pool and feeder threads start. The
+/// seam runs right after registration: no runner thread is alive yet, and a cancel there (a
+/// token cancelled during the start) sends nothing and answers every request cancelled.
+#[test]
+fn the_cancel_hook_is_registered_before_any_thread_starts() {
+    let ok = HttpResponse::new(200, vec![], b"{}".to_vec());
+    let transport = ScriptedTransport::responses(vec![ok.clone(), ok.clone(), ok]);
+    let log = MemoryLog::new().expect("log");
+    let http = HttpClient::new(
+        Arc::new(transport.clone()),
+        ResendPolicy::default(),
+        log.general(),
+    );
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "a-9", "test")
+            .expect("identity");
+    let backend = Arc::new(NeverMatches {
+        clock: ManualClock::new(Instant::now()),
+        decodes: AtomicU32::new(0),
+    });
+    let runner = DecisionRunner::new(
+        backend,
+        http,
+        log.session(identity),
+        log.general(),
+        RunnerConfig::default(),
+    );
+    let cancel = CancelToken::new();
+    let seen = Arc::new(Mutex::new(None));
+    {
+        let (cancel, seen) = (cancel.clone(), Arc::clone(&seen));
+        *runner.shared.after_hook.lock().expect("lock") = Some(Box::new(move |live| {
+            *seen.lock().expect("lock") = Some(live);
+            cancel.cancel();
+        }));
+    }
+    let results: Vec<DecisionResult> = runner
+        .decide_stream(Box::new((0..3).map(|_| request())), &cancel)
+        .collect();
+    assert_eq!(
+        *seen.lock().expect("lock"),
+        Some(0),
+        "the hook is registered before any runner thread starts"
+    );
+    assert_eq!(results.len(), 3);
+    assert!(
+        results
+            .iter()
+            .all(|result| matches!(result.outcome, Err(DecisionError::Cancelled { .. })))
+    );
+    assert_eq!(transport.sends(), 0, "nothing is sent");
+}
