@@ -44,17 +44,24 @@ pub(crate) const MAX_DOTENV_BYTES: u64 = 1024 * 1024;
 /// error holds a sanitized label, never the OS message.
 pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, SecretsError> {
     let path = repo_root.join(".env");
+    // Check the kind before opening: Windows refuses to open a directory
+    // (PermissionDenied), which would hide the real reason.
+    match fs::metadata(&path) {
+        Ok(metadata) if !metadata.is_file() => return Err(not_a_file()),
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(error) => return Err(dotenv_read_error(&error)),
+    }
     let file = match fs::File::open(&path) {
         Ok(file) => file,
+        // Removed between the two calls: as if it was never there.
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
         Err(error) => return Err(dotenv_read_error(&error)),
     };
+    // Backstop: the opened file is checked again (it may have been replaced).
     let metadata = file.metadata().map_err(|error| dotenv_read_error(&error))?;
     if !metadata.is_file() {
-        return Err(SecretsError::DotenvRead {
-            kind: "NotAFile".to_owned(),
-            cause: "path is not a regular file",
-        });
+        return Err(not_a_file());
     }
     if metadata.len() > MAX_DOTENV_BYTES {
         return Err(too_large());
@@ -67,6 +74,13 @@ pub(crate) fn load_dotenv(repo_root: &Path) -> Result<BTreeMap<String, String>, 
         return Err(too_large());
     }
     Ok(parse_dotenv(&text))
+}
+
+fn not_a_file() -> SecretsError {
+    SecretsError::DotenvRead {
+        kind: "NotAFile".to_owned(),
+        cause: "path is not a regular file",
+    }
 }
 
 fn too_large() -> SecretsError {
