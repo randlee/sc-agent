@@ -7,8 +7,9 @@ use crate::{ErrorDetail, ErrorId, ModelId, ShortName};
 
 /// A value given to this crate did not parse, or a catalog row conflicts.
 ///
-/// This is the bottom crate: nothing is wrapped, so [`ErrorId::cause_detail`] is always `None`
-/// and [`ErrorId::recovery`] is the provided `None`. `Display` is `"<id>: <message>"`.
+/// This is the bottom crate: nothing is wrapped, so [`ErrorId::cause_detail`] is always `None`.
+/// Every variant has a static [`ErrorId::recovery`] hint saying what to write instead.
+/// `Display` is `"<id>: <message>"`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TypesError {
@@ -71,18 +72,8 @@ impl ErrorId for TypesError {
             Self::InvalidModelId { text } => {
                 format!("model id {text:?} must be non-empty with no control characters")
             }
-            Self::UnknownShortName { text } => format!(
-                "{text:?} is not a short name; use one of {}",
-                join(crate::ShortName::ALL.iter().map(|name| name.as_str()))
-            ),
-            Self::UnknownProvider { text } => format!(
-                "{text:?} is not a provider; use one of {}",
-                join(
-                    crate::Provider::ALL
-                        .iter()
-                        .map(|provider| provider.as_str())
-                )
-            ),
+            Self::UnknownShortName { text } => format!("{text:?} is not a short name"),
+            Self::UnknownProvider { text } => format!("{text:?} is not a provider"),
             Self::InvalidReleaseDate { text } => {
                 format!("release date {text:?} is not YYYY-MM-DD with month 01..12 and day 01..31")
             }
@@ -105,6 +96,32 @@ impl ErrorId for TypesError {
     fn cause_detail(&self) -> Option<ErrorDetail> {
         None
     }
+
+    fn recovery(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::InvalidModelId { .. } => {
+                "use a non-empty model id with no control characters, or a short name such as haiku"
+            }
+            Self::UnknownShortName { .. } => {
+                "use one of: jev, haiku, sonnet, opus, fable, luna, terra, sol, astra"
+            }
+            Self::UnknownProvider { .. } => {
+                "use one of: typesafe, anthropic, openai, openrouter, nous, together"
+            }
+            Self::InvalidReleaseDate { .. } => {
+                "write the date as YYYY-MM-DD, for example 2026-10-14"
+            }
+            Self::ModelOnTwoLines { .. } => {
+                "keep the model under its existing line or choose a different id"
+            }
+            Self::InvalidVarName { .. } => {
+                "use a name matching ^[A-Z_][A-Z0-9_]{0,127}$, for example MY_RUNNER_TOKEN"
+            }
+            Self::InvalidSessionId { .. } => {
+                "use a 26-character uppercase ULID, for example 01ARZ3NDEKTSV4RRFFQ69G5FAV"
+            }
+        })
+    }
 }
 
 impl fmt::Display for TypesError {
@@ -114,7 +131,3 @@ impl fmt::Display for TypesError {
 }
 
 impl Error for TypesError {}
-
-fn join<'a>(names: impl Iterator<Item = &'a str>) -> String {
-    names.collect::<Vec<_>>().join(", ")
-}

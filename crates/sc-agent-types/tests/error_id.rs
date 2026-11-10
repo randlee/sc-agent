@@ -7,7 +7,7 @@ use std::fmt;
 use std::io;
 
 use sc_agent_types::{
-    ErrorDetail, ErrorId, ModelId, ReleaseDate, SessionId, ShortName, TypesError, VarName,
+    ErrorDetail, ErrorId, ModelId, Provider, ReleaseDate, SessionId, ShortName, TypesError, VarName,
 };
 
 #[cfg(test)]
@@ -16,9 +16,7 @@ fn every_types_error() -> Vec<TypesError> {
     vec![
         "".parse::<ModelId>().expect_err("model"),
         "nope".parse::<ShortName>().expect_err("short name"),
-        "nope"
-            .parse::<sc_agent_types::Provider>()
-            .expect_err("provider"),
+        "nope".parse::<Provider>().expect_err("provider"),
         "soon".parse::<ReleaseDate>().expect_err("date"),
         TypesError::ModelOnTwoLines {
             model,
@@ -31,8 +29,7 @@ fn every_types_error() -> Vec<TypesError> {
 }
 
 /// Every TypesError variant has a distinct id `types.<variant_snake>`; Display is
-/// `"<id>: <message>"` only; detail() carries id and message; bottom crate: no cause, no
-/// recovery.
+/// `"<id>: <message>"` only; bottom crate: no cause.
 #[test]
 fn test_types_error_ids_display_and_detail() {
     let errors = every_types_error();
@@ -57,12 +54,54 @@ fn test_types_error_ids_display_and_detail() {
             format!("{}: {}", error.id(), error.message())
         );
         assert!(error.cause_detail().is_none());
-        assert!(error.recovery().is_none());
         assert!(error.source().is_none());
-        assert_eq!(
-            error.detail(),
-            ErrorDetail::new(error.id(), error.message(), None)
-        );
+    }
+}
+
+/// Every TypesError variant has a non-empty static recovery hint; the short-name and provider
+/// hints list exactly the spellings `FromStr` accepts.
+#[test]
+fn test_every_types_error_has_a_recovery_hint() {
+    for error in every_types_error() {
+        let recovery = error
+            .recovery()
+            .unwrap_or_else(|| panic!("{} has no recovery", error.id()));
+        assert!(!recovery.is_empty(), "{}", error.id());
+    }
+    let listed = |names: Vec<&str>| format!("use one of: {}", names.join(", "));
+    let short_names = listed(ShortName::ALL.iter().map(|name| name.as_str()).collect());
+    let providers = listed(
+        Provider::ALL
+            .iter()
+            .map(|provider| provider.as_str())
+            .collect(),
+    );
+    let error = "nope".parse::<ShortName>().expect_err("short name");
+    assert_eq!(error.recovery(), Some(short_names.as_str()));
+    let error = "nope".parse::<Provider>().expect_err("provider");
+    assert_eq!(error.recovery(), Some(providers.as_str()));
+    assert!(
+        "lower"
+            .parse::<VarName>()
+            .expect_err("var name")
+            .recovery()
+            .is_some_and(|hint| hint.contains("^[A-Z_][A-Z0-9_]{0,127}$"))
+    );
+}
+
+/// RBP-F002: for every TypesError variant, the provided detail() equals the value built from
+/// id(), message(), recovery() and cause_detail(): no implementation overrides it.
+#[test]
+fn test_detail_is_built_from_the_four_methods() {
+    for error in every_types_error() {
+        let expected = ErrorDetail {
+            id: error.id().to_owned(),
+            message: error.message(),
+            recovery: error.recovery().map(std::borrow::Cow::Borrowed),
+            cause: error.cause_detail().map(Box::new),
+        };
+        assert_eq!(error.detail(), expected, "{}", error.id());
+        assert!(error.detail().recovery.is_some(), "{}", error.id());
     }
 }
 
