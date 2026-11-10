@@ -50,8 +50,8 @@ mod tests {
     #[test]
     fn the_provider_is_chosen_by_ranking_among_detected_keys() {
         let both = [
-            ("ANTHROPIC_API_KEY", ANTHROPIC_KEY),
-            ("OPENROUTER_API_KEY", OPENROUTER_KEY),
+            (sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY),
+            (sc_agent_secrets::OPENROUTER_API_KEY, OPENROUTER_KEY),
         ];
         let (result, transport) = haiku_send(&both, None, None);
         assert!(result.expect("send").outcome.is_ok());
@@ -59,7 +59,11 @@ mod tests {
         assert_eq!(sent[0].endpoint().host(), "api.anthropic.com");
         assert_eq!(body_json(&sent[0])["model"], "claude-haiku-5-5");
 
-        let (_, transport) = haiku_send(&[("OPENROUTER_API_KEY", OPENROUTER_KEY)], None, None);
+        let (_, transport) = haiku_send(
+            &[(sc_agent_secrets::OPENROUTER_API_KEY, OPENROUTER_KEY)],
+            None,
+            None,
+        );
         let sent = transport.requests();
         assert_eq!(sent[0].endpoint().host(), "openrouter.ai");
         assert_eq!(body_json(&sent[0])["model"], "anthropic/claude-haiku-5.5");
@@ -86,7 +90,7 @@ mod tests {
     /// catalog: a later-dated config haiku model is sent; without it, the built-in.
     #[test]
     fn haiku_resolves_through_the_config_catalog() {
-        let keys = [("ANTHROPIC_API_KEY", ANTHROPIC_KEY)];
+        let keys = [(sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY)];
         let config = r#"{"models":{"claude-haiku-6-0":{"line":"haiku","released":"2026-12-01"}}}"#;
         let (_, transport) = haiku_send(&keys, None, Some(config));
         assert_eq!(
@@ -111,7 +115,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("ANTHROPIC_API_KEY", ANTHROPIC_KEY)],
+            &[(sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -164,10 +168,13 @@ mod tests {
     #[test]
     fn a_busy_provider_is_resent_up_to_max_sends() {
         for (vars, sends) in [
-            (vec![("TYPESAFE_API_KEY", TYPESAFE_KEY)], 5_usize),
+            (
+                vec![(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+                5_usize,
+            ),
             (
                 vec![
-                    ("TYPESAFE_API_KEY", TYPESAFE_KEY),
+                    (sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY),
                     ("SC_AGENT__MAX_SENDS", "2"),
                 ],
                 2,
@@ -203,7 +210,7 @@ mod tests {
         let dir = config_dir(config);
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -284,7 +291,11 @@ mod tests {
     /// AC: REQ-SAG-0013. Bound violations fail before any send with `decide.config`.
     #[test]
     fn config_bounds_fail_before_any_send() {
-        let cases = [
+        let key_on_plain_http = format!(
+            r#"{{"local_runners":{{"laya":{{"kind":"laya","host":"10.0.0.5","port":9000,"model":"m","key_env":"{}"}}}}}}"#,
+            sc_agent_secrets::LAYA_API_KEY
+        );
+        let cases: [(&str, &str, &str); 4] = [
             (r#"{"workers":0}"#, "config.invalid", "workers"),
             (r#"{"max_sends":11}"#, "config.invalid", "max_sends"),
             (
@@ -293,7 +304,7 @@ mod tests {
                 "local_runners.laya.port",
             ),
             (
-                r#"{"local_runners":{"laya":{"kind":"laya","host":"10.0.0.5","port":9000,"model":"m","key_env":"LAYA_API_KEY"}}}"#,
+                &key_on_plain_http,
                 "config.key_on_plain_http",
                 "local_runners.laya.key_env",
             ),
@@ -304,7 +315,7 @@ mod tests {
             let dir = config_dir(json);
             let ctx = context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             );

@@ -45,7 +45,7 @@ mod tests {
             let dir = empty_config_dir();
             let context = context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             );
@@ -117,7 +117,7 @@ mod tests {
             let dir = empty_config_dir();
             let ctx = context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             );
@@ -165,7 +165,7 @@ mod tests {
                 ScriptedTransport::responses(vec![json_response(200, &fixture("response_noul"))]);
             let ctx = context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             );
@@ -202,7 +202,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -234,7 +234,7 @@ mod tests {
             runner: None,
             context: context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             ),

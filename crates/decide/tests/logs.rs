@@ -42,7 +42,7 @@ mod tests {
         let transport = ScriptedTransport::responses(vec![ok_noul()]);
         let mut ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport),
             &MemoryLog::new().expect("log"),
         );
@@ -87,7 +87,7 @@ mod tests {
     fn every_operation_writes_its_record_and_no_key() {
         let log = MemoryLog::new().expect("log");
         let dir = config_dir("{}");
-        let vars = [("TYPESAFE_API_KEY", TYPESAFE_KEY)];
+        let vars = [(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)];
         let models_body =
             r#"{"models":[{"name":"jev-1.13.0","description":"d","release_date":"2026-09-15"}]}"#;
         let transport = ScriptedTransport::responses(vec![
@@ -156,11 +156,17 @@ mod tests {
 
     fn doctor_context(dir: &Path, transport: ScriptedTransport, log: &MemoryLog) -> Context {
         let mut keyring = HashMap::new();
-        keyring.insert("ANTHROPIC_API_KEY".to_owned(), ANTHROPIC_KEY.to_owned());
+        keyring.insert(
+            sc_agent_secrets::ANTHROPIC_API_KEY.to_owned(),
+            ANTHROPIC_KEY.to_owned(),
+        );
         Context {
             service: "decide",
             config_dir: Some(dir.to_path_buf()),
-            environment: Some(environment(&[("TYPESAFE_API_KEY", TYPESAFE_KEY)])),
+            environment: Some(environment(&[(
+                sc_agent_secrets::TYPESAFE_API_KEY,
+                TYPESAFE_KEY,
+            )])),
             keyring: Some(Arc::new(MapKeyring(keyring))),
             transport: Some(Arc::new(transport)),
             general: Some(log.general()),

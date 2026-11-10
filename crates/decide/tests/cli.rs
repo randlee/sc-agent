@@ -28,7 +28,8 @@ fn help_lists_send_models_and_doctor() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::{TcpListener, TcpStream};

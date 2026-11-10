@@ -86,7 +86,10 @@ mod tests {
         let context = crate::Context {
             service: "decide",
             config_dir: Some(dir.path().to_path_buf()),
-            environment: Some(vec![("TYPESAFE_API_KEY".into(), "ts-signal-test".into())]),
+            environment: Some(vec![(
+                sc_agent_secrets::TYPESAFE_API_KEY.into(),
+                "ts-signal-test".into(),
+            )]),
             keyring: None,
             transport: Some(Arc::new(transport.clone())),
             general: Some(log.general()),
@@ -108,21 +111,38 @@ mod tests {
             .collect();
         let cancel = CancelToken::new();
         let interrupted = Arc::new(AtomicBool::new(false));
-        let handler = {
-            let (cancel, interrupted, transport) =
-                (cancel.clone(), Arc::clone(&interrupted), transport.clone());
-            std::thread::spawn(move || {
-                transport.wait_started(8);
-                on_interrupt(&cancel, &interrupted);
-            })
-        };
+        // The interrupt arrives while 8 sends are blocked: the 8th send runs the handler on
+        // its worker thread (no thread of this test's own), then blocks like the others.
+        struct InterruptAt {
+            sends: std::sync::atomic::AtomicUsize,
+            cancel: CancelToken,
+            interrupted: Arc<AtomicBool>,
+            inner: BlockingTransport,
+        }
+        impl sc_agent_http::Transport for InterruptAt {
+            fn send(
+                &self,
+                request: &sc_agent_http::HttpRequest,
+            ) -> Result<HttpResponse, sc_agent_http::HttpError> {
+                if self.sends.fetch_add(1, Ordering::SeqCst) + 1 == 8 {
+                    on_interrupt(&self.cancel, &self.interrupted);
+                }
+                self.inner.send(request)
+            }
+        }
+        let mut options = options;
+        options.context.transport = Some(Arc::new(InterruptAt {
+            sends: std::sync::atomic::AtomicUsize::new(0),
+            cancel: cancel.clone(),
+            interrupted: Arc::clone(&interrupted),
+            inner: transport.clone(),
+        }));
         let mut results = Vec::new();
         crate::send_batch(&options, requests, &cancel, &mut |result| {
             results.push(result);
             Ok(())
         })
         .expect("batch");
-        handler.join().expect("handler");
         transport.release();
         assert!(interrupted.load(Ordering::Acquire));
         assert_eq!(results.len(), 12);

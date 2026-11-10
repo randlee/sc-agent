@@ -968,14 +968,14 @@ mod tests {
     #[test]
     fn the_first_ranked_provider_with_a_key_is_chosen() {
         let both = keys(&[
-            ("ANTHROPIC_API_KEY", "sk-a"),
-            ("OPENROUTER_API_KEY", "sk-o"),
+            (sc_agent_secrets::ANTHROPIC_API_KEY, "sk-a"),
+            (sc_agent_secrets::OPENROUTER_API_KEY, "sk-o"),
         ]);
         let haiku = Some(ShortName::Haiku);
         let (provider, _) = choose_provider(None, haiku, "haiku", &both).expect("anthropic");
         assert_eq!(provider, Provider::Anthropic);
 
-        let reseller = keys(&[("OPENROUTER_API_KEY", "sk-o")]);
+        let reseller = keys(&[(sc_agent_secrets::OPENROUTER_API_KEY, "sk-o")]);
         let (provider, _) = choose_provider(None, haiku, "haiku", &reseller).expect("openrouter");
         assert_eq!(provider, Provider::OpenRouter);
 

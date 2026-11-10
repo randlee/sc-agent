@@ -182,7 +182,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport),
             &log,
         );
@@ -213,7 +213,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -251,7 +251,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -293,7 +293,7 @@ mod tests {
             let dir = config.map_or_else(empty_config_dir, config_dir);
             let ctx = context(
                 dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(transport.clone()),
                 &log,
             );
@@ -360,7 +360,7 @@ mod tests {
         let dir = empty_config_dir();
         let ctx = context(
             dir.path(),
-            &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
             Arc::new(transport.clone()),
             &log,
         );
@@ -410,7 +410,7 @@ mod tests {
             None,
             context(
                 typesafe_dir.path(),
-                &[("TYPESAFE_API_KEY", TYPESAFE_KEY)],
+                &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
                 Arc::new(typesafe.clone()),
                 &typesafe_log,
             ),
