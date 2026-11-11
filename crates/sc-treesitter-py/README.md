@@ -52,4 +52,4 @@ None of its own. It builds `sc-treesitter` with the `python` feature and the def
 - REQ-SAG-0303: PyO3 and CLI query surfaces.
 - REQ-SAG-0302: any tree-sitter grammar.
 - REQ-SAG-0002: errors are a discriminated union carried from bottom to top.
-- ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; `tsq` lives in sc-treesitter behind a `cli` feature.
+- ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; `sitr` lives in sc-treesitter behind a `cli` feature.

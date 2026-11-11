@@ -1,15 +1,15 @@
 # sc-agent-py
 
-The `sc_agent` Python module: one function per `decide` operation. It is a thin PyO3 layer over the `decide` library (ADR-SAG-0004) and adds no wiring of its own. It is the top of the stack with `decide`, and it has `publish = false`. Python users build it with maturin.
+The `sc_agent` Python module: one function per `decidr` operation. It is a thin PyO3 layer over the `decidr` library (ADR-SAG-0004) and adds no wiring of its own. It is the top of the stack with `decidr`, and it has `publish = false`. Python users build it with maturin.
 
 Each function returns the same JSON text that the CLI prints.
 
 ## What it provides
 
-- `sc_agent.send(request, *, model, project, agent_role, ...)`: `decide send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log` and `config_dir`.
-- `sc_agent.send_batch(requests, *, model, project, agent_role, ...)`: `decide send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns the result lines in finish order and passes each to `on_result` as it arrives.
-- `sc_agent.models(runner=None, ...)`: `decide models`.
-- `sc_agent.doctor(...)`: `decide doctor`.
+- `sc_agent.send(request, *, model, project, agent_role, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log` and `config_dir`.
+- `sc_agent.send_batch(requests, *, model, project, agent_role, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns the result lines in finish order and passes each to `on_result` as it arrives.
+- `sc_agent.models(runner=None, ...)`: `decidr models`.
+- `sc_agent.doctor(...)`: `decidr doctor`.
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
 
@@ -49,13 +49,13 @@ None. The crate builds as a `cdylib` named `sc_agent` with PyO3's `abi3-py310` a
 
 ## Depends on
 
-- `decide`, plus `sc-agent-types`, `sc-agent-config`, `sc-agent-log` and `sc-decision-schema`.
+- `decidr`, plus `sc-agent-types`, `sc-agent-config`, `sc-agent-log` and `sc-decision-schema`.
 
-Layer rule: a crate depends only on lower layers (ADR-SAG-0004). This crate calls the `decide` library and never chooses a backend itself.
+Layer rule: a crate depends only on lower layers (ADR-SAG-0004). This crate calls the `decidr` library and never chooses a backend itself.
 
 ## Requirements and decisions
 
-- REQ-SAG-0501: TypeSafe API as decide subcommands.
+- REQ-SAG-0501: TypeSafe API as decidr subcommands.
 - REQ-SAG-0008: optional logger injection with default loggers.
 - REQ-SAG-0011: interrupt cancels cleanly.
 - REQ-SAG-0104: cancel token.

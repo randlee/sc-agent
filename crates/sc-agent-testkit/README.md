@@ -15,7 +15,7 @@ It depends on `sc-agent-types` only.
 
 Every wait here ends: on its event, or after `HANG_GUARD` (60 s) with a panic that names what did not happen. The guard only stops a hung test. No test proves anything by how long a wait took. A test that needs time to pass uses `sc_agent_types::testing::ManualClock`, never real time.
 
-The workspace scan `tests_are_deterministic` (`crates/decide/tests/workspace.rs`) refuses raw unbounded waits and clock reads in tests. This crate holds the bounded forms that the scan expects tests to use.
+The workspace scan `tests_are_deterministic` (`crates/decidr/tests/workspace.rs`) refuses raw unbounded waits and clock reads in tests. This crate holds the bounded forms that the scan expects tests to use.
 
 ## What it provides
 

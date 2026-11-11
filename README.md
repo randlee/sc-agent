@@ -13,26 +13,26 @@ Every backend is launched the same way: one request form, one set of keys and co
 | Part | State |
 |---|---|
 | Decision models: Jev, local Jev-compatible runners, and Haiku and Luna answering in Jev's place | Done (phase A) |
-| `decide` CLI and the `sc_agent` Python module | Done (phase A) |
-| `tsq` tree-sitter query tool and the `sc_treesitter` Python module | Done (phase A) |
+| `decidr` CLI and the `sc_agent` Python module | Done (phase A) |
+| `sitr` tree-sitter query tool and the `sc_treesitter` Python module | Done (phase A) |
 | CLI agents (Claude Code, Codex) and SDK agents | Planned: they get their own crates on the same lower layers |
 
-## The `decide` CLI
+## The `decidr` CLI
 
 ```bash
-decide send --model jev --project my-project --agent-role judge request.json
+decidr send --model jev --project my-project --agent-role judge request.json
 ```
 
 ```bash
-decide send --batch --model haiku --project my-project --agent-role judge requests.jsonl
+decidr send --batch --model haiku --project my-project --agent-role judge requests.jsonl
 ```
 
 ```bash
-decide models
+decidr models
 ```
 
 ```bash
-decide doctor
+decidr doctor
 ```
 
 - `send`: one JSON request, or a JSONL batch with `--batch`.
@@ -44,7 +44,7 @@ decide doctor
 - `doctor`: lists the keys found, in the order they are used, and reports catalog mismatches.
 - `--config-dir PATH` (global): the configuration directory. The default is `~/.sc-agent`.
 
-Ctrl-C or SIGTERM cancels the run. Every unfinished request ends as `decision.cancelled`, the session log is flushed, and `decide` exits 130. A third interrupt exits at once.
+Ctrl-C or SIGTERM cancels the run. Every unfinished request ends as `decision.cancelled`, the session log is flushed, and `decidr` exits 130. A third interrupt exits at once.
 
 ## Python
 
@@ -57,7 +57,7 @@ sc_agent.models()
 sc_agent.doctor()
 ```
 
-Every `decide` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `config_dir=`, and the `general_log=` and `session_log=` callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
+Every `decidr` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `config_dir=`, and the `general_log=` and `session_log=` callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
 
 ## Configuration, keys and logs
 
@@ -79,8 +79,8 @@ The crates are layered: each one depends only on the layers below it (ADR-SAG-00
 | Decision schema | `sc-decision-schema` (one sync `Decision` trait, one `DecisionRequest`) |
 | Decision backends | `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider` and `sc-decision-llm` |
 | Runner | `sc-decision-runner` (worker threads, holdoff, cancellation, session rows) |
-| Top | `decide` (library, composition root and CLI) and `sc-agent-py` (the PyO3 `sc_agent` module) |
-| Stands alone | `sc-treesitter` (`tsq` and `sc_treesitter`) |
+| Top | `decidr` (library, composition root and CLI) and `sc-agent-py` (the PyO3 `sc_agent` module) |
+| Stands alone | `sc-treesitter` (`sitr` and `sc_treesitter`) |
 | Test support only | `sc-agent-testkit` |
 
 There is no async runtime: the workspace is synchronous and uses no tokio.
