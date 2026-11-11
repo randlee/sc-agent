@@ -3,7 +3,7 @@
 use sc_agent_types::{ErrorDetail, ErrorId, SessionId};
 use sc_decision_schema::{DecisionResult, OrderedMap, QuestionDigest, SystemOneResponse};
 
-use crate::DecideError;
+use crate::DecidrError;
 
 /// One printed result: its session ULID, input position, digests, and the response or the
 /// error chain.
@@ -47,8 +47,8 @@ impl<'a> ResultLine<'a> {
 ///
 /// # Errors
 ///
-/// [`DecideError::Encode`] when serde_json refuses a value.
-pub fn result_line(result: &DecisionResult) -> Result<Vec<u8>, DecideError> {
+/// [`DecidrError::Encode`] when serde_json refuses a value.
+pub fn result_line(result: &DecisionResult) -> Result<Vec<u8>, DecidrError> {
     Ok(serde_json::to_vec(&ResultLine::new(result))?)
 }
 
@@ -56,8 +56,8 @@ pub fn result_line(result: &DecisionResult) -> Result<Vec<u8>, DecideError> {
 ///
 /// # Errors
 ///
-/// [`DecideError::Encode`] when serde_json refuses a value.
-pub fn result_text(result: &DecisionResult) -> Result<String, DecideError> {
+/// [`DecidrError::Encode`] when serde_json refuses a value.
+pub fn result_text(result: &DecisionResult) -> Result<String, DecidrError> {
     to_json(&ResultLine::new(result))
 }
 
@@ -65,7 +65,7 @@ pub fn result_text(result: &DecisionResult) -> Result<String, DecideError> {
 ///
 /// # Errors
 ///
-/// [`DecideError::Encode`] when serde_json refuses a value.
-pub fn to_json<T: serde::Serialize + ?Sized>(value: &T) -> Result<String, DecideError> {
+/// [`DecidrError::Encode`] when serde_json refuses a value.
+pub fn to_json<T: serde::Serialize + ?Sized>(value: &T) -> Result<String, DecidrError> {
     Ok(serde_json::to_string(value)?)
 }

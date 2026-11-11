@@ -29,7 +29,7 @@
 //!
 //! A daemon that is not listening is reported down as [`LocalError::Http`] with cause
 //! `http.network`. Discovery is a library capability: nothing in this phase calls it from
-//! decide or Python; decide calls the load wait. Only [`LocalProbe`] sends, on the caller's
+//! decidr or Python; decidr calls the load wait. Only [`LocalProbe`] sends, on the caller's
 //! [`Transport`]; the crate reads no config, has no built-in host or port, starts no runtime,
 //! and waits only through [`Clock::wait_until`].
 //!

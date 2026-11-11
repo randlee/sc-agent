@@ -31,7 +31,7 @@ pub const MAX_LOAD_WAIT: Duration = Duration::from_secs(86_400);
 /// A runner's own timeouts (REQ-SAG-0015): local runners get longer ones than providers, and
 /// model loading does not count toward the request timeout.
 ///
-/// Values come from the caller (decide, from the runner's config entry); this crate has no
+/// Values come from the caller (decidr, from the runner's config entry); this crate has no
 /// default and reads no config.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LocalTimeouts {
@@ -102,7 +102,7 @@ const fn set_or_unset(set: bool) -> &'static str {
 impl LocalBackend {
     /// A backend for the runner at `http://{host}:{port}` serving `model`.
     ///
-    /// decide passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and
+    /// decidr passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and
     /// `runner.model` of a `LocalRunner`; host and port are checked at config load, so no
     /// check is repeated here. An IPv6 host is written in brackets. No timeouts until
     /// [`Self::with_timeouts`].

@@ -189,8 +189,8 @@ jobs:
           python -m pip install --no-index --find-links dist sc-treesitter
           python -m pytest crates/sc-treesitter-py/tests
 
-  # sc-agent-py (sprint a-10): the sc-agent wheel over the decide library, and its pytest
-  # suite against a loopback runner (REQ-QA-007). The suite also runs the decide binary.
+  # sc-agent-py (sprint a-10): the sc-agent wheel over the decidr library, and its pytest
+  # suite against a loopback runner (REQ-QA-007). The suite also runs the decidr binary.
   sc-agent-py:
     name: sc-agent-py wheel and pytest
     needs: [detect, fmt]
@@ -214,8 +214,8 @@ jobs:
             target
           key: ubuntu-sc-agent-py-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build the decide binary (the parity and identity tests run it)
-        run: cargo build -p decide
+      - name: Build the decidr binary (the parity and identity tests run it)
+        run: cargo build -p decidr
 
       - name: Install Python
         uses: actions/setup-python@v5

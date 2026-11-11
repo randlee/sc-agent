@@ -1,4 +1,4 @@
-//! [`DecideError`], the error of every public function of the decide library (REQ-SAG-0002).
+//! [`DecidrError`], the error of every public function of the decidr library (REQ-SAG-0002).
 
 use std::error::Error;
 use std::fmt;
@@ -10,29 +10,29 @@ use sc_agent_types::{ErrorDetail, ErrorId, Provider};
 use crate::ModelSelector;
 use crate::input::LimitKind;
 
-/// A decide command could not run, or stopped before it finished.
+/// A decidr command could not run, or stopped before it finished.
 ///
-/// A decision that fails inside `Decision::decide` or `decide_stream` is not a `DecideError`:
+/// A decision that fails inside `Decision::decide` or `decide_stream` is not a `DecidrError`:
 /// it is the `DecisionError` of its `DecisionResult`, printed in that result's line.
 ///
 /// `Display` is `"<id>: <message>"`. A wrapped error (a lower sc-agent error, or an io, clap,
-/// serde_json or ctrlc error) is kept unchanged, boxed where it is large so `DecideError` stays
+/// serde_json or ctrlc error) is kept unchanged, boxed where it is large so `DecidrError` stays
 /// small; it is reachable through [`Error::source`] and [`ErrorId::cause_detail`].
 ///
 /// # Examples
 ///
 /// ```
-/// use decide::DecideError;
+/// use decidr::DecidrError;
 /// use sc_agent_types::ErrorId;
 ///
-/// let error = DecideError::InputNotFound { input: "missing.json".into() };
-/// assert_eq!(error.id(), "decide.input_not_found");
-/// assert_eq!(error.to_string(), format!("decide.input_not_found: {}", error.message()));
+/// let error = DecidrError::InputNotFound { input: "missing.json".into() };
+/// assert_eq!(error.id(), "decidr.input_not_found");
+/// assert_eq!(error.to_string(), format!("decidr.input_not_found: {}", error.message()));
 /// assert!(error.recovery().is_some());
 /// ```
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum DecideError {
+pub enum DecidrError {
     /// The command line does not parse; the clap error is the cause.
     Usage {
         /// clap's error, unchanged.
@@ -144,7 +144,7 @@ pub enum DecideError {
 /// Every wrapped lower error converts into its variant, boxed.
 macro_rules! boxed_from {
     ($($error:ty => $variant:ident),* $(,)?) => {
-        $(impl From<$error> for DecideError {
+        $(impl From<$error> for DecidrError {
             fn from(error: $error) -> Self {
                 Self::$variant(Box::new(error))
             }
@@ -164,13 +164,13 @@ boxed_from! {
     sc_decision_runner::RunnerError => Runner,
 }
 
-impl From<serde_json::Error> for DecideError {
+impl From<serde_json::Error> for DecidrError {
     fn from(source: serde_json::Error) -> Self {
         Self::Encode { source }
     }
 }
 
-impl From<clap::Error> for DecideError {
+impl From<clap::Error> for DecidrError {
     fn from(source: clap::Error) -> Self {
         Self::Usage {
             source: Box::new(source),
@@ -178,7 +178,7 @@ impl From<clap::Error> for DecideError {
     }
 }
 
-impl DecideError {
+impl DecidrError {
     /// `RequestInvalid` at `line` for `source`.
     #[must_use]
     pub fn request_invalid(line: Option<u64>, source: sc_decision_schema::DecisionError) -> Self {
@@ -215,31 +215,31 @@ fn foreign(id: &str, error: &(dyn Error + 'static)) -> Option<ErrorDetail> {
     Some(ErrorDetail::foreign(id, error))
 }
 
-impl ErrorId for DecideError {
+impl ErrorId for DecidrError {
     fn id(&self) -> &'static str {
         match self {
-            Self::Usage { .. } => "decide.usage",
-            Self::Config(_) => "decide.config",
-            Self::Types(_) => "decide.types",
-            Self::Secrets(_) => "decide.secrets",
-            Self::Log(_) => "decide.log",
-            Self::Local(_) => "decide.local",
-            Self::Decision(_) => "decide.decision",
-            Self::Http(_) => "decide.http",
-            Self::Llm(_) => "decide.llm",
-            Self::Runner(_) => "decide.runner",
-            Self::NoProviderKey { .. } => "decide.no_provider_key",
-            Self::UnknownRunner { .. } => "decide.unknown_runner",
-            Self::InputNotFound { .. } => "decide.input_not_found",
-            Self::InputRead { .. } => "decide.input_read",
-            Self::LimitExceeded { .. } => "decide.limit_exceeded",
-            Self::LineNotUtf8 { .. } => "decide.line_not_utf8",
-            Self::ImageRead { .. } => "decide.image_read",
-            Self::ImageFormat { .. } => "decide.image_format",
-            Self::RequestInvalid { .. } => "decide.request_invalid",
-            Self::Encode { .. } => "decide.encode",
-            Self::Write { .. } => "decide.write",
-            Self::Signal { .. } => "decide.signal",
+            Self::Usage { .. } => "decidr.usage",
+            Self::Config(_) => "decidr.config",
+            Self::Types(_) => "decidr.types",
+            Self::Secrets(_) => "decidr.secrets",
+            Self::Log(_) => "decidr.log",
+            Self::Local(_) => "decidr.local",
+            Self::Decision(_) => "decidr.decision",
+            Self::Http(_) => "decidr.http",
+            Self::Llm(_) => "decidr.llm",
+            Self::Runner(_) => "decidr.runner",
+            Self::NoProviderKey { .. } => "decidr.no_provider_key",
+            Self::UnknownRunner { .. } => "decidr.unknown_runner",
+            Self::InputNotFound { .. } => "decidr.input_not_found",
+            Self::InputRead { .. } => "decidr.input_read",
+            Self::LimitExceeded { .. } => "decidr.limit_exceeded",
+            Self::LineNotUtf8 { .. } => "decidr.line_not_utf8",
+            Self::ImageRead { .. } => "decidr.image_read",
+            Self::ImageFormat { .. } => "decidr.image_format",
+            Self::RequestInvalid { .. } => "decidr.request_invalid",
+            Self::Encode { .. } => "decidr.encode",
+            Self::Write { .. } => "decidr.write",
+            Self::Signal { .. } => "decidr.signal",
         }
     }
 
@@ -351,7 +351,7 @@ impl ErrorId for DecideError {
 
     fn recovery(&self) -> Option<&'static str> {
         match self {
-            Self::Usage { .. } => Some("See decide --help."),
+            Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),
             Self::Secrets(error) => error.recovery(),
@@ -378,25 +378,25 @@ impl ErrorId for DecideError {
             Self::ImageRead { .. } => Some("pass an image file that exists and can be read"),
             Self::ImageFormat { .. } => Some("pass a .png, .jpg or .jpeg image"),
             Self::Encode { .. } => {
-                Some("report this as a bug: decide's output always encodes as JSON")
+                Some("report this as a bug: decidr's output always encodes as JSON")
             }
             Self::Write { .. } => {
-                Some("keep stdout open until decide exits (a closed pipe stops the batch)")
+                Some("keep stdout open until decidr exits (a closed pipe stops the batch)")
             }
             Self::Signal { .. } => {
-                Some("run decide in a process with no other interrupt handler installed")
+                Some("run decidr in a process with no other interrupt handler installed")
             }
         }
     }
 }
 
-impl fmt::Display for DecideError {
+impl fmt::Display for DecidrError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}: {}", self.id(), self.message())
     }
 }
 
-impl Error for DecideError {
+impl Error for DecidrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Usage { source } => Some(&**source),
@@ -429,29 +429,29 @@ mod tests {
     use super::*;
     use sc_agent_types::ShortName;
 
-    fn samples() -> Vec<DecideError> {
+    fn samples() -> Vec<DecidrError> {
         let io = || std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
         vec![
-            DecideError::NoProviderKey {
+            DecidrError::NoProviderKey {
                 model: ModelSelector::Short(ShortName::Jev),
                 tried: vec![Provider::TypeSafe],
             },
-            DecideError::from(sc_agent_types::TypesError::UnknownProvider { text: "x".into() }),
-            DecideError::LimitExceeded {
+            DecidrError::from(sc_agent_types::TypesError::UnknownProvider { text: "x".into() }),
+            DecidrError::LimitExceeded {
                 what: LimitKind::RequestBytes,
                 line: Some(3),
                 max: 8,
             },
-            DecideError::InputRead {
+            DecidrError::InputRead {
                 input: "f".into(),
                 source: io(),
             },
-            DecideError::Write { source: io() },
-            DecideError::from(sc_decision_schema::DecisionError::Limits {
+            DecidrError::Write { source: io() },
+            DecidrError::from(sc_decision_schema::DecisionError::Limits {
                 what: sc_decision_schema::LimitKind::Images,
                 max: 20,
             }),
-            DecideError::from(sc_agent_secrets::SecretsError::KeyMissing { var: "V".into() }),
+            DecidrError::from(sc_agent_secrets::SecretsError::KeyMissing { var: "V".into() }),
         ]
     }
 
@@ -482,13 +482,13 @@ mod tests {
             max: 20,
         };
         let expected = limits.recovery();
-        assert_eq!(DecideError::from(limits).recovery(), expected);
+        assert_eq!(DecidrError::from(limits).recovery(), expected);
     }
 
     /// RBP-F002: io sources are kept, with their kind, through `source()` and `cause_detail()`.
     #[test]
     fn io_sources_are_kept() {
-        let error = DecideError::Write {
+        let error = DecidrError::Write {
             source: std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe closed"),
         };
         let source = error.source().expect("source");
@@ -500,23 +500,23 @@ mod tests {
         assert!(!error.message().contains("BrokenPipe"), "no Debug strings");
     }
 
-    /// RBP-F009: the boxed sources keep `DecideError` small.
+    /// RBP-F009: the boxed sources keep `DecidrError` small.
     #[test]
     fn decide_error_stays_small() {
         assert!(
-            std::mem::size_of::<DecideError>() <= 64,
-            "DecideError is {} bytes",
-            std::mem::size_of::<DecideError>()
+            std::mem::size_of::<DecidrError>() <= 64,
+            "DecidrError is {} bytes",
+            std::mem::size_of::<DecidrError>()
         );
     }
 
     #[test]
     fn no_provider_key_has_a_recovery() {
-        let error = DecideError::NoProviderKey {
+        let error = DecidrError::NoProviderKey {
             model: ModelSelector::Short(ShortName::Jev),
             tried: vec![Provider::TypeSafe],
         };
-        assert_eq!(error.id(), "decide.no_provider_key");
+        assert_eq!(error.id(), "decidr.no_provider_key");
         assert!(
             error
                 .recovery()

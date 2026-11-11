@@ -1,4 +1,4 @@
-//! The TypeSafe API examples through decide's library and the real runner (REQ-SAG-0501).
+//! The TypeSafe API examples through decidr's library and the real runner (REQ-SAG-0501).
 
 mod common;
 
@@ -8,8 +8,8 @@ mod tests {
     use std::sync::Arc;
 
     use crate::common::send;
-    use decide::input::{build_request, read_batch};
-    use decide::{ModelsOptions, models, send_batch};
+    use decidr::input::{build_request, read_batch};
+    use decidr::{ModelsOptions, models, send_batch};
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_types::CancelToken;
@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(names, sent);
     }
 
-    /// AC: REQ-SAG-0501 AC1. Each example request goes through `decide::send` (real runner,
+    /// AC: REQ-SAG-0501 AC1. Each example request goes through `decidr::send` (real runner,
     /// SystemOneBackend), reaches the transport unchanged, and returns the API's response.
     #[test]
     fn every_typesafe_request_example_returns_the_api_response() {
@@ -100,7 +100,7 @@ mod tests {
             );
             assert_eq!(sent[0].body(), request_text.as_bytes(), "{request_name}");
             assert!(sent[0].secret().is_some(), "the TypeSafe key is attached");
-            let printed = decide::output::result_line(&result).expect("line");
+            let printed = decidr::output::result_line(&result).expect("line");
             let printed: serde_json::Value = serde_json::from_slice(&printed).expect("json line");
             assert_eq!(
                 printed["response"],
@@ -261,7 +261,7 @@ mod tests {
         );
     }
 
-    /// AC: REQ-SAG-0501 AC2. `decide models` returns the TypeSafe models list.
+    /// AC: REQ-SAG-0501 AC2. `decidr models` returns the TypeSafe models list.
     #[test]
     fn models_returns_the_typesafe_models_list() {
         let list_text = fixture("models");
@@ -319,6 +319,6 @@ mod tests {
             context: context(dir.path(), &[], Arc::new(transport.clone()), &log),
         };
         let error = models(&unknown, &CancelToken::new()).expect_err("unknown runner");
-        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.unknown_runner");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.unknown_runner");
     }
 }

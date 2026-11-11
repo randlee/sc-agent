@@ -128,7 +128,7 @@ impl Timeouts {
         Ok(self)
     }
 
-    /// Connect 5 s, request 10 s: discovery, `decide models`, `decide doctor`
+    /// Connect 5 s, request 10 s: discovery, `decidr models`, `decidr doctor`
     /// and health probes.
     #[must_use]
     pub const fn probe() -> Self {

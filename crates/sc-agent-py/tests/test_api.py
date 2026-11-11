@@ -1,7 +1,7 @@
 """The sc-agent Python API over the maturin build, against a loopback runner.
 
 Each call passes `config_dir=` (a tempdir whose default.json names the loopback runner `dec`
-and sets the log root); the one `decide` CLI child gets the same directory as `--config-dir`.
+and sets the log root); the one `decidr` CLI child gets the same directory as `--config-dir`.
 No environment variable, HOME or USERPROFILE is set anywhere. No test reaches an
 external network. Each test names the acceptance line it proves.
 Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
@@ -51,16 +51,16 @@ def error_of(info: pytest.ExceptionInfo) -> tuple[str, dict]:
     return ident, json.loads(detail)
 
 
-def test_every_decide_operation_has_its_python_function(decide_bin):
+def test_every_decidr_operation_has_its_python_function(decidr_bin):
     """AC: ANC-006."""
     text = subprocess.run(
-        [decide_bin, "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     commands = re.findall(r"^\s{2}(\w+)\s", text.split("Commands:")[1].split("Options:")[0], re.M)
     commands = [name for name in commands if name != "help"]
     assert sorted(commands) == ["doctor", "models", "send"]
     batch = subprocess.run(
-        [decide_bin, "send", "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "send", "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     assert "--batch" in batch
     operations = {"send": "send", "models": "models", "doctor": "doctor", "send --batch": "send_batch"}
@@ -110,7 +110,7 @@ def test_an_invalid_project_is_refused(env, args):
     with pytest.raises(sc_agent.SagError) as info:
         sc_agent.send(NOUL, **{**args, "project": "Phase B"})
     ident, detail = error_of(info)
-    assert ident == "decide.log"
+    assert ident == "decidr.log"
     assert detail["cause"]["id"] == "log.invalid_slug"
     assert loopback.requests == []
     assert session_files(log_root) == []
@@ -123,14 +123,14 @@ def assert_lowest_503(error: dict) -> None:
     assert error["message"] == "the API answered HTTP 503: " + json.dumps(FIXED_ERROR), error
 
 
-def test_cli_and_python_rows_carry_the_same_identity(env, decide_bin, tmp_path, args, config_dir):
+def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, args, config_dir):
     """AC: REQ-SAG-0004 AC3."""
     loopback, log_root = env
     request = tmp_path / "request.json"
     request.write_text(NOUL)
     child = subprocess.run(
         [
-            decide_bin,
+            decidr_bin,
             "--config-dir",
             str(config_dir),
             "send",
@@ -164,7 +164,7 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
     records: list[dict] = []
     rows: list[dict] = []
     sc_agent.send(NOUL, general_log=records.append, session_log=rows.append, **args)
-    assert "decide.send" in [record["action"] for record in records]
+    assert "decidr.send" in [record["action"] for record in records]
     assert "http.send" in [record["action"] for record in records]
     assert len(rows) == 1 and rows[0]["action"] == "session.row"
     assert list(rows[0]["fields"])[:4] == ["session_id", "repo", "project", "agent_role"]
@@ -175,7 +175,7 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
         sc_agent.models(runner="dec", general_log=models.append, config_dir=args["config_dir"])
     )
     assert listed["models"][0]["name"] == "jev-latest"
-    assert "decide.models" in [record["action"] for record in models]
+    assert "decidr.models" in [record["action"] for record in models]
 
 
 def test_only_a_session_log_callable_keeps_the_default_general_log(env, args):
@@ -186,7 +186,7 @@ def test_only_a_session_log_callable_keeps_the_default_general_log(env, args):
     assert len(rows) == 1
     general = log_root / "logs" / "sc-agent-py.log.jsonl"
     assert general.exists()
-    assert "decide.send" in general.read_text()
+    assert "decidr.send" in general.read_text()
     assert session_files(log_root) == []
 
 
@@ -195,7 +195,7 @@ def test_only_a_general_log_callable_keeps_the_default_session_log(env, args):
     _loopback, log_root = env
     records: list[dict] = []
     sc_agent.send(NOUL, general_log=records.append, **args)
-    assert "decide.send" in [record["action"] for record in records]
+    assert "decidr.send" in [record["action"] for record in records]
     files = session_files(log_root)
     assert len(files) == 1
     assert files[0].parts[-3:] == ("role", "proj", "sessions.jsonl")
@@ -297,9 +297,9 @@ def test_input_limits_raise_before_any_send(env, args):
     with pytest.raises(sc_agent.SagError) as info:
         sc_agent.send_batch([NOUL] * 10_001, **args)
     ident, detail = error_of(info)
-    assert ident == "decide.limit_exceeded" and "batch_lines" in detail["message"]
+    assert ident == "decidr.limit_exceeded" and "batch_lines" in detail["message"]
     with pytest.raises(sc_agent.SagError) as info:
         sc_agent.send(" " * (9 * 1024 * 1024), **args)
     ident, detail = error_of(info)
-    assert ident == "decide.limit_exceeded" and "request_bytes" in detail["message"]
+    assert ident == "decidr.limit_exceeded" and "request_bytes" in detail["message"]
     assert loopback.requests == []

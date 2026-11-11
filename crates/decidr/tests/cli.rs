@@ -1,4 +1,4 @@
-//! The `decide` binary as a process: help, slug refusal, interrupts, broken stdout and the
+//! The `decidr` binary as a process: help, slug refusal, interrupts, broken stdout and the
 //! fail-fast batch, against a loopback runner (no external network).
 //!
 //! Each child gets a cleared environment (only PATH) and `--config-dir <tempdir>/.sc-agent`,
@@ -14,14 +14,14 @@ mod common;
 #[cfg(test)]
 #[test]
 fn help_lists_send_models_and_doctor() {
-    let decide = env!("CARGO_BIN_EXE_decide");
-    let output = common::run_bounded(std::process::Command::new(decide).arg("--help"));
+    let decidr = env!("CARGO_BIN_EXE_decidr");
+    let output = common::run_bounded(std::process::Command::new(decidr).arg("--help"));
     assert!(output.status.success());
     let text = String::from_utf8_lossy(&output.stdout);
     for command in ["send", "models", "doctor"] {
         assert!(text.contains(command), "{text}");
     }
-    let output = common::run_bounded(std::process::Command::new(decide).args(["send", "--help"]));
+    let output = common::run_bounded(std::process::Command::new(decidr).args(["send", "--help"]));
     assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
 }
 
@@ -39,7 +39,7 @@ mod tests {
 
     use crate::common::{HANG_GUARD, NOUL, NOUL_RESPONSE, finish, run_bounded};
 
-    const DECIDE: &str = env!("CARGO_BIN_EXE_decide");
+    const DECIDR: &str = env!("CARGO_BIN_EXE_decidr");
 
     /// What the loopback daemon does with `POST /v1/systemone`.
     #[derive(Clone)]
@@ -144,8 +144,8 @@ mod tests {
         home
     }
 
-    fn decide(home: &Path, args: &[&str]) -> Command {
-        let mut command = Command::new(DECIDE);
+    fn decidr(home: &Path, args: &[&str]) -> Command {
+        let mut command = Command::new(DECIDR);
         command
             .arg("--config-dir")
             .arg(home.join(".sc-agent"))
@@ -191,14 +191,14 @@ mod tests {
         serde_json::from_str(text.lines().last().expect("one stderr line")).expect("stderr json")
     }
 
-    /// AC: REQ-SAG-0004. `--project "Phase B"` is `decide.log` (cause `log.invalid_slug`);
+    /// AC: REQ-SAG-0004. `--project "Phase B"` is `decidr.log` (cause `log.invalid_slug`);
     /// nothing is sent and no row is written.
     #[test]
     fn an_invalid_slug_is_refused_before_anything_is_sent() {
         let (runner, sends) = loopback(Mode::Answer);
         let home = home(runner.port());
         let file = batch_file(home.path(), 1);
-        let output = run_bounded(&mut decide(
+        let output = run_bounded(&mut decidr(
             home.path(),
             &[
                 "send",
@@ -213,14 +213,14 @@ mod tests {
         ));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
-        assert_eq!(detail["id"], "decide.log");
+        assert_eq!(detail["id"], "decidr.log");
         assert_eq!(detail["cause"]["id"], "log.invalid_slug");
         assert!(output.stdout.is_empty());
         assert!(sends.try_recv().is_err(), "nothing was sent");
         assert_eq!(rows(home.path()), 0);
     }
 
-    /// AC: REQ-SAG-0504, end to end: a bad line stops decide before the runner is contacted.
+    /// AC: REQ-SAG-0504, end to end: a bad line stops decidr before the runner is contacted.
     #[test]
     fn a_bad_batch_line_contacts_no_runner() {
         let runner = serve_each(|_| {});
@@ -228,7 +228,7 @@ mod tests {
         let path = home.path().join("bad.jsonl");
         let bad = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"score"}}}"#;
         std::fs::write(&path, format!("{NOUL}\n{bad}\n{NOUL}\n")).expect("batch");
-        let output = run_bounded(&mut decide(
+        let output = run_bounded(&mut decidr(
             home.path(),
             &[
                 "send",
@@ -244,7 +244,7 @@ mod tests {
         ));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
-        assert_eq!(detail["id"], "decide.request_invalid");
+        assert_eq!(detail["id"], "decidr.request_invalid");
         assert!(
             detail["message"]
                 .as_str()
@@ -254,14 +254,14 @@ mod tests {
         assert!(output.stdout.is_empty());
     }
 
-    /// AC: decide send, REQ-SAG-0701 output. A batch against the loopback runner prints one
+    /// AC: decidr send, REQ-SAG-0701 output. A batch against the loopback runner prints one
     /// JSONL line per request with its ULID and position; exit 0.
     #[test]
     fn a_batch_prints_one_line_per_request() {
         let (runner, _sends) = loopback(Mode::Answer);
         let home = home(runner.port());
         let file = batch_file(home.path(), 3);
-        let output = run_bounded(&mut decide(
+        let output = run_bounded(&mut decidr(
             home.path(),
             &[
                 "send",
@@ -303,14 +303,14 @@ mod tests {
             home.path()
                 .join(".sc-agent")
                 .join("logs")
-                .join("decide.log.jsonl")
+                .join("decidr.log.jsonl")
                 .exists()
         );
     }
 
-    /// AC: REQ-SAG-0701 output. A closed stdout makes decide cancel and report `decide.write`.
+    /// AC: REQ-SAG-0701 output. A closed stdout makes decidr cancel and report `decidr.write`.
     ///
-    /// Ordered: the runner answers only after the test has closed decide's stdout (and seen
+    /// Ordered: the runner answers only after the test has closed decidr's stdout (and seen
     /// the send arrive), so the first write always meets a closed pipe.
     #[test]
     fn a_closed_stdout_is_decide_write() {
@@ -320,7 +320,7 @@ mod tests {
         let home = home(runner.port());
         let file = batch_file(home.path(), 3);
         let mut child = ChildGuard::spawn(
-            decide(
+            decidr(
                 home.path(),
                 &[
                     "send",
@@ -342,10 +342,10 @@ mod tests {
         opener.open();
         let output = finish(child);
         assert_eq!(output.status.code(), Some(1));
-        assert_eq!(stderr_detail(&output)["id"], "decide.write");
+        assert_eq!(stderr_detail(&output)["id"], "decidr.write");
     }
 
-    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
+    /// AC: REQ-SAG-0011 decidr, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
     /// runner that never answers: every printed line is `decision.cancelled`, one session
     /// row per started request is on disk, exit 130 both times.
     #[test]
@@ -355,7 +355,7 @@ mod tests {
             let home = home(runner.port());
             let file = batch_file(home.path(), 3);
             let child = ChildGuard::spawn(
-                decide(
+                decidr(
                     home.path(),
                     &[
                         "send",
@@ -406,11 +406,11 @@ mod tests {
         }
     }
 
-    /// AC: REQ-SAG-0011 decide (RSH-001). SIGTERM while decide blocks reading its input exits
+    /// AC: REQ-SAG-0011 decidr (RSH-001). SIGTERM while decidr blocks reading its input exits
     /// 130 at once, with nothing printed or sent.
     ///
     /// Synchronised without a sleep: the batch input is a FIFO, so the test's open of its write
-    /// end returns only once decide (past `signal::install`, the first thing `main` does, and
+    /// end returns only once decidr (past `signal::install`, the first thing `main` does, and
     /// past loading its configuration) has opened it to read. Decide then blocks reading it;
     /// the test keeps it open and never writes.
     #[test]
@@ -421,7 +421,7 @@ mod tests {
         let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
         assert!(made.success());
         let child = ChildGuard::spawn(
-            decide(
+            decidr(
                 home.path(),
                 &[
                     "send",
@@ -439,7 +439,7 @@ mod tests {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
         );
-        // Opening the FIFO's write end blocks until decide opens it to read; bounded.
+        // Opening the FIFO's write end blocks until decidr opens it to read; bounded.
         let (opened, writer) = mpsc::channel();
         {
             let fifo = fifo.clone();
@@ -447,7 +447,7 @@ mod tests {
                 let _ = opened.send(std::fs::OpenOptions::new().write(true).open(&fifo));
             });
         }
-        let held = recv_within(&writer, HANG_GUARD).expect("decide opened its input");
+        let held = recv_within(&writer, HANG_GUARD).expect("decidr opened its input");
         let status = Command::new("kill")
             .args(["-TERM", &child.id().to_string()])
             .status()
@@ -466,7 +466,7 @@ mod tests {
     }
 
     /// RSH-002: a `default.json` that is a FIFO is refused from its metadata
-    /// (`config.not_a_file`), never opened, so decide cannot block on it: it exits 1 at once.
+    /// (`config.not_a_file`), never opened, so decidr cannot block on it: it exits 1 at once.
     #[test]
     fn a_fifo_config_file_is_refused_without_blocking() {
         let home = tempfile::tempdir().expect("home");
@@ -477,10 +477,10 @@ mod tests {
             .status()
             .expect("mkfifo");
         assert!(made.success());
-        let output = run_bounded(&mut decide(home.path(), &["models"]));
+        let output = run_bounded(&mut decidr(home.path(), &["models"]));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
-        assert_eq!(detail["id"], "decide.config");
+        assert_eq!(detail["id"], "decidr.config");
         assert_eq!(detail["cause"]["id"], "config.not_a_file");
     }
 }

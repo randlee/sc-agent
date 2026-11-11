@@ -40,7 +40,7 @@
 //! let root = tempfile::tempdir()?;
 //! let repo = Repo::local("m5", "work")?;
 //! let identity = SessionIdentity::new(repo, "phase-b", "sanity")?;
-//! let loggers = Loggers::open(root.path(), "decide", identity, None, None)?;
+//! let loggers = Loggers::open(root.path(), "decidr", identity, None, None)?;
 //! loggers.session.write(SessionId::new(), serde_json::Map::new())?;
 //! loggers.session.flush()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())

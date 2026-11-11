@@ -64,7 +64,7 @@ impl KeySource {
     }
 }
 
-/// A key and the source that supplied it (`decide doctor` lists the source).
+/// A key and the source that supplied it (`decidr doctor` lists the source).
 #[derive(Debug, Clone)]
 pub struct ResolvedKey {
     /// The sealed key.

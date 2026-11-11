@@ -1,17 +1,17 @@
-//! The `decide` command line: argument parsing only (the behaviour is in the library).
+//! The `decidr` command line: argument parsing only (the behaviour is in the library).
 
 use std::path::PathBuf;
 
 use clap::Parser;
 use clap::error::ErrorKind;
-use decide::DecideError;
+use decidr::DecidrError;
 use sc_agent_config::RunnerName;
 
-/// `decide`: send TypeSafe (Jev) decision requests.
+/// `decidr`: send TypeSafe (Jev) decision requests.
 #[derive(Debug, clap::Parser)]
 #[command(
-    name = "decide",
-    bin_name = "decide",
+    name = "decidr",
+    bin_name = "decidr",
     version,
     about = "Send TypeSafe (Jev) decision requests."
 )]
@@ -34,7 +34,7 @@ pub(crate) enum Command {
     Doctor,
 }
 
-/// `decide send`.
+/// `decidr send`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct SendArgs {
     /// Optional override (typesafe, anthropic, openai, openrouter, nous, together). Absent: chosen by ranking among detected keys (REQ-SAG-0103).
@@ -63,7 +63,7 @@ pub(crate) struct SendArgs {
     pub(crate) input: String,
 }
 
-/// `decide models`.
+/// `decidr models`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct ModelsArgs {
     /// A configured local runner; TypeSafe when absent.
@@ -84,8 +84,8 @@ pub(crate) enum Parsed {
 ///
 /// # Errors
 ///
-/// [`DecideError::Usage`] for every clap error other than the help and version displays.
-pub(crate) fn parse<I, T>(args: I) -> Result<Parsed, DecideError>
+/// [`DecidrError::Usage`] for every clap error other than the help and version displays.
+pub(crate) fn parse<I, T>(args: I) -> Result<Parsed, DecidrError>
 where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,
@@ -100,14 +100,14 @@ where
         {
             Ok(Parsed::Print(error.render().to_string()))
         }
-        Err(error) => Err(DecideError::from(error)),
+        Err(error) => Err(DecidrError::from(error)),
     }
 }
 
 /// A runner name, parsed once at the edge (`RunnerName`: non-empty, not a short name).
 fn parse_runner_name(value: &str) -> Result<RunnerName, String> {
     RunnerName::try_from(value.to_owned())
-        .map_err(|reason| format!("{reason}: {value:?}. See decide --help."))
+        .map_err(|reason| format!("{reason}: {value:?}. See decidr --help."))
 }
 
 fn non_empty_path(value: &str) -> Result<PathBuf, String> {
@@ -116,7 +116,7 @@ fn non_empty_path(value: &str) -> Result<PathBuf, String> {
 
 fn non_empty_text(value: &str) -> Result<String, String> {
     if value.is_empty() {
-        Err("a flag value must not be empty. See decide --help.".to_owned())
+        Err("a flag value must not be empty. See decidr --help.".to_owned())
     } else {
         Ok(value.to_owned())
     }
@@ -129,7 +129,7 @@ fn parse_image_arg(value: &str) -> Result<(String, PathBuf), String> {
             Ok((name.to_owned(), PathBuf::from(file)))
         }
         _ => Err(format!(
-            "--image takes NAME=FILE with both sides non-empty, got {value:?}. See decide --help."
+            "--image takes NAME=FILE with both sides non-empty, got {value:?}. See decidr --help."
         )),
     }
 }
@@ -147,9 +147,9 @@ mod tests {
     /// AC: REQ-SAG-0004 (no --agent-name flag; project and agent role required).
     #[test]
     fn there_is_no_agent_name_flag_and_both_slugs_are_required() {
-        let base = ["decide", "send", "--model", "jev", "--project", "p"];
+        let base = ["decidr", "send", "--model", "jev", "--project", "p"];
         let error = parse(base.iter().chain(&["--agent-name", "x"])).expect_err("no flag");
-        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.usage");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.usage");
         assert!(parse(base).is_err(), "--agent-role is required");
         let parsed = parse(base.iter().chain(&["--agent-role", "r"])).expect("parses");
         assert!(matches!(parsed, Parsed::Run(_)));
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn images_conflict_with_batch_and_need_name_and_file() {
         let base = [
-            "decide",
+            "decidr",
             "send",
             "--model",
             "jev",
@@ -187,11 +187,11 @@ mod tests {
     #[test]
     fn config_dir_is_a_global_flag() {
         for args in [
-            &["decide", "--config-dir", "/c", "doctor"][..],
-            &["decide", "doctor", "--config-dir", "/c"],
-            &["decide", "models", "--config-dir", "/c"],
+            &["decidr", "--config-dir", "/c", "doctor"][..],
+            &["decidr", "doctor", "--config-dir", "/c"],
+            &["decidr", "models", "--config-dir", "/c"],
             &[
-                "decide",
+                "decidr",
                 "send",
                 "--model",
                 "jev",
@@ -208,6 +208,6 @@ mod tests {
             };
             assert_eq!(cli.config_dir, Some(PathBuf::from("/c")), "{args:?}");
         }
-        assert!(parse(["decide", "--config-dir", "", "doctor"]).is_err());
+        assert!(parse(["decidr", "--config-dir", "", "doctor"]).is_err());
     }
 }

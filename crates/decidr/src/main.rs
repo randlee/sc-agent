@@ -1,6 +1,6 @@
-//! The `decide` binary: argv -> `decide::{send, send_batch, models, doctor}` -> stdout.
+//! The `decidr` binary: argv -> `decidr::{send, send_batch, models, doctor}` -> stdout.
 //!
-//! Argument parsing and output only; all behaviour lives in the decide library. Exit codes:
+//! Argument parsing and output only; all behaviour lives in the decidr library. Exit codes:
 //! 0 when the command ran and every result succeeded, 1 otherwise, 130 after an interrupt
 //! (REQ-SAG-0011).
 //!
@@ -8,7 +8,7 @@
 //! it returns; once the general logger has opened, an interrupt takes that close path (the
 //! third interrupt exits at once). Worker threads of the runner are never joined, so the last logger handle may
 //! outlive `main`; the explicit close is the flush barrier that puts every record and row on
-//! disk. A close failure (lost rows) is reported as one `decide.log` line on stderr and does
+//! disk. A close failure (lost rows) is reported as one `decidr.log` line on stderr and does
 //! not change the exit code.
 
 #![forbid(unsafe_code)]
@@ -19,10 +19,10 @@ use std::io::{self, BufReader, Read, Write};
 use std::process::ExitCode;
 
 use cli::{Command, Parsed, SendArgs};
-use decide::input::{build_request, read_batch, request_bytes};
-use decide::signal::{EXIT_INTERRUPTED, SignalWatch};
-use decide::{
-    Context, DecideError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, doctor,
+use decidr::input::{build_request, read_batch, request_bytes};
+use decidr::signal::{EXIT_INTERRUPTED, SignalWatch};
+use decidr::{
+    Context, DecidrError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, doctor,
     general_logger, load_config, models, send, send_batch, session_logger,
 };
 use sc_agent_log::{GeneralLogger, LogError, Slug};
@@ -30,11 +30,11 @@ use sc_agent_types::{CancelToken, ErrorId, Provider};
 use sc_decision_schema::{DecisionRequest, DecisionResult};
 
 /// The general-log service of the binary.
-const SERVICE: &str = "decide";
+const SERVICE: &str = "decidr";
 
 fn main() -> ExitCode {
     let cancel = CancelToken::new();
-    let watch = match decide::signal::install(&cancel) {
+    let watch = match decidr::signal::install(&cancel) {
         Ok(watch) => watch,
         Err(error) => return emit(&error),
     };
@@ -61,7 +61,7 @@ fn run(
     watch: &SignalWatch,
     stdin: &mut dyn Read,
     stdout: &mut dyn Write,
-) -> Result<ExitCode, DecideError> {
+) -> Result<ExitCode, DecidrError> {
     let cli = match parsed {
         Parsed::Print(text) => return Ok(print_stdout(text.as_bytes())),
         Parsed::Run(cli) => cli,
@@ -97,7 +97,7 @@ fn run(
     }
 }
 
-/// What `decide send` read: one request or a batch.
+/// What `decidr send` read: one request or a batch.
 enum Input {
     One(Box<DecisionRequest>),
     Batch(Vec<DecisionRequest>),
@@ -110,7 +110,7 @@ fn run_send(
     watch: &SignalWatch,
     stdin: &mut dyn Read,
     stdout: &mut dyn Write,
-) -> Result<ExitCode, DecideError> {
+) -> Result<ExitCode, DecidrError> {
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
     let project = Slug::new("project", &args.project)?;
     let agent_role = Slug::new("agent_role", &args.agent_role)?;
@@ -128,7 +128,7 @@ fn run_send(
             read_batch(&mut BufReader::new(stdin))?
         } else {
             let file = std::fs::File::open(&args.input)
-                .map_err(|error| DecideError::input(&args.input, error))?;
+                .map_err(|error| DecidrError::input(&args.input, error))?;
             read_batch(&mut BufReader::new(file))?
         })
     } else {
@@ -197,7 +197,7 @@ fn base_context(config_dir: Option<std::path::PathBuf>) -> Context {
 /// The binary's context with its general logger opened (and kept, to close it later).
 fn context_with_general(
     config_dir: Option<std::path::PathBuf>,
-) -> Result<(Context, GeneralLogger), DecideError> {
+) -> Result<(Context, GeneralLogger), DecidrError> {
     let mut context = base_context(config_dir);
     let general = general_logger(&context)?;
     context.general = Some(general.clone());
@@ -208,11 +208,11 @@ fn close_general(general: GeneralLogger) {
     report_close(general.close());
 }
 
-/// One `decide.log` stderr line for a logger that lost rows or could not be flushed; the
+/// One `decidr.log` stderr line for a logger that lost rows or could not be flushed; the
 /// exit code is not changed.
 fn report_close(closed: Result<(), LogError>) {
     if let Err(error) = closed {
-        report(&DecideError::from(error));
+        report(&DecidrError::from(error));
     }
 }
 
@@ -225,43 +225,43 @@ fn exit(success: bool) -> ExitCode {
 }
 
 /// One result line plus `\n`, flushed so a batch prints each result as it arrives.
-fn write_result(stdout: &mut dyn Write, result: &DecisionResult) -> Result<(), DecideError> {
-    let mut line = decide::output::result_line(result)?;
+fn write_result(stdout: &mut dyn Write, result: &DecisionResult) -> Result<(), DecidrError> {
+    let mut line = decidr::output::result_line(result)?;
     line.push(b'\n');
     write_bytes(stdout, &line)
 }
 
-fn write_json<T: serde::Serialize>(stdout: &mut dyn Write, value: &T) -> Result<(), DecideError> {
-    let mut text = decide::output::to_json(value)?;
+fn write_json<T: serde::Serialize>(stdout: &mut dyn Write, value: &T) -> Result<(), DecidrError> {
+    let mut text = decidr::output::to_json(value)?;
     text.push('\n');
     write_bytes(stdout, text.as_bytes())
 }
 
-fn write_bytes(stdout: &mut dyn Write, bytes: &[u8]) -> Result<(), DecideError> {
+fn write_bytes(stdout: &mut dyn Write, bytes: &[u8]) -> Result<(), DecidrError> {
     stdout
         .write_all(bytes)
         .and_then(|()| stdout.flush())
-        .map_err(|source| DecideError::Write { source })
+        .map_err(|source| DecidrError::Write { source })
 }
 
 fn print_stdout(bytes: &[u8]) -> ExitCode {
     match io::stdout().write_all(bytes) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(source) => emit(&DecideError::Write { source }),
+        Err(source) => emit(&DecidrError::Write { source }),
     }
 }
 
 /// One stderr line: `error.detail()` as JSON (`recovery` included when present).
-fn report(error: &DecideError) {
+fn report(error: &DecidrError) {
     let line = serde_json::to_string(&error.detail()).unwrap_or_else(|_| {
-        r#"{"id":"decide.encode","message":"the error could not be encoded as JSON"}"#.to_owned()
+        r#"{"id":"decidr.encode","message":"the error could not be encoded as JSON"}"#.to_owned()
     });
     // Best effort: a closed stderr leaves nowhere to report the failure.
     let _ = writeln!(io::stderr(), "{line}");
 }
 
 /// [`report`], then exit 1.
-fn emit(error: &DecideError) -> ExitCode {
+fn emit(error: &DecidrError) -> ExitCode {
     report(error);
     ExitCode::FAILURE
 }

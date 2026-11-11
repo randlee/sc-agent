@@ -1,4 +1,4 @@
-//! General and session logs (REQ-SAG-0003, ADR-SAG-0002, ANC-007) and `decide doctor`
+//! General and session logs (REQ-SAG-0003, ADR-SAG-0002, ANC-007) and `decidr doctor`
 //! (REQ-SAG-0503).
 
 mod common;
@@ -10,7 +10,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::common::send;
-    use decide::{Context, DoctorOptions, ModelsOptions, doctor, models};
+    use decidr::{Context, DoctorOptions, ModelsOptions, doctor, models};
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::Repo;
     use sc_agent_log::testing::MemoryLog;
@@ -34,7 +34,7 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0003, ADR-SAG-0002. With no injected loggers, a send writes
-    /// `<log_root>/logs/decide.log.jsonl` and its session row under
+    /// `<log_root>/logs/decidr.log.jsonl` and its session row under
     /// `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, identity fields first.
     #[test]
     fn default_logs_are_written_under_the_log_root() {
@@ -55,9 +55,9 @@ mod tests {
         assert!(result.outcome.is_ok());
         drop(options);
 
-        let general = root.path().join("logs").join("decide.log.jsonl");
+        let general = root.path().join("logs").join("decidr.log.jsonl");
         let text = std::fs::read_to_string(&general).expect("general log");
-        assert!(text.contains("decide.send"), "{text}");
+        assert!(text.contains("decidr.send"), "{text}");
 
         let repo = Repo::detect(&std::env::current_dir().expect("cwd")).expect("repo");
         let mut rows = Vec::new();
@@ -111,7 +111,7 @@ mod tests {
             })
         };
         let mut count = 0;
-        decide::send_batch(&options, vec![request(NOUL)], &cancel, &mut |_| {
+        decidr::send_batch(&options, vec![request(NOUL)], &cancel, &mut |_| {
             count += 1;
             Ok(())
         })
@@ -120,9 +120,9 @@ mod tests {
         drop(options);
         assert_eq!(count, 1);
         // The blocked worker still holds the runner's logger handles here.
-        let general = std::fs::read_to_string(root.path().join("logs").join("decide.log.jsonl"))
+        let general = std::fs::read_to_string(root.path().join("logs").join("decidr.log.jsonl"))
             .expect("the general log exists when send_batch returns");
-        assert!(general.contains("decide.send"), "{general}");
+        assert!(general.contains("decidr.send"), "{general}");
         let mut rows = Vec::new();
         find(root.path(), "sessions.jsonl", &mut rows);
         assert_eq!(rows.len(), 1);
@@ -132,7 +132,7 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0002 (QA-006). A single send whose session log cannot be flushed still
-    /// hands out its completed result, then returns `decide.runner`.
+    /// hands out its completed result, then returns `decidr.runner`.
     #[test]
     fn a_session_flush_failure_keeps_the_result() {
         let log = MemoryLog::new().expect("log");
@@ -155,7 +155,7 @@ mod tests {
                 .is_err()
         );
         let mut delivered = None;
-        let error = decide::send(
+        let error = decidr::send(
             &options,
             request(NOUL),
             &CancelToken::new(),
@@ -165,13 +165,13 @@ mod tests {
             },
         )
         .expect_err("the flush reports the lost row");
-        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.runner");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.runner");
         let result = delivered.expect("the result was handed out first");
         assert!(result.outcome.is_ok());
     }
 
     /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `log_root` configured (a tempdir), the
-    /// general log lands at `<log_root>/logs/decide.log.jsonl` and the session log under
+    /// general log lands at `<log_root>/logs/decidr.log.jsonl` and the session log under
     /// `<log_root>/logs/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
     /// (`<home>/.sc-agent`) is sc-agent-config's `default_dir`, tested there.
     #[test]
@@ -193,7 +193,7 @@ mod tests {
         drop(options);
         let logs = root.path().join("logs");
         assert!(
-            logs.join("decide.log.jsonl").is_file(),
+            logs.join("decidr.log.jsonl").is_file(),
             "general log under logs/"
         );
         let mut rows = Vec::new();
@@ -206,8 +206,8 @@ mod tests {
         );
     }
 
-    /// AC: ANC-007. One send, models and doctor write `decide.send`, `decide.models` and
-    /// `decide.doctor` to the injected general log, with `http.send` from the shared client;
+    /// AC: ANC-007. One send, models and doctor write `decidr.send`, `decidr.models` and
+    /// `decidr.doctor` to the injected general log, with `http.send` from the shared client;
     /// no record holds a key value.
     #[test]
     fn every_operation_writes_its_record_and_no_key() {
@@ -244,9 +244,9 @@ mod tests {
             .map(|record| record.action.as_str())
             .collect();
         for action in [
-            "decide.send",
-            "decide.models",
-            "decide.doctor",
+            "decidr.send",
+            "decidr.models",
+            "decidr.doctor",
             "http.send",
             "session.row",
         ] {
@@ -258,7 +258,7 @@ mod tests {
         }
         let send_record = records
             .iter()
-            .find(|record| record.action == "decide.send")
+            .find(|record| record.action == "decidr.send")
             .expect("send");
         for field in [
             "service",
@@ -271,7 +271,7 @@ mod tests {
         ] {
             assert!(
                 send_record.fields.contains_key(field),
-                "decide.send lacks {field}"
+                "decidr.send lacks {field}"
             );
         }
         assert_eq!(send_record.fields["provider"], "typesafe");
@@ -287,7 +287,7 @@ mod tests {
             ANTHROPIC_KEY.to_owned(),
         );
         Context {
-            service: "decide",
+            service: "decidr",
             config_dir: Some(dir.to_path_buf()),
             repo_root: Some(dir.to_path_buf()),
             environment: Some(environment(&[(

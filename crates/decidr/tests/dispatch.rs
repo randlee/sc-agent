@@ -10,9 +10,9 @@ mod tests {
     use std::sync::{Arc, Mutex, mpsc};
 
     use crate::common::send;
-    use decide::input::{build_request, read_batch, request_bytes};
-    use decide::output::result_line;
-    use decide::{DecideError, send_batch, send_batch_on, send_on};
+    use decidr::input::{build_request, read_batch, request_bytes};
+    use decidr::output::result_line;
+    use decidr::{DecidrError, send_batch, send_batch_on, send_on};
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{HttpError, NetworkKind};
     use sc_agent_log::testing::MemoryLog;
@@ -87,7 +87,7 @@ mod tests {
         }
     }
 
-    /// AC: decide send. A request from a file and from stdin reaches `send_on` unchanged;
+    /// AC: decidr send. A request from a file and from stdin reaches `send_on` unchanged;
     /// one result line with `session_id` and `position`.
     #[test]
     fn a_request_from_a_file_or_stdin_reaches_the_decision_unchanged() {
@@ -112,7 +112,7 @@ mod tests {
         }
         let missing =
             request_bytes("no/such/file.json", &mut std::io::empty()).expect_err("missing");
-        assert_eq!(missing.id(), "decide.input_not_found");
+        assert_eq!(missing.id(), "decidr.input_not_found");
     }
 
     /// AC: CRIT-M3 dispatch. Plain send calls `decide`; a one-line batch calls `decide_stream`.
@@ -205,7 +205,7 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0701 output. A stdout write failure cancels the batch and returns
-    /// `decide.write`; the rest is drained, and the stream still ends.
+    /// `decidr.write`; the rest is drained, and the stream still ends.
     #[test]
     fn a_failed_write_cancels_the_batch_and_returns_decide_write() {
         let transport = crate::common::Gate::new(ok_noul());
@@ -230,13 +230,13 @@ mod tests {
         let mut calls = 0;
         let error = send_batch(&options, requests, &cancel, &mut |_| {
             calls += 1;
-            Err(DecideError::Write {
+            Err(DecidrError::Write {
                 source: std::io::Error::new(std::io::ErrorKind::BrokenPipe, "broken pipe"),
             })
         })
         .expect_err("write failed");
         sc_agent_testkit::join_within(releaser, sc_agent_testkit::HANG_GUARD).expect("releaser");
-        assert_eq!(error.id(), "decide.write");
+        assert_eq!(error.id(), "decidr.write");
         assert!(cancel.is_cancelled(), "the token is cancelled");
         assert_eq!(calls, 1, "no result is handed out after the failure");
     }
@@ -265,7 +265,7 @@ mod tests {
         let worker = {
             let cancel = cancel.clone();
             std::thread::spawn(move || {
-                let outcome = decide::send(&options, request(NOUL), &cancel, &mut |result| {
+                let outcome = decidr::send(&options, request(NOUL), &cancel, &mut |result| {
                     let _ = sender.send(result);
                     Ok(())
                 });
@@ -333,7 +333,7 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0504. Line 412 of a 1,000-line batch has a score question without
-    /// `criteria`: decide stops with `decide.request_invalid` naming line 412, the field and
+    /// `criteria`: decidr stops with `decidr.request_invalid` naming line 412, the field and
     /// the reason, and the transport is never called.
     #[test]
     fn a_bad_line_stops_the_batch_before_any_send() {
@@ -348,10 +348,10 @@ mod tests {
             })
             .collect();
         let error = read_batch(&mut Cursor::new(text)).expect_err("line 412");
-        assert_eq!(error.id(), "decide.request_invalid");
+        assert_eq!(error.id(), "decidr.request_invalid");
         assert!(matches!(
             error,
-            DecideError::RequestInvalid {
+            DecidrError::RequestInvalid {
                 line: Some(412),
                 ..
             }
@@ -391,7 +391,7 @@ mod tests {
         assert_eq!(transport.sends(), 0);
     }
 
-    /// AC: decide send, owner-local-decision-crate. A LocalBackend and a SystemOneBackend run
+    /// AC: decidr send, owner-local-decision-crate. A LocalBackend and a SystemOneBackend run
     /// batches in parallel through two real runners.
     #[test]
     fn local_and_typesafe_batches_run_in_parallel() {
@@ -426,7 +426,7 @@ mod tests {
             ),
             &typesafe_log,
         );
-        let run = |options: decide::SendOptions| {
+        let run = |options: decidr::SendOptions| {
             std::thread::spawn(move || {
                 let mut ok = 0;
                 send_batch(
@@ -474,7 +474,7 @@ mod tests {
         );
     }
 
-    /// AC: REQ-SAG-0701 output. decide's source starts no thread (the ctrlc handler thread is
+    /// AC: REQ-SAG-0701 output. decidr's source starts no thread (the ctrlc handler thread is
     /// ctrlc's own).
     #[test]
     fn decide_source_spawns_no_thread() {

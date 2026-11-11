@@ -71,7 +71,7 @@ fn rows_lost_reported_once() {
 #[test]
 fn healthy_writer_loses_nothing() {
     let root = TempDir::new().expect("temp");
-    let general = GeneralLogger::open_default(root.path(), "decide").expect("general");
+    let general = GeneralLogger::open_default(root.path(), "decidr").expect("general");
     general
         .write(
             Level::Info,
@@ -96,13 +96,13 @@ fn general_rotates_at_start() {
     let root = TempDir::new().expect("temp");
     let logs = root.path().join("logs");
     std::fs::create_dir(&logs).expect("logs");
-    let active = logs.join("decide.log.jsonl");
+    let active = logs.join("decidr.log.jsonl");
     // Sparse: over the 64 MiB default, without writing it.
     let file = std::fs::File::create(&active).expect("file");
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
 
-    let log = GeneralLogger::open_default(root.path(), "decide").expect("logger");
+    let log = GeneralLogger::open_default(root.path(), "decidr").expect("logger");
     log.write(
         Level::Info,
         "sc_agent_log",
@@ -113,7 +113,7 @@ fn general_rotates_at_start() {
     .expect("row");
     log.flush().expect("flush");
 
-    let moved = logs.join("decide.log.jsonl.1");
+    let moved = logs.join("decidr.log.jsonl.1");
     assert_eq!(
         std::fs::metadata(&moved).expect("moved file").len(),
         OVERSIZED
@@ -388,13 +388,13 @@ fn log_error_keeps_io_cause() {
     let root = TempDir::new().expect("temp");
     let logs = root.path().join("logs");
     std::fs::create_dir(&logs).expect("logs");
-    let file = std::fs::File::create(logs.join("decide.log.jsonl")).expect("file");
+    let file = std::fs::File::create(logs.join("decidr.log.jsonl")).expect("file");
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
     if !common::make_unwritable(&logs).expect("chmod") {
         return;
     }
-    let error = GeneralLogger::open_default(root.path(), "decide").expect_err("cannot move");
+    let error = GeneralLogger::open_default(root.path(), "decidr").expect_err("cannot move");
     common::make_writable(&logs).expect("chmod");
     assert_eq!(error.id(), "log.open_sink");
     assert!(

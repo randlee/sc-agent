@@ -1,20 +1,20 @@
-//! decide's library target: the composition root shared by the `decide` binary and
+//! decidr's library target: the composition root shared by the `decidr` binary and
 //! sc-agent-py (ADR-SAG-0004).
 //!
 //! It chooses the backend (a configured local runner, TypeSafe, or an LLM provider by
 //! ranking), wires one `DecisionRunner` over one `HttpClient`, reads requests within the
 //! REQ-SAG-0014 limits, and lists models and diagnostics. Every operation returns
-//! [`DecideError`]; a failed decision is data in its `DecisionResult`.
+//! [`DecidrError`]; a failed decision is data in its `DecisionResult`.
 //!
 //! # Examples
 //!
 //! ```
-//! use decide::input::build_request;
+//! use decidr::input::build_request;
 //!
 //! let json = br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
 //! let request = build_request(json, &[], false, None)?;
 //! assert_eq!(request.digests().len(), 1);
-//! # Ok::<(), decide::DecideError>(())
+//! # Ok::<(), decidr::DecidrError>(())
 //! ```
 
 #![forbid(unsafe_code)]
@@ -31,7 +31,7 @@ mod select;
 #[doc(inline)]
 pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
 #[doc(inline)]
-pub use error::DecideError;
+pub use error::DecidrError;
 #[doc(inline)]
 pub use select::{
     Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,

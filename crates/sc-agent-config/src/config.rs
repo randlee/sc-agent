@@ -152,7 +152,7 @@ const RUNNER_NAME_IS_SHORT_NAME: &str = "runner name must not be a built-in shor
 /// A local runner's name: the `local_runners` key (REQ-SAG-0801).
 ///
 /// Non-empty and not a built-in short name (ASCII case-insensitive), so
-/// `decide` can tell a runner from a model line by name. A short name is
+/// `decidr` can tell a runner from a model line by name. A short name is
 /// refused while the config is deserialized; [`load`] reports it as
 /// [`AgentConfigError::RunnerName`] with the key path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
@@ -456,7 +456,7 @@ pub fn default_dir() -> Result<PathBuf, AgentConfigError> {
 
 /// Loads `<config_dir>/default.json`, optional `local.json` and `SC_AGENT__*` overrides.
 ///
-/// `environment` is the only override source (decide passes the process
+/// `environment` is the only override source (decidr passes the process
 /// environment and [`default_dir`]; tests pass their own). Values are checked
 /// against their types and bounds with the key path of any failure.
 ///

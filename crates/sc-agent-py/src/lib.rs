@@ -1,11 +1,11 @@
-//! The `sc_agent` Python module: one function per decide operation (ANC-006).
+//! The `sc_agent` Python module: one function per decidr operation (ANC-006).
 //!
-//! `send` (`decide send`), `send_batch` (`decide send --batch`), `models` (`decide models`) and
-//! `doctor` (`decide doctor`) call the decide library (ADR-SAG-0004) and return the same JSON
+//! `send` (`decidr send`), `send_batch` (`decidr send --batch`), `models` (`decidr models`) and
+//! `doctor` (`decidr doctor`) call the decidr library (ADR-SAG-0004) and return the same JSON
 //! text the CLI prints. Strings are parsed at the edge (`ModelSelector::parse`,
 //! `Provider::from_str`, `Slug::new`); every error raises `SagError(id, message, detail)`.
 //!
-//! The decide call runs on a scoped worker thread; the Python thread waits on its result
+//! The decidr call runs on a scoped worker thread; the Python thread waits on its result
 //! channel with a 100 ms timed wait outside the GIL and calls `check_signals` between waits,
 //! so `KeyboardInterrupt` cancels the run, drains it and is re-raised (REQ-SAG-0011).
 //! `general_log` and `session_log` take `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
@@ -17,9 +17,9 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use decide::input::{BatchInput, build_batch, build_request_bytes};
-use decide::{
-    Context, DecideError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, general_logger,
+use decidr::input::{BatchInput, build_batch, build_request_bytes};
+use decidr::{
+    Context, DecidrError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, general_logger,
     load_config, session_identity, session_logger,
 };
 use pyo3::exceptions::{PyException, PyRuntimeWarning};
@@ -51,12 +51,12 @@ pyo3::create_exception!(
 );
 
 /// `SagError(id, message, detail JSON)` for `error`; `detail` carries every cause and recovery.
-fn sag_error(error: &DecideError) -> PyErr {
+fn sag_error(error: &DecidrError) -> PyErr {
     let detail = serde_json::to_string(&error.detail()).unwrap_or_else(|_| "{}".to_owned());
     SagError::new_err((error.id(), error.message(), detail))
 }
 
-/// A cancel token shared with the decide call (REQ-SAG-0104).
+/// A cancel token shared with the decidr call (REQ-SAG-0104).
 #[pyclass(module = "sc_agent", frozen)]
 pub struct CancelToken(sc_agent_types::CancelToken);
 
@@ -161,7 +161,7 @@ impl LogSink for PyCallableSink {
 }
 
 /// A logger whose only sink is `callable` (file and console sinks off, as `MemoryLog`).
-fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecideError> {
+fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecidrError> {
     let log_kind = if service == SessionLogger::SERVICE {
         LogKind::Session
     } else {
@@ -169,7 +169,7 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
     };
     let name_error =
         |what: &'static str, value: &str, error: &(dyn std::error::Error + 'static)| {
-            DecideError::from(LogError::InvalidName {
+            DecidrError::from(LogError::InvalidName {
                 what,
                 value: value.to_owned(),
                 cause: sc_agent_types::ErrorDetail::foreign("sc_observability.invalid_name", error),
@@ -184,7 +184,7 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
     let name = SinkName::new("python").map_err(|error| name_error("sink", "python", &error))?;
     let sink: Arc<dyn LogSink> = Arc::new(PyCallableSink { callable, name });
     let start = |source| {
-        DecideError::from(LogError::Start {
+        DecidrError::from(LogError::Start {
             log: log_kind,
             source,
         })
@@ -195,18 +195,18 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
 }
 
 /// What a worker's call gives back: its result, and any logger that failed to close.
-type Outcome<T> = (Result<T, DecideError>, Vec<DecideError>);
+type Outcome<T> = (Result<T, DecidrError>, Vec<DecidrError>);
 
 /// What the worker sends the Python thread.
 enum Message<T> {
     /// One result line, as it finished.
     Line(String),
-    /// The decide call returned and its loggers were closed.
+    /// The decidr call returned and its loggers were closed.
     Done(Outcome<T>),
 }
 
-/// The callback a decide call reports each result to.
-type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecideError>;
+/// The callback a decidr call reports each result to.
+type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>;
 
 /// The stable id of a worker that panicked or ended without a result (RBP-F003).
 const WORKER_PANICKED: &str = "sc_agent_py.worker_panicked";
@@ -214,7 +214,7 @@ const WORKER_PANICKED: &str = "sc_agent_py.worker_panicked";
 /// `SagError(sc_agent_py.worker_panicked, message, detail)`.
 fn worker_panicked(message: String) -> PyErr {
     let detail = sc_agent_types::ErrorDetail::new(WORKER_PANICKED, message.clone(), None);
-    let detail = decide::output::to_json(&detail).unwrap_or_else(|_| "{}".to_owned());
+    let detail = decidr::output::to_json(&detail).unwrap_or_else(|_| "{}".to_owned());
     SagError::new_err((WORKER_PANICKED, message, detail))
 }
 
@@ -251,7 +251,7 @@ fn run_interruptible<T: Send>(
         let worker = scope.spawn(move || {
             let lines = sender.clone();
             let mut forward = |result: DecisionResult| {
-                let text = decide::output::result_text(&result)?;
+                let text = decidr::output::result_text(&result)?;
                 // The receiver lives until the worker is joined, so a send cannot fail.
                 let _ = lines.send(Message::Line(text));
                 Ok(())
@@ -304,7 +304,7 @@ fn run_interruptible<T: Send>(
         for error in &closed {
             // The whole chain (every cause id, e.g. `log.rows_lost`), as `SagError`'s detail.
             let text =
-                decide::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
+                decidr::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
             let message = std::ffi::CString::new(text).unwrap_or_default();
             PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
         }
@@ -322,7 +322,7 @@ fn run_interruptible<T: Send>(
 fn context(
     general_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
-) -> Result<Context, DecideError> {
+) -> Result<Context, DecidrError> {
     let mut context = Context::new(SERVICE);
     context.config_dir = config_dir;
     let general = match general_log {
@@ -343,7 +343,7 @@ fn send_options(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
-) -> Result<SendOptions, DecideError> {
+) -> Result<SendOptions, DecidrError> {
     let project = Slug::new("project", project)?;
     let agent_role = Slug::new("agent_role", agent_role)?;
     let mut probe = Context::new(SERVICE);
@@ -381,13 +381,13 @@ fn send_options(
 fn close_loggers(
     general: Option<GeneralLogger>,
     session: Option<SessionLogger>,
-) -> Vec<DecideError> {
+) -> Vec<DecidrError> {
     let mut failed = Vec::new();
     if let Some(Err(error)) = session.map(SessionLogger::close) {
-        failed.push(DecideError::from(error));
+        failed.push(DecidrError::from(error));
     }
     if let Some(Err(error)) = general.map(GeneralLogger::close) {
-        failed.push(DecideError::from(error));
+        failed.push(DecidrError::from(error));
     }
     failed
 }
@@ -396,7 +396,7 @@ fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
     cancel.map_or_else(sc_agent_types::CancelToken::new, |token| token.0.clone())
 }
 
-/// `decide send`: one request, always `Decision::decide`; returns its result line (JSON).
+/// `decidr send`: one request, always `Decision::decide`; returns its result line (JSON).
 ///
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
@@ -404,7 +404,7 @@ fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
 #[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None))]
 #[expect(
     clippy::too_many_arguments,
-    reason = "one keyword argument per decide send flag (ANC-006)"
+    reason = "one keyword argument per decidr send flag (ANC-006)"
 )]
 fn send(
     py: Python<'_>,
@@ -439,8 +439,8 @@ fn send(
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
         let mut line = None;
-        let sent = decide::send(&options, request, &worker_cancel, &mut |result| {
-            line = Some(decide::output::result_text(&result)?);
+        let sent = decidr::send(&options, request, &worker_cancel, &mut |result| {
+            line = Some(decidr::output::result_text(&result)?);
             Ok(())
         });
         let (general, session) = (options.context.general.take(), options.session.take());
@@ -456,9 +456,9 @@ fn send(
             (Some(line), Ok(())) => (Ok(line), closed),
             (None, Err(error)) => (Err(error), closed),
             (None, Ok(())) => (
-                Err(DecideError::from(
+                Err(DecidrError::from(
                     sc_decision_schema::DecisionError::Shutdown {
-                        reason: "decide::send returned without a result".to_owned(),
+                        reason: "decidr::send returned without a result".to_owned(),
                     },
                 )),
                 closed,
@@ -468,13 +468,13 @@ fn send(
     Ok(line)
 }
 
-/// `decide send --batch`: always `Decision::decide_stream`; returns the result lines in
+/// `decidr send --batch`: always `Decision::decide_stream`; returns the result lines in
 /// finish order and passes each to `on_result` as it arrives.
 #[pyfunction]
 #[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None))]
 #[expect(
     clippy::too_many_arguments,
-    reason = "one keyword argument per decide send flag (ANC-006)"
+    reason = "one keyword argument per decidr send flag (ANC-006)"
 )]
 fn send_batch(
     py: Python<'_>,
@@ -505,7 +505,7 @@ fn send_batch(
     let worker_cancel = cancel.clone();
     let ((), lines) = run_interruptible(py, &cancel, on_result.as_ref(), move |forward| {
         let mut options = options;
-        let outcome = decide::send_batch(&options, requests, &worker_cancel, forward);
+        let outcome = decidr::send_batch(&options, requests, &worker_cancel, forward);
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
         (outcome, close_loggers(general, session))
@@ -513,7 +513,7 @@ fn send_batch(
     Ok(lines)
 }
 
-/// `decide models`: the TypeSafe models list, or a configured runner's (JSON).
+/// `decidr models`: the TypeSafe models list, or a configured runner's (JSON).
 #[pyfunction]
 #[pyo3(signature = (runner = None, cancel = None, general_log = None, config_dir = None))]
 fn models(
@@ -535,30 +535,30 @@ fn models(
     let worker_cancel = cancel.clone();
     let (text, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
-        let list = decide::models(&options, &worker_cancel);
+        let list = decidr::models(&options, &worker_cancel);
         let general = options.context.general.take();
         drop(options);
         let closed = close_loggers(general, None);
-        (list.and_then(|list| decide::output::to_json(&list)), closed)
+        (list.and_then(|list| decidr::output::to_json(&list)), closed)
     })?;
     Ok(text)
 }
 
 /// `runner` as a `RunnerName`, parsed once at the edge; a name that cannot be a runner name
-/// is no configured runner either (`decide.unknown_runner`).
-fn runner_name(runner: &str, config_dir: Option<PathBuf>) -> Result<RunnerName, DecideError> {
+/// is no configured runner either (`decidr.unknown_runner`).
+fn runner_name(runner: &str, config_dir: Option<PathBuf>) -> Result<RunnerName, DecidrError> {
     RunnerName::try_from(runner.to_owned()).or_else(|_| {
         let mut probe = Context::new(SERVICE);
         probe.config_dir = config_dir;
         let config = load_config(&probe)?;
-        Err(DecideError::UnknownRunner {
+        Err(DecidrError::UnknownRunner {
             name: runner.to_owned(),
             known: config.local_runners.keys().cloned().collect(),
         })
     })
 }
 
-/// `decide doctor`: detected keys, missing provider models and config ties (JSON).
+/// `decidr doctor`: detected keys, missing provider models and config ties (JSON).
 #[pyfunction]
 #[pyo3(signature = (cancel = None, general_log = None, config_dir = None))]
 fn doctor(
@@ -574,12 +574,12 @@ fn doctor(
     let worker_cancel = cancel.clone();
     let (text, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
-        let report = decide::doctor(&options, &worker_cancel);
+        let report = decidr::doctor(&options, &worker_cancel);
         let general = options.context.general.take();
         drop(options);
         let closed = close_loggers(general, None);
         (
-            report.and_then(|report| decide::output::to_json(&report)),
+            report.and_then(|report| decidr::output::to_json(&report)),
             closed,
         )
     })?;
@@ -621,7 +621,7 @@ mod tests {
             request.digests().clone(),
             Ok(response),
         );
-        let text = decide::output::result_text(&result).expect("string");
+        let text = decidr::output::result_text(&result).expect("string");
         assert!(text.contains("\"noul\":0.123456789"), "{text}");
     }
 }

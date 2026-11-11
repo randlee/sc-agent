@@ -10,7 +10,7 @@ use crate::LlmProvider;
 /// with `anthropic/`, writing a trailing `-<major>-<minor>` as `<major>.<minor>`
 /// (`claude-haiku-5-5` -> `anthropic/claude-haiku-5.5`), and `gpt-*` ids with `openai/`.
 /// Together prefixes `claude-*` with `anthropic/` and `gpt-*` with `openai/`, id unchanged
-/// (Together's ids are unconfirmed; decide doctor reports any that do not map back). Any other
+/// (Together's ids are unconfirmed; decidr doctor reports any that do not map back). Any other
 /// id is sent unchanged.
 ///
 /// # Examples
@@ -50,7 +50,7 @@ pub fn provider_model_id(provider: LlmProvider, model: &ModelId) -> String {
 }
 
 /// The catalog id of the id `provider_id` that `provider` lists: the inverse of
-/// [`provider_model_id`], used by decide doctor.
+/// [`provider_model_id`], used by decidr doctor.
 ///
 /// An id that no rule produced is returned unchanged.
 ///

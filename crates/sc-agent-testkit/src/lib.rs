@@ -15,7 +15,7 @@
 //! - [`ChildGuard`]: a child process that is killed and reaped on drop.
 //!
 //! This crate depends on sc-agent-types only and is never a normal dependency of any crate.
-//! The workspace scan `tests_are_deterministic` (crates/decide/tests/workspace.rs) refuses
+//! The workspace scan `tests_are_deterministic` (crates/decidr/tests/workspace.rs) refuses
 //! raw unbounded waits and clock reads in tests; this crate is where the bounded forms live.
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

@@ -14,7 +14,7 @@ use tempfile::TempDir;
 #[test]
 fn general_file_per_cli() {
     let root = TempDir::new().expect("temp");
-    for service in ["decide", "sc-agent-py"] {
+    for service in ["decidr", "sc-agent-py"] {
         let log = GeneralLogger::open_default(root.path(), service).expect(service);
         let row = payload(&[("cli", json!(service))]);
         log.write(
@@ -27,7 +27,7 @@ fn general_file_per_cli() {
         .expect("row");
         log.flush().expect("flush");
     }
-    for service in ["decide", "sc-agent-py"] {
+    for service in ["decidr", "sc-agent-py"] {
         let rows = events(&root.path().join(format!("logs/{service}.log.jsonl"))).expect("rows");
         assert_eq!(rows.len(), 1, "{service}");
         assert_eq!(rows[0].fields["cli"], service);
@@ -39,7 +39,7 @@ fn general_file_per_cli() {
 #[test]
 fn general_write_generic() {
     let root = TempDir::new().expect("temp");
-    let log = GeneralLogger::open_default(root.path(), "decide").expect("logger");
+    let log = GeneralLogger::open_default(root.path(), "decidr").expect("logger");
     let row = payload(&[
         ("status", json!(429)),
         ("retry_after_seconds", json!(1.25)),
@@ -55,7 +55,7 @@ fn general_write_generic() {
     )
     .expect("row");
     log.flush().expect("flush");
-    let rows = events(&root.path().join("logs").join("decide.log.jsonl")).expect("rows");
+    let rows = events(&root.path().join("logs").join("decidr.log.jsonl")).expect("rows");
     assert_eq!(rows[0].fields, row);
     assert_eq!(rows[0].level, Level::Warn);
     assert_eq!(rows[0].target.as_str(), "sc_agent_http");
