@@ -1,8 +1,26 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/decidr",
+    "crates/sc-agent-config",
+    "crates/sc-agent-http",
+    "crates/sc-agent-log",
+    "crates/sc-agent-py",
+    "crates/sc-agent-secrets",
+    "crates/sc-agent-testkit",
+    "crates/sc-agent-types",
+    "crates/sc-decision-llm",
+    "crates/sc-decision-local",
+    "crates/sc-decision-runner",
+    "crates/sc-decision-schema",
+    "crates/sc-decision-systemone",
+    "crates/sc-llm-provider",
+    "crates/sc-treesitter",
+    "crates/sc-treesitter-py",
+]
 resolver = "3"
 
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.94.1"
 license = "MIT"

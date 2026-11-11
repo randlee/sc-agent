@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-http"
-version = "0.1.0"
+version.workspace = true
 description = "Sync HTTP layer for sc-agent: one send per call, busy and quota classification, resend holdoffs as not-before instants, secret redaction."
 edition.workspace = true
 rust-version.workspace = true

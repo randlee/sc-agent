@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-log"
-version = "0.1.0"
+version.workspace = true
 description = "General and session loggers for sc-agent over sc-observability."
 edition.workspace = true
 rust-version.workspace = true

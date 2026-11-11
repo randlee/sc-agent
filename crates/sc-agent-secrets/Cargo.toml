@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-secrets"
-version = "0.1.0"
+version.workspace = true
 description = "API key resolution for sc-agent: process environment, repo-root .env, platform keyring."
 edition.workspace = true
 rust-version.workspace = true

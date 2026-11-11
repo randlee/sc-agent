@@ -1,6 +1,6 @@
 [package]
 name = "sc-decision-runner"
-version = "0.1.0"
+version.workspace = true
 description = "Sync decision runner for sc-agent: one Decision over any Backend, worker threads, holdoffs in the queue, cancel, one session row per result."
 edition.workspace = true
 rust-version.workspace = true

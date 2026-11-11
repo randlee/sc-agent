@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-config"
-version = "0.1.0"
+version.workspace = true
 description = "Global sc-agent configuration (~/.sc-agent/default.json) loaded with sc-config."
 edition.workspace = true
 rust-version.workspace = true

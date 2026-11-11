@@ -43,11 +43,13 @@ Every edge is `must_follow` with trigger **dev-push**: the child starts when the
 | 4 | a-2 | a-5 src/request.rs + src/error.rs (pushed first after a-5's copy commit) |
 | 5 | a-6, a-7, a-9 | a-2's contract plus the a-4, a-5 and a-8 artifacts each names (each sprint's front matter) |
 | 6 | a-10 | a-6, a-7, a-9 named types |
+| 7 | a-11 | a-10 (develop integration after rename) |
+| 8 | a-12 | a-11 sc-publish kit install |
 
-Sprint count 10; critical path 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
+Sprint count 12; critical path for libraries 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); publish track adds waves 7–8 (a-11 → a-12); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
 Why more than three waves: ADR-SAG-0004 fixes the layer order, and the decision contract (a-2) carries the http types (HttpRequest/HttpResponse/HttpError, a-5), which carry ApiKey (a-4) and the logger (a-8). Hoisting the http types into a-1 would put them below their layer, so it is rejected. Dev-push triggers keep the elapsed cost of the extra waves to the time it takes each parent to push its named artifact.
 No sprint split: a-4, a-6, a-7, a-3 and a-10 each own two sibling crates with a recorded vertical_rationale; splitting would add sprints without shortening the critical path.
-owned_paths are disjoint across all sprints; the workspace root Cargo.toml and clippy.toml are owned by a-1 only (members = ["crates/*"], so no other sprint edits the root).
+owned_paths are disjoint across library sprints; a-1 owns the initial workspace root layout. Sprint **a-11** expands `[workspace].members` to literal crate paths and sets `workspace.package.version` so sc-publish `validate-manifest` succeeds (REQ-SAG-0130).
 
 ## Every must_follow edge
 
@@ -76,6 +78,8 @@ This table lists the edges. Each sprint's front matter (`must_follow`, with the 
 | a-10 | a-6 |
 | a-10 | a-7 |
 | a-10 | a-9 |
+| a-11 | a-10 |
+| a-12 | a-11 |
 
 ## Requirement ownership
 
@@ -122,6 +126,12 @@ The owner closes the record's acceptance; contributing sprints prove their bound
 | REQ-SAG-0701 | a-10 (end to end) | a-2, a-4, a-9, a-10 |
 | REQ-SAG-0801 | a-10 (end to end) | a-4, a-6, a-10 |
 | REQ-SAG-0901 | a-10 (end to end) | a-2, a-7, a-9, a-10 |
+| REQ-SAG-0130 | a-11 | a-11 |
+| REQ-SAG-0131 | a-11 | a-11 |
+| REQ-SAG-0132 | a-11 | a-11, a-12 |
+| REQ-SAG-0803 | a-12 | a-11, a-12 |
+| ADR-SAG-0017 | a-12 (channels end to end) | a-11, a-12 |
+| ADR-SAG-0018 | a-11 | a-11 |
 
 ## Outside phase A
 
@@ -142,3 +152,5 @@ The owner closes the record's acceptance; contributing sprints prove their bound
 | a-8 | [Sprint A-8: sc-agent-log](sprint-a-8-sc-agent-log.md) | `sprint/a-8-sc-agent-log` | a-1 | closed |
 | a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2, a-4, a-5, a-8 | closed |
 | a-10 | [Sprint A-10: decidr CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | closed |
+| a-11 | [Sprint A-11: sc-publish kit install](sprint-a-11-sc-publish-install.md) | `sprint/a-11-sc-publish-install` | a-10 | in_progress |
+| a-12 | [Sprint A-12: sc-publish dry-run](sprint-a-12-sc-publish-dry-run.md) | `sprint/a-12-sc-publish-dry-run` | a-11 | planned |
