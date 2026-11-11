@@ -1,9 +1,9 @@
-//! `tsq`: run predefined tree-sitter queries from the command line.
+//! `sitr`: run predefined tree-sitter queries from the command line.
 //!
 //! Output: JSON plus a newline on stdout, exit 0. Failure: one stderr line
 //! `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Each run records
-//! one `tsq.command` event in its own general log, `~/.sc-agent/logs/tsq.log.jsonl`, or
-//! `<PATH>/logs/tsq.log.jsonl` with `--log-root <PATH>`.
+//! one `sitr.command` event in its own general log, `~/.sc-agent/logs/sitr.log.jsonl`, or
+//! `<PATH>/logs/sitr.log.jsonl` with `--log-root <PATH>`.
 #![forbid(unsafe_code)]
 
 mod cli;
@@ -24,10 +24,10 @@ use sc_treesitter::{
 
 use crate::cli::{Command, Parsed};
 
-/// Service name, and so the log file name `tsq.log.jsonl`.
-const SERVICE: &str = "tsq";
+/// Service name, and so the log file name `sitr.log.jsonl`.
+const SERVICE: &str = "sitr";
 
-/// What the `tsq.command` event records about one run.
+/// What the `sitr.command` event records about one run.
 #[derive(Debug, Default)]
 struct CommandFields {
     subcommand: &'static str,
@@ -140,7 +140,7 @@ fn emit(error: &Error) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// sc-observability logger, service `tsq`, log root `log_root` (`--log-root`), else
+/// sc-observability logger, service `sitr`, log root `log_root` (`--log-root`), else
 /// `home_dir()/.sc-agent`.
 ///
 /// # Errors
@@ -170,7 +170,7 @@ fn default_log_root(home: PathBuf) -> PathBuf {
     home.join(".sc-agent")
 }
 
-/// Records the one `tsq.command` event; a failure here is dropped (it never changes the result).
+/// Records the one `sitr.command` event; a failure here is dropped (it never changes the result).
 fn record(logger: &Logger, command: &CommandFields, started: Instant, error: Option<&Error>) {
     if let Some(event) = command_event(logger, command, started, error) {
         let _logged = logger.log(event);
@@ -220,7 +220,7 @@ fn command_event(
         },
         service: logger.service_name().clone(),
         target: TargetCategory::new(SERVICE).ok()?,
-        action: ActionName::new("tsq.command").ok()?,
+        action: ActionName::new("sitr.command").ok()?,
         message: error.map(Error::message),
         identity: ProcessIdentity::default(),
         trace: None,

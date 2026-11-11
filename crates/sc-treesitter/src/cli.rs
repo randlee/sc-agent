@@ -1,4 +1,4 @@
-//! `tsq` argument parsing.
+//! `sitr` argument parsing.
 //!
 //! Every clap error other than the help and version displays becomes
 //! [`sc_treesitter::Error::Usage`] (id `treesitter.usage`).
@@ -8,14 +8,14 @@ use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "tsq",
-    bin_name = "tsq",
+    name = "sitr",
+    bin_name = "sitr",
     version,
     about = "Run predefined tree-sitter queries."
 )]
 pub(crate) struct Cli {
-    /// The log root: the general log is written to `<PATH>/logs/tsq.log.jsonl` instead of
-    /// `~/.sc-agent/logs/tsq.log.jsonl` (for tests and operators).
+    /// The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of
+    /// `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators).
     #[arg(long, value_name = "PATH", global = true)]
     pub(crate) log_root: Option<std::path::PathBuf>,
     /// The command to run.
@@ -23,7 +23,7 @@ pub(crate) struct Cli {
     pub(crate) command: Command,
 }
 
-/// `tsq` commands.
+/// `sitr` commands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
     /// Print the loaded grammars as a JSON array of language ids.
@@ -45,7 +45,7 @@ impl Command {
     }
 }
 
-/// Arguments of `tsq queries`.
+/// Arguments of `sitr queries`.
 #[derive(Debug, Args)]
 pub(crate) struct QueriesArgs {
     /// Only list queries for this language.
@@ -53,13 +53,13 @@ pub(crate) struct QueriesArgs {
     pub(crate) language: Option<String>,
 }
 
-/// Arguments of `tsq query`.
+/// Arguments of `sitr query`.
 #[derive(Debug, Args)]
 pub(crate) struct QueryArgs {
-    /// Grammar id (see `tsq languages`).
+    /// Grammar id (see `sitr languages`).
     #[arg(value_name = "LANGUAGE")]
     pub(crate) language: String,
-    /// Predefined query name (see `tsq queries`).
+    /// Predefined query name (see `sitr queries`).
     #[arg(value_name = "QUERY")]
     pub(crate) query: String,
     /// Source file to query.
@@ -161,14 +161,14 @@ fn parse_captures(value: &str) -> Result<Captures, String> {
 mod tests {
     use super::*;
 
-    /// AC: tsq query.
+    /// AC: sitr query.
     #[test]
     fn cli_definition_is_consistent() {
         use clap::CommandFactory;
         Cli::command().debug_assert();
     }
 
-    /// AC: tsq query.
+    /// AC: sitr query.
     #[test]
     fn captures_are_trimmed_and_ordered() {
         let parsed = parse_captures(" b ,a").expect("captures");
@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn bad_captures_and_missing_positional_are_usage_errors() {
         let error = parse([
-            "tsq",
+            "sitr",
             "query",
             "rust",
             "match-arms",
@@ -192,7 +192,7 @@ mod tests {
         assert_eq!(error.id(), "treesitter.usage");
         assert!(error.message().contains("empty name"), "{error}");
 
-        let error = parse(["tsq", "query", "rust"]).expect_err("missing positionals");
+        let error = parse(["sitr", "query", "rust"]).expect_err("missing positionals");
         assert!(matches!(
             error,
             sc_treesitter::Error::Usage { ref kind, .. } if kind == "MissingRequiredArgument"
@@ -202,7 +202,7 @@ mod tests {
     /// `--log-root` is read by clap and, for a run that fails to parse, by `log_root_arg`.
     #[test]
     fn the_log_root_flag_is_read_with_or_without_clap() {
-        let Ok(Parsed::Run(cli)) = parse(["tsq", "languages", "--log-root", "/srv/logs"]) else {
+        let Ok(Parsed::Run(cli)) = parse(["sitr", "languages", "--log-root", "/srv/logs"]) else {
             panic!("parsed");
         };
         assert_eq!(cli.log_root, Some(std::path::PathBuf::from("/srv/logs")));
@@ -210,21 +210,21 @@ mod tests {
             list.iter().map(std::ffi::OsString::from).collect()
         };
         assert_eq!(
-            log_root_arg(&args(&["tsq", "--log-root", "/a", "query", "rust"])),
+            log_root_arg(&args(&["sitr", "--log-root", "/a", "query", "rust"])),
             Some(std::path::PathBuf::from("/a"))
         );
         assert_eq!(
-            log_root_arg(&args(&["tsq", "query", "--log-root=/b"])),
+            log_root_arg(&args(&["sitr", "query", "--log-root=/b"])),
             Some(std::path::PathBuf::from("/b"))
         );
-        assert_eq!(log_root_arg(&args(&["tsq", "languages"])), None);
+        assert_eq!(log_root_arg(&args(&["sitr", "languages"])), None);
     }
 
     #[test]
     fn help_and_version_are_printed() {
         assert!(
-            matches!(parse(["tsq", "--help"]), Ok(Parsed::Print(text)) if text.contains("tsq"))
+            matches!(parse(["sitr", "--help"]), Ok(Parsed::Print(text)) if text.contains("sitr"))
         );
-        assert!(matches!(parse(["tsq", "--version"]), Ok(Parsed::Print(_))));
+        assert!(matches!(parse(["sitr", "--version"]), Ok(Parsed::Print(_))));
     }
 }

@@ -163,11 +163,11 @@ jobs:
           default = lib["features"].get("default", [])
           problems = [f"`{f}` is a default feature" for f in ("python", "cli") if f in default]
           bins = {t["name"]: t for t in lib["targets"] if "bin" in t["kind"]}
-          if bins.get("tsq", {}).get("required-features") != ["cli"]:
-              problems.append("bin tsq must have required-features = [\"cli\"]")
+          if bins.get("sitr", {}).get("required-features") != ["cli"]:
+              problems.append("bin sitr must have required-features = [\"cli\"]")
           if problems:
               sys.exit("ADR-SAG-0005: " + "; ".join(problems))
-          print(f"default features {default}; tsq required-features {bins['tsq']['required-features']}")
+          print(f"default features {default}; sitr required-features {bins['sitr']['required-features']}")
           PY
 
       - name: Test with only the Python grammar

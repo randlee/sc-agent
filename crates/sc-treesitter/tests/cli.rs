@@ -1,4 +1,4 @@
-//! `tsq` end-to-end tests (feature `cli`): each runs the built binary with
+//! `sitr` end-to-end tests (feature `cli`): each runs the built binary with
 //! `--log-root <tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 fn binary() -> &'static str {
-    env!("CARGO_BIN_EXE_tsq")
+    env!("CARGO_BIN_EXE_sitr")
 }
 
 fn fixture(name: &str) -> PathBuf {
@@ -73,19 +73,19 @@ fn success(output: &Output) {
     );
 }
 
-/// AC: REQ-SAG-0303 tsq listings.
+/// AC: REQ-SAG-0303 sitr listings.
 #[cfg(all(feature = "grammar-python", feature = "grammar-rust"))]
 #[test]
 fn cli_languages_and_queries_list_pinned_assets() {
     let home = tempfile::tempdir().expect("home");
-    let languages = run(home.path(), &["languages"]).expect("spawn tsq");
+    let languages = run(home.path(), &["languages"]).expect("spawn sitr");
     success(&languages);
     assert_eq!(languages.stdout, b"[\"python\",\"rust\"]\n");
     let listed: Vec<String> =
         serde_json::from_slice(trim_newline(&languages.stdout)).expect("languages");
     assert_eq!(listed, vec!["python".to_owned(), "rust".to_owned()]);
 
-    let queries = run(home.path(), &["queries", "--language", "python"]).expect("spawn tsq");
+    let queries = run(home.path(), &["queries", "--language", "python"]).expect("spawn sitr");
     success(&queries);
     let value: serde_json::Value =
         serde_json::from_slice(trim_newline(&queries.stdout)).expect("queries");
@@ -95,7 +95,7 @@ fn cli_languages_and_queries_list_pinned_assets() {
     );
 }
 
-/// AC: tsq query.
+/// AC: sitr query.
 #[cfg(feature = "grammar-rust")]
 #[test]
 fn query_prints_captures_matching_the_golden() {
@@ -110,7 +110,7 @@ fn query_prints_captures_matching_the_golden() {
             file.to_str().expect("utf8 path"),
         ],
     )
-    .expect("spawn tsq");
+    .expect("spawn sitr");
     success(&output);
     let golden = std::fs::read(fixture("match.rs.json")).expect("golden");
     assert_eq!(
@@ -120,34 +120,35 @@ fn query_prints_captures_matching_the_golden() {
     assert!(output.stderr.is_empty());
 }
 
-/// AC: tsq query.
+/// AC: sitr query.
 #[test]
 fn unknown_language_and_missing_positional_fail_with_ids() {
     let home = tempfile::tempdir().expect("home");
     let file = fixture("match.rs");
     let path = file.to_str().expect("utf8 path");
-    let unknown = error_json(&run(home.path(), &["query", "cobol", "x", path]).expect("spawn tsq"))
-        .expect("failure contract");
+    let unknown =
+        error_json(&run(home.path(), &["query", "cobol", "x", path]).expect("spawn sitr"))
+            .expect("failure contract");
     assert_eq!(unknown["id"], "treesitter.unknown_language");
     assert_eq!(unknown["message"], "unknown language \"cobol\"");
     assert!(
         unknown["recovery"]
             .as_str()
-            .is_some_and(|hint| hint.contains("tsq languages"))
+            .is_some_and(|hint| hint.contains("sitr languages"))
     );
 
-    let usage = error_json(&run(home.path(), &["query", "rust"]).expect("spawn tsq"))
+    let usage = error_json(&run(home.path(), &["query", "rust"]).expect("spawn sitr"))
         .expect("failure contract");
     assert_eq!(usage["id"], "treesitter.usage");
 
     let missing = error_json(
-        &run(home.path(), &["query", "rust", "match-arms", "absent.rs"]).expect("spawn tsq"),
+        &run(home.path(), &["query", "rust", "match-arms", "absent.rs"]).expect("spawn sitr"),
     )
     .expect("failure contract");
     assert_eq!(missing["id"], "treesitter.file_not_found");
 }
 
-/// AC: REQ-SAG-0002 lowest-layer tsq.
+/// AC: REQ-SAG-0002 lowest-layer sitr.
 #[cfg(feature = "grammar-python")]
 #[test]
 fn non_utf8_file_reaches_stderr_as_not_utf8() {
@@ -155,7 +156,7 @@ fn non_utf8_file_reaches_stderr_as_not_utf8() {
     let file = fixture("not-utf8.py");
     let path = file.to_str().expect("utf8 path");
     let value =
-        error_json(&run(home.path(), &["query", "python", "branches", path]).expect("spawn tsq"))
+        error_json(&run(home.path(), &["query", "python", "branches", path]).expect("spawn sitr"))
             .expect("failure contract");
     assert_eq!(value["id"], "treesitter.not_utf8");
     assert_eq!(
@@ -164,7 +165,7 @@ fn non_utf8_file_reaches_stderr_as_not_utf8() {
     );
 }
 
-/// AC: REQ-SAG-0002 lowest-layer tsq.
+/// AC: REQ-SAG-0002 lowest-layer sitr.
 #[test]
 fn closed_stdout_is_a_write_error() {
     let home = tempfile::tempdir().expect("home");
@@ -175,7 +176,7 @@ fn closed_stdout_is_a_write_error() {
         .stdout(Stdio::from(writer))
         .stderr(Stdio::piped())
         .output()
-        .expect("spawn tsq");
+        .expect("spawn sitr");
     assert_eq!(output.status.code(), Some(1), "status {:?}", output.status);
     let value: serde_json::Value =
         serde_json::from_slice(trim_newline(&output.stderr)).expect("stderr json");
@@ -188,38 +189,38 @@ fn closed_stdout_is_a_write_error() {
     );
 }
 
-/// AC: REQ-SAG-0003 tsq.log.
+/// AC: REQ-SAG-0003 sitr.log.
 #[test]
-fn each_run_writes_one_tsq_command_event_to_its_own_log() {
+fn each_run_writes_one_sitr_command_event_to_its_own_log() {
     let home = tempfile::tempdir().expect("home");
-    success(&run(home.path(), &["languages"]).expect("spawn tsq"));
+    success(&run(home.path(), &["languages"]).expect("spawn sitr"));
     let log = home
         .path()
         .join(".sc-agent")
         .join("logs")
-        .join("tsq.log.jsonl");
-    let text = std::fs::read_to_string(&log).expect("tsq.log.jsonl");
+        .join("sitr.log.jsonl");
+    let text = std::fs::read_to_string(&log).expect("sitr.log.jsonl");
     let events: Vec<serde_json::Value> = text
         .lines()
         .map(|line| serde_json::from_str(line).expect("jsonl"))
         .collect();
     let commands: Vec<&serde_json::Value> = events
         .iter()
-        .filter(|event| event["action"] == "tsq.command")
+        .filter(|event| event["action"] == "sitr.command")
         .collect();
     assert_eq!(commands.len(), 1, "{text}");
     let event = commands[0];
-    assert_eq!(event["service"], "tsq");
+    assert_eq!(event["service"], "sitr");
     assert_eq!(event["outcome"], "ok");
     assert_eq!(event["fields"]["subcommand"], "languages");
 
-    let failed = run(home.path(), &["query", "cobol", "x", "y"]).expect("spawn tsq");
+    let failed = run(home.path(), &["query", "cobol", "x", "y"]).expect("spawn sitr");
     assert_eq!(failed.status.code(), Some(1));
-    let text = std::fs::read_to_string(&log).expect("tsq.log.jsonl");
+    let text = std::fs::read_to_string(&log).expect("sitr.log.jsonl");
     let last: serde_json::Value = text
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .rfind(|event| event["action"] == "tsq.command")
+        .rfind(|event| event["action"] == "sitr.command")
         .expect("second event");
     assert_eq!(last["outcome"], "error");
     assert_eq!(last["fields"]["subcommand"], "query");
@@ -233,12 +234,12 @@ fn each_run_writes_one_tsq_command_event_to_its_own_log() {
     // A successful query records the source size.
     let file = fixture("match.rs");
     let path = file.to_str().expect("utf8 path");
-    success(&run(home.path(), &["query", "rust", "match-arms", path]).expect("spawn tsq"));
-    let text = std::fs::read_to_string(&log).expect("tsq.log.jsonl");
+    success(&run(home.path(), &["query", "rust", "match-arms", path]).expect("spawn sitr"));
+    let text = std::fs::read_to_string(&log).expect("sitr.log.jsonl");
     let last: serde_json::Value = text
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .rfind(|event| event["action"] == "tsq.command")
+        .rfind(|event| event["action"] == "sitr.command")
         .expect("third event");
     assert_eq!(last["outcome"], "ok");
     assert_eq!(last["fields"]["language"], "rust");
@@ -246,11 +247,11 @@ fn each_run_writes_one_tsq_command_event_to_its_own_log() {
     assert_eq!(last["fields"]["file"], path);
     let size = std::fs::metadata(&file).expect("fixture").len();
     assert_eq!(last["fields"]["bytes"], size);
-    // A separate file: nothing but tsq's own log lives in the logs directory.
+    // A separate file: nothing but sitr's own log lives in the logs directory.
     let files: Vec<_> = std::fs::read_dir(home.path().join(".sc-agent").join("logs"))
         .expect("logs dir")
         .filter_map(Result::ok)
         .map(|entry| entry.file_name())
         .collect();
-    assert_eq!(files, ["tsq.log.jsonl"]);
+    assert_eq!(files, ["sitr.log.jsonl"]);
 }
