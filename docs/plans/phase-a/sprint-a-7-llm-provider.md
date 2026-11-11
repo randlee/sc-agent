@@ -38,7 +38,6 @@ sprint:
     - "REQ-SAG-0901 AC2 (a schema mismatch is resent unchanged up to max_sends, then returned): a-9 acceptance, over this backend's SchemaMismatch signal."
     - "REQ-SAG-0503 decide doctor reporting provider model lists: a-10 acceptance (this sprint ships models_request/decode_models only)."
     - "A Haiku/Luna decision sent end to end through decide (REQ-SAG-0901, REQ-SAG-0103 through the CLI): a-10 acceptance."
-    - "Owner review of the SYSTEM_PROMPT draft (owner item, see notes)."
     - "Converting a config Provider to LlmProvider (LlmProvider::from_provider) once in decide's backend(), and sending models_request on a transport built with UreqTransport::new(Timeouts::probe()): a-10."
 ```
 
@@ -58,7 +57,7 @@ Decisions (assistant, 2026-11-09):
 - Model lists for decide doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.
 - Images: every asset is passed through (REQ-SAG-0901); a provider rejection is its own error (decision.backend, cause llm.api_status).
 - Model name: the request sends `provider_model_id(provider, resolved ModelId)`; the response reports the model the provider names.
-- System prompt: drafted below by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); the owner reviews the draft.
+- System prompt: drafted by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); owner-approved as written 2026-11-10.
 
 What the old code did, and why little is copied: old `sc-jev-backends` sent a consumer system prompt (judge-jev `check.toml`) plus the canonical payload to a token-count endpoint, then to Anthropic Messages or OpenAI Responses, with no JSON schema; old `sc-decision-schema/src/llm` checked only ids, choice membership and numeric types; `noul` was refused, `score` was a choice, `box` did not exist. Dropped: canonical payload and `payload_sha256` (ADR-SAG-0001), `WireFault`, token counting and byte limits (no record), the consumer prompt (REQ-SAG-0006), `ModelFamily`/`SchemaFamily`, the macro-built backends.
 
@@ -221,7 +220,7 @@ impl Backend for LlmDecisionBackend {
 }
 
 // src/prompt.rs
-/// Built in (ADR-SAG-0001). Assistant draft for owner review:
+/// Built in (ADR-SAG-0001). Owner-approved 2026-11-10:
 /// "You answer decision questions in place of a decision model. The user message is JSON with a state and
 /// questions keyed by id; images, if any, follow it. Answer every question in the required JSON schema. For a
 /// choice or score question give your own probability for every option and your confidence from 0 to 1; for a
@@ -369,7 +368,7 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 - Q3 images and every provider-supported input are passed through (REQ-SAG-0901).
 - Q4 provider-mapped model id sent; response.model reported.
 - Q6 model lists live in sc-llm-provider.
-Owner review pending (not a question): the SYSTEM_PROMPT draft in the design.
+Owner approved the SYSTEM_PROMPT as written (2026-11-10).
 Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usage) and LlmDecisionBackend::with_log (llm.schema_mismatch), sc-agent-log added to both crates and the ADR-SAG-0004 line; PLAN-CRIT-014 encode calls DecisionRequest::validate (superseded in round 2: validate removed) (a-2), no own part check; PLAN-CRIT-010 tests use a-5 ScriptedTransport and a-8 MemoryLog (no fake Backend is needed, so a-2 ScriptedBackend is unused); front matter, Required validation, tests cite acceptance lines.
 
 Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids then; 7 after llm.encode was removed in the QA-1 fix round); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
