@@ -1,0 +1,3 @@
+# Repository-owned sc-docli pin. The kit does not render this file.
+# scripts/generate-cli-docs.sh requires the host `docli` binary at this version.
+sc_docli_version = "0.2.0"

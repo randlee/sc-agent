@@ -1,6 +1,6 @@
 [package]
 name = "sc-decision-llm"
-version = "0.1.0"
+version.workspace = true
 description = "Haiku and Luna decision backends for sc-agent: the Jev request as a JSON-schema LLM call, self-reported probabilities and confidence."
 edition.workspace = true
 rust-version.workspace = true

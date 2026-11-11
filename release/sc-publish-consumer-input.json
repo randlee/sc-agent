@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "sc-agent",
+    "archive_prefix": "sc-agent",
+    "description": "TypeSafe decision client (decidr), sitr tree-sitter CLI, workspace crates, and Python bindings for Synaptic Canvas agents",
+    "homepage": "https://github.com/randlee/sc-agent",
+    "license": "MIT",
+    "workspace_toml": "Cargo.toml",
+    "rust_toolchain": "1.94.1",
+    "readme_dependency_crate": "decidr",
+    "renderer_archive_path": "bin/decidr"
+  },
+  "release_targets": [
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "os": "ubuntu-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "aarch64-unknown-linux-gnu",
+      "os": "ubuntu-24.04-arm",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "os": "macos-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "os": "macos-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "os": "windows-latest",
+      "archive": "zip"
+    }
+  ],
+  "crates": [
+    {
+      "artifact": "sc-agent-types",
+      "package": "sc-agent-types",
+      "cargo_toml": "crates/sc-agent-types/Cargo.toml",
+      "publish": true,
+      "publish_order": 1,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-decision-schema",
+      "package": "sc-decision-schema",
+      "cargo_toml": "crates/sc-decision-schema/Cargo.toml",
+      "publish": true,
+      "publish_order": 2,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-agent-config",
+      "package": "sc-agent-config",
+      "cargo_toml": "crates/sc-agent-config/Cargo.toml",
+      "publish": true,
+      "publish_order": 3,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-agent-secrets",
+      "package": "sc-agent-secrets",
+      "cargo_toml": "crates/sc-agent-secrets/Cargo.toml",
+      "publish": true,
+      "publish_order": 4,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-agent-log",
+      "package": "sc-agent-log",
+      "cargo_toml": "crates/sc-agent-log/Cargo.toml",
+      "publish": true,
+      "publish_order": 5,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-agent-http",
+      "package": "sc-agent-http",
+      "cargo_toml": "crates/sc-agent-http/Cargo.toml",
+      "publish": true,
+      "publish_order": 6,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-decision-systemone",
+      "package": "sc-decision-systemone",
+      "cargo_toml": "crates/sc-decision-systemone/Cargo.toml",
+      "publish": true,
+      "publish_order": 7,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-decision-local",
+      "package": "sc-decision-local",
+      "cargo_toml": "crates/sc-decision-local/Cargo.toml",
+      "publish": true,
+      "publish_order": 8,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-llm-provider",
+      "package": "sc-llm-provider",
+      "cargo_toml": "crates/sc-llm-provider/Cargo.toml",
+      "publish": true,
+      "publish_order": 9,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-decision-llm",
+      "package": "sc-decision-llm",
+      "cargo_toml": "crates/sc-decision-llm/Cargo.toml",
+      "publish": true,
+      "publish_order": 10,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-decision-runner",
+      "package": "sc-decision-runner",
+      "cargo_toml": "crates/sc-decision-runner/Cargo.toml",
+      "publish": true,
+      "publish_order": 11,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "sc-treesitter",
+      "package": "sc-treesitter",
+      "cargo_toml": "crates/sc-treesitter/Cargo.toml",
+      "publish": true,
+      "publish_order": 12,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
+      "artifact": "decidr",
+      "package": "decidr",
+      "cargo_toml": "crates/decidr/Cargo.toml",
+      "publish": true,
+      "publish_order": 13,
+      "wait_after_publish_seconds": 0,
+      "verify_registry_visibility": true
+    }
+  ],
+  "release_binaries": [
+    {
+      "name": "decidr"
+    },
+    {
+      "name": "sitr"
+    }
+  ],
+  "python_packages": [
+    {
+      "artifact": "sc-agent-py-wheel",
+      "package": "sc-agent",
+      "manifest": "crates/sc-agent-py/pyproject.toml",
+      "module": "sc_agent",
+      "publish": "pypi"
+    },
+    {
+      "artifact": "sc-treesitter-py-wheel",
+      "package": "sc-treesitter",
+      "manifest": "crates/sc-treesitter-py/pyproject.toml",
+      "module": "sc_treesitter",
+      "publish": "pypi"
+    }
+  ],
+  "python_distributions": [
+    {
+      "name": "sc-agent",
+      "source": "crates/sc-agent-py",
+      "cargo_manifest": "crates/sc-agent-py/Cargo.toml",
+      "module_path": "crates/sc-agent-py",
+      "sdist": true,
+      "wheels": [
+        {
+          "id": "linux-x86_64",
+          "os": "ubuntu-latest",
+          "target": "x86_64-unknown-linux-gnu",
+          "platform": "manylinux_2_28_x86_64",
+          "manylinux": "2_28"
+        },
+        {
+          "id": "linux-arm64",
+          "os": "ubuntu-latest",
+          "target": "aarch64-unknown-linux-gnu",
+          "platform": "manylinux_2_28_aarch64",
+          "manylinux": "2_28"
+        },
+        {
+          "id": "macos-arm64",
+          "os": "macos-latest",
+          "target": "aarch64-apple-darwin",
+          "platform": "macosx_11_0_arm64",
+          "deployment_target": "11.0"
+        },
+        {
+          "id": "macos-x86_64",
+          "os": "macos-latest",
+          "target": "x86_64-apple-darwin",
+          "platform": "macosx_11_0_x86_64",
+          "deployment_target": "11.0"
+        },
+        {
+          "id": "windows-x86_64",
+          "os": "windows-latest",
+          "target": "x86_64-pc-windows-msvc",
+          "platform": "win_amd64"
+        },
+        {
+          "id": "windows-arm64",
+          "os": "windows-11-arm",
+          "target": "aarch64-pc-windows-msvc",
+          "platform": "win_arm64"
+        }
+      ]
+    },
+    {
+      "name": "sc-treesitter",
+      "source": "crates/sc-treesitter-py",
+      "cargo_manifest": "crates/sc-treesitter-py/Cargo.toml",
+      "module_path": "crates/sc-treesitter-py",
+      "sdist": true,
+      "wheels": [
+        {
+          "id": "linux-x86_64",
+          "os": "ubuntu-latest",
+          "target": "x86_64-unknown-linux-gnu",
+          "platform": "manylinux_2_28_x86_64",
+          "manylinux": "2_28"
+        },
+        {
+          "id": "linux-arm64",
+          "os": "ubuntu-latest",
+          "target": "aarch64-unknown-linux-gnu",
+          "platform": "manylinux_2_28_aarch64",
+          "manylinux": "2_28"
+        },
+        {
+          "id": "macos-arm64",
+          "os": "macos-latest",
+          "target": "aarch64-apple-darwin",
+          "platform": "macosx_11_0_arm64",
+          "deployment_target": "11.0"
+        },
+        {
+          "id": "macos-x86_64",
+          "os": "macos-latest",
+          "target": "x86_64-apple-darwin",
+          "platform": "macosx_11_0_x86_64",
+          "deployment_target": "11.0"
+        },
+        {
+          "id": "windows-x86_64",
+          "os": "windows-latest",
+          "target": "x86_64-pc-windows-msvc",
+          "platform": "win_amd64"
+        },
+        {
+          "id": "windows-arm64",
+          "os": "windows-11-arm",
+          "target": "aarch64-pc-windows-msvc",
+          "platform": "win_arm64"
+        }
+      ]
+    }
+  ],
+  "npm_packages": [],
+  "channels": {
+    "pypi": {
+      "workflow": "pypi-publish.yml",
+      "dispatch_inputs": {
+        "target": "production"
+      },
+      "credential_rehearsal_inputs": {
+        "target": "testpypi"
+      },
+      "test_repository": "testpypi",
+      "production_repository": "pypi"
+    },
+    "homebrew": {
+      "workflow": "homebrew-publish.yml",
+      "dispatch_inputs": {},
+      "tap_repository": "randlee/homebrew-tap",
+      "renderer_target": "x86_64-unknown-linux-gnu",
+      "formulas": [
+        {
+          "path": "Formula/decidr.rb",
+          "template": "release/homebrew/formula.rb.j2",
+          "class": "Decidr",
+          "binaries": [
+            "decidr",
+            "sitr"
+          ],
+          "test_binary": "decidr",
+          "test_command": "--version",
+          "test_output": "decidr",
+          "release_track": "stable"
+        }
+      ],
+      "assets": [
+        {
+          "key": "macos_arm",
+          "target": "aarch64-apple-darwin"
+        },
+        {
+          "key": "macos_intel",
+          "target": "x86_64-apple-darwin"
+        },
+        {
+          "key": "linux",
+          "target": "x86_64-unknown-linux-gnu"
+        }
+      ]
+    },
+    "scoop": {
+      "workflow": "scoop-publish.yml",
+      "dispatch_inputs": {},
+      "bucket_repository": "randlee/scoop-bucket",
+      "manifest_path": "bucket/decidr.json",
+      "manifest_template": "release/scoop/manifest.json.j2",
+      "installer_target": "x86_64-pc-windows-msvc",
+      "binaries": [
+        "decidr",
+        "sitr"
+      ],
+      "renderer_target": "x86_64-unknown-linux-gnu"
+    },
+    "winget": {
+      "workflow": "winget-publish.yml",
+      "dispatch_inputs": {},
+      "identifier": "randlee.decidr",
+      "installer_target": "x86_64-pc-windows-msvc"
+    }
+  },
+  "docli": {
+    "enabled": true,
+    "generate_script": "scripts/generate-cli-docs.sh",
+    "drift_paths": [
+      "fixtures/cli/",
+      "site/cli/"
+    ],
+    "description": "CLI reference HTML for decidr and sitr matches the clap command trees"
+  }
+}

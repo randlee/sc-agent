@@ -1,6 +1,6 @@
 [package]
 name = "sc-decision-local"
-version = "0.1.0"
+version.workspace = true
 description = "Local System One decision backend for sc-agent: a configured Jev-compatible daemon (Strands Decider, Laya, Mapika/decider, generic) with model discovery."
 edition.workspace = true
 rust-version.workspace = true

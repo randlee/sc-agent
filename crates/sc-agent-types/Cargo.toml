@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-types"
-version = "0.1.0"
+version.workspace = true
 description = "Shared value types for sc-agent: model catalog, providers, session ids, cancellation, error ids."
 edition.workspace = true
 rust-version.workspace = true

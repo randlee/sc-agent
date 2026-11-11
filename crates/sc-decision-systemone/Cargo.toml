@@ -1,6 +1,6 @@
 [package]
 name = "sc-decision-systemone"
-version = "0.1.0"
+version.workspace = true
 description = "System One decision backend for sc-agent: sans-IO encode/decode of POST /v1/systemone and GET /v1/models for Jev and any System One server."
 edition.workspace = true
 rust-version.workspace = true

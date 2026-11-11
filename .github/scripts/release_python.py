@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import re
 
+WINDOWS_PLATFORMS = {"x86_64-pc-windows-msvc": "win_amd64", "aarch64-pc-windows-msvc": "win_arm64"}
+
 
 def wheel_targets(distribution):
     wheels = distribution["wheels"]
@@ -39,8 +41,8 @@ def wheel_targets(distribution):
                     raise ValueError("macOS wheels require deployment_target")
                 if not item["os"].startswith("macos-") or item["platform"] != f"macosx_{deployment.replace('.', '_')}_{arch}":
                     raise ValueError("macOS wheel runner/target/platform mismatch")
-            elif item["target"] == "x86_64-pc-windows-msvc":
-                if not item["os"].startswith("windows-") or item["platform"] != "win_amd64":
+            elif item["target"] in WINDOWS_PLATFORMS:
+                if not item["os"].startswith("windows-") or item["platform"] != WINDOWS_PLATFORMS[item["target"]]:
                     raise ValueError("Windows wheel runner/target/platform mismatch")
             else:
                 raise ValueError("unsupported explicit wheel target")
