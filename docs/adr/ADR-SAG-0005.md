@@ -1,4 +1,4 @@
-# Decision: sc-treesitter-py is a separate PyO3 crate; tsq lives in sc-treesitter behind a cli feature
+# Decision: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
 
 **Status:** Approved  
 **Version:** 0.1.0  
@@ -9,7 +9,7 @@
 
 ---
 
-## ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; tsq lives in sc-treesitter behind a cli feature
+## ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
 
 **Status:** Approved  
 
@@ -26,7 +26,7 @@
 
 ### Context
 
-sc-treesitter is a stand-alone library with two query surfaces: PyO3 bindings for Python and the `tsq` CLI.
+sc-treesitter is a stand-alone library with two query surfaces: PyO3 bindings for Python and the `sitr` CLI.
 
 **Problem Statement:**
 
@@ -34,12 +34,12 @@ The Python bindings and the CLI need PyO3, clap and sc-observability, but a Rust
 
 ### Decision
 
-`sc-treesitter-py` is a separate PyO3 crate over `sc-treesitter`. `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `tsq` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
+`sc-treesitter-py` is a separate PyO3 crate over `sc-treesitter`. `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
 
 **Key Principles:**
 
 - A default build of `sc-treesitter` pulls in no PyO3, clap or sc-observability.
-- `tsq` builds only when the `cli` feature is on.
+- `sitr` builds only when the `cli` feature is on.
 - The Python extension module is built from `sc-treesitter-py`, not from `sc-treesitter`.
 
 ### Rationale
@@ -62,7 +62,7 @@ Feature gates keep the library's default dependency set small while the PyO3 typ
 
 **Description:**
 
-Build the extension module and `tsq` from `sc-treesitter` with all dependencies always on.
+Build the extension module and `sitr` from `sc-treesitter` with all dependencies always on.
 
 **Pros:**
 
@@ -76,11 +76,11 @@ Build the extension module and `tsq` from `sc-treesitter` with all dependencies 
 
 Default features must carry no clap or sc-observability.
 
-#### Alternative 2: Separate tsq crate
+#### Alternative 2: Separate sitr crate
 
 **Description:**
 
-Put the `tsq` binary in its own crate.
+Put the `sitr` binary in its own crate.
 
 **Pros:**
 
