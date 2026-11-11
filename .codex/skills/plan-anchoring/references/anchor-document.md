@@ -1,6 +1,6 @@
 ---
 name: anchor-document
-version: 0.10.1
+version: 0.11.0
 description: The intent document, the anchors.json record of truth and its rendered anchors.md, ID rules, provenance, versioning, promotion, and retirement.
 ---
 
@@ -33,7 +33,7 @@ Anchor record fields:
 | `id` | string | `ANC-NNN` allocated by the script, or the register ID for REQ/ADR (`REQ-014`, `ADR-0007`) |
 | `source_type` | `ANC` / `REQ` / `ADR` | Where the fact comes from |
 | `source_ref` | string or null | The register ID for REQ/ADR; null for ANC (promotion records the ADR in `promoted_to`) |
-| `statement` | string | The testable requirement Jev judges; orchestrator-written, user-approved. Reworded with `update --statement` (history keeps the old text); refused if identical to the quote |
+| `statement` | string | The testable requirement Jev judges; orchestrator-written, user-approved at lock. Reworded for clarity with `update --statement` without approval, then drift-reviewed (history keeps the old text); refused if identical to the quote |
 | `quote` | string | The user's verbatim words; quoted in every failing verdict. Immutable. Required for ANC; the register text for REQ/ADR |
 | `stated_by`, `stated_at`, `context` | string | Who, ISO date, short setting ("planning session", the register name). Source words belong in `quote`; move any "source words: ..." found in `context` there |
 | `summary` | string | Short label for tables; never judged |

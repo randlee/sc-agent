@@ -1,5 +1,5 @@
 ---
-version: 0.10.1
+version: 0.11.0
 ---
 
 # Reference catalog
@@ -10,6 +10,7 @@ version: 0.10.1
 - `references/question-tuning-workflow.md` - calibrated independent rubric and question-tuning workflow
 - `references/planning-review-workflow.md` - source-neutral planning gate and quality loop
 - `references/development-review-workflow.md` - delivered-work review and reporting workflow
+- `references/change-report.md` - the owner's HTML report of a planning round's changes, scores before and after, and the drift review
 - `references/agent-delegation-workflow.md` - runner boundary, harness-specific agents, and parallel execution
 
 ## References
@@ -30,6 +31,7 @@ version: 0.10.1
 - `references/jev-api.md` - endpoint, request and response, limits, retries, the `allow_remote_judge` setting, every flag and error code
 - `references/installation-and-troubleshooting.md` - installing the plugin (`install.py`), python3, bd, and the API key; tracker selection and switching; PATH; Codex
 - `references/agent-runner-contract.md` - one trusted agent resolution, strict fenced envelopes, and redacted attestation
+- `scripts/change_report.py`, `templates/change-report.html.j2`, `templates/sprint-panel.xhtml.j2`, `templates/anchor-panel.xhtml.j2`, `templates/drift-panel.xhtml.j2`, `assets/schemas/drift-review.schema.json` - the change report and the drift review it renders
 - `assets/questions/plan.json`, `assets/questions/dev.json`, `assets/questions/testability.json`, `assets/questions/dedupe.json` - the question wording of record
 - `assets/templates/intent.md`, `assets/templates/anchor-questions-bead.md`, `assets/examples/` - starting points and a worked example
 - `<repository root>/tests/sc-plan-anchor/` - maintainer-only offline test suite; intentionally excluded from the redistributed plugin
