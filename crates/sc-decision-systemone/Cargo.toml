@@ -1,0 +1,25 @@
+[package]
+name = "sc-decision-systemone"
+version = "0.1.0"
+description = "System One decision backend for sc-agent: sans-IO encode/decode of POST /v1/systemone and GET /v1/models for Jev and any System One server."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-secrets = { path = "../sc-agent-secrets" }
+sc-agent-types = { path = "../sc-agent-types" }
+sc-decision-schema = { path = "../sc-decision-schema" }
+# preserve_order: bodies keep the request's key order; float_roundtrip: probabilities decode
+# unrounded (REQ-SAG-0007).
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+# Multipart boundary: "sc-agent-" + a fresh ULID per encode (REQ-SAG-0001).
+ulid = "1"
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+
+[lints]
+workspace = true

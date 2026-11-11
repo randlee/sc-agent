@@ -1,0 +1,23 @@
+[package]
+name = "sc-decision-runner"
+version = "0.1.0"
+description = "Sync decision runner for sc-agent: one Decision over any Backend, worker threads, holdoffs in the queue, cancel, one session row per result."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-config = { path = "../sc-agent-config" }
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-log = { path = "../sc-agent-log" }
+sc-agent-types = { path = "../sc-agent-types" }
+sc-decision-schema = { path = "../sc-decision-schema" }
+serde_json = "1"
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+
+[lints]
+workspace = true

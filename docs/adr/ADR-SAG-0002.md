@@ -1,11 +1,12 @@
 # Decision: Session logs are JSONL first, then SQLite with server sync
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-10  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
+**Revision:** 0.2.0 (2026-11-10, owner): session logs move under <log_root>/logs/.  
 
 ---
 
@@ -34,7 +35,7 @@ Session logs must be separable by repository, type of work and project, kept ind
 
 ### Decision
 
-For the MVP, session logs are JSONL under `<log_root>/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.
+For the MVP, session logs are JSONL under `<log_root>/logs/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.
 
 **Key Principles:**
 

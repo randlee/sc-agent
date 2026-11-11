@@ -1,0 +1,43 @@
+[package]
+name = "decide"            # crates.io availability checked at publish time
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Command-line client for the TypeSafe (Jev) decision API."
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "raw_value"] }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+sc-agent-config = { path = "../sc-agent-config", version = "0.1.0" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
+sc-agent-http = { path = "../sc-agent-http", version = "0.1.0" }
+sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.0" }
+sc-decision-systemone = { path = "../sc-decision-systemone", version = "0.1.0" }
+sc-decision-local = { path = "../sc-decision-local", version = "0.1.0" }
+sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.0" }
+sc-decision-llm = { path = "../sc-decision-llm", version = "0.1.0" }
+sc-decision-runner = { path = "../sc-decision-runner", version = "0.1.0" }
+
+ctrlc = { version = "3", features = ["termination"] }   # sync; SIGINT/SIGTERM, Ctrl-C/Ctrl-Break; no tokio (REQ-SAG-0011)
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }   # ScriptedTransport, BlockingTransport
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }     # MemoryLog
+tempfile = "3"
+sc-observability = "=1.5.0"   # a notifying LogSink for ordering tests (tests/common)
+
+[lib]
+name = "decide"
+path = "src/lib.rs"
+
+[[bin]]
+name = "decide"
+path = "src/main.rs"

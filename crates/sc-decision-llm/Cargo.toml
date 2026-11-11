@@ -1,0 +1,27 @@
+[package]
+name = "sc-decision-llm"
+version = "0.1.0"
+description = "Haiku and Luna decision backends for sc-agent: the Jev request as a JSON-schema LLM call, self-reported probabilities and confidence."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+base64 = "0.22"
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-log = { path = "../sc-agent-log" }
+sc-agent-types = { path = "../sc-agent-types" }
+sc-decision-schema = { path = "../sc-decision-schema" }
+sc-llm-provider = { path = "../sc-llm-provider" }
+# preserve_order: answers and probabilities keep request order; float_roundtrip: 0.123456789
+# is returned exactly (REQ-SAG-0007).
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+sc-agent-secrets = { path = "../sc-agent-secrets" }
+
+[lints]
+workspace = true

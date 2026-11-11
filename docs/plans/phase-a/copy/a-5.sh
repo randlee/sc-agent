@@ -2,15 +2,22 @@
 # Sprint A-5 (bead agt-4p2.5): copy the sc-agent-http starting code from sc-agent-ref@dce239a.
 # Run: bash docs/plans/phase-a/copy/a-5.sh   (TARGET=<dir> to dry-run elsewhere)
 #
+# From a git worktree, set SC_AGENT_REF explicitly: lib.sh's default is ../sc-agent-ref next
+# to the checkout root, which for a worktree is next to the worktree, not the main clone:
+#   SC_AGENT_REF=/path/to/sc-agent-ref TARGET="$PWD" bash docs/plans/phase-a/copy/a-5.sh
+#
 # This script only copies text. It does NOT do any of the following; the developer does them
-# (see the bead design for the exact target code):
+# (the bead design is the exact target code):
 #   - write Cargo.toml, README.md, src/lib.rs, src/error.rs (HttpError) or src/resend.rs (ResendPolicy,
-#     Attempts, Next, send_once): the old retry loop is NOT copied, it sleeps (old retry.rs:247-268);
+#     Attempts, Next, HttpClient::{may_start, may_resend, send_once}): the old retry loop is NOT
+#     copied, it sleeps (old retry.rs:247-268);
 #   - replace every JevError / ProviderFailure / BusyCause / NetworkErrorKind with HttpError,
 #     ProviderReply, BusyReason and NetworkKind (copied below under their old names);
 #   - drop HeaderName (header names become String, validated by the ureq request builder, no assert!);
-#   - Endpoint: drop the `https` flag, loopback_http() and its assert!s; accept http:// only for
-#     loopback hosts (open question Q1); rewrite log_form without slice indexing;
+#   - Endpoint: drop the `https` flag, loopback_http() and its assert!s; Endpoint::parse accepts
+#     https only, Endpoint::parse_local accepts http or https (a configured local runner); a key
+#     is refused on plain http to a non-loopback host (HttpRequest::with_secret, REQ-SAG-0013);
+#     rewrite log_form without slice indexing;
 #   - SecretHeader / ApiKey: ResolvedApiKey -> sc_agent_secrets::ApiKey; drop the test-util matches();
 #   - Timeouts: drop the clamp (MIN/MAX_*) and its unit test; keep the 10 s / 120 s defaults;
 #   - ureq_transport: drop loopback_for_tests, is_valid_url, the https_only refusal branch and every
@@ -18,9 +25,11 @@
 #   - retry_after: drop report_seconds/REPORT_MAX_SECONDS (they round); add seconds() -> f64 unrounded;
 #   - failure.rs: keep only the quota reader (Body, QUOTA_MARKERS, is_quota_reply) and read_failure;
 #     drop api_failure, ReplyShape, says_input_too_long and their tests;
-#   - retry.rs: keep only the constants, jitter, is_busy, backoff and the pure unit tests; Retry-After
-#     holdoffs get no jitter (REQ-SAG-0601); drop MAX_SENDS (no hard cap) and WAIT_SLICE;
-#   - test support: drop FakeClock/RecordingSleeper/with_send_duration; tests pass `now: Instant`;
+#   - retry.rs: keep only the constants, jitter, is_busy, backoff and the pure unit tests; a valid
+#     Retry-After is clamped to 250 ms-30 s and gets 0-250 ms jitter (REQ-SAG-0012), the fallback
+#     backoff keeps its jitter; drop MAX_SENDS (no hard cap) and WAIT_SLICE;
+#   - test support: drop FakeClock/RecordingSleeper; send_once takes `now: &dyn Fn() -> Instant`
+#     (tests pass a ManualClock); move the doubles to src/testing.rs behind feature `testing`;
 #   - write tests/resend.rs (every REQ-SAG-0601/0602 acceptance case) from scratch.
 . "$(dirname "$0")/lib.sh"
 

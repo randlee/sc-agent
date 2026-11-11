@@ -1,0 +1,1 @@
+{"model":"jev-latest","state":{"message":"Please help.","subject":"Duplicate charge"},"questions":{"spam":{"type":"noul","instructions":{"task":"Identify unsolicited advertising."},"criteria":{"true":"Unsolicited advertising","false":"A legitimate conversation"}}}}

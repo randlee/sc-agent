@@ -1,0 +1,23 @@
+[package]
+name = "sc-decision-schema"
+version = "0.1.0"
+description = "Decision-layer contract for sc-agent: TypeSafe System One API types, the Backend and Decision traits, per-question digests."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+sc-agent-http = { path = "../sc-agent-http" }
+sc-agent-types = { path = "../sc-agent-types" }
+sc-sha = "1.8"
+serde = { version = "1", features = ["derive"] }
+# preserve_order: nested key order round-trips and digests are stable; float_roundtrip:
+# 0.123456789 prints exactly (REQ-SAG-0007).
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+serde_path_to_error = "0.1"
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+
+[lints]
+workspace = true

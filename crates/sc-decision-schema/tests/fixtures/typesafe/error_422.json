@@ -1,0 +1,1 @@
+{"detail":[{"loc":["body","state"],"msg":"Field required","type":"missing"},{"loc":["body","questions","urgency","score","criteria"],"msg":"Field required","type":"missing","input":"{\"type\":\"score\"}","ctx":{"min_length":1}}]}
