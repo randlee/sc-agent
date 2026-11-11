@@ -14,7 +14,7 @@ use crate::schema::{SCHEMA_NAME, answer_schema};
 
 /// The built-in system prompt (ADR-SAG-0001; no consumer prompt, REQ-SAG-0006).
 ///
-/// Assistant draft, pending owner review.
+/// Owner-approved as written (2026-11-10).
 pub(crate) const SYSTEM_PROMPT: &str = "You answer decision questions in place of a decision model. \
 The user message is JSON with a state and questions keyed by id; images, if any, follow it. \
 Answer every question in the required JSON schema. For a choice or score question give your own \
