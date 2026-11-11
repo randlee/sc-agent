@@ -1,4 +1,4 @@
-//! `decide doctor` (REQ-SAG-0503): detected keys in use order, provider models missing from
+//! `decidr doctor` (REQ-SAG-0503): detected keys in use order, provider models missing from
 //! the catalog, and config models tying a built-in.
 
 use sc_agent_config::AgentConfig;
@@ -8,7 +8,7 @@ use sc_agent_types::{CancelToken, ErrorId, MODELS, ModelId, Provider};
 use sc_llm_provider::{LlmClient, LlmProvider, catalog_model_id};
 use serde_json::{Map, Value};
 
-use crate::DecideError;
+use crate::DecidrError;
 use crate::select::{
     Context, LOG_TARGET, detected_keys, flushed_result, probe, probe_client, probe_setup,
     typesafe_backend,
@@ -49,7 +49,7 @@ pub struct Tie {
     pub builtin: ModelId,
 }
 
-/// What `decide doctor` prints.
+/// What `decidr doctor` prints.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DoctorReport {
     /// Every detected provider key, in `Provider::PRIORITY` order.
@@ -67,7 +67,7 @@ pub struct DoctorOptions {
     pub context: Context,
 }
 
-/// Checks keys, provider model lists and config ties; writes one `decide.doctor` record.
+/// Checks keys, provider model lists and config ties; writes one `decidr.doctor` record.
 ///
 /// Model lists are fetched with `Timeouts::probe()` (the context transport when set).
 ///
@@ -75,7 +75,7 @@ pub struct DoctorOptions {
 ///
 /// `Config`, `Log`, `Secrets` (a key that is malformed or a source that fails), `Llm` and
 /// `Decision` (a request or reply), `Http` (a send).
-pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorReport, DecideError> {
+pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorReport, DecidrError> {
     let (config, general, owned) = probe_setup(&options.context)?;
     let result = examine(&options.context, &config, &general, cancel);
     let count = |pick: fn(&DoctorReport) -> usize| {
@@ -99,7 +99,7 @@ pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorRep
     let _ = general.write(
         Level::Info,
         LOG_TARGET,
-        "decide.doctor",
+        "decidr.doctor",
         LogContext::NONE,
         fields,
     );
@@ -111,8 +111,8 @@ fn examine(
     config: &AgentConfig,
     general: &GeneralLogger,
     cancel: &CancelToken,
-) -> Result<DoctorReport, DecideError> {
-    let catalog = config.catalog().map_err(DecideError::from)?;
+) -> Result<DoctorReport, DecidrError> {
+    let catalog = config.catalog().map_err(DecidrError::from)?;
     let found = detected_keys(context)?;
     let http = probe_client(context, config, general);
     let clock = context.clock();
@@ -154,13 +154,13 @@ fn provider_models(
     clock: &sc_agent_types::Clock,
     general: &GeneralLogger,
     cancel: &CancelToken,
-) -> Result<Vec<Listed>, DecideError> {
+) -> Result<Vec<Listed>, DecidrError> {
     match LlmProvider::from_provider(provider) {
         None => {
             let backend = typesafe_backend(key)?;
-            let request = backend.models_request().map_err(DecideError::from)?;
+            let request = backend.models_request().map_err(DecidrError::from)?;
             let response = probe(http, &request, clock, cancel)?;
-            let list = backend.decode_models(response).map_err(DecideError::from)?;
+            let list = backend.decode_models(response).map_err(DecidrError::from)?;
             Ok(list
                 .models
                 .into_iter()
@@ -172,11 +172,11 @@ fn provider_models(
         }
         Some(llm) => {
             let client = LlmClient::new(llm, key.key)
-                .map_err(DecideError::from)?
+                .map_err(DecidrError::from)?
                 .with_log(general.clone());
-            let request = client.models_request().map_err(DecideError::from)?;
+            let request = client.models_request().map_err(DecidrError::from)?;
             let response = probe(http, &request, clock, cancel)?;
-            let ids = client.decode_models(response).map_err(DecideError::from)?;
+            let ids = client.decode_models(response).map_err(DecidrError::from)?;
             Ok(ids
                 .into_iter()
                 .map(|id| Listed {

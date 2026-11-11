@@ -165,7 +165,7 @@ impl DecisionRunner {
     /// send (passed to `may_start`, `may_resend` and `send_once`), and the job queue waits for
     /// a holdoff on it.
     ///
-    /// A seam for callers' tests (decide's `Context.clock`, `sc_agent_types::testing::
+    /// A seam for callers' tests (decidr's `Context.clock`, `sc_agent_types::testing::
     /// ManualClock`): with a clock only the test moves, a holdoff or provider pause cannot
     /// elapse on its own, so ordering is forced without real waiting. Production uses
     /// [`Self::new`] (the real clock).

@@ -60,7 +60,7 @@ fn close_returns_lost_rows() {
     assert_eq!((*log, *count), (LogKind::Session, 1));
     assert!(last.is_some());
 
-    let healthy = GeneralLogger::open_default(root.path(), "decide").expect("general");
+    let healthy = GeneralLogger::open_default(root.path(), "decidr").expect("general");
     healthy
         .write(Level::Info, "t", "a", LogContext::NONE, Map::new())
         .expect("row");
@@ -140,7 +140,7 @@ fn shared_logger_reports_once() {
     let logger = failing_logger().expect("logger");
     let loggers = Loggers::open(
         root.path(),
-        "decide",
+        "decidr",
         identity().expect("identity"),
         Some(Arc::clone(&logger)),
         Some(Arc::clone(&logger)),

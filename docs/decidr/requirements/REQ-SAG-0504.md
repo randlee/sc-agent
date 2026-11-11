@@ -14,11 +14,11 @@
 
 ### Requirement Statement
 
-Definitions: A batch is the JSONL requests passed to `decide` in one call.
+Definitions: A batch is the JSONL requests passed to `decidr` in one call.
 
 **MUST statements:**
 
-- When a request in a batch does not match the Jev API request schema, `decide` MUST stop before sending any request and return an error naming the line, the field and what was wrong.
+- When a request in a batch does not match the Jev API request schema, `decidr` MUST stop before sending any request and return an error naming the line, the field and what was wrong.
 
 ### Rationale
 

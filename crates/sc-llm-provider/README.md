@@ -7,7 +7,7 @@ The sans-IO LLM provider wire for sc-agent. It encodes an LLM call into one HTTP
 - `LlmClient`:
   - `LlmClient::new(provider, key)` builds a client at the provider's built-in endpoint. `with_endpoint` and `with_log` adjust it.
   - `encode` builds the `HttpRequest` for an `LlmRequest`. `decode` turns the final `HttpResponse` into an `LlmResponse`.
-  - `models_request` and `decode_models` list a provider's models (`decide doctor` uses them).
+  - `models_request` and `decode_models` list a provider's models (`decidr doctor` uses them).
 - `LlmProvider`: `Anthropic`, `OpenAi`, `OpenRouter`, `Together` and `Nous`. `Wire::of(provider)` gives the wire. Anthropic speaks Anthropic Messages; the others speak Chat Completions.
 - `LlmRequest`, `Message`, `Part` (text or an image), `Role`, `ImageMediaType`, `LlmResponse` and `Usage`.
 - `Output::Json { name, schema }` asks for a JSON-schema reply through the provider's structured-output feature. `decode` returns the parsed value.

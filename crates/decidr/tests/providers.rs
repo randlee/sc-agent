@@ -1,5 +1,5 @@
 //! Provider choice, catalog, busy/quota/pause, config bounds, limits and local runners,
-//! end to end through `decide::send` / `send_batch` and the real runner.
+//! end to end through `decidr::send` / `send_batch` and the real runner.
 
 mod common;
 
@@ -10,11 +10,11 @@ mod tests {
     use std::time::Duration;
 
     use crate::common::send;
-    use decide::input::{
+    use decidr::input::{
         BatchInput, MAX_IMAGE_BYTES, MAX_REQUEST_BYTES, build_batch, build_request, read_batch,
         request_bytes,
     };
-    use decide::{DecideError, load_config, send_batch};
+    use decidr::{DecidrError, load_config, send_batch};
     use sc_agent_http::HttpResponse;
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_log::testing::MemoryLog;
@@ -31,7 +31,7 @@ mod tests {
         provider: Option<Provider>,
         config: Option<&str>,
     ) -> (
-        Result<sc_decision_schema::DecisionResult, DecideError>,
+        Result<sc_decision_schema::DecisionResult, DecidrError>,
         ScriptedTransport,
     ) {
         let transport = ScriptedTransport::responses(vec![anthropic_noul()]);
@@ -47,7 +47,7 @@ mod tests {
 
     /// AC: REQ-SAG-0103. haiku with Anthropic and OpenRouter keys goes to Anthropic; with only
     /// OpenRouter to OpenRouter as `anthropic/claude-haiku-5.5`; `--provider openrouter`
-    /// overrides; jev with no TypeSafe key is `decide.no_provider_key` with a recovery.
+    /// overrides; jev with no TypeSafe key is `decidr.no_provider_key` with a recovery.
     #[test]
     fn the_provider_is_chosen_by_ranking_among_detected_keys() {
         let both = [
@@ -82,7 +82,7 @@ mod tests {
             &CancelToken::new(),
         )
         .expect_err("no key");
-        assert_eq!(error.id(), "decide.no_provider_key");
+        assert_eq!(error.id(), "decidr.no_provider_key");
         assert!(error.recovery().is_some());
         assert_eq!(transport.sends(), 0);
     }
@@ -202,7 +202,7 @@ mod tests {
                 &CancelToken::new(),
             )
             .expect("send");
-            let line = String::from_utf8(decide::output::result_line(&result).expect("line"))
+            let line = String::from_utf8(decidr::output::result_line(&result).expect("line"))
                 .expect("utf-8");
             let error = result.outcome.expect_err("refused");
             assert_eq!(sc_agent_types::ErrorId::id(&error), id, "{status}");
@@ -229,7 +229,7 @@ mod tests {
             r#"{{"local_runners":{{"dec":{{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","key_env":"{}"}}}}}}"#,
             sc_agent_secrets::LAYA_API_KEY
         ));
-        let runner_key = "laya-decide-test-secret-0005";
+        let runner_key = "laya-decidr-test-secret-0005";
         let transport = ScriptedTransport::responses(vec![
             json_response(200, r#"{"ok":true,"model":"jev-latest"}"#),
             json_response(503, &format!("loading, key {runner_key} accepted later")),
@@ -248,7 +248,7 @@ mod tests {
         )
         .expect("send");
         let line =
-            String::from_utf8(decide::output::result_line(&result).expect("line")).expect("utf-8");
+            String::from_utf8(decidr::output::result_line(&result).expect("line")).expect("utf-8");
         assert!(!line.contains(runner_key), "the runner key leaked: {line}");
         assert!(
             line.contains("loading, key [redacted] accepted later"),
@@ -263,7 +263,7 @@ mod tests {
     /// REQ-SAG-0002 0.2.0 (QA-002): a 2xx reply whose mistyped field echoes the attached key is
     /// `decision.response_parse`; serde quotes the value in its message, and the key there is
     /// `[redacted]` with the rest of the message kept. The same for a models list
-    /// (`decode_models`), where the error is `decide.decision` with cause
+    /// (`decode_models`), where the error is `decidr.decision` with cause
     /// `decision.response_parse`.
     #[test]
     fn an_echoed_key_is_redacted_from_a_parse_error() {
@@ -286,7 +286,7 @@ mod tests {
         )
         .expect("send");
         let line =
-            String::from_utf8(decide::output::result_line(&result).expect("line")).expect("utf-8");
+            String::from_utf8(decidr::output::result_line(&result).expect("line")).expect("utf-8");
         let error = result.outcome.expect_err("not a response");
         assert_eq!(
             sc_agent_types::ErrorId::id(&error),
@@ -303,7 +303,7 @@ mod tests {
         let models_body = format!(r#"{{"models":"{TYPESAFE_KEY}"}}"#);
         let transport = ScriptedTransport::responses(vec![json_response(200, &models_body)]);
         let dir = empty_config_dir();
-        let options = decide::ModelsOptions {
+        let options = decidr::ModelsOptions {
             runner: None,
             context: context(
                 dir.path(),
@@ -312,8 +312,8 @@ mod tests {
                 &log,
             ),
         };
-        let error = decide::models(&options, &CancelToken::new()).expect_err("not a list");
-        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.decision");
+        let error = decidr::models(&options, &CancelToken::new()).expect_err("not a list");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.decision");
         let detail = error.detail();
         let text = serde_json::to_string(&detail).expect("json");
         assert!(!text.contains(TYPESAFE_KEY), "the key leaked: {text}");
@@ -364,7 +364,7 @@ mod tests {
             cause.recovery.is_some(),
             "the quota error carries its recovery"
         );
-        let line = String::from_utf8(decide::output::result_line(&result_of(error)).expect("line"))
+        let line = String::from_utf8(decidr::output::result_line(&result_of(error)).expect("line"))
             .expect("utf-8");
         assert!(line.contains("http.quota_exhausted"));
     }
@@ -529,13 +529,13 @@ mod tests {
     /// to that host, the other request's included, because the pause lives in the one
     /// `HttpClient` the runner shares; `Retry-After: 0` still pauses for the 250 ms floor.
     ///
-    /// Deterministic (QA-001, QA-003): decide's `Context.clock` is a ManualClock that only the
+    /// Deterministic (QA-001, QA-003): decidr's `Context.clock` is a ManualClock that only the
     /// test moves, so nothing paused can be sent until the clock reaches the pause end. The
     /// single worker admits the other request only after the 429 is handled. The test reads the
     /// exact pause end from the `http.busy` record and moves the clock to exactly it: every
     /// later send is stamped with exactly that instant.
     ///
-    /// Scope (rust-qa QA-001): this decide test checks the pause end to end on the injected
+    /// Scope (rust-qa QA-001): this decidr test checks the pause end to end on the injected
     /// clock, but it does not force the paused admission to happen while the clock is still
     /// frozen: neither the runner nor `HttpClient` writes a record when an admission is held, so
     /// nothing marks that moment. The forced proof that a first send waits for the pause
@@ -584,7 +584,7 @@ mod tests {
     /// (QA-001). So the third request is admitted only once the pause holds, and it and the
     /// resend are both sent at exactly the pause end, on a ManualClock only the test moves.
     ///
-    /// Scope (rust-qa QA-001): this decide test checks the pause end to end on the injected
+    /// Scope (rust-qa QA-001): this decidr test checks the pause end to end on the injected
     /// clock, but it does not force the paused admission to happen while the clock is still
     /// frozen: neither the runner nor `HttpClient` writes a record when an admission is held, so
     /// nothing marks that moment. The forced proof that a first send waits for the pause
@@ -664,7 +664,7 @@ mod tests {
         assert_eq!(transport.sends(), 1, "no resend after the budget ran out");
     }
 
-    /// AC: REQ-SAG-0013. Bound violations fail before any send with `decide.config`.
+    /// AC: REQ-SAG-0013. Bound violations fail before any send with `decidr.config`.
     #[test]
     fn config_bounds_fail_before_any_send() {
         let key_on_plain_http = format!(
@@ -696,13 +696,13 @@ mod tests {
                 &log,
             );
             let error = load_config(&ctx).expect_err(json);
-            assert_eq!(error.id(), "decide.config");
+            assert_eq!(error.id(), "decidr.config");
             let detail = error.cause_detail().expect("cause");
             assert_eq!(detail.id, cause, "{json}");
             assert!(detail.message.contains(path), "{json}: {}", detail.message);
             // send loads the same config first: nothing is sent.
-            let options = decide::SendOptions {
-                model: decide::ModelSelector::Short(sc_agent_types::ShortName::Jev),
+            let options = decidr::SendOptions {
+                model: decidr::ModelSelector::Short(sc_agent_types::ShortName::Jev),
                 provider: None,
                 project: sc_agent_log::Slug::new("project", "proj").expect("slug"),
                 agent_role: sc_agent_log::Slug::new("agent_role", "role").expect("slug"),
@@ -710,7 +710,7 @@ mod tests {
                 session: Some(log.session(crate::common::identity())),
             };
             let error = send(&options, request(NOUL), &CancelToken::new()).expect_err(json);
-            assert_eq!(error.id(), "decide.config");
+            assert_eq!(error.id(), "decidr.config");
             assert_eq!(transport.sends(), 0);
         }
     }
@@ -718,9 +718,9 @@ mod tests {
     /// AC: REQ-SAG-0014. Each limit ends with a typed error naming it; nothing is sent.
     #[test]
     fn input_limits_are_typed_errors() {
-        let limit = |error: DecideError| match error {
-            DecideError::LimitExceeded { what, .. } => what.as_str().to_owned(),
-            DecideError::RequestInvalid { source, .. } => source.id().to_owned(),
+        let limit = |error: DecidrError| match error {
+            DecidrError::LimitExceeded { what, .. } => what.as_str().to_owned(),
+            DecidrError::RequestInvalid { source, .. } => source.id().to_owned(),
             other => panic!("unexpected {other:?}"),
         };
         // A 9 MiB single request.
@@ -741,8 +741,8 @@ mod tests {
         let error = read_batch(&mut Cursor::new(long)).expect_err("long line");
         assert!(matches!(
             error,
-            DecideError::LimitExceeded {
-                what: decide::input::LimitKind::RequestBytes,
+            DecidrError::LimitExceeded {
+                what: decidr::input::LimitKind::RequestBytes,
                 line: Some(1),
                 ..
             }
@@ -764,7 +764,7 @@ mod tests {
             .collect();
         let error =
             build_request(with_part.as_bytes(), &images, false, None).expect_err("21 images");
-        assert_eq!(error.id(), "decide.request_invalid");
+        assert_eq!(error.id(), "decidr.request_invalid");
         assert_eq!(limit(error), "decision.limits");
         // In memory (sc-agent-py): 10,001 items and a request over 8 MiB.
         let items: Vec<BatchInput> = (0..10_001)
@@ -778,14 +778,14 @@ mod tests {
             "batch_lines"
         );
         let error =
-            decide::input::build_request_bytes(&big, Vec::new(), false, None).expect_err("9 MiB");
+            decidr::input::build_request_bytes(&big, Vec::new(), false, None).expect_err("9 MiB");
         assert_eq!(limit(error), "request_bytes");
         let png = [
             &[0x89_u8, b'P', b'N', b'G'][..],
             &vec![0_u8; 21 * 1024 * 1024],
         ]
         .concat();
-        let error = decide::input::build_request_bytes(
+        let error = decidr::input::build_request_bytes(
             with_part.as_bytes(),
             vec![("p".into(), png)],
             false,
@@ -816,8 +816,8 @@ mod tests {
         );
         assert!(matches!(
             outcome,
-            Err(DecideError::LimitExceeded {
-                what: decide::input::LimitKind::BatchBytes,
+            Err(DecidrError::LimitExceeded {
+                what: decidr::input::LimitKind::BatchBytes,
                 ..
             })
         ));
@@ -832,8 +832,8 @@ mod tests {
         });
         assert!(matches!(
             outcome,
-            Err(DecideError::LimitExceeded {
-                what: decide::input::LimitKind::BatchLines,
+            Err(DecidrError::LimitExceeded {
+                what: decidr::input::LimitKind::BatchLines,
                 ..
             })
         ));
@@ -868,7 +868,7 @@ mod tests {
         );
     }
 
-    /// AC: REQ-SAG-0015. A scripted daemon reports not-loaded twice, then loaded: decide
+    /// AC: REQ-SAG-0015. A scripted daemon reports not-loaded twice, then loaded: decidr
     /// probes until loaded, then makes one send; the send carries no load deadline (its
     /// timeout is the runner transport's own, counted from the send, after the load). A
     /// cancel during the load wait ends it at once with `decision.cancelled` and no send.
@@ -1023,7 +1023,7 @@ mod tests {
             &CancelToken::new(),
         )
         .expect_err("load timeout");
-        assert_eq!(error.id(), "decide.decision");
+        assert_eq!(error.id(), "decidr.decision");
         let backend = error.cause_detail().expect("cause");
         assert_eq!(backend.id, "decision.backend");
         let local = backend.cause.expect("local cause");
@@ -1061,7 +1061,7 @@ mod tests {
             &CancelToken::new(),
         )
         .expect_err("not served");
-        assert_eq!(error.id(), "decide.decision");
+        assert_eq!(error.id(), "decidr.decision");
         let cause = error.cause_detail().expect("cause");
         assert_eq!(cause.id, "decision.backend");
         assert_eq!(

@@ -1,4 +1,4 @@
-//! Shared by decide's integration tests: tempdir configs, an explicit environment, a map
+//! Shared by decidr's integration tests: tempdir configs, an explicit environment, a map
 //! keyring, injected transports and `MemoryLog`, all through the real `DecisionRunner`.
 //!
 //! No test reads or writes the process environment, HOME or the platform keyring.
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use decide::{Context, ModelSelector, SendOptions, load_config};
+use decidr::{Context, ModelSelector, SendOptions, load_config};
 use sc_agent_http::{HttpError, HttpRequest, HttpResponse, Transport};
 use sc_agent_log::testing::MemoryLog;
 use sc_agent_log::{Repo, SessionIdentity, Slug};
@@ -21,10 +21,10 @@ use sc_decision_schema::DecisionRequest;
 use serde_json::{Value, json};
 
 /// Test keys; no record or output may contain one.
-pub const TYPESAFE_KEY: &str = "ts-decide-test-secret-0001";
-pub const ANTHROPIC_KEY: &str = "sk-ant-decide-test-secret-0002";
-pub const OPENROUTER_KEY: &str = "sk-or-decide-test-secret-0003";
-pub const OPENAI_KEY: &str = "sk-oai-decide-test-secret-0004";
+pub const TYPESAFE_KEY: &str = "ts-decidr-test-secret-0001";
+pub const ANTHROPIC_KEY: &str = "sk-ant-decidr-test-secret-0002";
+pub const OPENROUTER_KEY: &str = "sk-or-decidr-test-secret-0003";
+pub const OPENAI_KEY: &str = "sk-oai-decidr-test-secret-0004";
 
 /// A noul request on question `q`.
 pub const NOUL: &str = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
@@ -69,7 +69,7 @@ pub fn context(
     log: &MemoryLog,
 ) -> Context {
     Context {
-        service: "decide",
+        service: "decidr",
         config_dir: Some(dir.to_path_buf()),
         // No real `.env` is read (QA-011): the repo root is the tempdir config dir.
         repo_root: Some(dir.to_path_buf()),
@@ -106,7 +106,7 @@ pub fn options(
 }
 
 pub fn request(json: &str) -> DecisionRequest {
-    decide::input::build_request(json.as_bytes(), &[], false, None).expect("request")
+    decidr::input::build_request(json.as_bytes(), &[], false, None).expect("request")
 }
 
 pub fn json_response(status: u16, body: &str) -> HttpResponse {
@@ -212,20 +212,20 @@ impl std::io::Read for BlankLines {
     }
 }
 
-/// `decide::send` with the result returned: the one result it hands out, or the command
+/// `decidr::send` with the result returned: the one result it hands out, or the command
 /// error. A flush error after the result is returned as the error (tests that need the
-/// result after a flush failure call `decide::send` directly).
+/// result after a flush failure call `decidr::send` directly).
 pub fn send(
     options: &SendOptions,
     request: DecisionRequest,
     cancel: &sc_agent_types::CancelToken,
-) -> Result<sc_decision_schema::DecisionResult, decide::DecideError> {
+) -> Result<sc_decision_schema::DecisionResult, decidr::DecidrError> {
     let mut delivered = None;
-    decide::send(options, request, cancel, &mut |result| {
+    decidr::send(options, request, cancel, &mut |result| {
         delivered = Some(result);
         Ok(())
     })?;
-    Ok(delivered.expect("decide::send hands out one result"))
+    Ok(delivered.expect("decidr::send hands out one result"))
 }
 
 /// How long a test waits for a forced ordering event before it fails instead of hanging
@@ -381,7 +381,7 @@ impl sc_observability::v2::LogSink for NotifySink {
 /// A general logger whose records reach [`Notify`] (file and console sinks off).
 pub fn notify_log() -> (sc_agent_log::GeneralLogger, Arc<Notify>) {
     let notify = Arc::new(Notify::default());
-    let service = sc_observability::v2::ServiceName::new("decide-test").expect("service");
+    let service = sc_observability::v2::ServiceName::new("decidr-test").expect("service");
     let mut config = sc_observability::v2::LoggerConfig::default_for(service, PathBuf::new());
     config.enable_file_sink = false;
     config.enable_console_sink = false;

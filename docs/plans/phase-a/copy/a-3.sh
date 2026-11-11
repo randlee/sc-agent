@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sprint A-3 (bead agt-4p2.3): sc-treesitter library and the tsq binary (feature `cli`).
+# Sprint A-3 (bead agt-4p2.3): sc-treesitter library and the sitr binary (feature `cli`).
 # Copies the old sc-treesitter library and CLI code (sc-agent-ref @ dce239a) into crates/sc-treesitter/.
 # Usage: bash docs/plans/phase-a/copy/a-3.sh   (TARGET=<dir> for a dry run)
 #
@@ -57,7 +57,7 @@ copy_lines "$S/src/render.rs" 6 21 "$D/src/lib.rs"
 copy_file  "$S/assets/queries/rust/match-arms.scm" "$D/assets/queries/rust/match-arms.scm"
 copy_lines "$S/assets/queries/python/branches.scm" 2 5 "$D/assets/queries/python/branches.scm"
 
-# ---- tsq binary, feature `cli` (src/cli.rs, src/main.rs, tests/cli.rs; moved from a-10.sh) ----
+# ---- sitr binary, feature `cli` (src/cli.rs, src/main.rs, tests/cli.rs; moved from a-10.sh) ----
 copy_lines "$S/src/cli/mod.rs" 11 12   "$D/src/cli.rs"     # clap imports
 copy_lines "$S/src/cli/mod.rs" 36 77   "$D/src/cli.rs"     # Cli, Command, ExtractArgs (language, query, captures)
 copy_lines "$S/src/cli/mod.rs" 87 144  "$D/src/cli.rs"     # path arg, QueriesArgs, Captures, Parsed, parse()

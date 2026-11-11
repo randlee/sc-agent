@@ -28,7 +28,7 @@ fn defaults_write_both() {
     let root = TempDir::new().expect("temp");
     let loggers = Loggers::open(
         root.path(),
-        "decide",
+        "decidr",
         identity().expect("identity"),
         None,
         None,
@@ -36,7 +36,7 @@ fn defaults_write_both() {
     .expect("open");
     write_both(&loggers).expect("both rows");
     assert_eq!(
-        events(&root.path().join("logs").join("decide.log.jsonl"))
+        events(&root.path().join("logs").join("decidr.log.jsonl"))
             .expect("rows")
             .len(),
         1
@@ -61,7 +61,7 @@ fn injected_session_only() {
     let memory = MemoryLog::new().expect("memory");
     let loggers = Loggers::open(
         root.path(),
-        "decide",
+        "decidr",
         identity().expect("identity"),
         None,
         Some(memory.logger()),
@@ -73,7 +73,7 @@ fn injected_session_only() {
     assert_eq!(records[0].action, SessionLogger::ACTION);
     assert_eq!(loggers.session.path(), None);
     assert_eq!(
-        events(&root.path().join("logs").join("decide.log.jsonl"))
+        events(&root.path().join("logs").join("decidr.log.jsonl"))
             .expect("rows")
             .len(),
         1
@@ -91,7 +91,7 @@ fn injected_general_only() {
     let memory = MemoryLog::new().expect("memory");
     let loggers = Loggers::open(
         root.path(),
-        "decide",
+        "decidr",
         identity().expect("identity"),
         Some(memory.logger()),
         None,
@@ -131,7 +131,7 @@ fn injected_logger_not_shut_down() {
     let memory = MemoryLog::new().expect("memory");
     let loggers = Loggers::open(
         root.path(),
-        "decide",
+        "decidr",
         identity().expect("identity"),
         Some(memory.logger()),
         Some(memory.logger()),

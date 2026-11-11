@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The sc-agent Python API: one function per decide operation (ANC-006)."
+description = "The sc-agent Python API: one function per decidr operation (ANC-006)."
 publish = false
 
 [lib]
@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 workspace = true
 
 [dependencies]
-decide = { path = "../decide", version = "0.1.0" }
+decidr = { path = "../decidr", version = "0.1.0" }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-agent-config = { path = "../sc-agent-config", version = "0.1.0" }
 sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }

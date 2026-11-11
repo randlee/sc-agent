@@ -35,21 +35,21 @@ sprint:
   requirements: [REQ-SAG-0201, REQ-SAG-0801, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0011, REQ-SAG-0014]  # 0011: cancel ends a load wait (decision.cancelled); 0014: limits enforced in a-2 DecisionRequest::new, consumed by multipart encode
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
-    - "Discovery is a library capability of sc-decision-local; no decide or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
-    - "REQ-SAG-0201 end to end (a decision sent through decide send over SystemOneBackend, or over LocalBackend for a local runner from config): a-10 acceptance."
-    - "decide models over SystemOneBackend::models_request/decode_models: a-10 acceptance."
+    - "Discovery is a library capability of sc-decision-local; no decidr or Python operation calls it in this phase (REQ-SAG-0801 requires only the library report)."
+    - "REQ-SAG-0201 end to end (a decision sent through decidr send over SystemOneBackend, or over LocalBackend for a local runner from config): a-10 acceptance."
+    - "decidr models over SystemOneBackend::models_request/decode_models: a-10 acceptance."
     - "Busy resend and holdoff for these backends (REQ-SAG-0601): a-5 (sc-agent-http) and a-9 (runner); this sprint only shows 503 is a final reply."
     - "Rejecting an unknown local runner kind, bad host, port 0 or bad key_env (REQ-SAG-0013): a-4 at config load (RunnerKind is closed, so this crate has no unknown-kind error)."
-    - "Per-runner load and request timeouts in config with longer defaults (REQ-SAG-0015), and calling LocalProbe::wait_until_loaded before a local runner's first decision: a-4 (config) and a-10 (decide)."
-    - "Building the probe transport with UreqTransport::new(Timeouts::probe()) for discover and decide models: a-10 (the caller owns the transport)."
+    - "Per-runner load and request timeouts in config with longer defaults (REQ-SAG-0015), and calling LocalProbe::wait_until_loaded before a local runner's first decision: a-4 (config) and a-10 (decidr)."
+    - "Building the probe transport with UreqTransport::new(Timeouts::probe()) for discover and decidr models: a-10 (the caller owns the transport)."
 ```
 
 # Sprint A-6 design: sc-decision-systemone and sc-decision-local (bead agt-4p2.6)
 
 Governing: REQ-SAG-0201, ADR-SAG-0001, REQ-SAG-0801 (local runners from config, discovery, no hard-coded host/port). Also binding: ADR-SAG-0004 (layer: above sc-decision-schema, below sc-decision-runner), REQ-SAG-0002, REQ-SAG-0001, REQ-SAG-0007, REQ-SAG-0401, REQ-SAG-0601 (busy handled by sc-agent-http and the runner, not here), owner-architecture, owner-system-one-backends, owner-local-decision-crate, owner-local-discovery, owner-no-sleep, owner-lowlevel-no-tokio.
 
-- sc-decision-systemone: one sans-IO `Backend` for any System One server: Jev (`POST {base}/v1/systemone`, Bearer key), Strands Decider, Laya and Mapika/decider (same path, key optional); plus GET /v1/models encode/decode (used by `decide models`, A-10).
-- sc-decision-local: minimal stub. Builds a `SystemOneBackend` for `http://{host}:{port}` from a config `local_runners` entry (A-4: kind, host, port, model, key_env) and adds discovery: is the daemon up, is its configured model loaded. LocalBackend is sans-IO and reads no clock (ADR-SAG-0001): it builds the probe (`probe_request`) and reads the reply (`read_probe`); the `LocalProbe` driver sends it on the caller's `Transport` and `Clock` (`discover`, `wait_until_loaded`). One `LocalDaemon` implementation per daemon kind: `strands` (Strands Decider), `laya`, `mapika` (Mapika/decider), `generic`; a later daemon (e.g. 'ollaya') adds one. Runners come from config by name (REQ-SAG-0801). It runs through sc-decision-runner like any backend (as `Arc<dyn Backend>`, wired by decide, A-10).
+- sc-decision-systemone: one sans-IO `Backend` for any System One server: Jev (`POST {base}/v1/systemone`, Bearer key), Strands Decider, Laya and Mapika/decider (same path, key optional); plus GET /v1/models encode/decode (used by `decidr models`, A-10).
+- sc-decision-local: minimal stub. Builds a `SystemOneBackend` for `http://{host}:{port}` from a config `local_runners` entry (A-4: kind, host, port, model, key_env) and adds discovery: is the daemon up, is its configured model loaded. LocalBackend is sans-IO and reads no clock (ADR-SAG-0001): it builds the probe (`probe_request`) and reads the reply (`read_probe`); the `LocalProbe` driver sends it on the caller's `Transport` and `Clock` (`discover`, `wait_until_loaded`). One `LocalDaemon` implementation per daemon kind: `strands` (Strands Decider), `laya`, `mapika` (Mapika/decider), `generic`; a later daemon (e.g. 'ollaya') adds one. Runners come from config by name (REQ-SAG-0801). It runs through sc-decision-runner like any backend (as `Arc<dyn Backend>`, wired by decidr, A-10).
 
 ## 1. Copy script
 
@@ -192,7 +192,7 @@ impl LocalBackend {
     /// base = http://{host}:{port}; the backend is SystemOneBackend::local(base, key). No timeouts until with_timeouts.
     /// A key on a plain-http non-loopback host (e.g. 10.0.0.5) is refused by `HttpRequest::with_secret` (a-5,
     /// `http.key_on_plain_http`) inside encode, surfaced as DecisionError::Http before any send (REQ-SAG-0013).
-    /// decide passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and `runner.model` from a LocalRunner.
+    /// decidr passes `DaemonKind::from(runner.kind)`, `&runner.host`, `runner.port` and `runner.model` from a LocalRunner.
     /// host and port are already validated at config load (a-4 RunnerHost: hostname or IP only; NonZeroU16), so new checks neither.
     pub fn new(kind: DaemonKind, host: &RunnerHost, port: NonZeroU16, model: ModelId, key: Option<ApiKey>) -> Result<Self, LocalError>;
     pub fn base(&self) -> &str;
@@ -297,7 +297,7 @@ Both: workspace package and lints; no tokio, no thiserror.
 - `cargo build -p sc-decision-systemone -p sc-decision-local`
 - `cargo clippy -p sc-decision-systemone -p sc-decision-local --all-targets -- -D warnings` with the workspace denies (a-1)
 - `cargo test -p sc-decision-systemone -p sc-decision-local`
-- `cargo tree -p sc-decision-systemone -e normal --depth 1` and `cargo tree -p sc-decision-local -e normal --depth 1`: the direct sc-agent dependencies are exactly those in section 6; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` has no sc-llm-provider, sc-decision-llm, sc-decision-runner, decide or tokio (AC 13, AC 16)
+- `cargo tree -p sc-decision-systemone -e normal --depth 1` and `cargo tree -p sc-decision-local -e normal --depth 1`: the direct sc-agent dependencies are exactly those in section 6; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` has no sc-llm-provider, sc-decision-llm, sc-decision-runner, decidr or tokio (AC 13, AC 16)
 - `grep -rn "sleep" crates/sc-decision-systemone/src crates/sc-decision-local/src` finds nothing (AC 12)
 - `grep -rnE "127\.0\.0\.1|localhost|:8000" crates/sc-decision-local/src crates/sc-decision-systemone/src` finds no runner host or port (AC 8)
 
@@ -348,7 +348,7 @@ sc-decision-local (tests/discovery.rs, over ScriptedTransport; discovery is `Loc
 - [ ] REQ-SAG-0401: sc-decision-systemone and sc-decision-local take keys as sc_agent_secrets::ApiKey (credential variable names TYPESAFE_API_KEY, LAYA_API_KEY come from sc-agent-secrets); no test, Debug output or log record prints a key; an attached key echoed by a daemon is replaced by [redacted] in error text, causes and log fields (a probe's transport error through HttpError::redacted_for, as HttpClient::send_once does), everything else kept whole (REQ-SAG-0002 0.2.0 exception).
 - [ ] REQ-SAG-0601: sc-decision-systemone: SystemOneBackend::decode returns a 503 from Laya or Mapika/decider as a final reply (decision.api_status with its body), not a busy signal.
 - [ ] REQ-SAG-0002: sc-decision-local: LocalError implements ErrorId with 6 distinct local.* ids (no unknown-kind error: RunnerKind is closed and checked at config load, a-4); wrapped HttpError/DecisionError are kept unchanged; clippy with the workspace denies passes; no sleep.
-- [ ] ADR-SAG-0004: `cargo tree -p sc-decision-systemone -e normal --depth 1` lists exactly sc-decision-schema, sc-agent-http, sc-agent-secrets and sc-agent-types as sc-agent dependencies (sc-decision-systemone has no error union, under the ADR-SAG-0004 exemption for crates whose functions all return the trait-fixed DecisionError), and `cargo tree -p sc-decision-local -e normal --depth 1` lists exactly sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types, sc-agent-config and sc-agent-log; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` contains no sc-llm-provider, sc-decision-llm, sc-decision-runner or decide. No live API calls in tests. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner.
+- [ ] ADR-SAG-0004: `cargo tree -p sc-decision-systemone -e normal --depth 1` lists exactly sc-decision-schema, sc-agent-http, sc-agent-secrets and sc-agent-types as sc-agent dependencies (sc-decision-systemone has no error union, under the ADR-SAG-0004 exemption for crates whose functions all return the trait-fixed DecisionError), and `cargo tree -p sc-decision-local -e normal --depth 1` lists exactly sc-decision-systemone, sc-decision-schema, sc-agent-http, sc-agent-secrets, sc-agent-types, sc-agent-config and sc-agent-log; the full `cargo tree -p sc-decision-systemone -p sc-decision-local` contains no sc-llm-provider, sc-decision-llm, sc-decision-runner or decidr. No live API calls in tests. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decidr sits above the runner.
 - [ ] REQ-SAG-0002: a test makes the ScriptedTransport fail and asserts the returned LocalError and SystemOne DecisionError chains carry the lower HttpError's id and message.
 - [ ] ADR-SAG-0001: every decision backend this sprint adds implements the Backend trait defined in the sc-decision-schema crate: SystemOneBackend (sc-decision-systemone) and LocalBackend (sc-decision-local) are each `impl sc_decision_schema::Backend`, and a compile-time test builds `Arc<dyn sc_decision_schema::Backend>` from both.
 - [ ] REQ-SAG-0009: neither sc-decision-systemone nor sc-decision-local depends on tokio; `cargo tree -p sc-decision-systemone -p sc-decision-local` lists no tokio crate.

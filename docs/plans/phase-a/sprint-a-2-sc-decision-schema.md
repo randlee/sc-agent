@@ -28,14 +28,14 @@ sprint:
   does_not_close:
     - "REQ-SAG-0901 resend up to max_sends: a-9 (sc-decision-runner) acceptance REQ-SAG-0901 AC2/AC3; a-2 only defines decision.schema_mismatch"
     - "REQ-SAG-0202 digest recorded with the response in the session row: a-9 acceptance REQ-SAG-0202"
-    - "REQ-SAG-0504 end to end (decide names the line, field and reason of a bad batch line): a-10; a-2 supplies only the field path and serde message"
+    - "REQ-SAG-0504 end to end (decidr names the line, field and reason of a bad batch line): a-10; a-2 supplies only the field path and serde message"
     - "REQ-SAG-0701 / REQ-SAG-0104 behaviour (parallel batch, cancel stops work in another crate): a-9 (runner boundary, REQ-SAG-0104 AC1) and a-10 (end to end); a-2 closes only the trait shape and its doc contract"
     - "REQ-SAG-0014 request (8 MiB) and batch (10,000 lines, 256 MiB) limits: a-10; a-2 enforces only the image count/size limits in DecisionRequest::new"
 ```
 
 # Sprint A-2 design: sc-decision-schema (bead agt-4p2.2)
 
-Governing: REQ-SAG-0201, REQ-SAG-0202, REQ-SAG-0006, ADR-SAG-0001, ADR-SAG-0004 (layer: above sc-agent-http, below every decision backend and the runner), ANC-001 (locked). Also binding: REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0901 (the schema-mismatch signal; resent up to max_sends), REQ-SAG-0504 (decide names the line, field and reason of a bad batch request), owner-architecture, owner-decision-trait, owner-error-contract, owner-no-sleep.
+Governing: REQ-SAG-0201, REQ-SAG-0202, REQ-SAG-0006, ADR-SAG-0001, ADR-SAG-0004 (layer: above sc-agent-http, below every decision backend and the runner), ANC-001 (locked). Also binding: REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0901 (the schema-mismatch signal; resent up to max_sends), REQ-SAG-0504 (decidr names the line, field and reason of a bad batch request), owner-architecture, owner-decision-trait, owner-error-contract, owner-no-sleep.
 Wire shapes: https://api.typesafe.ai/openapi.json v0.2.0 (copy at scratchpad/research/openapi.json), verified 2026-11-09.
 
 Scope: the Jev API types (POST /v1/systemone, GET /v1/models, the 400/422 error bodies), the sans-IO `Backend` trait, the sync `Decision` trait and `DecisionResult`, the per-question sc-sha digest, `DecisionError`. No queue, no workers, no I/O, no session rows (sc-decision-runner, A-9, implements `Decision`).

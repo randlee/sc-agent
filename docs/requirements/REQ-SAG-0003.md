@@ -40,7 +40,7 @@ sc-observability already rotates and prunes the general log. Session logs are th
 
 - [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
 - [ ] A session log written more than the sc-observability retention age ago is still present after a new session runs.
-- [ ] With no log_root configured, decide writes its general log and session logs under `<home>/.sc-agent/logs/`.
+- [ ] With no log_root configured, decidr writes its general log and session logs under `<home>/.sc-agent/logs/`.
 
 ### Dependencies
 

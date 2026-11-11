@@ -1,5 +1,5 @@
 [package]
-name = "decide"            # crates.io availability checked at publish time
+name = "decidr"            # crates.io name decidr
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -35,9 +35,9 @@ tempfile = "3"
 sc-observability = "=1.5.0"   # a notifying LogSink for ordering tests (tests/common)
 
 [lib]
-name = "decide"
+name = "decidr"
 path = "src/lib.rs"
 
 [[bin]]
-name = "decide"
+name = "decidr"
 path = "src/main.rs"

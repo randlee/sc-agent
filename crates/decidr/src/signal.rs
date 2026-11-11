@@ -1,9 +1,9 @@
 //! The interrupt hook (REQ-SAG-0011): SIGINT and SIGTERM (Ctrl-C and Ctrl-Break on Windows).
 //!
 //! The `ctrlc` crate (feature `termination`) installs the handler and starts and owns the one
-//! handler thread; decide's source starts no thread, uses no tokio and no `unsafe`.
+//! handler thread; decidr's source starts no thread, uses no tokio and no `unsafe`.
 //!
-//! Two phases. Before [`SignalWatch::logs_opened`] no logger is open: decide is parsing,
+//! Two phases. Before [`SignalWatch::logs_opened`] no logger is open: decidr is parsing,
 //! loading its configuration, reading its input (a file, stdin or a FIFO, where a read can
 //! block forever) or opening its general log, nothing has been sent and nothing logged, so an
 //! interrupt exits the process at once with [`EXIT_INTERRUPTED`] (RSH-001, RSH-002). From
@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use sc_agent_types::CancelToken;
 
-use crate::DecideError;
+use crate::DecidrError;
 
 /// The exit code after any interrupt. ctrlc does not report which signal fired, so SIGINT,
 /// SIGTERM, Ctrl-C and Ctrl-Break all exit 130 (no 143).
@@ -56,7 +56,7 @@ pub struct SignalWatch {
 }
 
 impl SignalWatch {
-    /// True once any interrupt was received; `decide` then exits 130.
+    /// True once any interrupt was received; `decidr` then exits 130.
     #[must_use]
     pub fn interrupted(&self) -> bool {
         self.state.interrupts.load(Ordering::Acquire) > 0
@@ -73,8 +73,8 @@ impl SignalWatch {
 ///
 /// # Errors
 ///
-/// [`DecideError::Signal`] when a handler is already set or cannot be installed.
-pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
+/// [`DecidrError::Signal`] when a handler is already set or cannot be installed.
+pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecidrError> {
     let state = Arc::new(State::default());
     let watch = SignalWatch {
         state: Arc::clone(&state),
@@ -85,7 +85,7 @@ pub fn install(cancel: &CancelToken) -> Result<SignalWatch, DecideError> {
             std::process::exit(EXIT_INTERRUPTED);
         }
     })
-    .map_err(|source| DecideError::Signal { source })?;
+    .map_err(|source| DecidrError::Signal { source })?;
     Ok(watch)
 }
 
@@ -177,7 +177,7 @@ mod tests {
             inner: transport.clone(),
         });
         let context = crate::Context {
-            service: "decide",
+            service: "decidr",
             config_dir: Some(dir.path().to_path_buf()),
             repo_root: Some(dir.path().to_path_buf()),
             environment: Some(vec![(
@@ -231,7 +231,7 @@ mod tests {
         })
     }
 
-    /// AC: REQ-SAG-0011 decide, NFR-SAG-0001. An interrupt during a `send_batch` over a blocked
+    /// AC: REQ-SAG-0011 decidr, NFR-SAG-0001. An interrupt during a `send_batch` over a blocked
     /// transport cancels the token; every unfinished request ends `decision.cancelled` and the
     /// session log holds one row per started request.
     #[test]
@@ -260,7 +260,7 @@ mod tests {
 
     /// REQ-SAG-0011, NFR-SAG-0001: an interrupt after the logs open (here before `models`
     /// sends anything) does not exit; the operation sees the cancel, writes its
-    /// `decide.models` record and flushes the general log it opened. Ordered by construction:
+    /// `decidr.models` record and flushes the general log it opened. Ordered by construction:
     /// the interrupt is delivered, then the operation runs on the cancelled token.
     #[test]
     fn an_interrupt_after_the_logs_open_still_flushes_the_general_log() {
@@ -281,7 +281,7 @@ mod tests {
             Action::Cancel,
             "no exit"
         );
-        let mut context = crate::Context::new("decide");
+        let mut context = crate::Context::new("decidr");
         context.config_dir = Some(dir.path().to_path_buf());
         context.repo_root = Some(dir.path().to_path_buf());
         context.environment = Some(vec![(
@@ -295,11 +295,11 @@ mod tests {
             context,
         };
         let error = crate::models(&options, &cancel).expect_err("cancelled");
-        assert_eq!(sc_agent_types::ErrorId::id(&error), "decide.decision");
+        assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.decision");
         assert_eq!(transport.sends(), 0, "nothing was sent after the interrupt");
-        let general = std::fs::read_to_string(root.path().join("logs").join("decide.log.jsonl"))
+        let general = std::fs::read_to_string(root.path().join("logs").join("decidr.log.jsonl"))
             .expect("the general log was flushed");
-        assert!(general.contains("decide.models"), "{general}");
+        assert!(general.contains("decidr.models"), "{general}");
         assert!(watch.interrupted());
     }
 

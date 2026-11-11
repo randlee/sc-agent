@@ -514,7 +514,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "decide"
+name = "decidr"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -1547,7 +1547,7 @@ dependencies = [
 name = "sc-agent-py"
 version = "0.1.0"
 dependencies = [
- "decide",
+ "decidr",
  "pyo3",
  "pyo3-build-config",
  "sc-agent-config",

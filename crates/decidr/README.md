@@ -1,20 +1,20 @@
-# decide
+# decidr
 
-The `decide` command line and its library. This is the top layer for decision models. The library target is the composition root: the one place where a backend is chosen (a configured local runner, TypeSafe Jev, or an LLM provider ranked by the keys found) and wired into `sc-decision-runner` over one `HttpClient`. The binary is the `decide` CLI. `sc-agent-py` is a thin layer over this library and adds no wiring of its own.
+The `decidr` command line and its library. This is the top layer for decision models. The library target is the composition root: the one place where a backend is chosen (a configured local runner, TypeSafe Jev, or an LLM provider ranked by the keys found) and wired into `sc-decision-runner` over one `HttpClient`. The binary is the `decidr` CLI. `sc-agent-py` is a thin layer over this library and adds no wiring of its own.
 
 ## Command line
 
 ```bash
-decide send --model jev --project my-project --agent-role judge request.json
+decidr send --model jev --project my-project --agent-role judge request.json
 ```
 
 ```bash
-decide send --batch --model haiku --project my-project --agent-role judge requests.jsonl
+decidr send --batch --model haiku --project my-project --agent-role judge requests.jsonl
 ```
 
 ```bash
-decide models
-decide doctor
+decidr models
+decidr doctor
 ```
 
 - `send`: one JSON request, or a JSONL batch with `--batch`. The input is a file, or `-` for stdin (the default). One result line is printed per request.
@@ -35,14 +35,14 @@ Exit codes: 0 when the command ran and every result succeeded, 1 otherwise, 130 
 - `load_config`, `general_logger`, `session_logger` and `session_identity`.
 - `DoctorReport`, `DetectedKey`, `MissingModel` and `Tie`.
 - Modules `input` (`build_request`, `build_batch`, `read_batch`, limits), `output` (`result_line`, `result_text`) and `signal`.
-- `DecideError`. A failed decision is data in its `DecisionResult`, not an error.
+- `DecidrError`. A failed decision is data in its `DecisionResult`, not an error.
 
 ## Library usage
 
 ```rust,ignore
-use decide::input::build_request;
-use decide::output::result_text;
-use decide::{Context, ModelSelector, SendOptions, load_config, send};
+use decidr::input::build_request;
+use decidr::output::result_text;
+use decidr::{Context, ModelSelector, SendOptions, load_config, send};
 use sc_agent_log::Slug;
 use sc_agent_types::CancelToken;
 
@@ -69,11 +69,11 @@ send(&options, request, &CancelToken::new(), &mut |result| {
 
 - `sc-agent-types`, `sc-agent-config`, `sc-agent-secrets`, `sc-agent-log`, `sc-agent-http`, `sc-decision-schema`, `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider`, `sc-decision-llm` and `sc-decision-runner`.
 
-Layer rule: a crate depends only on lower layers (ADR-SAG-0004), and `decide` is the top. Nothing above it except `sc-agent-py`. Dev only: `sc-agent-testkit`, and the `testing` features of `sc-agent-http` and `sc-agent-log`.
+Layer rule: a crate depends only on lower layers (ADR-SAG-0004), and `decidr` is the top. Nothing above it except `sc-agent-py`. Dev only: `sc-agent-testkit`, and the `testing` features of `sc-agent-http` and `sc-agent-log`.
 
 ## Requirements and decisions
 
-- REQ-SAG-0501: TypeSafe API as decide subcommands.
+- REQ-SAG-0501: TypeSafe API as decidr subcommands.
 - REQ-SAG-0503: doctor warns about models missing from the catalog.
 - REQ-SAG-0504: invalid batch input fails fast.
 - REQ-SAG-0014: input size limits.
@@ -81,4 +81,4 @@ Layer rule: a crate depends only on lower layers (ADR-SAG-0004), and `decide` is
 - REQ-SAG-0103: provider and model are separate.
 - REQ-SAG-0004: session log identity.
 - REQ-SAG-0008: optional logger injection with default loggers.
-- ADR-SAG-0001 and ADR-SAG-0004: one backend trait; crate layering, with `decide` as the composition root.
+- ADR-SAG-0001 and ADR-SAG-0004: one backend trait; crate layering, with `decidr` as the composition root.

@@ -270,7 +270,7 @@ impl LlmClient {
         }
     }
 
-    /// `GET {base}/models` with the credential header, for decide doctor.
+    /// `GET {base}/models` with the credential header, for decidr doctor.
     ///
     /// The URL is the call endpoint with its `/messages` or `/chat/completions` suffix
     /// replaced by `/models` (`https://api.anthropic.com/v1/models`). The caller sends it on a

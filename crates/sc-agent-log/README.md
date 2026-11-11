@@ -20,7 +20,7 @@ use sc_agent_types::SessionId;
 
 let repo = Repo::local("m5", "work")?;
 let identity = SessionIdentity::new(repo, "phase-b", "sanity")?;
-let loggers = Loggers::open(log_root, "decide", identity, None, None)?;
+let loggers = Loggers::open(log_root, "decidr", identity, None, None)?;
 
 loggers.session.write(SessionId::new(), serde_json::Map::new())?;
 loggers.session.flush()?;

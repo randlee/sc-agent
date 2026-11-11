@@ -56,11 +56,11 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-def decide_bin() -> pathlib.Path:
-    """The decide binary built by `cargo build -p decide`."""
-    name = "decide.exe" if os.name == "nt" else "decide"
-    path = pathlib.Path(os.environ.get("DECIDE_BIN", REPO_ROOT / "target" / "debug" / name))
-    assert path.exists(), f"build decide first (cargo build -p decide): {path}"
+def decidr_bin() -> pathlib.Path:
+    """The decidr binary built by `cargo build -p decidr`."""
+    name = "decidr.exe" if os.name == "nt" else "decidr"
+    path = pathlib.Path(os.environ.get("DECIDR_BIN", REPO_ROOT / "target" / "debug" / name))
+    assert path.exists(), f"build decidr first (cargo build -p decidr): {path}"
     return path
 
 

@@ -34,7 +34,7 @@ sprint:
   requirements: [REQ-SAG-0701, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0901, REQ-SAG-0202, REQ-SAG-0201, REQ-SAG-0008, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0004, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0104, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0011, NFR-SAG-0001, REQ-SAG-0006]
   adrs: [ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0701 end to end (a parallel batch through decide --batch and sc-agent-py, against real backends): a-10; a-9 closes it at the runner boundary with scripted transports"
+    - "REQ-SAG-0701 end to end (a parallel batch through decidr --batch and sc-agent-py, against real backends): a-10; a-9 closes it at the runner boundary with scripted transports"
     - "Budget-vs-timeout rule: closed in a-5 (A5-04, A5-06); a-9 only calls HttpClient::may_start / may_resend"
     - "Busy classification, Retry-After floor and jitter, the provider pause (REQ-SAG-0012 rule), max_sends and the 90 s budget themselves: a-5 acceptance; a-9 closes only that one HttpClient's pause covers every worker"
     - "REQ-SAG-0011 interrupt (SIGINT/SIGTERM, KeyboardInterrupt cancel the token): a-10 wires the signals; a-9 supplies the cancel path they use"
@@ -114,7 +114,7 @@ struct Shared {
 }
 impl DecisionRunner {
     pub fn new(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig) -> Self;
-    /// `new` with an explicit clock: `clock` is read for every admission, holdoff and send (passed to may_start, may_resend and send_once), and the job queue parks on it for a holdoff. A seam for callers' tests (decide's `Context.clock`, ManualClock): with a clock only the test moves, a holdoff or provider pause cannot elapse on its own.
+    /// `new` with an explicit clock: `clock` is read for every admission, holdoff and send (passed to may_start, may_resend and send_once), and the job queue parks on it for a holdoff. A seam for callers' tests (decidr's `Context.clock`, ManualClock): with a clock only the test moves, a holdoff or provider pause cannot elapse on its own.
     pub fn with_clock(backend: Arc<dyn Backend>, http: HttpClient, session: SessionLogger, general: GeneralLogger, config: RunnerConfig, clock: Clock) -> Self;
     /// Flushes the session log; RunnerError::SessionLog(log.rows_lost | log.flush) when any row was refused or lost.
     pub fn flush_session_log(&self) -> Result<(), RunnerError>;
@@ -276,7 +276,7 @@ Lints: workspace `panic`/`unwrap_used`/`expect_used`/`indexing_slicing` deny (A-
 - [ ] Result queue bound: sc-decision-runner's result queue holds at most queue_capacity results and a worker blocks on a full queue (test slow_consumer_blocks_workers).
 - [ ] LogContext: sc-decision-runner passes each job's LogContext::request(session_id, Some(position)) to HttpClient::send_once and Backend::decode; two concurrent busy requests' http.busy records carry their own session_ids; runner.session_log_failed carries session_id and position.
 - [ ] REQ-SAG-0013: sc-decision-runner's RunnerConfig::from_config takes workers from AgentConfig.workers, which a-4 bounds to 1..=64 at load, and sets queue_capacity = workers.checked_mul(4) (test: workers 64 -> queue_capacity 256; workers 1 -> 4); the bound itself is a-4's acceptance.
-- [ ] REQ-SAG-0011: sc-decision-runner supplies the cancel path decide's signal handler (a-10) uses — cancelling the CancelToken ends every unfinished request with decision.cancelled and writes its one row (tests cancel_running_batch, cancel_in_flight_send, cancel_ends_holdoff_at_once); signal wiring is a-10's.
+- [ ] REQ-SAG-0011: sc-decision-runner supplies the cancel path decidr's signal handler (a-10) uses — cancelling the CancelToken ends every unfinished request with decision.cancelled and writes its one row (tests cancel_running_batch, cancel_in_flight_send, cancel_ends_holdoff_at_once); signal wiring is a-10's.
 - [ ] decide_stream signature: sc-decision-runner implements decide_stream with `requests: Box<dyn Iterator<Item = DecisionRequest> + Send + 'static>` (A-2) and pulls it on its feeder thread; a compile test passes `Box::new(vec.into_iter())` through `&dyn Decision`.
 - [ ] REQ-SAG-0601: sc-decision-runner resends a request whose HttpClient::send_once returns Next::ResendAt { at, pending } (HTTP 429, 502 or 529, classified by a-5), through HttpClient::may_resend, until max_sends (default 5, set in the HttpClient ResendPolicy) is reached, and sends the same encoded bytes each time (encode called once). Test: a ScriptedTransport answering 529 four times then 200 yields the answer; one answering 529 every time stops after max_sends sends. A held-off request waits in the JobQueue, not in a worker (with 1 worker a second request is answered during the first one's holdoff); the wait (ResendAt or Start::Wait) is a Condvar timed wait woken by a CancelToken::on_cancel hook; no sleep. Rows and general records on the cancel, orphan and abandon paths use try_write.
 - [ ] REQ-SAG-0601 AC4: sc-decision-runner: cancelling a held-off request ends its wait at once and returns decision.cancelled (decide_stream and decide).

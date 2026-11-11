@@ -5,7 +5,7 @@
 //! [`GIT_DEADLINE`] (RSH-001): the child is polled with `try_wait` between deadline waits on
 //! the [`Clock`] (no sleep, REQ-SAG-0010), and a git still running at the deadline is killed,
 //! reaped and reported as [`LogError::GitUnavailable`], so a hung git (a stalled network
-//! filesystem, lock contention) cannot hold an interrupted decide.
+//! filesystem, lock contention) cannot hold an interrupted decidr.
 
 use std::ffi::OsStr;
 use std::fmt;

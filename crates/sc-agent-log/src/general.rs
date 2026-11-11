@@ -18,7 +18,7 @@ const LOG: LogKind = LogKind::General;
 /// The general (diagnostic) log. Clones share one writer.
 ///
 /// The default writes sc-observability's built-in file `<log_root>/logs/<service>.log.jsonl`,
-/// one file per CLI (`decide`, `sc-agent-py`), under sc-observability's default
+/// one file per CLI (`decidr`, `sc-agent-py`), under sc-observability's default
 /// `RetainedLogPolicy` and level; the file's retention is sc-observability's, not this crate's
 /// (REQ-SAG-0003). An injected logger is used as given and never shut down here (REQ-SAG-0008).
 ///
@@ -29,13 +29,13 @@ const LOG: LogKind = LogKind::General;
 /// use sc_agent_types::SessionId;
 ///
 /// let root = tempfile::tempdir()?;
-/// let log = GeneralLogger::open_default(root.path(), "decide")?;
+/// let log = GeneralLogger::open_default(root.path(), "decidr")?;
 /// let mut fields = serde_json::Map::new();
 /// fields.insert("elapsed_ms".into(), 12.into());
 /// let ctx = LogContext::request(SessionId::new(), Some(0));
 /// log.write(Level::Info, "sc_agent_http", "http.response", ctx, fields)?;
 /// log.flush()?;
-/// assert!(root.path().join("logs").join("decide.log.jsonl").exists());
+/// assert!(root.path().join("logs").join("decidr.log.jsonl").exists());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]

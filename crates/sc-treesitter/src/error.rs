@@ -41,7 +41,7 @@ impl Limit {
     }
 }
 
-/// Every failure sc-treesitter, its PyO3 bindings and `tsq` can report.
+/// Every failure sc-treesitter, its PyO3 bindings and `sitr` can report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -156,7 +156,7 @@ pub enum Error {
         /// The `serde_json` error's `Display`.
         detail: String,
     },
-    /// A `tsq` argument error.
+    /// A `sitr` argument error.
     Usage {
         /// `Debug` of clap's `ErrorKind` (display only).
         kind: String,
@@ -168,9 +168,9 @@ pub enum Error {
         /// The `PyErr` `Display`.
         detail: String,
     },
-    /// `tsq` could not write stdout.
+    /// `sitr` could not write stdout.
     ///
-    /// A failed stderr write is not reported: there is nowhere left to report it, so `tsq`
+    /// A failed stderr write is not reported: there is nowhere left to report it, so `sitr`
     /// drops it and exits 1.
     Write {
         /// The I/O error kind.
@@ -178,7 +178,7 @@ pub enum Error {
         /// The lower error's `Display`.
         detail: String,
     },
-    /// `tsq`'s general log could not start.
+    /// `sitr`'s general log could not start.
     Log {
         /// The sc-observability error's code and message.
         detail: String,
@@ -295,13 +295,13 @@ impl Error {
     pub fn recovery(&self) -> Option<&'static str> {
         match self {
             Self::UnknownLanguage { .. } => {
-                Some("run `tsq languages` (or call `languages()`) for the loaded language ids")
+                Some("run `sitr languages` (or call `languages()`) for the loaded language ids")
             }
             Self::GrammarUnavailable { .. } => {
                 Some("build sc-treesitter with the language's `grammar-<language>` feature")
             }
             Self::UnknownQuery { .. } => Some(
-                "run `tsq queries --language <language>` (or call `queries()`) for its queries",
+                "run `sitr queries --language <language>` (or call `queries()`) for its queries",
             ),
             Self::QueryCompile { .. } => Some("fix the query at the reported row and column"),
             Self::QueryCaptureInvalid { .. } => {
@@ -312,7 +312,7 @@ impl Error {
             Self::InputTooLarge { .. } => Some("query a source of at most 8 MiB"),
             Self::SyntaxError { .. } => Some("fix the syntax error inside the matched span"),
             Self::LimitExceeded { .. } => Some("narrow the query or query a smaller source"),
-            Self::Usage { .. } => Some("run `tsq --help`"),
+            Self::Usage { .. } => Some("run `sitr --help`"),
             Self::Python { .. } => Some("pass the source as `bytes` or `str`"),
             Self::GrammarLoad { .. }
             | Self::FileRead { .. }
@@ -482,7 +482,7 @@ mod tests {
         assert!(
             unknown
                 .recovery()
-                .is_some_and(|hint| hint.contains("tsq languages"))
+                .is_some_and(|hint| hint.contains("sitr languages"))
         );
         let unavailable = Error::GrammarUnavailable {
             language: "rust".to_owned(),
@@ -510,11 +510,11 @@ mod tests {
     fn multi_line_lower_text_becomes_one_line() {
         let error = Error::Usage {
             kind: "MissingRequiredArgument".to_owned(),
-            detail: "error: missing\n\nUsage: tsq query\n".to_owned(),
+            detail: "error: missing\n\nUsage: sitr query\n".to_owned(),
         };
         assert_eq!(
             error.message(),
-            "invalid arguments (MissingRequiredArgument): error: missing Usage: tsq query"
+            "invalid arguments (MissingRequiredArgument): error: missing Usage: sitr query"
         );
     }
 }

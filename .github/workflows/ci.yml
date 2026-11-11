@@ -163,11 +163,11 @@ jobs:
           default = lib["features"].get("default", [])
           problems = [f"`{f}` is a default feature" for f in ("python", "cli") if f in default]
           bins = {t["name"]: t for t in lib["targets"] if "bin" in t["kind"]}
-          if bins.get("tsq", {}).get("required-features") != ["cli"]:
-              problems.append("bin tsq must have required-features = [\"cli\"]")
+          if bins.get("sitr", {}).get("required-features") != ["cli"]:
+              problems.append("bin sitr must have required-features = [\"cli\"]")
           if problems:
               sys.exit("ADR-SAG-0005: " + "; ".join(problems))
-          print(f"default features {default}; tsq required-features {bins['tsq']['required-features']}")
+          print(f"default features {default}; sitr required-features {bins['sitr']['required-features']}")
           PY
 
       - name: Test with only the Python grammar
@@ -189,8 +189,8 @@ jobs:
           python -m pip install --no-index --find-links dist sc-treesitter
           python -m pytest crates/sc-treesitter-py/tests
 
-  # sc-agent-py (sprint a-10): the sc-agent wheel over the decide library, and its pytest
-  # suite against a loopback runner (REQ-QA-007). The suite also runs the decide binary.
+  # sc-agent-py (sprint a-10): the sc-agent wheel over the decidr library, and its pytest
+  # suite against a loopback runner (REQ-QA-007). The suite also runs the decidr binary.
   sc-agent-py:
     name: sc-agent-py wheel and pytest
     needs: [detect, fmt]
@@ -214,8 +214,8 @@ jobs:
             target
           key: ubuntu-sc-agent-py-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build the decide binary (the parity and identity tests run it)
-        run: cargo build -p decide
+      - name: Build the decidr binary (the parity and identity tests run it)
+        run: cargo build -p decidr
 
       - name: Install Python
         uses: actions/setup-python@v5

@@ -25,10 +25,10 @@ sprint:
   requirements: [REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0008, NFR-SAG-0001, REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0009, REQ-SAG-0010]
   adrs: [ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0004 slug rejection end to end (decide and sc-agent-py refuse project \"Phase B\" with log.invalid_slug and write nothing): a-10 acceptance"
+    - "REQ-SAG-0004 slug rejection end to end (decidr and sc-agent-py refuse project \"Phase B\" with log.invalid_slug and write nothing): a-10 acceptance"
     - "REQ-SAG-0004 AC3 end to end (the CLI and PyO3 inputs are only project and agent_role): a-10 acceptance"
-    - "REQ-SAG-0003 per-CLI file in use (decide opens GeneralLogger::open_default(.., \"decide\"), tsq its own): a-10 and a-3; the ~/.sc-agent default of <log_root> is AgentConfig::log_root, a-4"
-    - "REQ-SAG-0008 end to end (logger injection through decide's options and sc-agent-py): a-10 acceptance"
+    - "REQ-SAG-0003 per-CLI file in use (decidr opens GeneralLogger::open_default(.., \"decidr\"), sitr its own): a-10 and a-3; the ~/.sc-agent default of <log_root> is AgentConfig::log_root, a-4"
+    - "REQ-SAG-0008 end to end (logger injection through decidr's options and sc-agent-py): a-10 acceptance"
 ```
 
 # Sprint A-8: sc-agent-log (bead agt-4p2.8)
@@ -40,7 +40,7 @@ Copy script: `docs/plans/phase-a/copy/a-8.sh` (dry run 2026-11-09, reconciliatio
 
 ## Shape in one paragraph
 
-Two separate loggers, both `sc-observability` 1.5.0 v2 `Logger`s. `GeneralLogger` is the general log: default is sc-observability's built-in file sink at `<log_root>/logs/<service>.log.jsonl`, one file per CLI (`decide`; `sc-agent-py` for the Python API), with its default `RetainedLogPolicy` and level (rotation and retention are sc-observability's, REQ-SAG-0003). `<log_root>` is `AgentConfig::log_root()` (A-4), default `~/.sc-agent`, `<home>/.sc-agent` on every platform (owner decision 2026-11-10). `SessionLogger` writes one JSONL row per call into `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per directory, appended by every run and process and never rotated (REQ-SAG-0005), through a registered `JsonlFileSink` whose policy never rotates or prunes (concurrent appends are sc-observability's); its built-in file sink is off. Every session row's `fields{}` begins with `session_id`, `repo`, `project`, `agent_role` (agent role and agent name are one field, REQ-SAG-0004). Both loggers take generic rows (`serde_json::Map`); callers build the payload (the runner builds the decision row, A-9; sc-agent-http writes its events through an injected `GeneralLogger`, A-5). Either logger can be an injected `Arc<sc_observability::v2::Logger>`; what is not injected gets the default. A write a caller cannot act on (a log failure must never change a send or decision outcome) is still counted: `flush()` reports every refused or lost row once.
+Two separate loggers, both `sc-observability` 1.5.0 v2 `Logger`s. `GeneralLogger` is the general log: default is sc-observability's built-in file sink at `<log_root>/logs/<service>.log.jsonl`, one file per CLI (`decidr`; `sc-agent-py` for the Python API), with its default `RetainedLogPolicy` and level (rotation and retention are sc-observability's, REQ-SAG-0003). `<log_root>` is `AgentConfig::log_root()` (A-4), default `~/.sc-agent`, `<home>/.sc-agent` on every platform (owner decision 2026-11-10). `SessionLogger` writes one JSONL row per call into `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per directory, appended by every run and process and never rotated (REQ-SAG-0005), through a registered `JsonlFileSink` whose policy never rotates or prunes (concurrent appends are sc-observability's); its built-in file sink is off. Every session row's `fields{}` begins with `session_id`, `repo`, `project`, `agent_role` (agent role and agent name are one field, REQ-SAG-0004). Both loggers take generic rows (`serde_json::Map`); callers build the payload (the runner builds the decision row, A-9; sc-agent-http writes its events through an injected `GeneralLogger`, A-5). Either logger can be an injected `Arc<sc_observability::v2::Logger>`; what is not injected gets the default. A write a caller cannot act on (a log failure must never change a send or decision outcome) is still counted: `flush()` reports every refused or lost row once.
 
 ## 1. Copy list (source `sc-agent-ref@dce239a` -> `crates/sc-agent-log/`)
 
@@ -151,7 +151,7 @@ fn never_rotate() -> RetainedLogPolicy;
 #[derive(Clone)]
 pub struct GeneralLogger { writer: Arc<Writer> }
 impl GeneralLogger {
-    /// Default: built-in file sink `<log_root>/logs/<service>.log.jsonl` (`service` = the CLI name, e.g. "decide";
+    /// Default: built-in file sink `<log_root>/logs/<service>.log.jsonl` (`service` = the CLI name, e.g. "decidr";
     /// one file per CLI, REQ-SAG-0003), RetainedLogPolicy::default(), default level, console off, one startup retention pass (C4).
     pub fn open_default(log_root: &Path, service: &'static str) -> Result<Self, LogError>;
     pub fn injected(logger: Arc<Logger>) -> Self;

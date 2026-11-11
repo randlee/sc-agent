@@ -29,7 +29,7 @@ let backend: Arc<dyn Backend> = Arc::new(LlmDecisionBackend::new(llm, haiku_mode
 // Give `backend` to a sc_decision_runner::DecisionRunner.
 ```
 
-For Luna, use `LlmProvider::OpenAi` and a Luna model id. `sc-agent-types` supplies the latest id of each line (`Catalog::resolve`). `decide` makes this choice in one place.
+For Luna, use `LlmProvider::OpenAi` and a Luna model id. `sc-agent-types` supplies the latest id of each line (`Catalog::resolve`). `decidr` makes this choice in one place.
 
 ## Depends on
 
