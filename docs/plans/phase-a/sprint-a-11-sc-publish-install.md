@@ -16,6 +16,7 @@ requirements:
   - REQ-SAG-0132
   - REQ-SAG-0803
 adrs:
+  - ADR-SAG-0004
   - ADR-SAG-0017
   - ADR-SAG-0018
 owned_paths:
@@ -56,4 +57,8 @@ Install [sc-publish](https://github.com/randlee/sc-publish) at pin `44cebf2`, de
 python3 .github/scripts/release_artifacts.py validate-manifest \
   --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml
 bash .github/scripts/release-preflight-docli.sh
+cargo tree -p decidr --depth 1
+cargo tree -p sc-treesitter --depth 1
 ```
+
+Layering (ADR-SAG-0004): `version.workspace` / member list changes only; `cargo tree` depth-1 edges unchanged from a-10 integration.
