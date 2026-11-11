@@ -22,7 +22,7 @@ sprint:
   requirements: [REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601]
   adrs: [ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0101 end to end (decide --model <short name> resolves through the catalog built from the global config): a-10"
+    - "REQ-SAG-0101 end to end (decidr --model <short name> resolves through the catalog built from the global config): a-10"
     - "REQ-SAG-0102 'add a model by editing JSON, no rebuild': config part a-4 (AgentConfig::catalog), end to end a-10"
     - "REQ-SAG-0104 AC1 (a token cancelled by the caller stops an operation in another crate): a-9 (sc-decision-runner cancel tests, token created in the test crate); a-1 keeps the in-crate CancelToken tests"
     - "REQ-SAG-0104 AC2 (a CancelToken cancelled from Python stops a request): a-10, sc-agent-py"
@@ -38,14 +38,14 @@ Target: `crates/sc-agent-types` plus the workspace root (`Cargo.toml`, `clippy.t
 Governing: REQ-SAG-0001, 0002, 0006, 0009, 0010, 0101, 0102, 0103, 0104; ADR-SAG-0004 (bottom layer; the shared `ErrorId`/`ErrorDetail` convention); REQ-SAG-0401 (no env-var names here); REQ-SAG-0601 (cancel ends a holdoff wait at once).
 Owner decisions: owner-short-names, owner-model-catalog, owner-provider-and-model, owner-openai-naming, owner-cancel-token, owner-no-consumer-types, owner-error-contract, owner-errors-settled, owner-ids-ulid, owner-no-sleep, owner-lowlevel-no-tokio, owner-architecture.
 
-Layering (ADR-SAG-0004, every bead uses it): sc-agent-types <- sc-agent-config, sc-agent-secrets, sc-agent-log <- sc-agent-http <- sc-decision-schema <- sc-decision-systemone, sc-decision-local, sc-decision-llm (sc-decision-llm also uses sc-llm-provider, which sits on sc-agent-http and needs no decision types) <- sc-decision-runner <- decide (bin and lib) <- sc-agent-py (Python API, A-10). sc-treesitter stands alone.
+Layering (ADR-SAG-0004, every bead uses it): sc-agent-types <- sc-agent-config, sc-agent-secrets, sc-agent-log <- sc-agent-http <- sc-decision-schema <- sc-decision-systemone, sc-decision-local, sc-decision-llm (sc-decision-llm also uses sc-llm-provider, which sits on sc-agent-http and needs no decision types) <- sc-decision-runner <- decidr (bin and lib) <- sc-agent-py (Python API, A-10). sc-treesitter stands alone.
 
 Decisions in this design:
 - `Provider` is a closed enum of six (TypeSafe, Anthropic, OpenAi, OpenRouter, Nous, Together), not `#[non_exhaustive]`, so sc-agent-secrets matches it exhaustively.
-- Local decision runners are global-config entries (A-4 `local_runners`), selected by name in decide (A-10); `ShortName` has exactly the nine.
-- Catalog = built-in rows + global-config rows; per line the newest release date wins. On an equal release date the global-config model wins (assistant choice; owner: IDC, decide doctor warns, REQ-SAG-0503). sc-agent-types reads no files.
+- Local decision runners are global-config entries (A-4 `local_runners`), selected by name in decidr (A-10); `ShortName` has exactly the nine.
+- Catalog = built-in rows + global-config rows; per line the newest release date wins. On an equal release date the global-config model wins (assistant choice; owner: IDC, decidr doctor warns, REQ-SAG-0503). sc-agent-types reads no files.
 - Built-in rows carry each model's published release date (REQ-SAG-0102; research/model-dates.md, checked 2026-11-09): jev-1.13.0 2026-09-15 (date supplied by the owner 2026-11-09; docs.typesafe.ai publishes none), jev-1.14.0 2026-10-14, claude-haiku-5-5 2026-10-07, claude-sonnet-5-5 2026-09-28, claude-opus-5-5 2026-09-22, claude-fable-5-2 2026-11-09, gpt-6-luna 2026-09-22, gpt-6.1-terra 2026-10-26, gpt-6.1-sol 2026-09-29, gpt-6-astra 2026-09-03. Ids are provider-neutral (REQ-SAG-0103); each provider maps them to its own id in sc-llm-provider (A-7), e.g. OpenRouter `anthropic/claude-haiku-5.5`.
-- Provider ranking (REQ-SAG-0103, assistant decision): `Provider::PRIORITY` = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous. `Provider::ranking(line)` is the providers that serve a line, in that order: jev -> [TypeSafe]; haiku, sonnet, opus, fable -> [Anthropic, OpenRouter, Together]; luna, terra, sol, astra -> [OpenAi, OpenRouter, Together]; an id on no line (`None`) -> [OpenRouter, Together, Nous]. decide takes the first with a detected key; `--provider` is only an optional override (A-10).
+- Provider ranking (REQ-SAG-0103, assistant decision): `Provider::PRIORITY` = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous. `Provider::ranking(line)` is the providers that serve a line, in that order: jev -> [TypeSafe]; haiku, sonnet, opus, fable -> [Anthropic, OpenRouter, Together]; luna, terra, sol, astra -> [OpenAi, OpenRouter, Together]; an id on no line (`None`) -> [OpenRouter, Together, Nous]. decidr takes the first with a detected key; `--provider` is only an optional override (A-10).
 - `ModelChoice::Version(id)` resolves to itself without a catalog check (REQ-SAG-0101 AC2; REQ-SAG-0502/0503 allow unlisted models).
 - `SessionId` (ULID) lives here: sc-agent-log, sc-decision-schema and the runner all use it.
 - `CancelToken` has `on_cancel` registration; every timed wait is `Clock::wait_until(&CancelToken, Instant)` (the one time source: `Clock::system()` in production, `testing::ManualClock` in tests; the token itself has no timed wait); no sleep. The runner's queue registers a hook so held-off jobs and idle workers wake at once on cancel (A-9).
@@ -131,7 +131,7 @@ pub trait ErrorId: std::error::Error {
     fn cause_detail(&self) -> Option<ErrorDetail>;
     /// What the caller does next, if this layer knows. Provided: `None`. Sprints return non-empty
     /// text for secrets.key_missing (a-4), http.provider_busy and http.quota_exhausted (a-5),
-    /// local.model_not_served (a-6), decide.no_provider_key and decide.request_parse (a-10).
+    /// local.model_not_served (a-6), decidr.no_provider_key and decidr.request_parse (a-10).
     fn recovery(&self) -> Option<&'static str> { None }
     /// Provided: `ErrorDetail { id, message, recovery, cause: cause_detail() }`. Do not override.
     fn detail(&self) -> ErrorDetail;
@@ -385,7 +385,7 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-1.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] Shared files: right after the copy commit a-1 pushes the workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (sleep and sc_agent_secrets::ApiKey::as_str disallowed-methods entries); a-3, a-4 and a-8 start from that push; no later sprint edits either file.
-- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) (infallible: every line has a slot) returns the newest model of its line across built-in and with_config_model rows (test). The decide end-to-end check is a-10's.
+- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) (infallible: every line has a slot) returns the newest model of its line across built-in and with_config_model rows (test). The decidr end-to-end check is a-10's.
 - [ ] REQ-SAG-0101 AC2: sc-agent-types: a specific catalog version id parses as ModelChoice::Version and Catalog::resolve returns it unchanged (test).
 - [ ] REQ-SAG-0102 AC1/AC2: sc-agent-types: Catalog::with_config_model adding a haiku model dated later than every built-in haiku makes resolve(Latest(Haiku)) return it with no rebuild; an equal date also makes it win; an earlier date changes nothing (tests). sc-agent-types reads no files (no std::fs use). Loading the row from JSON is a-4's.
 - [ ] REQ-SAG-0102: sc-agent-types: every built-in MODELS row carries the model's published release date (claude-fable-5-2, not 5-1), checked by test, including jev-1.13.0 = 2026-09-15 (date supplied by the owner 2026-11-09).
@@ -407,7 +407,7 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 ## Notes
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7):
-- Same release date: the global-config model wins (assistant choice under the owner's 'IDC'); decide doctor warns (REQ-SAG-0503).
+- Same release date: the global-config model wins (assistant choice under the owner's 'IDC'); decidr doctor warns (REQ-SAG-0503).
 - Built-in rows and dates: research/model-dates.md; fable is claude-fable-5-2.
 - Provider-specific ids: the catalog holds provider-neutral ids; each provider maps them (REQ-SAG-0103, sc-llm-provider A-7). Provider ranking is defined here (design).
 - jev-1.13.0 release date 2026-09-15: date supplied by the owner 2026-11-09 (docs.typesafe.ai gives none; plan-hardening decision 10).

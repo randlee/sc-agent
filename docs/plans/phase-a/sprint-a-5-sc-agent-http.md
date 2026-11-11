@@ -28,8 +28,8 @@ sprint:
   requirements: [REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0002, REQ-SAG-0007, REQ-SAG-0008, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0401]
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0601 end to end (a decide send against a busy or timing-out provider, held off and resent through the real DecisionRunner): a-10 acceptance; the holdoff wait and cancel are a-9's"
-    - "REQ-SAG-0602 end to end (decide reports http.quota_exhausted from a provider reply): a-10 acceptance"
+    - "REQ-SAG-0601 end to end (a decidr send against a busy or timing-out provider, held off and resent through the real DecisionRunner): a-10 acceptance; the holdoff wait and cancel are a-9's"
+    - "REQ-SAG-0602 end to end (decidr reports http.quota_exhausted from a provider reply): a-10 acceptance"
     - "REQ-SAG-0012 end to end (one busy reply pauses the other requests of a batch through the runner's one HttpClient): a-9 and a-10 acceptance"
     - "REQ-SAG-0015 end to end (local runner timeouts 300 s / load 600 s read from config, one UreqTransport per runner, the load-on-first-request deadline chosen by the daemon): a-4 (config keys), a-6 (which request gets with_deadline), a-10 (builds the transports). Closed here: the per-transport Timeouts and the per-request deadline (A5-25, A5-26)"
     - "REQ-SAG-0013 max_sends 1..=10 bound and key_env refusal for plain-http non-loopback runners: checked at config load, a-4; ResendPolicy accepts any NonZeroU32. The request-level key guard (A5-24) is closed here"
@@ -56,7 +56,7 @@ Main departures from the old crate:
 
 Decisions (assistant, 2026-11-09):
 - Scheme: `Endpoint::parse` accepts only https; `Endpoint::parse_local` also accepts http and is called only by sc-decision-local with a host and port from a `local_runners` entry (runners on the user's machine or network often have no TLS).
-- One-off calls with no runner queue (decide models and doctor, a non-decision LLM call, REQ-SAG-0502) hold off on `Clock::wait_until(&cancel, t)` (a-1) on the calling thread: a queue of one, ended at once by cancel; no sleep.
+- One-off calls with no runner queue (decidr models and doctor, a non-decision LLM call, REQ-SAG-0502) hold off on `Clock::wait_until(&cancel, t)` (a-1) on the calling thread: a queue of one, ended at once by cancel; no sleep.
 
 Push order (PLAN-SCOPE-002): the first pushes after the copy commit are `src/request.rs` + `src/error.rs` building (`HttpRequest`, `HttpResponse`, `HttpError` with the section 3/4 surface), so a-2 can start on its dev-push edge; `resend.rs`, `ureq_transport.rs` and the rest follow.
 
@@ -187,7 +187,7 @@ pub struct Timeouts { pub connect: Duration, pub request: Duration }
 impl Timeouts { pub const MAX: Duration /* 3600 s, connect and request */; pub const DEADLINE_MAX: Duration; /* 10800 s = load max 7200 s + request max 3600 s (REQ-SAG-0015); with_deadline values over it or zero are refused as http.invalid_request at send */ pub fn validate(self) -> Result<Self, HttpError>; }
 impl Default for Timeouts { /* connect 10 s, request 120 s: decision and LLM sends */ }
 impl Timeouts {
-    /// connect 5 s, request 10 s: discovery, `decide models`, `decide doctor` and health probes (a-6, a-7, a-10).
+    /// connect 5 s, request 10 s: discovery, `decidr models`, `decidr doctor` and health probes (a-6, a-7, a-10).
     pub const fn probe() -> Self;
     /// Same connect timeout, this request deadline (REQ-SAG-0015: a local runner's own request timeout, default 300 s;
     /// a-10 builds one UreqTransport per local runner with `Timeouts::default().with_request(runner.request_timeout)`).

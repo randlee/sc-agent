@@ -13,7 +13,7 @@ Define the low-level sc-agent libraries: `sc-agent-types`, `sc-decision-schema` 
 
 ## What is deliberately out of scope
 
-- The decide CLI design beyond what the low-level libraries must support.
+- The decidr CLI design beyond what the low-level libraries must support.
 - Decision-model caching.
 
 ## Anchors

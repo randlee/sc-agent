@@ -27,9 +27,9 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 | sc-decision-systemone, sc-decision-local (over sc-decision-systemone) | decision backends | SystemOneBackend, LocalBackend (sans-IO: probe_request, read_probe, model), LocalProbe (Transport + Clock: discover, wait_until_loaded, with_log) | systemone: types, secrets, http, schema; local: also config, log and sc-decision-systemone | a-6 |
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
 | sc-decision-runner | runner | DecisionRunner, RunnerConfig, RunnerError | types, config, log, http, schema | a-9 |
-| decide, sc-agent-py | top (decide library = composition root) | decide library API, decide CLI, Python module | all of the above | a-10 |
-| sc-treesitter (tsq bin behind the non-default `cli` feature), sc-treesitter-py | stands alone (ADR-SAG-0005) | tsq CLI, Python query API | none (workspace root only) | a-3 |
-| sc-agent-testkit (dev-only, `publish = false`, never a normal dependency) | test support, not a layer | HANG_GUARD, recv_within, join_within, cancelled_within, Gate, Started, serve_once, serve_each, ChildGuard | types | none: added by the phase-end QA; the workspace scan `tests_are_deterministic` (crates/decide/tests/workspace.rs) refuses raw unbounded waits and clock reads in tests |
+| decidr, sc-agent-py | top (decidr library = composition root) | decidr library API, decidr CLI, Python module | all of the above | a-10 |
+| sc-treesitter (sitr bin behind the non-default `cli` feature), sc-treesitter-py | stands alone (ADR-SAG-0005) | sitr CLI, Python query API | none (workspace root only) | a-3 |
+| sc-agent-testkit (dev-only, `publish = false`, never a normal dependency) | test support, not a layer | HANG_GUARD, recv_within, join_within, cancelled_within, Gate, Started, serve_once, serve_each, ChildGuard | types | none: added by the phase-end QA; the workspace scan `tests_are_deterministic` (crates/decidr/tests/workspace.rs) refuses raw unbounded waits and clock reads in tests |
 
 ## Wave table
 
@@ -134,11 +134,11 @@ The owner closes the record's acceptance; contributing sprints prove their bound
 |---|---|---|---|---|
 | a-1 | [Sprint A-1: sc-agent-types](sprint-a-1-sc-agent-types.md) | `sprint/a-1-sc-agent-types` | — | closed |
 | a-2 | [Sprint A-2: sc-decision-schema](sprint-a-2-sc-decision-schema.md) | `sprint/a-2-sc-decision-schema` | a-5 | closed |
-| a-3 | [Sprint A-3: sc-treesitter, tsq and sc-treesitter-py](sprint-a-3-sc-treesitter.md) | `sprint/a-3-sc-treesitter` | a-1 | closed |
+| a-3 | [Sprint A-3: sc-treesitter, sitr and sc-treesitter-py](sprint-a-3-sc-treesitter.md) | `sprint/a-3-sc-treesitter` | a-1 | closed |
 | a-4 | [Sprint A-4: sc-agent-config and sc-agent-secrets](sprint-a-4-config-secrets.md) | `sprint/a-4-config-secrets` | a-1 | closed |
 | a-5 | [Sprint A-5: sc-agent-http](sprint-a-5-sc-agent-http.md) | `sprint/a-5-sc-agent-http` | a-4, a-8 | closed |
 | a-6 | [Sprint A-6: sc-decision-systemone and sc-decision-local](sprint-a-6-decision-backends.md) | `sprint/a-6-decision-backends` | a-2, a-4, a-5, a-8 | closed |
 | a-7 | [Sprint A-7: sc-llm-provider and sc-decision-llm](sprint-a-7-llm-provider.md) | `sprint/a-7-llm-provider` | a-2, a-4, a-5, a-8 | closed |
 | a-8 | [Sprint A-8: sc-agent-log](sprint-a-8-sc-agent-log.md) | `sprint/a-8-sc-agent-log` | a-1 | closed |
 | a-9 | [Sprint A-9: sc-decision-runner](sprint-a-9-decision-runner.md) | `sprint/a-9-decision-runner` | a-2, a-4, a-5, a-8 | closed |
-| a-10 | [Sprint A-10: decide CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | closed |
+| a-10 | [Sprint A-10: decidr CLI and sc-agent Python API](sprint-a-10-clis-python.md) | `sprint/a-10-clis-python` | a-6, a-7, a-9 | closed |

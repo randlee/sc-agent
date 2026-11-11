@@ -179,13 +179,13 @@
           "at": "2026-11-09T23:59:51+00:00",
           "event": "retired",
           "replaced_by": "ANC-006",
-          "reason": "the decision CLI is named decide, not sc-ai; scope rewritten to bead-level signals"
+          "reason": "the decision CLI is named decidr, not sc-ai; scope rewritten to bead-level signals"
         },
         {
           "at": "2026-11-10T05:47:12+00:00",
           "event": "excluded",
           "item": "agt-4p2.3",
-          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3.",
+          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its sitr binary and sc-treesitter-py; the sitr CLI and its Python parity are both in A-3.",
           "replaced": true
         }
       ],
@@ -208,7 +208,7 @@
         },
         {
           "item": "agt-4p2.3",
-          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3."
+          "reason": "Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its sitr binary and sc-treesitter-py; the sitr CLI and its Python parity are both in A-3."
         }
       ]
     },
@@ -389,14 +389,14 @@
           "at": "2026-11-10T01:15:09+00:00",
           "event": "excluded",
           "item": "agt-4p2.10",
-          "reason": "A-10 builds the decide and tsq binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
+          "reason": "A-10 builds the decidr and sitr binaries and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
           "replaced": false
         },
         {
           "at": "2026-11-10T05:47:04+00:00",
           "event": "excluded",
           "item": "agt-4p2.10",
-          "reason": "A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
+          "reason": "A-10 builds the decidr binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.",
           "replaced": true
         }
       ],
@@ -407,7 +407,7 @@
         },
         {
           "item": "agt-4p2.10",
-          "reason": "A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait."
+          "reason": "A-10 builds the decidr binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait."
         }
       ]
     },
@@ -426,7 +426,7 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decide, which sits above the runner."
+          "sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decidr, which sits above the runner."
         ],
         "fail": [
           "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."
@@ -660,7 +660,7 @@
           "at": "2026-11-10T04:41:13+00:00",
           "event": "excluded",
           "item": "agt-4p2.10",
-          "reason": "A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.",
+          "reason": "A-10 builds decidr and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.",
           "replaced": false
         }
       ],
@@ -687,7 +687,7 @@
         },
         {
           "item": "agt-4p2.10",
-          "reason": "A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them."
+          "reason": "A-10 builds decidr and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them."
         }
       ]
     },
@@ -882,7 +882,7 @@
           "at": "2026-11-10T01:15:09+00:00",
           "event": "excluded",
           "item": "agt-4p2.10",
-          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.",
+          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decidr only imports them.",
           "replaced": false
         }
       ],
@@ -893,7 +893,7 @@
         },
         {
           "item": "agt-4p2.10",
-          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them."
+          "reason": "A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decidr only imports them."
         }
       ]
     },
@@ -981,7 +981,7 @@
           "at": "2026-11-10T01:15:09+00:00",
           "event": "excluded",
           "item": "agt-4p2.10",
-          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.",
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decidr and the Python API only pass through the runner and add no resend logic.",
           "replaced": false
         }
       ],
@@ -1004,7 +1004,7 @@
         },
         {
           "item": "agt-4p2.10",
-          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic."
+          "reason": "Resending on 429/502/529 is built in A-5 and A-9; decidr and the Python API only pass through the runner and add no resend logic."
         }
       ]
     },
@@ -1019,7 +1019,7 @@
       "stated_at": "2026-11-09",
       "context": "record REQ-SAG-0701",
       "summary": "Batches run in parallel, fastest first, failures returned",
-      "scope": "adds or changes batch handling in sc-decision-runner or decide",
+      "scope": "adds or changes batch handling in sc-decision-runner or decidr",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -1079,21 +1079,21 @@
       "id": "ANC-006",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Every operation available in the decide CLI must also be available in the sc-agent Python API.",
+      "statement": "Every operation available in the decidr CLI must also be available in the sc-agent Python API.",
       "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
       "kind": "directive",
       "stated_by": "Rand Lee",
       "stated_at": "2026-11-08T21:07:35Z",
       "context": "planning session",
-      "summary": "Python API offers every decide CLI operation",
-      "scope": "adds or changes a decide subcommand or a function in the sc-agent Python bindings",
-      "deterministic_check": "each decide subcommand has a matching Python API function, checked by a test that lists both",
+      "summary": "Python API offers every decidr CLI operation",
+      "scope": "adds or changes a decidr subcommand or a function in the sc-agent Python bindings",
+      "deterministic_check": "each decidr subcommand has a matching Python API function, checked by a test that lists both",
       "fixtures": {
         "pass": [
-          "Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both."
+          "Each decidr subcommand has a matching function in the sc-agent Python API, checked by a test that lists both."
         ],
         "fail": [
-          "decide gains a `models` subcommand with no Python equivalent."
+          "decidr gains a `models` subcommand with no Python equivalent."
         ]
       },
       "question_overrides": {},
@@ -1131,25 +1131,25 @@
           "at": "2026-11-10T01:06:53+00:00",
           "event": "excluded",
           "item": "agt-4p2.3",
-          "reason": "A-3 builds the sc-treesitter library; it adds no decide CLI operation.",
+          "reason": "A-3 builds the sc-treesitter library; it adds no decidr CLI operation.",
           "replaced": false
         },
         {
           "at": "2026-11-10T01:07:05+00:00",
           "event": "excluded",
           "item": "agt-4p2.1",
-          "reason": "A-1 defines data types only; it adds no decide subcommand or Python binding function.",
+          "reason": "A-1 defines data types only; it adds no decidr subcommand or Python binding function.",
           "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-4p2.3",
-          "reason": "A-3 builds the sc-treesitter library; it adds no decide CLI operation."
+          "reason": "A-3 builds the sc-treesitter library; it adds no decidr CLI operation."
         },
         {
           "item": "agt-4p2.1",
-          "reason": "A-1 defines data types only; it adds no decide subcommand or Python binding function."
+          "reason": "A-1 defines data types only; it adds no decidr subcommand or Python binding function."
         }
       ]
     },
@@ -1242,14 +1242,14 @@
           "at": "2026-11-10T02:07:52+00:00",
           "event": "excluded",
           "item": "agt-4p2.3",
-          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq CLI's logging is planned in A-10.",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the sitr CLI's logging is planned in A-10.",
           "replaced": true
         },
         {
           "at": "2026-11-10T04:32:39+00:00",
           "event": "excluded",
           "item": "agt-4p2.3",
-          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line).",
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the sitr binary in A-3 writes its own sitr.log through sc-observability (A-3's REQ-SAG-0003 line).",
           "replaced": true
         }
       ],
@@ -1268,7 +1268,7 @@
         },
         {
           "item": "agt-4p2.3",
-          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line)."
+          "reason": "REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the sitr binary in A-3 writes its own sitr.log through sc-observability (A-3's REQ-SAG-0003 line)."
         }
       ]
     }

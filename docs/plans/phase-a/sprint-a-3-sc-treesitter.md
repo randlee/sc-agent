@@ -1,6 +1,6 @@
 <!-- Generated from bead agt-4p2.3 for file-based reviewers. The bead is the source of truth: edit the bead, then re-export. -->
 
-# Sprint A-3: sc-treesitter, tsq and sc-treesitter-py
+# Sprint A-3: sc-treesitter, sitr and sc-treesitter-py
 - id: `a-3` (bead `agt-4p2.3`)
 - branch: `sprint/a-3-sc-treesitter`
 - depends on: a-1
@@ -8,7 +8,7 @@
 
 ## Description
 
-Build sc-treesitter as a stand-alone library with PyO3 bindings (crates/sc-treesitter-py) and the tsq binary (non-default feature cli) for querying any grammar. Governing records: REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0003 (tsq log). Code to copy from sc-agent-ref: see design.
+Build sc-treesitter as a stand-alone library with PyO3 bindings (crates/sc-treesitter-py) and the sitr binary (non-default feature cli) for querying any grammar. Governing records: REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0003 (sitr log). Code to copy from sc-agent-ref: see design.
 
 ## Design
 
@@ -27,27 +27,27 @@ sprint:
   adrs: [ADR-SAG-0004, ADR-SAG-0005]
   does_not_close:
     - "REQ-SAG-0302 AC2 for C# (csharp) and Go is the second release and is outside phase A (recorded in plan.md); the AC stays unchecked in the record. Adding them is table rows, queries and samples with no API change."
-    - "tsq runs one short query and installs no signal handler (it writes no session log, so the default exit loses nothing)."
-    - "REQ-SAG-0003 rotation/retention acceptance criteria: sc-observability's built-in policy, checked for the sc-agent logs in a-8; this sprint closes only 'tsq writes its own general log file'."
+    - "sitr runs one short query and installs no signal handler (it writes no session log, so the default exit loses nothing)."
+    - "REQ-SAG-0003 rotation/retention acceptance criteria: sc-observability's built-in policy, checked for the sc-agent logs in a-8; this sprint closes only 'sitr writes its own general log file'."
 ```
 
-# Sprint A-3: sc-treesitter, the tsq binary and sc-treesitter-py (bead agt-4p2.3)
+# Sprint A-3: sc-treesitter, the sitr binary and sc-treesitter-py (bead agt-4p2.3)
 
-Copy script: `docs/plans/phase-a/copy/a-3.sh` (dry run 2026-11-09 after the tsq rows moved in from a-10.sh: 34 copy steps, 10 files, 751 lines before trimming).
+Copy script: `docs/plans/phase-a/copy/a-3.sh` (dry run 2026-11-09 after the sitr rows moved in from a-10.sh: 34 copy steps, 10 files, 751 lines before trimming).
 Source: sc-agent-ref @ dce239a, `crates/sc-treesitter`. Target: `crates/sc-treesitter/`.
-Governing records: ADR-SAG-0005 (sc-treesitter-py, the `python`/`cli` feature gates, the tsq bin inside sc-treesitter), REQ-SAG-0301, REQ-SAG-0302 (as amended: Python + Rust first release, C# `csharp` + Go second release), REQ-SAG-0303 (PyO3 bindings and `tsq`, the CLI a subset of PyO3), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0009 (no tokio), REQ-SAG-0010 (no sleep), REQ-SAG-0002 (now also denies `indexing_slicing`), REQ-SAG-0001, ADR-SAG-0004 (sc-treesitter stands alone).
+Governing records: ADR-SAG-0005 (sc-treesitter-py, the `python`/`cli` feature gates, the sitr bin inside sc-treesitter), REQ-SAG-0301, REQ-SAG-0302 (as amended: Python + Rust first release, C# `csharp` + Go second release), REQ-SAG-0303 (PyO3 bindings and `sitr`, the CLI a subset of PyO3), REQ-SAG-0003 (each CLI writes its own general log), REQ-SAG-0009 (no tokio), REQ-SAG-0010 (no sleep), REQ-SAG-0002 (now also denies `indexing_slicing`), REQ-SAG-0001, ADR-SAG-0004 (sc-treesitter stands alone).
 Error convention: the workspace id rule (A-1) is `"<crate-prefix>.<variant_snake>"` with an id, a message and a cause chain. sc-treesitter MUST NOT depend on sc-agent-types (REQ-SAG-0301), so it does not implement A-1's `ErrorId` trait; it follows the same convention with inherent `id()`/`message()` and serializes as the same `{"id","message"}` shape as `ErrorDetail`. Ids use the prefix `treesitter`. Owner memories: owner-sc-treesitter, owner-treesitter-grammars, owner-error-contract, owner-errors-settled, owner-no-sleep, owner-lowlevel-no-tokio.
-Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and Rust grammars and queries; C#/Go are the second wave; use the owner's 17-variant error list less `PositionOverflow` (unreachable, round 2 RBP-F006) plus `Write` and `Log` for the `tsq` binary, 18 variants (the owner: missing errors are added in the plan); no sc-agent deps, no git; PyO3 support types behind a `python` feature, built into the extension module by `crates/sc-treesitter-py` (section 3a).
+Owner corrections (2026-11-09) win over the older copy plan: KEEP the Python and Rust grammars and queries; C#/Go are the second wave; use the owner's 17-variant error list less `PositionOverflow` (unreachable, round 2 RBP-F006) plus `Write` and `Log` for the `sitr` binary, 18 variants (the owner: missing errors are added in the plan); no sc-agent deps, no git; PyO3 support types behind a `python` feature, built into the extension module by `crates/sc-treesitter-py` (section 3a).
 
-Scope: this sprint is the library, its output types, error ids, JSON encoder and file reader, the PyO3 support types, `crates/sc-treesitter-py`, and the `tsq` binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, sc-observability, the non-default `cli` feature, section 3b). It is the single owner of `crates/sc-treesitter/Cargo.toml`; no other sprint edits this crate. Install: `cargo install sc-treesitter --features cli`.
+Scope: this sprint is the library, its output types, error ids, JSON encoder and file reader, the PyO3 support types, `crates/sc-treesitter-py`, and the `sitr` binary (`src/main.rs`, `src/cli.rs`, `tests/cli.rs`, clap, sc-observability, the non-default `cli` feature, section 3b). It is the single owner of `crates/sc-treesitter/Cargo.toml`; no other sprint edits this crate. Install: `cargo install sc-treesitter --features cli`.
 
-Decisions (2026-11-09; the crate set, the `python`/`cli` features and the tsq placement are decided in ADR-SAG-0005 (Approved)):
+Decisions (2026-11-09; the crate set, the `python`/`cli` features and the sitr placement are decided in ADR-SAG-0005 (Approved)):
 - PyO3 placement: a separate crate `crates/sc-treesitter-py` builds the extension module; sc-treesitter stays an rlib with the support types behind `python` (section 3a); decided in ADR-SAG-0005 (Approved).
 - Output shape: flat captures sorted by (start_byte, name, end_byte), as copied; each capture is one part of a match.
-- Logging: the library logs nothing (stand-alone, REQ-SAG-0301); the `tsq` binary writes its own general log (REQ-SAG-0003, section 3b).
-- tsq (owner named it `tsq`): subcommands `languages`, `queries`, `query`; runs predefined queries only (REQ-SAG-0303: the CLI is a subset of PyO3). Exit 0 on success, 1 on any error.
-- tsq's general log: sc-observability directly (sc-treesitter may not depend on sc-agent crates), service `tsq`, root `~/.sc-agent` (sc-observability's standard default for app sc-agent), file `~/.sc-agent/logs/tsq.log.jsonl`, one event per command; the global flag `--log-root <PATH>` (before or after the subcommand; also read without clap when the arguments fail to parse) moves the root, so the file is `<PATH>/logs/tsq.log.jsonl`; tsq reads no sc-agent config.
-- `cli` is not a default feature, so a library consumer (and sc-treesitter-py) never builds clap or sc-observability; `[[bin]] tsq` has `required-features = ["cli"]`.
+- Logging: the library logs nothing (stand-alone, REQ-SAG-0301); the `sitr` binary writes its own general log (REQ-SAG-0003, section 3b).
+- sitr (owner named it `sitr`): subcommands `languages`, `queries`, `query`; runs predefined queries only (REQ-SAG-0303: the CLI is a subset of PyO3). Exit 0 on success, 1 on any error.
+- sitr's general log: sc-observability directly (sc-treesitter may not depend on sc-agent crates), service `sitr`, root `~/.sc-agent` (sc-observability's standard default for app sc-agent), file `~/.sc-agent/logs/sitr.log.jsonl`, one event per command; the global flag `--log-root <PATH>` (before or after the subcommand; also read without clap when the arguments fail to parse) moves the root, so the file is `<PATH>/logs/sitr.log.jsonl`; sitr reads no sc-agent config.
+- `cli` is not a default feature, so a library consumer (and sc-treesitter-py) never builds clap or sc-observability; `[[bin]] sitr` has `required-features = ["cli"]`.
 - Second wave (C# `csharp`, Go) is a later sprint, one predefined query each (proposed: csharp `switch-sections`, go `switch-cases`); each grammar is one table row, one `.scm` file and one test sample.
 
 ## 1. Copy list (a-3.sh)
@@ -69,7 +69,7 @@ Decisions (2026-11-09; the crate set, the `python`/`cli` features and the tsq pl
 | `assets/queries/rust/match-arms.scm` | same | Rust predefined query `match-arms` |
 | `assets/queries/python/branches.scm:2-5` | same | Python predefined query `branches`, case_clause half only (no Refusal/lite-gate half) |
 
-tsq binary (feature `cli`; rows moved from a-10.sh):
+sitr binary (feature `cli`; rows moved from a-10.sh):
 
 | Source (`crates/sc-treesitter/`) | Target (`crates/sc-treesitter/`) | What |
 |---|---|---|
@@ -92,9 +92,9 @@ Not copied: `src/git_io.rs`, the rest of `src/cli/` and `src/main.rs` (`extract`
 - `src/run.rs` tests: port to `run_query`; assert `Error` variants (`matches!`) and `id()` (e.g. `"treesitter.no_matches"`), not `.code()`; replace python tests that used the cross-impl `hook.py` fixture with inline sources; in the determinism test drop the subject-id asserts and keep `once == twice` and same-line byte ordering; gate tests with `grammar-python`/`grammar-rust`.
 - `src/lib.rs`: modules `error`, `grammar`, `query`, `run`, `source`, `#[cfg(feature = "python")] python`; re-exports as in section 3; `#![warn(missing_docs)]`. Fold `render.rs` as generic `to_json_bytes`; encode error -> `Error::Encode { detail }`.
 - `assets/queries/python/branches.scm`: remove the sentence about `@_fn` from the comment (there is no helper capture now).
-- tsq `src/cli.rs`: `#[command(name = "tsq", bin_name = "tsq", version, about = "Run predefined tree-sitter queries.")]`; delete `NOTES`/`after_help`, `PATH_VALUE_NAME` comment, `bin_name` comments. `Command::Extract(ExtractArgs)` -> `Command::Query(QueryArgs)` with positional `language`, `query`, `file: PathBuf` and `--captures`; drop `--rev`. `parse()` maps every non-help/version clap error to `sc_treesitter::Error::Usage { kind: format!("{:?}", e.kind()), detail: e.render().to_string() }` (id `treesitter.usage`); delete `value_parser_error`, `usage_error`, `message`, `parse_rev`. `parse_captures` returns `Result<Captures, String>` (clap carries its text into `Usage.detail`). Remove `sc_agent_types` import.
-- tsq `src/main.rs`: remove mimalloc, `git_io`, `JevError`, `ScAgentErrorResponse`. `query` command: `query_source` -> `read_source(&file)` -> `run_query(&language, text, &bytes, Some(&file), captures)` -> `to_json_bytes`. `json_line` generic over `Serialize`; listings print `languages()` ids and `queries()` (`QueryInfo` serializes as `{"language","query"}`). New `emit` (section 3b) with no `.expect`/`unwrap`; a failed stdout write is `Error::Write`. The general log (Decisions) starts before the command runs (`Error::Log` if it cannot) and records one `tsq.command` event (subcommand, outcome, error id); a log write failure never changes the result.
-- tsq `tests/cli.rs`: `env!("CARGO_BIN_EXE_tsq")`, each run passes the global flag `--log-root <tempdir>/.sc-agent` and no test sets `HOME` or `USERPROFILE`; `run()` = `Command::new(binary()).args(args).current_dir(cwd).output()` (no git isolation, no deadline helper); `error_json` expects exit 1 and the `{"id","message"}` line; listing test asserts `["python","rust"]` and `branches`; gate with `grammar-python`/`grammar-rust`.
+- sitr `src/cli.rs`: `#[command(name = "sitr", bin_name = "sitr", version, about = "Run predefined tree-sitter queries.")]`; delete `NOTES`/`after_help`, `PATH_VALUE_NAME` comment, `bin_name` comments. `Command::Extract(ExtractArgs)` -> `Command::Query(QueryArgs)` with positional `language`, `query`, `file: PathBuf` and `--captures`; drop `--rev`. `parse()` maps every non-help/version clap error to `sc_treesitter::Error::Usage { kind: format!("{:?}", e.kind()), detail: e.render().to_string() }` (id `treesitter.usage`); delete `value_parser_error`, `usage_error`, `message`, `parse_rev`. `parse_captures` returns `Result<Captures, String>` (clap carries its text into `Usage.detail`). Remove `sc_agent_types` import.
+- sitr `src/main.rs`: remove mimalloc, `git_io`, `JevError`, `ScAgentErrorResponse`. `query` command: `query_source` -> `read_source(&file)` -> `run_query(&language, text, &bytes, Some(&file), captures)` -> `to_json_bytes`. `json_line` generic over `Serialize`; listings print `languages()` ids and `queries()` (`QueryInfo` serializes as `{"language","query"}`). New `emit` (section 3b) with no `.expect`/`unwrap`; a failed stdout write is `Error::Write`. The general log (Decisions) starts before the command runs (`Error::Log` if it cannot) and records one `sitr.command` event (subcommand, outcome, error id); a log write failure never changes the result.
+- sitr `tests/cli.rs`: `env!("CARGO_BIN_EXE_sitr")`, each run passes the global flag `--log-root <tempdir>/.sc-agent` and no test sets `HOME` or `USERPROFILE`; `run()` = `Command::new(binary()).args(args).current_dir(cwd).output()` (no git isolation, no deadline helper); `error_json` expects exit 1 and the `{"id","message"}` line; listing test asserts `["python","rust"]` and `branches`; gate with `grammar-python`/`grammar-rust`.
 
 ## 3. Public API (exact Rust; bodies elided)
 
@@ -209,14 +209,14 @@ fn sc_treesitter(module: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyRes
 
 `pyproject.toml` (maturin): wheel `sc-treesitter`, module `sc_treesitter`. `tests/test_query.py` holds test 9.
 
-## 3b. tsq (`src/cli.rs`, `src/main.rs`; feature `cli`)
+## 3b. sitr (`src/cli.rs`, `src/main.rs`; feature `cli`)
 
 ```rust
 #[derive(Debug, clap::Parser)]
-#[command(name = "tsq", bin_name = "tsq", version, about = "Run predefined tree-sitter queries.")]
+#[command(name = "sitr", bin_name = "sitr", version, about = "Run predefined tree-sitter queries.")]
 pub(crate) struct Cli {
-    /// The log root: the general log is written to `<PATH>/logs/tsq.log.jsonl` instead of
-    /// `~/.sc-agent/logs/tsq.log.jsonl` (for tests and operators).
+    /// The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of
+    /// `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators).
     #[arg(long, value_name = "PATH", global = true)]
     pub(crate) log_root: Option<std::path::PathBuf>,
     #[command(subcommand)]
@@ -272,7 +272,7 @@ fn run(parsed: Parsed) -> Result<Vec<u8>, sc_treesitter::Error>;
 fn json_line<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, sc_treesitter::Error>;
 /// One stderr line: the serialized Error `{"id": ..., "message": ...}`; exit 1.
 fn emit(error: &sc_treesitter::Error) -> std::process::ExitCode;
-/// sc_observability Logger, service "tsq", log root = `log_root` (the --log-root flag), else home_dir()/.sc-agent (default_log_root); Err -> Error::Log (no log root and no home directory, or the logger cannot start).
+/// sc_observability Logger, service "sitr", log root = `log_root` (the --log-root flag), else home_dir()/.sc-agent (default_log_root); Err -> Error::Log (no log root and no home directory, or the logger cannot start).
 fn general_log(log_root: Option<std::path::PathBuf>) -> Result<sc_observability::v2::Logger, sc_treesitter::Error>;
 // cli.rs: the --log-root value of the arguments (`--log-root PATH` or `--log-root=PATH`), read without clap so a run whose arguments fail to parse still logs where it was told to.
 pub(crate) fn log_root_arg(args: &[std::ffi::OsString]) -> Option<std::path::PathBuf>;
@@ -282,7 +282,7 @@ Output: stdout JSON + `\n`, exit 0. Failure: one stderr line `{"id": "treesitter
 
 ## 4. Error enum (18 variants; `src/error.rs`, new)
 
-Lower errors here are external (tree-sitter, std::io, std::str, serde_json, clap (tsq), pyo3, sc-observability (tsq)); each variant keeps the lower error's kind and message in its fields. No sc-agent error is wrapped. Hand-written `Display` (`"<id>: <message>"`), no thiserror, no serde tag.
+Lower errors here are external (tree-sitter, std::io, std::str, serde_json, clap (sitr), pyo3, sc-observability (sitr)); each variant keeps the lower error's kind and message in its fields. No sc-agent error is wrapped. Hand-written `Display` (`"<id>: <message>"`), no thiserror, no serde tag.
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -315,13 +315,13 @@ pub enum Error {
     NoMatches { language: String, query: String },                             // "treesitter.no_matches"
     /// serde_json error Display.
     Encode { detail: String },                                                 // "treesitter.encode"
-    /// tsq argument error (section 3b); kind = Debug of clap ErrorKind (display only), detail = clap's text.
+    /// sitr argument error (section 3b); kind = Debug of clap ErrorKind (display only), detail = clap's text.
     Usage { kind: String, detail: String },                                    // "treesitter.usage"
     /// PyO3 argument conversion failure (bindings only); detail = PyErr Display.
     Python { detail: String },                                                 // "treesitter.python"
-    /// `tsq` could not write stdout or stderr (section 3b); kind = Debug of io::ErrorKind (display only), detail = Display.
+    /// `sitr` could not write stdout or stderr (section 3b); kind = Debug of io::ErrorKind (display only), detail = Display.
     Write { kind: String, detail: String },                                    // "treesitter.write"
-    /// `tsq`'s general log could not start (section 3b); detail = the sc-observability error's code and message.
+    /// `sitr`'s general log could not start (section 3b); detail = the sc-observability error's code and message.
     Log { detail: String },                                                    // "treesitter.log"
 }
 impl Error {
@@ -370,7 +370,7 @@ clap = { version = "4", features = ["derive"], optional = true }
 sc-observability = { version = "=1.5.0", optional = true }
 
 [[bin]]
-name = "tsq"
+name = "sitr"
 path = "src/main.rs"
 required-features = ["cli"]
 
@@ -391,7 +391,7 @@ Second wave (a later sprint; see Decisions): add `grammar-csharp` (`tree-sitter-
 - `src/python.rs`: section 3, ~90 lines.
 - `Capture` and the capture-filter check in `src/run.rs`.
 - `README.md` (names `cargo install sc-treesitter --features cli`), `Cargo.toml`.
-- tsq: `QueryArgs`, `Command::Query`, new `emit`, `general_log`, fixtures `tests/fixtures/match.rs` + golden `match.rs.json`, `tests/fixtures/not-utf8.py`.
+- sitr: `QueryArgs`, `Command::Query`, new `emit`, `general_log`, fixtures `tests/fixtures/match.rs` + golden `match.rs.json`, `tests/fixtures/not-utf8.py`.
 
 ## 7. Tests
 
@@ -409,12 +409,12 @@ New (library, `src/*` unit tests):
 8. All 18 ids distinct, `^treesitter\.[a-z_]+$`, serialized id = `id()`; `to_json_bytes` ends with `\n` (AC: REQ-SAG-0002 errors).
 PyO3 (`crates/sc-treesitter-py/tests/test_query.py`, pytest over the maturin build):
 9. Caller-written query returns `Capture` objects; non-UTF-8 `bytes` raises `TreesitterError(treesitter.not_utf8, message)` (AC: REQ-SAG-0303 PyO3, REQ-SAG-0002 lowest-layer PyO3).
-tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
-10. `cli_definition_is_consistent`, `captures_are_trimmed_and_ordered` (copied; AC: tsq query).
-11. `languages` / `queries --language python` (AC: REQ-SAG-0303 tsq listings).
-12. `query rust match-arms tests/fixtures/match.rs` equals the golden JSON; unknown language -> `treesitter.unknown_language`, exit 1, empty stdout; missing positional -> `treesitter.usage` (AC: tsq query).
-13. Non-UTF-8 fixture -> stderr `treesitter.not_utf8`; closed stdout -> `treesitter.write` (AC: REQ-SAG-0002 lowest-layer tsq).
-14. A run with `--log-root <tempdir>/.sc-agent` writes `<tempdir>/.sc-agent/logs/tsq.log.jsonl` with one `tsq.command` event, a separate file (AC: REQ-SAG-0003 tsq.log); `the_log_root_flag_is_read_with_or_without_clap` (`src/cli.rs` unit: `--log-root` read by clap, and by `log_root_arg` before or after the subcommand, `--log-root=PATH` included).
+sitr (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
+10. `cli_definition_is_consistent`, `captures_are_trimmed_and_ordered` (copied; AC: sitr query).
+11. `languages` / `queries --language python` (AC: REQ-SAG-0303 sitr listings).
+12. `query rust match-arms tests/fixtures/match.rs` equals the golden JSON; unknown language -> `treesitter.unknown_language`, exit 1, empty stdout; missing positional -> `treesitter.usage` (AC: sitr query).
+13. Non-UTF-8 fixture -> stderr `treesitter.not_utf8`; closed stdout -> `treesitter.write` (AC: REQ-SAG-0002 lowest-layer sitr).
+14. A run with `--log-root <tempdir>/.sc-agent` writes `<tempdir>/.sc-agent/logs/sitr.log.jsonl` with one `sitr.command` event, a separate file (AC: REQ-SAG-0003 sitr.log); `the_log_root_flag_is_read_with_or_without_clap` (`src/cli.rs` unit: `--log-root` read by clap, and by `log_root_arg` before or after the subcommand, `--log-root=PATH` included).
 
 ## Required validation
 
@@ -431,38 +431,38 @@ tsq (`src/cli.rs` unit tests and `tests/cli.rs`, `--features cli`):
 
 ## Acceptance criteria
 
-- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a, 34 copy steps incl. the tsq rows), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
+- [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-3.sh` (sc-agent-ref@dce239a, 34 copy steps incl. the sitr rows), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] REQ-SAG-0301: `cargo tree -p sc-treesitter -e normal,build` lists no sc-agent or sc-decision crate, with default features and with `--features cli`; the crate has no agent or decision-model code.
 - [ ] REQ-SAG-0302 same call: sc-treesitter `run_query` runs one caller-written query against Python source and against Rust source (first release).
 - [ ] REQ-SAG-0302 every id: every id from `languages()` runs through the same `run_query` call; adding a grammar adds a `GRAMMARS` row and a test sample only, no API change.
 - [ ] REQ-SAG-0303 listings: sc-treesitter `languages()` lists the loaded grammars and `queries()` lists the predefined queries (python/branches, rust/match-arms).
 - [ ] REQ-SAG-0303 PyO3: a caller-written query runs through crates/sc-treesitter-py (module sc_treesitter, feature python) and returns its matches as Capture objects.
-- [ ] REQ-SAG-0303 tsq listings: `tsq languages` prints `["python","rust"]` and `tsq queries --language python` lists `branches`.
-- [ ] tsq query: `tsq query <language> <query> <file>` runs a predefined query and prints its captures as JSON (exit 0); every failure prints one stderr line {id, message} with a treesitter.* id, exit 1, empty stdout.
-- [ ] REQ-SAG-0002 errors: all 18 sc-treesitter Error variants (the owner's 17 less the unreachable PositionOverflow, plus Write and Log for tsq) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message.
+- [ ] REQ-SAG-0303 sitr listings: `sitr languages` prints `["python","rust"]` and `sitr queries --language python` lists `branches`.
+- [ ] sitr query: `sitr query <language> <query> <file>` runs a predefined query and prints its captures as JSON (exit 0); every failure prints one stderr line {id, message} with a treesitter.* id, exit 1, empty stdout.
+- [ ] REQ-SAG-0002 errors: all 18 sc-treesitter Error variants (the owner's 17 less the unreachable PositionOverflow, plus Write and Log for sitr) exist with stable ids treesitter.<variant_snake> (the workspace convention, without depending on sc-agent-types), serialized as {id, message}; each keeps the lower error's kind and message.
 - [ ] REQ-SAG-0002 lowest-layer PyO3: an injected non-UTF-8 source reaches the sc-treesitter-py entry point as TreesitterError with id treesitter.not_utf8 and its message.
-- [ ] REQ-SAG-0002 lowest-layer tsq: a non-UTF-8 file reaches tsq's stderr as treesitter.not_utf8 with its message; a failed stdout write is treesitter.write.
+- [ ] REQ-SAG-0002 lowest-layer sitr: a non-UTF-8 file reaches sitr's stderr as treesitter.not_utf8 with its message; a failed stdout write is treesitter.write.
 - [ ] REQ-SAG-0002 clippy: `cargo clippy -p sc-treesitter -p sc-treesitter-py --all-features --all-targets -- -D warnings` passes with panic, unwrap_used, expect_used and indexing_slicing denied in non-test code.
 - [ ] Positions: no git, no sc-sha; no u32 clamping; 1-based lines are `row.saturating_add(1)` under the documented 8 MiB MAX_SOURCE_BYTES bound, so there is no position error variant.
-- [ ] REQ-SAG-0003 tsq.log: a tsq run writes its own general log `~/.sc-agent/logs/tsq.log.jsonl` (one `tsq.command` event per command), a file separate from decide's; the global `--log-root <PATH>` flag moves the root to `<PATH>/logs/tsq.log.jsonl`, and the tests pass it and set no HOME or USERPROFILE.
-- [ ] Stand-alone library: the sc-treesitter library writes no log (REQ-SAG-0301); `cli` is not a default feature and `[[bin]] tsq` has `required-features = ["cli"]`, so `cargo tree -p sc-treesitter -e normal` (default features) lists no sc-observability and no clap.
+- [ ] REQ-SAG-0003 sitr.log: a sitr run writes its own general log `~/.sc-agent/logs/sitr.log.jsonl` (one `sitr.command` event per command), a file separate from decidr's; the global `--log-root <PATH>` flag moves the root to `<PATH>/logs/sitr.log.jsonl`, and the tests pass it and set no HOME or USERPROFILE.
+- [ ] Stand-alone library: the sc-treesitter library writes no log (REQ-SAG-0301); `cli` is not a default feature and `[[bin]] sitr` has `required-features = ["cli"]`, so `cargo tree -p sc-treesitter -e normal` (default features) lists no sc-observability and no clap.
 - [ ] REQ-SAG-0009: `cargo tree -p sc-treesitter -e normal` and `cargo tree -p sc-treesitter --features cli -e normal` list no tokio crate.
-- [ ] REQ-SAG-0010: sc-treesitter (library and tsq) and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
-- [ ] ADR-SAG-0005: crates/sc-treesitter-py is the only crate with the `#[pymodule]`, sc-treesitter's `python` and `cli` features are both off by default, and the `tsq` bin lives in sc-treesitter behind `required-features = ["cli"]`, checked by `cargo metadata` (features, bin targets) in CI.
+- [ ] REQ-SAG-0010: sc-treesitter (library and sitr) and sc-treesitter-py are Rust crates in the sc-agent workspace, and their source calls no sleep function (std::thread::sleep, tokio::time::sleep or any other), enforced by the workspace clippy disallowed-methods rule.
+- [ ] ADR-SAG-0005: crates/sc-treesitter-py is the only crate with the `#[pymodule]`, sc-treesitter's `python` and `cli` features are both off by default, and the `sitr` bin lives in sc-treesitter behind `required-features = ["cli"]`, checked by `cargo metadata` (features, bin targets) in CI.
 
 ## Notes
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7); each decision is recorded once in the design:
 1. PyO3 placement: crates/sc-treesitter-py (module and wheel sc_treesitter / sc-treesitter); decided in ADR-SAG-0005 (Approved).
 2. Output shape: flat sorted captures (assistant).
-3. Logging: none in the library (stand-alone); the tsq binary logs (this sprint, REQ-SAG-0003).
+3. Logging: none in the library (stand-alone); the sitr binary logs (this sprint, REQ-SAG-0003).
 4. C#/Go: a later sprint; one predefined query each, proposed by the assistant.
-5. tsq write failure: new variant Write (treesitter.write); Log added for tsq's general log.
-6. Tree-sitter CLI binary name: tsq (owner); it runs predefined queries only (REQ-SAG-0303).
-7. Hardening round 1 (2026-11-09): the tsq binary, its copy rows, tests and acceptance moved here from A-10 (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); `cli` is a non-default feature; this sprint is the single owner of crates/sc-treesitter/Cargo.toml; must_follow A-1 (workspace root, PLAN-CRIT-004).
-Round 2 (2026-11-09): ADR-SAG-0005 cited; PositionOverflow deleted (18 variants), impossible slice skipped (RBP-F006); C#/Go outside phase A (REQ-QA-008); tsq needs no signal handling (REQ-SAG-0011).
+5. sitr write failure: new variant Write (treesitter.write); Log added for sitr's general log.
+6. Tree-sitter CLI binary name: sitr (owner); it runs predefined queries only (REQ-SAG-0303).
+7. Hardening round 1 (2026-11-09): the sitr binary, its copy rows, tests and acceptance moved here from A-10 (PLAN-SCOPE-004, PLAN-CRIT-007/011/012); `cli` is a non-default feature; this sprint is the single owner of crates/sc-treesitter/Cargo.toml; must_follow A-1 (workspace root, PLAN-CRIT-004).
+Round 2 (2026-11-09): ADR-SAG-0005 cited; PositionOverflow deleted (18 variants), impossible slice skipped (RBP-F006); C#/Go outside phase A (REQ-QA-008); sitr needs no signal handling (REQ-SAG-0011).
 No open questions.
 
 Dev round 1 corrections (2026-11-10, from the a-3 developer; code at 94f8039 is right, doc follows): (1) section 7 test 8 id pattern is `^treesitter\.[a-z][a-z0-9_]*$` (treesitter.not_utf8 has a digit); (2) section 3b general_log returns `sc_observability::v2::Logger` (the v1 Logger is deprecated in 1.5.0 and fails -D warnings); (3) section 3a: sc-treesitter-py has build.rs + build-dependency `pyo3-build-config = "=0.29.2"` calling add_extension_module_link_args() so plain cargo links on macOS.
-QA-1 fix round (2026-11-10, 99688e1) — now part of the sprint surface: Error has 19 variants (adds LimitExceeded { language, limit: Limit { Captures, CaptureTextBytes, InProgressMatches }, max }, id treesitter.limit_exceeded; MAX_CAPTURES = 100_000, MAX_CAPTURE_TEXT_BYTES = 64 MiB, MATCH_LIMIT = 4096); id pattern ^treesitter\.[a-z][a-z0-9_]*$; LanguageId newtype (LanguageId::new/languages(); run_query(LanguageId, ..), query_source(LanguageId, name), queries(Option<LanguageId>) infallible); Error::recovery() serialized as optional ; FileRead/Write hold std::io::ErrorKind; read_source refuses non-regular files and checks metadata size first; a failed stderr write is dropped (exit 1 is the only signal; Error::Write covers stdout); tsq.command event fields subcommand, language, query, file, bytes, duration_ms, error_id; CI job  (cargo metadata ADR-SAG-0005 gate, no-default-features test, maturin wheel + pytest) required by CI result; fixtures .gitattributes .
-Correction to the previous note (shell ate backticked words): Error::recovery() is serialized as the optional field "recovery"; the new CI job is named "treesitter" ("sc-treesitter features and wheel"); tsq.command event fields are subcommand, language, query, file, bytes, duration_ms, error_id.
+QA-1 fix round (2026-11-10, 99688e1) — now part of the sprint surface: Error has 19 variants (adds LimitExceeded { language, limit: Limit { Captures, CaptureTextBytes, InProgressMatches }, max }, id treesitter.limit_exceeded; MAX_CAPTURES = 100_000, MAX_CAPTURE_TEXT_BYTES = 64 MiB, MATCH_LIMIT = 4096); id pattern ^treesitter\.[a-z][a-z0-9_]*$; LanguageId newtype (LanguageId::new/languages(); run_query(LanguageId, ..), query_source(LanguageId, name), queries(Option<LanguageId>) infallible); Error::recovery() serialized as optional ; FileRead/Write hold std::io::ErrorKind; read_source refuses non-regular files and checks metadata size first; a failed stderr write is dropped (exit 1 is the only signal; Error::Write covers stdout); sitr.command event fields subcommand, language, query, file, bytes, duration_ms, error_id; CI job  (cargo metadata ADR-SAG-0005 gate, no-default-features test, maturin wheel + pytest) required by CI result; fixtures .gitattributes .
+Correction to the previous note (shell ate backticked words): Error::recovery() is serialized as the optional field "recovery"; the new CI job is named "treesitter" ("sc-treesitter features and wheel"); sitr.command event fields are subcommand, language, query, file, bytes, duration_ms, error_id.

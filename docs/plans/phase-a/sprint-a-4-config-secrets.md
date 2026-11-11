@@ -26,11 +26,11 @@ sprint:
   requirements: [REQ-SAG-0002, REQ-SAG-0003, REQ-SAG-0005, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0015, REQ-SAG-0102, REQ-SAG-0401, REQ-SAG-0601, REQ-SAG-0701, REQ-SAG-0801]
   adrs: [ADR-SAG-0002, ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0102 end to end (decide resolves a model added to ~/.sc-agent/default.json): a-10"
+    - "REQ-SAG-0102 end to end (decidr resolves a model added to ~/.sc-agent/default.json): a-10"
     - "REQ-SAG-0601 resending on 429/502/529 up to max_sends: a-5 (sc-agent-http Attempts) and a-9 (runner)"
     - "REQ-SAG-0701 running a batch across `workers` workers: a-9"
-    - "REQ-SAG-0801 using a local runner (discovery library a-6; selection by name in decide a-10)"
-    - "REQ-SAG-0003/0005 log files written under log_root: a-8 (sc-agent-log) and a-10 (decide)"
+    - "REQ-SAG-0801 using a local runner (discovery library a-6; selection by name in decidr a-10)"
+    - "REQ-SAG-0003/0005 log files written under log_root: a-8 (sc-agent-log) and a-10 (decidr)"
     - "REQ-SAG-0401 the key is read only at the transport (the single ApiKey::as_str site): a-5"
     - "ADR-SAG-0002 the <repo>/<agent_role>/<project>/ session-log layout under <log_root>/logs/: a-8; a-4 supplies only the root"
     - "REQ-SAG-0015 applying the runner timeouts to local sends and model loads: a-6 (sc-decision-local)"
@@ -123,7 +123,7 @@ impl<'a> KeySources<'a> {
 pub enum KeySource { Env, DotEnv, Keyring }
 impl KeySource { pub const fn as_str(self) -> &'static str; }   // "env" | ".env" | "keyring"
 #[derive(Debug, Clone)]
-pub struct ResolvedKey { pub key: ApiKey, pub source: KeySource }   // source: decide doctor lists it (REQ-SAG-0503)
+pub struct ResolvedKey { pub key: ApiKey, pub source: KeySource }   // source: decidr doctor lists it (REQ-SAG-0503)
 /// The key for `provider`, from its variable: env, then .env (a variable already set in env is not overridden), then keyring.
 pub fn resolve(provider: Provider, sources: &KeySources<'_>) -> Result<ResolvedKey, SecretsError>;
 /// The same order for a variable named by configuration (a local runner's `key_env`, e.g. LAYA_API_KEY).
@@ -207,7 +207,7 @@ impl Default for AgentConfig {}
 pub fn default_dir() -> Result<PathBuf, AgentConfigError>;
 
 /// Loads `<config_dir>/default.json` (+ optional local.json) and SC_AGENT__* overrides from `environment`
-/// (decide passes default_dir()). No default.json -> AgentConfig::default(), unless an SC_AGENT__ variable is set
+/// (decidr passes default_dir()). No default.json -> AgentConfig::default(), unless an SC_AGENT__ variable is set
 /// (then config.load with cause CFG.MISSING_DEFAULT, so an override is never ignored).
 /// Steps: sc-config `Loader::load::<serde_json::Value>()` (files + overrides; failures -> Load), then
 /// `serde_path_to_error::deserialize::<_, AgentConfig>(value)` (any type or bound failure -> Invalid with the key
@@ -317,15 +317,15 @@ Error causes that can hold key bytes (REQ-SAG-0002 / REQ-SAG-0401): SecretsError
 ## Acceptance criteria
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-4.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
-- [ ] REQ-SAG-0102 AC1/AC2: sc-agent-config: a default.json models entry for a haiku model dated later than every built-in haiku makes AgentConfig::catalog()?.resolve(Latest(Haiku)) return it with no rebuild; an earlier date does not (tempdir tests). The decide end-to-end check is a-10's.
+- [ ] REQ-SAG-0102 AC1/AC2: sc-agent-config: a default.json models entry for a haiku model dated later than every built-in haiku makes AgentConfig::catalog()?.resolve(Latest(Haiku)) return it with no rebuild; an earlier date does not (tempdir tests). The decidr end-to-end check is a-10's.
 - [ ] REQ-SAG-0102: sc-agent-config: a user adds a model by editing JSON only; keys models, log_root (optional), workers, max_sends, local_runners load through sc-config 0.2.0 Loader with SC_AGENT__ env overrides (tests: SC_AGENT__MAX_SENDS=2, SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000).
 - [ ] REQ-SAG-0601: sc-agent-config: this sprint delivers only the max_sends setting (default 5; 2 via file or env gives 2; 0 and 11 rejected as config.invalid at path max_sends); resending on 429/502/529 is built in A-5 and A-9.
 - [ ] REQ-SAG-0701: sc-agent-config: this sprint delivers only the workers setting (default 8; 0 and 65 rejected as config.invalid at path workers); running a batch across that many workers is built in A-9.
 - [ ] REQ-SAG-0801 (config part): sc-agent-config: each local_runners entry carries name (map key), kind (RunnerKind), host (RunnerHost), port, model and optional key_env (VarName) from the config file; a runner added to default.json is returned by load() with no rebuild; no runner host or port literal outside tests (grep).
 - [ ] REQ-SAG-0401: sc-agent-secrets: TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_API_KEY, NOUS_API_KEY and LAYA_API_KEY appear as string literals only in crates/sc-agent-secrets (automated check, tests/vars_gate.rs).
 - [ ] REQ-SAG-0401: sc-agent-secrets: resolve(p, sources) and resolve_var(&VarName, sources) look in the process environment, then the repo-root .env, then the platform keyring, and report which source supplied the key; each of the six Providers uses env_var(p); none -> secrets.key_missing naming the variable, with non-empty recovery() text naming the process environment, the repo-root .env and the keyring; malformed -> secrets.key_malformed (MapEnv/MapKeyring/tempdir tests; process env never mutated).
-- [ ] REQ-SAG-0003: sc-agent-config: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (`<home>/.sc-agent` on every platform; owner decision 2026-11-10, REQ-SAG-0003 0.2.0); the config directory decide passes is default_dir().
-- [ ] sc-agent-config: a missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set or a local.json is present (then config.load with cause CFG.MISSING_DEFAULT, so an override is never silently ignored); a local runner named like a short name is config.runner_name with path local_runners.<name>; a default.json or local.json that exists but is not a regular file (a FIFO, a device, a directory) is refused as config.not_a_file from its metadata before any read, so a FIFO cannot block decide (RSH-002; test a_config_path_that_is_not_a_regular_file_is_refused_before_reading) (tests).
+- [ ] REQ-SAG-0003: sc-agent-config: AgentConfig::log_root() returns the configured log_root, else default_dir() = ~/.sc-agent (`<home>/.sc-agent` on every platform; owner decision 2026-11-10, REQ-SAG-0003 0.2.0); the config directory decidr passes is default_dir().
+- [ ] sc-agent-config: a missing default.json gives AgentConfig::default() unless an SC_AGENT__ override is set or a local.json is present (then config.load with cause CFG.MISSING_DEFAULT, so an override is never silently ignored); a local runner named like a short name is config.runner_name with path local_runners.<name>; a default.json or local.json that exists but is not a regular file (a FIFO, a device, a directory) is refused as config.not_a_file from its metadata before any read, so a FIFO cannot block decidr (RSH-002; test a_config_path_that_is_not_a_regular_file_is_refused_before_reading) (tests).
 - [ ] sc-agent-secrets: never log or print a key: ApiKey Debug/Display print [redacted]; no SecretsError Display/Debug contains key bytes, including keyring failures (test).
 - [ ] REQ-SAG-0002: sc-agent-secrets and sc-agent-config: SecretsError and AgentConfigError implement ErrorId (cause_detail, recovery) with ids secrets.* and config.*, Display "<id>: <message>" only; bad JSON gives config.load whose cause has id CFG.PARSE and the sc-config message with the path; a model on two lines gives config.catalog whose cause is types.model_on_two_lines (tests); cargo clippy --workspace --all-targets -- -D warnings with a-1's workspace denies and clippy.toml passes.
 - [ ] REQ-SAG-0009/0010: sc-agent-secrets and sc-agent-config: cargo tree -e normal for both crates lists no tokio crate; no sleep call (rg); dependencies limited to sc-agent-types, sc-config, serde, serde_json, serde_path_to_error, keyring, whoami (dev: tempfile).
@@ -340,7 +340,7 @@ Error causes that can hold key bytes (REQ-SAG-0002 / REQ-SAG-0401): SecretsError
 ## Notes
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in the design:
-- Q1 config location: ~/.sc-agent/ (default_dir); decide passes it.
+- Q1 config location: ~/.sc-agent/ (default_dir); decidr passes it.
 - Q2 .env and keyring: restored; order process env -> repo-root .env -> keyring (REQ-SAG-0401).
 - Q3 variable names: OPENROUTER_API_KEY, TOGETHER_API_KEY, NOUS_API_KEY (assistant).
 - Q4 log_root: optional, default ~/.sc-agent (REQ-SAG-0003).

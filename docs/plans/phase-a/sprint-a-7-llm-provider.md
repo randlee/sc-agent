@@ -36,9 +36,9 @@ sprint:
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0901 AC2 (a schema mismatch is resent unchanged up to max_sends, then returned): a-9 acceptance, over this backend's SchemaMismatch signal."
-    - "REQ-SAG-0503 decide doctor reporting provider model lists: a-10 acceptance (this sprint ships models_request/decode_models only)."
-    - "A Haiku/Luna decision sent end to end through decide (REQ-SAG-0901, REQ-SAG-0103 through the CLI): a-10 acceptance."
-    - "Converting a config Provider to LlmProvider (LlmProvider::from_provider) once in decide's backend(), and sending models_request on a transport built with UreqTransport::new(Timeouts::probe()): a-10."
+    - "REQ-SAG-0503 decidr doctor reporting provider model lists: a-10 acceptance (this sprint ships models_request/decode_models only)."
+    - "A Haiku/Luna decision sent end to end through decidr (REQ-SAG-0901, REQ-SAG-0103 through the CLI): a-10 acceptance."
+    - "Converting a config Provider to LlmProvider (LlmProvider::from_provider) once in decidr's backend(), and sending models_request on a transport built with UreqTransport::new(Timeouts::probe()): a-10."
 ```
 
 # Sprint A-7: sc-llm-provider and sc-decision-llm (bead agt-4p2.7)
@@ -50,11 +50,11 @@ Copy script: `docs/plans/phase-a/copy/a-7.sh` (source sc-agent-ref@dce239a; dry 
 Both crates are sans-IO: they build an `HttpRequest` and read an `HttpResponse` (A-5). Sending, busy resend and holdoff are sc-agent-http plus the runner's queue; the schema-mismatch resend (up to max_sends) is the runner's too (A-9), signalled by `DecisionError::SchemaMismatch` from `decode`.
 
 Decisions (assistant, 2026-11-09):
-- Providers: `LlmProvider` (Anthropic, OpenAi, OpenRouter, Together, Nous) is the provider type in this crate; TypeSafe has no LLM wire and cannot be named here, so there is no unsupported-provider error (decide converts once).
+- Providers: `LlmProvider` (Anthropic, OpenAi, OpenRouter, Together, Nous) is the provider type in this crate; TypeSafe has no LLM wire and cannot be named here, so there is no unsupported-provider error (decidr converts once).
 - Wire: Anthropic Messages for anthropic; Chat Completions for openai, openrouter, together and nous (one encoder). Token cap: `max_completion_tokens` for openai, `max_tokens` for the others.
 - Nous: base `https://inference-api.nousresearch.com/v1`, Bearer, `response_format` json_schema; a model that rejects it returns the provider's error.
-- Provider ids (REQ-SAG-0103): `provider_model_id` maps a catalog id to the provider's id: anthropic, openai, nous unchanged; openrouter `anthropic/<id>` for `claude-*` with the trailing `-<major>-<minor>` written `<major>.<minor>` (`claude-haiku-5-5` -> `anthropic/claude-haiku-5.5`) and `openai/<id>` for `gpt-*`; together `anthropic/<id>` / `openai/<id>` (Together's ids are unconfirmed; decide doctor reports any that do not map back). `catalog_model_id` is the inverse, used by decide doctor.
-- Model lists for decide doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.
+- Provider ids (REQ-SAG-0103): `provider_model_id` maps a catalog id to the provider's id: anthropic, openai, nous unchanged; openrouter `anthropic/<id>` for `claude-*` with the trailing `-<major>-<minor>` written `<major>.<minor>` (`claude-haiku-5-5` -> `anthropic/claude-haiku-5.5`) and `openai/<id>` for `gpt-*`; together `anthropic/<id>` / `openai/<id>` (Together's ids are unconfirmed; decidr doctor reports any that do not map back). `catalog_model_id` is the inverse, used by decidr doctor.
+- Model lists for decidr doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.
 - Images: every asset is passed through (REQ-SAG-0901); a provider rejection is its own error (decision.backend, cause llm.api_status).
 - Model name: the request sends `provider_model_id(provider, resolved ModelId)`; the response reports the model the provider names.
 - System prompt: drafted by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); owner-approved as written 2026-11-10.
@@ -167,7 +167,7 @@ impl LlmClient {
     pub fn decode(&self, request: &LlmRequest, response: HttpResponse, ctx: LogContext) -> Result<LlmResponse, LlmError>;
     /// Wrap a send failure with this client's provider, for callers that send.
     pub fn http_error(&self, error: HttpError) -> LlmError;
-    /// GET {base}/v1/models with the credential header (decide doctor). The caller sends it on a probe
+    /// GET {base}/v1/models with the credential header (decidr doctor). The caller sends it on a probe
     /// transport (`UreqTransport::new(Timeouts::probe())`, connect 5 s, request 10 s; a-5), not the 120 s decision one.
     pub fn models_request(&self) -> Result<HttpRequest, LlmError>;   // secret via with_secret(..)? -> LlmError::Http
     /// The provider's model ids (`data[].id`, or a top-level array of `{id}`); non-2xx -> ApiStatus.
@@ -325,7 +325,7 @@ None. Model ids come from the A-1 catalog, keys from A-4 (`ANTHROPIC_API_KEY`, `
 - `cargo build -p sc-llm-provider -p sc-decision-llm`
 - `cargo clippy -p sc-llm-provider -p sc-decision-llm --all-targets -- -D warnings` with the workspace denies (a-1) -> AC 13
 - `cargo test -p sc-llm-provider -p sc-decision-llm`
-- `cargo tree -p sc-llm-provider -e normal --depth 1` and `cargo tree -p sc-decision-llm -e normal --depth 1`: direct sc-agent dependencies exactly as in section 7; full `cargo tree -p sc-llm-provider -p sc-decision-llm` has no sc-decision-runner, decide or tokio, and ureq appears only under sc-agent-http (no direct dependency), and sc-llm-provider's has no sc-decision-* crate -> AC 14, AC 16, AC 17
+- `cargo tree -p sc-llm-provider -e normal --depth 1` and `cargo tree -p sc-decision-llm -e normal --depth 1`: direct sc-agent dependencies exactly as in section 7; full `cargo tree -p sc-llm-provider -p sc-decision-llm` has no sc-decision-runner, decidr or tokio, and ureq appears only under sc-agent-http (no direct dependency), and sc-llm-provider's has no sc-decision-* crate -> AC 14, AC 16, AC 17
 - `grep -rn "sleep" crates/sc-llm-provider/src crates/sc-decision-llm/src` finds nothing -> AC 16
 
 ## 7. Dependencies
@@ -352,7 +352,7 @@ Estimated size: sc-llm-provider about 350 lines of code, sc-decision-llm about 3
 - [ ] ADR-SAG-0001: LlmDecisionBackend implements the Backend trait imported from sc-decision-schema (no crate defines its own Backend trait) (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest, &LogContext)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.
 - [ ] REQ-SAG-0007: a model probability of 0.123456789 is returned as 0.123456789; no rounding, normalizing or clamping.
 - [ ] REQ-SAG-0002: LlmError (7 llm.* ids, no llm.encode; no unsupported-provider id, since LlmProvider cannot name TypeSafe) wraps HttpError; DecisionLlmError (6 decision_llm.* ids, incl. invalid_max_tokens and invariant) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
-- [ ] ADR-SAG-0004: `cargo tree -p sc-llm-provider -e normal --depth 1` lists exactly sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http as sc-agent dependencies (the http layer, no decision types); `cargo tree -p sc-decision-llm -e normal --depth 1` lists exactly sc-decision-schema, sc-llm-provider, sc-agent-http, sc-agent-types and sc-agent-log (the decision-backend layer); the full `cargo tree -p sc-llm-provider -p sc-decision-llm` contains no sc-decision-runner or decide. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner.
+- [ ] ADR-SAG-0004: `cargo tree -p sc-llm-provider -e normal --depth 1` lists exactly sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http as sc-agent dependencies (the http layer, no decision types); `cargo tree -p sc-decision-llm -e normal --depth 1` lists exactly sc-decision-schema, sc-llm-provider, sc-agent-http, sc-agent-types and sc-agent-log (the decision-backend layer); the full `cargo tree -p sc-llm-provider -p sc-decision-llm` contains no sc-decision-runner or decidr. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decidr sits above the runner.
 - [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.
 - [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio; neither crate depends directly on ureq (it arrives only through sc-agent-http, which owns the transport per ADR-SAG-0004); no sleep call.
 - [ ] REQ-SAG-0201: sc-decision-llm imports every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema and defines none of its own; sc-llm-provider uses no decision types.
