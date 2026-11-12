@@ -7,7 +7,7 @@
 //!
 //! The library is stand-alone: synchronous, no threads, no logging, and no sc-agent
 //! dependency. Feature `python` adds the PyO3 support types (module [`python`]) used by the
-//! `sc-treesitter-py` extension crate; feature `cli` builds the `sitr` binary.
+//! `sc-treesitter-py` extension crate. The `sitr` CLI is the separate **`sitr`** crate.
 //!
 //! # Examples
 //!

@@ -16,6 +16,7 @@ members = [
     "crates/sc-llm-provider",
     "crates/sc-treesitter",
     "crates/sc-treesitter-py",
+    "crates/sitr",
 ]
 resolver = "3"
 

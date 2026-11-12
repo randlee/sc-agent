@@ -1,6 +1,6 @@
 # sc-treesitter
 
-Loads tree-sitter grammars and runs any query against them. The library stands alone: it is synchronous, starts no threads, does no logging and has no sc-agent dependency. It sits outside the sc-agent layering. The `sitr` binary and the Python module are built from it.
+Loads tree-sitter grammars and runs any query against them. The library stands alone: it is synchronous, starts no threads, does no logging and has no sc-agent dependency. It sits outside the sc-agent layering. The **`sitr`** CLI ships from the separate **`sitr`** crate; the Python bindings ship as the PyPI **`sitr`** project (`import sc_treesitter`).
 
 Captures come back sorted by (start byte, name, end byte), with 1-based inclusive lines.
 
@@ -30,10 +30,10 @@ assert_eq!(captures[0].text, "hello");
 let json = sc_treesitter::to_json_bytes(&captures)?;
 ```
 
-`sitr` runs the predefined queries:
+The **`sitr`** CLI runs the predefined queries:
 
 ```bash
-cargo install sc-treesitter --features cli
+cargo install sitr
 sitr languages
 sitr queries --language python
 sitr query python branches path/to/file.py
@@ -46,7 +46,6 @@ sitr query rust match-arms src/lib.rs --captures arm
 
 - `grammar-python` and `grammar-rust` (default): compile in that grammar.
 - `python`: the PyO3 support types, used by the `sc-treesitter-py` extension crate.
-- `cli` (not default): builds the `sitr` binary. It adds `clap` and `sc-observability`.
 
 ## Depends on
 
@@ -59,4 +58,4 @@ No sc-agent crate. This crate stands alone (ADR-SAG-0004).
 - REQ-SAG-0303: PyO3 and CLI query surfaces.
 - REQ-SAG-0002: errors are a discriminated union carried from bottom to top (`treesitter.*` ids).
 - REQ-SAG-0003: log retention (the `sitr` general log).
-- ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; `sitr` lives in sc-treesitter behind a `cli` feature.
+- ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; the `sitr` CLI is a separate crate.
