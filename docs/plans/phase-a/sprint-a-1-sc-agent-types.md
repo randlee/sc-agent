@@ -22,12 +22,12 @@ sprint:
   requirements: [REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0013, REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0401, REQ-SAG-0601]
   adrs: [ADR-SAG-0004]
   does_not_close:
-    - "REQ-SAG-0101 end to end (decide --model <short name> resolves through the catalog built from the global config): a-10"
+    - "REQ-SAG-0101 end to end (decidr --model <short name> resolves through the catalog built from the global config): a-10"
     - "REQ-SAG-0102 'add a model by editing JSON, no rebuild': config part a-4 (AgentConfig::catalog), end to end a-10"
     - "REQ-SAG-0104 AC1 (a token cancelled by the caller stops an operation in another crate): a-9 (sc-decision-runner cancel tests, token created in the test crate); a-1 keeps the in-crate CancelToken tests"
     - "REQ-SAG-0104 AC2 (a CancelToken cancelled from Python stops a request): a-10, sc-agent-py"
     - "REQ-SAG-0001 AC2 (workspace-wide search that no crate generates a UUID): a-10, the last sprint, once the workspace is complete; a-1 only rejects a UUID in SessionId::from_str"
-    - "REQ-SAG-0601 cancel ends a runner holdoff at once: a-9 (uses CancelToken::wait_until/on_cancel from here)"
+    - "REQ-SAG-0601 cancel ends a runner holdoff at once: a-9 (uses Clock::wait_until/Clock::park/on_cancel from here)"
     - "REQ-SAG-0010 / ApiKey::as_str rule: a-1 writes both clippy.toml entries; each crate's clippy run enforces them; the single allowed as_str site is a-5's ureq_transport"
 ```
 
@@ -38,17 +38,17 @@ Target: `crates/sc-agent-types` plus the workspace root (`Cargo.toml`, `clippy.t
 Governing: REQ-SAG-0001, 0002, 0006, 0009, 0010, 0101, 0102, 0103, 0104; ADR-SAG-0004 (bottom layer; the shared `ErrorId`/`ErrorDetail` convention); REQ-SAG-0401 (no env-var names here); REQ-SAG-0601 (cancel ends a holdoff wait at once).
 Owner decisions: owner-short-names, owner-model-catalog, owner-provider-and-model, owner-openai-naming, owner-cancel-token, owner-no-consumer-types, owner-error-contract, owner-errors-settled, owner-ids-ulid, owner-no-sleep, owner-lowlevel-no-tokio, owner-architecture.
 
-Layering (ADR-SAG-0004, every bead uses it): sc-agent-types <- sc-agent-config, sc-agent-secrets, sc-agent-log <- sc-agent-http <- sc-decision-schema <- sc-decision-systemone, sc-decision-local, sc-decision-llm (sc-decision-llm also uses sc-llm-provider, which sits on sc-agent-http and needs no decision types) <- sc-decision-runner <- decide (bin and lib) <- sc-agent-py (Python API, A-10). sc-treesitter stands alone.
+Layering (ADR-SAG-0004, every bead uses it): sc-agent-types <- sc-agent-config, sc-agent-secrets, sc-agent-log <- sc-agent-http <- sc-decision-schema <- sc-decision-systemone, sc-decision-local, sc-decision-llm (sc-decision-llm also uses sc-llm-provider, which sits on sc-agent-http and needs no decision types) <- sc-decision-runner <- decidr (bin and lib) <- sc-agent-py (Python API, A-10). sc-treesitter stands alone.
 
 Decisions in this design:
 - `Provider` is a closed enum of six (TypeSafe, Anthropic, OpenAi, OpenRouter, Nous, Together), not `#[non_exhaustive]`, so sc-agent-secrets matches it exhaustively.
-- Local decision runners are global-config entries (A-4 `local_runners`), selected by name in decide (A-10); `ShortName` has exactly the nine.
-- Catalog = built-in rows + global-config rows; per line the newest release date wins. On an equal release date the global-config model wins (assistant choice; owner: IDC, decide doctor warns, REQ-SAG-0503). sc-agent-types reads no files.
+- Local decision runners are global-config entries (A-4 `local_runners`), selected by name in decidr (A-10); `ShortName` has exactly the nine.
+- Catalog = built-in rows + global-config rows; per line the newest release date wins. On an equal release date the global-config model wins (assistant choice; owner: IDC, decidr doctor warns, REQ-SAG-0503). sc-agent-types reads no files.
 - Built-in rows carry each model's published release date (REQ-SAG-0102; research/model-dates.md, checked 2026-11-09): jev-1.13.0 2026-09-15 (date supplied by the owner 2026-11-09; docs.typesafe.ai publishes none), jev-1.14.0 2026-10-14, claude-haiku-5-5 2026-10-07, claude-sonnet-5-5 2026-09-28, claude-opus-5-5 2026-09-22, claude-fable-5-2 2026-11-09, gpt-6-luna 2026-09-22, gpt-6.1-terra 2026-10-26, gpt-6.1-sol 2026-09-29, gpt-6-astra 2026-09-03. Ids are provider-neutral (REQ-SAG-0103); each provider maps them to its own id in sc-llm-provider (A-7), e.g. OpenRouter `anthropic/claude-haiku-5.5`.
-- Provider ranking (REQ-SAG-0103, assistant decision): `Provider::PRIORITY` = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous. `Provider::ranking(line)` is the providers that serve a line, in that order: jev -> [TypeSafe]; haiku, sonnet, opus, fable -> [Anthropic, OpenRouter, Together]; luna, terra, sol, astra -> [OpenAi, OpenRouter, Together]; an id on no line (`None`) -> [OpenRouter, Together, Nous]. decide takes the first with a detected key; `--provider` is only an optional override (A-10).
+- Provider ranking (REQ-SAG-0103, assistant decision): `Provider::PRIORITY` = TypeSafe, Anthropic, OpenAi, OpenRouter, Together, Nous. `Provider::ranking(line)` is the providers that serve a line, in that order: jev -> [TypeSafe]; haiku, sonnet, opus, fable -> [Anthropic, OpenRouter, Together]; luna, terra, sol, astra -> [OpenAi, OpenRouter, Together]; an id on no line (`None`) -> [OpenRouter, Together, Nous]. decidr takes the first with a detected key; `--provider` is only an optional override (A-10).
 - `ModelChoice::Version(id)` resolves to itself without a catalog check (REQ-SAG-0101 AC2; REQ-SAG-0502/0503 allow unlisted models).
 - `SessionId` (ULID) lives here: sc-agent-log, sc-decision-schema and the runner all use it.
-- `CancelToken` has `wait_until(deadline)` and `on_cancel` registration; no sleep. The runner's queue registers a hook so held-off jobs and idle workers wake at once on cancel (A-9).
+- `CancelToken` has `on_cancel` registration; every timed wait is `Clock::wait_until(&CancelToken, Instant)` (the one time source: `Clock::system()` in production, `testing::ManualClock` in tests; the token itself has no timed wait); no sleep. The runner's queue registers a hook so held-off jobs and idle workers wake at once on cancel (A-9).
 - Every crate's error enum implements `ErrorId` (below). Ids are `"<crate-prefix>.<variant_snake>"`. This replaces every SCREAMING_SNAKE code, `code()`/`lower_code()`/`lower_id()` method and serde-tag id scheme. No crate uses `thiserror`.
 
 Size: about 420 lines of code and 200 lines of tests.
@@ -100,8 +100,9 @@ a-1 owns the workspace root `Cargo.toml` (`[workspace] members`, `[workspace.pac
 
 ```rust
 // src/lib.rs
-mod cancel; mod catalog; mod error; mod error_id; mod model; mod provider; mod release_date; mod session_id; mod short_name; mod var_name;
+mod cancel; mod catalog; mod clock; mod error; mod error_id; mod model; mod provider; mod release_date; mod session_id; mod short_name; mod var_name;
 pub use cancel::{CancelHook, CancelToken, Wait};
+pub use clock::{AdvanceHook, Clock, SystemClock, Waker};
 pub use catalog::{Catalog, ModelChoice};
 pub use error::TypesError;
 pub use error_id::{ErrorDetail, ErrorId};
@@ -111,6 +112,8 @@ pub use provider::Provider;
 pub use release_date::ReleaseDate;
 pub use session_id::SessionId;
 pub use short_name::ShortName;
+#[cfg(feature = "testing")]
+pub mod testing;   // ManualClock, CancelEvent (test doubles for consumers; no dependency)
 
 // src/error_id.rs  (the one error convention of the workspace)
 /// Every sc-agent error enum implements this. `id()` is stable per variant:
@@ -128,7 +131,7 @@ pub trait ErrorId: std::error::Error {
     fn cause_detail(&self) -> Option<ErrorDetail>;
     /// What the caller does next, if this layer knows. Provided: `None`. Sprints return non-empty
     /// text for secrets.key_missing (a-4), http.provider_busy and http.quota_exhausted (a-5),
-    /// local.model_not_served (a-6), decide.no_provider_key and decide.request_parse (a-10).
+    /// local.model_not_served (a-6), decidr.no_provider_key and decidr.request_parse (a-10).
     fn recovery(&self) -> Option<&'static str> { None }
     /// Provided: `ErrorDetail { id, message, recovery, cause: cause_detail() }`. Do not override.
     fn detail(&self) -> ErrorDetail;
@@ -173,8 +176,10 @@ impl CancelToken {
     #[must_use] pub fn new() -> Self;
     pub fn cancel(&self);                                   // idempotent; wakes every waiter and runs every hook once
     #[must_use] pub fn is_cancelled(&self) -> bool;
-    /// Condvar::wait_timeout_while; returns Cancelled at once if already cancelled. No sleep.
-    #[must_use] pub fn wait_until(&self, deadline: Instant) -> Wait;
+    /// Crate-private: Clock::wait_until parks on the token's condvar until cancel or the clock reaches the deadline.
+    pub(crate) fn park_until(&self, clock: &Clock, deadline: Instant) -> Wait;
+    /// feature `testing`: `trace` is called with each CancelEvent of this token, so a test can stop at a point of the cancel / hook-drop interleaving.
+    #[cfg(feature = "testing")] pub fn set_trace(&self, trace: Arc<dyn Fn(crate::testing::CancelEvent) + Send + Sync>);
     /// Runs `wake` once on cancel (at once if already cancelled). `wake` must not block.
     #[must_use] pub fn on_cancel(&self, wake: Arc<dyn Fn() + Send + Sync>) -> CancelHook;
 }
@@ -184,6 +189,56 @@ pub struct CancelHook { token: Weak<Inner>, id: u64 }
 impl Drop for CancelHook {}
 impl PartialEq for CancelToken { /* Arc::ptr_eq */ }  impl Eq for CancelToken {}
 impl fmt::Debug for CancelToken {}
+
+// src/clock.rs (the one time source of sc-agent: every wait and every `now` goes through a Clock)
+/// A wake-up run when a clock's time moves by a call rather than by real time.
+pub type Waker = Arc<dyn Fn() + Send + Sync>;
+/// The real clock: Instant::now, and waits that end when real time reaches the deadline (condvar timeout; no polling, no sleep).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SystemClock;
+/// The source of time of a run: the real clock in production, a manual one in tests. Cheap to clone; Default is Clock::system().
+#[derive(Clone, Default)]
+pub struct Clock(Source);   // enum Source { #[default] System, #[cfg(feature = "testing")] Manual(ManualClock) }
+/// Keeps a Waker registered with Clock::on_advance; dropping it deregisters the waker. Holds nothing for the real clock.
+#[must_use = "dropping an AdvanceHook deregisters its waker at once"]
+pub struct AdvanceHook { /* private */ }   // Debug
+impl Clock {
+    #[must_use] pub fn system() -> Self;
+    #[must_use] pub fn now(&self) -> Instant;
+    /// Blocks until `cancel` is cancelled or this clock reaches `deadline`: Wait::Cancelled at once if already cancelled, DeadlineReached at once if passed. Replaces the former timed wait of the token.
+    #[must_use] pub fn wait_until(&self, cancel: &CancelToken, deadline: Instant) -> Wait;
+    /// Parks once on `condvar` (paired with the mutex of `guard`) until a notify or `deadline` of this clock; the caller loops and re-checks. Real clock: Condvar::wait_timeout; manual clock: parks until notified, so the caller registers on_advance.
+    pub fn park<'a, T>(&self, condvar: &Condvar, guard: MutexGuard<'a, T>, deadline: Instant) -> MutexGuard<'a, T>;
+    /// Runs `wake` each time this clock is moved by a call (a manual clock's advance; the real clock never calls it), on the advancing thread outside the clock's locks; `wake` must not block.
+    pub fn on_advance(&self, wake: Waker) -> AdvanceHook;
+}
+impl From<SystemClock> for Clock {}
+#[cfg(feature = "testing")] impl From<ManualClock> for Clock {}
+impl fmt::Debug for Clock {}
+
+// src/testing.rs (feature `testing`, not default; a dev-dependency feature of consumers)
+/// A point inside a CancelToken reported to its trace (CancelToken::set_trace).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CancelEvent { HookTaken /* cancel has taken a hook and marked it running, not yet called */, DropWaiting /* a CancelHook drop found its hook running on another thread and is about to wait */ }
+/// A clock that moves only when the test moves it. Clones share one instant. A wait on it ends when the test advances it past the deadline (or on cancel), never by real time.
+#[derive(Clone)]
+pub struct ManualClock { inner: Arc<Manual> }
+impl ManualClock {
+    /// The longest wait_for_waiters waits before it gives up: a guard, never a measurement.
+    pub const FAILSAFE: Duration = Duration::from_secs(60);
+    #[must_use] pub fn new() -> Self;                                    // reads an arbitrary instant (the moment it was made)
+    #[must_use] pub fn starting_at(start: Instant) -> Self;
+    #[must_use] pub fn now(&self) -> Instant;
+    /// Moves the clock forward by `by` and wakes every parked wait, which then re-reads it.
+    pub fn advance(&self, by: Duration);
+    pub fn advance_to(&self, at: Instant);
+    /// Blocks until `waiters` waits are parked on this clock; false after FAILSAFE.
+    #[must_use] pub fn wait_for_waiters(&self, waiters: usize) -> bool;
+    #[must_use] pub fn waiters(&self) -> usize;
+    #[must_use] pub fn clock(&self) -> Clock;                            // Clock::from(self.clone())
+}
+impl Default for ManualClock {}  impl fmt::Debug for ManualClock {}
 
 // src/model.rs
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -299,13 +354,14 @@ impl ErrorId for TypesError {}  impl fmt::Display for TypesError {}  impl std::e
 
 ## 5. New code
 
-- N1 `src/lib.rs` (starts with `#![forbid(unsafe_code)]`), `README.md`, crate `Cargo.toml` (`[lints] workspace = true`, no features).
+- N1 `src/lib.rs` (starts with `#![forbid(unsafe_code)]`), `README.md`, crate `Cargo.toml` (`[lints] workspace = true`, one non-default feature `testing = []`, no dependency).
+- N1a `src/clock.rs` (`Clock`, `SystemClock`, `AdvanceHook`, `Waker`) and `src/testing.rs` (`ManualClock`, `CancelEvent`, feature `testing`).
 - N2 `src/error.rs`, `src/error_id.rs` (section 3-4).
 - N3 Workspace root `Cargo.toml`: `[workspace] members = ["crates/*"]`, `resolver = "3"`; `[workspace.package] edition = "2024"`, `rust-version = "1.94.1"`, `license = "MIT"`; `[workspace.lints.rust] unsafe_code = "deny"` (not `forbid`: PyO3's `#[pymodule]`/`#[pyfunction]` expansions carry `#[allow(unsafe_code)]`, which a workspace `forbid` rejects, so sc-treesitter-py (A-3) and sc-agent-py (A-10) would not compile); every non-PyO3 crate adds `#![forbid(unsafe_code)]` at its crate root (sc-agent-types does, in src/lib.rs); `[workspace.lints.clippy] panic = "deny"`, `unwrap_used = "deny"`, `expect_used = "deny"`, `indexing_slicing = "deny"` (REQ-SAG-0002 AC2; sc-lint does not enforce these yet, so clippy is the gate). `clippy.toml`: `allow-unwrap-in-tests`, `allow-expect-in-tests`, `allow-panic-in-tests`, `allow-indexing-slicing-in-tests` = true; `disallowed-methods = ["std::thread::sleep", "std::thread::sleep_until", { path = "sc_agent_secrets::ApiKey::as_str", reason = "the key is read only at sc-agent-http's ureq_transport (A-5)" }]` (REQ-SAG-0010 as a lint; the as_str entry is written here, see Shared files; A-5 does not edit clippy.toml).
-- N4 `CancelToken::wait_until`, `on_cancel`, `CancelHook`, `Wait`.
+- N4 `Clock::wait_until`, `CancelToken::on_cancel`, `CancelHook`, `Wait`.
 - N5 `ModelChoice`, `Catalog::resolve` (infallible, total `Latest`), generic `line_of`, `VarName`.
 - Tests (each names the acceptance line it proves; the acceptance list holds the assertions):
-  - N6 tests/cancel.rs: proves AC "REQ-SAG-0104 (boundary part)" and "REQ-SAG-0104 AC2" (Send + Sync). Extra cases not in an acceptance line: `DeadlineReached` with no cancel; a hook that registers or drops another hook does not deadlock. Waits use deadlines and channels, never sleep.
+  - N6 tests/cancel.rs: proves AC "REQ-SAG-0104 (boundary part)" and "REQ-SAG-0104 AC2" (Send + Sync). Extra cases not in an acceptance line: `DeadlineReached` when the ManualClock reaches the deadline (and not before: a deadline just ahead is not reached until the clock gets there); a wait returns at once when cancelled or past the deadline, on the system clock too; a hook that registers or drops another hook does not deadlock; a hook drop that overlaps a running hook waits for it, forced through the `CancelEvent` trace points. Deterministic by design: time moves only through a `ManualClock` the test advances and every wait for another thread is bounded by the testkit's hang guard; no sleep.
   - N7 tests/catalog.rs: proves AC "REQ-SAG-0101 AC1", "REQ-SAG-0101 AC2", "REQ-SAG-0102 AC1/AC2" and "REQ-SAG-0102" (built-in dates). Extra cases: the same id on two lines is `types.model_on_two_lines`; every MODELS id round-trips through Display/serde; `line_of` for built-in and config ids, called with `&ModelId` and with `&str`; each `Latest` slot of `builtin()` is the newest MODELS row of its line.
   - N8 tests/names.rs: proves AC "REQ-SAG-0103" and "REQ-SAG-0001". Extra cases: ShortName/Provider/ReleaseDate/VarName spellings and rejections with their ids (VarName accepts MY_RUNNER_TOKEN (never a real credential name here, REQ-SAG-0401), rejects "", "lower", "1X", "A-B" and 129 characters).
   - N9 tests/error_id.rs: proves AC "REQ-SAG-0002" (both ErrorId lines). Extra cases: `ErrorDetail::foreign` keeps an io error's source chain; `cause_detail()` and `recovery()` called through `&dyn ErrorId` with `std::error::Error` in scope compile (the E0034 guard); an ErrorDetail with no recovery serializes without the key.
@@ -317,6 +373,7 @@ impl ErrorId for TypesError {}  impl fmt::Display for TypesError {}  impl std::e
 | serde | "1" (1.0.229), features ["derive"] | ErrorDetail; hand-written string serde for the name types |
 | ulid | "1" (1.2.1) | SessionId |
 | dev: serde_json | "1" (1.0.154) | round-trip tests |
+| dev: sc-agent-types (self, feature `testing`), sc-agent-testkit (path, dev-only) | | ManualClock and CancelToken trace in tests/cancel.rs; the testkit's bounded waits |
 
 No sc-observability: this crate does no I/O and logs nothing.
 
@@ -328,12 +385,12 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 
 - [ ] Copy first: the sprint's first commit is the unchanged output of `docs/plans/phase-a/copy/a-1.sh` (sc-agent-ref@dce239a), committed before any edit; every change needed to make that code build and pass comes in later commits (owner-copy-mechanically).
 - [ ] Shared files: right after the copy commit a-1 pushes the workspace root Cargo.toml (members = ["crates/*"], [workspace.package], [workspace.lints]) and clippy.toml (sleep and sc_agent_secrets::ApiKey::as_str disallowed-methods entries); a-3, a-4 and a-8 start from that push; no later sprint edits either file.
-- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) (infallible: every line has a slot) returns the newest model of its line across built-in and with_config_model rows (test). The decide end-to-end check is a-10's.
+- [ ] REQ-SAG-0101 AC1: sc-agent-types: each of jev, haiku, sonnet, opus, fable, luna, terra, sol, astra parses as ShortName and Catalog::resolve(Latest) (infallible: every line has a slot) returns the newest model of its line across built-in and with_config_model rows (test). The decidr end-to-end check is a-10's.
 - [ ] REQ-SAG-0101 AC2: sc-agent-types: a specific catalog version id parses as ModelChoice::Version and Catalog::resolve returns it unchanged (test).
 - [ ] REQ-SAG-0102 AC1/AC2: sc-agent-types: Catalog::with_config_model adding a haiku model dated later than every built-in haiku makes resolve(Latest(Haiku)) return it with no rebuild; an equal date also makes it win; an earlier date changes nothing (tests). sc-agent-types reads no files (no std::fs use). Loading the row from JSON is a-4's.
 - [ ] REQ-SAG-0102: sc-agent-types: every built-in MODELS row carries the model's published release date (claude-fable-5-2, not 5-1), checked by test, including jev-1.13.0 = 2026-09-15 (date supplied by the owner 2026-11-09).
 - [ ] REQ-SAG-0103: sc-agent-types: Provider and ModelId are separate types; a catalog ModelId encodes no provider and is used with two Providers unchanged (test); Provider::PRIORITY is the fixed ranking and Provider::ranking(line) lists the providers serving a line in that order (test); Provider::OpenAi is spelled openai.
-- [ ] REQ-SAG-0104 (boundary part; AC1 across crates is closed by a-9): sc-agent-types: a CancelToken cancelled on another thread ends wait_until with Wait::Cancelled at once (well before the deadline) and runs every registered on_cancel hook once (at once if registered after cancel; never after its CancelHook is dropped); clones share it (tests; no sleep).
+- [ ] REQ-SAG-0104 (boundary part; AC1 across crates is closed by a-9): sc-agent-types: a CancelToken cancelled on another thread ends Clock::wait_until(&token, deadline) with Wait::Cancelled at once (well before the deadline; on a ManualClock the wait is parked until the test cancels or advances the clock, so no real time passes) and runs every registered on_cancel hook once (at once if registered after cancel; never after its CancelHook is dropped); clones share it (tests; no sleep).
 - [ ] REQ-SAG-0104 AC2 (Python, boundary part): sc-agent-types: CancelToken is Send + Sync (compile test), so the PyO3 crate can wrap it; the Python test is a-10's (sc-agent-py).
 - [ ] REQ-SAG-0001: sc-agent-types: SessionId::new() is a ULID; FromStr accepts only the canonical 26-char form and rejects a UUID with types.invalid_session_id (test).
 - [ ] REQ-SAG-0002: sc-agent-types: ErrorId (id, message, cause_detail, provided recovery and detail) and ErrorDetail {id, message, recovery (optional, omitted when None), cause} exist; every TypesError variant has a distinct id types.<variant_snake>; Display is "<id>: <message>" only and detail() carries the chain; ErrorDetail round-trips through serde with its cause chain (tests).
@@ -342,7 +399,7 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 - [ ] REQ-SAG-0401: sc-agent-types: no credential env-var name appears in the crate (rg '_API_KEY' crates/sc-agent-types finds nothing).
 - [ ] REQ-SAG-0009: sc-agent-types: `cargo tree -p sc-agent-types -e normal` lists no tokio crate (deps: serde, ulid; dev serde_json).
 - [ ] REQ-SAG-0010: sc-agent-types source calls no sleep function (no std::thread::sleep, sleep_until or tokio::time::sleep): `rg 'sleep\(' crates/sc-agent-types/src` finds none, and the workspace clippy.toml that a-1 owns disallows std::thread::sleep and std::thread::sleep_until, so `cargo clippy --workspace -- -D warnings` fails on any sleep call.
-- [ ] ADR-SAG-0004: no sc-agent crate may depend on a higher layer (types; config, secrets and log; http; decision schema; decision backends over sc-llm-provider; runner); sc-agent-types is the bottom layer: its Cargo.toml declares no sc-agent crate dependency (only serde and ulid; dev serde_json), checked by `cargo tree -p sc-agent-types`.
+- [ ] ADR-SAG-0004: no sc-agent crate may depend on a higher layer (types; config, secrets and log; http; decision schema; decision backends over sc-llm-provider; runner); sc-agent-types is the bottom layer: its Cargo.toml declares no sc-agent crate dependency (only serde and ulid; dev serde_json, its own `testing` feature and the dev-only sc-agent-testkit), checked by `cargo tree -p sc-agent-types`.
 - [ ] REQ-SAG-0002: sc-agent-types: a test wraps a lower-layer error two levels deep (ErrorDetail::new with nested causes) and asserts the outermost ErrorDetail chain carries the id and message of every cause at every level.
 - [ ] sc-agent-types: ModelId implements AsRef<str> and Borrow<str>, and Catalog::line_of answers for a plain &str without parsing (test); VarName parses ^[A-Z_][A-Z0-9_]{0,127}$ and rejects anything else with types.invalid_var_name (test).
 - [ ] REQ-SAG-0013 (key_env pattern part): sc-agent-types: VarName accepts ^[A-Z_][A-Z0-9_]{0,127}$ and rejects anything else with types.invalid_var_name (tests/names.rs VarName test); a-4 applies it to key_env at load.
@@ -350,10 +407,11 @@ ModelId variant enum; ModelFamily; ModelSource, ResolvedModel and overrides (con
 ## Notes
 
 Closed 2026-11-09 by owner answers (search-for-truth step 7):
-- Same release date: the global-config model wins (assistant choice under the owner's 'IDC'); decide doctor warns (REQ-SAG-0503).
+- Same release date: the global-config model wins (assistant choice under the owner's 'IDC'); decidr doctor warns (REQ-SAG-0503).
 - Built-in rows and dates: research/model-dates.md; fable is claude-fable-5-2.
 - Provider-specific ids: the catalog holds provider-neutral ids; each provider maps them (REQ-SAG-0103, sc-llm-provider A-7). Provider ranking is defined here (design).
 - jev-1.13.0 release date 2026-09-15: date supplied by the owner 2026-11-09 (docs.typesafe.ai gives none; plan-hardening decision 10).
 No open questions.
 Hardening round 1 (2026-11-09): front matter added; a-1 owns workspace root Cargo.toml and clippy.toml (unsafe_code = "deny" at the workspace, #![forbid(unsafe_code)] per non-PyO3 crate) incl. the ApiKey::as_str entry (clippy 0.1.99 skips an entry whose crate is not a dependency, checked).
 Hardening round 2 (2026-11-09): ErrorId::cause -> cause_detail (E0034 with Error::cause); recovery() provided + ErrorDetail.recovery; Display = "<id>: <message>"; LineHasNoModel deleted (total Latest, resolve infallible); ModelId AsRef/Borrow<str>, generic line_of; VarName added for A-4 key_env (REQ-SAG-0013); REQ-SAG-0104 AC1 -> a-9, REQ-SAG-0001 AC2 -> a-10.
+QA-1 fix (2026-11-10, 5066236): TypesError::recovery() now returns Some for every variant (RBP-F001); short-name/provider lists moved from message() into recovery(); CancelHook drop waits for a running hook (REQ-QA-001). The design text saying recovery is the provided None is superseded.

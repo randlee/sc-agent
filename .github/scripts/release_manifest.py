@@ -53,6 +53,9 @@ def load_manifest(path: Path, *, with_channel_contracts: bool = False) -> dict:
     release_binaries = data.get("release_binaries", [])
     python_packages = data.get("python_packages", [])
     python_distributions = data.get("python_distributions", [])
+    for crate in crates:
+        if "verify_registry_visibility" in crate and type(crate["verify_registry_visibility"]) is not bool:
+            raise SystemExit("crates.verify_registry_visibility must be a boolean")
     crates = sorted(crates, key=lambda item: (item["publish_order"], item["artifact"]))
     manifest = {
         "project": data.get("project", {}),
@@ -527,6 +530,30 @@ def _validate_homebrew_formulas(
     return formulas
 
 
+def _validate_scoop_binaries(channel: dict, available_binaries: set[str]) -> None:
+    """Require exactly one of Scoop's single binary path or its list of release binaries."""
+    if ("binary" in channel) == ("binaries" in channel):
+        raise SystemExit("[channels.scoop] must define exactly one of binary or binaries")
+    if "binary" in channel:
+        if not isinstance(channel["binary"], str) or not channel["binary"]:
+            raise SystemExit("[channels.scoop].binary must be a non-empty string")
+        return
+    binaries = channel["binaries"]
+    if (
+        not isinstance(binaries, list)
+        or not binaries
+        or not all(isinstance(binary, str) and binary for binary in binaries)
+        or len(set(binaries)) != len(binaries)
+    ):
+        raise SystemExit("[channels.scoop].binaries must be a non-empty list of unique strings")
+    undeclared = sorted(set(binaries) - available_binaries)
+    if undeclared:
+        raise SystemExit(
+            "[channels.scoop].binaries references undeclared release binary(s): "
+            + ", ".join(undeclared)
+        )
+
+
 def _homebrew_formulas_for_tag(
     channel: dict, tag: str, available_binaries: set[str] | None = None
 ) -> list[dict]:
@@ -738,3 +765,16 @@ def _channel_preflight_result(
         "credential_rehearsal": rehearsal,
         "sanitized_diagnostic": diagnostic,
     }
+
+
+def cmd_list_publish_plan(args: object) -> int:
+    """Render the ordered plan, retaining the legacy fields unless requested."""
+    manifest = load_manifest(Path(args.manifest))
+    for crate in manifest["crates"]:
+        row = f"{crate['package']}|{crate['wait_after_publish_seconds']}"
+        if args.include_manifest:
+            row += f"|{crate['cargo_toml']}"
+        if args.include_visibility:
+            row += "|" + str(crate.get("verify_registry_visibility", False)).lower()
+        print(row)
+    return 0

@@ -1,0 +1,32 @@
+[package]
+name = "sc-agent-http"
+version.workspace = true
+description = "Sync HTTP layer for sc-agent: one send per call, busy and quota classification, resend holdoffs as not-before instants, secret redaction."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Transport test doubles for consumers' tests (PLAN-CRIT-010): ScriptedTransport,
+# RecordingTransport, BlockingTransport, ManualClock. Adds no dependency.
+testing = ["sc-agent-types/testing"]
+
+[dependencies]
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+serde_json = "1"
+# Exact pin: the transport depends on ureq 3.5 config APIs (Agent::config_builder,
+# timeout_connect / timeout_global, Agent::configure_request for the per-request
+# deadline, unversioned::resolver for LookupResolver) and on how 3.5 reports
+# errors (io::Error kinds, Error::Timeout). A ureq upgrade is a reviewed change
+# that re-runs tests/ureq.rs, not a semver float. Advisories: CI cargo-deny job.
+ureq = "=3.5.1"
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-http = { path = ".", features = ["testing"] }
+sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,28 @@
+[package]
+name = "sc-agent-log"
+version.workspace = true
+description = "General and session loggers for sc-agent over sc-observability."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# In-memory MemoryLog for consumers' tests (PLAN-CRIT-010); adds no dependency.
+testing = []
+
+[dependencies]
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+sc-observability = "=1.5.0"
+sc-observability-types = "=1.5.0"
+# preserve_order: identity and context fields are written first, then the payload in its order.
+serde_json = { version = "1", features = ["preserve_order"] }
+hostname = "0.4.2"
+
+[dev-dependencies]
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+sc-agent-types = { path = "../sc-agent-types", features = ["testing"] }
+tempfile = "3"
+sc-agent-log = { path = ".", features = ["testing"] }
+
+[lints]
+workspace = true

@@ -43,6 +43,7 @@ jobs:
   detect:
     name: Detect workspace
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       rust: ${{ steps.detect.outputs.rust }}
     steps:
@@ -57,6 +58,7 @@ jobs:
     needs: [detect]
     if: ${{ needs.detect.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -74,6 +76,7 @@ jobs:
     needs: [detect, fmt]
     if: ${{ needs.detect.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -104,6 +107,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -124,13 +128,136 @@ jobs:
       - name: Run workspace tests
         run: cargo test --workspace --all-features
 
+  # sc-treesitter (sprint a-3): ADR-SAG-0005 feature gates, the grammar feature matrix and
+  # the sc-treesitter-py wheel (REQ-QA-001, REQ-QA-002).
+  treesitter:
+    name: sc-treesitter features and wheel
+    needs: [detect, fmt]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-treesitter-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check ADR-SAG-0005 feature gates (cargo metadata)
+        run: |
+          cargo metadata --format-version 1 --no-deps > metadata.json
+          python3 - <<'PY'
+          import json, sys
+          packages = {p["name"]: p for p in json.load(open("metadata.json"))["packages"]}
+          lib = packages["sc-treesitter"]
+          default = lib["features"].get("default", [])
+          problems = [f"`{f}` is a default feature" for f in ("python", "cli") if f in default]
+          bins = {t["name"]: t for t in lib["targets"] if "bin" in t["kind"]}
+          if bins.get("sitr", {}).get("required-features") != ["cli"]:
+              problems.append("bin sitr must have required-features = [\"cli\"]")
+          if problems:
+              sys.exit("ADR-SAG-0005: " + "; ".join(problems))
+          print(f"default features {default}; sitr required-features {bins['sitr']['required-features']}")
+          PY
+
+      - name: Test with only the Python grammar
+        run: cargo test -p sc-treesitter --no-default-features --features grammar-python
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install maturin and pytest
+        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
+
+      - name: Build the sc-treesitter wheel
+        run: maturin build -m crates/sc-treesitter-py/Cargo.toml --out dist
+
+      - name: Run the sc-treesitter-py tests
+        run: |
+          python -m pip install --no-index --find-links dist sc-treesitter
+          python -m pytest crates/sc-treesitter-py/tests
+
+  # sc-agent-py (sprint a-10): the sc-agent wheel over the decidr library, and its pytest
+  # suite against a loopback runner (REQ-QA-007). The suite also runs the decidr binary.
+  sc-agent-py:
+    name: sc-agent-py wheel and pytest
+    needs: [detect, fmt]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-sc-agent-py-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build the decidr binary (the parity and identity tests run it)
+        run: cargo build -p decidr
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install maturin and pytest
+        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
+
+      - name: Build the sc-agent wheel
+        run: maturin build -m crates/sc-agent-py/Cargo.toml --out dist
+
+      - name: Run the sc-agent-py tests
+        run: |
+          python -m pip install --no-index --find-links dist sc-agent
+          python -m pytest crates/sc-agent-py/tests
+
+  # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).
+  # Exact pins such as ureq =3.5.1 are not floated, so this job is how a
+  # published advisory against a pinned crate reaches the merge gate.
+  deny:
+    name: Dependency advisories and licenses
+    needs: [detect]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo deny check advisories licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses
+
   # The one required status check: it always reports, passes when every job
   # above succeeded or was skipped, and fails if any failed or was cancelled.
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test]
+    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, deny]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Check job results
         env:

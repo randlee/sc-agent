@@ -36,10 +36,9 @@ sprint:
   adrs: [ADR-SAG-0001, ADR-SAG-0004]
   does_not_close:
     - "REQ-SAG-0901 AC2 (a schema mismatch is resent unchanged up to max_sends, then returned): a-9 acceptance, over this backend's SchemaMismatch signal."
-    - "REQ-SAG-0503 decide doctor reporting provider model lists: a-10 acceptance (this sprint ships models_request/decode_models only)."
-    - "A Haiku/Luna decision sent end to end through decide (REQ-SAG-0901, REQ-SAG-0103 through the CLI): a-10 acceptance."
-    - "Owner review of the SYSTEM_PROMPT draft (owner item, see notes)."
-    - "Converting a config Provider to LlmProvider (LlmProvider::from_provider) once in decide's backend(), and sending models_request on a transport built with UreqTransport::new(Timeouts::probe()): a-10."
+    - "REQ-SAG-0503 decidr doctor reporting provider model lists: a-10 acceptance (this sprint ships models_request/decode_models only)."
+    - "A Haiku/Luna decision sent end to end through decidr (REQ-SAG-0901, REQ-SAG-0103 through the CLI): a-10 acceptance."
+    - "Converting a config Provider to LlmProvider (LlmProvider::from_provider) once in decidr's backend(), and sending models_request on a transport built with UreqTransport::new(Timeouts::probe()): a-10."
 ```
 
 # Sprint A-7: sc-llm-provider and sc-decision-llm (bead agt-4p2.7)
@@ -51,14 +50,14 @@ Copy script: `docs/plans/phase-a/copy/a-7.sh` (source sc-agent-ref@dce239a; dry 
 Both crates are sans-IO: they build an `HttpRequest` and read an `HttpResponse` (A-5). Sending, busy resend and holdoff are sc-agent-http plus the runner's queue; the schema-mismatch resend (up to max_sends) is the runner's too (A-9), signalled by `DecisionError::SchemaMismatch` from `decode`.
 
 Decisions (assistant, 2026-11-09):
-- Providers: `LlmProvider` (Anthropic, OpenAi, OpenRouter, Together, Nous) is the provider type in this crate; TypeSafe has no LLM wire and cannot be named here, so there is no unsupported-provider error (decide converts once).
+- Providers: `LlmProvider` (Anthropic, OpenAi, OpenRouter, Together, Nous) is the provider type in this crate; TypeSafe has no LLM wire and cannot be named here, so there is no unsupported-provider error (decidr converts once).
 - Wire: Anthropic Messages for anthropic; Chat Completions for openai, openrouter, together and nous (one encoder). Token cap: `max_completion_tokens` for openai, `max_tokens` for the others.
 - Nous: base `https://inference-api.nousresearch.com/v1`, Bearer, `response_format` json_schema; a model that rejects it returns the provider's error.
-- Provider ids (REQ-SAG-0103): `provider_model_id` maps a catalog id to the provider's id: anthropic, openai, nous unchanged; openrouter `anthropic/<id>` for `claude-*` with the trailing `-<major>-<minor>` written `<major>.<minor>` (`claude-haiku-5-5` -> `anthropic/claude-haiku-5.5`) and `openai/<id>` for `gpt-*`; together `anthropic/<id>` / `openai/<id>` (Together's ids are unconfirmed; decide doctor reports any that do not map back). `catalog_model_id` is the inverse, used by decide doctor.
-- Model lists for decide doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.
+- Provider ids (REQ-SAG-0103): `provider_model_id` maps a catalog id to the provider's id: anthropic, openai, nous unchanged; openrouter `anthropic/<id>` for `claude-*` with the trailing `-<major>-<minor>` written `<major>.<minor>` (`claude-haiku-5-5` -> `anthropic/claude-haiku-5.5`) and `openai/<id>` for `gpt-*`; together `anthropic/<id>` / `openai/<id>` (Together's ids are unconfirmed; decidr doctor reports any that do not map back). `catalog_model_id` is the inverse, used by decidr doctor.
+- Model lists for decidr doctor (REQ-SAG-0503) live here: `LlmClient::models_request` / `decode_models`.
 - Images: every asset is passed through (REQ-SAG-0901); a provider rejection is its own error (decision.backend, cause llm.api_status).
 - Model name: the request sends `provider_model_id(provider, resolved ModelId)`; the response reports the model the provider names.
-- System prompt: drafted below by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); the owner reviews the draft.
+- System prompt: drafted by the assistant (Mapika/decider uses none, plan-anchor has no decider mode); owner-approved as written 2026-11-10.
 
 What the old code did, and why little is copied: old `sc-jev-backends` sent a consumer system prompt (judge-jev `check.toml`) plus the canonical payload to a token-count endpoint, then to Anthropic Messages or OpenAI Responses, with no JSON schema; old `sc-decision-schema/src/llm` checked only ids, choice membership and numeric types; `noul` was refused, `score` was a choice, `box` did not exist. Dropped: canonical payload and `payload_sha256` (ADR-SAG-0001), `WireFault`, token counting and byte limits (no record), the consumer prompt (REQ-SAG-0006), `ModelFamily`/`SchemaFamily`, the macro-built backends.
 
@@ -83,7 +82,7 @@ What the old code did, and why little is copied: old `sc-jev-backends` sent a co
 - `decode.rs`: `parse_vendor` -> `decode_anthropic` / `decode_chat` -> `LlmResponse`. Keep Anthropic text concatenation (drop `non_text_blocks`). Usage: provider's own counters (Chat `prompt_tokens`/`completion_tokens`); no cache sums. Truncation: `stop_reason == "max_tokens"`, Chat `finish_reason == "length"`. Refusal: Anthropic `stop_reason == "refusal"`, Chat `message.refusal` non-null. First choice via `.first()`. Negative counter -> `ReplyInvalid`.
 - `client.rs`: the fold becomes `LlmClient::encode`'s tail.
 - `tests/decode.rs`: port builders; add `chat_message(text, finish_reason)`; truncation asserts `LlmError::Truncated` on both wires.
-- `answers.rs`: `LlmOutput::parse` keeps the not-JSON / no-`answers` split (`DecisionLlmError::AnswerInvalid` / `AnswerIds`). Replace the choice-only check with one check per Jev question type (section 3). Delete `input_bytes`, `parse_output`, `id_set`, `QuestionAnswer`.
+- `answers.rs`: `LlmOutput::parse` is deleted (LlmClient::decode always returns parsed JSON for Output::Json; a missing reply.json is decision_llm.invariant). Replace the choice-only check with one check per Jev question type (section 3). Delete `input_bytes`, `parse_output`, `id_set`, `QuestionAnswer`.
 
 ## 3. New code (exact public surface; bodies elided)
 
@@ -96,21 +95,22 @@ pub use client::{LlmClient, Wire};
 pub use provider::LlmProvider;
 pub use error::LlmError;
 pub use ids::{catalog_model_id, provider_model_id};
-pub use types::{LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
+pub use types::{ImageMediaType, LlmRequest, LlmResponse, Message, Output, Part, Role, Usage};
 
 // src/types.rs - any LLM call (REQ-SAG-0502), not only decisions
 #[derive(Debug, Clone, PartialEq)]
-pub struct LlmRequest { pub model: ModelId, pub system: Option<String>, pub messages: Vec<Message>, pub max_tokens: u32, pub output: Output }
+pub struct LlmRequest<'a> { pub model: ModelId, pub system: Option<String>, pub messages: Vec<Message<'a>>, pub max_tokens: u32, pub output: Output }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message { pub role: Role, pub content: Vec<Part> }
+pub struct Message<'a> { pub role: Role, pub content: Vec<Part<'a>> }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Part {
+pub enum Part<'a> {
     Text(String),
     /// Anthropic `{type:"image", source:{type:"base64", media_type, data}}`; Chat `{type:"image_url", image_url:{url:"data:<media_type>;base64,<data>"}}`.
-    Image { media_type: &'static str, data_base64: String },
+    Image { media_type: ImageMediaType, data_base64: Cow<'a, str> },   // ImageMediaType: #[non_exhaustive] { Png, Jpeg, OctetStream } with as_str()
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role { User, Assistant }
+impl Role { pub const fn as_str(self) -> &'static str; }
 #[derive(Debug, Clone, PartialEq)]
 pub enum Output {
     Text,
@@ -167,7 +167,7 @@ impl LlmClient {
     pub fn decode(&self, request: &LlmRequest, response: HttpResponse, ctx: LogContext) -> Result<LlmResponse, LlmError>;
     /// Wrap a send failure with this client's provider, for callers that send.
     pub fn http_error(&self, error: HttpError) -> LlmError;
-    /// GET {base}/v1/models with the credential header (decide doctor). The caller sends it on a probe
+    /// GET {base}/v1/models with the credential header (decidr doctor). The caller sends it on a probe
     /// transport (`UreqTransport::new(Timeouts::probe())`, connect 5 s, request 10 s; a-5), not the 120 s decision one.
     pub fn models_request(&self) -> Result<HttpRequest, LlmError>;   // secret via with_secret(..)? -> LlmError::Http
     /// The provider's model ids (`data[].id`, or a top-level array of `{id}`); non-2xx -> ApiStatus.
@@ -200,7 +200,7 @@ impl LlmDecisionBackend {
     /// Luna: LlmClient::new(LlmProvider::OpenAi, key) with catalog.resolve(Latest(Luna)).
     /// (Catalog::resolve is infallible, a-1: it returns the ModelId, no error arm.)
     pub fn new(llm: LlmClient, model: ModelId) -> Self;
-    pub fn with_max_tokens(self, max_tokens: u32) -> Self;
+    pub fn with_max_tokens(self, max_tokens: u32) -> Result<Self, DecisionLlmError>;   // 0 -> decision_llm.invalid_max_tokens
     /// Sets the logger on itself and on its LlmClient (`self.llm = self.llm.with_log(log.clone())`), so one
     /// decode writes `llm.usage` (LlmClient) and, on a mismatch, `llm.schema_mismatch` (this backend).
     pub fn with_log(self, log: GeneralLogger) -> Self;
@@ -220,7 +220,7 @@ impl Backend for LlmDecisionBackend {
 }
 
 // src/prompt.rs
-/// Built in (ADR-SAG-0001). Assistant draft for owner review:
+/// Built in (ADR-SAG-0001). Owner-approved 2026-11-10:
 /// "You answer decision questions in place of a decision model. The user message is JSON with a state and
 /// questions keyed by id; images, if any, follow it. Answer every question in the required JSON schema. For a
 /// choice or score question give your own probability for every option and your confidence from 0 to 1; for a
@@ -253,7 +253,7 @@ Anthropic structured outputs accept no numeric min/max, so ranges are not in the
 
 How decode maps failures (the runner resends on `SchemaMismatch` up to max_sends, then returns it, A-9; backend name `"llm"`):
 - `DecisionError::SchemaMismatch { backend: "llm", detail }`: `LlmError::OutputNotJson`, `LlmError::Truncated`, `LlmError::NoText`, `DecisionLlmError::AnswerIds`, `DecisionLlmError::AnswerInvalid` (e.g. a choice answer missing `probabilities`). `detail` = `DecisionLlmError::detail()`, which carries the LlmError chain.
-- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Encode`, `Http`) and `DecisionLlmError::Encode`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
+- `DecisionError::Backend { backend: "llm", detail }`: every other LlmError (`ApiStatus`, `ReplyInvalid`, `Refused`, `Http`) and `DecisionLlmError::Encode` (incl. an unsupported question type and an asset with no image), `InvalidMaxTokens` and `Invariant`. Not resent; a provider rejecting an image is `ApiStatus` with its own message.
 
 Log records (ANC-007), via `GeneralLogger::write(Level::Info, target, action, ctx, fields)` (session_id/position travel in `ctx`, not in `fields`); never a prompt, body, header value or key; a log write error is ignored (counted by sc-agent-log) and never changes a decode result:
 - `llm.usage`, target `"sc_llm_provider"`: `provider`, `model` (as the provider reports it), `input_tokens`, `output_tokens`; ctx = the caller's LogContext.
@@ -270,9 +270,7 @@ pub enum LlmError {
     /// The send failed in sc-agent-http; the HttpError is kept whole.
     Http { provider: LlmProvider, source: HttpError },                 // "llm.http"
     /// A non-2xx final reply, in the provider's own words (redacted).
-    ApiStatus { provider: LlmProvider, reply: ProviderReply },         // "llm.api_status"
-    /// The request body could not be serialized.
-    Encode { message: String },                                     // "llm.encode"
+    ApiStatus { provider: LlmProvider, reply: Box<ProviderReply> },         // "llm.api_status"
     /// The 2xx body is not JSON or not the provider's envelope (serde message, never body bytes).
     ReplyInvalid { provider: LlmProvider, message: String },           // "llm.reply_invalid"
     /// The reply has no text content.
@@ -293,17 +291,21 @@ pub enum DecisionLlmError {
     /// Wraps LlmError (and through it HttpError), kept whole.
     Llm(LlmError),                                                   // "decision_llm.llm"
     /// State, questions or schema could not be serialized.
-    Encode { message: String },                                      // "decision_llm.encode"
+    Encode { message: String },                                      // "decision_llm.encode" (also: unsupported question type, asset with no image)
     /// The model's answer ids differ from the question ids.
-    AnswerIds { missing: Vec<String>, extra: Vec<String> },          // "decision_llm.answer_ids"
+    /// `extra` lists at most MAX_LISTED_IDS (8); extra_count is the full count.
+    AnswerIds { missing: Vec<String>, extra: Vec<String>, extra_count: usize },   // "decision_llm.answer_ids"
     /// One answer lacks a required field, has a wrong type, or a choice outside the criteria.
     AnswerInvalid { question: String, message: String },             // "decision_llm.answer_invalid"
+    InvalidMaxTokens { max_tokens: u32 },                            // "decision_llm.invalid_max_tokens"
+    Invariant { message: String },                                   // "decision_llm.invariant" (never a mismatch)
 }
 impl ErrorId for DecisionLlmError {}
 impl From<LlmError> for DecisionLlmError {}
 ```
 
-LlmError 8 variants, DecisionLlmError 4 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
+impl DecisionLlmError { pub const MAX_MODEL_TEXT_BYTES: usize = 64; pub const MAX_LISTED_IDS: usize = 8; }
+LlmError 7 variants, DecisionLlmError 6 (DecisionLlmError::Llm: cause_detail() = the LlmError detail). sc-decision-schema does not depend on either: they reach DecisionError as ErrorDetail (ADR-SAG-0004).
 
 ## 5. Config keys
 
@@ -323,7 +325,7 @@ None. Model ids come from the A-1 catalog, keys from A-4 (`ANTHROPIC_API_KEY`, `
 - `cargo build -p sc-llm-provider -p sc-decision-llm`
 - `cargo clippy -p sc-llm-provider -p sc-decision-llm --all-targets -- -D warnings` with the workspace denies (a-1) -> AC 13
 - `cargo test -p sc-llm-provider -p sc-decision-llm`
-- `cargo tree -p sc-llm-provider -e normal --depth 1` and `cargo tree -p sc-decision-llm -e normal --depth 1`: direct sc-agent dependencies exactly as in section 7; full `cargo tree -p sc-llm-provider -p sc-decision-llm` has no sc-decision-runner, decide, tokio or ureq, and sc-llm-provider's has no sc-decision-* crate -> AC 14, AC 16, AC 17
+- `cargo tree -p sc-llm-provider -e normal --depth 1` and `cargo tree -p sc-decision-llm -e normal --depth 1`: direct sc-agent dependencies exactly as in section 7; full `cargo tree -p sc-llm-provider -p sc-decision-llm` has no sc-decision-runner, decidr or tokio, and ureq appears only under sc-agent-http (no direct dependency), and sc-llm-provider's has no sc-decision-* crate -> AC 14, AC 16, AC 17
 - `grep -rn "sleep" crates/sc-llm-provider/src crates/sc-decision-llm/src` finds nothing -> AC 16
 
 ## 7. Dependencies
@@ -349,10 +351,10 @@ Estimated size: sc-llm-provider about 350 lines of code, sc-decision-llm about 3
 - [ ] REQ-SAG-0503 support: LlmClient::models_request/decode_models return a provider's model ids (tests over canned replies).
 - [ ] ADR-SAG-0001: LlmDecisionBackend implements the Backend trait imported from sc-decision-schema (no crate defines its own Backend trait) (encode(&DecisionRequest), decode(HttpResponse, &DecisionRequest, &LogContext)), receives the SystemOneRequest unchanged and returns a SystemOneResponse; all Haiku/Luna adaptation lives only in sc-decision-llm.
 - [ ] REQ-SAG-0007: a model probability of 0.123456789 is returned as 0.123456789; no rounding, normalizing or clamping.
-- [ ] REQ-SAG-0002: LlmError (8 llm.* ids; no unsupported-provider id, since LlmProvider cannot name TypeSafe) wraps HttpError; DecisionLlmError (4 decision_llm.* ids) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
-- [ ] ADR-SAG-0004: `cargo tree -p sc-llm-provider -e normal --depth 1` lists exactly sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http as sc-agent dependencies (the http layer, no decision types); `cargo tree -p sc-decision-llm -e normal --depth 1` lists exactly sc-decision-schema, sc-llm-provider, sc-agent-http, sc-agent-types and sc-agent-log (the decision-backend layer); the full `cargo tree -p sc-llm-provider -p sc-decision-llm` contains no sc-decision-runner or decide. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decide sits above the runner.
+- [ ] REQ-SAG-0002: LlmError (7 llm.* ids, no llm.encode; no unsupported-provider id, since LlmProvider cannot name TypeSafe) wraps HttpError; DecisionLlmError (6 decision_llm.* ids, incl. invalid_max_tokens and invariant) wraps LlmError; both implement ErrorId; an injected HttpError::Network reaches DecisionError's detail chain with http.network and its message; clippy with the workspace denies passes.
+- [ ] ADR-SAG-0004: `cargo tree -p sc-llm-provider -e normal --depth 1` lists exactly sc-agent-types, sc-agent-secrets, sc-agent-log and sc-agent-http as sc-agent dependencies (the http layer, no decision types); `cargo tree -p sc-decision-llm -e normal --depth 1` lists exactly sc-decision-schema, sc-llm-provider, sc-agent-http, sc-agent-types and sc-agent-log (the decision-backend layer); the full `cargo tree -p sc-llm-provider -p sc-decision-llm` contains no sc-decision-runner or decidr. Neither crate's Cargo.toml depends on a crate in a higher layer: per ADR-SAG-0004 the layers from the bottom are types; config, secrets and log; http; decision schema; decision backends (sc-decision-llm over sc-llm-provider); runner, and decidr sits above the runner.
 - [ ] REQ-SAG-0006 / REQ-SAG-0401: no Haiku/Luna/mock type in sc-agent-types or sc-decision-schema; no consumer prompt; credential names only from sc-agent-secrets; keys only in SecretHeader, never in errors or Debug.
-- [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio or ureq; no sleep call.
+- [ ] REQ-SAG-0009 / REQ-SAG-0010: both crates are sans-IO; cargo tree lists no tokio; neither crate depends directly on ureq (it arrives only through sc-agent-http, which owns the transport per ADR-SAG-0004); no sleep call.
 - [ ] REQ-SAG-0201: sc-decision-llm imports every Jev-mapped type (SystemOneRequest, SystemOneResponse and the answer types) from sc-decision-schema and defines none of its own; sc-llm-provider uses no decision types.
 - [ ] ANC-007: the existing sc-agent library code in sc-llm-provider and sc-decision-llm is updated to write log records: LlmClient::with_log and LlmDecisionBackend::with_log take the caller's GeneralLogger (REQ-SAG-0008: default or injected); LlmClient::decode(request, response, ctx) writes one `llm.usage` record (provider, model, input and output tokens, the LogContext session_id and position) per decoded reply and LlmDecisionBackend::decode writes one `llm.schema_mismatch` record (provider, model, cause id) per schema mismatch it returns, both carrying the LogContext passed to Backend::decode, never a prompt, body or key (sends are logged by sc-agent-http as http.send); a test in each crate builds `MemoryLog::new()?` (a-8's sc_agent_log::testing), passes `log.general()` to with_log, decodes one reply (and in sc-decision-llm one schema mismatch), and finds those records in `log.records()?` by `action`.
 - [ ] REQ-SAG-0201: sc_llm_provider::Usage maps provider wire fields (Anthropic usage input/output_tokens, OpenAI-compatible prompt/completion_tokens); it is not a Jev-API-mapped type (the Jev Usage is sc_decision_schema::Usage) and is excluded from REQ-SAG-0201 AC2.
@@ -366,11 +368,16 @@ Closed 2026-11-09 by owner answers (search-for-truth step 7); decisions are in t
 - Q3 images and every provider-supported input are passed through (REQ-SAG-0901).
 - Q4 provider-mapped model id sent; response.model reported.
 - Q6 model lists live in sc-llm-provider.
-Owner review pending (not a question): the SYSTEM_PROMPT draft in the design.
-Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usage) and LlmDecisionBackend::with_log (llm.schema_mismatch), sc-agent-log added to both crates and the ADR-SAG-0004 line; PLAN-CRIT-014 encode calls DecisionRequest::validate (a-2), no own part check; PLAN-CRIT-010 tests use a-5 ScriptedTransport and a-8 MemoryLog (no fake Backend is needed, so a-2 ScriptedBackend is unused); front matter, Required validation, tests cite acceptance lines.
+Owner approved the SYSTEM_PROMPT as written (2026-11-10).
+Plan hardening round 1 (2026-11-09): PLAN-CRIT-005 LlmClient::with_log (llm.usage) and LlmDecisionBackend::with_log (llm.schema_mismatch), sc-agent-log added to both crates and the ADR-SAG-0004 line; PLAN-CRIT-014 encode calls DecisionRequest::validate (superseded in round 2: validate removed) (a-2), no own part check; PLAN-CRIT-010 tests use a-5 ScriptedTransport and a-8 MemoryLog (no fake Backend is needed, so a-2 ScriptedBackend is unused); front matter, Required validation, tests cite acceptance lines.
 
-Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
+Plan review round 2 (2026-11-09): REQ-QA-006 adds REQ-SAG-0008; RBP-F002 validate calls dropped; RBP-F007 LlmProvider enum (no TypeSafe) in LlmClient::new, Wire::of, provider_model_id/catalog_model_id and LlmError; UnsupportedProvider deleted (8 llm ids then; 7 after llm.encode was removed in the QA-1 fix round); RSH-009 LlmClient::decode takes &LogContext and llm.usage carries it; models_request is sent on a Timeouts::probe() transport (a-10); ErrorId::cause -> cause_detail. RBP-F018 (Cow<'static, str> for static strings) skipped: low priority, a small per-send allocation with no observed defect.
 a-1 contract folded in: Catalog::resolve is infallible (no error arm); Display prints `<id>: <message>` only; cause_detail()/recovery() from ErrorId.
 Resolved: a-2 Backend::decode takes ctx: &LogContext; LlmDecisionBackend passes it to LlmClient::decode, so llm.usage and llm.schema_mismatch carry it. LogContext/GeneralLogger::write(.., ctx, fields)/may_start+SendPermit+send_once match a-5/a-8.
 Round 3 (REQ-QA-R2-007): sc_llm_provider::Usage is a provider-wire type, excluded from REQ-SAG-0201 AC2 (new acceptance line).
 Round 4: HttpRequest::with_secret(..)? at the secret attach in encode and models_request (now Result<HttpRequest, LlmError>; a-10 callers add ?).
+- Plan correction (2026-11-10, dev round 1): the 'no ureq in cargo tree' check contradicted the planned sc-agent-http dependency (sc-agent-http owns UreqTransport; ADR-SAG-0004). No REQ/ADR requires absence of ureq (REQ-SAG-0009 is tokio, REQ-SAG-0010 is sleep), so the check is now 'no direct ureq dependency'. Feature-gating ureq in sc-agent-http was considered and not taken in phase A.
+- LlmError::ApiStatus.reply is Box<ProviderReply> (clippy result_large_err), matching sc-agent-http.
+- LlmClient::decode takes ctx: LogContext by value (Copy), per the section 3 signature.
+- QA-1 fix round (code at abd2b24): LlmRequest<'a>/Message<'a>/Part<'a>; Part::Image {ImageMediaType, Cow}; encode/decode take &LlmRequest<'_>; llm.encode removed (Value Display is infallible); LlmClient::new keeps Result (unreachable, documented); decode reads only request.output; models URL = call endpoint with /messages or /chat/completions replaced by /models; a reply without `model` is llm.reply_invalid; inline media type sniffed from the base64 prefix (iVBORw0KGgo png, /9j/ jpeg, else octet-stream); the AC 13 chain test is a unit test in src/backend.rs (the HttpError injection point is private); model text in our messages capped at 64 bytes, extra ids at 8; llm.usage model capped at 128 bytes with model_truncated; refusal and ApiStatus text kept whole with the key scrubbed (REQ-SAG-0002).
+- Plan-hardening round-2 note 'LlmClient::decode takes &LogContext' is superseded: it takes LogContext by value (Copy), per section 3.

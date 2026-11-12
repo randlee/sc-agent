@@ -1,0 +1,23 @@
+[package]
+name = "sc-agent-types"
+version.workspace = true
+description = "Shared value types for sc-agent: model catalog, providers, session ids, cancellation, error ids."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Test doubles for consumers' tests: ManualClock and the CancelToken trace. Adds no dependency.
+testing = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ulid = "1"
+
+[dev-dependencies]
+sc-agent-types = { path = ".", features = ["testing"] }
+sc-agent-testkit = { path = "../sc-agent-testkit" }
+serde_json = "1"
+
+[lints]
+workspace = true

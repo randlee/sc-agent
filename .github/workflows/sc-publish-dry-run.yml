@@ -1,0 +1,85 @@
+# Consumer-owned PR gate for the sc-publish release surface (REQ-SAG-0132,
+# REQ-SAG-0803). Not a kit file: install.py never writes this path.
+#
+# The kit's release-preflight.yml is workflow_dispatch-only and needs release
+# secrets, environments, and immutable releases, so it cannot run on a PR; the
+# publisher dispatches it at release time. This job runs the same local recipe
+# on every PR: kit drift check, manifest validation, version lockstep, consumer
+# preflight, cargo publish --dry-run, and a maturin wheel build. It never tags
+# or publishes.
+#
+# Determinism: every action is pinned to a commit SHA, the runner image,
+# toolchain, Python, and maturin are exact, and no step retries.
+name: sc-publish dry-run
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sc-publish-dry-run-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: "1.94.1"
+  PYTHON_VERSION: "3.11"
+  MATURIN_VERSION: "1.16.0"
+  CARGO_HTTP_TIMEOUT: "60"
+  CARGO_NET_RETRY: "2"
+  PIP_DEFAULT_TIMEOUT: "60"
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install maturin
+        timeout-minutes: 5
+        run: python3 -m pip install --timeout 60 "maturin==${MATURIN_VERSION}"
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            # Content-keyed publish dirs (one per source state) are not
+            # reused across commits; keep them out of the cache.
+            !target/sc-publish-dry-run
+          key: sc-publish-dry-run-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sc-publish-dry-run-${{ runner.os }}-rust-${{ env.RUST_TOOLCHAIN }}-
+
+      - name: Kit clone, sc-compose bootstrap, drift check
+        timeout-minutes: 10
+        run: bash scripts/sc-publish-dry-run.sh kit
+
+      - name: Manifest validation, version lockstep, consumer preflight
+        timeout-minutes: 5
+        run: bash scripts/sc-publish-dry-run.sh checks
+
+      - name: cargo publish --dry-run
+        timeout-minutes: 25
+        run: bash scripts/sc-publish-dry-run.sh publish
+
+      - name: maturin build sc-jev-py
+        timeout-minutes: 15
+        env:
+          SC_AGENT_WHEEL_DIR: ${{ runner.temp }}/sc-agent-wheels
+        run: bash scripts/sc-publish-dry-run.sh wheel

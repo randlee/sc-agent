@@ -1,0 +1,13 @@
+# Consumer publish preflight checks. Executed from release-preflight.yml via
+# .github/scripts/run-consumer-preflight.sh (fail-closed before release dispatch).
+
+schema_version = 1
+
+[docli]
+generate_script = "scripts/generate-cli-docs.sh"
+drift_paths = ["fixtures/cli/", "site/cli/"]
+
+[[checks]]
+id = "docli-cli-html"
+description = "CLI reference HTML for decidr and sitr matches the clap command trees"
+run = "bash .github/scripts/release-preflight-docli.sh"

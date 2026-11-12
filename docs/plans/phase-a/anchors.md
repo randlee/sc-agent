@@ -20,7 +20,7 @@ Intent: `docs/plans/phase-a/intent.md`
 | REQ-SAG-0201 | locked | Jev API types defined only in sc-decision-schema, built from the spec | 2026-11-09 |
 | REQ-SAG-0601 | locked | Busy resend: configurable sends, holdoff in the queue | 2026-11-09 |
 | REQ-SAG-0701 | locked | Batches run in parallel, fastest first, failures returned | 2026-11-09 |
-| ANC-006 | locked | Python API offers every decide CLI operation | 2026-11-08T21:07:35Z |
+| ANC-006 | locked | Python API offers every decidr CLI operation | 2026-11-08T21:07:35Z |
 | ANC-007 | locked | Existing sc-agent library code updated to write log records | 2026-11-09T00:26:57Z |
 
 ## ANC-001
@@ -67,7 +67,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.4`: A-4 builds config and secrets crates; it adds no CLI command and no Python API function.
 - `agt-4p2.5`: A-5 builds the HTTP transport crate; it adds no CLI command and no Python API function.
 - `agt-4p2.6`: A-6 builds decision backends; it adds no CLI command and no Python API function.
-- `agt-4p2.3`: Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its tsq binary and sc-treesitter-py; the tsq CLI and its Python parity are both in A-3.
+- `agt-4p2.3`: Retired anchor (replaced by ANC-006). A-3 builds sc-treesitter, its sitr binary and sc-treesitter-py; the sitr CLI and its Python parity are both in A-3.
 
 Beads: anchor `agt-ug0`, plan questions `agt-ug0.1`, dev questions `agt-ug0.2`
 
@@ -121,7 +121,7 @@ Scope: adds or changes a decision backend, the Backend or Decision trait, or sc-
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.5`: A-5 builds the sc-agent-http transport; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner.
-- `agt-4p2.10`: A-10 builds the decide binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
+- `agt-4p2.10`: A-10 builds the decidr binary and the Python API; it implements no decision backend and does not define the Backend or Decision trait or sc-decision-runner, it only calls the Decision trait.
 
 Beads: anchor `agt-7mi`, plan questions `agt-7mi.1`, dev questions `agt-7mi.2`
 
@@ -147,7 +147,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 Beads: anchor `agt-mud`, plan questions `agt-mud.1`, dev questions `agt-mud.2`
 
 Fixtures:
-- pass: sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decide, which sits above the runner.
+- pass: sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decidr, which sits above the runner.
 - fail: sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest.
 
 ## REQ-SAG-0002
@@ -186,7 +186,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.7`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-7 adds no type, field or constant to either.
 - `agt-4p2.8`: REQ-SAG-0006 governs sc-agent-types and sc-decision-schema; A-8 builds sc-agent-log.
 - `agt-4p2.4`: A-4 builds sc-agent-config and sc-agent-secrets and adds no type, field or constant to sc-agent-types or sc-decision-schema (VarName and the catalog types are A-1's).
-- `agt-4p2.10`: A-10 builds decide and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.
+- `agt-4p2.10`: A-10 builds decidr and sc-agent-py and adds no type, field or constant to sc-agent-types or sc-decision-schema; it only uses them.
 
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
@@ -247,7 +247,7 @@ Scope: adds or changes a type that maps to a TypeSafe API field
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.1`: sc-agent-types defines no type that maps to a TypeSafe API field; those are sprint A-2 (sc-decision-schema).
-- `agt-4p2.10`: A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decide only imports them.
+- `agt-4p2.10`: A-10 defines no type that maps to a TypeSafe API field; those types are sprint A-2 (sc-decision-schema) and decidr only imports them.
 
 Beads: anchor `agt-gc6`, plan questions `agt-gc6.1`, dev questions `agt-gc6.2`
 
@@ -272,7 +272,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.7`: A-7 only returns decision.schema_mismatch; the 429/502/529 busy resend is built in A-5 and A-9.
 - `agt-4p2.2`: Resending on 429/502/529 is built in A-5 and A-9; sc-decision-schema only encodes and decodes.
 - `agt-4p2.6`: Resending on 429/502/529 is built in A-5 and A-9; the A-6 backends only encode and decode.
-- `agt-4p2.10`: Resending on 429/502/529 is built in A-5 and A-9; decide and the Python API only pass through the runner and add no resend logic.
+- `agt-4p2.10`: Resending on 429/502/529 is built in A-5 and A-9; decidr and the Python API only pass through the runner and add no resend logic.
 
 Beads: anchor `agt-ebd`, plan questions `agt-ebd.1`, dev questions `agt-ebd.2`
 
@@ -290,7 +290,7 @@ Said by Rand Lee, record REQ-SAG-0701, 2026-11-09. Status: locked. Version 2.
 
 Summary: Batches run in parallel, fastest first, failures returned
 
-Scope: adds or changes batch handling in sc-decision-runner or decide
+Scope: adds or changes batch handling in sc-decision-runner or decidr
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.4`: A-4 delivers only the workers setting; the parallel batch run is built in A-9.
@@ -303,27 +303,27 @@ Fixtures:
 
 ## ANC-006
 
-Anchor: Every operation available in the decide CLI must also be available in the sc-agent Python API.
+Anchor: Every operation available in the decidr CLI must also be available in the sc-agent Python API.
 
 > I expect the python api may allow more flexibility than cli, NOT less.
 
 Said by Rand Lee, planning session, 2026-11-08T21:07:35Z. Status: locked. Version 2.
 
-Summary: Python API offers every decide CLI operation
+Summary: Python API offers every decidr CLI operation
 
-Scope: adds or changes a decide subcommand or a function in the sc-agent Python bindings
+Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings
 
-Deterministic check to pair with the development gate: each decide subcommand has a matching Python API function, checked by a test that lists both
+Deterministic check to pair with the development gate: each decidr subcommand has a matching Python API function, checked by a test that lists both
 
 Excluded from (not judged; the cell passes as `excluded`):
-- `agt-4p2.3`: A-3 builds the sc-treesitter library; it adds no decide CLI operation.
-- `agt-4p2.1`: A-1 defines data types only; it adds no decide subcommand or Python binding function.
+- `agt-4p2.3`: A-3 builds the sc-treesitter library; it adds no decidr CLI operation.
+- `agt-4p2.1`: A-1 defines data types only; it adds no decidr subcommand or Python binding function.
 
 Beads: anchor `agt-frw`, plan questions `agt-frw.1`, dev questions `agt-frw.2`
 
 Fixtures:
-- pass: Each decide subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.
-- fail: decide gains a `models` subcommand with no Python equivalent.
+- pass: Each decidr subcommand has a matching function in the sc-agent Python API, checked by a test that lists both.
+- fail: decidr gains a `models` subcommand with no Python equivalent.
 
 ## ANC-007
 
@@ -343,7 +343,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-4p2.1`: sc-agent-types is the bottom ADR-SAG-0004 layer, below sc-agent-log, and holds data types with no I/O; it cannot take a GeneralLogger.
 - `agt-4p2.2`: ANC-001 limits sc-decision-schema to the decision API types and traits with no logging code; its logging happens in the HTTP client and runner.
 - `agt-4p2.4`: sc-agent-config and sc-agent-secrets share the ADR-SAG-0004 layer with sc-agent-log and cannot depend on it, so they cannot take a GeneralLogger; their callers log config and key-source events.
-- `agt-4p2.3`: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the tsq binary in A-3 writes its own tsq.log through sc-observability (A-3's REQ-SAG-0003 line).
+- `agt-4p2.3`: REQ-SAG-0301 makes sc-treesitter a stand-alone library that depends on no sc-agent crate, so it cannot take sc-agent's GeneralLogger; the sitr binary in A-3 writes its own sitr.log through sc-observability (A-3's REQ-SAG-0003 line).
 
 Beads: anchor `agt-em9`, plan questions `agt-em9.1`, dev questions `agt-em9.2`
 

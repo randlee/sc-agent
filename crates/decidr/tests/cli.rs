@@ -1,0 +1,486 @@
+//! The `decidr` binary as a process: help, slug refusal, interrupts, broken stdout and the
+//! fail-fast batch, against a loopback runner (no external network).
+//!
+//! Each child gets a cleared environment (only PATH) and `--config-dir <tempdir>/.sc-agent`,
+//! whose default.json sets `log_root` to that same directory: no HOME or USERPROFILE is set,
+//! so no test reads or writes the real home. (The real-home default of `log_root` is
+//! sc-agent-config's `default_dir`, unit-tested there.) The process tests here are Unix-only
+//! because they use Unix signals, `kill` and `mkfifo`. The test process's own environment is
+//! never changed.
+
+mod common;
+
+/// AC: ANC-006 (the subcommands the Python parity test lists).
+#[cfg(test)]
+#[test]
+fn help_lists_send_models_and_doctor() {
+    let decidr = env!("CARGO_BIN_EXE_decidr");
+    let output = common::run_bounded(std::process::Command::new(decidr).arg("--help"));
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    for command in ["send", "models", "doctor"] {
+        assert!(text.contains(command), "{text}");
+    }
+    let output = common::run_bounded(std::process::Command::new(decidr).args(["send", "--help"]));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
+}
+
+#[cfg(test)]
+#[cfg(unix)]
+mod tests {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::net::TcpStream;
+    use std::path::{Path, PathBuf};
+    use std::process::{Command, Output, Stdio};
+    use std::sync::{Mutex, mpsc};
+
+    use sc_agent_testkit::{ChildGuard, Gate, Loopback, recv_within, serve_each};
+    use serde_json::Value;
+
+    use crate::common::{HANG_GUARD, NOUL, NOUL_RESPONSE, finish, run_bounded};
+
+    const DECIDR: &str = env!("CARGO_BIN_EXE_decidr");
+
+    /// What the loopback daemon does with `POST /v1/systemone`.
+    #[derive(Clone)]
+    enum Mode {
+        /// Accept and never answer (the connection is held open).
+        Hang,
+        /// Answer 200 with [`NOUL_RESPONSE`].
+        Answer,
+        /// Answer 200 once the test opens the gate (bounded by `HANG_GUARD`).
+        AnswerAfter(Gate),
+    }
+
+    /// A Mapika-style daemon on 127.0.0.1 (testkit `serve_each`: every read and write bounded,
+    /// the port held until it stops): `/health` says loaded; each systemone request is
+    /// reported on the returned channel.
+    fn loopback(mode: Mode) -> (Loopback, mpsc::Receiver<()>) {
+        let (sender, receiver) = mpsc::channel();
+        let sender = Mutex::new(sender);
+        let server = serve_each(move |stream| {
+            let sender = sender.lock().expect("sender").clone();
+            serve(stream, &mode, &sender);
+        });
+        (server, receiver)
+    }
+
+    fn serve(stream: TcpStream, mode: &Mode, sender: &mpsc::Sender<()>) {
+        let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+        let mut writer = stream;
+        loop {
+            let mut request_line = String::new();
+            if reader.read_line(&mut request_line).unwrap_or(0) == 0 {
+                return;
+            }
+            let mut length = 0_usize;
+            loop {
+                let mut header = String::new();
+                if reader.read_line(&mut header).unwrap_or(0) == 0 {
+                    return;
+                }
+                let header = header.trim_end();
+                if header.is_empty() {
+                    break;
+                }
+                if let Some((name, value)) = header.split_once(':')
+                    && name.eq_ignore_ascii_case("content-length")
+                {
+                    length = value.trim().parse().unwrap_or(0);
+                }
+            }
+            let mut body = vec![0; length];
+            if reader.read_exact(&mut body).is_err() {
+                return;
+            }
+            let body = if request_line.contains("/health") {
+                r#"{"ok":true,"model":"jev-latest"}"#
+            } else {
+                let _ = sender.send(());
+                match mode {
+                    Mode::Hang => {
+                        // Hold the connection: wait until the client goes away (the read is
+                        // bounded by the stream's hang-guard timeout).
+                        let mut rest = Vec::new();
+                        let _ = reader.read_to_end(&mut rest);
+                        return;
+                    }
+                    Mode::Answer => NOUL_RESPONSE,
+                    Mode::AnswerAfter(gate) => {
+                        gate.wait_open();
+                        NOUL_RESPONSE
+                    }
+                }
+            };
+            let reply = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                body.len()
+            );
+            if writer.write_all(reply.as_bytes()).is_err() {
+                return;
+            }
+        }
+    }
+
+    /// The `default.json` of these tests: runner `dec` on `port`, and `log_root` = `config`.
+    fn config_json(config: &Path, port: u16) -> String {
+        serde_json::json!({
+            "log_root": config,
+            "local_runners": {
+                "dec": { "kind": "mapika", "host": "127.0.0.1", "port": port, "model": "jev-latest" }
+            }
+        })
+        .to_string()
+    }
+
+    /// A tempdir whose `.sc-agent/default.json` (the child's `--config-dir`) names runner `dec`
+    /// on `port` and sets `log_root` to `.sc-agent` itself.
+    fn home(port: u16) -> tempfile::TempDir {
+        let home = tempfile::tempdir().expect("home");
+        let config = home.path().join(".sc-agent");
+        std::fs::create_dir_all(&config).expect("config dir");
+        std::fs::write(config.join("default.json"), config_json(&config, port))
+            .expect("default.json");
+        home
+    }
+
+    fn decidr(home: &Path, args: &[&str]) -> Command {
+        let mut command = Command::new(DECIDR);
+        command
+            .arg("--config-dir")
+            .arg(home.join(".sc-agent"))
+            .args(args)
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .current_dir(env!("CARGO_MANIFEST_DIR"));
+        command
+    }
+
+    fn batch_file(dir: &Path, lines: usize) -> PathBuf {
+        let path = dir.join("batch.jsonl");
+        let text: String = (0..lines).map(|_| format!("{NOUL}\n")).collect();
+        std::fs::write(&path, text).expect("batch");
+        path
+    }
+
+    fn find_rows(dir: &Path, found: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                find_rows(&path, found);
+            } else if path
+                .file_name()
+                .is_some_and(|name| name == "sessions.jsonl")
+            {
+                found.push(path);
+            }
+        }
+    }
+
+    fn rows(home: &Path) -> usize {
+        let mut files = Vec::new();
+        find_rows(&home.join(".sc-agent").join("logs"), &mut files);
+        files
+            .iter()
+            .map(|file| std::fs::read_to_string(file).expect("rows").lines().count())
+            .sum()
+    }
+
+    fn stderr_detail(output: &Output) -> Value {
+        let text = String::from_utf8_lossy(&output.stderr);
+        serde_json::from_str(text.lines().last().expect("one stderr line")).expect("stderr json")
+    }
+
+    /// AC: REQ-SAG-0004. `--project "Phase B"` is `decidr.log` (cause `log.invalid_slug`);
+    /// nothing is sent and no row is written.
+    #[test]
+    fn an_invalid_slug_is_refused_before_anything_is_sent() {
+        let (runner, sends) = loopback(Mode::Answer);
+        let home = home(runner.port());
+        let file = batch_file(home.path(), 1);
+        let output = run_bounded(&mut decidr(
+            home.path(),
+            &[
+                "send",
+                "--model",
+                "dec",
+                "--project",
+                "Phase B",
+                "--agent-role",
+                "role",
+                file.to_str().expect("utf-8"),
+            ],
+        ));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decidr.log");
+        assert_eq!(detail["cause"]["id"], "log.invalid_slug");
+        assert!(output.stdout.is_empty());
+        assert!(sends.try_recv().is_err(), "nothing was sent");
+        assert_eq!(rows(home.path()), 0);
+    }
+
+    /// AC: REQ-SAG-0504, end to end: a bad line stops decidr before the runner is contacted.
+    #[test]
+    fn a_bad_batch_line_contacts_no_runner() {
+        let runner = serve_each(|_| {});
+        let home = home(runner.port());
+        let path = home.path().join("bad.jsonl");
+        let bad = r#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"score"}}}"#;
+        std::fs::write(&path, format!("{NOUL}\n{bad}\n{NOUL}\n")).expect("batch");
+        let output = run_bounded(&mut decidr(
+            home.path(),
+            &[
+                "send",
+                "--batch",
+                "--model",
+                "dec",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                path.to_str().expect("utf-8"),
+            ],
+        ));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decidr.request_invalid");
+        assert!(
+            detail["message"]
+                .as_str()
+                .is_some_and(|text| text.contains("line 2") && text.contains("criteria"))
+        );
+        assert_eq!(runner.stop(), 0, "no connection reached the runner");
+        assert!(output.stdout.is_empty());
+    }
+
+    /// AC: decidr send, REQ-SAG-0701 output. A batch against the loopback runner prints one
+    /// JSONL line per request with its ULID and position; exit 0.
+    #[test]
+    fn a_batch_prints_one_line_per_request() {
+        let (runner, _sends) = loopback(Mode::Answer);
+        let home = home(runner.port());
+        let file = batch_file(home.path(), 3);
+        let output = run_bounded(&mut decidr(
+            home.path(),
+            &[
+                "send",
+                "--batch",
+                "--model",
+                "dec",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                file.to_str().expect("utf-8"),
+            ],
+        ));
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let lines: Vec<Value> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("json"))
+            .collect();
+        assert_eq!(lines.len(), 3);
+        let mut positions: Vec<u64> = lines
+            .iter()
+            .map(|line| line["position"].as_u64().expect("position"))
+            .collect();
+        positions.sort_unstable();
+        assert_eq!(positions, [0, 1, 2]);
+        assert!(
+            lines
+                .iter()
+                .all(|line| line["session_id"].as_str().is_some_and(|id| id.len() == 26))
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("0.123456789"));
+        assert_eq!(rows(home.path()), 3);
+        assert!(
+            home.path()
+                .join(".sc-agent")
+                .join("logs")
+                .join("decidr.log.jsonl")
+                .exists()
+        );
+    }
+
+    /// AC: REQ-SAG-0701 output. A closed stdout makes decidr cancel and report `decidr.write`.
+    ///
+    /// Ordered: the runner answers only after the test has closed decidr's stdout (and seen
+    /// the send arrive), so the first write always meets a closed pipe.
+    #[test]
+    fn a_closed_stdout_is_decide_write() {
+        let gate = Gate::new();
+        let opener = gate.opener();
+        let (runner, sends) = loopback(Mode::AnswerAfter(gate));
+        let home = home(runner.port());
+        let file = batch_file(home.path(), 3);
+        let mut child = ChildGuard::spawn(
+            decidr(
+                home.path(),
+                &[
+                    "send",
+                    "--batch",
+                    "--model",
+                    "dec",
+                    "--project",
+                    "proj",
+                    "--agent-role",
+                    "role",
+                    file.to_str().expect("utf-8"),
+                ],
+            )
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+        );
+        drop(child.take_stdout());
+        recv_within(&sends, HANG_GUARD);
+        opener.open();
+        let output = finish(child);
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(stderr_detail(&output)["id"], "decidr.write");
+    }
+
+    /// AC: REQ-SAG-0011 decidr, NFR-SAG-0001. SIGINT and SIGTERM during a batch against a
+    /// runner that never answers: every printed line is `decision.cancelled`, one session
+    /// row per started request is on disk, exit 130 both times.
+    #[test]
+    fn an_interrupt_cancels_flushes_and_exits_130() {
+        for signal in ["-INT", "-TERM"] {
+            let (runner, sends) = loopback(Mode::Hang);
+            let home = home(runner.port());
+            let file = batch_file(home.path(), 3);
+            let child = ChildGuard::spawn(
+                decidr(
+                    home.path(),
+                    &[
+                        "send",
+                        "--batch",
+                        "--model",
+                        "dec",
+                        "--project",
+                        "proj",
+                        "--agent-role",
+                        "role",
+                        file.to_str().expect("utf-8"),
+                    ],
+                )
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+            );
+            for _ in 0..3 {
+                recv_within(&sends, HANG_GUARD);
+            }
+            let status = Command::new("kill")
+                .args([signal, &child.id().to_string()])
+                .status()
+                .expect("kill");
+            assert!(status.success());
+            let output = finish(child);
+            assert_eq!(
+                output.status.code(),
+                Some(130),
+                "{signal}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let lines: Vec<Value> = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(|line| serde_json::from_str(line).expect("json"))
+                .collect();
+            assert_eq!(lines.len(), 3, "{signal}");
+            assert!(
+                lines
+                    .iter()
+                    .all(|line| line["error"]["id"] == "decision.cancelled"),
+                "{signal}: {lines:?}"
+            );
+            assert_eq!(
+                rows(home.path()),
+                3,
+                "{signal}: one row per started request"
+            );
+        }
+    }
+
+    /// AC: REQ-SAG-0011 decidr (RSH-001). SIGTERM while decidr blocks reading its input exits
+    /// 130 at once, with nothing printed or sent.
+    ///
+    /// Synchronised without a sleep: the batch input is a FIFO, so the test's open of its write
+    /// end returns only once decidr (past `signal::install`, the first thing `main` does, and
+    /// past loading its configuration) has opened it to read. Decide then blocks reading it;
+    /// the test keeps it open and never writes.
+    #[test]
+    fn sigterm_while_the_input_blocks_exits_130() {
+        let runner = serve_each(|_| {});
+        let home = home(runner.port());
+        let fifo = home.path().join("input.jsonl");
+        let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
+        assert!(made.success());
+        let child = ChildGuard::spawn(
+            decidr(
+                home.path(),
+                &[
+                    "send",
+                    "--batch",
+                    "--model",
+                    "dec",
+                    "--project",
+                    "proj",
+                    "--agent-role",
+                    "role",
+                    fifo.to_str().expect("utf-8"),
+                ],
+            )
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+        );
+        // Opening the FIFO's write end blocks until decidr opens it to read; bounded.
+        let (opened, writer) = mpsc::channel();
+        {
+            let fifo = fifo.clone();
+            std::thread::spawn(move || {
+                let _ = opened.send(std::fs::OpenOptions::new().write(true).open(&fifo));
+            });
+        }
+        let held = recv_within(&writer, HANG_GUARD).expect("decidr opened its input");
+        let status = Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status()
+            .expect("kill");
+        assert!(status.success());
+        let output = finish(child);
+        drop(held);
+        assert_eq!(
+            output.status.code(),
+            Some(130),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stdout.is_empty());
+        assert_eq!(runner.stop(), 0, "nothing was sent");
+    }
+
+    /// RSH-002: a `default.json` that is a FIFO is refused from its metadata
+    /// (`config.not_a_file`), never opened, so decidr cannot block on it: it exits 1 at once.
+    #[test]
+    fn a_fifo_config_file_is_refused_without_blocking() {
+        let home = tempfile::tempdir().expect("home");
+        let config = home.path().join(".sc-agent");
+        std::fs::create_dir_all(&config).expect("config dir");
+        let made = Command::new("mkfifo")
+            .arg(config.join("default.json"))
+            .status()
+            .expect("mkfifo");
+        assert!(made.success());
+        let output = run_bounded(&mut decidr(home.path(), &["models"]));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decidr.config");
+        assert_eq!(detail["cause"]["id"], "config.not_a_file");
+    }
+}

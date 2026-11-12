@@ -75,7 +75,9 @@ When root `Cargo.toml` exists:
 
 - Sprint QA: `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`,
   `cargo test --workspace`
-- Phase-end artifact command: same unless a phase plan overrides it
+- Phase-end artifact command: `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
+  `cargo test --workspace --all-features` unless a phase plan overrides it
 
 ## Release and publishing
 

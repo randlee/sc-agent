@@ -14,12 +14,12 @@
 
 ### Requirement Statement
 
-The `tsq` CLI can expose a subset of the PyO3 query surface.
+The `sitr` CLI can expose a subset of the PyO3 query surface.
 
 **MUST statements:**
 
 - The PyO3 bindings MUST accept any query for any loaded grammar.
-- The `tsq` CLI MUST provide `languages` and `queries` subcommands.
+- The `sitr` CLI MUST provide `languages` and `queries` subcommands.
 
 ### Rationale
 
