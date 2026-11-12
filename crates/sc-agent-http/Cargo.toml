@@ -12,9 +12,9 @@ license.workspace = true
 testing = ["sc-agent-types/testing"]
 
 [dependencies]
-sc-agent-log = { path = "../sc-agent-log" }
-sc-agent-secrets = { path = "../sc-agent-secrets" }
-sc-agent-types = { path = "../sc-agent-types" }
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 serde_json = "1"
 # Exact pin: the transport depends on ureq 3.5 config APIs (Agent::config_builder,
 # timeout_connect / timeout_global, Agent::configure_request for the per-request
