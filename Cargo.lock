@@ -534,6 +534,7 @@ dependencies = [
  "sc-observability",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
