@@ -148,11 +148,20 @@
       "verify_registry_visibility": true
     },
     {
+      "artifact": "sitr",
+      "package": "sitr",
+      "cargo_toml": "crates/sitr/Cargo.toml",
+      "publish": true,
+      "publish_order": 13,
+      "wait_after_publish_seconds": 30,
+      "verify_registry_visibility": true
+    },
+    {
       "artifact": "decidr",
       "package": "decidr",
       "cargo_toml": "crates/decidr/Cargo.toml",
       "publish": true,
-      "publish_order": 13,
+      "publish_order": 14,
       "wait_after_publish_seconds": 0,
       "verify_registry_visibility": true
     }
@@ -168,14 +177,14 @@
   "python_packages": [
     {
       "artifact": "sc-agent-py-wheel",
-      "package": "sc-agent",
+      "package": "decidr",
       "manifest": "crates/sc-agent-py/pyproject.toml",
       "module": "sc_agent",
       "publish": "pypi"
     },
     {
       "artifact": "sc-treesitter-py-wheel",
-      "package": "sc-treesitter",
+      "package": "sitr",
       "manifest": "crates/sc-treesitter-py/pyproject.toml",
       "module": "sc_treesitter",
       "publish": "pypi"
@@ -183,7 +192,7 @@
   ],
   "python_distributions": [
     {
-      "name": "sc-agent",
+      "name": "decidr",
       "source": "crates/sc-agent-py",
       "cargo_manifest": "crates/sc-agent-py/Cargo.toml",
       "module_path": "crates/sc-agent-py",
@@ -232,7 +241,7 @@
       ]
     },
     {
-      "name": "sc-treesitter",
+      "name": "sitr",
       "source": "crates/sc-treesitter-py",
       "cargo_manifest": "crates/sc-treesitter-py/Cargo.toml",
       "module_path": "crates/sc-treesitter-py",

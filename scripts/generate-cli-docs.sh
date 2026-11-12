@@ -33,7 +33,7 @@ mkdir -p fixtures/cli site/cli/decidr site/cli/sitr
 
 cargo run --locked --quiet --example gen-cli-model --package decidr -- \
   --output fixtures/cli/decidr-cli-model.json
-cargo run --locked --quiet --example gen-cli-model --package sc-treesitter --features cli -- \
+cargo run --locked --quiet --example gen-cli-model --package sitr -- \
   --output fixtures/cli/sitr-cli-model.json
 
 docli generate --input fixtures/cli/decidr-cli-model.json --html site/cli/decidr

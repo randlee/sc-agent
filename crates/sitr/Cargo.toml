@@ -1,0 +1,39 @@
+[package]
+name = "sitr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "sitr CLI: run predefined tree-sitter queries (product binary for sc-treesitter)."
+include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "examples/**"]
+
+[lints]
+workspace = true
+
+[features]
+default = ["grammar-python", "grammar-rust"]
+grammar-python = ["sc-treesitter/grammar-python"]
+grammar-rust = ["sc-treesitter/grammar-rust"]
+
+[dependencies]
+sc-treesitter = { path = "../sc-treesitter", version = "0.1.0", default-features = false }
+clap = { version = "4", features = ["derive"] }
+sc-observability = "=1.5.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "sitr"
+path = "src/main.rs"
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[example]]
+name = "gen-cli-model"
+path = "examples/gen-cli-model.rs"
+test = true
