@@ -28,7 +28,7 @@ Define and build the low-level crates: sc-agent-types, sc-decision-schema (decis
 | sc-llm-provider, sc-decision-llm | decision backends (llm over provider) | LlmClient, LlmDecisionBackend (+with_log), catalog_model_id | types, secrets, log, http (+schema for sc-decision-llm) | a-7 |
 | sc-decision-runner | runner | DecisionRunner, RunnerConfig, RunnerError | types, config, log, http, schema | a-9 |
 | decidr, sc-agent-py | top (decidr library = composition root) | decidr library API, decidr CLI, Python module | all of the above | a-10 |
-| sc-treesitter (sitr bin behind the non-default `cli` feature), sc-treesitter-py | stands alone (ADR-SAG-0005) | sitr CLI, Python query API | none (workspace root only) | a-3 |
+| sc-treesitter, sitr (CLI), sc-treesitter-py | stands alone (ADR-SAG-0005) | sitr CLI (thin crate), `sc_treesitter` library + PyPI `sitr` | sitr → sc-treesitter only | a-3, a-13 |
 | sc-agent-testkit (dev-only, `publish = false`, never a normal dependency) | test support, not a layer | HANG_GUARD, recv_within, join_within, cancelled_within, Gate, Started, serve_once, serve_each, ChildGuard | types | none: added by the phase-end QA; the workspace scan `tests_are_deterministic` (crates/decidr/tests/workspace.rs) refuses raw unbounded waits and clock reads in tests |
 
 ## Wave table
@@ -45,8 +45,9 @@ Every edge is `must_follow` with trigger **dev-push**: the child starts when the
 | 6 | a-10 | a-6, a-7, a-9 named types |
 | 7 | a-11 | a-10 (develop integration after rename) |
 | 8 | a-12 | a-11 sc-publish kit install |
+| 9 | a-13 | a-12 dry-run green (develop) |
 
-Sprint count 12; critical path for libraries 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); publish track adds waves 7–8 (a-11 → a-12); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
+Sprint count 13; critical path for libraries 6 waves (a-1 → a-4/a-8 → a-5 → a-2 → a-9 → a-10); publish track adds waves 7–8 (a-11 → a-12); width 3 (waves 2 and 5); a-3 is its own track after wave 1.
 Why more than three waves: ADR-SAG-0004 fixes the layer order, and the decision contract (a-2) carries the http types (HttpRequest/HttpResponse/HttpError, a-5), which carry ApiKey (a-4) and the logger (a-8). Hoisting the http types into a-1 would put them below their layer, so it is rejected. Dev-push triggers keep the elapsed cost of the extra waves to the time it takes each parent to push its named artifact.
 No sprint split: a-4, a-6, a-7, a-3 and a-10 each own two sibling crates with a recorded vertical_rationale; splitting would add sprints without shortening the critical path.
 owned_paths are disjoint across library sprints; a-1 owns the initial workspace root layout. Sprint **a-11** expands `[workspace].members` to literal crate paths and sets `workspace.package.version` so sc-publish `validate-manifest` succeeds (REQ-SAG-0130).
