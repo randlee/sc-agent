@@ -53,7 +53,7 @@
       "package": "sc-decision-schema",
       "cargo_toml": "crates/sc-decision-schema/Cargo.toml",
       "publish": true,
-      "publish_order": 2,
+      "publish_order": 6,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -62,7 +62,7 @@
       "package": "sc-agent-config",
       "cargo_toml": "crates/sc-agent-config/Cargo.toml",
       "publish": true,
-      "publish_order": 3,
+      "publish_order": 2,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -71,7 +71,7 @@
       "package": "sc-agent-secrets",
       "cargo_toml": "crates/sc-agent-secrets/Cargo.toml",
       "publish": true,
-      "publish_order": 4,
+      "publish_order": 3,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -80,7 +80,7 @@
       "package": "sc-agent-log",
       "cargo_toml": "crates/sc-agent-log/Cargo.toml",
       "publish": true,
-      "publish_order": 5,
+      "publish_order": 4,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -89,7 +89,7 @@
       "package": "sc-agent-http",
       "cargo_toml": "crates/sc-agent-http/Cargo.toml",
       "publish": true,
-      "publish_order": 6,
+      "publish_order": 5,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -98,7 +98,7 @@
       "package": "sc-decision-systemone",
       "cargo_toml": "crates/sc-decision-systemone/Cargo.toml",
       "publish": true,
-      "publish_order": 7,
+      "publish_order": 8,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -107,7 +107,7 @@
       "package": "sc-decision-local",
       "cargo_toml": "crates/sc-decision-local/Cargo.toml",
       "publish": true,
-      "publish_order": 8,
+      "publish_order": 10,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -116,7 +116,7 @@
       "package": "sc-llm-provider",
       "cargo_toml": "crates/sc-llm-provider/Cargo.toml",
       "publish": true,
-      "publish_order": 9,
+      "publish_order": 7,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
@@ -125,7 +125,7 @@
       "package": "sc-decision-llm",
       "cargo_toml": "crates/sc-decision-llm/Cargo.toml",
       "publish": true,
-      "publish_order": 10,
+      "publish_order": 9,
       "wait_after_publish_seconds": 30,
       "verify_registry_visibility": true
     },
