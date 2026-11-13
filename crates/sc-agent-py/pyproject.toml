@@ -3,7 +3,7 @@ requires = ["maturin>=1.7,<2"]
 build-backend = "maturin"
 
 [project]
-name = "decidr"
+name = "sc-decidr"
 version = "0.1.0"
 description = "The sc-agent Python API: send TypeSafe (Jev) decision requests, list models, run doctor."
 requires-python = ">=3.10"

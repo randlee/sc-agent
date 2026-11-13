@@ -177,7 +177,7 @@
   "python_packages": [
     {
       "artifact": "sc-agent-py-wheel",
-      "package": "decidr",
+      "package": "sc-decidr",
       "manifest": "crates/sc-agent-py/pyproject.toml",
       "module": "sc_agent",
       "publish": "pypi"
@@ -192,7 +192,7 @@
   ],
   "python_distributions": [
     {
-      "name": "decidr",
+      "name": "sc-decidr",
       "source": "crates/sc-agent-py",
       "cargo_manifest": "crates/sc-agent-py/Cargo.toml",
       "module_path": "crates/sc-agent-py",
