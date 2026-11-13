@@ -240,7 +240,7 @@ jobs:
 
       - name: Run the sc-agent-py tests
         run: |
-          python -m pip install --no-index --find-links dist decidr
+          python -m pip install --no-index --find-links dist sc-decidr
           python -m pytest crates/sc-agent-py/tests
 
   # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).

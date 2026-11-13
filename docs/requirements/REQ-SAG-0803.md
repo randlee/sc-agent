@@ -16,7 +16,7 @@
 
 **MUST statements:**
 
-- Sprint **a-12** MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate and maturin wheel builds for **decidr** and **sitr** PyPI packages in CI or a documented local recipe.
+- Sprint **a-12** MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate and maturin wheel builds for **sc-decidr** and **sitr** PyPI packages in CI or a documented local recipe.
 - Production registry uploads and version tags remain out of scope until the owner dispatches a release.
 
 ### Rationale
