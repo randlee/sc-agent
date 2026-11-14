@@ -1,0 +1,32 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScAgentPy"
+owner_package = "sc-agent-py"
+owner_crate_path = "sc_agent"
+name = "ScAgentPyLayer"
+
+[public]
+facade = "CancelToken"
+
+[implementation]
+type = "CancelToken"
+module = "sc_agent"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["CancelToken"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["decidr", "sc-agent-config", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

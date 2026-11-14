@@ -1,0 +1,32 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScDecisionSystemone"
+owner_package = "sc-decision-systemone"
+owner_crate_path = "sc_decision_systemone"
+name = "ScDecisionSystemoneLayer"
+
+[public]
+facade = "SystemOneBackend"
+
+[implementation]
+type = "SystemOneBackend"
+module = "sc_decision_systemone"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["SystemOneBackend"]
+
+[dependencies]
+allowed_dependents = ["decidr", "sc-decision-local"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

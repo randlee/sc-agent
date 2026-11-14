@@ -1,0 +1,32 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-Decidr"
+owner_package = "decidr"
+owner_crate_path = "decidr"
+name = "DecidrLayer"
+
+[public]
+facade = "input"
+
+[implementation]
+type = "input"
+module = "decidr"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["input"]
+
+[dependencies]
+allowed_dependents = ["sc-agent-py"]
+allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"
