@@ -1,1 +1,0 @@
-{"id":"NFR-SAG-0003","sha256":"4bed557a0c67c86077e4df93c3c2b4843606b5000ad67d1428f2c5117090b45b","runs":[".sc/judge-jev/fix/NFR-SAG-0003/r5c-run1.json",".sc/judge-jev/fix/NFR-SAG-0003/r5c-run2.json",".sc/judge-jev/fix/NFR-SAG-0003/r5c-run3.json"],"lowest":0.65,"note":"judged from a scratch index without the ADR-SAG-0019 dependency line (ADR does not import into Raptor)"}

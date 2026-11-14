@@ -28,6 +28,8 @@ Definitions:
 - The wheel README is `crates/sc-agent-py/README.md`.
 - The keyring overrides are the `keyring_service` and `keyring_account` arguments of `send` and `send_batch`, which choose the keyring entry the wheel reads the API key from.
 - A matched release is an sc-decidr wheel and a sitr wheel of the same version.
+- A decision call is a call to `send` or `send_batch`.
+- A covered release is an sc-agent release of version 0.2.0 or later.
 - PyPI is the Python Package Index, pypi.org.
 
 **MUST statements:**
@@ -35,14 +37,14 @@ Definitions:
 - The consumer template MUST ship in the sc-decidr wheel as package data.
 - The consumer module MUST make the decision call through `send` or `send_batch`.
 - The consumer module MUST pass the model selector through unchanged.
-- The consumer module's calls to `send` and `send_batch` MUST pass the keyring overrides.
+- Every decision call in the consumer module MUST pass the keyring overrides.
 - The consumer module's source MUST contain the logging wiring.
 - The consumer module MUST contain the error mapping.
 - The consumer module's header MUST record the sc-decidr version that rendered it.
 - When `sitr` is true, the consumer module's header MUST record the sitr version.
 - Feature variables MUST be the only template input that changes the consumer module's code.
 - The consumer template MUST be tested against a matched release.
-- For every sc-agent release from 0.2.0 on, PyPI MUST hold that release's matched release.
+- PyPI MUST hold the matched release of every covered release.
 - The sitr section MUST import `sc_treesitter` lazily, inside that section.
 - The sitr section MUST stay separate from the decision call.
 - The consumer module MUST call only the public API and the Python standard library.

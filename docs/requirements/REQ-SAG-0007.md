@@ -14,12 +14,12 @@
 
 ### Requirement Statement
 
+Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one. A transport timing hint, such as `retry_after_ms` in an error detail, is not a decision value (owner, 2026-11-14); its owning ADR, ADR-SAG-0019, states how it is rounded.
+
 **MUST statements:**
 
-Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one.
-
 - sc-agent MUST return decision values at the precision it received or computed them, using floating-point types where values are fractional.
-- Scope (owner, 2026-11-14): transport timing hints, such as `retry_after_ms` in an error detail, are not decision values and MAY be rounded as their owning ADR states (ADR-SAG-0019). The exact value MUST remain available where the owning ADR says.
+- sc-agent MUST keep the exact value of a transport timing hint available where its owning ADR states.
 
 **MUST NOT statements:**
 
