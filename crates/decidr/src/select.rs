@@ -536,7 +536,13 @@ impl TransportChoice {
     fn build(self) -> Arc<dyn Transport> {
         match self {
             Self::Injected(transport) => transport,
-            Self::Ureq(timeouts) => Arc::new(UreqTransport::new(timeouts)),
+            Self::Ureq(timeouts) => {
+                #[cfg(test)]
+                if let Some(recording) = timeout_tests::record_construction(timeouts) {
+                    return recording;
+                }
+                Arc::new(UreqTransport::new(timeouts))
+            }
         }
     }
 }
@@ -1437,3 +1443,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "timeout_tests.rs"]
+mod timeout_tests;
