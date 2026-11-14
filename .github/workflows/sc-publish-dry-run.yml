@@ -73,14 +73,18 @@ jobs:
         run: bash scripts/sc-publish-dry-run.sh kit
 
       - name: Manifest validation, version lockstep, consumer preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
         timeout-minutes: 5
         run: bash scripts/sc-publish-dry-run.sh checks
 
       - name: cargo publish --dry-run
+        if: ${{ !cancelled() }}
         timeout-minutes: 25
         run: bash scripts/sc-publish-dry-run.sh publish
 
       - name: maturin build sc-jev-py
+        if: ${{ !cancelled() }}
         timeout-minutes: 15
         env:
           SC_AGENT_WHEEL_DIR: ${{ runner.temp }}/sc-agent-wheels

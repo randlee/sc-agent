@@ -8,6 +8,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shlex
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -33,6 +35,35 @@ def command(args, *, cwd=ROOT):
         env=env,
     )
     return result.stdout.strip()
+
+
+
+def diagnostic_text(value):
+    """Redact credentials from infrastructure diagnostics; never include command stdout."""
+    text = value.decode("utf-8", "replace") if isinstance(value, bytes) else str(value or "")
+    values = {value for key, value in os.environ.items()
+              if value and re.search(r"KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL", key, re.I)}
+    for secret in sorted(values, key=len, reverse=True):
+        text = text.replace(secret, "[redacted]")
+    text = re.sub(r"(https?://)[^/\s@]+@", r"\1[redacted]@", text)
+    return re.sub(r"(?i)(bearer\s+)[^\s\"']+", r"\1[redacted]", text)
+
+
+def subprocess_failure(error):
+    """Name the failed infrastructure command and its stderr, excluding provider evidence."""
+    args = list(error.cmd) if isinstance(error.cmd, (list, tuple)) else [str(error.cmd)]
+    validator = "-c" in args and any("validate_integration_results" in str(arg) for arg in args)
+    if "-c" in args:
+        args[args.index("-c") + 1] = "<integration-validator>" if validator else "<python-code>"
+    stderr = error.stderr
+    if validator and stderr:
+        # A validator's ValueError may quote case/provider evidence. Dependency loader
+        # failures are safe and useful; the input and all other validator text stay private.
+        safe = [line for line in diagnostic_text(stderr).splitlines()
+                if line.startswith(("ModuleNotFoundError: No module named", "ImportError:", "OSError:"))]
+        stderr = "\n".join(safe) if safe else "[withheld: validator stderr may contain provider evidence]"
+    stderr = stderr if stderr else "[not captured]" if stderr is None else "[empty]"
+    return diagnostic_text(f"command {shlex.join(map(str, args))} failed (exit {error.returncode}); stderr: {stderr}")
 
 
 def git(*args, root=ROOT):
@@ -131,7 +162,7 @@ def installed_validator(run):
         helper.verify_checksum(wheel, checksums[wheel_name])
         venv.create(root / "venv", with_pip=True)
         python = root / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-        subprocess.run([str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)], check=True)
+        subprocess.run([str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)], check=True, text=True, capture_output=True)
         def validate(results, source):
             code = "import json,sys,sc_agent; value=json.load(sys.stdin); print(sc_agent.validate_integration_results(value['results'], value['source']))"
             result = subprocess.run([str(python), "-I", "-c", code], input=json.dumps({"results": results, "source": source}), text=True, capture_output=True, check=True)
@@ -192,9 +223,13 @@ def main():
     parser.add_argument("--candidate", default=None)
     args = parser.parse_args()
     import os
-    candidate = args.candidate or os.environ.get("CANDIDATE_SHA") or git("rev-parse", "HEAD")
-    # Refresh only remote branch evidence; never infer publication from an unpushed local commit.
-    git("fetch", "--prune", "origin")
+    try:
+        candidate = args.candidate or os.environ.get("CANDIDATE_SHA") or git("rev-parse", "HEAD")
+        # Refresh only remote branch evidence; never infer publication from an unpushed local commit.
+        git("fetch", "--prune", "origin")
+    except subprocess.CalledProcessError as error:
+        print(json.dumps({"status": "FAIL", "error": "integration.command_failed", "reason": subprocess_failure(error)}))
+        return 1
     reasons = []
     for path in sorted((ROOT / str(REPORT_ROOT)).glob("*.json")):
         try:
@@ -210,7 +245,8 @@ def main():
             return 0
         except (Exception, SystemExit) as error:
             # No provider text or credential bytes are included in gate errors.
-            reasons.append(f"{path.name}: {str(error) if isinstance(error, Refusal) else type(error).__name__}")
+            detail = subprocess_failure(error) if isinstance(error, subprocess.CalledProcessError) else str(error) if isinstance(error, Refusal) else type(error).__name__
+            reasons.append(f"{path.name}: {detail}")
     print(json.dumps({"status": "FAIL", "error": "integration.no_passing_platform", "reason": "No complete passing platform matches candidate source and verified artifacts", "reports": reasons}))
     return 1
 
