@@ -18,7 +18,7 @@ import sys
 import tempfile
 
 from integration_errors import failure_detail
-from preflight import ROOT, Refusal, checked_process, command, digest, git, prerelease_helper
+from preflight import ROOT, RUN_SCHEMA_VERSION, Refusal, checked_process, command, digest, git, prerelease_helper, validate_run_schema
 from configuration import case_specs, distribution_wheel, module_distribution, platform_target, release_manifest
 
 
@@ -52,6 +52,7 @@ def prepare(args):
     state_path = run_dir / "run.json"
     if state_path.exists():
         state = json.loads(state_path.read_text())
+        validate_run_schema(state)
         if (state["prerelease_tag"], state["platform"], state["run_id"]) != (args.tag, args.platform, args.run_id):
             raise Refusal('run directory belongs to a different tag/platform/run-id', code="integration.run_identity_mismatch", remediation='Use the original run identity or select a fresh run directory.')
         return state
@@ -88,7 +89,7 @@ def prepare(args):
         raise Refusal('installed Rust case contract differs from the formula', code="integration.case_contract_mismatch", remediation='Use matching published artifacts and generated integration case configuration.')
     archive = helper.archive_name(manifest, version, target)
     artifacts = [{"name": name, "sha256": checksums[name]} for name in [archive, *[p.name for p in wheels]]]
-    state = {"run_id": args.run_id, "source_commit": source, "platform": args.platform, "prerelease_tag": args.tag, "artifacts": artifacts, "results": [], "beads": payload["graph"]["ids"], "formula_root": payload["graph"]["parent"]}
+    state = {"schema_version": RUN_SCHEMA_VERSION, "run_id": args.run_id, "source_commit": source, "platform": args.platform, "prerelease_tag": args.tag, "artifacts": artifacts, "results": [], "beads": payload["graph"]["ids"], "formula_root": payload["graph"]["parent"]}
     state_path.write_text(json.dumps(state, indent=2) + "\n")
     checked_process(["bd", "close", state["beads"]["verify_assets"], "--reason", "Downloaded and checksum-verified installed target binary archive and both wheels"])
     return state

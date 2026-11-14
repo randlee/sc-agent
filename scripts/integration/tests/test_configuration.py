@@ -59,7 +59,7 @@ class Configuration(unittest.TestCase):
             manifest.write_text(json.dumps(modified))
             run_dir = root / "run"
             run_dir.mkdir()
-            state = {"source_commit": "a" * 40, "platform": "fixture", "prerelease_tag": "prerelease/v9.2.0", "results": [], "beads": {"typesafe_decision_cli": "fixture-bead"}, "artifacts": [{"name": "archive.tar.gz", "sha256": "b" * 64}]}
+            state = {"schema_version": preflight.RUN_SCHEMA_VERSION, "source_commit": "a" * 40, "platform": "fixture", "prerelease_tag": "prerelease/v9.2.0", "results": [], "beads": {"typesafe_decision_cli": "fixture-bead"}, "artifacts": [{"name": "archive.tar.gz", "sha256": "b" * 64}]}
             answer = {"response": {"answers": {"q": {"type": "noul", "noul": 0.5}}}}
             with patch.object(run, "ROOT", root), patch.object(run.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=json.dumps(answer), stderr="")) as process, contextlib.redirect_stdout(io.StringIO()):
                 run.execute_case(state, run_dir, "typesafe-decision-cli")
@@ -67,6 +67,7 @@ class Configuration(unittest.TestCase):
             self.assertEqual(command[command.index("--provider") + 1], "anthropic")
             self.assertEqual(command[command.index("--model") + 1], "custom-model")
             self.assertEqual(json.loads((run_dir / "request.json").read_text())["model"], "custom-model")
+            self.assertEqual(json.loads((run_dir / "run.json").read_text())["schema_version"], preflight.RUN_SCHEMA_VERSION)
             cli_case["model"] = ""
             manifest.write_text(json.dumps(modified))
             with self.assertRaises(configuration.Refusal):

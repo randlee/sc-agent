@@ -202,7 +202,7 @@ class GateHistory(unittest.TestCase):
             report.write_text('<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Fixture</title></head><body>controlled</body></html>')
             git("add", ".");git("commit", "-qm", "report")
             candidate = git("rev-parse", "HEAD")
-            run_record = {"source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifacts": [{"name": "binary.tar.gz", "sha256": "b" * 64}], "results": [{"case_id": "anthropic-decision-cli", "source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifact_sha256": "b" * 64}], "report": "site/reports/integration/run.html", "report_sha256": preflight.digest(report)}
+            run_record = {"schema_version": preflight.RUN_SCHEMA_VERSION, "source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifacts": [{"name": "binary.tar.gz", "sha256": "b" * 64}], "results": [{"case_id": "anthropic-decision-cli", "source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifact_sha256": "b" * 64}], "report": "site/reports/integration/run.html", "report_sha256": preflight.digest(report)}
             # The real installed Rust parser has separate boundary tests; this seam isolates git/artifact composition.
             validator = lambda results, _: results
             verified = []
