@@ -393,6 +393,11 @@ def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch
 @pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_models_list_outcome(outcome_models_args, outcome_call):
+    """SC_AGENT_LIVE=1 checks default TypeSafe models with provider omitted.
+
+    Only a native missing key skips; jev/haiku/luna are exercised by the send
+    outcomes through conftest.outcome_model, since models() takes no model.
+    """
     models = json.loads(outcome_call(sc_agent.models, **outcome_models_args))["models"]
     assert isinstance(models, list) and models
     assert all(isinstance(model["name"], str) and model["name"] for model in models)
@@ -401,6 +406,10 @@ def test_models_list_outcome(outcome_models_args, outcome_call):
 @pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_noul_send_outcome(outcome_args, outcome_call):
+    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
+
+    Provider is omitted; only a native missing key skips the owner-run case.
+    """
     line = json.loads(outcome_call(sc_agent.send, NOUL, **outcome_args))
     assert "error" not in line
     assert line["position"] == 0
@@ -413,6 +422,10 @@ def test_noul_send_outcome(outcome_args, outcome_call):
 @pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_noul_send_batch_outcome(outcome_args, outcome_call):
+    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
+
+    Provider is omitted; only a native missing key skips the owner-run case.
+    """
     lines = [json.loads(line) for line in outcome_call(sc_agent.send_batch, [NOUL] * 3, **outcome_args)]
     assert sorted(line["position"] for line in lines) == [0, 1, 2]
     for line in lines:
