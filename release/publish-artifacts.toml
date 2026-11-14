@@ -9,7 +9,8 @@ license = "MIT"
 readme_dependency_crate = "decidr"
 renderer_archive_path = "bin/decidr"
 workspace_toml = "Cargo.toml"
-rust_toolchain = "1.99.0"
+sc_lint_source_revision = "5b9b7d78cf865d4f5e98c97aa35934be7d4e839a"
+rust_toolchain = "1.94.1"
 
 [prerelease]
 tag_prefix = "prerelease/v"
