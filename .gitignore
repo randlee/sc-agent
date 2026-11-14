@@ -30,6 +30,8 @@ rustc-ice-*.txt
 .sc/*
 !.sc/plan-anchor/
 !.sc/plan-anchor/**
+!.sc/judge-jev/
+!.sc/judge-jev/**
 .sc-publish-kit/
 .sc-publish-venv/
 .claude/projects/
