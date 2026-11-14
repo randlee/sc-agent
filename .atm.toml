@@ -3,17 +3,15 @@
 # Runtime identity (see `atm help identity`):
 #   export ATM_IDENTITY=ai-lead ATM_TEAM=sc-ai
 #
-# Register the team on the ATM daemon before first use:
-#   atm teams add-member sc-ai ai-lead --agent-type lead --model opus \
-#     --home-dir "$HOME/github/sc-agent"
-#   atm teams add-member sc-ai ai-qa --agent-type qa --model sonnet \
-#     --home-dir "$HOME/github/sc-agent"
-#   atm teams add-member sc-ai tai --agent-type dev --model gpt-6.1-terra \
-#     --home-dir "$HOME/github/sc-agent"
-#   atm teams add-member sc-ai lai --agent-type dev --model gpt-6-luna \
-#     --home-dir "$HOME/github/sc-agent"
-#   atm teams add-member sc-ai sai --agent-type dev --model gpt-6.1-sol \
-#     --home-dir "$HOME/github/sc-agent"
+# Register the team on the ATM daemon before first use. --backend herdr is NOT
+# set by add-member and without it no nudge ever reaches a pane (atm doctor still
+# reports "healthy", so this is the silent half of the setup):
+#   atm teams add-member sc-ai ai-lead   --agent-type lead   --model opus          --home-dir "$HOME/github/sc-agent" --backend herdr
+#   atm teams add-member sc-ai ai-qa     --agent-type qa     --model sonnet        --home-dir "$HOME/github/sc-agent" --backend herdr
+#   atm teams add-member sc-ai ai-sanity --agent-type sanity --model sonnet        --home-dir "$HOME/github/sc-agent" --backend herdr
+#   atm teams add-member sc-ai tai       --agent-type dev    --model gpt-6.1-terra --home-dir "$HOME/github/sc-agent" --backend herdr
+#   atm teams add-member sc-ai lai       --agent-type dev    --model gpt-6-luna    --home-dir "$HOME/github/sc-agent" --backend herdr
+#   atm teams add-member sc-ai sai       --agent-type dev    --model gpt-6.1-sol   --home-dir "$HOME/github/sc-agent" --backend herdr
 #   (then, per codex member: atm teams update-member sc-ai <name> --harness codex-cli)
 #
 # Orchestration: pass `--var lead=ai-lead` and dispatch QA to `ai-qa`
@@ -22,6 +20,11 @@
 # Codex panes run with --no-daemon: under codex 0.16x the shared app-server
 # does not inherit the pane environment, so ATM_IDENTITY/BEADS_ACTOR arrive
 # empty and the agent cannot identify itself.
+#
+# ai-sanity is deliberately a claude pane, not codex: an independent verifier
+# that shares the developers' model family is a weaker check. It sits with
+# ai-qa in the quality window so verification traffic is separate from the
+# lead's window.
 
 [atm]
 default_team = "sc-ai"
@@ -38,12 +41,6 @@ name = "ai-lead"
 model = "opus"
 dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "ai-lead", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
-
-[[rmux.windows.panes]]
-name = "ai-qa"
-model = "sonnet"
-dir = "/Users/randlee/github/sc-agent"
-env = { ATM_IDENTITY = "ai-qa", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
 
 [[rmux.windows]]
 name = "developers"
@@ -66,3 +63,19 @@ name = "sai"
 command = "codex --no-daemon -c features.hooks=true --model gpt-6.1-sol --yolo"
 dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "sai", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+[[rmux.windows]]
+name = "quality"
+layout = "even-horizontal"
+
+[[rmux.windows.panes]]
+name = "ai-qa"
+model = "sonnet"
+dir = "/Users/randlee/github/sc-agent"
+env = { ATM_IDENTITY = "ai-qa", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+[[rmux.windows.panes]]
+name = "ai-sanity"
+model = "sonnet"
+dir = "/Users/randlee/github/sc-agent"
+env = { ATM_IDENTITY = "ai-sanity", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }

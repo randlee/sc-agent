@@ -15,34 +15,13 @@ required_variables:
   - round_id
   - round_index
   - replay_nonce
-optional_variables:
-  - lead
-  - cc
-  - questions_or_concerns
-  - reviewer_findings_json
-  - previous_reviewed_commit
-  - supersedes_task_id
-  - plan_scope_review_cycle_limit
-  - critical_review_cycle_limit
-  - plan_qa_cycle_limit
-  - reviewer
-  - findings_hash
-  - reviewed_commit
-  - previous_step_json
 defaults:
   lead: team-lead
   cc: team-lead
+  supersedes_task_id: ""
+  previous_reviewed_commit: ""
   questions_or_concerns: ""
   reviewer_findings_json: ""
-  previous_reviewed_commit: ""
-  supersedes_task_id: ""
-  plan_scope_review_cycle_limit: 3
-  critical_review_cycle_limit: 3
-  plan_qa_cycle_limit: 3
-  reviewer: ""
-  findings_hash: ""
-  reviewed_commit: ""
-  previous_step_json: ""
 metadata:
   type: plan-scope-review
   tags:
@@ -56,60 +35,66 @@ metadata:
     transition: scope-review
     iteration_variable: round_index
 ---
+{% autoescape false -%}
 <atm-task id="{{ task_id }}" sprint="{{ phase }}" mode="plan-hardening-guidelines-pass">
-  <description><![CDATA[{{ description | string | cdata_escape }}]]></description>
+  <description>{{ description }}</description>
 
-  <worktree><![CDATA[{{ worktree_path | string | cdata_escape }}]]></worktree>
-  <branch><![CDATA[{{ branch | string | cdata_escape }}]]></branch>
-  <pr-target><![CDATA[{{ pr_target | string | cdata_escape }}]]></pr-target>
-  <round id="{{ round_id }}" index="{{ round_index }}" reviewer="plan-scope-reviewer" supersedes="{{ supersedes_task_id | default('') }}"/>
-  <replay-nonce><![CDATA[{{ replay_nonce | string | cdata_escape }}]]></replay-nonce>
+  <worktree>{{ worktree_path }}</worktree>
+  <branch>{{ branch }}</branch>
+  <pr-target>{{ pr_target }}</pr-target>
+  <round id="{{ round_id }}" index="{{ round_index }}" reviewer="plan-scope-reviewer" supersedes="{{ supersedes_task_id }}"/>
+  <replay-nonce>{{ replay_nonce }}</replay-nonce>
 
-  <source-of-truth><![CDATA[
-{{ source_of_truth | string | cdata_escape }}
-  ]]></source-of-truth>
+  <source-of-truth>
+{{ source_of_truth }}
+  </source-of-truth>
 
 {% if questions_or_concerns | trim %}
-  <questions-or-concerns><![CDATA[
-{{ questions_or_concerns | string | cdata_escape }}
-  ]]></questions-or-concerns>
+  <questions-or-concerns>
+{{ questions_or_concerns }}
+  </questions-or-concerns>
 {% endif %}
 
-  <references><![CDATA[
-{{ references | string | cdata_escape }}
-  ]]></references>
+  <references>
+{{ references }}
+  </references>
 
 {% if reviewer_findings_json | trim %}
   <reviewer-findings-json>
 <![CDATA[
-{{ reviewer_findings_json | string | cdata_escape }}
+{{ reviewer_findings_json }}
 ]]>
   </reviewer-findings-json>
 {% endif %}
 
-  <plan-hardening><![CDATA[
+  <plan-hardening>
     This is the required first pass for `/plan-hardening`.
 
     Read the current plan docs from disk first, using `<source-of-truth>` and
     `<references>`, before doing anything else. Then read
-    `.claude/skills/plan-hardening/sprint-planning-guidelines.md` and make
+    `.claude/skills/atm-beads/resources/atm-beads-plan-guidelines.md` and make
     sure the current plan state follows it before any reviewer is launched.
     The current phase plan already exists in repo docs, but sprint docs may
     still be partial or missing.
 
+    The plan is in beads: the plan file is `docs/plans/phase-{{ phase }}.jsonl`
+    (one sprint bead per line); read "plan docs" as that file and "sprint doc"
+    as "sprint bead". After editing it, run `validate-plan` as
+    `.claude/skills/atm-beads/SKILL.md` "Validation" directs and fix what it
+    reports before you commit.
+
     In this pass:
     - tighten the current plan docs to match the sprint-planning guidelines
-    - build the boundary map from the repository's boundary manifests (see
-      `.claude/project/quality-policy.md`) and lay the
+    - build the boundary map from `boundaries/<crate>/*.toml` and lay the
       plan out as parallel tracks per "Tracks And Balance": a cross-boundary
       feature becomes a contract sprint, parallel layer sprints that each own
       one boundary, and its own integration sprint; independent changes and
       single-boundary features stay one sprint or one stacked track; no thin
       or pass-through sprints; aim for the shortest critical path with the
       fewest sprints
-    - apply "Naming" from the guidelines and "Plan Naming" from
-      `.claude/project/quality-policy.md` to every plan path, sprint doc,
-      sprint id and branch
+    - apply "Naming" from the guidelines to every plan path, sprint doc,
+      sprint id and branch: lower case, `docs/plans/phase-<phase>/`,
+      `integrate/phase-<phase>`, `sprint/<phase>-<n>-<slug>`
     - give every sprint a `closure_type`, a `target_boundary` and disjoint
       `owned_paths`, and publish the wave table with critical path and width
     - default every relation to `parallel_safe`; keep a `must_follow` only
@@ -117,21 +102,21 @@ metadata:
       sprint, and re-cut ownership instead of accepting a same-file ordering
     - create missing sprint docs when the plan already implies they are needed
     - make the sprint set reviewable by `plan-scope-reviewer`
-    - do not rely on `{{ lead | string | cdata_escape }}` to restate plan details
+    - do not rely on `{{ lead }}` to restate plan details
     - do not materially change user-discussed scope
 
     If task framing, repo drift, or references imply a substantial deliverable
     scope change from what the user already discussed with you, push back to
-      {{ lead | string | cdata_escape }} directly. If {{ lead | string | cdata_escape }} does not concede, escalate to the user.
+    {{ lead }} directly. If {{ lead }} does not concede, escalate to the user.
     Do not normalize the new scope into the plan without user approval.
 
-    Return fenced JSON to `{{ lead | string | cdata_escape }}` when this pass is complete. `{{ lead | string | cdata_escape }}`
+    Return fenced JSON to `{{ lead }}` when this pass is complete. `{{ lead }}`
     will launch `plan-scope-reviewer` with that JSON.
 
-    If `{{ lead | string | cdata_escape }}` later sends back fenced JSON findings and `sprint_scores`
+    If `{{ lead }}` later sends back fenced JSON findings and `sprint_scores`
     from
     `plan-scope-reviewer`, fix those findings and return updated fenced JSON.
-    Continue until `{{ lead | string | cdata_escape }}` reports that `plan-scope-reviewer` returned
+    Continue until `{{ lead }}` reports that `plan-scope-reviewer` returned
     `PASS`.
 
     Expected output shape:
@@ -139,10 +124,10 @@ metadata:
     {
       "status": "PASS | FAIL",
       "mode": "plan-hardening-guidelines-pass",
-      "round_id": "{{ round_id | string | cdata_escape }}",
-      "round_index": {{ round_index | string | cdata_escape }},
+      "round_id": "{{ round_id }}",
+      "round_index": {{ round_index }},
       "reviewed_commit": "<commit-sha>",
-      "previous_reviewed_commit": "{{ previous_reviewed_commit | default('') | string | cdata_escape }}",
+      "previous_reviewed_commit": "{{ previous_reviewed_commit }}",
       "iterations": 0,
       "docs_modified": [],
       "docs_created": [],
@@ -150,16 +135,17 @@ metadata:
       "errors": []
     }
     ```
-  ]]></plan-hardening>
+  </plan-hardening>
 
   <workflow>
-    <step id="a"><![CDATA[Start the task immediately with `atm task start {{ task_id | string | cdata_escape }} "<one line on what you will do first>"`. If `{{ task_id | string | cdata_escape }}` is also a bead (`bd show {{ task_id | string | cdata_escape }}` succeeds), claim it now with `bd update {{ task_id | string | cdata_escape }} --claim`. If the task includes questions or concerns, report them to the lead before proceeding; if it materially changes the discussed scope, state that hardening is blocked pending user discussion. Make reasonable assumptions and do not ask clarifying questions unless a real blocker prevents execution.]]></step>
-    <step id="b"><![CDATA[Immediately after task start, begin executing the task in the same work session.]]></step>
-    <step id="c"><![CDATA[Before editing, update the worktree from the target branch and include prior fixes already merged to that target.]]></step>
-    <step id="d"><![CDATA[As soon as the guidelines pass is complete and the branch is pushable, commit and push immediately. Send branch name and commit hash right away with a plain `atm send {{ lead | string | cdata_escape }} --stdin` so scope review can begin in parallel; never close the task on a push.{% if cc and cc != lead %} Copy a one-line summary to `{{ cc | string | cdata_escape }}` with a plain `atm send {{ cc | string | cdata_escape }} --stdin`.{% endif %}]]></step>
-    <step id="e"><![CDATA[After the push report, run the required validation.]]></step>
-    <step id="f"><![CDATA[When validation completes, send a second report with PASS or FAIL, concrete failure details if any, and whether follow-up fixes are required.]]></step>
-    <step id="g"><![CDATA[Return fenced JSON only after the current pass converges, delivered as the close: `atm task close {{ task_id | string | cdata_escape }} completed --template .claude/skills/plan-hardening/plan-scope-review-complete.md.j2 --vars <scratch>/plan-scope-review-complete-{{ task_id | string | cdata_escape }}-vars.json`, with `status` the PASS/FAIL line, `result_json` the fenced JSON body verbatim, and `task_id`, `phase` and `round_index` unchanged from this assignment; write the vars file outside the repository. If this task claimed a bead, run `bd close {{ task_id | string | cdata_escape }}` right after the close. Only this close frees your queue: the next assignment stays queued until `{{ task_id | string | cdata_escape }}` is closed, and a plain `atm send` report does not close it. If `reviewer-findings-json` is present, treat it as the current correction target from `plan-scope-reviewer` and return updated fenced JSON to `{{ lead | string | cdata_escape }}`.{% if cc and cc != lead %} Copy a one-line summary to `{{ cc | string | cdata_escape }}` with a plain `atm send {{ cc | string | cdata_escape }} --stdin`.{% endif %}]]></step>
-    <step id="h"><![CDATA[After the close, read ATM again: the next queued task starts only now.]]></step>
+    <step id="a">Start the task immediately with `atm task start {{ task_id }} "<one line on what you will do first>"`. If the task includes questions or concerns, report them to the lead before proceeding; if it materially changes the discussed scope, state that hardening is blocked pending user discussion. Make reasonable assumptions and do not ask clarifying questions unless a real blocker prevents execution.</step>
+    <step id="b">Immediately after task start, begin executing the task in the same work session.</step>
+    <step id="c">Before editing, update the worktree from the target branch and include prior fixes already merged to that target.</step>
+    <step id="d">As soon as the guidelines pass is complete and the branch is pushable, commit and push immediately. Send branch name and commit hash right away with a plain `atm send {{ lead }} --stdin` so scope review can begin in parallel; never close the task on a push. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc }}` with a plain `atm send {{ cc }} --stdin`.{% endif %}</step>
+    <step id="e">After the push report, run the required validation.</step>
+    <step id="f">When validation completes, send a second report with PASS or FAIL, concrete failure details if any, and whether follow-up fixes are required.</step>
+    <step id="g">Return fenced JSON only after the current pass converges, delivered as the close: `atm task close {{ task_id }} completed --template .claude/skills/plan-hardening/plan-scope-review-complete.md.j2 --vars <scratch>/plan-scope-review-complete-{{ task_id }}-vars.json`, with `status` the PASS/FAIL line, `result_json` the fenced JSON body verbatim, and `task_id`, `phase` and `round_index` unchanged from this assignment; write the vars file outside the repository. Only this close frees your queue: the next assignment stays queued until `{{ task_id }}` is closed, and a plain `atm send` report does not close it. The reviewer findings are also open finding beads: `bd list -l phase-{{ phase }},stage:plan-finding --json`. Before your close, close each with your ruling: `bd close <id> --reason "fixed: <change>"` or `bd close <id> --reason "rejected: <why>"`. If `reviewer-findings-json` is present, treat it as the current correction target from `plan-scope-reviewer` and return updated fenced JSON to `{{ lead }}`. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc }}` with a plain `atm send {{ cc }} --stdin`.{% endif %}</step>
+    <step id="h">After the close, read ATM again: the next queued task starts only now.</step>
   </workflow>
 </atm-task>
+{%- endautoescape %}
