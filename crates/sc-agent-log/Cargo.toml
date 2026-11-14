@@ -12,7 +12,7 @@ testing = []
 
 [dependencies]
 serde = "1"
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.3" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.4" }
 sc-observability = "=1.5.0"
 sc-observability-types = "=1.5.0"
 # preserve_order: identity and context fields are written first, then the payload in its order.

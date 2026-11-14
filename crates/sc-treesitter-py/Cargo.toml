@@ -1,6 +1,6 @@
 [package]
 name = "sc-treesitter-py"
-version = "0.1.3"
+version = "0.1.4"
 edition.workspace = true
 rust-version.workspace = true
 license = "MIT"
