@@ -16,7 +16,7 @@ grammar-python = ["sc-treesitter/grammar-python"]
 grammar-rust = ["sc-treesitter/grammar-rust"]
 
 [dependencies]
-sc-treesitter = { path = "../sc-treesitter", version = "0.1.0", default-features = false }
+sc-treesitter = { path = "../sc-treesitter", version = "0.1.4", default-features = false }
 clap = { version = "4", features = ["derive"] }
 sc-observability = "=1.5.0"
 serde = { version = "1", features = ["derive"] }

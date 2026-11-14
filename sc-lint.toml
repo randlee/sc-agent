@@ -1,0 +1,5 @@
+[tool.sc-lint]
+minimum_version = "0.8.9"
+
+[tool.sc-lint.analyzers.runtime]
+panic_rule_packages = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sc-treesitter", "sc-treesitter-py", "sitr"]

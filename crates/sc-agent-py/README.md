@@ -6,14 +6,18 @@ Each function returns the same JSON text that the CLI prints.
 
 ## What it provides
 
-- `sc_agent.send(request, *, model, project, agent_role, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log` and `config_dir`.
+- `sc_agent.send(request, *, model, project, agent_role, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log`, `config_dir`, `keyring_service` and `keyring_account`.
 - `sc_agent.send_batch(requests, *, model, project, agent_role, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns the result lines in finish order and passes each to `on_result` as it arrives.
 - `sc_agent.models(runner=None, ...)`: `decidr models`.
 - `sc_agent.doctor(...)`: `decidr doctor`.
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
 
-A failed decision is data in the returned line, not an exception. `KeyboardInterrupt` cancels the run, drains it and is re-raised. `general_log` and `session_log` take a `Callable[[dict], None]`, which injects the logger.
+A failed decision is data in the returned line, not an exception. `KeyboardInterrupt` cancels the run, drains it and is re-raised. `general_log` and `session_log` accept a caller-owned `sc_observability.Logger` directly, or the existing `Callable[[dict], None]`. Python and Rust records reach the same injected Logger through its public `log(LogEvent)` API; the caller retains flush and shutdown. Each omitted logger uses its default file. No consumer adapter or record conversion is required.
+
+Keyring overrides require `provider=` and apply only to that provider. Each supplied service/account must be 1–255 UTF-8 bytes. Omitted components independently use the provider credential-variable name and the current OS account. Lookup order is repository-root `.env`, process environment, then keyring; a present invalid higher-priority key never falls back. Invalid options raise `SagError("sc_agent_py.invalid_option", message, detail_json)` before network I/O.
+
+The direct Logger form uses the separately installed `sc-observability` package (tested with 1.5.0). The callable and default-file forms do not require it.
 
 ## Usage
 

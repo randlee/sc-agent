@@ -29,15 +29,9 @@ use serde_json::{Map, Value};
 
 use crate::{LogError, LogKind};
 
-/// Largest serialized `fields` object of one row, in bytes.
-///
-/// A row over the cap is not written: the write returns [`LogError::RowTooLarge`] and the row is
-/// counted as lost. 256 KiB is a quarter of sc-observability's 1 MiB event cap
-/// (`MAX_LOG_EVENT_BYTES`), leaving ample room for the event envelope, and far above any
-/// decision or diagnostic row (callers log ids, sizes and timings, never bodies). With
-/// [`QUEUE_CAPACITY`] it also bounds the writer queue's worst-case memory to 128 MiB. Raising it
-/// toward 1 MiB makes sc-observability, not this crate, refuse oversized events.
-pub const MAX_ROW_BYTES: usize = 256 * 1024;
+/// Largest serialized event, excluding its newline, accepted by sc-observability's sink.
+/// The row and its identity, timestamp and correlation envelope share this bound.
+pub const MAX_ROW_BYTES: usize = sc_observability::constants::MAX_LOG_EVENT_BYTES - 1;
 
 /// Rows each logger's sc-observability writer queue holds before `write` blocks and `try_write`
 /// refuses.
@@ -115,6 +109,8 @@ pub(crate) struct Writer {
     service: ServiceName,
     ledger: Arc<Ledger>,
     kind: LogKind,
+    #[cfg(feature = "testing")]
+    timestamp: Option<Timestamp>,
 }
 
 impl Writer {
@@ -143,7 +139,23 @@ impl Writer {
             closed: false,
             ledger,
             kind,
+            #[cfg(feature = "testing")]
+            timestamp: None,
         }
+    }
+
+    #[cfg(feature = "testing")]
+    pub(crate) fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    fn timestamp(&self) -> Timestamp {
+        #[cfg(feature = "testing")]
+        if let Some(timestamp) = self.timestamp {
+            return timestamp;
+        }
+        Timestamp::now_utc()
     }
 
     /// Builds and admits one event; any Err is counted before it is returned.
@@ -171,14 +183,6 @@ impl Writer {
         correlation: Option<SessionId>,
         fields: Map<String, Value>,
     ) -> Result<LogEvent, LogError> {
-        let bytes = serialized_len(&fields);
-        if bytes > MAX_ROW_BYTES {
-            return Err(LogError::RowTooLarge {
-                log: self.kind,
-                bytes,
-                max: MAX_ROW_BYTES,
-            });
-        }
         let correlation_id = correlation
             .map(|id| {
                 let text = id.to_string();
@@ -190,7 +194,7 @@ impl Writer {
             version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).map_err(|error| {
                 LogError::invalid_name("version", OBSERVATION_ENVELOPE_VERSION, &error)
             })?,
-            timestamp: Timestamp::now_utc(),
+            timestamp: self.timestamp(),
             level,
             service: self.service.clone(),
             target: TargetCategory::new(target)
@@ -210,6 +214,14 @@ impl Writer {
     }
 
     fn admit(&self, event: LogEvent, mode: Mode) -> Result<(), LogError> {
+        let bytes = serialized_len(&event);
+        if bytes > MAX_ROW_BYTES {
+            return Err(LogError::RowTooLarge {
+                log: self.kind,
+                bytes,
+                max: MAX_ROW_BYTES,
+            });
+        }
         let admitted = match mode {
             Mode::Blocking => self.logger.log(event),
             Mode::NonBlocking => self.logger.try_log(event),
@@ -348,7 +360,7 @@ fn bounded(id: &str) -> String {
 }
 
 /// The serialized JSON length of `fields`, counted without allocating the text.
-fn serialized_len(fields: &Map<String, Value>) -> usize {
+fn serialized_len(value: &impl serde::Serialize) -> usize {
     /// Counts bytes written to it.
     struct Counter(usize);
     impl std::io::Write for Counter {
@@ -363,7 +375,7 @@ fn serialized_len(fields: &Map<String, Value>) -> usize {
     let mut counter = Counter(0);
     // A Map of serde_json Values always serializes; on the impossible error the count so far
     // is used, which is still a lower bound of the size.
-    let _ = serde_json::to_writer(&mut counter, fields);
+    let _ = serde_json::to_writer(&mut counter, value);
     counter.0
 }
 
@@ -397,4 +409,49 @@ pub(crate) fn start_logger(
     builder
         .build()
         .map_err(|source| LogError::Start { log, source })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The exact boundary is driven by a fixed event, including timestamp and envelope.
+    #[test]
+    fn full_event_cap_includes_envelope_and_newline() {
+        let memory = crate::testing::MemoryLog::new().expect("memory");
+        let logger = memory.logger();
+        let writer = Writer::injected(logger, None, LogKind::Session);
+        let mut event = writer
+            .event(
+                Level::Info,
+                "sc_agent.session",
+                "session.result",
+                Some(SessionId::new()),
+                [("blob".to_owned(), Value::String(String::new()))]
+                    .into_iter()
+                    .collect(),
+            )
+            .expect("event");
+        event.timestamp = Timestamp::UNIX_EPOCH;
+        let overhead = serialized_len(&event);
+        let cap = sc_observability::constants::MAX_LOG_EVENT_BYTES - 1;
+        event
+            .fields
+            .insert("blob".to_owned(), Value::String("x".repeat(cap - overhead)));
+        assert_eq!(serialized_len(&event), cap);
+        writer
+            .admit(event.clone(), Mode::Blocking)
+            .expect("exactly at sink limit");
+        let written = memory.events().expect("flush");
+        assert_eq!(written.len(), 1);
+        assert_eq!(serialized_len(&written[0]), cap);
+        event.fields.insert(
+            "blob".to_owned(),
+            Value::String("x".repeat(cap - overhead + 1)),
+        );
+        assert!(
+            matches!(writer.admit(event, Mode::Blocking), Err(LogError::RowTooLarge { bytes, max, .. }) if bytes == cap + 1 && max == cap)
+        );
+        assert_eq!(memory.events().expect("flush").len(), 1);
+    }
 }

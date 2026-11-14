@@ -10,7 +10,7 @@ license.workspace = true
 # No default features: platform keystores are enabled per target below.
 # Targets without a keystore fall back to keyring's empty mock (no network).
 keyring = { version = "3.6", default-features = false }
-sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+sc-agent-types = { version = "0.1.4", path = "../sc-agent-types" }
 whoami = "1.6"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]

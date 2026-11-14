@@ -18,7 +18,7 @@ fn one_row_per_result() {
     let held = gate.clone();
     let (transport, dropped) = FnTransport::new(move |request| match index_of(request) {
         0..10 => Ok(ok()),
-        10..15 => Ok(HttpResponse::new(500, vec![], b"down".to_vec())),
+        10..15 => Ok(HttpResponse::new(409, vec![], b"down".to_vec())),
         _ => {
             held.pass();
             Ok(ok())
@@ -70,7 +70,7 @@ fn one_row_per_result() {
                 assert!(
                     row["error"]["message"]
                         .as_str()
-                        .is_some_and(|text| text.contains("500"))
+                        .is_some_and(|text| text.contains("409"))
                 );
             }
         }

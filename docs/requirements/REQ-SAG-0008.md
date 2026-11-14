@@ -21,7 +21,9 @@ Definitions: The general logger writes the general log. The session logger write
 - The general logger and the session logger MUST be separate loggers.
 - A caller MUST be able to inject the general logger, the session logger, or both.
 - When a logger is not injected, sc-agent MUST use its default logger for that log.
-- The Python API (`sc-agent-py`) MUST let a caller inject the general logger, the session logger, or both, each as a callable that receives each record; a logger not injected MUST be the default logger.
+- The Python API (`sc-agent-py`) MUST let a caller inject the general logger, the session logger, or both, each as a caller-owned `sc_observability.Logger` or a callable that receives each record; a logger not injected MUST be the default logger.
+
+- Injecting a Python Logger MUST forward records into that same Logger through its public `log(LogEvent)` API, without a consumer adapter or consumer record mapping. The caller MUST retain ownership of flush and shutdown. An injected Logger replaces only its corresponding default.
 
 ### Rationale
 

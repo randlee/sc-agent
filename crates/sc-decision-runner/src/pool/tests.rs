@@ -3,6 +3,8 @@
 //! No test asserts on elapsed time and nothing sleeps. Every wait that could hang has a
 //! failsafe deadline that turns a deadlock into a failure.
 
+#![cfg(test)]
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};

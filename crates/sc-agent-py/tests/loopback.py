@@ -76,7 +76,7 @@ class Loopback:
                     self.end_headers()
                     self.wfile.write(data)
                     return
-                self._reply(503, FIXED_ERROR)
+                self._reply(409, FIXED_ERROR)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True

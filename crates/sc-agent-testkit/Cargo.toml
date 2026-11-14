@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-testkit"
-version = "0.1.0"
+version = "0.1.4"
 description = "Bounded test primitives for the sc-agent workspace: hang-guarded receive, join, gates, a one-shot loopback server and a reaping child guard. Dev-only."
 edition.workspace = true
 rust-version.workspace = true

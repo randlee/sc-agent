@@ -9,8 +9,18 @@ license = "MIT"
 readme_dependency_crate = "decidr"
 renderer_archive_path = "bin/decidr"
 workspace_toml = "Cargo.toml"
+sc_lint_source_revision = "5b9b7d78cf865d4f5e98c97aa35934be7d4e839a"
 rust_toolchain = "1.94.1"
 
+[prerelease]
+tag_prefix = "prerelease/v"
+tag_script = "scripts/prerelease_tag.py"
+install_root = "~/.sc-agent/prerelease"
+binaries = ["decidr", "sitr"]
+protected_branches = ["develop", "main", "integrate/phase-b"]
+selector_dir = { darwin = "~/.local/bin", linux = "~/.local/bin", windows = "~/.local/bin" }
+post_install = "{python} scripts/integration/install_wheels.py --stage \"{stage_dir}\" {wheels}"
+verify = "{python} scripts/integration/install_wheels.py --verify --stage \"{stage_dir}\" --version {version}"
 
 [[release_targets]]
 target = "x86_64-unknown-linux-gnu"

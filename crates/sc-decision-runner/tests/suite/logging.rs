@@ -60,9 +60,9 @@ fn busy_records_carry_session() {
 fn runner_general_records() {
     let (transport, dropped) = FnTransport::new(|request| {
         Ok(match index_of(request) {
-            1 => HttpResponse::new(500, vec![], b"down".to_vec()),
+            1 => HttpResponse::new(409, vec![], b"down".to_vec()),
             2 => {
-                let blob = "x".repeat(300 * 1024);
+                let blob = "x".repeat(sc_agent_log::MAX_ROW_BYTES + 1);
                 HttpResponse::new(
                     200,
                     vec![],

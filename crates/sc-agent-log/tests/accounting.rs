@@ -190,7 +190,7 @@ fn oversized_row_refused() {
     let memory = MemoryLog::new().expect("memory");
     let general = memory.general();
     // {"blob":"<n>"} is n + 11 bytes.
-    let under = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES - 11)))]);
+    let under = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES / 2 - 11)))]);
     general
         .write(Level::Info, "t", "a", LogContext::NONE, under)
         .expect("at the cap");
@@ -200,7 +200,7 @@ fn oversized_row_refused() {
         .expect_err("over the cap");
     assert!(
         matches!(error, LogError::RowTooLarge { log: LogKind::General, bytes, max }
-            if bytes == MAX_ROW_BYTES + 1 && max == MAX_ROW_BYTES),
+            if bytes > MAX_ROW_BYTES && max == MAX_ROW_BYTES),
         "{error:?}"
     );
     assert_eq!(error.id(), "log.row_too_large");

@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "decidr"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "clap",
  "ctrlc",
@@ -1505,7 +1505,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sc-agent-config"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-testkit",
  "sc-agent-types",
@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-http"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-http",
  "sc-agent-log",
@@ -1531,7 +1531,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-log"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "hostname",
  "sc-agent-log",
@@ -1539,19 +1539,21 @@ dependencies = [
  "sc-agent-types",
  "sc-observability",
  "sc-observability-types",
+ "serde",
  "serde_json",
  "tempfile",
 ]
 
 [[package]]
 name = "sc-agent-py"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "decidr",
  "pyo3",
  "pyo3-build-config",
  "sc-agent-config",
  "sc-agent-log",
+ "sc-agent-secrets",
  "sc-agent-types",
  "sc-decision-schema",
  "sc-observability",
@@ -1561,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-secrets"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "keyring",
  "sc-agent-testkit",
@@ -1572,14 +1574,14 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-testkit"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-types",
 ]
 
 [[package]]
 name = "sc-agent-types"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-testkit",
  "sc-agent-types",
@@ -1600,7 +1602,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-llm"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "base64 0.22.1",
  "sc-agent-http",
@@ -1615,7 +1617,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-local"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-config",
  "sc-agent-http",
@@ -1631,7 +1633,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-runner"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-config",
  "sc-agent-http",
@@ -1639,12 +1641,13 @@ dependencies = [
  "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
+ "sc-observability",
  "serde_json",
 ]
 
 [[package]]
 name = "sc-decision-schema"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-http",
  "sc-agent-testkit",
@@ -1657,7 +1660,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-systemone"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-http",
  "sc-agent-secrets",
@@ -1691,7 +1694,7 @@ dependencies = [
 
 [[package]]
 name = "sc-llm-provider"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "sc-agent-http",
  "sc-agent-log",
@@ -1738,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "sc-treesitter"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "pyo3",
  "serde",
@@ -1751,7 +1754,7 @@ dependencies = [
 
 [[package]]
 name = "sc-treesitter-py"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "pyo3",
  "pyo3-build-config",
@@ -1937,7 +1940,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
 name = "sitr"
-version = "0.1.0"
+version = "0.1.4"
 dependencies = [
  "clap",
  "sc-observability",

@@ -157,18 +157,18 @@ fn assert_found(resolved: &ResolvedKey, expected: &str, source: KeySource) {
     assert!(holds(&resolved.key, expected), "wrong key from {source:?}");
 }
 
-/// AC REQ-SAG-0401: env first, then `.env`, then the keyring, for each of the six providers.
+/// AC REQ-SAG-0401: `.env` first, then env, then the keyring, for each of the six providers.
 #[test]
-fn every_provider_resolves_env_then_dotenv_then_keyring() {
+fn every_provider_resolves_dotenv_then_env_then_keyring() {
     for provider in Provider::ALL.iter().copied() {
         let var = env_var(provider);
         let repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
         let keyring = MapKeyring::new([(var, "sk-keyring-only")]);
 
-        // Env wins over .env and keyring; .env does not override a set variable.
+        // .env wins over both process environment and keyring.
         let env = MapEnv::with([(var, SECRET)]);
         let found = resolve(provider, &sources(&env, Some(repo.path()), &keyring)).unwrap();
-        assert_found(&found, SECRET, KeySource::Env);
+        assert_found(&found, OTHER, KeySource::DotEnv);
         assert!(keyring.asked().is_empty(), "keyring read after an env hit");
 
         // Unset in env: .env supplies it.
@@ -176,6 +176,10 @@ fn every_provider_resolves_env_then_dotenv_then_keyring() {
         let found = resolve(provider, &sources(&empty, Some(repo.path()), &keyring)).unwrap();
         assert_found(&found, OTHER, KeySource::DotEnv);
         assert!(keyring.asked().is_empty(), "keyring read after a .env hit");
+
+        let found = resolve(provider, &sources(&env, None, &keyring)).unwrap();
+        assert_found(&found, SECRET, KeySource::Env);
+        assert!(keyring.asked().is_empty());
 
         // Neither env nor .env: the keyring, service = variable name.
         let bare = tempfile::tempdir().unwrap();
@@ -233,27 +237,31 @@ fn malformed_key_is_key_malformed_without_key_bytes() {
     assert_no_secret(&error, SECRET);
 }
 
-/// A blank env value counts as set: it skips `.env` and goes to the keyring.
+/// Higher-priority values are authoritative even when malformed or blank.
 #[test]
-fn blank_env_value_skips_dotenv_and_reads_keyring() {
-    let var = env_var(Provider::OpenAi);
-    let repo = repo_with_dotenv(&format!("{var}={OTHER}\n")).unwrap();
-    let env = MapEnv::with([(var, "  ")]);
-    let keyring = MapKeyring::new([(var, SECRET)]);
-    let found = resolve(
-        Provider::OpenAi,
-        &sources(&env, Some(repo.path()), &keyring),
-    )
-    .unwrap();
-    assert_found(&found, SECRET, KeySource::Keyring);
-
-    let empty_keyring = MapKeyring::default();
-    let error = resolve(
-        Provider::OpenAi,
-        &sources(&env, Some(repo.path()), &empty_keyring),
-    )
-    .unwrap_err();
-    assert_eq!(error.id(), "secrets.key_missing");
+fn invalid_higher_priority_values_never_fall_back() {
+    for provider in Provider::ALL.iter().copied() {
+        let var = env_var(provider);
+        for invalid in ["", "   ", "bad key", "non-ascii-é"] {
+            let repo = repo_with_dotenv(&format!("{var}=\"{invalid}\"\n")).unwrap();
+            let env = MapEnv::with([(var, SECRET)]);
+            let ring = MapKeyring::new([(var, OTHER)]);
+            let error = resolve(provider, &sources(&env, Some(repo.path()), &ring)).unwrap_err();
+            assert!(matches!(
+                error,
+                SecretsError::KeyMissing { .. } | SecretsError::KeyMalformed { .. }
+            ));
+            assert!(ring.asked().is_empty());
+            assert_no_secret(&error, SECRET);
+            let env = MapEnv::with([(var, invalid)]);
+            let error = resolve(provider, &sources(&env, None, &ring)).unwrap_err();
+            assert!(matches!(
+                error,
+                SecretsError::KeyMissing { .. } | SecretsError::KeyMalformed { .. }
+            ));
+            assert!(ring.asked().is_empty());
+        }
+    }
 }
 
 /// `repo_root: None` reads no `.env`: the same sources with the repo find the key in `.env`.
@@ -478,4 +486,56 @@ fn secrets_errors_follow_the_error_contract() {
 fn assert_no_secret(error: &SecretsError, secret: &str) {
     let rendered = format!("{error} {error:?} {:?}", error.detail());
     assert!(!rendered.contains(secret), "{rendered}");
+}
+
+/// Location components default independently, and overrides never reach another provider.
+#[test]
+fn checked_keyring_locations_are_independent_and_provider_scoped() {
+    use sc_agent_secrets::{KeyringLocation, ProviderKeyring};
+    use std::sync::Arc;
+    for (service, account) in [
+        (None, None),
+        (Some("custom-service"), None),
+        (None, Some("custom-user")),
+        (Some("custom-service"), Some("custom-user")),
+    ] {
+        let ring = Arc::new(MapKeyring::default());
+        let wrapped = ProviderKeyring::new(
+            Provider::TypeSafe,
+            KeyringLocation::new(service, account).unwrap(),
+            ring.clone(),
+        );
+        wrapped
+            .password(env_var(Provider::TypeSafe), "os-user")
+            .unwrap();
+        wrapped
+            .password(env_var(Provider::Anthropic), "os-user")
+            .unwrap();
+        assert_eq!(
+            ring.asked(),
+            vec![
+                (
+                    service.unwrap_or(env_var(Provider::TypeSafe)).to_owned(),
+                    account.unwrap_or("os-user").to_owned()
+                ),
+                (
+                    env_var(Provider::Anthropic).to_owned(),
+                    "os-user".to_owned()
+                )
+            ]
+        );
+    }
+    for value in ["".to_owned(), "a".repeat(256), "é".repeat(128)] {
+        for (service, account, option) in [
+            (Some(value.as_str()), None, "keyring_service"),
+            (None, Some(value.as_str()), "keyring_account"),
+        ] {
+            let error = KeyringLocation::new(service, account).unwrap_err();
+            assert_eq!(error.id(), "secrets.invalid_location");
+            assert!(error.message().contains(option));
+            assert!(error.message().contains("255"));
+            assert!(!format!("{error:?}").contains(&value) || value.is_empty());
+        }
+    }
+    assert!(KeyringLocation::new(Some(&"a".repeat(255)), Some(&"é".repeat(127))).is_ok());
 }

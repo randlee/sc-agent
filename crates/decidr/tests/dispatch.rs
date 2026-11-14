@@ -179,7 +179,7 @@ mod tests {
             )),
         ]);
         let log = MemoryLog::new().expect("log");
-        let dir = empty_config_dir();
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let ctx = context(
             dir.path(),
             &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],

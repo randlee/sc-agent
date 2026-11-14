@@ -9,7 +9,8 @@
     "workspace_toml": "Cargo.toml",
     "rust_toolchain": "1.94.1",
     "readme_dependency_crate": "decidr",
-    "renderer_archive_path": "bin/decidr"
+    "renderer_archive_path": "bin/decidr",
+    "sc_lint_source_revision": "5b9b7d78cf865d4f5e98c97aa35934be7d4e839a"
   },
   "release_targets": [
     {
@@ -366,5 +367,33 @@
       "site/cli/"
     ],
     "description": "CLI reference HTML for decidr and sitr matches the clap command trees"
-  }
+  },
+  "prerelease": {
+    "tag_prefix": "prerelease/v",
+    "tag_script": "scripts/prerelease_tag.py",
+    "install_root": "~/.sc-agent/prerelease",
+    "binaries": [
+      "decidr",
+      "sitr"
+    ],
+    "protected_branches": [
+      "develop",
+      "main",
+      "integrate/phase-b"
+    ],
+    "selector_dir": {
+      "darwin": "~/.local/bin",
+      "linux": "~/.local/bin",
+      "windows": "~/.local/bin"
+    },
+    "post_install": "{python} scripts/integration/install_wheels.py --stage \"{stage_dir}\" {wheels}",
+    "verify": "{python} scripts/integration/install_wheels.py --verify --stage \"{stage_dir}\" --version {version}"
+  },
+  "preflight_checks": [
+    {
+      "id": "live-provider-integration",
+      "description": "One complete passing checksum-verified prerelease platform run matches candidate source",
+      "run": "python3 scripts/integration/preflight.py"
+    }
+  ]
 }

@@ -1,4 +1,4 @@
-//! Key resolution: process environment, then repo-root `.env`, then keyring.
+//! Key resolution: repo-root `.env`, then process environment, then keyring.
 
 use std::path::Path;
 
@@ -13,13 +13,13 @@ use crate::vars::env_var;
 
 /// Where keys are looked up, in this order (REQ-SAG-0401).
 ///
-/// The process environment first, then `<repo_root>/.env`, then the keyring.
+/// The repo-root `.env` first, then the process environment, then the keyring.
 /// Tests build one from their own [`EnvSource`] and [`KeyringSource`], so no
 /// test reads or writes the process environment or the real keyring.
 pub struct KeySources<'a> {
-    /// The environment read first.
+    /// The environment read second.
     pub env: &'a dyn EnvSource,
-    /// The git work-tree top level whose `.env` is read second; `None` reads no `.env`.
+    /// The git work-tree top level whose `.env` is read first; `None` reads no `.env`.
     pub repo_root: Option<&'a Path>,
     /// The keyring read last (service = variable name, account = OS user).
     pub keyring: &'a dyn KeyringSource,
@@ -75,11 +75,10 @@ pub struct ResolvedKey {
 
 /// Resolves the key of `provider` from its variable ([`env_var`]).
 ///
-/// The process environment is read first. A blank value there counts as set:
-/// it skips `.env` and goes to the keyring. An unset variable is looked up in
-/// `<repo_root>/.env` (which never overrides a set variable), then in the
-/// keyring under service = variable name and account = OS user. Nothing is
-/// logged; callers log the returned error.
+/// The repository-root `.env` is read first, then the process environment,
+/// then the keyring under service = variable name and account = OS user.
+/// A present but invalid value is authoritative and never falls back.
+/// Nothing is logged; callers log the returned error.
 ///
 /// # Errors
 ///
@@ -110,20 +109,16 @@ pub fn resolve_var(var: &VarName, sources: &KeySources<'_>) -> Result<ResolvedKe
 }
 
 fn resolve_name(name: &str, sources: &KeySources<'_>) -> Result<ResolvedKey, SecretsError> {
-    // Each candidate is sealed from a borrow; ApiKey::try_new makes the one
-    // copy of the key that is kept.
-    let process_value = sources.env.var(name);
-    if let Some(raw) = process_value.as_deref().filter(|value| is_present(value)) {
-        return seal(name, raw, KeySource::Env);
-    }
-
-    if process_value.is_none()
-        && let Some(repo_root) = sources.repo_root
-    {
+    // A selected value is authoritative, including a blank or malformed one.
+    // Never consult a lower-priority store after a value has been found.
+    if let Some(repo_root) = sources.repo_root {
         let dotenv = load_dotenv(repo_root)?;
-        if let Some(raw) = dotenv.get(name).filter(|value| is_present(value)) {
+        if let Some(raw) = dotenv.get(name) {
             return seal(name, raw, KeySource::DotEnv);
         }
+    }
+    if let Some(raw) = sources.env.var(name) {
+        return seal(name, &raw, KeySource::Env);
     }
 
     let account = current_account();
