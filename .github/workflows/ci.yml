@@ -98,6 +98,9 @@ jobs:
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+      - name: Test sc-lint release checksum verification
+        run: python3 .github/scripts/tests/test_setup_sc_lint_checksum.py
+
       - name: Install sc-lint
         uses: ./.github/actions/setup-sc-lint
         with:
