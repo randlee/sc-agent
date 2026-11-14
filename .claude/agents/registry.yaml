@@ -84,3 +84,7 @@ skills:
       rust-code-explorer: 0.x
       rust-developer: 0.x
       rust-qa-agent: 0.x
+roles:
+  dev-sanity: ai-sanity
+  quality-mgr: ai-qa
+  lead: ai-lead

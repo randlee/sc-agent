@@ -1,6 +1,6 @@
 ---
 name: plan-review-notice
-version: 1.1.0
+version: 1.0.0
 description: durable notice that one in-process (background-agent) plan review round ran, so plan activity stays observable in ATM search.
 format: xml
 required_variables:
@@ -25,12 +25,14 @@ metadata:
     transition: notice
     iteration_variable: round_index
 ---
+{% autoescape false -%}
 <plan-review-notice phase="{{ phase }}" reviewer="{{ reviewer }}" round="{{ round_index }}" verdict="{{ verdict }}">
-  <pr-number><![CDATA[{{ pr_number | string | cdata_escape }}]]></pr-number>
-  <branch><![CDATA[{{ branch | string | cdata_escape }}]]></branch>
-  <commit><![CDATA[{{ commit | string | cdata_escape }}]]></commit>
-  <summary><![CDATA[
-{{ summary | string | cdata_escape }}
-  ]]></summary>
-  <note><![CDATA[Informational only. No reply or task action is required.]]></note>
+  <pr-number>{{ pr_number }}</pr-number>
+  <branch>{{ branch }}</branch>
+  <commit>{{ commit }}</commit>
+  <summary>
+{{ summary }}
+  </summary>
+  <note>Informational only. No reply or task action is required.</note>
 </plan-review-notice>
+{%- endautoescape %}
