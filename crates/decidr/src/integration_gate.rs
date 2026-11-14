@@ -236,9 +236,9 @@ fn validate_results(json: &str, source_commit: &str) -> Result<Vec<CaseResult>, 
     let first = results
         .first()
         .ok_or_else(|| invalid("results", "must include every required case"))?;
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeSet::<&str>::new();
     for result in &results {
-        if !seen.insert(&result.case_id.0) {
+        if !seen.insert(result.case_id.0.as_str()) {
             return Err(invalid("case_id", "duplicate case in platform run"));
         }
         if result.status != Status::Pass {
@@ -257,10 +257,7 @@ fn validate_results(json: &str, source_commit: &str) -> Result<Vec<CaseResult>, 
             ));
         }
     }
-    if REQUIRED_CASES
-        .iter()
-        .any(|case| !seen.contains(&case.to_string()))
-    {
+    if REQUIRED_CASES.iter().any(|case| !seen.contains(*case)) {
         return Err(invalid(
             "case_id",
             "one or more required live cases are missing",
