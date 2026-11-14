@@ -91,15 +91,23 @@ def prepare(args):
 
 def result_outcome(case, output, returncode):
     """Judge the actual installed process output, without retaining raw provider text."""
-    if "invalid-key" in case:
-        expected = ["decision.api_status"] if case.startswith("typesafe") else ["decision.backend", "decision_llm.llm", "llm.api_status"]
-        if all(error_id in output for error_id in expected) and re.search(r"\b401\b", output):
-            return "PASS", "Invalid environment credential returned the expected sanitized HTTP 401 cause chain", None
-        return "FAIL", "Invalid environment credential did not produce the required HTTP 401 cause chain", None
     try:
         value = json.loads(output)
     except ValueError:
         return "FAIL", "Installed process did not return valid JSON", None
+    if "invalid-key" in case:
+        expected = ["decision.api_status"] if case.startswith("typesafe") else ["decision.backend", "decision_llm.llm", "llm.api_status"]
+        error = value.get("error") if isinstance(value, dict) else None
+        chain = []
+        messages = []
+        while isinstance(error, dict):
+            chain.append(error.get("id"))
+            messages.append(str(error.get("message", "")))
+            error = error.get("cause")
+        for index in range(len(chain) - len(expected) + 1):
+            if chain[index:index + len(expected)] == expected and re.search(r"\b401\b", messages[index + len(expected) - 1]):
+                return "PASS", "Invalid environment credential returned the expected sanitized HTTP 401 cause chain", value.get("session_id")
+        return "FAIL", "Invalid environment credential did not produce the required HTTP 401 cause chain", None
     if "secrets.key_missing" in output:
         return "SKIP", "Required provider credential was unavailable", None
     if returncode or (isinstance(value, dict) and "error" in value):
