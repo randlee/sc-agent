@@ -69,7 +69,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
-        run: cargo fmt --check --all
+        run: cargo --locked fmt --check --all
 
   clippy:
     name: Clippy
@@ -96,7 +96,7 @@ jobs:
           key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 
       - name: Test sc-lint release setup
         run: |
@@ -152,7 +152,7 @@ jobs:
           key: ${{ matrix.os }}-test-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run workspace tests
-        run: cargo test --workspace --all-features
+        run: cargo test --locked --workspace --all-features
 
   # sc-treesitter (sprint a-3): ADR-SAG-0005 feature gates, the grammar feature matrix and
   # the sc-treesitter-py wheel (REQ-QA-001, REQ-QA-002).
@@ -181,7 +181,7 @@ jobs:
 
       - name: Check ADR-SAG-0005 feature gates (cargo metadata)
         run: |
-          cargo metadata --format-version 1 --no-deps > metadata.json
+          cargo metadata --locked --format-version 1 --no-deps > metadata.json
           python3 - <<'PY'
           import json, sys
           packages = {p["name"]: p for p in json.load(open("metadata.json"))["packages"]}
@@ -204,10 +204,10 @@ jobs:
           PY
 
       - name: Test with only the Python grammar
-        run: cargo test -p sc-treesitter --no-default-features --features grammar-python
+        run: cargo test --locked -p sc-treesitter --no-default-features --features grammar-python
 
       - name: Test the sitr CLI crate
-        run: cargo test -p sitr
+        run: cargo test --locked -p sitr
 
       - name: Install Python
         uses: actions/setup-python@v5
@@ -251,7 +251,7 @@ jobs:
           key: ubuntu-sc-agent-py-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build the decidr binary (the parity and identity tests run it)
-        run: cargo build -p decidr
+        run: cargo build --locked -p decidr
 
       - name: Install Python
         uses: actions/setup-python@v5
