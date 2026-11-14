@@ -135,13 +135,13 @@ histories; their fixture PASS records are parser/composition tests and are never
 live acceptance evidence. The workspace logging test `forty_thousand_sessions`
 retains the NFR-SAG-0001 capacity check.
 
-### B-1 sprint requirement covered here
+### B-1 sprint requirements and capacity evidence
 
-- [NFR-SAG-0001](../nfr/NFR-SAG-0001.md): a 40,000-session task writes one
-  row per session without creating one file per session. This requirement is
-  listed in the B-1 sprint bead `agt-b-1` (`metadata.requirements`).
+The committed [B-1 sprint requirements list](b-1-sprint-requirements.md) includes
+NFR-SAG-0001 and mirrors the requirement IDs on sprint bead `agt-b-1`.
 
-Workspace test evidence: `cargo test --workspace --all-features` passed. In `sc-agent-log`'s
+Workspace test evidence: `cargo test --workspace --all-features` passed at source
+commit `92b105ebca8874bb9965b0eccb005c39af690b4a`. In `sc-agent-log`'s
 `tests/session.rs`, `forty_thousand_sessions` passed; the target reported 4
-passed, 0 failed, 0 ignored in 1.70 s. The test asserted 40,000 log rows and
+passed, 0 failed, 0 ignored in 1.64 s. The test asserted 40,000 log rows and
 40,000 distinct session IDs.
