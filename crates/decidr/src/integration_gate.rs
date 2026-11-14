@@ -59,17 +59,17 @@ impl Identifier {
     }
 }
 
-/// A complete SHA-1 source revision or SHA-256 artifact digest.
+/// A complete hexadecimal digest whose required length is part of its type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-struct Digest(String);
+struct Digest<const LENGTH: usize>(String);
 
-impl Digest {
-    fn new(value: String, len: usize, field: &'static str) -> Result<Self, DecidrError> {
-        if value.len() != len || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+impl<const LENGTH: usize> Digest<LENGTH> {
+    fn new(value: String, field: &'static str) -> Result<Self, DecidrError> {
+        if value.len() != LENGTH || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(invalid(
                 field,
-                "must be a complete hexadecimal digest (40 source or 64 artifact characters)",
+                "must be a complete hexadecimal digest of the required length",
             ));
         }
         Ok(Self(value.to_ascii_lowercase()))
@@ -105,7 +105,7 @@ impl PrereleaseTag {
 }
 
 /// A case outcome. SKIP and FAIL are preserved as evidence and never pass the gate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 enum Status {
     /// The actual case passed.
     #[serde(rename = "PASS")]
@@ -123,10 +123,39 @@ enum Status {
 #[serde(transparent)]
 struct SanitizedReason(String);
 
+impl SanitizedReason {
+    fn new(value: String) -> Result<Self, DecidrError> {
+        if value.trim().is_empty() || value.len() > 4096 || value.chars().any(char::is_control) {
+            return Err(invalid(
+                "reason",
+                "must contain 1..=4096 printable UTF-8 bytes, redacted by the producer",
+            ));
+        }
+        Ok(Self(value))
+    }
+}
+
 /// A validated session ULID.
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
 struct Session(String);
+
+impl Session {
+    fn new(value: String) -> Result<Self, DecidrError> {
+        if value.len() != 26
+            || value.as_bytes().first().is_none_or(|b| *b > b'7')
+            || !value
+                .bytes()
+                .all(|b| b"0123456789ABCDEFGHJKMNPQRSTVWXYZ".contains(&b))
+        {
+            return Err(invalid(
+                "session_id",
+                "must be a canonical 26-character ULID",
+            ));
+        }
+        Ok(Self(value))
+    }
+}
 
 /// Checked result contract. Fields cannot be instantiated without boundary validation.
 #[derive(Debug, Clone, Serialize)]
@@ -136,8 +165,8 @@ struct CaseResult {
     status: Status,
     reason: SanitizedReason,
     prerelease_tag: PrereleaseTag,
-    source_commit: Digest,
-    artifact_sha256: Digest,
+    source_commit: Digest<40>,
+    artifact_sha256: Digest<64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     session_id: Option<Session>,
 }
@@ -147,7 +176,7 @@ struct CaseResult {
 struct RawResult {
     case_id: String,
     platform: String,
-    status: String,
+    status: Status,
     reason: String,
     prerelease_tag: String,
     source_commit: String,
@@ -158,46 +187,15 @@ struct RawResult {
 impl TryFrom<RawResult> for CaseResult {
     type Error = DecidrError;
     fn try_from(raw: RawResult) -> Result<Self, Self::Error> {
-        let status = match raw.status.as_str() {
-            "PASS" => Status::Pass,
-            "FAIL" => Status::Fail,
-            "SKIP" => Status::Skip,
-            _ => return Err(invalid("status", "must be PASS, FAIL or SKIP")),
-        };
-        if raw.reason.trim().is_empty()
-            || raw.reason.len() > 4096
-            || raw.reason.chars().any(char::is_control)
-        {
-            return Err(invalid(
-                "reason",
-                "must contain 1..=4096 printable UTF-8 bytes, redacted by the producer",
-            ));
-        }
-        let session_id = raw
-            .session_id
-            .map(|id| {
-                if id.len() != 26
-                    || id.as_bytes().first().is_none_or(|b| *b > b'7')
-                    || !id
-                        .bytes()
-                        .all(|b| b"0123456789ABCDEFGHJKMNPQRSTVWXYZ".contains(&b))
-                {
-                    return Err(invalid(
-                        "session_id",
-                        "must be a canonical 26-character ULID",
-                    ));
-                }
-                Ok(Session(id))
-            })
-            .transpose()?;
+        let session_id = raw.session_id.map(Session::new).transpose()?;
         Ok(Self {
             case_id: Identifier::new(raw.case_id, "case_id")?,
             platform: Identifier::new(raw.platform, "platform")?,
-            status,
-            reason: SanitizedReason(raw.reason),
+            status: raw.status,
+            reason: SanitizedReason::new(raw.reason)?,
             prerelease_tag: PrereleaseTag::new(raw.prerelease_tag)?,
-            source_commit: Digest::new(raw.source_commit, 40, "source_commit")?,
-            artifact_sha256: Digest::new(raw.artifact_sha256, 64, "artifact_sha256")?,
+            source_commit: Digest::<40>::new(raw.source_commit, "source_commit")?,
+            artifact_sha256: Digest::<64>::new(raw.artifact_sha256, "artifact_sha256")?,
             session_id,
         })
     }
@@ -209,7 +207,7 @@ impl TryFrom<RawResult> for CaseResult {
 /// Returns `decidr.integration_evidence` for malformed fields, duplicate/missing cases,
 /// mixed platforms/tags/sources, or any non-PASS outcome. No clock or external state is used.
 fn validate_results(json: &str, source_commit: &str) -> Result<Vec<CaseResult>, DecidrError> {
-    let source = Digest::new(source_commit.to_owned(), 40, "source_commit")?;
+    let source = Digest::<40>::new(source_commit.to_owned(), "source_commit")?;
     let raw: Vec<RawResult> =
         serde_json::from_str(json).map_err(|error| DecidrError::IntegrationEvidence {
             field: "results",
@@ -351,6 +349,14 @@ mod tests {
         ] {
             let mut result = complete().remove(0);
             result[field] = json!(value);
+            if field == "status" {
+                assert_eq!(
+                    validate(vec![result]).unwrap_err().id(),
+                    "decidr.integration_evidence",
+                    "{field}"
+                );
+                continue;
+            }
             let raw: RawResult = serde_json::from_value(result).unwrap();
             assert_eq!(
                 CaseResult::try_from(raw).unwrap_err().id(),
