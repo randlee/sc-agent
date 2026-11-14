@@ -19,6 +19,10 @@ const KEYRING_READ_RECOVERY: &str = "unlock or start the platform keystore for t
 /// Recovery text for [`SecretsError::KeyringTimeout`].
 const KEYRING_TIMEOUT_RECOVERY: &str = "unlock the platform keystore for this OS user (a retry blocks again until it answers), or set the variable in the process environment or the repo-root .env file";
 
+/// Recovery text for [`SecretsError::KeyringConstructionRefused`].
+const KEYRING_CONSTRUCTION_REFUSED_RECOVERY: &str =
+    "use an injected keyring source in tests; do not access the platform keyring from a test";
+
 /// A key could not be resolved.
 ///
 /// No variant holds key bytes. `cause` and `kind` are this layer's summary
@@ -75,6 +79,8 @@ pub enum SecretsError {
     },
     /// The keyring did not answer within 15 s, or an earlier read is still stuck.
     KeyringTimeout,
+    /// A test guard refused construction of the real platform keyring.
+    KeyringConstructionRefused,
 }
 
 impl ErrorId for SecretsError {
@@ -86,6 +92,7 @@ impl ErrorId for SecretsError {
             Self::DotenvRead { .. } => "secrets.dotenv_read",
             Self::KeyringRead { .. } => "secrets.keyring_read",
             Self::KeyringTimeout => "secrets.keyring_timeout",
+            Self::KeyringConstructionRefused => "secrets.keyring_construction_refused",
         }
     }
 
@@ -110,6 +117,9 @@ impl ErrorId for SecretsError {
                 "the platform keyring did not answer within 15 s, or an earlier read is still stuck"
                     .to_owned()
             }
+            Self::KeyringConstructionRefused => {
+                "real platform keyring construction was refused by the active test guard".to_owned()
+            }
         }
     }
 
@@ -119,7 +129,8 @@ impl ErrorId for SecretsError {
             Self::InvalidLocation { .. }
             | Self::KeyMissing { .. }
             | Self::KeyMalformed { .. }
-            | Self::KeyringTimeout => None,
+            | Self::KeyringTimeout
+            | Self::KeyringConstructionRefused => None,
         }
     }
 
@@ -133,6 +144,7 @@ impl ErrorId for SecretsError {
             Self::DotenvRead { .. } => Some(DOTENV_READ_RECOVERY),
             Self::KeyringRead { .. } => Some(KEYRING_READ_RECOVERY),
             Self::KeyringTimeout => Some(KEYRING_TIMEOUT_RECOVERY),
+            Self::KeyringConstructionRefused => Some(KEYRING_CONSTRUCTION_REFUSED_RECOVERY),
         }
     }
 }
@@ -152,7 +164,8 @@ impl std::error::Error for SecretsError {
             Self::InvalidLocation { .. }
             | Self::KeyMissing { .. }
             | Self::KeyMalformed { .. }
-            | Self::KeyringTimeout => None,
+            | Self::KeyringTimeout
+            | Self::KeyringConstructionRefused => None,
         }
     }
 }

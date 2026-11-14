@@ -829,16 +829,19 @@ mod tests {
         .expect("keyring override");
 
         keyring
-            .password("TYPESAFE_API_KEY", "os-user")
+            .password(sc_agent_secrets::TYPESAFE_API_KEY, "os-user")
             .expect("typesafe lookup");
         keyring
-            .password("ANTHROPIC_API_KEY", "os-user")
+            .password(sc_agent_secrets::ANTHROPIC_API_KEY, "os-user")
             .expect("other provider lookup");
         assert_eq!(
             *calls.lock().expect("recording lock"),
             [
                 ("service".to_owned(), "account".to_owned()),
-                ("ANTHROPIC_API_KEY".to_owned(), "os-user".to_owned()),
+                (
+                    sc_agent_secrets::ANTHROPIC_API_KEY.to_owned(),
+                    "os-user".to_owned()
+                ),
             ]
         );
     }

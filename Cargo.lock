@@ -1566,6 +1566,7 @@ name = "sc-agent-secrets"
 version = "0.1.5"
 dependencies = [
  "keyring",
+ "sc-agent-secrets",
  "sc-agent-testkit",
  "sc-agent-types",
  "tempfile",

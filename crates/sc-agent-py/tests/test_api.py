@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import _thread
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -355,4 +356,30 @@ def test_keyring_override_requires_named_provider(env, args, operation):
     assert "provider" in detail["message"]
     assert "required with a keyring override" in detail["message"]
     assert detail["recovery"] == "Correct the named option and retry."
+    assert loopback.requests == []
+
+
+def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch, tmp_path):
+    """A missing remote credential reaches the real-backend constructor, which must refuse."""
+    loopback, _log_root = env
+    assert os.environ.get("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING") == "1"
+    # Avoid repository .env discovery so the test always reaches the keyring path.
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.send(
+            NOUL,
+            model="jev-latest",
+            project="proj",
+            agent_role="role",
+            provider="typesafe",
+            config_dir=args["config_dir"],
+            keyring_service="test-keyring-trap",
+        )
+    ident, detail = error_of(info)
+    assert ident == "decidr.secrets"
+    assert detail["cause"]["id"] == "secrets.keyring_construction_refused"
+    assert "refused by the active test guard" in detail["cause"]["message"]
+    assert detail["cause"]["recovery"] == (
+        "use an injected keyring source in tests; do not access the platform keyring from a test"
+    )
     assert loopback.requests == []

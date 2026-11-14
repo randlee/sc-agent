@@ -18,10 +18,10 @@ sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.5" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [dev-dependencies]
+sc-agent-secrets = { path = "../sc-agent-secrets", features = ["test-keyring-guard"] }
 sc-agent-testkit = { path = "../sc-agent-testkit" }
 sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
 sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
-sc-agent-secrets = { path = "../sc-agent-secrets" }
 
 [lints]
 workspace = true
