@@ -48,29 +48,24 @@ impl PlatformKeyring {
     /// Constructs the real OS keyring backend.
     ///
     /// Test builds with `test-keyring-guard`, and Python test runs setting
-    /// `SC_AGENT_TEST_TRAP_PLATFORM_KEYRING`, refuse construction before any
-    /// OS keyring call can occur.
-    #[must_use]
-    #[allow(clippy::panic)] // Intentional test tripwire; it must fail before OS access.
-    pub fn new() -> Self {
-        #[cfg(feature = "test-keyring-guard")]
-        panic!("PlatformKeyring construction is forbidden in guarded test builds");
-
-        #[cfg(not(feature = "test-keyring-guard"))]
+    /// `SC_AGENT_TEST_TRAP_PLATFORM_KEYRING`, return a typed refusal before
+    /// any OS keyring call can occur.
+    pub fn new() -> Result<Self, SecretsError> {
+        #[cfg(any(test, feature = "test-keyring-guard"))]
         {
-            assert_ne!(
-                std::env::var_os("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING").as_deref(),
-                Some(std::ffi::OsStr::new("1")),
-                "PlatformKeyring construction is forbidden during tests"
-            );
-            Self { _private: () }
+            Err(SecretsError::KeyringConstructionRefused)
         }
-    }
-}
 
-impl Default for PlatformKeyring {
-    fn default() -> Self {
-        Self::new()
+        #[cfg(not(any(test, feature = "test-keyring-guard")))]
+        {
+            if std::env::var_os("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING").as_deref()
+                == Some(std::ffi::OsStr::new("1"))
+            {
+                Err(SecretsError::KeyringConstructionRefused)
+            } else {
+                Ok(Self { _private: () })
+            }
+        }
     }
 }
 
@@ -80,7 +75,7 @@ pub struct DeferredPlatformKeyring;
 
 impl KeyringSource for DeferredPlatformKeyring {
     fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError> {
-        PlatformKeyring::new().password(service, account)
+        PlatformKeyring::new()?.password(service, account)
     }
 }
 
@@ -344,10 +339,12 @@ mod tests {
 
     use super::*;
 
-    #[cfg(feature = "test-keyring-guard")]
     #[test]
     fn test_build_traps_real_platform_keyring_construction() {
-        assert!(std::panic::catch_unwind(PlatformKeyring::new).is_err());
+        assert!(matches!(
+            PlatformKeyring::new(),
+            Err(SecretsError::KeyringConstructionRefused)
+        ));
     }
 
     /// REQ-SAG-0002 0.2.0: a keyring failure keeps the keyring's own error whole as its
