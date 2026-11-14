@@ -79,14 +79,23 @@ runs:
         esac
         archive="sc-lint_${SC_LINT_VERSION}_${target}.tar.gz"
         url="https://github.com/${SC_LINT_REPOSITORY}/releases/download/v${SC_LINT_VERSION}/${archive}"
+        checksums_url="https://github.com/${SC_LINT_REPOSITORY}/releases/download/v${SC_LINT_VERSION}/checksums.txt"
         install_dir="${RUNNER_TEMP}/sc-lint-${SC_LINT_VERSION}/${target}"
         mkdir -p "${install_dir}"
+        archive_path="${RUNNER_TEMP}/${archive}"
+        checksums_path="${RUNNER_TEMP}/sc-lint-${SC_LINT_VERSION}-checksums.txt"
         curl --fail --location --retry 4 --retry-all-errors --silent --show-error \
-          --output "${RUNNER_TEMP}/${archive}" "${url}" || {
+          --output "${archive_path}" "${url}" || {
           echo "sc-lint setup: could not download ${url}; verify that release v${SC_LINT_VERSION} publishes this runner asset" >&2
           exit 1
         }
-        tar -xzf "${RUNNER_TEMP}/${archive}" -C "${install_dir}"
+        curl --fail --location --retry 4 --retry-all-errors --silent --show-error \
+          --output "${checksums_path}" "${checksums_url}" || {
+          echo "sc-lint setup: could not download ${checksums_url}; release checksums are required" >&2
+          exit 1
+        }
+        python3 .github/scripts/verify_sc_lint_checksum.py "${checksums_path}" "${archive_path}" "${archive}"
+        tar -xzf "${archive_path}" -C "${install_dir}"
         test -x "${install_dir}/sc-lint" || {
           echo "sc-lint setup: release archive is missing executable sc-lint" >&2
           exit 1
@@ -112,13 +121,24 @@ runs:
         $target = 'x86_64-pc-windows-msvc'
         $archive = "sc-lint_$env:SC_LINT_VERSION`_$target.zip"
         $url = "https://github.com/$env:SC_LINT_REPOSITORY/releases/download/v$env:SC_LINT_VERSION/$archive"
+        $checksumsUrl = "https://github.com/$env:SC_LINT_REPOSITORY/releases/download/v$env:SC_LINT_VERSION/checksums.txt"
         $installDir = Join-Path $env:RUNNER_TEMP "sc-lint-$env:SC_LINT_VERSION\$target"
         New-Item -ItemType Directory -Force -Path $installDir | Out-Null
         $archivePath = Join-Path $env:RUNNER_TEMP $archive
+        $checksumsPath = Join-Path $env:RUNNER_TEMP "sc-lint-$env:SC_LINT_VERSION-checksums.txt"
         try {
           Invoke-WebRequest -Uri $url -OutFile $archivePath
         } catch {
           throw "sc-lint setup: could not download $url; verify that release v$env:SC_LINT_VERSION publishes this runner asset. $($_.Exception.Message)"
+        }
+        try {
+          Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath
+        } catch {
+          throw "sc-lint setup: could not download $checksumsUrl; release checksums are required. $($_.Exception.Message)"
+        }
+        python .github/scripts/verify_sc_lint_checksum.py $checksumsPath $archivePath $archive
+        if ($LASTEXITCODE -ne 0) {
+          throw "sc-lint setup: SHA-256 verification failed for $archive"
         }
         Expand-Archive -Path $archivePath -DestinationPath $installDir -Force
         foreach ($binary in @('sc-lint.exe', 'sc-lint-boundary.exe', 'sc-lint-portability.exe', 'sc-lint-runtime.exe')) {
