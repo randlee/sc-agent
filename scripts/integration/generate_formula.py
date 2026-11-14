@@ -34,11 +34,14 @@ def render_formula() -> str:
         case_id = record["id"]
         step_id = case_id.replace("-", "_")
         step_ids.append(step_id)
+        description = f'Run scripts/integration/run.py --case {case_id}; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication.'
+        if record.get("operation") == "invalid-key":
+            description += f' Expected authentication cause chain: {" -> ".join(record["error_chain"])}.'
         lines.extend([
             "[[steps]]",
             f"id = {json.dumps(step_id)}",
             f"title = {json.dumps('Live ' + case_id + ' for {{run_id}}')}",
-            f"description = {json.dumps(f'Run scripts/integration/run.py --case {case_id}; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication.')}",
+            f"description = {json.dumps(description)}",
             'type = "task"',
             'needs = ["verify_assets"]',
             "",

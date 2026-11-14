@@ -5,8 +5,8 @@
   {"id":"typesafe-decision-wheel","provider":"typesafe","model":"jev","operation":"decision","client":"wheel","artifact":"sc-decidr-wheel"},
   {"id":"anthropic-decision-cli","provider":"anthropic","model":"haiku","operation":"decision","client":"cli","artifact":"archive"},
   {"id":"anthropic-decision-wheel","provider":"anthropic","model":"haiku","operation":"decision","client":"wheel","artifact":"sc-decidr-wheel"},
-  {"id":"typesafe-invalid-key-cli","provider":"typesafe","model":"jev","operation":"invalid-key","client":"cli","artifact":"archive"},
-  {"id":"typesafe-invalid-key-wheel","provider":"typesafe","model":"jev","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel"},
-  {"id":"anthropic-invalid-key-cli","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"cli","artifact":"archive"},
-  {"id":"anthropic-invalid-key-wheel","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel"}
+  {"id":"typesafe-invalid-key-cli","provider":"typesafe","model":"jev","operation":"invalid-key","client":"cli","artifact":"archive","error_chain":["decision.api_status"]},
+  {"id":"typesafe-invalid-key-wheel","provider":"typesafe","model":"jev","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel","error_chain":["decision.api_status"]},
+  {"id":"anthropic-invalid-key-cli","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"cli","artifact":"archive","error_chain":["decision.backend","decision_llm.llm","llm.api_status"]},
+  {"id":"anthropic-invalid-key-wheel","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel","error_chain":["decision.backend","decision_llm.llm","llm.api_status"]}
 ]

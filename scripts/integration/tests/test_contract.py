@@ -103,12 +103,23 @@ class FormulaAndTransport(unittest.TestCase):
         expected_fields = {"id", "provider", "model", "operation", "client", "artifact"}
         self.assertTrue(case_records)
         for case_id, record in case_records.items():
-            self.assertEqual(set(record), expected_fields)
+            record_fields = expected_fields | ({"error_chain"} if record["operation"] == "invalid-key" else set())
+            self.assertEqual(set(record), record_fields)
             self.assertEqual(record["id"], case_id)
             self.assertIn(record["provider"], {"typesafe", "anthropic"})
             self.assertIn(record["operation"], {"models", "decision", "invalid-key"})
             self.assertIn(record["client"], {"cli", "wheel"})
             self.assertEqual(record["artifact"] == "sc-decidr-wheel", record["client"] == "wheel")
+            if record["operation"] == "invalid-key":
+                self.assertTrue(record["error_chain"])
+                self.assertTrue(all(isinstance(error_id, str) and error_id for error_id in record["error_chain"]))
+
+    def test_generated_formula_carries_each_invalid_key_error_chain(self):
+        formula = tomllib.loads((ROOT / "formulas/integration.formula.toml").read_text())
+        steps = {step["id"].replace("_", "-"): step for step in formula["steps"]}
+        for case_id, record in preflight.integration_case_records().items():
+            if record["operation"] == "invalid-key":
+                self.assertIn(" -> ".join(record["error_chain"]), steps[case_id]["description"])
 
 
 class GateHistory(unittest.TestCase):

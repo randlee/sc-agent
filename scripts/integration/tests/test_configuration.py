@@ -72,6 +72,19 @@ class Configuration(unittest.TestCase):
             with self.assertRaises(configuration.Refusal):
                 configuration.case_specs(root)
 
+    def test_auth_result_uses_error_chain_from_case_record(self):
+        records = list(configuration.integration_case_records().values())
+        case = next(record for record in records if record["id"] == "anthropic-invalid-key-cli")
+        case["error_chain"] = ["custom.wrapper", "custom.auth"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "crates/decidr/integration-cases.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(json.dumps(records))
+            output = json.dumps({"error": {"id": "custom.wrapper", "cause": {"id": "custom.auth", "message": "HTTP 401"}}})
+            with patch.object(run, "ROOT", root):
+                self.assertEqual(run.result_outcome("anthropic-invalid-key-cli", output, 1)[0], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

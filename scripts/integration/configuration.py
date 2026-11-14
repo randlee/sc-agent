@@ -76,11 +76,12 @@ def case_specs(root=ROOT):
             "expectation": {"models": "models", "decision": "noul", "invalid-key": "auth_401"}[operation],
         }
         if operation == "invalid-key":
+            error_chain = record.get("error_chain")
+            if not isinstance(error_chain, list) or not error_chain or any(
+                not isinstance(error_id, str) or not error_id for error_id in error_chain
+            ):
+                raise Refusal('invalid-key integration cases must declare a non-empty error chain', code="integration.invalid_case_configuration", remediation='Declare the expected error_chain on each invalid-key record in integration-cases.json.')
             spec["credential_env"] = "TYPESAFE_API_KEY" if provider == "typesafe" else "ANTHROPIC_API_KEY"
-            spec["error_chain"] = (
-                ["decision.api_status"]
-                if provider == "typesafe"
-                else ["decision.backend", "decision_llm.llm", "llm.api_status"]
-            )
+            spec["error_chain"] = error_chain
         cases[case] = spec
     return cases
