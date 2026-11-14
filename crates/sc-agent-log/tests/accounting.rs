@@ -188,8 +188,9 @@ fn memory_log_reports_once() {
     session.flush().expect("already reported");
 }
 
-/// RSH-003: a row whose fields serialize over MAX_ROW_BYTES is not written; the write returns
-/// log.row_too_large and flush counts it as a lost row. A row just under the cap is written.
+/// RSH-003: oversized complete events are refused and counted as lost rows.
+/// This accounting test accepts a small row; writer::tests::full_event_cap_includes_envelope_and_newline
+/// exercises the exact serialized cap and one byte over it.
 #[test]
 fn oversized_row_refused() {
     let memory = MemoryLog::new().expect("memory");
@@ -198,7 +199,7 @@ fn oversized_row_refused() {
     let under = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES / 2 - 11)))]);
     general
         .write(Level::Info, "t", "a", LogContext::NONE, under)
-        .expect("at the cap");
+        .expect("small row below the cap");
     let over = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES - 10)))]);
     let error = general
         .write(Level::Info, "t", "a", LogContext::NONE, over)
@@ -226,6 +227,6 @@ fn oversized_row_refused() {
     assert_eq!(
         memory.records().expect("records").len(),
         1,
-        "only the row at the cap"
+        "only the small accepted row"
     );
 }
