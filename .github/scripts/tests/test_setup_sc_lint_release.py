@@ -112,6 +112,34 @@ class ReleaseSetupTests(unittest.TestCase):
                 if not accepted:
                     self.assertIn('version contract failed', result.stderr)
 
+    def test_root_probe_selects_family_and_distinguishes_findings_from_errors(self):
+        block = ACTION.read_text().split('    - name: Smoke-test repository root discovery (Unix)\n', 1)[1]
+        block = block.split('      run: |\n', 1)[1].split('\n    - name:', 1)[0]
+        cases = (
+            (0, {'ok': True, 'data': {'status': 'pass'}}, True),
+            (10, {'ok': True, 'data': {'status': 'fail', 'findings': ['controlled finding']}}, True),
+            (3, {'ok': False, 'error': {'code': 'config.boundaries_dir_missing'}}, False),
+            (0, {'ok': False, 'error': {'code': 'CLI.CONFIG_ERROR'}}, False),
+            (7, {'ok': True, 'data': {'status': 'pass'}}, False),
+        )
+        for code, payload, accepted in cases:
+            with self.subTest(code=code, payload=payload), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                argv = root / 'argv.json'
+                command = root / 'sc-lint'
+                command.write_text('#!/usr/bin/env python3\nimport json,sys\n'
+                                   'open(' + repr(str(argv)) + ', "w").write(json.dumps(sys.argv[1:]))\n'
+                                   'print(' + repr(json.dumps(payload)) + ')\nsys.exit(' + str(code) + ')\n')
+                command.chmod(0o755)
+                env = dict(os.environ, GITHUB_WORKSPACE=str(root), SC_LINT_SMOKE_FAMILY='sc-runtime',
+                           PATH=str(root) + os.pathsep + os.environ['PATH'])
+                result = subprocess.run(['bash', '-c', textwrap.dedent(block)], cwd=ROOT, env=env,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+                self.assertEqual(json.loads(argv.read_text()), ['--json', '--root', str(root), 'lint', 'sc-runtime'])
+                if code == 10:
+                    self.assertIn('controlled finding', result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

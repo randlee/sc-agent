@@ -13,6 +13,10 @@ inputs:
     description: Released sc-lint version to install (deliberate ecosystem pin)
     required: false
     default: "0.8.4"
+  smoke-family:
+    description: Configured analyzer family used to verify repository root discovery; findings are reported by the caller's lint gates
+    required: false
+    default: "sc-boundary"
   repository:
     description: GitHub repository slug hosting sc-lint releases
     required: false
@@ -217,24 +221,43 @@ runs:
     - name: Smoke-test repository root discovery (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: bash
+      env:
+        SC_LINT_SMOKE_FAMILY: ${{ inputs.smoke-family }}
       run: |
         set -euo pipefail
         root="${GITHUB_WORKSPACE:-${PWD}}"
-        smoke_json="$(sc-lint --json --root "${root}" lint sc-boundary)"
+        smoke_rc=0
+        smoke_json="$(sc-lint --json --root "${root}" lint "${SC_LINT_SMOKE_FAMILY}")" || smoke_rc=$?
+        if [ "${smoke_rc}" -ne 0 ] && [ "${smoke_rc}" -ne 10 ]; then
+          printf '%s\n' "${smoke_json}"
+          exit "${smoke_rc}"
+        fi
         jq -e '.ok == true and (.error.code // "") != "CLI.CONFIG_ERROR"' \
           <<<"${smoke_json}" >/dev/null || {
           echo "sc-lint setup: root discovery failed or returned CLI.CONFIG_ERROR" >&2
           exit 1
         }
+        if [ "${smoke_rc}" -eq 10 ]; then
+          printf '%s\n' "${smoke_json}"
+        fi
     - name: Smoke-test repository root discovery (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: pwsh
+      env:
+        SC_LINT_SMOKE_FAMILY: ${{ inputs.smoke-family }}
       run: |
         $root = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
-        $value = sc-lint --json --root $root lint sc-boundary | ConvertFrom-Json
-        if (-not $value.ok -or $value.error.code -eq 'CLI.CONFIG_ERROR') {
+        # Exit 10 means completed analysis with findings, not failed discovery.
+        $PSNativeCommandUseErrorActionPreference = $false
+        $value = sc-lint --json --root $root lint $env:SC_LINT_SMOKE_FAMILY | ConvertFrom-Json
+        $smokeRc = $LASTEXITCODE
+        if ($smokeRc -notin @(0, 10) -or -not $value.ok -or $value.error.code -eq 'CLI.CONFIG_ERROR') {
           throw "sc-lint root discovery failed: $($value | ConvertTo-Json -Compress)"
         }
+        if ($smokeRc -eq 10) {
+          $value | ConvertTo-Json -Depth 100
+        }
+        exit 0
     - name: Verify source sc-lint consumer semantics (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION != ''
       shell: bash

@@ -107,6 +107,7 @@ jobs:
         uses: ./.github/actions/setup-sc-lint
         with:
           version: "0.8.9"
+          smoke-family: "sc-runtime"
 
       - name: Reject production panic constructs
         run: |
