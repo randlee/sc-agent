@@ -31,7 +31,7 @@ Definitions:
   - `decidr.invalid_workers` for a bad worker count.
 
   A refusal MUST happen before any logger opens or any request is sent, and MUST name the value and the allowed range.
-- A `bool` MUST be refused for both overrides.
+- A `bool` MUST be refused for both overrides. (An unknown keyword, such as `workers` on `send`, raises Python's own `TypeError`.)
 - `decidr send --workers` without `--batch` MUST be refused with `decidr.invalid_workers`.
 - `timeout_secs` with an injected transport MUST be refused with `decidr.invalid_request_timeout`.
 - A send that exceeds the timeout MUST be resent under `max_sends` and the start budget.

@@ -28,7 +28,9 @@ Definitions:
   - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`.
 - Each field MUST be omitted from serialized JSON when it is not set.
 - Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
-- `ErrorId::detail()` MUST remain the only builder of a detail. It MUST take each field from the variant's own accessor and, when that is `None`, from the cause's detail.
+- `ErrorId::detail()` MUST remain the only builder of a detail.
+- A level whose catalog rule is `inherit` MUST take all three fields from its cause's detail. A level whose rule is `base` MUST report only its own accessors.
+- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`, which is the level `category()` uses (REQ-SAG-0017).
 - `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
   - as the ceiling in milliseconds;
   - saturating at `u64::MAX`;
@@ -55,6 +57,7 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 
 - [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
 - [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields at the top level.
+- [ ] A base-rule level over a cause that has a status reports its own fields only, and `category` comes from the same level.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.
 - [ ] `decision.cancelled` carries `attempts` equal to its sends.
 - [ ] `RetryAfter::parse` gives these `retry_after_ms` values:

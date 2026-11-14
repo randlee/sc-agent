@@ -1,7 +1,7 @@
 # Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, an error catalog with chain categories, and per-call limits
 
 **Status:** Proposed  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
@@ -49,7 +49,7 @@ Their integration code should be identical. They should differ only in prompt au
   - judge-jev refuses `--timeout`.
   - plan-anchor calls `timeout_secs`, which phase b added (agt-b-1.8, 05902db) and which is not yet released.
 
-Phase b, on the b stack, already changed the error type, and this ADR builds on that base:
+Phase b's b-stack fix branches already changed the error type, and this ADR builds on that base. Those commits are not yet on `integrate/phase-b` or `develop`; the implementation of this ADR is cut on top of them.
 
 - agt-zii (d827a04) added `ErrorDetail.status: Option<u16>` and a provided method `ErrorId::status()`, set for `http.provider_busy` and `decision.api_status`.
 - It changed `recovery` to `Option<Box<str>>`.
@@ -104,10 +104,16 @@ The wheel also ships a `sc_agent.pyi` type stub, so consumers get signatures and
 
 There is still no extension map: it would be untyped, would show no field names in Python or rustdoc, and would turn every new datum into a convention instead of a reviewed field.
 
-`detail()` remains the only builder and must not be overridden. It now does the copy-up in one place: it takes each field from the variant's own method and, when that is `None`, fills it from `cause_detail()`'s field. The result:
+`detail()` remains the only builder and must not be overridden. It does the copy-up in one place, keyed by the catalog rule (decision 6), so that the top-level fields and the category always describe the same level:
+
+- A level whose rule is `inherit` (a wrapper) takes all three fields from its cause's detail and none of its own.
+- A level whose rule is `base` reports only its own accessors and does not fill from its cause.
+
+The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`. `category()` uses that same level (decision 6). The result:
 
 - every wrapper carries its cause's fields with no code of its own, including wrappers added later;
 - a leaf variant overrides only the methods for data it holds;
+- `SagError.status` and `SagError.category` always describe the same reply;
 - each crate's existing test, which checks that `detail()` equals the value built from the accessors, covers all three fields and the copy-up.
 
 Leaf variants and their fields (`—` means not set):
@@ -223,9 +229,9 @@ The two Python-binding ids, `sc_agent_py.invalid_option` and `sc_agent_py.worker
 
 **Category over the chain.** `ErrorDetail::category(&self) -> ErrorCategory` works on a detail, not a bare id:
 
-1. Walk to the innermost level whose id is in the catalog with a `Base` rule. Wrappers marked `Inherit` and foreign ids are skipped.
+1. Walk from the top through levels whose rule is `Inherit` to the deciding level: the first level with a `Base` rule. This is the level whose fields the top carries (decision 2).
 2. Apply the status refinement at that level, using that level's `status`.
-3. Return the result. If the chain contains no catalog id, return `other`.
+3. Return the result. A foreign id before any `Base` level, or a chain with no catalog id, gives `other`.
 
 The status refinement applies only to `llm.api_status`, `decision.api_status` and `local.probe_status`, whose base category is `other`:
 
@@ -235,13 +241,18 @@ The status refinement applies only to `llm.api_status`, `decision.api_status` an
 | 402 | `quota` |
 | 400, 422 | `validation` |
 | 429 | `busy` (in practice only `local.probe_status`; the HTTP layer resends 429 everywhere else) |
+| 500, 503, 504 | `busy`: a transient server-side failure. The HTTP layer resends only 429, 502 and 529, so these arrive as final replies and must stay retryable. judge-jev treated every 5xx as transient. |
 | anything else | the base category (`other`) |
+
+Rejected: a separate `server` category. It would extend the owner's fixed category set for a distinction no consumer has asked to act on; `busy` already means "the provider could not serve this now; resubmit later".
 
 The rule lives in Rust only. Python exposes the same function:
 
 - `sc_agent.category(detail_or_id, status=None) -> str`, which takes a detail dict, a detail JSON string or a bare id;
 - `sc_agent.retryable(detail_or_id) -> bool`;
 - `sc_agent.ERROR_IDS: frozenset[str]`.
+
+**`retryable` means "worth resubmitting as a new call later, after the wheel's own resends have run out."** The wheel has already applied `max_sends`, the 90 s start budget and the provider pause before returning a `busy` or `network` failure. A consumer that resubmits waits first, at least `retry_after_ms` when it is set, and must not wrap the wheel in an immediate retry loop. `retryable` is true for `busy` and `network` only.
 
 An id outside the catalog gives `other` and does not raise. Foreign cause ids (`io.*`, `foreign.source`) and newer ids seen by an older wheel are therefore safe. `id in ERROR_IDS` is the membership test.
 
@@ -258,7 +269,7 @@ An id outside the catalog gives `other` and does not raise. Foreign cause ids (`
 | cancelled | `decision.cancelled`, `decidr.signal` |
 | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
 | log | `log.*` except `log.invalid_slug` |
-| other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `decidr.integration_evidence`, `sc_agent_py.worker_panicked` |
+| other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
 | inherit | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
 
 The implementing sprint adds any id that lands on the b stack after this ADR, with a category, in the same table. A missing row fails to compile, so none can be forgotten.
@@ -281,7 +292,7 @@ There is one validator per value, used by Python and the CLI alike. `RunnerConfi
 | `decidr send` | `--workers N` (new; refused without `--batch`, with `decidr.invalid_workers`) | `--timeout-secs SECS` (new) |
 
 - **Scope.** A limit applies to its own call only. It never writes the configuration and never affects another call. `None` means the configured value.
-- **Python argument handling.** Arguments are taken as `Bound<PyAny>` and extracted by hand, so every bad value raises `SagError`, never `TypeError` or `OverflowError`:
+- **Python argument handling.** Arguments are taken as `Bound<PyAny>` and extracted by hand, so every bad value of an accepted keyword raises `SagError`, never `TypeError` or `OverflowError`. An unknown keyword, such as `workers` on `send`, raises Python's own `TypeError`:
   - `bool` is refused for both arguments;
   - `timeout_secs` accepts an `int` or a `float`;
   - `workers` accepts an `int` only.
@@ -306,6 +317,16 @@ There is one validator per value, used by Python and the CLI alike. `RunnerConfi
 #### 8. `send_batch` returns its list in input order
 
 The returned list is sorted by `position`. `on_result` still receives each line as it finishes. Both existing consumers re-sort the list themselves, so the wheel does it once.
+
+#### 9. Prerelease integration tooling leaves the product API
+
+`decidr::integration_gate` (about 400 lines that validate prerelease integration results) is public decidr API today, re-exported as `integration_cases` and `validate_integration_results`, and exposed in the wheel as `sc_agent.integration_cases` and `sc_agent.validate_integration_results`. Its error, `decidr.integration_evidence`, would otherwise enter the error catalog and become a permanent part of the product's error contract.
+
+Before 0.2.0 freezes the catalog, the module and both Python functions move out of the published crate and wheel into release tooling that is not published (for example a `publish = false` workspace crate or script used by `/prerelease`). `decidr.integration_evidence` is not a catalog id. The prerelease flow keeps working; only its home changes.
+
+#### 10. Category assignments are part of the contract
+
+Consumers map categories to their own codes, so moving an id to a different category, or changing the status refinement, is a breaking change and needs a breaking version bump (a minor bump below 1.0). Adding an id with a category is not breaking. NFR-SAG-0002 records this.
 
 ### Tests (written with the implementation)
 
@@ -336,7 +357,8 @@ The returned list is sorted by `position`. `on_result` still receives each line 
   - Over `QuotaExhausted` it is `quota`, and over `Network` it is `network`.
   - `decision.backend` over a 401 `llm.api_status` is `auth`.
   - `local.probe_status` with 429 is `busy`.
-  - `decision.api_status` with 500 is `other`.
+  - `decision.api_status` with 500, 503 or 504 is `busy`, and with 501 is `other`.
+  - A detail whose top-level `status` comes from level N gets its `category` from level N.
   - `io.ConnectionRefused` is `other`.
 - **`SagError`.**
   - `SagError("x", "y", "{}")` has `status` `None` and `category` `"other"`.
@@ -387,6 +409,7 @@ Changes inside judge-jev and plan-anchor are out of scope.
 
 **Positive:**
 
+- Prerelease tooling no longer ships in the product crate or wheel.
 - New Python integrations need about 40 lines of shared glue and contain only their own prompts and result handling.
 - No consumer parses error text or pins id lists.
 - A missing catalog row is a compile error, and copy-up needs no per-wrapper code.
