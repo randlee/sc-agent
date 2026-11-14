@@ -17,11 +17,12 @@
 Definitions:
 
 - The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum. sc-compose is an external tool, not a dependency of either wheel.
-- The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
+- The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. sc-compose does not enforce it when rendering.
+- `floors.toml` is the file at the repository root that declares the workspace's floors; `[tools].sc-compose` is its sc-compose floor.
 - sc-decidr and sitr are version-locked: they are released together at the same version. Mixed versions are not supported; this is documented, not enforced.
 - The consumer module is the Python file a consumer renders from the consumer template.
 - A feature variable is a template variable that selects a section of the consumer module: `logging` (`general`, `session` or `both`), `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
-- The public API is `send`, `send_batch`, `category`, `retryable`, `ERROR_IDS` and `SagError`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_treesitter` for the sitr section.
+- The public API is `send`, `send_batch`, `category`, `retryable`, `ERROR_IDS`, `SagError` and `CancelToken`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_treesitter` for the sitr section.
 - The logging wiring is the consumer module's code that passes the consumer's general logger and session log to the public API, as the `logging` feature variable selects.
 - The error mapping is the consumer module's code that maps an error to its category with `category`, and that category to a consumer code through a category-to-code map the consumer passes in.
 - The sitr section is the part of the consumer module that runs tree-sitter extraction; its output is passed into the consumer's prompt authoring.
@@ -34,6 +35,7 @@ Definitions:
 - The permitted API is the public API plus the Python standard library.
 - `provider` is the keyword argument of `send` and `send_batch` that forces a provider instead of resolving it from the model selector.
 - The consumer module's header is its leading comment block written by the consumer template.
+- `abort_on` is a runtime argument of the consumer module that selects an abort set: the empty set, {`auth`}, or {`auth`, `quota`}.
 - PyPI is the Python Package Index, pypi.org.
 
 **MUST statements:**
@@ -52,6 +54,11 @@ Definitions:
 - The consumer module MUST import `sc_treesitter` only inside the sitr section.
 - The sitr section MUST stay separate from the decision call.
 - The consumer module MUST call only the permitted API.
+- Every decision call in the consumer module MUST pass a `CancelToken`.
+- The consumer module MUST cancel that `CancelToken` on `KeyboardInterrupt`.
+- `abort_on` MUST have no default; each consumer passes it.
+- The consumer module MUST cancel the remaining batch on the first result whose category is in the `abort_on` set.
+- A CI check MUST fail when the sc-compose minimum differs from `[tools].sc-compose` in `floors.toml`.
 - The public API MUST stay documented in `sc_agent.pyi`.
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
@@ -81,6 +88,9 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 - [ ] The matched release of the released version is installable from PyPI.
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
 - [ ] A rendered module with `sitr` false imports with `sc_treesitter` absent.
+- [ ] One loopback test per `abort_on` set: with the empty set a batch runs to completion past an `auth` failure; with {`auth`} the remaining batch is cancelled after the first `auth` result; with {`auth`, `quota`} it is cancelled after the first `auth` or `quota` result.
+- [ ] A `KeyboardInterrupt` during a rendered module's batch cancels the `CancelToken` passed to its decision call.
+- [ ] Changing `[tools].sc-compose` in `floors.toml` without changing the template's sc-compose minimum makes the CI check fail.
 - [ ] Scanning the rendered modules finds only public-API and standard-library references.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command, and the consumer CI check (regenerate and diff) is documented there.
 

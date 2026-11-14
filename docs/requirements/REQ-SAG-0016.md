@@ -27,7 +27,21 @@ Definitions:
   - `attempts`, the sends made with the first included, a `u32`;
   - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`.
 - Each field MUST be omitted from serialized JSON when it is not set.
-- Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
+- Every leaf variant MUST set the fields this table gives it (`—` means not set):
+
+  | Id | status | attempts | retry_after_ms |
+  | --- | --- | --- | --- |
+  | `http.provider_busy` | `last.status` (exists) | `attempts` | `last.retry_after_ms` |
+  | `http.quota_exhausted` | `reply.status` | `attempts` | `reply.retry_after_ms` |
+  | `http.network` | — | `attempts` | — |
+  | `http.response_too_large` | `status`, `None` when 0 (refused before the status was read) | — | — |
+  | `llm.api_status` | `reply.status` | — | `reply.retry_after_ms` |
+  | `decision.api_bad_request` | 400 | — | — |
+  | `decision.api_validation` | 422 | — | — |
+  | `decision.api_status` | `status` (exists) | — | — |
+  | `decision.response_parse` | `status` | — | — |
+  | `local.probe_status` | `status` | — | — |
+  | `decision.cancelled` | — | `sends` | — |
 - `ErrorId::detail()` MUST remain the only builder of a detail.
 - A level whose catalog rule is `inherit` MUST take all three fields from its cause's detail. A level whose rule is `base` MUST report only its own accessors.
 - The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`, which is the level `category()` uses (REQ-SAG-0017).
@@ -55,7 +69,7 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 
 **Acceptance Criteria:**
 
-- [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
+- [ ] For each leaf row in the table above, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
 - [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields at the top level.
 - [ ] A base-rule level over a cause that has a status reports its own fields only, and `category` comes from the same level.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.

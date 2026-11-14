@@ -90,7 +90,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum the template declares in its front matter, in the skills' form (`requires.cli`, an `sc-compose` entry with `minimum_version`). The minimum is declared, not enforced. sc-compose is an external render tool, not a dependency of either wheel:
+   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum the template declares in its front matter, in the skills' form (`requires.cli`, an `sc-compose` entry with `minimum_version`). sc-compose does not enforce the minimum when rendering; a CI check compares it with `[tools].sc-compose` in `floors.toml`. sc-compose is an external render tool, not a dependency of either wheel:
 
    - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
    - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
@@ -132,21 +132,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - `SagError.status` and `SagError.category` always describe the same reply;
    - each crate's existing test, which checks that `detail()` equals the value built from the accessors, covers all three fields and the copy-up.
 
-   Leaf variants and their fields (`—` means not set):
-
-   | Id | status | attempts | retry_after_ms |
-   | --- | --- | --- | --- |
-   | `http.provider_busy` | `last.status` (exists) | `attempts` | `last.retry_after_ms` |
-   | `http.quota_exhausted` | `reply.status` | `attempts` | `reply.retry_after_ms` |
-   | `http.network` | — | `attempts` | — |
-   | `http.response_too_large` | `status`, `None` when 0 (refused before the status was read) | — | — |
-   | `llm.api_status` | `reply.status` | — | `reply.retry_after_ms` |
-   | `decision.api_bad_request` | 400 | — | — |
-   | `decision.api_validation` | 422 | — | — |
-   | `decision.api_status` | `status` (exists) | — | — |
-   | `decision.response_parse` | `status` | — | — |
-   | `local.probe_status` | `status` | — | — |
-   | `decision.cancelled` | — | `sends` | — |
+   REQ-SAG-0016 lists every leaf variant and the fields it sets.
 
    `decision.schema_mismatch` and `decision.backend` set no fields of their own. `decision.backend` is a wrapper (rule `inherit`) and takes all three fields from its cause through the copy-up. `decision.schema_mismatch` has its own category, `response_invalid`, so it reports only its own fields, all `None`; its reply was 2xx in any case.
 
@@ -272,23 +258,9 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    An id outside the catalog gives `other` and does not raise. Foreign cause ids (`io.*`, `foreign.source`) and newer ids seen by an older wheel are therefore safe. `id in ERROR_IDS` is the membership test.
 
-   **Base categories** (the `error_catalog!` rows). `inherit` is a wrapper whose category is its cause's.
+   REQ-SAG-0017 lists every catalog id with its base category or the `inherit` rule (a wrapper whose category is its cause's).
 
-   | Category | Ids |
-   | --- | --- |
-   | busy | `http.provider_busy` |
-   | quota | `http.quota_exhausted` |
-   | auth | `decidr.no_provider_key`, `secrets.key_missing`, `secrets.key_malformed`, `secrets.keyring_read`, `secrets.keyring_timeout`, `secrets.keyring_construction_refused` |
-   | network | `http.network`, `local.load_timeout` |
-   | response_invalid | `decision.response_parse`, `decision.schema_mismatch`, `http.response_too_large`, `llm.reply_invalid`, `llm.no_text`, `llm.truncated`, `llm.output_not_json`, `decision_llm.answer_ids`, `decision_llm.answer_invalid`, `local.probe_parse` |
-   | validation | `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers` (new), `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
-   | cancelled | `decision.cancelled`, `decidr.signal` |
-   | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
-   | log | `log.*` except `log.invalid_slug` |
-   | other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
-   | inherit | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
-
-   The implementing sprint adds any id that lands on the b stack after this ADR, with a category, in the same table. A missing row fails to compile, so none can be forgotten.
+   The implementing sprint adds any id that lands on the b stack after this ADR, with a category, to that table. A missing row fails to compile, so none can be forgotten.
 
 7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
 
@@ -352,7 +324,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 12. **One Python floor (NFR-SAG-0003).**
 
-    - The Python floor is the minimum declared by `[project].requires-python` in `crates/sc-agent-py/pyproject.toml`; every other place that repeats it is checked against it in CI.
+    - The Python floor is `[python].floor` in `floors.toml` at the repository root, the single source for the workspace's floors. A CI check compares every place that repeats it against it: the pyo3 abi3 features, each wheel's `requires-python`, the wheel-job Python and the consumer template's script header. sc-lint will later enforce `floors.toml` under the check name `floors`.
     - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3) moves from `abi3-py310` to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels already declare.
     - CI builds both wheels and runs their pytest suites on the Python floor; the `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already do.
     - The generated consumer module's script header declares the Python floor as its `requires-python`.
@@ -502,6 +474,21 @@ Deliverables beyond the code:
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
 - The version files listed in decision 4.
+- `floors.toml` at the repository root, the single source for floors, with this shape:
+
+  ```toml
+  schema_version = 1
+  [python]
+  floor = "<the Python floor>"
+  [rust]
+  msrv = "<the workspace rust-version>"
+  [tools]
+  sc-compose = "<the sc-compose minimum>"
+  # optional per-manifest overrides
+  [packages."<manifest dir>"]
+  ```
+
+  `[rust].msrv` records the workspace `rust-version` as its current value. A check of the Rust floor is out of scope for this ADR and is a follow-up. sc-compose#1046 asks sc-compose to take `floors.toml` values as template input and to report a template whose declared sc-compose minimum is not met.
 - sc-decidr 0.2.0 and sitr 0.2.0 on PyPI.
 
 Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope, including plan-anchor dropping its Python 3.9 CI floor.

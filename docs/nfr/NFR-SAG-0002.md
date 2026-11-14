@@ -18,7 +18,7 @@ Definitions: 0.1.0-shaped detail JSON is an `ErrorDetail` serialized by sc-decid
 
 **MUST statements:**
 
-- 0.2.0 MUST deserialize 0.1.0-shaped detail JSON at every cause level, with `status`, `attempts` and `retry_after_ms` unset.
+- Every release from 0.2.0 on MUST deserialize 0.1.0-shaped detail JSON at every cause level, with `status`, `attempts` and `retry_after_ms` unset.
 - A detail with none of those fields set MUST serialize to the bytes 0.1.0 wrote.
 - Moving a catalog id to a different category, or changing the status refinement of REQ-SAG-0017, MUST be released as a breaking version (a minor bump below 1.0) and listed under "Breaking" in the CHANGELOG. Adding a new id with a category is not breaking.
 

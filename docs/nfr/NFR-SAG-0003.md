@@ -16,7 +16,8 @@
 
 Definitions:
 
-- The Python floor is the minimum Python version declared by `[project].requires-python` in `crates/sc-agent-py/pyproject.toml`.
+- `floors.toml` is the file at the repository root that declares the workspace's floors: the minimum versions of Python, Rust and tools.
+- The Python floor is `[python].floor` in `floors.toml`.
 - The wheels are sc-decidr (`crates/sc-agent-py`) and sitr (`crates/sc-treesitter-py`).
 - The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel's stable-ABI tag. The abi3 tag of the Python floor is the `cp3NN-abi3` wheel tag whose `3NN` is the Python floor.
 - The Python binding crates are `crates/sc-agent-py`, `crates/sc-treesitter-py` and `crates/sc-treesitter` (its optional pyo3).
@@ -38,7 +39,7 @@ Definitions:
 
 ### Rationale
 
-At the time of writing the Python floor is 3.11, while pyo3 builds `cp310-abi3` wheels, so the tag claims support the package metadata refuses. One floor, declared in one file and checked everywhere it is repeated, removes that mismatch, lets consumers drop older CI floors, and makes raising the floor a one-line change.
+At the time of writing the Python floor is 3.11, while pyo3 builds `cp310-abi3` wheels, so the tag claims support the package metadata refuses. One floor, declared in `floors.toml` and checked everywhere it is repeated, removes that mismatch, lets consumers drop older CI floors, and makes raising the floor a one-line change.
 
 ### Success Criteria
 

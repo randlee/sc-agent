@@ -17,13 +17,14 @@
 Definitions:
 
 - The send timeout is the deadline for one HTTP send of a decision request: connect, headers and body.
-- The start budget is REQ-SAG-0601's 90 s limit on starting a send, measured from the request's first send.
+- The start budget is REQ-SAG-0601's limit on starting sends, measured from the request's first send.
+- The request-timeout bounds are REQ-SAG-0015's bounds on a request timeout. The `workers` bounds are REQ-SAG-0013's bounds on `workers`. The remote default request timeout is REQ-SAG-0015's default request timeout for remote providers.
 
 **MUST statements:**
 
 - `sc_agent.send`, `sc_agent.send_batch` and `decidr send` MUST accept a per-call send timeout in seconds, `timeout_secs` (`--timeout-secs` on the CLI).
-- `timeout_secs` MUST be a finite number in 10..=3600. It MUST replace the default 120 s, or a local runner's `request_timeout_secs`, for every send of the call. The exception is a load-on-first-request runner: its sends before the first 2xx MUST use the deadline `load_timeout + timeout_secs`.
-- `sc_agent.send_batch` and `decidr send --batch` MUST accept a per-call worker count, `workers` (`--workers` on the CLI). It MUST be an integer in 1..=64.
+- `timeout_secs` MUST be a finite number within the request-timeout bounds. It MUST replace the remote default request timeout, or a local runner's `request_timeout_secs`, for every send of the call. The exception is a load-on-first-request runner: its sends before the first 2xx MUST use the deadline `load_timeout + timeout_secs`.
+- `sc_agent.send_batch` and `decidr send --batch` MUST accept a per-call worker count, `workers` (`--workers` on the CLI). It MUST be an integer within the `workers` bounds.
 - A worker count below or above the configured `workers` within that range MUST be honored.
 - An override MUST apply to its own call only. An absent override MUST mean the configured value.
 - Each override MUST be validated once, in decidr. Python arguments MUST be refused with `SagError`:
@@ -78,4 +79,5 @@ Different callers in one process need different parallelism and different patien
 - REQ-SAG-0701
 - REQ-SAG-0601
 - REQ-SAG-0013
+- REQ-SAG-0015
 - REQ-SAG-0015

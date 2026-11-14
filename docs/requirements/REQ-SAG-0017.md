@@ -25,7 +25,21 @@ Definitions:
 
 - Each variant's id and category rule MUST be written once, in the `error_catalog!` table from which `id()` is generated.
 - A variant with no row MUST fail to compile.
-- Every catalog row MUST have the base category or the `inherit` rule given in ADR-SAG-0019 decision 6.
+- Every catalog row MUST have the base category or the `inherit` rule this table gives it:
+
+  | Category | Ids |
+  | --- | --- |
+  | busy | `http.provider_busy` |
+  | quota | `http.quota_exhausted` |
+  | auth | `decidr.no_provider_key`, `secrets.key_missing`, `secrets.key_malformed`, `secrets.keyring_read`, `secrets.keyring_timeout`, `secrets.keyring_construction_refused` |
+  | network | `http.network`, `local.load_timeout` |
+  | response_invalid | `decision.response_parse`, `decision.schema_mismatch`, `http.response_too_large`, `llm.reply_invalid`, `llm.no_text`, `llm.truncated`, `llm.output_not_json`, `decision_llm.answer_ids`, `decision_llm.answer_invalid`, `local.probe_parse` |
+  | validation | `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers` (new), `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
+  | cancelled | `decision.cancelled`, `decidr.signal` |
+  | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
+  | log | `log.*` except `log.invalid_slug` |
+  | other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
+  | inherit | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
 - `ErrorDetail::category()` MUST:
   - return the category of the deciding level, the first level from the top whose rule is base, which is the level whose fields the top carries (REQ-SAG-0016);
   - refine `llm.api_status`, `decision.api_status` and `local.probe_status` by that level's status:
