@@ -210,6 +210,13 @@ impl ErrorId for DecisionError {
         }
     }
 
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ApiStatus { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
     fn recovery(&self) -> Option<&'static str> {
         match self {
             Self::RequestParse { .. } => Some(

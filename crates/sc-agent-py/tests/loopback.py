@@ -24,10 +24,11 @@ OK_RESPONSE = (
 class Loopback:
     """A runner on 127.0.0.1 in a background thread."""
 
-    def __init__(self, mode: str) -> None:
-        if mode not in ("hang", "error", "ok"):
+    def __init__(self, mode: str, status: int | None = None) -> None:
+        if mode not in ("hang", "error", "ok", "status"):
             raise ValueError(mode)
         self.mode = mode
+        self.status = status
         self.requests: list[dict] = []
         self.started = threading.Event()
         self.release = threading.Event()
@@ -52,7 +53,10 @@ class Loopback:
                 if self.path == "/health":
                     self._reply(200, {"ok": True, "model": MODEL})
                 elif self.path == "/v1/models":
-                    self._reply(200, {"models": [{"name": MODEL, "description": "loopback", "release_date": "2026-09-15"}]})
+                    if loopback.mode == "status":
+                        self._reply(loopback.status, {"detail": "controlled status"})
+                    else:
+                        self._reply(200, {"models": [{"name": MODEL, "description": "loopback", "release_date": "2026-09-15"}]})
                 else:
                     self._reply(404, {"detail": "not found"})
 
@@ -75,6 +79,9 @@ class Loopback:
                     self.send_header("content-length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)
+                    return
+                if loopback.mode == "status":
+                    self._reply(loopback.status, {"detail": "controlled status"})
                     return
                 self._reply(409, FIXED_ERROR)
 

@@ -97,8 +97,9 @@ fn test_detail_is_built_from_the_four_methods() {
         let expected = ErrorDetail {
             id: error.id().to_owned(),
             message: error.message(),
-            recovery: error.recovery().map(std::borrow::Cow::Borrowed),
+            recovery: error.recovery().map(Box::<str>::from),
             cause: error.cause_detail().map(Box::new),
+            status: error.status(),
         };
         assert_eq!(error.detail(), expected, "{}", error.id());
         assert!(error.detail().recovery.is_some(), "{}", error.id());
@@ -127,6 +128,17 @@ fn test_error_detail_serde_roundtrip_and_recovery_omitted() {
     );
     let plain = serde_json::to_value(ErrorDetail::new("x.y", "z", None)).expect("serialize");
     assert_eq!(plain, serde_json::json!({ "id": "x.y", "message": "z" }));
+    let with_status = ErrorDetail::new("http.provider_busy", "busy", None).with_status(429);
+    assert_eq!(
+        serde_json::to_value(&with_status).expect("serialize")["status"],
+        429
+    );
+    assert_eq!(
+        serde_json::from_value::<ErrorDetail>(serde_json::to_value(with_status).unwrap())
+            .unwrap()
+            .status,
+        Some(429)
+    );
     assert_eq!(detail.to_string(), "decision.backend_failed: failed");
 }
 
