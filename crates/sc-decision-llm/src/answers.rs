@@ -3,7 +3,7 @@
 //! A provider's strict mode is not trusted: every rule of the required schema
 //! ([`crate::schema`]) is checked again here. Values pass through unrounded and unchecked for
 //! range or sum (REQ-SAG-0007). Model-written names and values placed in an error message are
-//! cut with [`bounded`] (RSH-002).
+//! redacted of the attached key before being cut with [`bounded`] (RSH-002).
 
 use serde_json::{Map, Value};
 
@@ -32,26 +32,31 @@ impl LlmOutput {
     pub(crate) fn from_value(
         value: Value,
         question_ids: &[&str],
+        redact: &impl Fn(&str) -> String,
     ) -> Result<Self, DecisionLlmError> {
         match value {
             Value::Object(mut object) => match object.remove("answers") {
                 Some(Value::Object(answers)) => Ok(Self { answers }),
-                _ => Err(ids_differ(question_ids, &[])),
+                _ => Err(ids_differ(question_ids, &[], redact)),
             },
-            _ => Err(ids_differ(question_ids, &[])),
+            _ => Err(ids_differ(question_ids, &[], redact)),
         }
     }
 }
 
 /// `AnswerIds`: `missing` are request ids (ours); `extra` are model-written, so at most
 /// [`DecisionLlmError::MAX_LISTED_IDS`] are kept, each bounded, with the full count.
-fn ids_differ(missing: &[&str], extra: &[&str]) -> DecisionLlmError {
+fn ids_differ(
+    missing: &[&str],
+    extra: &[&str],
+    redact: &impl Fn(&str) -> String,
+) -> DecisionLlmError {
     DecisionLlmError::AnswerIds {
         missing: missing.iter().map(|id| (*id).to_owned()).collect(),
         extra: extra
             .iter()
             .take(DecisionLlmError::MAX_LISTED_IDS)
-            .map(|id| bounded(id))
+            .map(|id| bounded(&redact(id)))
             .collect(),
         extra_count: extra.len(),
     }
@@ -72,6 +77,7 @@ fn ids_differ(missing: &[&str], extra: &[&str]) -> DecisionLlmError {
 pub(crate) fn answers(
     request: &SystemOneRequest,
     reply: LlmResponse,
+    redact: &impl Fn(&str) -> String,
 ) -> Result<SystemOneResponse, DecisionLlmError> {
     let LlmResponse {
         model, json, usage, ..
@@ -93,7 +99,7 @@ pub(crate) fn answers(
     let json = json.ok_or_else(|| DecisionLlmError::Invariant {
         message: "the reply has no parsed JSON although Output::Json was asked for".to_owned(),
     })?;
-    let output = LlmOutput::from_value(json, &ids)?;
+    let output = LlmOutput::from_value(json, &ids, redact)?;
     let missing: Vec<&str> = ids
         .iter()
         .copied()
@@ -106,7 +112,7 @@ pub(crate) fn answers(
         .filter(|key| !ids.contains(key))
         .collect();
     if !missing.is_empty() || !extra.is_empty() {
-        return Err(ids_differ(&missing, &extra));
+        return Err(ids_differ(&missing, &extra, redact));
     }
     let mut typed = Vec::with_capacity(ids.len());
     for (id, question) in &request.questions {
@@ -115,7 +121,7 @@ pub(crate) fn answers(
             .get(id)
             .and_then(Value::as_object)
             .ok_or_else(|| invalid(id, "the answer is not an object".to_owned()))?;
-        typed.push((id.clone(), answer(id, question, item)?));
+        typed.push((id.clone(), answer(id, question, item, redact)?));
     }
     Ok(SystemOneResponse::new(
         model,
@@ -162,11 +168,12 @@ fn fields<'a, const N: usize>(
     id: &str,
     item: &'a Map<String, Value>,
     allowed: [&str; N],
+    redact: &impl Fn(&str) -> String,
 ) -> Result<[&'a Value; N], DecisionLlmError> {
     if let Some(extra) = item.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(invalid(
             id,
-            format!("unexpected field `{}`", bounded(extra)),
+            format!("unexpected field `{}`", bounded(&redact(extra))),
         ));
     }
     let mut out = [&Value::Null; N];
@@ -192,6 +199,7 @@ fn probabilities(
     id: &str,
     value: &Value,
     keys: &[String],
+    redact: &impl Fn(&str) -> String,
 ) -> Result<OrderedMap<String, f64>, DecisionLlmError> {
     let object = value
         .as_object()
@@ -201,7 +209,7 @@ fn probabilities(
             id,
             format!(
                 "`probabilities` has `{}`, which is not an option",
-                bounded(extra)
+                bounded(&redact(extra))
             ),
         ));
     }
@@ -226,10 +234,11 @@ fn answer(
     id: &str,
     question: &Question,
     item: &Map<String, Value>,
+    redact: &impl Fn(&str) -> String,
 ) -> Result<Answer, DecisionLlmError> {
     match question {
         Question::Noul { .. } => {
-            let [noul] = fields(id, item, ["noul"])?;
+            let [noul] = fields(id, item, ["noul"], redact)?;
             Ok(Answer::Noul {
                 noul: number(id, "noul", noul)?,
             })
@@ -237,42 +246,45 @@ fn answer(
         Question::Choice { criteria, .. } => {
             let keys: Vec<String> = criteria.iter().map(|(key, _)| key.clone()).collect();
             let [choice, confidence, probs] =
-                fields(id, item, ["choice", "confidence", "probabilities"])?;
+                fields(id, item, ["choice", "confidence", "probabilities"], redact)?;
             let choice = choice
                 .as_str()
                 .ok_or_else(|| invalid(id, "`choice` is not a string".to_owned()))?;
             if !keys.iter().any(|key| key == choice) {
                 return Err(invalid(
                     id,
-                    format!("choice `{}` is not one of the criteria", bounded(choice)),
+                    format!(
+                        "choice `{}` is not one of the criteria",
+                        bounded(&redact(choice))
+                    ),
                 ));
             }
             Ok(Answer::Choice {
                 choice: choice.to_owned(),
                 confidence: number(id, "confidence", confidence)?,
-                probabilities: probabilities(id, probs, &keys)?,
+                probabilities: probabilities(id, probs, &keys, redact)?,
             })
         }
         Question::Score { criteria, .. } => {
             let keys = score_keys(criteria.len());
             let [score, confidence, probs] =
-                fields(id, item, ["score", "confidence", "probabilities"])?;
+                fields(id, item, ["score", "confidence", "probabilities"], redact)?;
             Ok(Answer::Score {
                 score: number(id, "score", score)?,
                 confidence: number(id, "confidence", confidence)?,
                 legend: ordered(keys.iter().cloned().zip(criteria.iter().cloned()).collect())?,
-                probabilities: probabilities(id, probs, &keys)?,
+                probabilities: probabilities(id, probs, &keys, redact)?,
             })
         }
         Question::Box { .. } => {
-            let [edges, confidence] = fields(id, item, ["box", "confidence"])?;
+            let [edges, confidence] = fields(id, item, ["box", "confidence"], redact)?;
             let edges = edges
                 .as_object()
                 .ok_or_else(|| invalid(id, "`box` is not an object".to_owned()))?;
             if let Some(extra) = edges.keys().find(|key| !EDGES.contains(&key.as_str())) {
                 return Err(invalid(
                     id,
-                    format!("`box` has unexpected `{}`", bounded(extra)),
+                    format!("`box` has unexpected `{}`", bounded(&redact(extra))),
                 ));
             }
             let edge = |name: &str| {

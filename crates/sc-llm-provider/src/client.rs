@@ -1,5 +1,6 @@
 //! [`LlmClient`]: sans-IO encode and decode of one LLM call, and [`Wire`].
 
+use std::borrow::Cow;
 use std::fmt;
 
 use sc_agent_http::{Endpoint, HttpError, HttpRequest, HttpResponse, Method, ProviderReply};
@@ -118,6 +119,13 @@ impl fmt::Debug for LlmClient {
 }
 
 impl LlmClient {
+    /// Replace this client's attached key in error or log text, keeping every other byte.
+    /// Downstream adapters use this for errors produced after decoding the provider reply.
+    #[must_use]
+    pub fn redact_text<'a>(&self, text: &'a str) -> Cow<'a, str> {
+        self.key.redact_text(text)
+    }
+
     /// A client for `provider` at its built-in endpoint, with no logger.
     ///
     /// # Errors
@@ -337,7 +345,8 @@ impl LlmClient {
         };
         let mut fields = Map::new();
         fields.insert("provider".to_owned(), self.provider.as_str().into());
-        let (model, cut) = bounded(&envelope.model, MAX_LOGGED_MODEL_BYTES);
+        let redacted_model = self.redact_text(&envelope.model);
+        let (model, cut) = bounded(&redacted_model, MAX_LOGGED_MODEL_BYTES);
         fields.insert("model".to_owned(), model.into());
         if cut {
             fields.insert("model_truncated".to_owned(), true.into());
