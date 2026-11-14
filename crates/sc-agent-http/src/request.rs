@@ -6,6 +6,7 @@
 
 use std::fmt;
 use std::net::IpAddr;
+use std::ops::Range;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -157,6 +158,11 @@ impl fmt::Debug for SecretHeader {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Endpoint {
     url: String,
+    scheme: &'static str,
+    // Ranges into the immutable URL preserve spelling without copying its parts.
+    host: Range<usize>,
+    path: Range<usize>,
+    loopback: bool,
 }
 
 /// Which schemes a parse accepts.
@@ -211,8 +217,35 @@ impl Endpoint {
         if uri.host().is_none_or(str::is_empty) {
             return Err(invalid("the URL has no host".to_owned()));
         }
+        let scheme = if scheme == Some("http") {
+            "http"
+        } else {
+            "https"
+        };
+        let authority_start = scheme.len() + 3;
+        let rest = url.get(authority_start..).unwrap_or_default();
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        let (authority, tail) = rest.split_at_checked(end).unwrap_or((rest, ""));
+        let host_port = authority
+            .rsplit_once('@')
+            .map_or(authority, |(_, host)| host);
+        let host_len = if host_port.starts_with('[') {
+            host_port.find(']').map_or(host_port.len(), |end| end + 1)
+        } else {
+            host_port.find(':').unwrap_or(host_port.len())
+        };
+        let host_start = authority_start + authority.len() - host_port.len();
+        let host = host_start..host_start + host_len;
+        let path_start = authority_start + end;
+        let path_len = tail.find(['?', '#']).unwrap_or(tail.len());
+        let path = path_start..path_start + path_len;
+        let loopback = is_loopback_host(url.get(host.clone()).unwrap_or_default());
         Ok(Self {
             url: url.to_owned(),
+            scheme,
+            host,
+            path,
+            loopback,
         })
     }
 
@@ -239,61 +272,48 @@ impl Endpoint {
     /// ```
     #[must_use]
     pub fn log_form(&self) -> String {
-        let parts = self.parts();
-        format!("{}://{}{}", parts.scheme, parts.host, parts.path)
+        format!(
+            "{}://{}{}",
+            self.scheme,
+            self.host(),
+            self.url.get(self.path.clone()).unwrap_or_default()
+        )
     }
 
     /// The host without port or userinfo (IPv6 in brackets): the
     /// [`ProviderPause`](crate::ProviderPause) key.
     #[must_use]
     pub fn host(&self) -> &str {
-        self.parts().host
+        self.url.get(self.host.clone()).unwrap_or_default()
     }
 
     /// Scheme is http (only [`Self::parse_local`] can produce one).
     #[must_use]
     pub fn is_plain_http(&self) -> bool {
-        self.parts().scheme == "http"
+        self.scheme == "http"
     }
 
     /// Host is `localhost`, an IPv4 address in 127.0.0.0/8, or `::1`
     /// (parsed with `std::net`, no DNS lookup).
     #[must_use]
     pub fn is_loopback(&self) -> bool {
-        let host = self.host();
-        if host.eq_ignore_ascii_case("localhost") {
-            return true;
-        }
-        let bare = host
-            .strip_prefix('[')
-            .and_then(|inner| inner.strip_suffix(']'))
-            .unwrap_or(host);
-        match IpAddr::from_str(bare) {
-            Ok(IpAddr::V4(address)) => address.is_loopback(),
-            Ok(IpAddr::V6(address)) => address == std::net::Ipv6Addr::LOCALHOST,
-            Err(_) => false,
-        }
+        self.loopback
     }
+}
 
-    /// Scheme, host and path of the URL text (validated at parse).
-    fn parts(&self) -> UrlParts<'_> {
-        let text = self.url.as_str();
-        let (scheme, rest) = text.split_once("://").unwrap_or(("", text));
-        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-        let (authority, tail) = rest.split_at_checked(end).unwrap_or((rest, ""));
-        let host_port = authority
-            .rsplit_once('@')
-            .map_or(authority, |(_, host)| host);
-        let host = if host_port.starts_with('[') {
-            host_port
-                .split_once(']')
-                .and_then(|(inner, _)| host_port.get(..=inner.len()))
-                .unwrap_or(host_port)
-        } else {
-            host_port.split(':').next().unwrap_or(host_port)
-        };
-        let path = tail.split(['?', '#']).next().unwrap_or("");
-        UrlParts { scheme, host, path }
+/// Classify a validated host once, without DNS lookup.
+fn is_loopback_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    let bare = host
+        .strip_prefix('[')
+        .and_then(|inner| inner.strip_suffix(']'))
+        .unwrap_or(host);
+    match IpAddr::from_str(bare) {
+        Ok(IpAddr::V4(address)) => address.is_loopback(),
+        Ok(IpAddr::V6(address)) => address == std::net::Ipv6Addr::LOCALHOST,
+        Err(_) => false,
     }
 }
 
@@ -340,13 +360,6 @@ const CREDENTIAL_HEADERS: [&str; 6] = [
     "x-goog-api-key",
     "cookie",
 ];
-
-/// Borrowed pieces of an [`Endpoint`] URL.
-struct UrlParts<'a> {
-    scheme: &'a str,
-    host: &'a str,
-    path: &'a str,
-}
 
 impl fmt::Display for Endpoint {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -668,6 +681,54 @@ mod tests {
                 .log_form(),
             "http://[::1]/x"
         );
+    }
+
+    #[test]
+    fn cached_endpoint_components_preserve_url_spelling_and_log_privacy() {
+        for (url, host, log, plain, loopback) in [
+            (
+                "https://u:p@Api.Example.test:8443/a/b?key=SECRET#tail",
+                "Api.Example.test",
+                "https://Api.Example.test/a/b",
+                false,
+                false,
+            ),
+            (
+                "http://u:p@[::1]:8080?key=SECRET#tail",
+                "[::1]",
+                "http://[::1]",
+                true,
+                true,
+            ),
+            (
+                "https://host.test#fragment",
+                "host.test",
+                "https://host.test",
+                false,
+                false,
+            ),
+            (
+                "https://host.test",
+                "host.test",
+                "https://host.test",
+                false,
+                false,
+            ),
+            (
+                "http://LocalHost:80/path/",
+                "LocalHost",
+                "http://LocalHost/path/",
+                true,
+                true,
+            ),
+        ] {
+            let endpoint = Endpoint::parse_local(url).expect("endpoint").clone();
+            assert_eq!(endpoint.as_str(), url);
+            assert_eq!(endpoint.host(), host);
+            assert_eq!(endpoint.log_form(), log);
+            assert_eq!(endpoint.is_plain_http(), plain);
+            assert_eq!(endpoint.is_loopback(), loopback);
+        }
     }
 
     #[test]
