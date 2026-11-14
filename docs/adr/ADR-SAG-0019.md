@@ -1,7 +1,7 @@
-# Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, an error catalog with chain categories, and per-call limits
+# Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, an error catalog with chain categories, per-call limits and a generated consumer module
 
 **Status:** Proposed  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
@@ -21,6 +21,8 @@
 - REQ-SAG-0017: Every error id is in one catalog with a category, computed over the cause chain (new)
 - REQ-SAG-0702: A send or batch call may override the send timeout and the worker count for that call only (new)
 - NFR-SAG-0002: Error detail JSON written by 0.1.0 still reads in 0.2.0 (new)
+- REQ-SAG-0018: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel (new)
+- NFR-SAG-0003: Python 3.11 is the floor for sc-agent's wheels and their consumers (new)
 - REQ-SAG-0007: No rounding of returned values; amended here so it covers decision values, which makes `retry_after_ms` a permitted transport hint
 - REQ-SAG-0002: Errors carried from bottom to top (unchanged; this ADR only adds detail)
 - REQ-SAG-0601, REQ-SAG-0602: Busy resend and quota, the sources of the status, send count and Retry-After
@@ -36,7 +38,7 @@ sc-decidr is the one harness through which sc-agent's Python consumers reach dec
 - judge-jev, a stack of more than 20 layers;
 - plan-anchor, PR plan-anchor#90.
 
-Their integration code should be identical. They should differ only in prompt authoring and in processing results and decision trees. Comparing the two showed that each rebuilt the wheel boundary on its own, and that the two copies diverged:
+**Owner requirement:** judge-jev, plan-anchor and every later Python consumer have identical integration for errors, API keys, model selection (the jev, haiku, luna, decider and laya alternates), the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees. Comparing the two showed that each rebuilt the wheel boundary on its own, and that the two copies diverged:
 
 - **Errors.**
   - judge-jev pins the 0.1.0 id list and maps by id and `status`, falling back to `JEV.UNMAPPED`.
@@ -78,12 +80,16 @@ Every consumer concern except prompt authoring and result interpretation belongs
 | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
 | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-The integration recipe, written into `crates/sc-agent-py/README.md` as a "Consumer integration" section, is short. It covers:
+**The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module:
 
-- the call;
-- reading `line["response"]` or `line["error"]`;
-- `category(line["error"])` for errors;
-- `SagError` for command errors.
+- **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
+- **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
+- **Versioning.** The template ships inside the sc-decidr wheel as package data, so its version is the installed wheel's by construction. The wheel moves to maturin's mixed layout (`python-source`, the native module re-exported by `sc_agent/__init__.py`, so `import sc_agent` is unchanged) to carry the file. The generated file's header records the sc-decidr version, and the sitr version when the sitr section is on. On import the module raises `RuntimeError` naming both versions when either differs from the installed one.
+- **Feature variables.** Features are chosen only by template variables: `logging` (`general`, `session` or `both`), `models` and `sitr` (`true` or `false`). The same variables give byte-identical code.
+- **Consumer CI.** Consumer CI renders the file again and diffs it, so any hand edit fails.
+- **README.** `crates/sc-agent-py/README.md` keeps a short pointer to the template, with the render command and the CI check.
+
+**The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `ERROR_IDS` and `SagError` remain public and documented. The generated code uses only them and the standard library, and nothing is reachable only through generated code. A sc-agent test renders the template with every feature combination and runs each result against the loopback runner.
 
 The wheel also ships a `sc_agent.pyi` type stub, so consumers get signatures and field names without reading Rust.
 
@@ -174,10 +180,10 @@ The Rust change breaks SemVer:
 
 The crates are published on crates.io (`release/publish-artifacts.toml`). Below 1.0 a minor bump is the breaking bump, so `^0.1` dependents are not moved silently, and a 0.1.1 would break them. For Python the change only adds things, except the batch return order (decision 8), which the CHANGELOG states.
 
-Every crate on the workspace version moves to 0.2.0, sc-treesitter and sitr included. They have no functional change, but one version gives one tag. sc-treesitter-py keeps its own version, because it is a separate wheel and is unchanged. The files to bump are:
+Everything on the sc-agent release version moves from 0.1.5 to 0.2.0: every workspace crate, sc-treesitter and sitr included, and both wheels. sc-decidr and sitr are pinned to the same sc-agent release, so one version gives one tag and one pin. The files to bump are:
 
 - `Cargo.toml` (`[workspace.package]`);
-- `crates/sc-agent-py/Cargo.toml` and `pyproject.toml`, whose literal 0.1.0 becomes 0.2.0;
+- `crates/sc-agent-py/Cargo.toml` and `pyproject.toml`, and `crates/sc-treesitter-py/Cargo.toml` and `pyproject.toml`, whose literal 0.1.5 becomes 0.2.0;
 - `Cargo.lock`;
 - `fixtures/cli/decidr-cli-model.json` and the generated CLI docs (`scripts/generate-cli-docs.sh`), which also change because of the new flags.
 
@@ -328,6 +334,18 @@ Before 0.2.0 freezes the catalog, the module and both Python functions move out 
 
 Consumers map categories to their own codes, so moving an id to a different category, or changing the status refinement, is a breaking change and needs a breaking version bump (a minor bump below 1.0). Adding an id with a category is not breaking. NFR-SAG-0002 records this.
 
+#### 11. sitr is an optional, separate section of the consumer template
+
+sitr is published on PyPI (package `sitr`, module `sc_treesitter`) and on crates.io (`sitr`), first as 0.1.0, with wheels for the same six platforms as sc-decidr. It is pinned to the same sc-agent release as sc-decidr (decision 4).
+
+The template's sitr section is kept separate from the decidr call: tree-sitter extraction runs outside the decision path, and its output is passed into the consumer's prompt authoring. In this phase the section only imports `sc_treesitter` lazily, inside the section, and one offline test shows extraction output from a checked-in source file reaching a dry-run request. It is not used beyond that yet.
+
+#### 12. Python 3.11 is the floor (NFR-SAG-0003)
+
+- pyo3 `abi3-py310` becomes `abi3-py311` in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3), so the wheel tag matches the `requires-python >=3.11` both wheels already declare.
+- CI builds both wheels and runs their pytest suites on 3.11. The `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already use 3.11; this decision keeps 3.11 as the tested floor.
+- The generated consumer module's script header declares `requires-python = ">=3.11"`.
+
 ### Tests (written with the implementation)
 
 - **Fields.** For every leaf row in decision 2:
@@ -382,13 +400,20 @@ Consumers map categories to their own codes, so moving an id to a different cate
     - a ManualClock Rust test with `timeout_secs` above 90 s showing the send is not cut.
 - **Isolation.** A call with overrides followed by a call without them shows the second uses the configured values.
 - **Order.** `send_batch` returns its list in input order while `on_result` sees finish order.
+- **Consumer template (REQ-SAG-0018).**
+  - Every feature combination renders and runs against the loopback runner: success, error-to-code mapping, session-log records and general-logger events.
+  - Rendering twice gives byte-identical files.
+  - A version mismatch raises `RuntimeError` on import.
+  - The sitr offline test: extraction from a checked-in source file reaches a dry-run request; with `sitr` false the module imports without `sc_treesitter`.
+  - The rendered modules reference only the public API and the standard library.
+- **Python floor (NFR-SAG-0003).** Both built wheels are tagged `cp311-abi3`.
 - **Compatibility (NFR-SAG-0002).** A checked-in 0.1.0 detail JSON with a two-level chain:
   - deserializes with every new field `None`;
   - serializes back to the original bytes.
 
 ### Delivery
 
-The work lands on `integrate/phase-b` through the b stack, as phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. Deliverables beyond the code:
+The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits, in phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. This includes the consumer template and its tests, the abi3 and CI changes, and the CHANGELOG. Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor can delete:
   - the pinned id lists;
@@ -397,20 +422,21 @@ The work lands on `integrate/phase-b` through the b stack, as phase b sprints th
   - the `recoverable` lookup;
   - the `--timeout` refusal and the ignored `--max-workers`;
   - the `provider="typesafe"` pin;
-  - the result re-sorting.
-- The "Consumer integration" section of `crates/sc-agent-py/README.md`.
+  - the result re-sorting;
+  - their hand-written integration glue, replaced by the rendered consumer module, with the render command and the CI regenerate-and-diff check.
+- The consumer template, `sc_agent/templates/consumer.py.j2`, and the README pointer to it.
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
 - The version files listed in decision 4.
 
-Changes inside judge-jev and plan-anchor are out of scope.
+Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope, including plan-anchor dropping its Python 3.9 CI floor.
 
 ### Consequences
 
 **Positive:**
 
 - Prerelease tooling no longer ships in the product crate or wheel.
-- New Python integrations need about 40 lines of shared glue and contain only their own prompts and result handling.
+- Every Python consumer renders the same integration module from the installed wheel and contains only its own prompts and result handling; a hand edit or a version skew fails CI or import.
 - No consumer parses error text or pins id lists.
 - A missing catalog row is a compile error, and copy-up needs no per-wrapper code.
 - `#[non_exhaustive]` on `ErrorDetail`, `ErrorCategory` and `CallLimits` makes future additions non-breaking.
@@ -423,3 +449,5 @@ Changes inside judge-jev and plan-anchor are out of scope.
   - `send_with_timeout` becomes `send_with`.
 - `id()` moves into the macro across 12 enums, which is a one-time mechanical diff.
 - The order of the list `send_batch` returns changes, as the CHANGELOG states.
+- The wheel moves to maturin's mixed layout to carry the template; `import sc_agent` is unchanged.
+- Python 3.10 users lose the wheel; `requires-python` already excluded them.
