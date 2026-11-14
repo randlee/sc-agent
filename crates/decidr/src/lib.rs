@@ -21,7 +21,7 @@
 #![warn(missing_docs)]
 
 pub mod input;
-pub mod integration_gate;
+mod integration_gate;
 pub mod output;
 pub mod signal;
 
@@ -33,6 +33,8 @@ mod select;
 pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
 #[doc(inline)]
 pub use error::DecidrError;
+#[doc(inline)]
+pub use integration_gate::{integration_cases, validate_integration_results};
 #[doc(inline)]
 pub use select::{
     Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,
