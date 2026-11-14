@@ -54,28 +54,28 @@ needs = ["verify_assets"]
 [[steps]]
 id = "typesafe_invalid_key_cli"
 title = "Live typesafe-invalid-key-cli for {{run_id}}"
-description = "Run scripts/integration/run.py --case typesafe-invalid-key-cli; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication."
+description = "Run scripts/integration/run.py --case typesafe-invalid-key-cli; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication. Expected authentication cause chain: decision.api_status."
 type = "task"
 needs = ["verify_assets"]
 
 [[steps]]
 id = "typesafe_invalid_key_wheel"
 title = "Live typesafe-invalid-key-wheel for {{run_id}}"
-description = "Run scripts/integration/run.py --case typesafe-invalid-key-wheel; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication."
+description = "Run scripts/integration/run.py --case typesafe-invalid-key-wheel; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication. Expected authentication cause chain: decision.api_status."
 type = "task"
 needs = ["verify_assets"]
 
 [[steps]]
 id = "anthropic_invalid_key_cli"
 title = "Live anthropic-invalid-key-cli for {{run_id}}"
-description = "Run scripts/integration/run.py --case anthropic-invalid-key-cli; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication."
+description = "Run scripts/integration/run.py --case anthropic-invalid-key-cli; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication. Expected authentication cause chain: decision.backend -> decision_llm.llm -> llm.api_status."
 type = "task"
 needs = ["verify_assets"]
 
 [[steps]]
 id = "anthropic_invalid_key_wheel"
 title = "Live anthropic-invalid-key-wheel for {{run_id}}"
-description = "Run scripts/integration/run.py --case anthropic-invalid-key-wheel; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication."
+description = "Run scripts/integration/run.py --case anthropic-invalid-key-wheel; persist its sanitized PASS, FAIL or SKIP result. SKIP never passes publication. Expected authentication cause chain: decision.backend -> decision_llm.llm -> llm.api_status."
 type = "task"
 needs = ["verify_assets"]
 
