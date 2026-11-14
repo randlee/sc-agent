@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -22,7 +23,17 @@ class Refusal(Exception):
 
 
 def command(args, *, cwd=ROOT):
-    result = subprocess.run(args, cwd=cwd, check=True, text=True, capture_output=True)
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    result = subprocess.run(
+        args,
+        cwd=cwd,
+        check=True,
+        text=True,
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        timeout=60,
+        env=env,
+    )
     return result.stdout.strip()
 
 
