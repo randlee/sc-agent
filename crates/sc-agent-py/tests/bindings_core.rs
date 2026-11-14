@@ -89,7 +89,7 @@ fn invalid_keyring_overrides_do_not_construct_a_backend() {
 #[test]
 fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() -> Result<(), String> {
     let calls = Arc::new(Mutex::new(Vec::new()));
-    let keyring = with_factory(
+    let (provider, keyring) = with_factory(
         Some("typesafe"),
         Some("service"),
         Some("account"),
@@ -102,8 +102,9 @@ fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() -> Result<
             ))
         },
     )
-    .map_err(|error| format!("{error:?}"))?
-    .ok_or("expected keyring override")?;
+    .map_err(|error| format!("{error:?}"))?;
+    assert_eq!(provider, Some(Provider::TypeSafe));
+    let keyring = keyring.ok_or("expected keyring override")?;
     keyring
         .password(sc_agent_secrets::TYPESAFE_API_KEY, "os-user")
         .map_err(|error| error.to_string())?;
@@ -120,5 +121,16 @@ fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() -> Result<
             ),
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn no_keyring_override_leaves_provider_parsing_to_send_options() -> Result<(), String> {
+    let (provider, keyring) = with_factory(Some("anthropic"), None, None, |_, _| {
+        Arc::new(RecordingKeyring(Arc::new(Mutex::new(Vec::new()))))
+    })
+    .map_err(|error| format!("{error:?}"))?;
+    assert_eq!(provider, None);
+    assert!(keyring.is_none());
     Ok(())
 }
