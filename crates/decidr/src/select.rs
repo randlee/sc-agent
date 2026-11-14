@@ -19,8 +19,8 @@ use sc_agent_http::{
 };
 use sc_agent_log::{GeneralLogger, Level, LogError, Repo, SessionIdentity, SessionLogger, Slug};
 use sc_agent_secrets::{
-    EnvSource, KeySources, KeyringSource, PlatformKeyring, ResolvedKey, SecretsError, resolve,
-    resolve_var,
+    DeferredPlatformKeyring, EnvSource, KeySources, KeyringSource, ResolvedKey, SecretsError,
+    resolve, resolve_var,
 };
 use sc_agent_types::{
     CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
@@ -280,7 +280,7 @@ impl<'c> Keys<'c> {
             keyring: context
                 .keyring
                 .clone()
-                .unwrap_or_else(|| Arc::new(PlatformKeyring)),
+                .unwrap_or_else(|| Arc::new(DeferredPlatformKeyring)),
         })
     }
 

@@ -39,8 +39,50 @@ pub trait KeyringSource: Send + Sync {
 /// providers cost one wait, and at most one thread is stranded. A reader
 /// thread that fails or panics is [`SecretsError::KeyringRead`]; the panic is
 /// not propagated.
+#[derive(Debug, Clone, Copy)]
+pub struct PlatformKeyring {
+    _private: (),
+}
+
+impl PlatformKeyring {
+    /// Constructs the real OS keyring backend.
+    ///
+    /// Test builds with `test-keyring-guard`, and Python test runs setting
+    /// `SC_AGENT_TEST_TRAP_PLATFORM_KEYRING`, refuse construction before any
+    /// OS keyring call can occur.
+    #[must_use]
+    #[allow(clippy::panic)] // Intentional test tripwire; it must fail before OS access.
+    pub fn new() -> Self {
+        #[cfg(feature = "test-keyring-guard")]
+        panic!("PlatformKeyring construction is forbidden in guarded test builds");
+
+        #[cfg(not(feature = "test-keyring-guard"))]
+        {
+            assert_ne!(
+                std::env::var_os("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING").as_deref(),
+                Some(std::ffi::OsStr::new("1")),
+                "PlatformKeyring construction is forbidden during tests"
+            );
+            Self { _private: () }
+        }
+    }
+}
+
+impl Default for PlatformKeyring {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Defers constructing the OS backend until a secret lookup actually needs it.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct PlatformKeyring;
+pub struct DeferredPlatformKeyring;
+
+impl KeyringSource for DeferredPlatformKeyring {
+    fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError> {
+        PlatformKeyring::new().password(service, account)
+    }
+}
 
 /// Longest a platform keyring read may take.
 ///
@@ -301,6 +343,12 @@ mod tests {
     use sc_agent_types::ErrorId;
 
     use super::*;
+
+    #[cfg(feature = "test-keyring-guard")]
+    #[test]
+    fn test_build_traps_real_platform_keyring_construction() {
+        assert!(std::panic::catch_unwind(PlatformKeyring::new).is_err());
+    }
 
     /// REQ-SAG-0002 0.2.0: a keyring failure keeps the keyring's own error whole as its
     /// cause (`keyring.<kind>` and the keyring's message); this layer only adds its label.

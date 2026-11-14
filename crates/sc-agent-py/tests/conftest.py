@@ -48,6 +48,9 @@ def env(tmp_path, monkeypatch, request):
     for name in list(os.environ):
         if name.startswith("SC_AGENT__") or name.endswith("_API_KEY"):
             monkeypatch.delenv(name)
+    # The extension and child CLI inherit this trap. Any real OS keyring
+    # backend construction during Python tests fails before contacting it.
+    monkeypatch.setenv("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
     log_root = _write_config(tmp_path, loopback.port, max_sends=1 if status is not None else None)
     try:
         yield loopback, log_root
@@ -57,6 +60,9 @@ def env(tmp_path, monkeypatch, request):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "mode(name): loopback runner mode, hang or error")
+    # Applies during collection and to every test, including those that do
+    # not request the per-test env fixture. Child CLI processes inherit it.
+    os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] = "1"
 
 
 @pytest.fixture

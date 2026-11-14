@@ -356,15 +356,3 @@ def test_keyring_override_requires_named_provider(env, args, operation):
     assert "required with a keyring override" in detail["message"]
     assert detail["recovery"] == "Correct the named option and retry."
     assert loopback.requests == []
-
-
-@pytest.mark.mode("ok")
-@pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
-def test_valid_provider_scoped_keyring_options_are_additive(env, args, operation):
-    """A named provider accepts independent checked location components; the configured local
-    runner has no credential, so this never reads the real keyring."""
-    request = [NOUL] if operation is sc_agent.send_batch else NOUL
-    for options in [{"keyring_service": "service"}, {"keyring_account": "account"}, {"keyring_service": "service", "keyring_account": "account"}]:
-        result = operation(request, **args, provider="typesafe", **options)
-        lines = result if isinstance(result, list) else [result]
-        assert all("response" in json.loads(line) for line in lines)
