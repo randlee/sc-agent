@@ -134,3 +134,14 @@ Build and install both wheels into a Python 3.11 environment and install
 histories; their fixture PASS records are parser/composition tests and are never
 live acceptance evidence. The workspace logging test `forty_thousand_sessions`
 retains the NFR-SAG-0001 capacity check.
+
+### B-1 sprint requirements and capacity evidence
+
+The committed [B-1 sprint requirements list](b-1-sprint-requirements.md) includes
+NFR-SAG-0001 and mirrors the requirement IDs on sprint bead `agt-b-1`.
+
+Workspace test evidence: `cargo test --workspace --all-features` passed at source
+commit `e9998349859efa8d4c754bf0b6ed044c91819fc8`. In `sc-agent-log`'s
+`tests/session.rs`, `forty_thousand_sessions` passed; the target reported 4
+passed, 0 failed, 0 ignored in 1.60 s. The test asserted 40,000 log rows and
+40,000 distinct session IDs.
