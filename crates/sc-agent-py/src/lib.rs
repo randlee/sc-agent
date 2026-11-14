@@ -401,7 +401,7 @@ fn send_options(
     model: &str,
     project: &str,
     agent_role: &str,
-    provider: Option<&str>,
+    provider: ProviderOption<'_>,
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
@@ -412,7 +412,7 @@ fn send_options(
     probe.config_dir = config_dir.clone();
     let config = load_config(&probe)?;
     let model = ModelSelector::parse(model, &config)?;
-    let provider = provider.map(str::parse::<Provider>).transpose()?;
+    let provider = provider.parse()?;
     let context = context(general_log, config_dir)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
@@ -433,6 +433,20 @@ fn send_options(
         options.session = Some(session_logger(&options)?);
     }
     Ok(options)
+}
+
+enum ProviderOption<'a> {
+    Text(Option<&'a str>),
+    Parsed(Provider),
+}
+
+impl ProviderOption<'_> {
+    fn parse(self) -> Result<Option<Provider>, sc_agent_types::TypesError> {
+        match self {
+            Self::Text(provider) => provider.map(str::parse::<Provider>).transpose(),
+            Self::Parsed(provider) => Ok(Some(provider)),
+        }
+    }
 }
 
 /// Closes the loggers of an operation on the worker thread, after the operation, so every
@@ -463,7 +477,7 @@ fn keyring_override(
     provider: Option<&str>,
     service: Option<&str>,
     account: Option<&str>,
-) -> PyResult<Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>> {
+) -> PyResult<keyring_options::PreparedKeyring> {
     use sc_agent_secrets::{DeferredPlatformKeyring, ProviderKeyring};
     keyring_options::with_factory(provider, service, account, |provider, location| {
         Arc::new(ProviderKeyring::new(
@@ -522,7 +536,8 @@ fn send(
         .map(decidr::RequestTimeout::from_secs)
         .transpose()
         .map_err(|error| sag_error(&error))?;
-    let keyring = keyring_override(provider, keyring_service, keyring_account)?;
+    let (parsed_provider, keyring) = keyring_override(provider, keyring_service, keyring_account)?;
+    let provider = parsed_provider.map_or(ProviderOption::Text(provider), ProviderOption::Parsed);
     // The request is checked before any logger opens, so a refused one writes no file.
     let images = images.unwrap_or_default().into_iter().collect();
     let request = build_request_bytes(request.as_bytes(), images, long_context, None)
@@ -601,7 +616,8 @@ fn send_batch(
         .map(decidr::RequestTimeout::from_secs)
         .transpose()
         .map_err(|error| sag_error(&error))?;
-    let keyring = keyring_override(provider, keyring_service, keyring_account)?;
+    let (parsed_provider, keyring) = keyring_override(provider, keyring_service, keyring_account)?;
+    let provider = parsed_provider.map_or(ProviderOption::Text(provider), ProviderOption::Parsed);
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
     let mut options = send_options(

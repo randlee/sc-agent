@@ -491,7 +491,7 @@ fn assert_no_secret(error: &SecretsError, secret: &str) {
 /// Location components default independently, and overrides never reach another provider.
 #[test]
 fn checked_keyring_locations_are_independent_and_provider_scoped() {
-    use sc_agent_secrets::{KeyringLocation, ProviderKeyring};
+    use sc_agent_secrets::{KeyringAccount, KeyringLocation, KeyringService, ProviderKeyring};
     use std::sync::Arc;
     for (service, account) in [
         (None, None),
@@ -500,11 +500,11 @@ fn checked_keyring_locations_are_independent_and_provider_scoped() {
         (Some("custom-service"), Some("custom-user")),
     ] {
         let ring = Arc::new(MapKeyring::default());
-        let wrapped = ProviderKeyring::new(
-            Provider::TypeSafe,
-            KeyringLocation::new(service, account).unwrap(),
-            ring.clone(),
+        let location = KeyringLocation::new(
+            service.map(|value| KeyringService::new(value).unwrap()),
+            account.map(|value| KeyringAccount::new(value).unwrap()),
         );
+        let wrapped = ProviderKeyring::new(Provider::TypeSafe, location, ring.clone());
         wrapped
             .password(env_var(Provider::TypeSafe), "os-user")
             .unwrap();
@@ -526,16 +526,17 @@ fn checked_keyring_locations_are_independent_and_provider_scoped() {
         );
     }
     for value in ["".to_owned(), "a".repeat(256), "é".repeat(128)] {
-        for (service, account, option) in [
-            (Some(value.as_str()), None, "keyring_service"),
-            (None, Some(value.as_str()), "keyring_account"),
-        ] {
-            let error = KeyringLocation::new(service, account).unwrap_err();
+        for option in ["keyring_service", "keyring_account"] {
+            let error = match option {
+                "keyring_service" => KeyringService::new(value.as_str()).unwrap_err(),
+                _ => KeyringAccount::new(value.as_str()).unwrap_err(),
+            };
             assert_eq!(error.id(), "secrets.invalid_location");
             assert!(error.message().contains(option));
             assert!(error.message().contains("255"));
             assert!(!format!("{error:?}").contains(&value) || value.is_empty());
         }
     }
-    assert!(KeyringLocation::new(Some(&"a".repeat(255)), Some(&"é".repeat(127))).is_ok());
+    assert!(KeyringService::new(&"a".repeat(255)).is_ok());
+    assert!(KeyringAccount::new(&"é".repeat(127)).is_ok());
 }

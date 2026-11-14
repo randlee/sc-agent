@@ -41,4 +41,4 @@ pub use vars::{
 };
 
 #[doc(inline)]
-pub use location::{KeyringLocation, ProviderKeyring};
+pub use location::{KeyringAccount, KeyringLocation, KeyringService, ProviderKeyring};
