@@ -1,11 +1,12 @@
 # Decision: First release surfaces via sc-publish
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-11  
-**Last Updated:** 2026-11-11  
+**Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-11  
+**Revision:** 0.2.0 (2026-11-14, owner-approved): record the current PyPI distributions from owner commit [a6fca64](https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e).  
 
 ---
 
@@ -28,12 +29,12 @@ Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter C
 
 ### Decision
 
-Phase A first release surfaces are **crates.io** (thirteen workspace crates), **PyPI** (`sc-agent` and `sc-treesitter` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
+Phase A first release surfaces are **crates.io** (thirteen workspace crates), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
 
 **Key Principles:**
 
 - Customer-facing CLI names on channels are **decidr** and **sitr**.
-- PyPI distribution names remain **sc-agent** and **sc-treesitter**.
+- PyPI distribution names are **sc-decidr** and **sitr**.
 - No ad-hoc per-channel workflow literals for crate lists or binary names.
 
 ### Consequences
