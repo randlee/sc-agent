@@ -35,8 +35,6 @@ use crate::retry_after::RetryAfter;
 use crate::transport::Transport;
 
 /// HTTP statuses that mean "busy, resend the same body".
-const BUSY_STATUSES: [u16; 1] = [429];
-
 /// First backoff holdoff when `Retry-After` is absent or malformed.
 const BACKOFF_FIRST: Duration = Duration::from_secs(1);
 
@@ -61,9 +59,9 @@ const DEFAULT_MAX_SENDS: NonZeroU32 = match NonZeroU32::new(5) {
 /// The `target` of every event this crate logs.
 const LOG_TARGET: &str = "sc_agent_http";
 
-/// Whether `status` is a busy status (429, 502, 529).
+/// Whether `status` is retryable: non-quota 429 or any server error.
 pub(crate) fn is_busy_status(status: u16) -> bool {
-    BUSY_STATUSES.contains(&status) || (500..=599).contains(&status)
+    status == 429 || (500..=599).contains(&status)
 }
 
 /// The jitter of `sample`: `sample % 251` milliseconds, so every value of `0..=250 ms` is
@@ -753,9 +751,9 @@ impl HttpClient {
         now + (backoff(attempts.sends) + self.jitter.sample()).min(remaining)
     }
 
-    /// A transport error of send `attempts.sends`: a timeout with sends left
-    /// is held for a resend after 0-250 ms of jitter, with no host pause
-    /// (REQ-SAG-0601); anything else is returned now.
+    /// A network error with sends left uses exponential holdoff plus bounded jitter,
+    /// clamped to the remaining start budget, without pausing the provider host.
+    /// Other transport failures (including response-size refusal) are terminal.
     fn transport_failed(
         &self,
         error: HttpError,
@@ -772,10 +770,17 @@ impl HttpClient {
                 cause,
                 ..
             } if attempt < self.policy.max_sends() => {
-                let holdoff = backoff(attempt) + self.jitter.sample();
+                let remaining = attempts.first_send.map_or(BUDGET, |first| {
+                    BUDGET.saturating_sub(ended.saturating_duration_since(first))
+                });
+                let holdoff = (backoff(attempt) + self.jitter.sample()).min(remaining);
                 self.event(
                     Level::Warn,
-                    "http.timeout_resend",
+                    if kind == NetworkKind::Timeout {
+                        "http.timeout_resend"
+                    } else {
+                        "http.network_resend"
+                    },
                     ctx,
                     fields([
                         ("attempt", attempt.into()),

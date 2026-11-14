@@ -608,6 +608,7 @@ fn drive_schema(
     max_sends: u32,
     busy: usize,
     parse_error: bool,
+    cancel_on_holdoff: bool,
 ) -> (
     DecisionResult,
     Vec<Duration>,
@@ -666,6 +667,14 @@ fn drive_schema(
             Step::Done(result) => return (result.into_result(), holdoffs, backend, log),
             Step::HoldOff { until, job: next } => {
                 holdoffs.push(until.saturating_duration_since(clock.now()));
+                if cancel_on_holdoff {
+                    work.jobs.cancel();
+                    let result = work
+                        .skipped(next.identity().clone(), Skipped::Cancelled)
+                        .expect("cancel result")
+                        .into_result();
+                    return (result, holdoffs, backend, log);
+                }
                 clock.advance_to(until);
                 job = next;
             }
@@ -678,7 +687,7 @@ fn drive_schema(
 #[test]
 fn invalid_response_resend_uses_controlled_holdoff() {
     for parse_error in [false, true] {
-        let (result, waits, backend, log) = drive_schema(1, 5, 0, parse_error);
+        let (result, waits, backend, log) = drive_schema(1, 5, 0, parse_error, false);
         assert!(result.outcome.is_ok(), "{result:?}");
         assert_eq!(waits, [Duration::from_millis(1137)]);
         assert_eq!(backend.encodes.load(Ordering::SeqCst), 1);
@@ -696,7 +705,7 @@ fn invalid_response_resend_uses_controlled_holdoff() {
 #[test]
 fn invalid_response_exhaustion_keeps_cause_and_same_send_budget() {
     for max_sends in [2, 5] {
-        let (result, waits, backend, log) = drive_schema(usize::MAX, max_sends, 0, false);
+        let (result, waits, backend, log) = drive_schema(usize::MAX, max_sends, 0, false, false);
         let error = result.outcome.expect_err("never matches");
         assert_eq!(error.id(), "decision.schema_mismatch");
         assert_eq!(
@@ -718,7 +727,7 @@ fn invalid_response_exhaustion_keeps_cause_and_same_send_budget() {
         assert_eq!(row.fields["sends"], max_sends);
         assert_eq!(row.fields["schema_resends"], max_sends - 1);
     }
-    let (result, _, backend, log) = drive_schema(usize::MAX, 5, 2, false);
+    let (result, _, backend, log) = drive_schema(usize::MAX, 5, 2, false, false);
     assert_eq!(
         result.outcome.expect_err("never matches").id(),
         "decision.schema_mismatch"
@@ -731,4 +740,15 @@ fn invalid_response_exhaustion_keeps_cause_and_same_send_budget() {
         .expect("session row");
     assert_eq!(row.fields["sends"], 5);
     assert_eq!(row.fields["schema_resends"], 2);
+}
+
+#[test]
+fn cancelling_invalid_response_holdoff_does_not_send_again() {
+    let (result, waits, backend, _) = drive_schema(usize::MAX, 5, 0, false, true);
+    assert_eq!(waits, [Duration::from_millis(1137)]);
+    assert!(matches!(
+        result.outcome,
+        Err(DecisionError::Cancelled { sends: 1 })
+    ));
+    assert_eq!(backend.decodes.load(Ordering::SeqCst), 1);
 }

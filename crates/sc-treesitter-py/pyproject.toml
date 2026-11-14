@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "sitr"
 version = "0.1.0"
 description = "Load tree-sitter grammars and run any query against them."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 
 [tool.maturin]

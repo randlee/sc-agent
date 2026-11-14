@@ -21,6 +21,7 @@
 #![warn(missing_docs)]
 
 pub mod input;
+pub mod integration_gate;
 pub mod output;
 pub mod signal;
 

@@ -20,6 +20,12 @@ class RuntimePanicGate(unittest.TestCase):
         }
         # This crate contains only hang guards and doubles for test consumers.
         names.remove("sc-agent-testkit")
+        for member in workspace["members"]:
+            manifest = tomllib.loads((ROOT / member / "Cargo.toml").read_text())
+            sections = [manifest, *manifest.get("target", {}).values()]
+            for section in sections:
+                for kind in ["dependencies", "build-dependencies"]:
+                    self.assertNotIn("sc-agent-testkit", section.get(kind, {}), f"{member} acquired a production testkit dependency")
         config = tomllib.loads((ROOT / "sc-lint.toml").read_text())
         self.assertEqual(set(config["tool"]["sc-lint"]["analyzers"]["runtime"]["panic_rule_packages"]), names)
 

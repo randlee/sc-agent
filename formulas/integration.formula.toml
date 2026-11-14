@@ -1,0 +1,90 @@
+formula = "integration"
+description = "Live checksum-verified sc-agent prerelease provider integration"
+version = 1
+type = "workflow"
+
+[vars.run_id]
+required = true
+
+[[steps]]
+id = "verify-assets"
+title = "Verify prerelease assets for {{run_id}}"
+description = "Download and verify the target binary archive and both wheel SHA-256 values before any case."
+type = "task"
+
+[[steps]]
+id = "typesafe-models-cli"
+title = "Live typesafe-models-cli for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-models-cli with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "typesafe-models-wheel"
+title = "Live typesafe-models-wheel for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-models-wheel with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "typesafe-decision-cli"
+title = "Live typesafe-decision-cli for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-decision-cli with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "typesafe-decision-wheel"
+title = "Live typesafe-decision-wheel for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-decision-wheel with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "anthropic-decision-cli"
+title = "Live anthropic-decision-cli for {{run_id}}"
+description = "Run scripts/integration/run.py --case anthropic-decision-cli with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "anthropic-decision-wheel"
+title = "Live anthropic-decision-wheel for {{run_id}}"
+description = "Run scripts/integration/run.py --case anthropic-decision-wheel with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "typesafe-invalid-key-cli"
+title = "Live typesafe-invalid-key-cli for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-invalid-key-cli with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "typesafe-invalid-key-wheel"
+title = "Live typesafe-invalid-key-wheel for {{run_id}}"
+description = "Run scripts/integration/run.py --case typesafe-invalid-key-wheel with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "anthropic-invalid-key-cli"
+title = "Live anthropic-invalid-key-cli for {{run_id}}"
+description = "Run scripts/integration/run.py --case anthropic-invalid-key-cli with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "anthropic-invalid-key-wheel"
+title = "Live anthropic-invalid-key-wheel for {{run_id}}"
+description = "Run scripts/integration/run.py --case anthropic-invalid-key-wheel with the prepared run directory. Persist the sanitized PASS, FAIL or SKIP result; SKIP never passes publication."
+type = "task"
+needs = ["verify-assets"]
+
+[[steps]]
+id = "report"
+title = "Render and publish XHTML for {{run_id}}"
+description = "Render the owner-selected XHTML template with sc-compose; validate XML, commit and push this platform report and its per-case results."
+type = "task"
+needs = ["typesafe-models-cli", "typesafe-models-wheel", "typesafe-decision-cli", "typesafe-decision-wheel", "anthropic-decision-cli", "anthropic-decision-wheel", "typesafe-invalid-key-cli", "typesafe-invalid-key-wheel", "anthropic-invalid-key-cli", "anthropic-invalid-key-wheel"]
