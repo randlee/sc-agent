@@ -22,7 +22,14 @@ class FormulaAndTransport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "input.formula.toml.j2").write_text((ROOT / "formulas/integration.formula.toml").read_text())
-            result = subprocess.run(["sc-compose", "render", "--file", str(root / "input.formula.toml.j2"), "--var", "run_id=controlled", "--root", str(root), "--output", str(root / "integration.formula.toml")], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ["sc-compose", "render", "--file", str(root / "input.formula.toml.j2"), "--var", "run_id=controlled", "--root", str(root), "--output", str(root / "integration.formula.toml")],
+                capture_output=True,
+                text=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=60,
+            )
             self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
             import tomllib
             formula = tomllib.loads((root / "integration.formula.toml").read_text())
