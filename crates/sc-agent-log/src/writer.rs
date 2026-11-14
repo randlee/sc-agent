@@ -359,7 +359,7 @@ fn bounded(id: &str) -> String {
     id.chars().take(MAX_REPORT_ID_CHARS).collect()
 }
 
-/// The serialized JSON length of `fields`, counted without allocating the text.
+/// The serialized JSON length of a value, counted without allocating the text.
 fn serialized_len(value: &impl serde::Serialize) -> usize {
     /// Counts bytes written to it.
     struct Counter(usize);

@@ -96,7 +96,7 @@ impl GeneralLogger {
     /// # Errors
     ///
     /// [`LogError::ReservedField`] when `fields` uses a [`Self::CONTEXT_KEYS`] key,
-    /// [`LogError::RowTooLarge`] when the fields are over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES),
+    /// [`LogError::RowTooLarge`] when the complete event is over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES),
     /// [`LogError::InvalidName`] for a bad `target` or `action`, [`LogError::Rejected`] when
     /// sc-observability refuses the event. Every Err is also counted and reported once by
     /// [`Self::flush`], so a caller that must not act on it loses nothing.
