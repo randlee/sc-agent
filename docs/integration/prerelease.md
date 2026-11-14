@@ -134,3 +134,9 @@ Build and install both wheels into a Python 3.11 environment and install
 histories; their fixture PASS records are parser/composition tests and are never
 live acceptance evidence. The workspace logging test `forty_thousand_sessions`
 retains the NFR-SAG-0001 capacity check.
+
+Evidence recorded for source revision `14076dec8ce6ca3eb59858613d91ed8702a7b636`:
+`cargo test --workspace --all-features` passed. In `sc-agent-log`'s
+`tests/session.rs`, `forty_thousand_sessions` passed; the target reported 4
+passed, 0 failed, 0 ignored in 1.61 s. The test asserted 40,000 log rows and
+40,000 distinct session IDs.
