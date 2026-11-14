@@ -16,9 +16,9 @@ import secrets
 import subprocess
 import sys
 import tempfile
-import tomllib
 
 from preflight import ROOT, Refusal, command, digest, git, prerelease_helper
+from configuration import case_specs, distribution_wheel, module_distribution, platform_target, release_manifest
 
 
 def runtime_python(stage):
@@ -26,8 +26,7 @@ def runtime_python(stage):
 
 
 def formula_cases():
-    formula = tomllib.loads((ROOT / "formulas/integration.formula.toml").read_text())
-    return [step["id"].replace("_", "-") for step in formula["steps"] if step["id"] not in {"verify_assets", "report"}]
+    return list(case_specs(ROOT))
 
 
 def install_release(helper, tag, version, manifest, names, stage):
@@ -56,10 +55,9 @@ def prepare(args):
             raise Refusal("run directory belongs to a different tag/platform/run-id")
         return state
     helper = prerelease_helper()
-    manifest = tomllib.loads((ROOT / "release/publish-artifacts.toml").read_text())
+    manifest = release_manifest(ROOT)
     target = helper.host_target(manifest)
-    expected = {"aarch64-apple-darwin": "macos-aarch64", "x86_64-apple-darwin": "macos-x86_64", "aarch64-unknown-linux-gnu": "linux-aarch64", "x86_64-unknown-linux-gnu": "linux-x86_64", "x86_64-pc-windows-msvc": "windows-x86_64"}[target["target"]]
-    if args.platform != expected:
+    if platform_target(manifest, args.platform)["target"] != target["target"]:
         raise Refusal("platform must match the machine executing the installed artifacts")
     version = args.tag.removeprefix(manifest["prerelease"]["tag_prefix"])
     release = helper.release_for_tag(args.tag)
@@ -101,8 +99,9 @@ def result_outcome(case, output, returncode):
         value = json.loads(output)
     except ValueError:
         return "FAIL", "Installed process did not return valid JSON", None
-    if "invalid-key" in case:
-        expected = ["decision.api_status"] if case.startswith("typesafe") else ["decision.backend", "decision_llm.llm", "llm.api_status"]
+    spec = case_specs(ROOT)[case]
+    if spec["expectation"] == "auth_401":
+        expected = spec["error_chain"]
         error = value.get("error") if isinstance(value, dict) else None
         chain = []
         messages = []
@@ -118,7 +117,7 @@ def result_outcome(case, output, returncode):
         return "SKIP", "Required provider credential was unavailable", None
     if returncode or (isinstance(value, dict) and "error" in value):
         return "FAIL", "Installed provider call returned an error", None
-    if "models" in case:
+    if spec["expectation"] == "models":
         if isinstance(value, dict) and value.get("models"):
             return "PASS", "Installed client discovered real TypeSafe models", None
         return "FAIL", "TypeSafe model discovery returned no models", None
@@ -137,25 +136,25 @@ def execute_case(state, run_dir, case):
     if any(result["case_id"] == case for result in state["results"]):
         raise Refusal("case already has a result; use a new run-id for a rerun")
     stage = run_dir / "installed"
-    provider = "typesafe" if case.startswith("typesafe") else "anthropic"
-    model = "jev" if provider == "typesafe" else "haiku"
+    spec = case_specs(ROOT)[case]
+    provider, model = spec["provider"], spec["model"]
     config = run_dir / "config"
     config.mkdir(exist_ok=True)
     (config / "default.json").write_text(json.dumps({"log_root": str(run_dir / "logs")}))
     request = run_dir / "request.json"
-    request.write_text(json.dumps({"model": "jev-latest", "state": "A door is open.", "questions": {"q": {"type": "noul", "instructions": "Is the door open?"}}}))
-    models = "models" in case
-    if case.endswith("-cli"):
+    request.write_text(json.dumps({"model": model, "state": "A door is open.", "questions": {"q": {"type": "noul", "instructions": "Is the door open?"}}}))
+    models = spec["operation"] == "models"
+    if spec["interface"] == "cli":
         binary = stage / "bin" / ("decidr.exe" if sys.platform == "win32" else "decidr")
         cmd = [str(binary), "--config-dir", str(config), "models"] if models else [str(binary), "--config-dir", str(config), "send", "--model", model, "--provider", provider, "--project", "integration", "--agent-role", "prerelease", str(request)]
     else:
         cmd = [str(runtime_python(stage)), str(ROOT / "scripts/integration/wheel_case.py"), "models" if models else "send", "--config-dir", str(config), "--request", str(request), "--provider", provider, "--model", model]
     env = dict(os.environ)
-    invalid = "invalid-key" in case
+    invalid = spec["expectation"] == "auth_401"
     marker = "invalid-integration-" + secrets.token_hex(16) if invalid else None
     if invalid:
         # The isolated working directory has no repository-root .env; the invalid ENV key is authoritative.
-        env["TYPESAFE_API_KEY" if provider == "typesafe" else "ANTHROPIC_API_KEY"] = marker
+        env[spec["credential_env"]] = marker
     try:
         with tempfile.TemporaryDirectory(prefix="integration-no-dotenv-") as cwd:
             result = subprocess.run(cmd, cwd=cwd if invalid else ROOT, env=env, text=True, capture_output=True, check=False, timeout=240)
@@ -171,8 +170,11 @@ def execute_case(state, run_dir, case):
         status, reason, session = "FAIL", "Credential disclosure detected; raw output was discarded", None
     else:
         status, reason, session = result_outcome(case, result.stdout.strip() or result.stderr.strip(), result.returncode)
-    if case.endswith("-wheel"):
-        artifact = next(a for a in state["artifacts"] if a["name"].startswith("sc_decidr-") and a["name"].endswith(".whl"))
+    if spec["interface"] == "wheel":
+        manifest = release_manifest(ROOT)
+        version = state["prerelease_tag"].removeprefix(manifest["prerelease"]["tag_prefix"])
+        name = distribution_wheel(prerelease_helper(), [a["name"] for a in state["artifacts"]], module_distribution(manifest), version)
+        artifact = next(a for a in state["artifacts"] if a["name"] == name)
     else:
         artifact = next(a for a in state["artifacts"] if a["name"].endswith((".tar.gz", ".zip")))
     record = {"case_id": case, "platform": state["platform"], "status": status, "reason": reason, "prerelease_tag": state["prerelease_tag"], "source_commit": state["source_commit"], "artifact_sha256": artifact["sha256"]}

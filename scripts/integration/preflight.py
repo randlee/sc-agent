@@ -14,12 +14,10 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
+from configuration import Refusal, distribution_wheel, module_distribution, platform_target, release_manifest
+
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_ROOT = PurePosixPath("site/reports/integration")
-
-
-class Refusal(Exception):
-    """Actionable refusal: no evidence case is silently skipped."""
 
 
 def command(args, *, cwd=ROOT):
@@ -72,8 +70,7 @@ def verify_artifacts(run, *, helper=None):
     helper = helper or prerelease_helper()
     tag = run["prerelease_tag"]
     release = helper.release_for_tag(tag)
-    import tomllib
-    manifest = tomllib.loads((ROOT / "release/publish-artifacts.toml").read_text())
+    manifest = release_manifest(ROOT)
     version = tag.removeprefix(manifest["prerelease"]["tag_prefix"])
     helper.require_release_assets(release, manifest, version)
     # Resolve the remote tag, not a local tag that could have been replaced.
@@ -82,11 +79,8 @@ def verify_artifacts(run, *, helper=None):
     remote_source = refs.get(f"refs/tags/{tag}^{{}}", refs.get(f"refs/tags/{tag}"))
     if remote_source != run["source_commit"]:
         raise Refusal("remote prerelease tag does not point to the tested source")
-    aliases = {"macos-aarch64": "aarch64-apple-darwin", "macos-x86_64": "x86_64-apple-darwin", "linux-aarch64": "aarch64-unknown-linux-gnu", "linux-x86_64": "x86_64-unknown-linux-gnu", "windows-x86_64": "x86_64-pc-windows-msvc"}
-    target_name = aliases.get(run["platform"], run["platform"])
-    target = next((target for target in manifest["release_targets"] if target["target"] == target_name), None)
-    if target is None:
-        raise Refusal("reported platform has no declared release target")
+    target = platform_target(manifest, run["platform"])
+    target_name = target["target"]
     release_names = helper.release_asset_names(release)
     expected_names = {helper.archive_name(manifest, version, target)}
     for distribution in manifest["python_distributions"]:
@@ -99,15 +93,13 @@ def verify_artifacts(run, *, helper=None):
             raise Refusal("platform wheel is missing or ambiguous")
         expected_names.add(matching[0])
     artifacts = run["artifacts"]
-    if not isinstance(artifacts, list) or len(artifacts) < 3:
-        raise Refusal("verified target binary archive and both Python wheels are required")
+    if not isinstance(artifacts, list) or len(artifacts) != 1 + len(manifest["python_distributions"]):
+        raise Refusal("verified target archive and every declared Python distribution are required")
     names = [artifact["name"] for artifact in artifacts]
     if set(names) != expected_names:
         raise Refusal("reported artifact set does not match the tested platform's archive and wheels")
     if len(names) != len(set(names)) or any(Path(name).name != name for name in names):
         raise Refusal("artifact names must be unique basenames")
-    if not any(name.endswith((".tar.gz", ".zip")) for name in names) or not any(name.startswith("sc_decidr-") and name.endswith(".whl") for name in names) or not any(name.startswith("sitr-") and name.endswith(".whl") for name in names):
-        raise Refusal("missing target archive or one of the two wheels")
     with tempfile.TemporaryDirectory(prefix="sc-agent-integration-preflight-") as directory:
         checksums = helper.checksums(helper.download_asset(tag, "checksums.txt", Path(directory)).read_text())
         for artifact in artifacts:
@@ -120,15 +112,14 @@ def verify_artifacts(run, *, helper=None):
 @contextmanager
 def installed_validator(run):
     """Use a checksum-verified host wheel from the tested source, even on another platform."""
-    import tomllib
     import venv
     helper = prerelease_helper()
     tag = run["prerelease_tag"]
-    manifest = tomllib.loads((ROOT / "release/publish-artifacts.toml").read_text())
+    manifest = release_manifest(ROOT)
     version = tag.removeprefix(manifest["prerelease"]["tag_prefix"])
     release = helper.release_for_tag(tag)
     names = helper.host_wheel_names(helper.release_asset_names(release), manifest, version)
-    wheel_name = next(name for name in names if name.startswith("sc_decidr-"))
+    wheel_name = distribution_wheel(helper, names, module_distribution(manifest), version)
     with tempfile.TemporaryDirectory(prefix="integration-validator-") as directory:
         root = Path(directory)
         checksums = helper.checksums(helper.download_asset(tag, "checksums.txt", root).read_text())
@@ -158,8 +149,14 @@ def validate_run(run, candidate, *, root=ROOT, validator=None, artifact_verifier
     if any(result["artifact_sha256"] not in verified for result in results):
         raise Refusal("case names an artifact not verified by this run")
     for result in results:
-        prefix = "sc_decidr-" if result["case_id"].endswith("-wheel") else None
-        selected = [a for a in artifacts if (a["name"].startswith(prefix) and a["name"].endswith(".whl"))] if prefix else [a for a in artifacts if a["name"].endswith((".tar.gz", ".zip"))]
+        if result["case_id"].endswith("-wheel"):
+            helper = prerelease_helper()
+            manifest = release_manifest(root)
+            version = run["prerelease_tag"].removeprefix(manifest["prerelease"]["tag_prefix"])
+            name = distribution_wheel(helper, [a["name"] for a in artifacts], module_distribution(manifest), version)
+            selected = [a for a in artifacts if a["name"] == name]
+        else:
+            selected = [a for a in artifacts if a["name"].endswith((".tar.gz", ".zip"))]
         if len(selected) != 1 or selected[0]["sha256"] != result["artifact_sha256"]:
             raise Refusal("case is bound to the wrong binary/wheel artifact")
     git("merge-base", "--is-ancestor", run["source_commit"], candidate, root=root)
