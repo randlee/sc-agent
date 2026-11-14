@@ -462,7 +462,26 @@ fn keyring_override(
     service: Option<&str>,
     account: Option<&str>,
 ) -> PyResult<Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>> {
-    use sc_agent_secrets::{KeyringLocation, PlatformKeyring, ProviderKeyring, SecretsError};
+    use sc_agent_secrets::{PlatformKeyring, ProviderKeyring};
+    keyring_override_with_factory(provider, service, account, |provider, location| {
+        Arc::new(ProviderKeyring::new(
+            provider,
+            location,
+            Arc::new(PlatformKeyring),
+        ))
+    })
+}
+
+fn keyring_override_with_factory(
+    provider: Option<&str>,
+    service: Option<&str>,
+    account: Option<&str>,
+    make_backend: impl FnOnce(
+        Provider,
+        sc_agent_secrets::KeyringLocation,
+    ) -> Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>,
+) -> PyResult<Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>> {
+    use sc_agent_secrets::{KeyringLocation, SecretsError};
     let location = KeyringLocation::new(service, account).map_err(|error| {
         let option = match error {
             SecretsError::InvalidLocation { option } => option,
@@ -478,11 +497,7 @@ fn keyring_override(
     let provider = provider
         .parse::<Provider>()
         .map_err(|error| sag_error(&DecidrError::from(error)))?;
-    Ok(Some(Arc::new(ProviderKeyring::new(
-        provider,
-        location,
-        Arc::new(PlatformKeyring),
-    ))))
+    Ok(Some(make_backend(provider, location)))
 }
 
 fn invalid_option(option: &str, bound: &str) -> PyErr {
@@ -733,6 +748,8 @@ fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sc_agent_secrets::KeyringSource;
+    use std::cell::Cell;
 
     /// AC: REQ-SAG-0007. The string returned for a result keeps 0.123456789 unchanged.
     #[test]
@@ -755,5 +772,74 @@ mod tests {
         );
         let text = decidr::output::result_text(&result).expect("string");
         assert!(text.contains("\"noul\":0.123456789"), "{text}");
+    }
+
+    #[test]
+    fn invalid_keyring_overrides_do_not_construct_a_backend() {
+        for (provider, service, account) in [
+            (Some("typesafe"), Some(""), None),
+            (None, Some("consumer"), None),
+        ] {
+            let constructed = Cell::new(false);
+            let result = keyring_override_with_factory(provider, service, account, |_, _| {
+                constructed.set(true);
+                panic!("keyring backend must not be constructed for a rejected override");
+            });
+
+            assert!(result.is_err());
+            assert!(
+                !constructed.get(),
+                "the keyring backend factory ran for a rejected override"
+            );
+        }
+    }
+
+    #[test]
+    fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() {
+        struct RecordingKeyring(Arc<Mutex<Vec<(String, String)>>>);
+        impl KeyringSource for RecordingKeyring {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, sc_agent_secrets::SecretsError> {
+                self.0
+                    .lock()
+                    .expect("recording lock")
+                    .push((service.to_owned(), account.to_owned()));
+                Ok(None)
+            }
+        }
+
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let keyring = keyring_override_with_factory(
+            Some("typesafe"),
+            Some("service"),
+            Some("account"),
+            |provider, location| {
+                assert_eq!(provider, Provider::TypeSafe);
+                Arc::new(sc_agent_secrets::ProviderKeyring::new(
+                    provider,
+                    location,
+                    Arc::new(RecordingKeyring(calls.clone())),
+                ))
+            },
+        )
+        .expect("valid override")
+        .expect("keyring override");
+
+        keyring
+            .password("TYPESAFE_API_KEY", "os-user")
+            .expect("typesafe lookup");
+        keyring
+            .password("ANTHROPIC_API_KEY", "os-user")
+            .expect("other provider lookup");
+        assert_eq!(
+            *calls.lock().expect("recording lock"),
+            [
+                ("service".to_owned(), "account".to_owned()),
+                ("ANTHROPIC_API_KEY".to_owned(), "os-user".to_owned()),
+            ]
+        );
     }
 }
