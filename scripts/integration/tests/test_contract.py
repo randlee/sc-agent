@@ -22,18 +22,21 @@ class FormulaAndTransport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "input.formula.toml.j2").write_text((ROOT / "formulas/integration.formula.toml").read_text())
-            request = {"schema": "sc-compose/beads/v1", "operation": "render", "working_directory": str(root), "template": "input.formula.toml.j2", "rendered_formula": "integration.formula.toml", "compose_variables": {}, "formula_name": "integration", "bead_variables": {"run_id": "controlled"}, "bd_executable": None, "pour_authorization": None}
-            path = root / "request.json"
-            path.write_text(json.dumps(request))
-            result = subprocess.run(["sc-compose", "bead", "render", "--request", str(path), "--json"], capture_output=True, text=True, check=False)
+            result = subprocess.run(["sc-compose", "render", "--file", str(root / "input.formula.toml.j2"), "--var", "run_id=controlled", "--root", str(root), "--output", str(root / "integration.formula.toml")], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
             import tomllib
             formula = tomllib.loads((root / "integration.formula.toml").read_text())
-            steps = {step["id"]: step for step in formula["steps"]}
+            # sc-compose graph pour accepts rendered formulas, not bd runtime vars,
+            # and its step grammar excludes hyphens (the public case IDs keep them).
+            self.assertNotIn("vars", formula)
+            for step in formula["steps"]:
+                self.assertRegex(step["id"], r"^[A-Za-z0-9_]{1,64}$")
+                self.assertIn("controlled", step["title"])
+            steps = {step["id"].replace("_", "-"): step for step in formula["steps"]}
             self.assertEqual(len(steps), 12)
-            self.assertEqual(set(steps["report"]["needs"]), set(run.formula_cases()))
+            self.assertEqual({value.replace("_", "-") for value in steps["report"]["needs"]}, set(run.formula_cases()))
             for case in run.formula_cases():
-                self.assertEqual(steps[case]["needs"], ["verify-assets"])
+                self.assertEqual(steps[case]["needs"], ["verify_assets"])
 
     def test_xhtml_render_uses_sc_compose_and_rejects_invalid_xml(self):
         with tempfile.TemporaryDirectory() as directory:

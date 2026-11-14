@@ -27,7 +27,7 @@ def runtime_python(stage):
 
 def formula_cases():
     formula = tomllib.loads((ROOT / "formulas/integration.formula.toml").read_text())
-    return [step["id"] for step in formula["steps"] if step["id"] not in {"verify-assets", "report"}]
+    return [step["id"].replace("_", "-") for step in formula["steps"] if step["id"] not in {"verify_assets", "report"}]
 
 
 def prepare(args):
@@ -74,7 +74,7 @@ def prepare(args):
     with tempfile.TemporaryDirectory(prefix="integration-assets-") as download_dir:
         directory = Path(download_dir)
         checksums = helper.checksums(helper.download_asset(args.tag, "checksums.txt", directory).read_text())
-        helper.stage_release(args.tag, version, manifest, names, stage, directory)
+        helper.stage_release(args.tag, version, manifest, names, stage, directory, public_url=None)
     wheels = helper.staged_wheels(stage, manifest)
     subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--stage", str(stage), *map(str, wheels)], check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--verify", "--stage", str(stage), "--version", version], check=True)
@@ -85,7 +85,7 @@ def prepare(args):
     artifacts = [{"name": name, "sha256": checksums[name]} for name in [archive, *[p.name for p in wheels]]]
     state = {"run_id": args.run_id, "source_commit": source, "platform": args.platform, "prerelease_tag": args.tag, "artifacts": artifacts, "results": [], "beads": payload["graph"]["ids"], "formula_root": payload["graph"]["parent"]}
     state_path.write_text(json.dumps(state, indent=2) + "\n")
-    subprocess.run(["bd", "close", state["beads"]["verify-assets"], "--reason", "Downloaded and checksum-verified installed target binary archive and both wheels"], check=True)
+    subprocess.run(["bd", "close", state["beads"]["verify_assets"], "--reason", "Downloaded and checksum-verified installed target binary archive and both wheels"], check=True)
     return state
 
 
@@ -137,7 +137,7 @@ def execute_case(state, run_dir, case):
     config.mkdir(exist_ok=True)
     (config / "default.json").write_text(json.dumps({"log_root": str(run_dir / "logs")}))
     request = run_dir / "request.json"
-    request.write_text(json.dumps({"model": "jev-latest", "state": "A door is open.", "questions": {"q": {"type": "noul"}}}))
+    request.write_text(json.dumps({"model": "jev-latest", "state": "A door is open.", "questions": {"q": {"type": "noul", "instructions": "Is the door open?"}}}))
     models = "models" in case
     if case.endswith("-cli"):
         binary = stage / "bin" / ("decidr.exe" if sys.platform == "win32" else "decidr")
@@ -175,9 +175,9 @@ def execute_case(state, run_dir, case):
     state["results"].append(record)
     (run_dir / "run.json").write_text(json.dumps(state, indent=2) + "\n")
     if status == "PASS":
-        subprocess.run(["bd", "close", state["beads"][case], "--reason", reason], check=True)
+        subprocess.run(["bd", "close", state["beads"][case.replace("-", "_")], "--reason", reason], check=True)
     else:
-        subprocess.run(["bd", "update", state["beads"][case], "--append-notes", f"{status}: {reason}"], check=True)
+        subprocess.run(["bd", "update", state["beads"][case.replace("-", "_")], "--append-notes", f"{status}: {reason}"], check=True)
     print(json.dumps(record))
 
 
