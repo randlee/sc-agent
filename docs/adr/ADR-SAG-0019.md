@@ -86,7 +86,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. A missing key is a typed `auth` error. | Nothing. |
    | Session log | One JSONL record per query and response, at the default location, or sent to the `session_log` callable. | Nothing, unless it redirects the log. |
    | General log | The `general_log` callable. The wheel calls it and never owns the caller's logger. | Optionally inject one. |
-   | Errors | Typed fields, `ERROR_IDS`, `category()`, `retryable()`, and `SagError` attributes (decisions 2 to 6). | Map a category to its own codes. Never parse message text. |
+   | Errors | Typed fields, `ERROR_IDS`, `category`, `retryable`, and `SagError` attributes, all computed through `decidr::category` (decisions 2 to 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
@@ -118,14 +118,16 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - `attempts(&self) -> Option<u32>`
    - `retry_after_ms(&self) -> Option<u64>`
 
+   It also gains one required method, `category_rule(&self) -> CategoryRule`, generated together with `id()` by each crate's `error_catalog!` table (decision 6).
+
    There is still no extension map: it would be untyped, would show no field names in Python or rustdoc, and would turn every new datum into a convention instead of a reviewed field.
 
-   `detail()` remains the only builder and must not be overridden. It does the copy-up in one place, keyed by the catalog rule (decision 6), so that the top-level fields and the category always describe the same level:
+   `detail()` remains the only builder and must not be overridden. It does the copy-up in one place, using only the level's own rule (`self.category_rule()`), so that the top-level fields and the category always describe the same level. There is no lookup across crates:
 
-   - A level whose rule is `inherit` (a wrapper) takes all three fields from its cause's detail and none of its own.
-   - A level whose rule is `base` reports only its own accessors and does not fill from its cause.
+   - A level whose rule is `inherit` (a wrapper) takes all three fields from its cause's already-built top-level fields and none of its own. The cause's `detail()` has already done its own copy-up.
+   - A level whose rule is `base` keeps its own accessors and does not fill from its cause.
 
-   The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`. `category()` uses that same level (decision 6). The result:
+   The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`. `decidr::category` uses that same level (decision 6). The result:
 
    - every wrapper carries its cause's fields with no code of its own, including wrappers added later;
    - a leaf variant overrides only the methods for data it holds;
@@ -199,8 +201,8 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | --- | --- |
    | `id`, `message`, `detail` | The three args. |
    | `status`, `attempts`, `retry_after_ms` | From the top-level detail, which carries its cause's fields through the copy-up. |
-   | `category` | `category(detail)` (decision 6). |
-   | `retryable` | `True` for categories `busy` and `network`. |
+   | `category` | `decidr::category` of the detail (decision 6). |
+   | `retryable` | `True` for categories `busy` and `network`, from the same `decidr::category`. |
 
    Result lines keep their shape. Each level of `error` gains the new fields when they are set. A failed decision stays as data in its line; `SagError` is for command errors.
 
@@ -225,11 +227,11 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - an inherent `const fn catalog_row(&self) -> (&'static str, CategoryRule)`, holding the exhaustive match. Inside its own crate, `#[non_exhaustive]` does not relax exhaustiveness, so a variant with no row fails to compile.
    - `impl ErrorCatalog for E { const ROWS: &'static [(&'static str, CategoryRule)] }`.
 
-   `ErrorId::id()` becomes `self.catalog_row().0` in each impl.
+   In each impl, `ErrorId::id()` becomes `self.catalog_row().0` and `ErrorId::category_rule()` becomes `self.catalog_row().1`.
 
    The two Python-binding ids, `sc_agent_py.invalid_option` and `sc_agent_py.worker_panicked`, become variants of a small `PyBindingError` enum in sc-agent-py with its own table, so every row comes from an enum. `decidr::error_catalog()` concatenates every decidr-reachable crate's `ROWS`; sc-treesitter's ids are not decidr errors and are excluded.
 
-   **Category over the chain.** `ErrorDetail::category(&self) -> ErrorCategory` works on a detail, not a bare id:
+   **Category over the chain.** `sc-agent-types` has no rows-free `category()`. It offers only `ErrorDetail::category_with(&self, rows: &[(&'static str, CategoryRule)]) -> ErrorCategory`, which looks up each level's id in the rows it is given. `decidr::category(&ErrorDetail) -> ErrorCategory` is `category_with(error_catalog())` and is the single entry point, for in-memory and read-back details alike: below the top, causes are `ErrorDetail` data in both cases, so their rules come from the rows. There is no global registry, no copied table and no new JSON field, so NFR-SAG-0002 byte-identity is unchanged. The category works on a detail, not a bare id:
 
    1. Walk from the top through levels whose rule is `Inherit` to the deciding level: the first level with a `Base` rule. This is the level whose fields the top carries (decision 2).
    2. Apply the status refinement at that level, using that level's `status`.
@@ -248,7 +250,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    Rejected: a separate `server` category. It would extend the owner's fixed category set for a distinction no consumer has asked to act on; `busy` already means "the provider could not serve this now; resubmit later".
 
-   The rule lives in Rust only. Python exposes the same function:
+   The rule lives in Rust only. Python goes through `decidr::category`; `sc_agent.category`, `SagError.category` and `retryable` all call it:
 
    - `sc_agent.category(detail_or_id, status=None) -> str`, which takes a detail dict, a detail JSON string or a bare id;
    - `sc_agent.retryable(detail_or_id) -> bool`;
@@ -315,6 +317,8 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 10. **Category assignments are part of the contract.**
 
     Consumers map categories to their own codes, so moving an id to a different category, or changing the status refinement, is a breaking change and needs a breaking version bump (a minor bump below 1.0). Adding an id with a category is not breaking. NFR-SAG-0002 records this.
+
+    A stored detail keeps the top-level fields from when it was written, but its category is computed when it is read. After a breaking category change, the two can therefore describe different levels.
 
 11. **sitr is an optional, separate section of the consumer template.**
 

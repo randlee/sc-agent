@@ -43,8 +43,9 @@ Definitions:
   | `local.probe_status` | `status` | — | — |
   | `decision.cancelled` | — | `sends` | — |
 - `ErrorId::detail()` MUST remain the only builder of a detail.
-- A level whose catalog rule is `inherit` MUST take all three fields from its cause's detail. A level whose rule is `base` MUST report only its own accessors.
-- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`, which is the level `category()` uses (REQ-SAG-0017).
+- `ErrorId` MUST have a required `category_rule()`, generated with `id()` by the crate's `error_catalog!` table.
+- The copy-up in `detail()` MUST use only the level's own rule, with no lookup across crates. A level whose rule is `inherit` MUST take all three fields from its cause's already-built top-level fields. A level whose rule is `base` MUST keep its own accessors.
+- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`, which is the level `decidr::category` uses (REQ-SAG-0017).
 - `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
   - as the ceiling in milliseconds;
   - saturating at `u64::MAX`;
