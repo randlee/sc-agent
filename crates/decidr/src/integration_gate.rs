@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::DecidrError;
 
 /// Required live cases. Each runs against an installed binary or wheel, never source substitutes.
-pub const REQUIRED_CASES: [&str; 10] = [
+const REQUIRED_CASES: [&str; 10] = [
     "typesafe-models-cli",
     "typesafe-models-wheel",
     "typesafe-decision-cli",
@@ -20,6 +20,26 @@ pub const REQUIRED_CASES: [&str; 10] = [
     "anthropic-invalid-key-wheel",
 ];
 
+/// Returns the required case identifiers for the installed wheel's integration contract.
+#[must_use]
+pub fn integration_cases() -> Vec<&'static str> {
+    REQUIRED_CASES.to_vec()
+}
+
+/// Validates and serializes a complete passing platform run for the installed wheel.
+///
+/// Checked representations stay inside this module; callers receive the existing JSON contract.
+///
+/// # Errors
+/// Returns `decidr.integration_evidence` for malformed, missing or non-passing case results,
+/// or the existing serialization error if the validated records cannot be serialized.
+pub fn validate_integration_results(
+    json: &str,
+    source_commit: &str,
+) -> Result<String, DecidrError> {
+    crate::output::to_json(&validate_results(json, source_commit)?)
+}
+
 fn invalid(field: &'static str, reason: &'static str) -> DecidrError {
     DecidrError::IntegrationEvidence {
         field,
@@ -31,7 +51,7 @@ fn invalid(field: &'static str, reason: &'static str) -> DecidrError {
 /// An extensible case/platform identifier, checked once at the JSON boundary.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(transparent)]
-pub struct Identifier(String);
+struct Identifier(String);
 
 impl Identifier {
     fn new(value: String, field: &'static str) -> Result<Self, DecidrError> {
@@ -53,7 +73,7 @@ impl Identifier {
 /// A complete SHA-1 source revision or SHA-256 artifact digest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-pub struct Digest(String);
+struct Digest(String);
 
 impl Digest {
     fn new(value: String, len: usize, field: &'static str) -> Result<Self, DecidrError> {
@@ -70,7 +90,7 @@ impl Digest {
 /// A validated prerelease tag.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-pub struct PrereleaseTag(String);
+struct PrereleaseTag(String);
 
 impl PrereleaseTag {
     fn new(value: String) -> Result<Self, DecidrError> {
@@ -97,7 +117,7 @@ impl PrereleaseTag {
 
 /// A case outcome. SKIP and FAIL are preserved as evidence and never pass the gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum Status {
+enum Status {
     /// The actual case passed.
     #[serde(rename = "PASS")]
     Pass,
@@ -112,16 +132,16 @@ pub enum Status {
 /// A bounded printable reason supplied by the producer after credential redaction.
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
-pub struct SanitizedReason(String);
+struct SanitizedReason(String);
 
 /// A validated session ULID.
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
-pub struct Session(String);
+struct Session(String);
 
 /// Checked result contract. Fields cannot be instantiated without boundary validation.
 #[derive(Debug, Clone, Serialize)]
-pub struct CaseResult {
+struct CaseResult {
     case_id: Identifier,
     platform: Identifier,
     status: Status,
@@ -199,7 +219,7 @@ impl TryFrom<RawResult> for CaseResult {
 /// # Errors
 /// Returns `decidr.integration_evidence` for malformed fields, duplicate/missing cases,
 /// mixed platforms/tags/sources, or any non-PASS outcome. No clock or external state is used.
-pub fn validate_results(json: &str, source_commit: &str) -> Result<Vec<CaseResult>, DecidrError> {
+fn validate_results(json: &str, source_commit: &str) -> Result<Vec<CaseResult>, DecidrError> {
     let source = Digest::new(source_commit.to_owned(), 40, "source_commit")?;
     let raw: Vec<RawResult> =
         serde_json::from_str(json).map_err(|error| DecidrError::IntegrationEvidence {
@@ -269,8 +289,16 @@ mod tests {
     #[test]
     fn complete_platform_passes_and_round_trips_without_reshaping() {
         let raw = complete();
+        assert_eq!(integration_cases(), REQUIRED_CASES);
         assert_eq!(
-            serde_json::to_value(validate(raw.clone()).unwrap()).unwrap(),
+            serde_json::from_str::<Value>(
+                &validate_integration_results(
+                    &serde_json::to_string(&raw).unwrap(),
+                    &"a".repeat(40)
+                )
+                .unwrap(),
+            )
+            .unwrap(),
             json!(raw)
         );
         let mut extra = raw;
