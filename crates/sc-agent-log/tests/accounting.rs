@@ -4,7 +4,7 @@
 mod common;
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use common::{identity, payload};
@@ -12,6 +12,7 @@ use sc_agent_log::testing::MemoryLog;
 use sc_agent_log::{
     GeneralLogger, Level, LogContext, LogError, LogKind, Loggers, MAX_ROW_BYTES, SessionLogger,
 };
+use sc_agent_testkit::{ChildGuard, HANG_GUARD};
 use sc_agent_types::{ErrorId, SessionId};
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
@@ -36,10 +37,14 @@ fn failing_session(root: &Path) -> Result<SessionLogger, Box<dyn std::error::Err
 
 /// Runs this test binary's test `name` alone with `CHILD=scenario`; returns its stderr.
 fn child_stderr(name: &str, scenario: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new(std::env::current_exe()?)
+    let mut command = Command::new(std::env::current_exe()?);
+    command
         .args([name, "--exact", "--nocapture", "--test-threads=1"])
         .env(CHILD, scenario)
-        .output()?;
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let output = ChildGuard::spawn(&mut command).wait_with_output(HANG_GUARD);
     if !output.status.success() {
         return Err(format!("child {scenario} failed: {output:?}").into());
     }
