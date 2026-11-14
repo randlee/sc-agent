@@ -25,7 +25,6 @@ coverage is reconciled into the phase closeout record.
 - `REQ-SAG-0130`
 - `REQ-SAG-0131`
 - `REQ-SAG-0132`
-- `REQ-SAG-0133`
 - `REQ-SAG-0134`
 - `REQ-SAG-0201`
 - `REQ-SAG-0501`
