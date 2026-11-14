@@ -25,27 +25,13 @@ Definitions:
 - `ErrorDetail` MUST have these optional fields:
   - `status`, the HTTP status, a `u16`;
   - `attempts`, the sends made with the first included, a `u32`;
-  - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`.
+  - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`;
+  - `category`, the error category that REQ-SAG-0017 assigns, stored when the detail is built.
 - Each field MUST be omitted from serialized JSON when it is not set.
-- Every leaf variant MUST set the fields this table gives it (`—` means not set):
-
-  | Id | status | attempts | retry_after_ms |
-  | --- | --- | --- | --- |
-  | `http.provider_busy` | `last.status` (exists) | `attempts` | `last.retry_after_ms` |
-  | `http.quota_exhausted` | `reply.status` | `attempts` | `reply.retry_after_ms` |
-  | `http.network` | — | `attempts` | — |
-  | `http.response_too_large` | `status`, `None` when 0 (refused before the status was read) | — | — |
-  | `llm.api_status` | `reply.status` | — | `reply.retry_after_ms` |
-  | `decision.api_bad_request` | 400 | — | — |
-  | `decision.api_validation` | 422 | — | — |
-  | `decision.api_status` | `status` (exists) | — | — |
-  | `decision.response_parse` | `status` | — | — |
-  | `local.probe_status` | `status` | — | — |
-  | `decision.cancelled` | — | `sends` | — |
+- Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
 - `ErrorId::detail()` MUST remain the only builder of a detail.
-- `ErrorId` MUST have a required `category_rule()`, generated with `id()` by the crate's `error_catalog!` table.
-- The copy-up in `detail()` MUST use only the level's own rule, with no lookup across crates. A level whose rule is `inherit` MUST take all three fields from its cause's already-built top-level fields. A level whose rule is `base` MUST keep its own accessors.
-- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`, which is the level `decidr::category` uses (REQ-SAG-0017).
+- A level whose catalog rule is `inherit` MUST take all four fields from its cause's detail. A level whose rule is `base` MUST keep its own fields.
+- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`.
 - `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
   - as the ceiling in milliseconds;
   - saturating at `u64::MAX`;
@@ -54,7 +40,7 @@ Definitions:
 - `ErrorDetail::map_text` MUST rewrite id and message text throughout the chain and keep `recovery` and every field.
 - `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`. It MUST expose:
   - the read-only attributes `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`;
-  - the field values taken from its top-level detail.
+  - the field values taken from its top-level detail, with `category` `"other"` when the detail has none.
 - These attributes MUST be present on a `SagError` built in Python and on one that has been pickled and restored.
 
 **MUST NOT statements:**
@@ -70,9 +56,9 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 
 **Acceptance Criteria:**
 
-- [ ] For each leaf row in the table above, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
-- [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields at the top level.
-- [ ] A base-rule level over a cause that has a status reports its own fields only, and `category` comes from the same level.
+- [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
+- [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields, `category` included, at the top level.
+- [ ] A base-rule level over a cause that has a status reports its own fields and its own `category` only.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.
 - [ ] `decision.cancelled` carries `attempts` equal to its sends.
 - [ ] `RetryAfter::parse` gives these `retry_after_ms` values:
@@ -85,10 +71,10 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
   | `0.0000001` | 1 |
   | 32 nines | `u64::MAX` |
   | a malformed header | `None` |
-- [ ] `map_text` keeps `status`, `attempts`, `retry_after_ms` and `recovery`.
+- [ ] `map_text` keeps `status`, `attempts`, `retry_after_ms`, `category` and `recovery`.
 - [ ] `SagError("x", "y", "{}")` has `status` `None` and `category` `"other"`.
 - [ ] A pickle round trip of a `SagError` keeps its `status`.
-- [ ] Each crate's test that `detail()` equals the value built from the accessors covers all three fields and the copy-up.
+- [ ] Each crate's test that `detail()` equals the value built from the accessors covers all four fields and the copy-up.
 
 ### Dependencies
 
@@ -97,6 +83,7 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 - ADR-SAG-0019
 - REQ-SAG-0002
 - REQ-SAG-0007
+- REQ-SAG-0017
 - REQ-SAG-0601
 - REQ-SAG-0602
 - NFR-SAG-0002

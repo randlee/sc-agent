@@ -86,11 +86,11 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. A missing key is a typed `auth` error. | Nothing. |
    | Session log | One JSONL record per query and response, at the default location, or sent to the `session_log` callable. | Nothing, unless it redirects the log. |
    | General log | The `general_log` callable. The wheel calls it and never owns the caller's logger. | Optionally inject one. |
-   | Errors | Typed fields, `ERROR_IDS`, `category`, `retryable`, and `SagError` attributes, all computed through `decidr::category` (decisions 2 to 6). | Map a category to its own codes. Never parse message text. |
+   | Errors | Typed fields including the stored `category`, `category()`, `retryable()`, and `SagError` attributes (decisions 2 to 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum the template declares in its front matter, in the skills' form (`requires.cli`, an `sc-compose` entry with `minimum_version`). sc-compose does not enforce the minimum when rendering; a CI check compares it with `[tools].sc-compose` in `floors.toml`. sc-compose is an external render tool, not a dependency of either wheel:
+   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum the template declares in its front matter, in the skills' form (`requires.cli`, an `sc-compose` entry with `minimum_version`). The minimum is declared, not enforced; its value is written down in `floors.toml` (decision 12). sc-compose is an external render tool, not a dependency of either wheel:
 
    - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
    - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
@@ -99,7 +99,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - **Consumer CI.** Consumer CI renders the file again and diffs it, so any hand edit fails.
    - **README.** `crates/sc-agent-py/README.md` keeps a short pointer to the template, with the render command and the CI check.
 
-   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `ERROR_IDS` and `SagError` remain public and documented. The generated code uses only them and the standard library, and nothing is reachable only through generated code. A sc-agent test renders the template with every feature combination and runs each result against the loopback runner.
+   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken` remain public and documented. The generated code uses only them and the standard library, and nothing is reachable only through generated code. A sc-agent test renders the template with every feature combination and runs each result against the loopback runner.
 
    The wheel also ships a `sc_agent.pyi` type stub, so consumers get signatures and field names without reading Rust.
 
@@ -118,23 +118,37 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - `attempts(&self) -> Option<u32>`
    - `retry_after_ms(&self) -> Option<u64>`
 
-   It also gains one required method, `category_rule(&self) -> CategoryRule`, generated together with `id()` by each crate's `error_catalog!` table (decision 6).
+   `ErrorDetail` also gains an optional `category` field. It is stored when the detail is built, like `status`, and is never looked up later (decision 6).
 
    There is still no extension map: it would be untyped, would show no field names in Python or rustdoc, and would turn every new datum into a convention instead of a reviewed field.
 
-   `detail()` remains the only builder and must not be overridden. It does the copy-up in one place, using only the level's own rule (`self.category_rule()`), so that the top-level fields and the category always describe the same level. There is no lookup across crates:
+   `detail()` remains the only builder and must not be overridden. It sets `category` and does the copy-up in one place, using only the level's own catalog rule (decision 6), so that the top-level fields and the category always describe the same level:
 
-   - A level whose rule is `inherit` (a wrapper) takes all three fields from its cause's already-built top-level fields and none of its own. The cause's `detail()` has already done its own copy-up.
-   - A level whose rule is `base` keeps its own accessors and does not fill from its cause.
+   - A level whose rule is `inherit` (a wrapper) takes `status`, `attempts`, `retry_after_ms` and `category` from its cause's detail and none of its own.
+   - A level whose rule is `base` keeps its own accessors and its own category and does not fill from its cause.
 
-   The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`. `decidr::category` uses that same level (decision 6). The result:
+   The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`, and the stored `category` is that level's. The result:
 
    - every wrapper carries its cause's fields with no code of its own, including wrappers added later;
    - a leaf variant overrides only the methods for data it holds;
    - `SagError.status` and `SagError.category` always describe the same reply;
-   - each crate's existing test, which checks that `detail()` equals the value built from the accessors, covers all three fields and the copy-up.
+   - each crate's existing test, which checks that `detail()` equals the value built from the accessors, covers all four fields and the copy-up.
 
-   REQ-SAG-0016 lists every leaf variant and the fields it sets.
+   Leaf variants and their fields (`—` means not set):
+
+   | Id | status | attempts | retry_after_ms |
+   | --- | --- | --- | --- |
+   | `http.provider_busy` | `last.status` (exists) | `attempts` | `last.retry_after_ms` |
+   | `http.quota_exhausted` | `reply.status` | `attempts` | `reply.retry_after_ms` |
+   | `http.network` | — | `attempts` | — |
+   | `http.response_too_large` | `status`, `None` when 0 (refused before the status was read) | — | — |
+   | `llm.api_status` | `reply.status` | — | `reply.retry_after_ms` |
+   | `decision.api_bad_request` | 400 | — | — |
+   | `decision.api_validation` | 422 | — | — |
+   | `decision.api_status` | `status` (exists) | — | — |
+   | `decision.response_parse` | `status` | — | — |
+   | `local.probe_status` | `status` | — | — |
+   | `decision.cancelled` | — | `sends` | — |
 
    `decision.schema_mismatch` and `decision.backend` set no fields of their own. `decision.backend` is a wrapper (rule `inherit`) and takes all three fields from its cause through the copy-up. `decision.schema_mismatch` has its own category, `response_invalid`, so it reports only its own fields, all `None`; its reply was 2xx in any case.
 
@@ -201,8 +215,8 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | --- | --- |
    | `id`, `message`, `detail` | The three args. |
    | `status`, `attempts`, `retry_after_ms` | From the top-level detail, which carries its cause's fields through the copy-up. |
-   | `category` | `decidr::category` of the detail (decision 6). |
-   | `retryable` | `True` for categories `busy` and `network`, from the same `decidr::category`. |
+   | `category` | The top-level detail's stored `category`; `other` when it is not set. |
+   | `retryable` | `True` for categories `busy` and `network`. |
 
    Result lines keep their shape. Each level of `error` gains the new fields when they are set. A failed decision stays as data in its line; `SagError` is for command errors.
 
@@ -227,15 +241,15 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - an inherent `const fn catalog_row(&self) -> (&'static str, CategoryRule)`, holding the exhaustive match. Inside its own crate, `#[non_exhaustive]` does not relax exhaustiveness, so a variant with no row fails to compile.
    - `impl ErrorCatalog for E { const ROWS: &'static [(&'static str, CategoryRule)] }`.
 
-   In each impl, `ErrorId::id()` becomes `self.catalog_row().0` and `ErrorId::category_rule()` becomes `self.catalog_row().1`.
+   `ErrorId::id()` becomes `self.catalog_row().0` in each impl.
 
-   The two Python-binding ids, `sc_agent_py.invalid_option` and `sc_agent_py.worker_panicked`, become variants of a small `PyBindingError` enum in sc-agent-py with its own table, so every row comes from an enum. `decidr::error_catalog()` concatenates every decidr-reachable crate's `ROWS`; sc-treesitter's ids are not decidr errors and are excluded.
+   The two Python-binding ids, `sc_agent_py.invalid_option` and `sc_agent_py.worker_panicked`, become variants of a small `PyBindingError` enum in sc-agent-py with its own table, so every row comes from an enum. Each crate keeps its own table; no table is combined with another crate's, and no category is looked up across crates. sc-treesitter's ids are not decidr errors and get no table.
 
-   **Category over the chain.** `sc-agent-types` has no rows-free `category()`. It offers only `ErrorDetail::category_with(&self, rows: &[(&'static str, CategoryRule)]) -> ErrorCategory`, which looks up each level's id in the rows it is given. `decidr::category(&ErrorDetail) -> ErrorCategory` is `category_with(error_catalog())` and is the single entry point, for in-memory and read-back details alike: below the top, causes are `ErrorDetail` data in both cases, so their rules come from the rows. There is no global registry, no copied table and no new JSON field, so NFR-SAG-0002 byte-identity is unchanged. The category works on a detail, not a bare id:
+   **The category is stored when the detail is built.** `category` is an optional `ErrorDetail` field, set by `detail()`:
 
-   1. Walk from the top through levels whose rule is `Inherit` to the deciding level: the first level with a `Base` rule. This is the level whose fields the top carries (decision 2).
-   2. Apply the status refinement at that level, using that level's `status`.
-   3. Return the result. A foreign id before any `Base` level, or a chain with no catalog id, gives `other`.
+   1. A leaf sets it from its own crate's `error_catalog!` row. For `llm.api_status`, `decision.api_status` and `local.probe_status` it sets the status-refined category below.
+   2. A wrapper copies it up with `status`, `attempts` and `retry_after_ms`, using only its own rule (decision 2).
+   3. It is omitted from JSON when it is not set, so 0.1.0-shaped JSON still round-trips unchanged (NFR-SAG-0002).
 
    The status refinement applies only to `llm.api_status`, `decision.api_status` and `local.probe_status`, whose base category is `other`:
 
@@ -250,19 +264,32 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    Rejected: a separate `server` category. It would extend the owner's fixed category set for a distinction no consumer has asked to act on; `busy` already means "the provider could not serve this now; resubmit later".
 
-   The rule lives in Rust only. Python goes through `decidr::category`; `sc_agent.category`, `SagError.category` and `retryable` all call it:
+   The rule lives in Rust only. Python reads the stored field:
 
-   - `sc_agent.category(detail_or_id, status=None) -> str`, which takes a detail dict, a detail JSON string or a bare id;
-   - `sc_agent.retryable(detail_or_id) -> bool`;
-   - `sc_agent.ERROR_IDS: frozenset[str]`.
+   - `sc_agent.category(detail) -> str`, which takes a detail dict or a detail JSON string;
+   - `sc_agent.retryable(detail) -> bool`.
 
    **`retryable` means "worth resubmitting as a new call later, after the wheel's own resends have run out."** The wheel has already applied `max_sends`, the 90 s start budget and the provider pause before returning a `busy` or `network` failure. A consumer that resubmits waits first, at least `retry_after_ms` when it is set, and must not wrap the wheel in an immediate retry loop. `retryable` is true for `busy` and `network` only.
 
-   An id outside the catalog gives `other` and does not raise. Foreign cause ids (`io.*`, `foreign.source`) and newer ids seen by an older wheel are therefore safe. `id in ERROR_IDS` is the membership test.
+   A detail without a stored `category` (written by 0.1.0, or foreign) gives `other` and does not raise.
 
-   REQ-SAG-0017 lists every catalog id with its base category or the `inherit` rule (a wrapper whose category is its cause's).
+   **Base categories** (the `error_catalog!` rows). `inherit` is a wrapper whose category is its cause's.
 
-   The implementing sprint adds any id that lands on the b stack after this ADR, with a category, to that table. A missing row fails to compile, so none can be forgotten.
+   | Category | Ids |
+   | --- | --- |
+   | busy | `http.provider_busy` |
+   | quota | `http.quota_exhausted` |
+   | auth | `decidr.no_provider_key`, `secrets.key_missing`, `secrets.key_malformed`, `secrets.keyring_read`, `secrets.keyring_timeout`, `secrets.keyring_construction_refused` |
+   | network | `http.network`, `local.load_timeout` |
+   | response_invalid | `decision.response_parse`, `decision.schema_mismatch`, `http.response_too_large`, `llm.reply_invalid`, `llm.no_text`, `llm.truncated`, `llm.output_not_json`, `decision_llm.answer_ids`, `decision_llm.answer_invalid`, `local.probe_parse` |
+   | validation | `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers` (new), `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
+   | cancelled | `decision.cancelled`, `decidr.signal` |
+   | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
+   | log | `log.*` except `log.invalid_slug` |
+   | other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
+   | inherit | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
+
+   The implementing sprint adds any id that lands on the b stack after this ADR, with a category, in the same table. A missing row fails to compile, so none can be forgotten.
 
 7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
 
@@ -318,8 +345,6 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
     Consumers map categories to their own codes, so moving an id to a different category, or changing the status refinement, is a breaking change and needs a breaking version bump (a minor bump below 1.0). Adding an id with a category is not breaking. NFR-SAG-0002 records this.
 
-    A stored detail keeps the top-level fields from when it was written, but its category is computed when it is read. After a breaking category change, the two can therefore describe different levels.
-
 11. **sitr is an optional, separate section of the consumer template.**
 
     sitr is published on PyPI (package `sitr`, module `sc_treesitter`) and on crates.io (`sitr`), first as 0.1.0, with wheels for the same six platforms as sc-decidr. It is pinned to the same sc-agent release as sc-decidr (decision 4).
@@ -328,7 +353,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 12. **One Python floor (NFR-SAG-0003).**
 
-    - The Python floor is `[python].floor` in `floors.toml` at the repository root, the single source for the workspace's floors. A CI check compares every place that repeats it against it: the pyo3 abi3 features, each wheel's `requires-python`, the wheel-job Python and the consumer template's script header. sc-lint will later enforce `floors.toml` under the check name `floors`.
+    - The Python floor is the `[python].floor` value in `floors.toml` at the repository root. `floors.toml` only writes down floor values, to feed sc-compose templates; the consumer template reads them. Checking floors belongs to the tools: sc-lint#972 (a `floors` lint step) and sc-compose#1046 (floors as template input and a minimum-version diagnostic).
     - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3) moves from `abi3-py310` to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels already declare.
     - CI builds both wheels and runs their pytest suites on the Python floor; the `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already do.
     - The generated consumer module's script header declares the Python floor as its `requires-python`.
@@ -399,9 +424,9 @@ Tests, written with the implementation:
   - a Rust test builds the error and asserts its `detail()` fields;
   - a Python test reads the same values through `SagError` or the result line, end to end, using the loopback runner where an HTTP reply is needed.
 - **Copy-up.**
-  - `decision.http` over `ProviderBusy` carries the busy fields at the top level.
+  - `decision.http` over `ProviderBusy` carries the busy fields and `category` at the top level.
   - `decision.backend` over a 401 `llm.api_status` carries `status == 401`.
-  - `map_text` keeps all three fields.
+  - `map_text` keeps all four fields.
 - **`retry_after_ms`.** These values from `RetryAfter::parse`:
 
   | Retry-After | `retry_after_ms` |
@@ -415,14 +440,14 @@ Tests, written with the implementation:
 - **Catalog.**
   - A `compile_fail` doctest in sc-agent-types shows that a variant with no row does not compile.
   - Each crate's `every()` sample values map to ids that are in `ROWS`.
-  - `error_catalog()` has no duplicate ids.
-  - The Python test that `ERROR_IDS` equals the catalog is plumbing only.
-- **Category.**
+  - No crate's table has a duplicate id.
+- **Category** (the stored field).
   - `decision.http` over `ProviderBusy` is `busy`.
   - Over `QuotaExhausted` it is `quota`, and over `Network` it is `network`.
   - `decision.backend` over a 401 `llm.api_status` is `auth`.
   - `local.probe_status` with 429 is `busy`.
   - `decision.api_status` with 500, 503 or 504 is `busy`, and with 501 is `other`.
+  - A 0.1.0 detail with no stored `category` is `other` in Python.
   - A detail whose top-level `status` comes from level N gets its `category` from level N.
   - `io.ConnectionRefused` is `other`.
 - **`SagError`.**
@@ -452,14 +477,14 @@ Tests, written with the implementation:
   - The rendered header records the installed sc-decidr version, and the sitr version when `sitr` is true.
   - The sitr offline test: extraction from a checked-in source file reaches a dry-run request; with `sitr` false the module imports without `sc_treesitter`.
   - The rendered modules reference only the public API and the standard library.
-- **Python floor (NFR-SAG-0003).** Both built wheels carry the abi3 tag of the Python floor, and the CI check fails when a repeated floor differs from it.
+- **Python floor (NFR-SAG-0003).** Both built wheels carry the abi3 tag of the Python floor.
 - **Compatibility (NFR-SAG-0002).** A checked-in 0.1.0 detail JSON with a two-level chain:
   - deserializes with every new field `None`;
   - serializes back to the original bytes.
 
 Delivery:
 
-The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits, in phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. This includes the consumer template and its tests, the abi3 and CI changes, and the CHANGELOG.
+The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits, in phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. This includes the consumer template and its tests, the abi3 changes, and the CHANGELOG.
 
 The 0.2.0 release MUST publish both sc-decidr and sitr to PyPI at the same version, not only as GitHub prerelease assets. Today PyPI has only 0.1.0; 0.1.2 to 0.1.5 exist only on GitHub, and consumers can pin only what is on PyPI.
 
@@ -478,7 +503,7 @@ Deliverables beyond the code:
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
 - The version files listed in decision 4.
-- `floors.toml` at the repository root, the single source for floors, with this shape:
+- `floors.toml` at the repository root. It only writes down floor values, to feed sc-compose templates:
 
   ```toml
   schema_version = 1
@@ -491,8 +516,6 @@ Deliverables beyond the code:
   # optional per-manifest overrides
   [packages."<manifest dir>"]
   ```
-
-  `[rust].msrv` records the workspace `rust-version` as its current value. A check of the Rust floor is out of scope for this ADR and is a follow-up. sc-compose#1046 asks sc-compose to take `floors.toml` values as template input and to report a template whose declared sc-compose minimum is not met.
 - sc-decidr 0.2.0 and sitr 0.2.0 on PyPI.
 
 Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope, including plan-anchor dropping its Python 3.9 CI floor.
