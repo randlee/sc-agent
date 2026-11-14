@@ -17,7 +17,8 @@ import subprocess
 import sys
 import tempfile
 
-from preflight import ROOT, Refusal, command, digest, git, prerelease_helper
+from integration_errors import failure_detail
+from preflight import ROOT, Refusal, checked_process, command, digest, git, prerelease_helper
 from configuration import case_specs, distribution_wheel, module_distribution, platform_target, release_manifest
 
 
@@ -36,29 +37,29 @@ def install_release(helper, tag, version, manifest, names, stage):
         helper.stage_release(tag, version, manifest, names, stage, directory, public_url=None)
         checksums = helper.checksums((directory / "checksums.txt").read_text())
     wheels = helper.staged_wheels(stage, manifest)
-    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--stage", str(stage), *map(str, wheels)], check=True)
-    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--verify", "--stage", str(stage), "--version", version], check=True)
+    checked_process([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--stage", str(stage), *map(str, wheels)])
+    checked_process([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--verify", "--stage", str(stage), "--version", version])
     return checksums, wheels
 
 
 def prepare(args):
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", args.run_id):
-        raise Refusal("run-id must be a safe 1..64 character identifier")
+        raise Refusal('run-id must be a safe 1..64 character identifier', code="integration.invalid_run_id", remediation='Use a new 1..64 character run id containing only letters, digits, underscore, dot or hyphen.')
     if not re.fullmatch(r"prerelease/v\d+\.\d+\.\d+", args.tag):
-        raise Refusal("tag must be prerelease/vMAJOR.MINOR.PATCH")
+        raise Refusal('tag must be prerelease/vMAJOR.MINOR.PATCH', code="integration.invalid_tag", remediation='Select a published prerelease tag in the required format.')
     run_dir = args.run_dir.resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     state_path = run_dir / "run.json"
     if state_path.exists():
         state = json.loads(state_path.read_text())
         if (state["prerelease_tag"], state["platform"], state["run_id"]) != (args.tag, args.platform, args.run_id):
-            raise Refusal("run directory belongs to a different tag/platform/run-id")
+            raise Refusal('run directory belongs to a different tag/platform/run-id', code="integration.run_identity_mismatch", remediation='Use the original run identity or select a fresh run directory.')
         return state
     helper = prerelease_helper()
     manifest = release_manifest(ROOT)
     target = helper.host_target(manifest)
     if platform_target(manifest, args.platform)["target"] != target["target"]:
-        raise Refusal("platform must match the machine executing the installed artifacts")
+        raise Refusal('platform must match the machine executing the installed artifacts', code="integration.host_platform_mismatch", remediation='Run on the declared platform or select this host platform.')
     version = args.tag.removeprefix(manifest["prerelease"]["tag_prefix"])
     release = helper.release_for_tag(args.tag)
     helper.require_release_assets(release, manifest, version)
@@ -66,11 +67,11 @@ def prepare(args):
     git("fetch", "origin", f"refs/tags/{args.tag}:refs/tags/{args.tag}")
     source = git("rev-list", "-n", "1", args.tag)
     if git("rev-parse", "HEAD") != source:
-        raise Refusal("check out the exact prerelease source before executing its integration scripts")
+        raise Refusal('check out the exact prerelease source before executing its integration scripts', code="integration.source_checkout_mismatch", remediation='Check out the commit named by the selected prerelease tag and retry.')
     if not git("branch", "--show-current"):
-        raise Refusal("use an attached branch for report commits and pushes")
+        raise Refusal('use an attached branch for report commits and pushes', code="integration.detached_checkout", remediation='Create or check out a branch at the tested source before publishing its report.')
     if git("status", "--porcelain", "--untracked-files=no"):
-        raise Refusal("integration requires a clean tested source checkout")
+        raise Refusal('integration requires a clean tested source checkout', code="integration.dirty_checkout", remediation='Commit or remove local source edits before starting a new integration run.')
     receipt_path = run_dir / "formula-receipt.json"
     if receipt_path.exists():
         receipt = json.loads(receipt_path.read_text())
@@ -79,17 +80,17 @@ def prepare(args):
         receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
     payload = receipt["payload"]
     if payload.get("outcome") != "succeeded" or not payload.get("graph", {}).get("ids"):
-        raise Refusal("formula pour did not produce a successful graph receipt")
+        raise Refusal('formula pour did not produce a successful graph receipt', code="integration.formula_pour_failed", remediation='Inspect the sc-compose receipt, correct the formula or Beads prerequisites and pour again.')
     stage = run_dir / "installed"
     checksums, wheels = install_release(helper, args.tag, version, manifest, names, stage)
     installed = json.loads(command([str(runtime_python(stage)), str(ROOT / "scripts/integration/wheel_case.py"), "contract", "--config-dir", str(run_dir / "config")]))
     if set(installed) != set(required_cases()):
-        raise Refusal("installed Rust case contract differs from the formula")
+        raise Refusal('installed Rust case contract differs from the formula', code="integration.case_contract_mismatch", remediation='Use matching published artifacts and generated integration case configuration.')
     archive = helper.archive_name(manifest, version, target)
     artifacts = [{"name": name, "sha256": checksums[name]} for name in [archive, *[p.name for p in wheels]]]
     state = {"run_id": args.run_id, "source_commit": source, "platform": args.platform, "prerelease_tag": args.tag, "artifacts": artifacts, "results": [], "beads": payload["graph"]["ids"], "formula_root": payload["graph"]["parent"]}
     state_path.write_text(json.dumps(state, indent=2) + "\n")
-    subprocess.run(["bd", "close", state["beads"]["verify_assets"], "--reason", "Downloaded and checksum-verified installed target binary archive and both wheels"], check=True)
+    checked_process(["bd", "close", state["beads"]["verify_assets"], "--reason", "Downloaded and checksum-verified installed target binary archive and both wheels"])
     return state
 
 
@@ -132,9 +133,9 @@ def result_outcome(case, output, returncode):
 
 def execute_case(state, run_dir, case):
     if case not in required_cases():
-        raise Refusal("unknown integration case")
+        raise Refusal('unknown integration case', code="integration.unknown_case", remediation='Select a case declared by the integration case manifest.')
     if any(result["case_id"] == case for result in state["results"]):
-        raise Refusal("case already has a result; use a new run-id for a rerun")
+        raise Refusal('case already has a result; use a new run-id for a rerun', code="integration.case_already_recorded", remediation='Choose a new run id and run directory to repeat this case without overwriting evidence.')
     stage = run_dir / "installed"
     spec = case_specs(ROOT)[case]
     provider, model = spec["provider"], spec["model"]
@@ -183,26 +184,26 @@ def execute_case(state, run_dir, case):
     state["results"].append(record)
     (run_dir / "run.json").write_text(json.dumps(state, indent=2) + "\n")
     if status == "PASS":
-        subprocess.run(["bd", "close", state["beads"][case.replace("-", "_")], "--reason", reason], check=True)
+        checked_process(["bd", "close", state["beads"][case.replace("-", "_")], "--reason", reason])
     else:
-        subprocess.run(["bd", "update", state["beads"][case.replace("-", "_")], "--append-notes", f"{status}: {reason}"], check=True)
+        checked_process(["bd", "update", state["beads"][case.replace("-", "_")], "--append-notes", f"{status}: {reason}"])
     print(json.dumps(record))
 
 
 def render_report(state, run_dir, template, report):
     vars_path = run_dir / "report-vars.json"
     vars_path.write_text(json.dumps(state, indent=2) + "\n")
-    subprocess.run(["sc-compose", "render", "--file", str(template), "--var-file", str(vars_path), "--strict", "--output", str(report)], cwd=ROOT, check=True)
+    checked_process(["sc-compose", "render", "--file", str(template), "--var-file", str(vars_path), "--strict", "--output", str(report)], cwd=ROOT)
     import xml.etree.ElementTree as ET
     if ET.fromstring(report.read_bytes()).tag != "{http://www.w3.org/1999/xhtml}html":
-        raise Refusal("rendered report must be well-formed XHTML")
+        raise Refusal('rendered report must be well-formed XHTML', code="integration.invalid_xhtml", remediation='Correct the selected report template and render well-formed XHTML.')
 
 
 def publish_report(state, run_dir, template):
     if not template.is_file():
-        raise Refusal("owner-selected XHTML template is unavailable; report acceptance remains open")
+        raise Refusal('owner-selected XHTML template is unavailable; report acceptance remains open', code="integration.template_unavailable", remediation='Provide the owner-selected XHTML template at the requested path.')
     if {result["case_id"] for result in state["results"]} != set(required_cases()):
-        raise Refusal("run every required case before publishing its platform report")
+        raise Refusal('run every required case before publishing its platform report', code="integration.incomplete_run", remediation='Execute every declared integration case before publishing the report.')
     directory = ROOT / "site/reports/integration"
     directory.mkdir(parents=True, exist_ok=True)
     report = directory / f"{state['run_id']}.html"
@@ -217,9 +218,9 @@ def publish_report(state, run_dir, template):
     git("commit", "-m", f"integration: record {state['platform']} run {state['run_id']}")
     git("push", "origin", "HEAD")
     passed = all(result["status"] == "PASS" for result in state["results"])
-    subprocess.run(["bd", "close", state["beads"]["report"], "--reason", "Platform XHTML report committed and pushed"], check=True)
+    checked_process(["bd", "close", state["beads"]["report"], "--reason", "Platform XHTML report committed and pushed"])
     if passed:
-        subprocess.run(["bd", "close", state["formula_root"], "--reason", "All required live provider cases passed; platform report committed and pushed"], check=True)
+        checked_process(["bd", "close", state["formula_root"], "--reason", "All required live provider cases passed; platform report committed and pushed"])
     return passed
 
 
@@ -229,7 +230,13 @@ def main():
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--platform", required=True)
-    parser.add_argument("--case", choices=required_cases())
+    try:
+        cases = required_cases()
+    except (Exception, SystemExit) as error:
+        detail = failure_detail(error)
+        print(json.dumps({"status": "FAIL", "error": detail["id"], "reason": detail["message"], "remediation": detail["remediation"], "detail": detail}))
+        return 1
+    parser.add_argument("--case", choices=cases)
     parser.add_argument("--template", type=Path, default=ROOT / "templates/integration-report/platform.xhtml.j2")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--report-only", action="store_true")
@@ -246,8 +253,8 @@ def main():
             return 0 if state["results"][-1]["status"] == "PASS" else 1
         return 0 if publish_report(state, args.run_dir.resolve(), args.template) else 1
     except (Exception, SystemExit) as error:
-        reason = str(error) if isinstance(error, Refusal) else f"{type(error).__name__}: integration could not complete; inspect local execution before retrying"
-        print(json.dumps({"status": "FAIL", "error": "integration.cannot_complete", "reason": reason}))
+        detail = failure_detail(error)
+        print(json.dumps({"status": "FAIL", "error": detail["id"], "reason": detail["message"], "remediation": detail["remediation"], "detail": detail}))
         return 1
 
 
