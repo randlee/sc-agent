@@ -39,6 +39,10 @@ def git(*args, root=ROOT):
     return command(["git", *args], cwd=root)
 
 
+def pushed_ref_contains(commit, *, root=ROOT):
+    return bool(git("for-each-ref", f"--contains={commit}", "--format=%(refname)", "refs/remotes/origin/", root=root))
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -174,7 +178,7 @@ def validate_run(run, candidate, *, root=ROOT, validator=None, artifact_verifier
     git("ls-files", "--error-unmatch", "--", str(report), root=root)
     git("diff", "--exit-code", "HEAD", "--", str(report), root=root)
     commit = git("log", "-1", "--format=%H", "--", str(report), root=root)
-    if not commit or not git("for-each-ref", f"--contains={commit}", "--format=%(refname)", "refs/remotes/origin/", root=root):
+    if not commit or not pushed_ref_contains(commit, root=root):
         raise Refusal("platform report has not been committed and pushed to origin")
     artifact_verifier(run)
     return results
@@ -196,7 +200,7 @@ def main():
             run = json.loads(path.read_text())
             record_commit = git("log", "-1", "--format=%H", "--", str(path.relative_to(ROOT)))
             report_commit = git("log", "-1", "--format=%H", "--", str(report_path(run["report"])))
-            if record_commit != report_commit or not git("for-each-ref", f"--contains={record_commit}", "--format=%(refname)", "refs/remotes/origin/"):
+            if record_commit != report_commit or not pushed_ref_contains(record_commit):
                 raise Refusal("case results and XHTML must be committed together and pushed to origin")
             validate_run(run, candidate)
             print(json.dumps({"status": "PASS", "report": run["report"], "source_commit": run["source_commit"]}))
