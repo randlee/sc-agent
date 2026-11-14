@@ -339,7 +339,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    `decidr::integration_gate` (about 400 lines that validate prerelease integration results) is public decidr API today, re-exported as `integration_cases` and `validate_integration_results`, and exposed in the wheel as `sc_agent.integration_cases` and `sc_agent.validate_integration_results`. Its error, `decidr.integration_evidence`, would otherwise enter the error catalog and become a permanent part of the product's error contract. Around it, about 1,800 more lines of scripts, formula, report template and evidence plumbing implement REQ-SAG-0133's reports, transports and publication gate.
 
-   Before 0.2.0 freezes the catalog, the module, both Python functions and that tooling are removed. Prerelease verification becomes live tests that the owner runs by hand against the installed prerelease wheel. They verify that the TypeSafe API works with `jev`, `haiku` and `luna`; a model whose API key is not available is skipped. `decidr.integration_evidence` is not a catalog id. REQ-SAG-0133 is superseded by this decision.
+   Before 0.2.0 freezes the catalog, the module, both Python functions and that tooling are removed. Prerelease verification becomes live tests that the owner runs by hand against the installed prerelease wheel. They verify that the TypeSafe API works with `jev`, `haiku` and `luna`; a model whose API key is not available is skipped. Each tested platform's live-test report is an XHTML file that is committed and pushed; one passing platform is sufficient. `decidr.integration_evidence` is not a catalog id. REQ-SAG-0133 is superseded by this decision.
 
 10. **Category assignments are part of the contract.**
 
