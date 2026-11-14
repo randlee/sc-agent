@@ -18,7 +18,9 @@
 
 - Credential environment-variable names such as `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` MUST be defined in `sc-agent-secrets`.
 - Any other crate that needs a credential variable name MUST obtain it from `sc-agent-secrets`.
-- `sc-agent-secrets` MUST resolve a key from the process environment first, then the repository-root `.env` file, then the platform keyring.
+- `sc-agent-secrets` MUST resolve a key from the repository-root `.env` file first, then the process environment, then the platform keyring.
+
+- A present but invalid credential in a higher-priority source MUST be authoritative and MUST NOT fall back to a lower-priority source.
 
 ### Rationale
 

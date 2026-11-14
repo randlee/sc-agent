@@ -1,7 +1,7 @@
 //! API key resolution for sc-agent (REQ-SAG-0401).
 //!
-//! A key is looked up by its variable name in the process environment, then
-//! in the repo-root `.env` file, then in the platform keyring (service =
+//! A key is looked up by its variable name in the repo-root `.env` file, then
+//! in the process environment, then in the platform keyring (service =
 //! variable name, account = OS user). [`resolve`] takes a
 //! [`Provider`](sc_agent_types::Provider) and uses [`env_var`]; [`resolve_var`]
 //! takes a variable named by configuration (a local runner's `key_env`).
