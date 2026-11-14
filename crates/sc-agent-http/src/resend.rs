@@ -34,7 +34,6 @@ use crate::request::{HttpRequest, HttpResponse, SecretHeader};
 use crate::retry_after::RetryAfter;
 use crate::transport::Transport;
 
-/// HTTP statuses that mean "busy, resend the same body".
 /// First backoff holdoff when `Retry-After` is absent or malformed.
 const BACKOFF_FIRST: Duration = Duration::from_secs(1);
 

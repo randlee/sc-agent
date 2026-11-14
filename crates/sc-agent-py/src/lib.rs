@@ -732,6 +732,7 @@ fn validate_integration_results(results_json: &str, source_commit: &str) -> PyRe
         .map_err(|error| sag_error(&error))
 }
 
+/// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
 #[pymodule]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(integration_cases, module)?)?;
@@ -750,6 +751,24 @@ mod tests {
     use super::*;
     use sc_agent_secrets::KeyringSource;
     use std::cell::Cell;
+
+    #[test]
+    fn python_module_exposes_its_module_documentation() {
+        Python::initialize();
+        Python::attach(|py| {
+            let module_object = sc_agent::_PYO3_DEF.make_module(py).expect("module");
+            let module = module_object.bind(py);
+            let documentation = module
+                .getattr("__doc__")
+                .expect("module documentation")
+                .extract::<String>()
+                .expect("documentation string");
+            assert_eq!(
+                documentation,
+                "The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+            );
+        });
+    }
 
     /// AC: REQ-SAG-0007. The string returned for a result keeps 0.123456789 unchanged.
     #[test]
