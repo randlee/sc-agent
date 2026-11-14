@@ -7,6 +7,12 @@ is required. The integration formula contains ten live cases: TypeSafe model
 discovery, TypeSafe noul decisions, Anthropic structured-output decisions, and
 invalid-credential/redaction checks for each provider, through both interfaces.
 
+Provider, model, interface, operation and result expectation are configured per case
+in the formula’s `steps.metadata.integration` tables. Platform identifiers come
+from declared wheel IDs or target triples in `release/publish-artifacts.toml`;
+architecture-spelled aliases are derived from those declarations. Wheel package
+names and import modules come from the same manifest.
+
 The case-result boundary is implemented in
 `crates/decidr/src/integration_gate.rs`. The installed wheel exposes the same
 validator through `validate_integration_results(results_json, source_commit)`;

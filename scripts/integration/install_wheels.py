@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Install verified staged wheels into an isolated Python 3.11+ environment or verify it."""
 import argparse
+import json
 from pathlib import Path
 import subprocess
 import sys
 import venv
+
+from configuration import release_manifest
 
 
 def main():
@@ -18,12 +21,15 @@ def main():
         parser.error("Python 3.11+ is required")
     python = args.stage / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     if args.verify:
-        for binary in ["decidr", "sitr"]:
+        manifest = release_manifest()
+        for binary in manifest["prerelease"]["binaries"]:
             path = args.stage / "bin" / (binary + (".exe" if sys.platform == "win32" else ""))
             result = subprocess.run([str(path), "--version"], check=True, text=True, capture_output=True)
             if args.version not in result.stdout:
                 raise SystemExit(f"{binary} version differs from requested prerelease")
-        subprocess.run([str(python), "-c", "import importlib.metadata as m,sc_agent,sc_treesitter,sys; expected=sys.argv[1]; actual=[m.version(name) for name in ('sc-decidr','sitr')]; sys.exit('installed wheel version differs from prerelease' if any(version != expected for version in actual) else 0)", args.version], check=True)
+        packages = manifest["python_packages"]
+        code = "import importlib,importlib.metadata as m,json,sys; expected=sys.argv[1]; packages=json.loads(sys.argv[2]); [importlib.import_module(p['module']) for p in packages]; actual=[m.version(p['package']) for p in packages]; sys.exit('installed wheel version differs from prerelease' if any(version != expected for version in actual) else 0)"
+        subprocess.run([str(python), "-c", code, args.version, json.dumps(packages)], check=True)
         print(args.version)
     else:
         if not args.wheels:
