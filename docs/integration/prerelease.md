@@ -156,3 +156,26 @@ commit `e9998349859efa8d4c754bf0b6ed044c91819fc8`. In `sc-agent-log`'s
 `tests/session.rs`, `forty_thousand_sessions` passed; the target reported 4
 passed, 0 failed, 0 ignored in 1.60 s. The test asserted 40,000 log rows and
 40,000 distinct session IDs.
+
+### Integration error output
+
+`run.py` failures return a stable `error` id, a safe `reason`, a
+`remediation`, and structured `detail`. Refusals distinguish invalid run ids,
+source/identity mismatches, incomplete runs, report publication and artifact
+failures. For example, `integration.stale_source` requires a newly tested
+prerelease and committed/pushed report; `integration.report_not_pushed`
+requires committing the report and results together and pushing to origin.
+
+Preflight retains its aggregate `integration.no_passing_platform` status and
+legacy `reports` summaries, and adds `failures`: each entry identifies the
+report and its typed error with remediation. Repository setup failures also
+return typed details. No acceptance condition changes.
+
+Subprocess details include redacted `argv`, the exit `returncode` when
+available, and the last 4096 characters of redacted `stderr_tail`.
+`integration.subprocess_failed` and `integration.subprocess_timeout` have
+separate recovery guidance. Stdout is never included in a failure detail;
+validator evidence-bearing stderr and Python code arguments remain private.
+Environment credentials, URL credentials, bearer/basic authentication and
+credential options are redacted before a tail is selected. The pinned
+prerelease helper is unchanged; its subprocess seam captures failure stderr.
