@@ -33,6 +33,11 @@ use crate::input::LimitKind;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum DecidrError {
+    /// A per-call timeout is non-finite or outside the request-timeout bounds.
+    InvalidRequestTimeout {
+        /// A lower-level duration-conversion failure, when present.
+        source: Option<Box<ErrorDetail>>,
+    },
     /// Integration evidence failed boundary validation.
     IntegrationEvidence {
         /// The invalid field or contract element.
@@ -227,6 +232,7 @@ fn foreign(id: &str, error: &(dyn Error + 'static)) -> Option<ErrorDetail> {
 impl ErrorId for DecidrError {
     fn id(&self) -> &'static str {
         match self {
+            Self::InvalidRequestTimeout { .. } => "decidr.invalid_request_timeout",
             Self::IntegrationEvidence { .. } => "decidr.integration_evidence",
             Self::Usage { .. } => "decidr.usage",
             Self::Config(_) => "decidr.config",
@@ -255,6 +261,11 @@ impl ErrorId for DecidrError {
 
     fn message(&self) -> String {
         match self {
+            Self::InvalidRequestTimeout { .. } => format!(
+                "timeout_secs must be finite and within {}..={} seconds",
+                sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.start(),
+                sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.end(),
+            ),
             Self::IntegrationEvidence { field, reason, .. } => {
                 format!("integration evidence {field}: {reason}")
             }
@@ -336,7 +347,9 @@ impl ErrorId for DecidrError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
-            Self::IntegrationEvidence { source, .. } => source.as_deref().cloned(),
+            Self::InvalidRequestTimeout { source } | Self::IntegrationEvidence { source, .. } => {
+                source.as_deref().cloned()
+            }
             Self::Usage { source } => foreign("clap", &**source),
             Self::Config(error) => Some(error.detail()),
             Self::Types(error) => Some(error.detail()),
@@ -365,6 +378,9 @@ impl ErrorId for DecidrError {
 
     fn recovery(&self) -> Option<&'static str> {
         match self {
+            Self::InvalidRequestTimeout { .. } => {
+                Some("omit timeout_secs or pass finite seconds within the reported bounds")
+            }
             Self::IntegrationEvidence { .. } => Some(
                 "rerun every required integration case against checksum-verified candidate assets",
             ),
@@ -416,7 +432,7 @@ impl fmt::Display for DecidrError {
 impl Error for DecidrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::IntegrationEvidence { source, .. } => {
+            Self::InvalidRequestTimeout { source } | Self::IntegrationEvidence { source, .. } => {
                 source.as_ref().map(|error| &**error as &dyn Error)
             }
             Self::Usage { source } => Some(&**source),

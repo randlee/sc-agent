@@ -28,6 +28,7 @@ pub mod signal;
 mod doctor;
 mod error;
 mod select;
+mod timeout;
 
 #[doc(inline)]
 pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
@@ -38,5 +39,8 @@ pub use integration_gate::{integration_cases, validate_integration_results};
 #[doc(inline)]
 pub use select::{
     Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,
-    send_batch, send_batch_on, send_on, session_identity, session_logger,
+    send_batch, send_batch_on, send_batch_with_timeout, send_on, send_with_timeout,
+    session_identity, session_logger,
 };
+#[doc(inline)]
+pub use timeout::RequestTimeout;
