@@ -84,6 +84,44 @@ class FormulaAndTransport(unittest.TestCase):
 
 
 class GateHistory(unittest.TestCase):
+    def test_shallow_checkout_needs_full_remote_history_for_pushed_ref_proof(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "origin.git"
+            producer = root / "producer"
+            shallow = root / "shallow"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True, text=True)
+            subprocess.run(["git", "init", str(producer)], check=True, capture_output=True, text=True)
+
+            def run_git(cwd, *args):
+                return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+            run_git(producer, "config", "user.email", "fixture@example.invalid")
+            run_git(producer, "config", "user.name", "Controlled fixture")
+            (producer / "report.html").write_text("committed report")
+            run_git(producer, "add", "report.html")
+            run_git(producer, "commit", "-m", "publish report")
+            commit = run_git(producer, "rev-parse", "HEAD")
+            run_git(producer, "remote", "add", "origin", str(remote))
+            run_git(producer, "push", "origin", "HEAD:main")
+
+            shallow.mkdir()
+            run_git(shallow, "init")
+            run_git(shallow, "remote", "add", "origin", str(remote))
+            run_git(shallow, "fetch", "--depth=1", "origin", commit)
+            run_git(shallow, "checkout", "--detach", "FETCH_HEAD")
+            self.assertFalse(preflight.pushed_ref_contains(commit, root=shallow))
+
+            run_git(shallow, "fetch", "--unshallow", "origin", "+refs/heads/*:refs/remotes/origin/*")
+            self.assertTrue(preflight.pushed_ref_contains(commit, root=shallow))
+
+    def test_dry_run_checkout_fetches_full_history(self):
+        workflow = (ROOT / ".github/workflows/sc-publish-dry-run.yml").read_text()
+        self.assertRegex(
+            workflow,
+            r"(?m)^      - uses: actions/checkout@[^\n]+\n        with:\n          fetch-depth: 0$",
+        )
+
     def test_only_report_descendants_are_allowed(self):
         preflight.check_source_history("source", "candidate", ["site/reports/integration/run.html", "site/reports/integration/run.json"])
         for changed in ["crates/decidr/src/lib.rs", "scripts/integration/run.py", "site/reports/integration-old/run.html"]:
