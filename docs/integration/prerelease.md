@@ -141,7 +141,7 @@ The committed [B-1 sprint requirements list](b-1-sprint-requirements.md) include
 NFR-SAG-0001 and mirrors the requirement IDs on sprint bead `agt-b-1`.
 
 Workspace test evidence: `cargo test --workspace --all-features` passed at source
-commit `92b105ebca8874bb9965b0eccb005c39af690b4a`. In `sc-agent-log`'s
+commit `e9998349859efa8d4c754bf0b6ed044c91819fc8`. In `sc-agent-log`'s
 `tests/session.rs`, `forty_thousand_sessions` passed; the target reported 4
-passed, 0 failed, 0 ignored in 1.64 s. The test asserted 40,000 log rows and
+passed, 0 failed, 0 ignored in 1.60 s. The test asserted 40,000 log rows and
 40,000 distinct session IDs.
