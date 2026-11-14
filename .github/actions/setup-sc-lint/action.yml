@@ -96,17 +96,18 @@ runs:
         }
         python3 .github/scripts/verify_sc_lint_checksum.py "${checksums_path}" "${archive_path}" "${archive}"
         tar -xzf "${archive_path}" -C "${install_dir}"
-        test -x "${install_dir}/sc-lint" || {
+        archive_root="${install_dir}/sc-lint_${SC_LINT_VERSION}_${target}/bin"
+        test -x "${archive_root}/sc-lint" || {
           echo "sc-lint setup: release archive is missing executable sc-lint" >&2
           exit 1
         }
         for backend in sc-lint-boundary sc-lint-portability sc-lint-runtime; do
-          test -x "${install_dir}/${backend}" || {
+          test -x "${archive_root}/${backend}" || {
             echo "sc-lint setup: release archive is missing sibling backend ${backend}" >&2
             exit 1
           }
         done
-        echo "${install_dir}" >> "${GITHUB_PATH}"
+        echo "${archive_root}" >> "${GITHUB_PATH}"
     - name: Install sc-lint release (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: pwsh
@@ -141,12 +142,13 @@ runs:
           throw "sc-lint setup: SHA-256 verification failed for $archive"
         }
         Expand-Archive -Path $archivePath -DestinationPath $installDir -Force
+        $archiveRoot = Join-Path $installDir "sc-lint_${env:SC_LINT_VERSION}_${target}/bin"
         foreach ($binary in @('sc-lint.exe', 'sc-lint-boundary.exe', 'sc-lint-portability.exe', 'sc-lint-runtime.exe')) {
-          if (-not (Test-Path (Join-Path $installDir $binary))) {
+          if (-not (Test-Path -PathType Leaf (Join-Path $archiveRoot $binary))) {
             throw "sc-lint setup: release archive is missing sibling backend $binary"
           }
         }
-        Add-Content -Path $env:GITHUB_PATH -Value $installDir
+        Add-Content -Path $env:GITHUB_PATH -Value $archiveRoot
     - name: Verify sc-lint version contract
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: bash
@@ -157,7 +159,7 @@ runs:
         set -euo pipefail
         version_json="$(sc-lint version --json)"
         jq -e --arg expected "${SC_LINT_VERSION}" \
-          '.ok == true and .data.crate_version == $expected' \
+          '.ok == true and .data.version == $expected' \
           <<<"${version_json}" >/dev/null || {
           echo "sc-lint setup: version contract failed; expected ${SC_LINT_VERSION}" >&2
           exit 1
@@ -170,8 +172,8 @@ runs:
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
       run: |
         $value = sc-lint version --json | ConvertFrom-Json
-        if (-not $value.ok -or $value.data.crate_version -ne $env:SC_LINT_VERSION) {
-          throw "sc-lint setup: expected version $env:SC_LINT_VERSION, got $($value.data.crate_version)"
+        if (-not $value.ok -or $value.data.version -ne $env:SC_LINT_VERSION) {
+          throw "sc-lint setup: expected version $env:SC_LINT_VERSION, got $($value.data.version)"
         }
     - name: Materialize pinned sc-lint Python utilities (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
