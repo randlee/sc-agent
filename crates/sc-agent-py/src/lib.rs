@@ -499,7 +499,7 @@ fn invalid_option(option: &str, bound: &str) -> PyErr {
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
 #[pyfunction]
-#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None))]
+#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None, timeout_secs = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -519,7 +519,12 @@ fn send(
     config_dir: Option<PathBuf>,
     keyring_service: Option<&str>,
     keyring_account: Option<&str>,
+    timeout_secs: Option<f64>,
 ) -> PyResult<String> {
+    let timeout = timeout_secs
+        .map(decidr::RequestTimeout::from_secs)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
     let keyring = keyring_override(provider, keyring_service, keyring_account)?;
     // The request is checked before any logger opens, so a refused one writes no file.
     let images = images.unwrap_or_default().into_iter().collect();
@@ -541,10 +546,11 @@ fn send(
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
         let mut line = None;
-        let sent = decidr::send(&options, request, &worker_cancel, &mut |result| {
-            line = Some(decidr::output::result_text(&result)?);
-            Ok(())
-        });
+        let sent =
+            decidr::send_with_timeout(&options, request, &worker_cancel, timeout, &mut |result| {
+                line = Some(decidr::output::result_text(&result)?);
+                Ok(())
+            });
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
         let mut closed = close_loggers(general, session);
@@ -573,7 +579,7 @@ fn send(
 /// `decidr send --batch`: always `Decision::decide_stream`; returns the result lines in
 /// finish order and passes each to `on_result` as it arrives.
 #[pyfunction]
-#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None))]
+#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None, timeout_secs = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -592,7 +598,12 @@ fn send_batch(
     config_dir: Option<PathBuf>,
     keyring_service: Option<&str>,
     keyring_account: Option<&str>,
+    timeout_secs: Option<f64>,
 ) -> PyResult<Vec<String>> {
+    let timeout = timeout_secs
+        .map(decidr::RequestTimeout::from_secs)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
     let keyring = keyring_override(provider, keyring_service, keyring_account)?;
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
@@ -611,7 +622,8 @@ fn send_batch(
     let worker_cancel = cancel.clone();
     let ((), lines) = run_interruptible(py, &cancel, on_result.as_ref(), move |forward| {
         let mut options = options;
-        let outcome = decidr::send_batch(&options, requests, &worker_cancel, forward);
+        let outcome =
+            decidr::send_batch_with_timeout(&options, requests, &worker_cancel, timeout, forward);
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
         (outcome, close_loggers(general, session))
