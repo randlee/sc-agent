@@ -178,3 +178,124 @@ fn abandon_record_counts_live_threads() {
     gate.open();
     harness.finish(&dropped);
 }
+
+/// A fixed timestamp and ManualClock keep every serialized envelope component stable.
+fn decide_session_blob(
+    bytes: usize,
+) -> (
+    sc_decision_schema::DecisionResult,
+    sc_agent_log::testing::MemoryLog,
+    serde_json::Value,
+) {
+    use sc_agent_http::testing::{ManualClock, ScriptedTransport};
+    use sc_agent_http::{HttpClient, ResendPolicy};
+    use sc_agent_log::testing::MemoryLog;
+    use sc_agent_log::{Repo, SessionIdentity, SessionLogger};
+    use sc_decision_runner::{DecisionRunner, RunnerConfig};
+    use sc_decision_schema::SystemOneResponse;
+
+    let log = MemoryLog::new().expect("log");
+    let body = serde_json::json!({"model":"m", "answers":{"q":{"type":"noul","noul":0.5}}, "usage":{"input_tokens":1,"output_tokens":1}, "blob":"x".repeat(bytes)}).to_string();
+    let expected = serde_json::to_value(
+        SystemOneResponse::from_json(200, body.as_bytes()).expect("expected response"),
+    )
+    .expect("response JSON");
+    let transport =
+        ScriptedTransport::responses(vec![HttpResponse::new(200, vec![], body.into_bytes())]);
+    let http = HttpClient::new(Arc::new(transport), ResendPolicy::default(), log.general());
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "b-1", "test")
+            .expect("identity");
+    let session = SessionLogger::injected_with_timestamp(
+        log.logger(),
+        identity,
+        sc_observability::Timestamp::UNIX_EPOCH,
+    );
+    let runner = DecisionRunner::with_clock(
+        Arc::new(ScriptedBackend::new()),
+        http,
+        session,
+        log.general(),
+        RunnerConfig::new(1).expect("worker"),
+        ManualClock::new().clock(),
+    );
+    (
+        runner.decide(request("m"), &CancelToken::new()),
+        log,
+        expected,
+    )
+}
+
+fn session_envelope_bytes() -> usize {
+    let (_, log, _) = decide_session_blob(0);
+    let events = log.events().expect("flush calibration");
+    let event = events
+        .iter()
+        .find(|event| event.target.as_str() == sc_agent_log::SessionLogger::TARGET)
+        .expect("calibration session row");
+    serde_json::to_vec(event)
+        .expect("serialize calibration")
+        .len()
+}
+
+/// REQ-QA-001: exactly MAX_ROW_BYTES is written without runner.session_log_failed.
+#[test]
+fn session_row_at_max_row_bytes_is_written_without_failure() {
+    use sc_agent_log::{MAX_ROW_BYTES, SessionLogger};
+    let (result, log, expected) = decide_session_blob(MAX_ROW_BYTES - session_envelope_bytes());
+    assert_eq!(
+        serde_json::to_value(result.outcome.expect("decision preserved")).expect("response JSON"),
+        expected
+    );
+    let events = log.events().expect("flush session row");
+    let rows: Vec<_> = events
+        .iter()
+        .filter(|event| event.target.as_str() == SessionLogger::TARGET)
+        .collect();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        serde_json::to_vec(rows[0]).expect("serialize row").len(),
+        MAX_ROW_BYTES
+    );
+    assert!(
+        log.records()
+            .expect("flush general records")
+            .iter()
+            .all(|event| event.action != "runner.session_log_failed")
+    );
+}
+
+/// REQ-QA-001: one byte over MAX_ROW_BYTES preserves the decision and reports exact refusal.
+#[test]
+fn session_row_one_byte_over_max_row_bytes_preserves_decision() {
+    use sc_agent_log::{LogError, LogKind, MAX_ROW_BYTES, SessionLogger};
+    use sc_agent_types::ErrorId;
+    let (result, log, expected) = decide_session_blob(MAX_ROW_BYTES - session_envelope_bytes() + 1);
+    let session_id = result.session_id.to_string();
+    assert_eq!(
+        serde_json::to_value(result.outcome.expect("decision preserved")).expect("response JSON"),
+        expected
+    );
+    let records = log.records().expect("flush refused row");
+    assert!(
+        records
+            .iter()
+            .all(|event| event.target != SessionLogger::TARGET)
+    );
+    let failures: Vec<_> = records
+        .iter()
+        .filter(|event| event.action == "runner.session_log_failed")
+        .collect();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].fields["session_id"], session_id);
+    assert_eq!(failures[0].fields["position"], 0);
+    let error = LogError::RowTooLarge {
+        log: LogKind::Session,
+        bytes: MAX_ROW_BYTES + 1,
+        max: MAX_ROW_BYTES,
+    };
+    assert_eq!(
+        failures[0].fields["error"],
+        serde_json::to_value(error.detail()).expect("typed refusal detail")
+    );
+}
