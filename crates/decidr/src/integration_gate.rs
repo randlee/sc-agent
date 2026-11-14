@@ -69,7 +69,7 @@ impl<const LENGTH: usize> Digest<LENGTH> {
         if value.len() != LENGTH || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(invalid(
                 field,
-                "must be a complete hexadecimal digest of the required length",
+                "must be a complete hexadecimal digest (40 source or 64 artifact characters)",
             ));
         }
         Ok(Self(value.to_ascii_lowercase()))
@@ -105,7 +105,7 @@ impl PrereleaseTag {
 }
 
 /// A case outcome. SKIP and FAIL are preserved as evidence and never pass the gate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 enum Status {
     /// The actual case passed.
     #[serde(rename = "PASS")]
@@ -176,7 +176,7 @@ struct CaseResult {
 struct RawResult {
     case_id: String,
     platform: String,
-    status: Status,
+    status: String,
     reason: String,
     prerelease_tag: String,
     source_commit: String,
@@ -187,11 +187,17 @@ struct RawResult {
 impl TryFrom<RawResult> for CaseResult {
     type Error = DecidrError;
     fn try_from(raw: RawResult) -> Result<Self, Self::Error> {
+        let status = match raw.status.as_str() {
+            "PASS" => Status::Pass,
+            "FAIL" => Status::Fail,
+            "SKIP" => Status::Skip,
+            _ => return Err(invalid("status", "must be PASS, FAIL or SKIP")),
+        };
         let session_id = raw.session_id.map(Session::new).transpose()?;
         Ok(Self {
             case_id: Identifier::new(raw.case_id, "case_id")?,
             platform: Identifier::new(raw.platform, "platform")?,
-            status: raw.status,
+            status,
             reason: SanitizedReason::new(raw.reason)?,
             prerelease_tag: PrereleaseTag::new(raw.prerelease_tag)?,
             source_commit: Digest::<40>::new(raw.source_commit, "source_commit")?,
@@ -350,11 +356,17 @@ mod tests {
             let mut result = complete().remove(0);
             result[field] = json!(value);
             if field == "status" {
-                assert_eq!(
-                    validate(vec![result]).unwrap_err().id(),
-                    "decidr.integration_evidence",
-                    "{field}"
-                );
+                match validate(vec![result]).unwrap_err() {
+                    DecidrError::IntegrationEvidence {
+                        field: actual_field,
+                        reason,
+                        ..
+                    } => {
+                        assert_eq!(actual_field, "status");
+                        assert_eq!(reason, "must be PASS, FAIL or SKIP");
+                    }
+                    error => panic!("expected status integration error, got {error}"),
+                }
                 continue;
             }
             let raw: RawResult = serde_json::from_value(result).unwrap();
