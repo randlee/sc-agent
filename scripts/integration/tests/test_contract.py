@@ -63,7 +63,7 @@ class FormulaAndTransport(unittest.TestCase):
             remote.remote_command("windows-ssh", "D:\\work", "python", [], "-oProxyCommand=bad")
 
     def test_real_output_judging_requires_auth_chain_and_success_schema(self):
-        self.assertEqual(run.result_outcome("typesafe-invalid-key-cli", '{"id":"decision.api_status","message":"HTTP 401"}', 1)[0], "PASS")
+        self.assertEqual(run.result_outcome("typesafe-invalid-key-cli", '{"error":{"id":"decision.api_status","message":"HTTP 401"}}', 1)[0], "PASS")
         self.assertEqual(run.result_outcome("anthropic-invalid-key-wheel", '{"error":{"id":"decision.backend","cause":{"id":"decision_llm.llm","cause":{"id":"llm.api_status","message":"HTTP 401"}}}}', 1)[0], "PASS")
         self.assertEqual(run.result_outcome("anthropic-invalid-key-cli", 'HTTP 401', 1)[0], "FAIL")
         self.assertEqual(run.result_outcome("anthropic-invalid-key-cli", '{"error":{"id":"wrong.type","message":"decision.backend decision_llm.llm llm.api_status HTTP 401"}}', 1)[0], "FAIL")
