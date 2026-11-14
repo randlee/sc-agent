@@ -30,6 +30,18 @@ def formula_cases():
     return [step["id"].replace("_", "-") for step in formula["steps"] if step["id"] not in {"verify_assets", "report"}]
 
 
+def install_release(helper, tag, version, manifest, names, stage):
+    """Stage and install once; the pinned helper owns the checksum download."""
+    with tempfile.TemporaryDirectory(prefix="integration-assets-") as download_dir:
+        directory = Path(download_dir)
+        helper.stage_release(tag, version, manifest, names, stage, directory, public_url=None)
+        checksums = helper.checksums((directory / "checksums.txt").read_text())
+    wheels = helper.staged_wheels(stage, manifest)
+    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--stage", str(stage), *map(str, wheels)], check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--verify", "--stage", str(stage), "--version", version], check=True)
+    return checksums, wheels
+
+
 def prepare(args):
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", args.run_id):
         raise Refusal("run-id must be a safe 1..64 character identifier")
@@ -71,13 +83,7 @@ def prepare(args):
     if payload.get("outcome") != "succeeded" or not payload.get("graph", {}).get("ids"):
         raise Refusal("formula pour did not produce a successful graph receipt")
     stage = run_dir / "installed"
-    with tempfile.TemporaryDirectory(prefix="integration-assets-") as download_dir:
-        directory = Path(download_dir)
-        checksums = helper.checksums(helper.download_asset(args.tag, "checksums.txt", directory).read_text())
-        helper.stage_release(args.tag, version, manifest, names, stage, directory, public_url=None)
-    wheels = helper.staged_wheels(stage, manifest)
-    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--stage", str(stage), *map(str, wheels)], check=True)
-    subprocess.run([sys.executable, str(ROOT / "scripts/integration/install_wheels.py"), "--verify", "--stage", str(stage), "--version", version], check=True)
+    checksums, wheels = install_release(helper, args.tag, version, manifest, names, stage)
     installed = json.loads(command([str(runtime_python(stage)), str(ROOT / "scripts/integration/wheel_case.py"), "contract", "--config-dir", str(run_dir / "config")]))
     if set(installed) != set(formula_cases()):
         raise Refusal("installed Rust case contract differs from the formula")
