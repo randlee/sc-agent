@@ -91,7 +91,14 @@ class FormulaAndTransport(unittest.TestCase):
         formula_ids = [step["id"].replace("_", "-") for step in formula["steps"] if step["id"] not in {"verify_assets", "report"}]
         self.assertEqual(run.required_cases(), case_ids)
         self.assertEqual(formula_ids, case_ids)
-        result = subprocess.run([sys.executable, str(ROOT / "scripts/integration/generate_formula.py"), "--check"], check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/integration/generate_formula.py"), "--check"],
+            check=False,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=60,
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         expected_fields = {"id", "provider", "model", "operation", "client", "artifact"}
         self.assertTrue(case_records)
