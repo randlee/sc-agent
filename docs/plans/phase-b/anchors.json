@@ -538,7 +538,7 @@
       "id": "REQ-SAG-0002",
       "source_type": "REQ",
       "source_ref": "REQ-SAG-0002",
-      "statement": "Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.",
+      "statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.",
       "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -549,14 +549,16 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message."
+          "When no API key was attached, HttpError::Network wraps the ureq error and the outer error chain retains the lower error ID and message.",
+          "Return the lower-layer error ID and message while replacing the attached API key with [redacted]."
         ],
         "fail": [
-          "The backend maps every lower-layer failure to a new error with the message \"request failed\", dropping the original error."
+          "The backend returns only a generic request-failed error and discards the lower-layer error ID and message.",
+          "The returned lower-layer error reveals the API key attached to the request."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -585,6 +587,22 @@
             "plan_questions": "agt-t70.1",
             "dev_questions": "agt-t70.2"
           }
+        },
+        {
+          "at": "2026-11-14T23:46:59+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it."
+        },
+        {
+          "at": "2026-11-14T23:47:50+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -693,6 +711,51 @@
             "plan_questions": "agt-6dm.1",
             "dev_questions": "agt-6dm.2"
           }
+        }
+      ]
+    },
+    {
+      "id": "ANC-010",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase-b integration work must fix minor implementation defects when requirements have not changed.",
+      "quote": "If minor issues are encountered, I expect them fixed (assuming no requirements changed).",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Fix minor integration defects",
+      "scope": "Sprints integrating the sc-agent client with plan-anchor or judge-jev.",
+      "deterministic_check": "Inspect integration changes and defect tests against existing requirements.",
+      "fixtures": {
+        "pass": [
+          "Fix minor integration defects discovered while implementing the unchanged requirements."
+        ],
+        "fail": [
+          "Leave a discovered minor integration defect unfixed even though the requirements did not change."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:47:04+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:47:08+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     }

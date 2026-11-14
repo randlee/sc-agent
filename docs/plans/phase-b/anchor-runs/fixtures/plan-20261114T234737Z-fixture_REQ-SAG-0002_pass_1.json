@@ -1,0 +1,113 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261114T234737Z-fixture_REQ-SAG-0002_pass_1",
+  "gate": "plan",
+  "created_at": "2026-11-14T23:47:37+00:00",
+  "anchors_path": "docs/plans/phase-b/anchors.json",
+  "plan": "phase-b",
+  "item": {
+    "id": "fixture:REQ-SAG-0002:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 123,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [],
+  "results": [
+    {
+      "anchor_id": "REQ-SAG-0002",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0002",
+      "statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.",
+      "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
+      "anchor_version": 3,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.92,
+          "probabilities": {
+            "yes": 0.95,
+            "no": 0.04,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.37,
+          "probabilities": {
+            "yes": 0.58,
+            "no": 0.17,
+            "unclear": 0.25
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.93,
+            "unclear": 0.05
+          }
+        }
+      },
+      "min_confidence": 0.37,
+      "explanation": "Jev was not confident (min confidence 0.37); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1037,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.37
+        }
+      ],
+      "attempts": 1,
+      "item_chars_sent": 123,
+      "item_shortened": false,
+      "request_bytes": 3103
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "REQ-SAG-0002"
+    ],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": false
+  }
+}

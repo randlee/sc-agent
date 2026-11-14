@@ -1,0 +1,192 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.6,
+    "dry_run": false,
+    "fixture": false,
+    "path": "docs/plans/phase-b/anchors.json",
+    "anchors": [
+      {
+        "id": "ANC-010",
+        "statement": "Phase-b integration work must fix minor implementation defects when requirements have not changed.",
+        "quote": "If minor issues are encountered, I expect them fixed (assuming no requirements changed).",
+        "scope": "Sprints integrating the sc-agent client with plan-anchor or judge-jev.",
+        "verdict": "inconclusive",
+        "failing": [
+          "observable",
+          "self_contained"
+        ],
+        "answers": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.0,
+              "yes": 0.99
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.25,
+            "probabilities": {
+              "no": 0.5,
+              "unclear": 0.34,
+              "yes": 0.16
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.72,
+            "probabilities": {
+              "no": 0.18,
+              "unclear": 0.01,
+              "yes": 0.81
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.96,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.02,
+              "yes": 0.97
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.33,
+            "probabilities": {
+              "no": 0.55,
+              "unclear": 0.07,
+              "yes": 0.38
+            }
+          }
+        },
+        "lint": {
+          "warnings": [],
+          "errors": []
+        },
+        "answers_second": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.0,
+              "yes": 0.99
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.25,
+            "probabilities": {
+              "no": 0.5,
+              "unclear": 0.31,
+              "yes": 0.19
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.73,
+            "probabilities": {
+              "no": 0.17,
+              "unclear": 0.01,
+              "yes": 0.82
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.89,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.06,
+              "yes": 0.93
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.4,
+            "probabilities": {
+              "no": 0.6,
+              "unclear": 0.06,
+              "yes": 0.34
+            }
+          }
+        },
+        "attempts": 2,
+        "confirmations": {
+          "verdict": "inconclusive",
+          "failing": [
+            "observable",
+            "self_contained"
+          ],
+          "low_confidence": [
+            "observable",
+            "self_contained"
+          ],
+          "unstable": [],
+          "initial_disagreements": [],
+          "resolved": {
+            "single_constraint": {
+              "choice": "yes",
+              "confidence": 0.98,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "observable": {
+              "choice": "no",
+              "confidence": 0.25,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "faithful": {
+              "choice": "yes",
+              "confidence": 0.72,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "scoped": {
+              "choice": "yes",
+              "confidence": 0.89,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "self_contained": {
+              "choice": "no",
+              "confidence": 0.33,
+              "matching_calls": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "next": "Plan diagnosis: run `judge` on the item, then `report --run <run>` for triage answers and routes. A disputed rubric role on a locked anchor: anchor-tuning `triage` with `gate: testability`."
+      }
+    ],
+    "needs_work": [
+      "ANC-010"
+    ],
+    "pass": false
+  },
+  "error": null
+}

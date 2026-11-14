@@ -19,6 +19,7 @@ Intent: `docs/plans/phase-b/intent.md`
 | REQ-SAG-0002 | locked | Each crate returns its own error union carrying lower errors | 2026-11-09 |
 | REQ-SAG-0006 | locked | No consumer-app or Jev-mock types in shared crates | 2026-11-09 |
 | REQ-SAG-0010 | locked | No sleep calls in sc-agent source | 2026-11-09 |
+| ANC-010 | proposed | Fix minor integration defects | 2026-11-14 |
 
 ## ANC-001
 
@@ -202,11 +203,11 @@ Fixtures:
 
 ## REQ-SAG-0002
 
-Anchor: Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.
+Anchor: A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.
 
 > An error MUST carry the error id and message of every lower-layer error that caused it.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
 
 Summary: Each crate returns its own error union carrying lower errors
 
@@ -215,8 +216,10 @@ Scope: adds or changes an error type or a public function's return type
 Beads: anchor `agt-t70`, plan questions `agt-t70.1`, dev questions `agt-t70.2`
 
 Fixtures:
-- pass: HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message.
-- fail: The backend maps every lower-layer failure to a new error with the message "request failed", dropping the original error.
+- pass: When no API key was attached, HttpError::Network wraps the ureq error and the outer error chain retains the lower error ID and message.
+- pass: Return the lower-layer error ID and message while replacing the attached API key with [redacted].
+- fail: The backend returns only a generic request-failed error and discards the lower-layer error ID and message.
+- fail: The returned lower-layer error reveals the API key attached to the request.
 
 ## REQ-SAG-0006
 
@@ -253,3 +256,21 @@ Beads: anchor `agt-6dm`, plan questions `agt-6dm.1`, dev questions `agt-6dm.2`
 Fixtures:
 - pass: The sc-agent runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls.
 - fail: The sc-agent retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts.
+
+## ANC-010
+
+Anchor: Phase-b integration work must fix minor implementation defects when requirements have not changed.
+
+> If minor issues are encountered, I expect them fixed (assuming no requirements changed).
+
+Said by user, phase-b planning, 2026-11-14. Status: proposed. Version 2.
+
+Summary: Fix minor integration defects
+
+Scope: Sprints integrating the sc-agent client with plan-anchor or judge-jev.
+
+Deterministic check to pair with the development gate: Inspect integration changes and defect tests against existing requirements.
+
+Fixtures:
+- pass: Fix minor integration defects discovered while implementing the unchanged requirements.
+- fail: Leave a discovered minor integration defect unfixed even though the requirements did not change.
