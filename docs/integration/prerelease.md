@@ -68,8 +68,13 @@ python3 scripts/integration/run.py \
   --tag prerelease/v0.1.1 --platform macos-aarch64
 ```
 
-The process pours `formulas/integration.formula.toml` through sc-compose, verifies
-and installs the assets, executes each case, and records only sanitized results.
+The required cases and their provider, model, operation, client and artifact
+metadata have one source in `crates/decidr/integration-cases.json`. Rust derives
+the wheel validator's required IDs at build time, Python reads the same records,
+and `python3 scripts/integration/generate_formula.py` regenerates the poured
+workflow formula. The process pours `formulas/integration.formula.toml` through
+sc-compose, verifies and installs the assets, executes each case, and records
+only sanitized results.
 Each successful case closes its formula bead. FAIL/SKIP cases remain open with
 the reason. A run directory retains the formula receipt, artifact provenance and
 case results for interrupted-run recovery. Repeating the command executes only

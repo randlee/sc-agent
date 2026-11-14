@@ -1,4 +1,5 @@
-"""Shared release-manifest and formula configuration for integration producer and gate."""
+"""Shared release and case-record configuration for integration producer and gate."""
+import json
 from pathlib import Path
 import tomllib
 
@@ -47,21 +48,40 @@ def distribution_wheel(helper, names, distribution, version):
     return wheels[0]
 
 
+def integration_case_records(root=ROOT):
+    records = json.loads((root / "crates/decidr/integration-cases.json").read_text(encoding="utf-8"))
+    if not isinstance(records, list) or any(not isinstance(record, dict) or not isinstance(record.get("id"), str) for record in records):
+        raise Refusal("integration case manifest must be an array of records with string ids")
+    indexed = {record["id"]: record for record in records}
+    if len(indexed) != len(records):
+        raise Refusal("integration case identifiers must be unique")
+    return indexed
+
+
 def case_specs(root=ROOT):
-    formula = tomllib.loads((root / "formulas/integration.formula.toml").read_text())
     cases = {}
-    for step in formula["steps"]:
-        if step["id"] in {"verify_assets", "report"}:
-            continue
-        case = step["id"].replace("_", "-")
-        spec = step.get("metadata", {}).get("integration")
-        if not isinstance(spec, dict) or any(not isinstance(spec.get(k), str) or not spec[k] for k in ("provider", "model")):
-            raise Refusal("each integration case requires provider/model formula metadata")
-        if spec.get("interface") not in {"cli", "wheel"} or spec.get("operation") not in {"models", "send"} or spec.get("expectation") not in {"models", "noul", "auth_401"}:
-            raise Refusal("case interface, operation and expectation must be supported")
-        if spec["expectation"] == "auth_401" and (not isinstance(spec.get("credential_env"), str) or not spec["credential_env"] or not isinstance(spec.get("error_chain"), list) or not spec["error_chain"] or any(not isinstance(item, str) or not item for item in spec["error_chain"])):
-            raise Refusal("invalid-key cases require a credential variable and expected error chain")
-        if case in cases:
-            raise Refusal("formula case identifiers must be unique")
+    for case, record in integration_case_records(root).items():
+        operation = record["operation"]
+        provider = record["provider"]
+        if record.get("client") not in {"cli", "wheel"} or record.get("artifact") not in {"archive", "sc-decidr-wheel"}:
+            raise Refusal("case client and artifact must be supported")
+        if provider not in {"typesafe", "anthropic"} or not isinstance(record.get("model"), str) or not record["model"]:
+            raise Refusal("case provider and model must be supported")
+        if operation not in {"models", "decision", "invalid-key"}:
+            raise Refusal("case operation must be supported")
+        spec = {
+            "provider": provider,
+            "model": record["model"],
+            "interface": record["client"],
+            "operation": "models" if operation == "models" else "send",
+            "expectation": {"models": "models", "decision": "noul", "invalid-key": "auth_401"}[operation],
+        }
+        if operation == "invalid-key":
+            spec["credential_env"] = "TYPESAFE_API_KEY" if provider == "typesafe" else "ANTHROPIC_API_KEY"
+            spec["error_chain"] = (
+                ["decision.api_status"]
+                if provider == "typesafe"
+                else ["decision.backend", "decision_llm.llm", "llm.api_status"]
+            )
         cases[case] = spec
     return cases

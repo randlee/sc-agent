@@ -25,7 +25,7 @@ def runtime_python(stage):
     return stage / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
-def formula_cases():
+def required_cases():
     return list(case_specs(ROOT))
 
 
@@ -83,7 +83,7 @@ def prepare(args):
     stage = run_dir / "installed"
     checksums, wheels = install_release(helper, args.tag, version, manifest, names, stage)
     installed = json.loads(command([str(runtime_python(stage)), str(ROOT / "scripts/integration/wheel_case.py"), "contract", "--config-dir", str(run_dir / "config")]))
-    if set(installed) != set(formula_cases()):
+    if set(installed) != set(required_cases()):
         raise Refusal("installed Rust case contract differs from the formula")
     archive = helper.archive_name(manifest, version, target)
     artifacts = [{"name": name, "sha256": checksums[name]} for name in [archive, *[p.name for p in wheels]]]
@@ -131,7 +131,7 @@ def result_outcome(case, output, returncode):
 
 
 def execute_case(state, run_dir, case):
-    if case not in formula_cases():
+    if case not in required_cases():
         raise Refusal("unknown integration case")
     if any(result["case_id"] == case for result in state["results"]):
         raise Refusal("case already has a result; use a new run-id for a rerun")
@@ -201,7 +201,7 @@ def render_report(state, run_dir, template, report):
 def publish_report(state, run_dir, template):
     if not template.is_file():
         raise Refusal("owner-selected XHTML template is unavailable; report acceptance remains open")
-    if {result["case_id"] for result in state["results"]} != set(formula_cases()):
+    if {result["case_id"] for result in state["results"]} != set(required_cases()):
         raise Refusal("run every required case before publishing its platform report")
     directory = ROOT / "site/reports/integration"
     directory.mkdir(parents=True, exist_ok=True)
@@ -229,7 +229,7 @@ def main():
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--platform", required=True)
-    parser.add_argument("--case", choices=formula_cases())
+    parser.add_argument("--case", choices=required_cases())
     parser.add_argument("--template", type=Path, default=ROOT / "templates/integration-report/platform.xhtml.j2")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--report-only", action="store_true")
@@ -240,7 +240,7 @@ def main():
             return 0
         if not args.report_only:
             completed = {result["case_id"] for result in state["results"]}
-            for case in [args.case] if args.case else [case for case in formula_cases() if case not in completed]:
+            for case in [args.case] if args.case else [case for case in required_cases() if case not in completed]:
                 execute_case(state, args.run_dir.resolve(), case)
         if args.case:
             return 0 if state["results"][-1]["status"] == "PASS" else 1

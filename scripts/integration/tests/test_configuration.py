@@ -46,13 +46,17 @@ class Configuration(unittest.TestCase):
             with self.assertRaises(configuration.Refusal):
                 configuration.distribution_wheel(helper, names, distribution, "0.0.0" if len(names) == 1 else "9.2.0")
 
-    def test_provider_and_model_formula_changes_drive_the_installed_command(self):
-        source = (run.ROOT / "formulas/integration.formula.toml").read_text()
+    def test_provider_and_model_record_changes_drive_the_installed_command(self):
+        records = configuration.integration_case_records()
+        source = list(records.values())
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "formulas").mkdir()
-            formula = root / "formulas/integration.formula.toml"
-            formula.write_text(source.replace('provider = "typesafe"', 'provider = "configured-provider"').replace('model = "jev"', 'model = "configured-model"'))
+            manifest = root / "crates/decidr/integration-cases.json"
+            manifest.parent.mkdir(parents=True)
+            modified = [dict(record) for record in source]
+            cli_case = next(record for record in modified if record["id"] == "typesafe-decision-cli")
+            cli_case.update(provider="anthropic", model="custom-model")
+            manifest.write_text(json.dumps(modified))
             run_dir = root / "run"
             run_dir.mkdir()
             state = {"source_commit": "a" * 40, "platform": "fixture", "prerelease_tag": "prerelease/v9.2.0", "results": [], "beads": {"typesafe_decision_cli": "fixture-bead"}, "artifacts": [{"name": "archive.tar.gz", "sha256": "b" * 64}]}
@@ -60,10 +64,11 @@ class Configuration(unittest.TestCase):
             with patch.object(run, "ROOT", root), patch.object(run.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=json.dumps(answer), stderr="")) as process, contextlib.redirect_stdout(io.StringIO()):
                 run.execute_case(state, run_dir, "typesafe-decision-cli")
             command = process.call_args_list[0].args[0]
-            self.assertEqual(command[command.index("--provider") + 1], "configured-provider")
-            self.assertEqual(command[command.index("--model") + 1], "configured-model")
-            self.assertEqual(json.loads((run_dir / "request.json").read_text())["model"], "configured-model")
-            formula.write_text(source.replace('model = "jev"', 'model = ""'))
+            self.assertEqual(command[command.index("--provider") + 1], "anthropic")
+            self.assertEqual(command[command.index("--model") + 1], "custom-model")
+            self.assertEqual(json.loads((run_dir / "request.json").read_text())["model"], "custom-model")
+            cli_case["model"] = ""
+            manifest.write_text(json.dumps(modified))
             with self.assertRaises(configuration.Refusal):
                 configuration.case_specs(root)
 

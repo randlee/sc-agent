@@ -6,19 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::DecidrError;
 
-/// Required live cases. Each runs against an installed binary or wheel, never source substitutes.
-const REQUIRED_CASES: [&str; 10] = [
-    "typesafe-models-cli",
-    "typesafe-models-wheel",
-    "typesafe-decision-cli",
-    "typesafe-decision-wheel",
-    "anthropic-decision-cli",
-    "anthropic-decision-wheel",
-    "typesafe-invalid-key-cli",
-    "typesafe-invalid-key-wheel",
-    "anthropic-invalid-key-cli",
-    "anthropic-invalid-key-wheel",
-];
+// Required case identifiers are generated from the packaged case record manifest.
+include!(concat!(env!("OUT_DIR"), "/integration_cases.rs"));
 
 /// Returns the required case identifiers for the installed wheel's integration contract.
 #[must_use]
@@ -285,6 +274,16 @@ mod tests {
     }
     fn validate(results: Vec<Value>) -> Result<Vec<CaseResult>, DecidrError> {
         validate_results(&serde_json::to_string(&results).unwrap(), &"a".repeat(40))
+    }
+    #[test]
+    fn generated_required_cases_match_the_packaged_case_manifest() {
+        let records: Vec<Value> =
+            serde_json::from_str(include_str!("../integration-cases.json")).unwrap();
+        let manifest_cases: Vec<_> = records
+            .iter()
+            .map(|record| record["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(integration_cases(), manifest_cases);
     }
     #[test]
     fn complete_platform_passes_and_round_trips_without_reshaping() {
