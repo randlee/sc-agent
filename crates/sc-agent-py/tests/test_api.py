@@ -38,6 +38,12 @@ PART = json.dumps(
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 
+def test_python_module_exposes_its_module_documentation():
+    assert sc_agent.__doc__ == (
+        "The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+    )
+
+
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
     root = log_root / "logs"
     return sorted(root.rglob("sessions.jsonl")) if root.exists() else []
