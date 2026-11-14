@@ -90,7 +90,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum declared in the template's front matter. sc-compose is an external render tool, not a dependency of either wheel:
+   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum the template declares in its front matter, in the skills' form (`requires.cli`, an `sc-compose` entry with `minimum_version`). The minimum is declared, not enforced. sc-compose is an external render tool, not a dependency of either wheel:
 
    - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
    - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.

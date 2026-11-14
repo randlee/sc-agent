@@ -29,7 +29,6 @@ Definitions:
 - The abi3 feature of every Python binding crate MUST match the Python floor.
 - Each wheel's `requires-python` MUST declare the Python floor.
 - The file name of each built wheel MUST carry the abi3 tag of the Python floor.
-- CI MUST run every wheel job on the Python floor.
 - The consumer module's script header MUST declare the Python floor as its `requires-python`.
 - A CI check MUST fail when any of these differs from the Python floor: the abi3 feature of a Python binding crate, a wheel's `requires-python`, the Python version of a wheel job, or the consumer template's script header.
 
