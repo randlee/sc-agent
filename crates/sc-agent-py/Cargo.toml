@@ -16,6 +16,7 @@ workspace = true
 
 [dependencies]
 decidr = { path = "../decidr", version = "0.1.0" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
 sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
 sc-agent-config = { path = "../sc-agent-config", version = "0.1.0" }
 sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }

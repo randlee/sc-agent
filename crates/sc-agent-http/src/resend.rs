@@ -35,7 +35,7 @@ use crate::retry_after::RetryAfter;
 use crate::transport::Transport;
 
 /// HTTP statuses that mean "busy, resend the same body".
-const BUSY_STATUSES: [u16; 3] = [429, 502, 529];
+const BUSY_STATUSES: [u16; 1] = [429];
 
 /// First backoff holdoff when `Retry-After` is absent or malformed.
 const BACKOFF_FIRST: Duration = Duration::from_secs(1);
@@ -63,7 +63,7 @@ const LOG_TARGET: &str = "sc_agent_http";
 
 /// Whether `status` is a busy status (429, 502, 529).
 pub(crate) fn is_busy_status(status: u16) -> bool {
-    BUSY_STATUSES.contains(&status)
+    BUSY_STATUSES.contains(&status) || (500..=599).contains(&status)
 }
 
 /// The jitter of `sample`: `sample % 251` milliseconds, so every value of `0..=250 ms` is
@@ -251,7 +251,8 @@ enum Last {
     /// The last reply was busy (already redacted).
     Busy(ProviderReply),
     /// The last send timed out (message and cause already redacted).
-    Timeout {
+    Network {
+        kind: NetworkKind,
         message: String,
         cause: Option<Box<ErrorDetail>>,
     },
@@ -261,7 +262,11 @@ impl Last {
     fn as_str(&self) -> &'static str {
         match self {
             Self::Busy(_) => "busy",
-            Self::Timeout { .. } => "timeout",
+            Self::Network {
+                kind: NetworkKind::Timeout,
+                ..
+            } => "timeout",
+            Self::Network { .. } => "network",
         }
     }
 }
@@ -283,8 +288,12 @@ impl Pending {
                 retry_after_seconds: reply.retry_after_seconds,
                 last: Box::new(reply),
             },
-            Last::Timeout { message, cause } => {
-                let error = HttpError::network(NetworkKind::Timeout, attempts, message);
+            Last::Network {
+                kind,
+                message,
+                cause,
+            } => {
+                let error = HttpError::network(kind, attempts, message);
                 match cause {
                     Some(cause) => error.with_cause(*cause),
                     None => error,
@@ -731,6 +740,19 @@ impl HttpClient {
         })
     }
 
+    /// Earliest resend after an invalid response, within this request's send/budget limits.
+    /// The runner retains the schema error and checks admission again at this instant.
+    #[must_use]
+    pub fn invalid_response_at(&self, attempts: &Attempts, now: Instant) -> Instant {
+        if attempts.sends >= self.policy.max_sends() {
+            return now;
+        }
+        let remaining = attempts.first_send.map_or(BUDGET, |first| {
+            BUDGET.saturating_sub(now.saturating_duration_since(first))
+        });
+        now + (backoff(attempts.sends) + self.jitter.sample()).min(remaining)
+    }
+
     /// A transport error of send `attempts.sends`: a timeout with sends left
     /// is held for a resend after 0-250 ms of jitter, with no host pause
     /// (REQ-SAG-0601); anything else is returned now.
@@ -745,12 +767,12 @@ impl HttpClient {
         let attempt = attempts.sends;
         let error = match error {
             HttpError::Network {
-                kind: NetworkKind::Timeout,
+                kind,
                 message,
                 cause,
                 ..
             } if attempt < self.policy.max_sends() => {
-                let holdoff = self.jitter.sample();
+                let holdoff = backoff(attempt) + self.jitter.sample();
                 self.event(
                     Level::Warn,
                     "http.timeout_resend",
@@ -765,7 +787,11 @@ impl HttpClient {
                     at: ended + holdoff,
                     pending: Pending {
                         attempts,
-                        last: Last::Timeout { message, cause },
+                        last: Last::Network {
+                            kind,
+                            message,
+                            cause,
+                        },
                     },
                 });
             }
@@ -914,7 +940,7 @@ mod tests {
             "timed out",
         )));
         let (ended, at) = resend_at(&client);
-        assert_eq!(at, ended + fixed_jitter());
+        assert_eq!(at, ended + BACKOFF_FIRST + fixed_jitter());
         assert_eq!(client.pause().not_before("jitter.test"), None);
     }
 
@@ -958,11 +984,14 @@ mod tests {
     }
 
     #[test]
-    fn busy_set_is_exactly_three_statuses() {
+    fn retry_statuses_are_non_quota_429_and_all_server_errors() {
         let busy: Vec<u16> = (100..600)
             .filter(|status| is_busy_status(*status))
             .collect();
-        assert_eq!(busy, [429, 502, 529]);
+        assert_eq!(
+            busy,
+            std::iter::once(429).chain(500..600).collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -22,6 +22,12 @@
 
 - A present but invalid credential in a higher-priority source MUST be authoritative and MUST NOT fall back to a lower-priority source.
 
+- Callers MUST be able to override keyring service and account independently per provider. An omitted service MUST default to that provider's credential-variable name; an omitted account MUST default to the current OS account.
+- Each provided keyring component MUST contain 1–255 UTF-8 bytes, validated before network I/O. Errors MUST name the option and bound without retaining its supplied value.
+- Overrides for one provider MUST NOT affect another provider.
+
+- Python calls supplying either keyring override MUST name `provider`; otherwise they MUST return `sc_agent_py.invalid_option` before network I/O. Calls without overrides MUST retain automatic provider selection.
+
 ### Rationale
 
 Credential handling stays in one crate, so redaction and key lookup cannot disagree about which variables hold secrets.

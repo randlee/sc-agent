@@ -105,7 +105,7 @@ impl SecretHeader {
     }
 
     /// The key, for redaction only ([`ApiKey::redact_text`]).
-    #[must_use]
+    #[must_use = "the credential is borrowed for request transport"]
     pub fn key(&self) -> &ApiKey {
         &self.key
     }

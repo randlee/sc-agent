@@ -243,6 +243,25 @@ jobs:
           python -m pip install --no-index --find-links dist sc-decidr
           python -m pytest crates/sc-agent-py/tests
 
+  runtime:
+    name: Production panic prohibition
+    needs: [detect]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: ./.github/actions/setup-sc-lint
+        with:
+          version: "0.8.9"
+      - name: Reject production panic constructs
+        run: |
+          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008
+          python3 .github/scripts/tests/test_runtime_panic_gate.py
+
   # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).
   # Exact pins such as ureq =3.5.1 are not floated, so this job is how a
   # published advisory against a pinned crate reaches the merge gate.
@@ -265,7 +284,7 @@ jobs:
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, deny]
+    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, runtime, deny]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

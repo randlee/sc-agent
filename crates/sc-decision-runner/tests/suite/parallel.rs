@@ -165,7 +165,7 @@ fn config_from_agent_config() {
 fn failed_request_returned_rest_continue() {
     let (transport, _dropped) = FnTransport::new(|request| {
         if index_of(request) == 3 {
-            Ok(HttpResponse::new(500, vec![], b"internal error".to_vec()))
+            Ok(HttpResponse::new(409, vec![], b"internal error".to_vec()))
         } else {
             Ok(ok())
         }

@@ -21,9 +21,9 @@ fn levels(detail: ErrorDetail) -> Vec<(String, String)> {
     levels
 }
 
-/// A 200 reply whose response row is over the 256 KiB row cap.
+/// A 200 reply whose response row is over the observability event cap.
 fn oversize() -> HttpResponse {
-    let blob = "x".repeat(300 * 1024);
+    let blob = "x".repeat(sc_agent_log::MAX_ROW_BYTES + 1);
     let body = format!(
         r#"{{"model":"m","answers":{{"q":{{"type":"noul","noul":0.5}}}},"usage":{{"input_tokens":1,"output_tokens":1}},"blob":"{blob}"}}"#
     );

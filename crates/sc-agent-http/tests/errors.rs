@@ -88,7 +88,11 @@ mod cases {
     /// Sends `request` through `transport` once and returns the error.
     fn send_err(transport: Arc<dyn Transport>, request: &HttpRequest) -> HttpError {
         let memory = MemoryLog::new().expect("memory log");
-        let client = HttpClient::new(transport, ResendPolicy::default(), memory.general());
+        let client = HttpClient::new(
+            transport,
+            ResendPolicy::new(std::num::NonZeroU32::MIN),
+            memory.general(),
+        );
         let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");

@@ -20,6 +20,7 @@ mod dotenv;
 mod env;
 mod error;
 mod keyring;
+mod location;
 mod resolve;
 mod vars;
 
@@ -38,3 +39,6 @@ pub use vars::{
     ALL_VARS, ANTHROPIC_API_KEY, LAYA_API_KEY, NOUS_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY,
     TOGETHER_API_KEY, TYPESAFE_API_KEY, env_var,
 };
+
+#[doc(inline)]
+pub use location::{KeyringLocation, ProviderKeyring};

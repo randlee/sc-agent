@@ -14,12 +14,13 @@
 
 ### Requirement Statement
 
-Definitions: A busy response is an HTTP 429, 502 or 529. A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds.
+Definitions: A busy response is a non-quota HTTP 429 or 5xx (including 529). A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds.
 
 **MUST statements:**
 
 - A request that receives a busy response MUST be resent unchanged.
-- A request whose send times out MUST be resent unchanged, counting toward the same maximum number of sends.
+- A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends and 90-second budget.
+- An invalid response, including a schema mismatch, MUST be resent unchanged using the same exponential holdoff and jitter, send limit, budget and cancellation.
 - The maximum number of sends per request MUST be configurable, with a default of 5.
 - A valid `Retry-After` MUST set the holdoff, clamped to 0.25 through 30 seconds, with up to 250 milliseconds of jitter (REQ-SAG-0012).
 - A `Retry-After` MUST be valid only when it is 1 to 32 ASCII characters of digits with an optional fractional part.
@@ -31,7 +32,7 @@ Definitions: A busy response is an HTTP 429, 502 or 529. A send is one transmiss
 **MUST NOT statements:**
 
 - Holdoff MUST NOT use `sleep()`.
-- Remote errors other than busy responses, including quota errors, MUST NOT be resent; they MUST be returned with the remote error id and message.
+- Authentication (401), quota and responses exceeding the HTTP size limit MUST NOT be resent; they MUST be returned with the remote error id and message.
 
 ### Rationale
 

@@ -1,5 +1,7 @@
 //! Runner tests that need the crate-private clock seam or job types.
 
+#![cfg(test)]
+
 use std::sync::atomic::AtomicU32;
 use std::time::Duration;
 
@@ -553,4 +555,180 @@ fn a_worker_is_uncounted_when_it_closes_the_results() {
         vec![0],
         "live threads when a worker closed the results"
     );
+}
+
+/// Counts the actual runner's encode/decode calls without scheduling worker threads.
+#[derive(Debug)]
+struct SchemaSequence {
+    invalids: usize,
+    parse_error: bool,
+    encodes: AtomicUsize,
+    decodes: AtomicUsize,
+}
+
+impl Backend for SchemaSequence {
+    fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError> {
+        self.encodes.fetch_add(1, Ordering::SeqCst);
+        Ok(HttpRequest::new(
+            Method::Post,
+            Endpoint::parse("https://schema.test/v1")?,
+            request.body().to_json()?.into_bytes(),
+        ))
+    }
+    fn decode(
+        &self,
+        response: HttpResponse,
+        _: &DecisionRequest,
+        _: &LogContext,
+    ) -> Result<SystemOneResponse, DecisionError> {
+        if self.decodes.fetch_add(1, Ordering::SeqCst) < self.invalids {
+            if self.parse_error {
+                return Err(DecisionError::ResponseParse {
+                    status: 200,
+                    expected: "SystemOneResponse",
+                    message: "invalid JSON".to_owned(),
+                });
+            }
+            return Err(DecisionError::SchemaMismatch {
+                backend: "scripted",
+                detail: ErrorDetail::new(
+                    "scripted.schema",
+                    "answers.q: missing field `probabilities`",
+                    None,
+                ),
+            });
+        }
+        SystemOneResponse::from_json(response.status(), response.body())
+    }
+}
+
+/// Drives real RunnerWork steps with explicit time. No thread or deadline ordering is involved.
+fn drive_schema(
+    invalids: usize,
+    max_sends: u32,
+    busy: usize,
+    parse_error: bool,
+) -> (
+    DecisionResult,
+    Vec<Duration>,
+    Arc<SchemaSequence>,
+    MemoryLog,
+) {
+    let clock = ManualClock::new();
+    let log = MemoryLog::new().expect("log");
+    let backend = Arc::new(SchemaSequence {
+        invalids,
+        parse_error,
+        encodes: AtomicUsize::new(0),
+        decodes: AtomicUsize::new(0),
+    });
+    let ok = HttpResponse::new(200, vec![], br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#.to_vec());
+    let replies = (0..busy)
+        .map(|_| {
+            HttpResponse::new(
+                529,
+                vec![("retry-after".to_owned(), "0".to_owned())],
+                vec![],
+            )
+        })
+        .chain((0..max_sends).map(|_| ok.clone()))
+        .collect();
+    let http = HttpClient::new(
+        Arc::new(ScriptedTransport::responses(replies)),
+        ResendPolicy::new(std::num::NonZeroU32::new(max_sends).expect("nonzero")),
+        log.general(),
+    )
+    .with_jitter(sc_agent_http::Jitter::fixed(Duration::from_millis(137)));
+    let identity =
+        SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "b-1", "test")
+            .expect("identity");
+    let runner = DecisionRunner::with_clock(
+        backend.clone(),
+        http,
+        log.session(identity),
+        log.general(),
+        RunnerConfig::new(1).expect("worker"),
+        clock.clock(),
+    );
+    let work = RunnerWork {
+        shared: runner.shared.clone(),
+        jobs: Arc::new(RunnerJobs::new(8, clock.clock())),
+        run_id: SessionId::new(),
+    };
+    let request = request();
+    let mut job = Job::Fresh(Box::new(Fresh {
+        identity: Identity::new(SessionId::new(), 0, &request),
+        request,
+    }));
+    let mut holdoffs = Vec::new();
+    for _ in 0..=max_sends {
+        match work.run(job) {
+            Step::Done(result) => return (result.into_result(), holdoffs, backend, log),
+            Step::HoldOff { until, job: next } => {
+                holdoffs.push(until.saturating_duration_since(clock.now()));
+                clock.advance_to(until);
+                job = next;
+            }
+            other => panic!("unexpected step: {other:?}"),
+        }
+    }
+    panic!("runner exceeded its send limit");
+}
+
+#[test]
+fn invalid_response_resend_uses_controlled_holdoff() {
+    for parse_error in [false, true] {
+        let (result, waits, backend, log) = drive_schema(1, 5, 0, parse_error);
+        assert!(result.outcome.is_ok(), "{result:?}");
+        assert_eq!(waits, [Duration::from_millis(1137)]);
+        assert_eq!(backend.encodes.load(Ordering::SeqCst), 1);
+        assert_eq!(backend.decodes.load(Ordering::SeqCst), 2);
+        let events = log.records().expect("flush");
+        let row = events
+            .iter()
+            .find(|row| row.target == SessionLogger::TARGET)
+            .expect("session row");
+        assert_eq!(row.fields["sends"], 2);
+        assert_eq!(row.fields["schema_resends"], 1);
+    }
+}
+
+#[test]
+fn invalid_response_exhaustion_keeps_cause_and_same_send_budget() {
+    for max_sends in [2, 5] {
+        let (result, waits, backend, log) = drive_schema(usize::MAX, max_sends, 0, false);
+        let error = result.outcome.expect_err("never matches");
+        assert_eq!(error.id(), "decision.schema_mismatch");
+        assert_eq!(
+            error.cause_detail().expect("cause").message,
+            "answers.q: missing field `probabilities`"
+        );
+        assert_eq!(backend.encodes.load(Ordering::SeqCst), 1);
+        assert_eq!(backend.decodes.load(Ordering::SeqCst), max_sends as usize);
+        let expected: Vec<_> = (0..max_sends - 1)
+            .map(|n| Duration::from_secs(1 << n) + Duration::from_millis(137))
+            .chain(std::iter::once(Duration::ZERO))
+            .collect();
+        assert_eq!(waits, expected);
+        let events = log.records().expect("flush");
+        let row = events
+            .iter()
+            .find(|row| row.target == SessionLogger::TARGET)
+            .expect("session row");
+        assert_eq!(row.fields["sends"], max_sends);
+        assert_eq!(row.fields["schema_resends"], max_sends - 1);
+    }
+    let (result, _, backend, log) = drive_schema(usize::MAX, 5, 2, false);
+    assert_eq!(
+        result.outcome.expect_err("never matches").id(),
+        "decision.schema_mismatch"
+    );
+    assert_eq!(backend.decodes.load(Ordering::SeqCst), 3);
+    let events = log.records().expect("flush");
+    let row = events
+        .iter()
+        .find(|row| row.target == SessionLogger::TARGET)
+        .expect("session row");
+    assert_eq!(row.fields["sends"], 5);
+    assert_eq!(row.fields["schema_resends"], 2);
 }

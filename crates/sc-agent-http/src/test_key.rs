@@ -1,6 +1,8 @@
 //! Test-only: real [`ApiKey`] values built through `resolve_var` over an
 //! in-memory environment (no process environment, no keyring).
 
+#![cfg(test)]
+
 use sc_agent_secrets::{ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var};
 
 struct OneVar(String);

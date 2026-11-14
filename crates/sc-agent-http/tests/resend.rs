@@ -419,7 +419,7 @@ mod cases {
         }
         assert_eq!(transport.sends(), 5);
         // Resent after the jitter alone (RSH-003), none here, and the host is not paused.
-        assert_eq!(holdoffs, [Duration::ZERO; 4]);
+        assert_eq!(holdoffs, [secs(1.0), secs(2.0), secs(4.0), secs(8.0)]);
         assert_eq!(client.pause().not_before("api.example.test"), None);
         // At the other edge of the jitter range each timeout resend waits exactly 250 ms.
         let transport = ScriptedTransport::new((0..8).map(|_| Err(timeout())).collect());
@@ -429,7 +429,7 @@ mod cases {
             Jitter::fixed(Duration::from_millis(250)),
         );
         let (_, holdoffs) = drive(&most, &request(), &ManualClock::new());
-        assert_eq!(holdoffs, [secs(0.25); 4]);
+        assert_eq!(holdoffs, [secs(1.25), secs(2.25), secs(4.25), secs(8.25)]);
     }
 
     // A5-06: a 120 s timeout uses the budget; the request ends with the timeout
@@ -474,17 +474,15 @@ mod cases {
 
     // A5-06: connect, TLS and other transport failures are returned after one send.
     #[test]
-    fn connect_not_resent() {
+    fn network_failures_are_resent_with_holdoff() {
         for kind in [NetworkKind::Connect, NetworkKind::Tls, NetworkKind::Other] {
             let error = HttpError::network(kind, 1, "ureq.HostNotFound: host not found".to_owned());
             let transport = ScriptedTransport::new(vec![Err(error), Ok(ok())]);
             let client = client(&transport, ResendPolicy::default());
-            let (result, _) = drive(&client, &request(), &ManualClock::new());
-            assert!(
-                matches!(result, Err(HttpError::Network { kind: got, attempts: 1, .. }) if got == kind),
-                "{kind:?}: {result:?}"
-            );
-            assert_eq!(transport.sends(), 1);
+            let (result, waits) = drive(&client, &request(), &ManualClock::new());
+            assert!(result.is_ok(), "{kind:?}: {result:?}");
+            assert_eq!(waits, [Duration::from_secs(1)]);
+            assert_eq!(transport.sends(), 2);
         }
     }
 
@@ -572,7 +570,7 @@ mod cases {
     // A5-09
     #[test]
     fn final_replies_unchanged() {
-        for status in [200, 201, 400, 401, 402, 404, 413, 422, 500, 503, 504] {
+        for status in [200, 201, 400, 401, 402, 404, 413, 422] {
             let response = reply(status, r#"{"error":{"message":"m","type":"t"}}"#);
             let transport = ScriptedTransport::responses(vec![response.clone()]);
             let client = client(&transport, ResendPolicy::default());

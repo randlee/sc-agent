@@ -396,12 +396,50 @@ fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
     cancel.map_or_else(sc_agent_types::CancelToken::new, |token| token.0.clone())
 }
 
+/// Parses provider-scoped keyring overrides before opening loggers or sending.
+fn keyring_override(
+    provider: Option<&str>,
+    service: Option<&str>,
+    account: Option<&str>,
+) -> PyResult<Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>> {
+    use sc_agent_secrets::{KeyringLocation, PlatformKeyring, ProviderKeyring, SecretsError};
+    let location = KeyringLocation::new(service, account).map_err(|error| {
+        let option = match error {
+            SecretsError::InvalidLocation { option } => option,
+            _ => "keyring",
+        };
+        invalid_option(option, "must contain 1..=255 UTF-8 bytes")
+    })?;
+    if service.is_none() && account.is_none() {
+        return Ok(None);
+    }
+    let provider = provider
+        .ok_or_else(|| invalid_option("provider", "is required with a keyring override"))?;
+    let provider = provider
+        .parse::<Provider>()
+        .map_err(|error| sag_error(&DecidrError::from(error)))?;
+    Ok(Some(Arc::new(ProviderKeyring::new(
+        provider,
+        location,
+        Arc::new(PlatformKeyring),
+    ))))
+}
+
+fn invalid_option(option: &str, bound: &str) -> PyErr {
+    let id = "sc_agent_py.invalid_option";
+    SagError::new_err((
+        id,
+        format!("{option} {bound}"),
+        serde_json::json!({"id": id, "option": option, "allowed_bound": bound}).to_string(),
+    ))
+}
+
 /// `decidr send`: one request, always `Decision::decide`; returns its result line (JSON).
 ///
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
 #[pyfunction]
-#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None))]
+#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -419,12 +457,15 @@ fn send(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
+    keyring_service: Option<&str>,
+    keyring_account: Option<&str>,
 ) -> PyResult<String> {
+    let keyring = keyring_override(provider, keyring_service, keyring_account)?;
     // The request is checked before any logger opens, so a refused one writes no file.
     let images = images.unwrap_or_default().into_iter().collect();
     let request = build_request_bytes(request.as_bytes(), images, long_context, None)
         .map_err(|error| sag_error(&error))?;
-    let options = send_options(
+    let mut options = send_options(
         model,
         project,
         agent_role,
@@ -434,6 +475,7 @@ fn send(
         config_dir,
     )
     .map_err(|error| sag_error(&error))?;
+    options.context.keyring = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
@@ -471,7 +513,7 @@ fn send(
 /// `decidr send --batch`: always `Decision::decide_stream`; returns the result lines in
 /// finish order and passes each to `on_result` as it arrives.
 #[pyfunction]
-#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None))]
+#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -488,10 +530,13 @@ fn send_batch(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
+    keyring_service: Option<&str>,
+    keyring_account: Option<&str>,
 ) -> PyResult<Vec<String>> {
+    let keyring = keyring_override(provider, keyring_service, keyring_account)?;
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
-    let options = send_options(
+    let mut options = send_options(
         model,
         project,
         agent_role,
@@ -501,6 +546,7 @@ fn send_batch(
         config_dir,
     )
     .map_err(|error| sag_error(&error))?;
+    options.context.keyring = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let ((), lines) = run_interruptible(py, &cancel, on_result.as_ref(), move |forward| {

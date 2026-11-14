@@ -1539,6 +1539,7 @@ dependencies = [
  "sc-agent-types",
  "sc-observability",
  "sc-observability-types",
+ "serde",
  "serde_json",
  "tempfile",
 ]
@@ -1552,6 +1553,7 @@ dependencies = [
  "pyo3-build-config",
  "sc-agent-config",
  "sc-agent-log",
+ "sc-agent-secrets",
  "sc-agent-types",
  "sc-decision-schema",
  "sc-observability",
