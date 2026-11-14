@@ -8,7 +8,7 @@ use crate::api_key::ApiKey;
 use crate::dotenv::load_dotenv;
 use crate::env::{EnvSource, ProcessEnv};
 use crate::error::SecretsError;
-use crate::keyring::{KeyringSource, PlatformKeyring, current_account};
+use crate::keyring::{DeferredPlatformKeyring, KeyringSource, current_account};
 use crate::vars::env_var;
 
 /// Where keys are looked up, in this order (REQ-SAG-0401).
@@ -36,10 +36,12 @@ impl<'a> KeySources<'a> {
         Self {
             env: &ProcessEnv,
             repo_root,
-            keyring: &PlatformKeyring,
+            keyring: &SYSTEM_KEYRING,
         }
     }
 }
+
+static SYSTEM_KEYRING: DeferredPlatformKeyring = DeferredPlatformKeyring;
 
 /// Which source supplied a key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

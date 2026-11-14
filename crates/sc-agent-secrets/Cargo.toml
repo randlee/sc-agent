@@ -6,6 +6,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+# Makes accidental platform keyring construction fail in test runs.
+test-keyring-guard = []
+
 [dependencies]
 # No default features: platform keystores are enabled per target below.
 # Targets without a keystore fall back to keyring's empty mock (no network).

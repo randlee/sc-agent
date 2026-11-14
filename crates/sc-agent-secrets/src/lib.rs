@@ -31,7 +31,7 @@ pub use env::{EnvSource, ProcessEnv};
 #[doc(inline)]
 pub use error::SecretsError;
 #[doc(inline)]
-pub use keyring::{KeyringSource, PlatformKeyring};
+pub use keyring::{DeferredPlatformKeyring, KeyringSource, PlatformKeyring};
 #[doc(inline)]
 pub use resolve::{KeySource, KeySources, ResolvedKey, resolve, resolve_var};
 #[doc(inline)]

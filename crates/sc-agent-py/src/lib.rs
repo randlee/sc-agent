@@ -462,12 +462,12 @@ fn keyring_override(
     service: Option<&str>,
     account: Option<&str>,
 ) -> PyResult<Option<Arc<dyn sc_agent_secrets::KeyringSource + Send + Sync>>> {
-    use sc_agent_secrets::{PlatformKeyring, ProviderKeyring};
+    use sc_agent_secrets::{DeferredPlatformKeyring, ProviderKeyring};
     keyring_override_with_factory(provider, service, account, |provider, location| {
         Arc::new(ProviderKeyring::new(
             provider,
             location,
-            Arc::new(PlatformKeyring),
+            Arc::new(DeferredPlatformKeyring),
         ))
     })
 }
