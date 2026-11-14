@@ -5,9 +5,10 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
 import venv
 
-from configuration import release_manifest
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
@@ -21,7 +22,7 @@ def main():
         parser.error("Python 3.11+ is required")
     python = args.stage / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     if args.verify:
-        manifest = release_manifest()
+        manifest = tomllib.loads((ROOT / "release/publish-artifacts.toml").read_text(encoding="utf-8"))
         for binary in manifest["prerelease"]["binaries"]:
             path = args.stage / "bin" / (binary + (".exe" if sys.platform == "win32" else ""))
             result = subprocess.run([str(path), "--version"], check=True, text=True, capture_output=True)
