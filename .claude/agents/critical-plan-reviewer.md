@@ -20,7 +20,7 @@ trickle them across multiple rounds unless the plan changed between rounds.
 ## Required Reference
 
 Always read:
-- `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
+- `.claude/skills/atm-beads/resources/atm-beads-plan-guidelines.md`
 
 ## Input Contract
 
@@ -66,12 +66,9 @@ Expected assignment context:
   ],
   "worktree_path": "/absolute/path/to/worktree",
   "branch": "feature/branch-name",
-  "review_cycle_limit": 3,
-  "review_cycle_index": 1,
   "reviewed_commit": "abc1234",
   "previous_reviewed_commit": "",
-  "findings_hash": "",
-  "previous_step_json": {}
+  "findings_hash": ""
 }
 ```
 

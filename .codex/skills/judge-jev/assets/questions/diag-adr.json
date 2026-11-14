@@ -1,0 +1,107 @@
+{
+ "schema": "judge-jev/quality-tree/1",
+ "id": "diag-adr",
+ "kind": "adr",
+ "version": 1,
+ "approved": false,
+ "note": "diagnostic copy: gate questions unchanged, extra d_* questions appended; verdict rules unchanged",
+ "start": "wave-1",
+ "nodes": {
+  "wave-1": {
+   "questions": {
+    "context": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. Does its context name the problem and the forces behind the decision?",
+     "criteria": {
+      "problem and forces": "Names the problem and the forces or constraints that shaped the decision.",
+      "background only": "Gives background but no problem. Fix: state the problem.",
+      "missing": "No context in substance. Fix: add the problem and its forces."
+     }
+    },
+    "alternatives": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. Does it name the alternatives considered?",
+     "criteria": {
+      "named with reasons rejected": "Names alternatives and why each was rejected.",
+      "named only": "Names alternatives without why they were rejected. Fix: add why rejected.",
+      "none": "Names no alternative. Fix: add alternatives."
+     }
+    },
+    "consequences": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. Does it name the decision's consequences?",
+     "criteria": {
+      "positive and negative": "Names benefits and costs.",
+      "positive only": "Names only benefits. Fix: add the costs.",
+      "missing": "Names no consequence. Fix: add benefits and costs."
+     }
+    },
+    "d_ctx_gap": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. What is the context section most missing?",
+     "criteria": {
+      "nothing": "It names the problem and the forces.",
+      "problem": "A statement of the problem being decided.",
+      "forces": "The forces or constraints pulling against each other.",
+      "scope": "What the decision applies to.",
+      "mixed": "It mixes context with the decision itself."
+     }
+    },
+    "d_alt_gap": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. What is the alternatives section most missing?",
+     "criteria": {
+      "nothing": "Each alternative is named with why it was rejected.",
+      "reasons": "The reason each alternative was rejected.",
+      "alternatives": "Real alternatives (only straw men or none are listed).",
+      "link": "A link from each rejection reason to a force in the context."
+     }
+    },
+    "d_cons_gap": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. What is the consequences section most missing?",
+     "criteria": {
+      "nothing": "It names positive and negative consequences.",
+      "negative": "A negative consequence or cost.",
+      "positive": "A positive consequence.",
+      "concrete": "Concrete effects (it is abstract or restates the decision).",
+      "separation": "A clear separation of positive from negative consequences."
+     }
+    },
+    "d_cons_weak": {
+     "type": "choice",
+     "instructions": "`item.text` is one architecture decision record as JSON. Which consequence statement is weakest?",
+     "criteria": {
+      "none": "All are clear.",
+      "vague": "One uses a vague word (simpler, better, cleaner) with no measure.",
+      "restates": "One restates the decision instead of an effect.",
+      "unowned": "One does not say who or what is affected.",
+      "speculative": "One is speculative (may, might) with no condition."
+     }
+    }
+   },
+   "verdict_rules": [
+    {
+     "any": {
+      "context": [
+       "background only",
+       "missing"
+      ],
+      "alternatives": [
+       "named only",
+       "none"
+      ],
+      "consequences": [
+       "positive only",
+       "missing"
+      ]
+     },
+     "verdict": "no"
+    },
+    {
+     "verdict": "yes"
+    }
+   ]
+  }
+ }
+}
