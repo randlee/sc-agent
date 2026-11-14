@@ -1,12 +1,12 @@
 # Decision: First release surfaces via sc-publish
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-11  
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-11  
-**Revision:** 0.2.0 (2026-11-14, owner-approved): record the current PyPI distributions from owner commit [a6fca64](https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e).  
+**Revision:** 0.3.0 (2026-11-14, owner-approved): record fourteen published crates including **decidr**, alongside the PyPI names approved in owner commit [a6fca64](https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e).  
 
 ---
 
@@ -29,7 +29,7 @@ Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter C
 
 ### Decision
 
-Phase A first release surfaces are **crates.io** (thirteen workspace crates), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
+Phase A first release surfaces are **crates.io** (fourteen workspace crates, including **decidr**), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
 
 **Key Principles:**
 
