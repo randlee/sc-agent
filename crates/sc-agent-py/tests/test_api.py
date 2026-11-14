@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import _thread
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -37,6 +38,12 @@ PART = json.dumps(
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 
+def test_python_module_exposes_its_module_documentation():
+    assert sc_agent.__doc__ == (
+        "The `sc_agent` module: `integration_cases`, `validate_integration_results`, `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+    )
+
+
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
     root = log_root / "logs"
     return sorted(root.rglob("sessions.jsonl")) if root.exists() else []
@@ -49,6 +56,26 @@ def session_rows(log_root: pathlib.Path) -> list[dict]:
 def error_of(info: pytest.ExceptionInfo) -> tuple[str, dict]:
     ident, _message, detail = info.value.args
     return ident, json.loads(detail)
+
+
+def find_status(detail: dict) -> int | None:
+    if "status" in detail:
+        return detail["status"]
+    cause = detail.get("cause")
+    return find_status(cause) if cause else None
+
+
+@pytest.mark.parametrize("status", [429, 503, 529, 401, 422])
+def test_structured_http_status_on_batch_and_exception(env, args, status):
+    """Controlled loopback statuses remain numeric in batch errors and SagError details."""
+    _loopback, _log_root = env
+    result = json.loads(sc_agent.send_batch([NOUL], **args)[0])
+    assert find_status(result["error"]) == status
+
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+    _ident, detail = error_of(info)
+    assert find_status(detail) == status
 
 
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
@@ -116,11 +143,11 @@ def test_an_invalid_project_is_refused(env, args):
     assert session_files(log_root) == []
 
 
-def assert_lowest_503(error: dict) -> None:
-    """The loopback's 503 as the lowest-layer error: its id and its message with the body."""
+def assert_lowest_409(error: dict) -> None:
+    """The loopback's 409 as the lowest-layer error: its id and its message with the body."""
     assert error["id"] == "decision.api_status"
     assert "cause" not in error, error
-    assert error["message"] == "the API answered HTTP 503: " + json.dumps(FIXED_ERROR), error
+    assert error["message"] == "the API answered HTTP 409: " + json.dumps(FIXED_ERROR), error
 
 
 def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, args, config_dir):
@@ -147,10 +174,10 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, 
         timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
-    # REQ-SAG-0002 AC1 at both entry points: the 503 is the lowest-layer failure, so it is the
+    # REQ-SAG-0002 AC1 at both entry points: the 409 is the lowest-layer failure, so it is the
     # error itself (no cause below it), and its message carries the provider's body whole.
     for error in (json.loads(child.stdout)["error"], json.loads(sc_agent.send(NOUL, **args))["error"]):
-        assert_lowest_503(error)
+        assert_lowest_409(error)
     rows = session_rows(log_root)
     assert len(rows) == 2
     identities = {(row["fields"]["project"], row["fields"]["agent_role"]) for row in rows}
@@ -302,4 +329,63 @@ def test_input_limits_raise_before_any_send(env, args):
         sc_agent.send(" " * (9 * 1024 * 1024), **args)
     ident, detail = error_of(info)
     assert ident == "decidr.limit_exceeded" and "request_bytes" in detail["message"]
+    assert loopback.requests == []
+
+
+@pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
+@pytest.mark.parametrize("option", ["keyring_service", "keyring_account"])
+@pytest.mark.parametrize("value", ["", "x" * 256, "é" * 128])
+def test_keyring_location_invalid_before_any_send(env, args, operation, option, value):
+    loopback, log_root = env
+    request = [NOUL] if operation is sc_agent.send_batch else NOUL
+    with pytest.raises(sc_agent.SagError) as info:
+        operation(request, **args, **{option: value})
+    ident, detail = error_of(info)
+    assert ident == "sc_agent_py.invalid_option"
+    assert detail["id"] == ident
+    assert option in detail["message"]
+    assert "255" in detail["message"]
+    assert detail["recovery"] == "Correct the named option and retry."
+    assert loopback.requests == []
+    assert not session_files(log_root)
+
+
+@pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
+def test_keyring_override_requires_named_provider(env, args, operation):
+    loopback, _ = env
+    request = [NOUL] if operation is sc_agent.send_batch else NOUL
+    with pytest.raises(sc_agent.SagError) as info:
+        operation(request, **args, keyring_service="consumer")
+    ident, detail = error_of(info)
+    assert ident == "sc_agent_py.invalid_option"
+    assert detail["id"] == ident
+    assert "provider" in detail["message"]
+    assert "required with a keyring override" in detail["message"]
+    assert detail["recovery"] == "Correct the named option and retry."
+    assert loopback.requests == []
+
+
+def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch, tmp_path):
+    """A missing remote credential reaches the real-backend constructor, which must refuse."""
+    loopback, _log_root = env
+    assert os.environ.get("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING") == "1"
+    # Avoid repository .env discovery so the test always reaches the keyring path.
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.send(
+            NOUL,
+            model="jev-latest",
+            project="proj",
+            agent_role="role",
+            provider="typesafe",
+            config_dir=args["config_dir"],
+            keyring_service="test-keyring-trap",
+        )
+    ident, detail = error_of(info)
+    assert ident == "decidr.secrets"
+    assert detail["cause"]["id"] == "secrets.keyring_construction_refused"
+    assert "refused by the active test guard" in detail["cause"]["message"]
+    assert detail["cause"]["recovery"] == (
+        "use an injected keyring source in tests; do not access the platform keyring from a test"
+    )
     assert loopback.requests == []

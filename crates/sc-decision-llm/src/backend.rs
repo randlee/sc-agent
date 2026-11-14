@@ -140,14 +140,26 @@ impl LlmDecisionBackend {
     /// The `DecisionError` of `error`: a schema mismatch (resent by the runner) or a backend
     /// failure, with the whole chain. A mismatch writes one `llm.schema_mismatch` record.
     fn decision_error(&self, error: DecisionLlmError, ctx: LogContext) -> DecisionError {
+        let mut detail = error.detail();
+        let mut next = Some(&mut detail);
+        while let Some(node) = next {
+            node.message = self.llm.redact_text(&node.message).into_owned();
+            if let Some(recovery) = &mut node.recovery {
+                *recovery = self.llm.redact_text(recovery).into_owned().into();
+            }
+            next = node.cause.as_deref_mut();
+        }
         if is_mismatch(&error) {
             self.log_mismatch(&error, ctx);
             DecisionError::SchemaMismatch {
                 backend: BACKEND,
-                detail: error.detail(),
+                detail,
             }
         } else {
-            backend_error(&error)
+            DecisionError::Backend {
+                backend: BACKEND,
+                detail,
+            }
         }
     }
 
@@ -163,12 +175,21 @@ impl LlmDecisionBackend {
         };
         let mut fields = Map::new();
         fields.insert("provider".to_owned(), self.llm.provider().as_str().into());
-        fields.insert("model".to_owned(), self.model.as_str().into());
+        fields.insert(
+            "model".to_owned(),
+            self.llm
+                .redact_text(self.model.as_str())
+                .into_owned()
+                .into(),
+        );
         fields.insert("error".to_owned(), cause.into());
         if let DecisionLlmError::AnswerInvalid { question, .. } = error
             && !question.is_empty()
         {
-            fields.insert("question".to_owned(), question.clone().into());
+            fields.insert(
+                "question".to_owned(),
+                self.llm.redact_text(question).into_owned().into(),
+            );
         }
         let _ = log.write(Level::Info, LOG_TARGET, "llm.schema_mismatch", ctx, fields);
     }
@@ -200,14 +221,6 @@ fn is_mismatch(error: &DecisionLlmError) -> bool {
     }
 }
 
-/// `decision.backend` with the whole chain; never resent.
-fn backend_error(error: &DecisionLlmError) -> DecisionError {
-    DecisionError::Backend {
-        backend: BACKEND,
-        detail: error.detail(),
-    }
-}
-
 impl Backend for LlmDecisionBackend {
     /// `DecisionRequest` -> `LlmRequest` (built-in prompt, per-question JSON schema, every
     /// asset as an image part) -> `HttpRequest`.
@@ -221,10 +234,10 @@ impl Backend for LlmDecisionBackend {
     /// rejects one returns its own error at decode.
     fn encode(&self, request: &DecisionRequest) -> Result<HttpRequest, DecisionError> {
         let call = translate(request, &self.model, self.max_tokens)
-            .map_err(|error| backend_error(&error))?;
+            .map_err(|error| self.decision_error(error, LogContext::NONE))?;
         self.llm
             .encode(&call)
-            .map_err(|error| backend_error(&DecisionLlmError::Llm(error)))
+            .map_err(|error| self.decision_error(DecisionLlmError::Llm(error), LogContext::NONE))
     }
 
     /// `HttpResponse` -> `LlmResponse` -> `SystemOneResponse` with one answer per question, in
@@ -249,7 +262,10 @@ impl Backend for LlmDecisionBackend {
             .llm
             .decode(&self.decode_request(request), response, ctx)
             .map_err(|error| self.decision_error(DecisionLlmError::Llm(error), ctx))?;
-        answers(request.body(), reply).map_err(|error| self.decision_error(error, ctx))
+        answers(request.body(), reply, &|text| {
+            self.llm.redact_text(text).into_owned()
+        })
+        .map_err(|error| self.decision_error(error, ctx))
     }
 }
 

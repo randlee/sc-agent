@@ -104,12 +104,12 @@ pub enum LogError {
         /// sc-observability's failure.
         source: FlushError,
     },
-    /// A row's serialized fields are over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES); it is not
+    /// A complete serialized event is over [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES); it is not
     /// written and is counted as a lost row.
     RowTooLarge {
         /// Which logger.
         log: LogKind,
-        /// The serialized size of the row's fields.
+        /// The serialized size of the complete event, excluding its newline.
         bytes: usize,
         /// The cap, [`MAX_ROW_BYTES`](crate::MAX_ROW_BYTES).
         max: usize,

@@ -88,7 +88,11 @@ mod cases {
     /// Sends `request` through `transport` once and returns the error.
     fn send_err(transport: Arc<dyn Transport>, request: &HttpRequest) -> HttpError {
         let memory = MemoryLog::new().expect("memory log");
-        let client = HttpClient::new(transport, ResendPolicy::default(), memory.general());
+        let client = HttpClient::new(
+            transport,
+            ResendPolicy::new(std::num::NonZeroU32::MIN),
+            memory.general(),
+        );
         let Ok(Start::Go(permit)) = client.may_start(request, Attempts::new(), test_clock().now())
         else {
             panic!("fresh");
@@ -140,12 +144,16 @@ mod cases {
             if let Some(recovery) = error.recovery() {
                 expected = expected.with_recovery(recovery);
             }
+            if let Some(status) = error.status() {
+                expected = expected.with_status(status);
+            }
             assert_eq!(error.detail(), expected);
             assert_eq!(
                 std::error::Error::source(error).is_some(),
                 error.cause_detail().is_some()
             );
         }
+        assert_eq!(errors[0].detail().status, Some(429));
         let with_recovery: HashSet<&str> = errors
             .iter()
             .filter(|error| error.recovery().is_some())

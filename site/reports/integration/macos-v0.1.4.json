@@ -1,0 +1,122 @@
+{
+  "run_id": "macos-v0.1.4",
+  "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+  "platform": "macos-aarch64",
+  "prerelease_tag": "prerelease/v0.1.4",
+  "artifacts": [
+    {
+      "name": "sc-agent_0.1.4_aarch64-apple-darwin.tar.gz",
+      "sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110"
+    },
+    {
+      "name": "sc_decidr-0.1.4-cp310-abi3-macosx_11_0_arm64.whl",
+      "sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b"
+    },
+    {
+      "name": "sitr-0.1.4-cp310-abi3-macosx_11_0_arm64.whl",
+      "sha256": "90ce7023e804d8a8719e8f0b241fbb96f0bf3dfc8f381e2e351c0021393decca"
+    }
+  ],
+  "results": [
+    {
+      "case_id": "typesafe-models-cli",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client discovered real TypeSafe models",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110"
+    },
+    {
+      "case_id": "typesafe-models-wheel",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client discovered real TypeSafe models",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b"
+    },
+    {
+      "case_id": "typesafe-decision-cli",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client returned a real schema-valid noul decision",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110",
+      "session_id": "01M7CJ4SZC29G77KMGBY3KSC6Q"
+    },
+    {
+      "case_id": "typesafe-decision-wheel",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client returned a real schema-valid noul decision",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b",
+      "session_id": "01M7CJ4TWG43T79GJ13GCV1QJS"
+    },
+    {
+      "case_id": "anthropic-decision-cli",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client returned a real schema-valid noul decision",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110",
+      "session_id": "01M7CJ4VSMNZH52VSPRJ4HWHPJ"
+    },
+    {
+      "case_id": "anthropic-decision-wheel",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Installed client returned a real schema-valid noul decision",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b",
+      "session_id": "01M7CJ4XWNJCHT4M9SXG78S8RP"
+    },
+    {
+      "case_id": "typesafe-invalid-key-cli",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Invalid environment credential returned the expected sanitized HTTP 401 cause chain",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110",
+      "session_id": "01M7CJ5004RZ0GQ3VV3YZ1TTC7"
+    },
+    {
+      "case_id": "typesafe-invalid-key-wheel",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Invalid environment credential returned the expected sanitized HTTP 401 cause chain",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b",
+      "session_id": "01M7CJ50RC0GEV5WA6DKWV21Q2"
+    },
+    {
+      "case_id": "anthropic-invalid-key-cli",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Invalid environment credential returned the expected sanitized HTTP 401 cause chain",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "51107e0a8dd0ebe248419932d1595b839eb4fcd5ff89b7d85b92880d053d1110",
+      "session_id": "01M7CJ51HR827YSWGE1A6DYCZP"
+    },
+    {
+      "case_id": "anthropic-invalid-key-wheel",
+      "platform": "macos-aarch64",
+      "status": "PASS",
+      "reason": "Invalid environment credential returned the expected sanitized HTTP 401 cause chain",
+      "prerelease_tag": "prerelease/v0.1.4",
+      "source_commit": "b32fc854aa6ae56c6fb8277f26535a4c06c4568a",
+      "artifact_sha256": "69a48e33c63fcd4458c39c9a4548100b1c1e507b49c058dae51702c52049689b",
+      "session_id": "01M7CJ52E6CTX21QEFQN5E6ZN1"
+    }
+  ],
+  "report": "site/reports/integration/macos-v0.1.4.html",
+  "report_sha256": "080f70db1832a631051ea3d9b386d9cfe030c87bdff2a685448cf58b1048b0fc"
+}

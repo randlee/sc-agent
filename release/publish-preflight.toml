@@ -11,3 +11,8 @@ drift_paths = ["fixtures/cli/", "site/cli/"]
 id = "docli-cli-html"
 description = "CLI reference HTML for decidr and sitr matches the clap command trees"
 run = "bash .github/scripts/release-preflight-docli.sh"
+
+[[checks]]
+id = "live-provider-integration"
+description = "One complete passing checksum-verified prerelease platform run matches candidate source"
+run = "python3 scripts/integration/preflight.py"

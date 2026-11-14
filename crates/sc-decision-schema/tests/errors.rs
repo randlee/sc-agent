@@ -109,6 +109,13 @@ mod tests {
             assert_eq!(detail.message, error.message());
             assert_eq!(detail.recovery.as_deref(), error.recovery());
             assert_eq!(detail.cause.map(|cause| *cause), error.cause_detail());
+            assert_eq!(
+                detail.status,
+                match error {
+                    DecisionError::ApiStatus { status, .. } => Some(*status),
+                    _ => None,
+                }
+            );
         }
     }
 

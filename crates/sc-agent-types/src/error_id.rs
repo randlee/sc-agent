@@ -1,6 +1,5 @@
 //! The one error convention of the workspace: [`ErrorId`] and [`ErrorDetail`] (REQ-SAG-0002).
 
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 
@@ -16,10 +15,10 @@ use serde::{Deserialize, Serialize};
 /// provided.
 ///
 /// Implementors must not override [`Self::detail`]; workspace review rejects an override. It
-/// is the one place that assembles id, message, recovery and cause, which keeps every printed
-/// error, session row and Python exception consistent with `id()`, `message()`, `recovery()`
-/// and `cause_detail()`. Rust cannot seal a provided method, so each crate's tests check that
-/// `detail()` equals the value built from those four.
+/// is the one place that assembles id, message, recovery, optional HTTP status and cause, which
+/// keeps every printed error, session row and Python exception consistent with the accessors.
+/// Rust cannot seal a provided method, so each crate's tests check that `detail()` equals the
+/// value built from those accessors.
 ///
 /// The cause method is `cause_detail`, not `cause`: the deprecated `std::error::Error::cause`
 /// on the supertrait has that name, and `x.cause()` would be ambiguous (E0034) wherever
@@ -57,15 +56,21 @@ pub trait ErrorId: Error {
         None
     }
 
-    /// This error as data: id, message, recovery and the cause chain.
+    /// The HTTP status for an error that represents an HTTP response, when available.
+    fn status(&self) -> Option<u16> {
+        None
+    }
+
+    /// This error as data: id, message, recovery, HTTP status and the cause chain.
     ///
     /// Must not be overridden (see the trait docs); workspace review rejects an override.
     fn detail(&self) -> ErrorDetail {
         ErrorDetail {
             id: self.id().to_owned(),
             message: self.message(),
-            recovery: self.recovery().map(Cow::Borrowed),
+            recovery: self.recovery().map(Box::<str>::from),
             cause: self.cause_detail().map(Box::new),
+            status: self.status(),
         }
     }
 }
@@ -96,13 +101,16 @@ pub struct ErrorDetail {
     pub message: String,
     /// What the caller does next, if known. Omitted from serde output when `None`.
     ///
-    /// A `Cow`, not `&'static str`: `ErrorDetail` is also deserialized (session rows, PyO3),
-    /// which cannot produce a `&'static str`. Values built from [`ErrorId::recovery`] borrow.
+    /// A boxed string keeps the deserialized representation compact while allowing details
+    /// from session rows and PyO3 to own their recovery text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub recovery: Option<Cow<'static, str>>,
+    pub recovery: Option<Box<str>>,
     /// The lower error that caused this one. Omitted from serde output when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<Box<ErrorDetail>>,
+    /// The HTTP status represented by this error, when available. Omitted when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<u16>,
 }
 
 /// The id given to each level of a foreign error's `source()` chain below the top one, which
@@ -118,6 +126,7 @@ impl ErrorDetail {
             message: message.into(),
             recovery: None,
             cause: cause.map(Box::new),
+            status: None,
         }
     }
 
@@ -125,7 +134,16 @@ impl ErrorDetail {
     #[must_use]
     pub fn with_recovery(self, recovery: &'static str) -> Self {
         Self {
-            recovery: Some(Cow::Borrowed(recovery)),
+            recovery: Some(Box::<str>::from(recovery)),
+            ..self
+        }
+    }
+
+    /// This detail with the numeric HTTP status represented by it.
+    #[must_use]
+    pub fn with_status(self, status: u16) -> Self {
+        Self {
+            status: Some(status),
             ..self
         }
     }
@@ -144,6 +162,7 @@ impl ErrorDetail {
             cause: error
                 .source()
                 .map(|source| Box::new(Self::foreign(FOREIGN_SOURCE_ID, source))),
+            status: None,
         }
     }
 }

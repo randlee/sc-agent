@@ -11,7 +11,7 @@ The crate does no I/O, reads no files and needs no runtime. Its only dependencie
 - **Identifiers:** `SessionId` (a ULID) and `VarName` (a checked environment-variable name).
 - **Cancellation:** `CancelToken`, cooperative cancel with deadline waits and wake hooks (`on_cancel`, `CancelHook`, `Wait`).
 - **Time:** `Clock` (`Clock::system()`, `now`, `wait_until`) and `SystemClock`. It is the one source of time and of timed waits.
-- **Errors:** the `ErrorId` trait and `ErrorDetail` (id, message, cause), the one error convention of the workspace, and the crate's own `TypesError`.
+- **Errors:** the `ErrorId` trait and `ErrorDetail` (id, message, optional recovery, HTTP status and cause), the one error convention of the workspace, and the crate's own `TypesError`.
 
 ## Usage
 

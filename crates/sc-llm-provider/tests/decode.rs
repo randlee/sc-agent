@@ -336,3 +336,22 @@ fn http_error_wraps_the_send_failure() {
     assert_eq!(cause.id, "http.network");
     assert!(matches!(&error, LlmError::Http { source, .. } if *source == send));
 }
+
+/// A malformed envelope names the field; it never copies the untrusted value.
+#[test]
+fn invalid_envelope_names_the_field_without_echoing_the_credential() {
+    let client = client(LlmProvider::Anthropic);
+    let reply = response(200, Vec::new(), json!({"model":"haiku", "content": KEY}));
+    let error = client
+        .decode(&request("haiku", json_output()), reply, LogContext::NONE)
+        .expect_err("content must be an array");
+    assert_eq!(error.id(), "llm.reply_invalid");
+    assert!(
+        matches!(&error, LlmError::ReplyInvalid { message, .. } if message == "the reply has no `content` array")
+    );
+    assert!(
+        !serde_json::to_string(&error.detail())
+            .expect("detail")
+            .contains(KEY)
+    );
+}

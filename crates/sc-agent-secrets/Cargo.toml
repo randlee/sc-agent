@@ -6,11 +6,15 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+# Makes accidental platform keyring construction fail in test runs.
+test-keyring-guard = []
+
 [dependencies]
 # No default features: platform keystores are enabled per target below.
 # Targets without a keystore fall back to keyring's empty mock (no network).
 keyring = { version = "3.6", default-features = false }
-sc-agent-types = { version = "0.1.0", path = "../sc-agent-types" }
+sc-agent-types = { version = "0.1.5", path = "../sc-agent-types" }
 whoami = "1.6"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
@@ -23,6 +27,7 @@ keyring = { version = "3.6", default-features = false, features = ["windows-nati
 keyring = { version = "3.6", default-features = false, features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
+sc-agent-secrets = { path = ".", features = ["test-keyring-guard"] }
 sc-agent-testkit = { path = "../sc-agent-testkit" }
 sc-agent-types = { path = "../sc-agent-types", features = ["testing"] }
 tempfile = "3"

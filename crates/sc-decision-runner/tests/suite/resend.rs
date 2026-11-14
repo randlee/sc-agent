@@ -267,7 +267,10 @@ fn busy_quota_network_passed_through() {
     let sends = lock(&sends);
     assert_eq!(sends[&0], 1, "quota is never resent");
     assert_eq!(sends[&1], 2, "busy is resent up to max_sends (2)");
-    assert_eq!(sends[&2], 1, "a connect failure is not resent");
+    assert_eq!(
+        sends[&2], 2,
+        "network failure is resent up to max_sends (2)"
+    );
 }
 
 // REQ-SAG-0012 (runner side), formerly `provider_pause_holds_other_jobs` here, raced on when

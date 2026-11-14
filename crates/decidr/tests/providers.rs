@@ -135,7 +135,8 @@ mod tests {
             )),
         ]);
         let log = MemoryLog::new().expect("log");
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let ctx = context(
             dir.path(),
             &[(sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY)],
@@ -162,7 +163,7 @@ mod tests {
     }
 
     /// REQ-SAG-0002 0.2.0 (attached-key redaction), end to end: a provider that echoes the
-    /// attached key in a 400, 422 or 503 body (TypeSafe, and a keyed local runner) yields a
+    /// attached key in a 400, 422 or 409 body (TypeSafe, and a keyed local runner) yields a
     /// result whose error has the same id, `[redacted]` where the key was, and the rest of
     /// the provider's text whole.
     #[test]
@@ -181,7 +182,7 @@ mod tests {
                 "decision.api_validation",
             ),
             (
-                503,
+                409,
                 format!("upstream refused Bearer {TYPESAFE_KEY}; retry later"),
                 "decision.api_status",
             ),
@@ -232,7 +233,7 @@ mod tests {
         let runner_key = "laya-decidr-test-secret-0005";
         let transport = ScriptedTransport::responses(vec![
             json_response(200, r#"{"ok":true,"model":"jev-latest"}"#),
-            json_response(503, &format!("loading, key {runner_key} accepted later")),
+            json_response(409, &format!("loading, key {runner_key} accepted later")),
         ]);
         let log = MemoryLog::new().expect("log");
         let ctx = context(
@@ -255,7 +256,7 @@ mod tests {
             "{line}"
         );
         assert_eq!(
-            sc_agent_types::ErrorId::id(&result.outcome.expect_err("503")),
+            sc_agent_types::ErrorId::id(&result.outcome.expect_err("409")),
             "decision.api_status"
         );
     }
@@ -272,7 +273,8 @@ mod tests {
         );
         let transport = ScriptedTransport::responses(vec![json_response(200, &body)]);
         let log = MemoryLog::new().expect("log");
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let ctx = context(
             dir.path(),
             &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
@@ -302,7 +304,8 @@ mod tests {
 
         let models_body = format!(r#"{{"models":"{TYPESAFE_KEY}"}}"#);
         let transport = ScriptedTransport::responses(vec![json_response(200, &models_body)]);
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let options = decidr::ModelsOptions {
             runner: None,
             context: context(

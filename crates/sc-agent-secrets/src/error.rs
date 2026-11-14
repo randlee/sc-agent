@@ -19,6 +19,10 @@ const KEYRING_READ_RECOVERY: &str = "unlock or start the platform keystore for t
 /// Recovery text for [`SecretsError::KeyringTimeout`].
 const KEYRING_TIMEOUT_RECOVERY: &str = "unlock the platform keystore for this OS user (a retry blocks again until it answers), or set the variable in the process environment or the repo-root .env file";
 
+/// Recovery text for [`SecretsError::KeyringConstructionRefused`].
+const KEYRING_CONSTRUCTION_REFUSED_RECOVERY: &str =
+    "use an injected keyring source in tests; do not access the platform keyring from a test";
+
 /// A key could not be resolved.
 ///
 /// No variant holds key bytes. `cause` and `kind` are this layer's summary
@@ -30,6 +34,11 @@ const KEYRING_TIMEOUT_RECOVERY: &str = "unlock the platform keystore for this OS
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SecretsError {
+    /// A keyring location component is empty or exceeds 255 UTF-8 bytes.
+    InvalidLocation {
+        /// The option name; its supplied value is never retained.
+        option: &'static str,
+    },
     /// The variable is unset, empty or blank in every source.
     KeyMissing {
         /// The variable (and keyring service) that was looked up.
@@ -70,21 +79,28 @@ pub enum SecretsError {
     },
     /// The keyring did not answer within 15 s, or an earlier read is still stuck.
     KeyringTimeout,
+    /// A test guard refused construction of the real platform keyring.
+    KeyringConstructionRefused,
 }
 
 impl ErrorId for SecretsError {
     fn id(&self) -> &'static str {
         match self {
+            Self::InvalidLocation { .. } => "secrets.invalid_location",
             Self::KeyMissing { .. } => "secrets.key_missing",
             Self::KeyMalformed { .. } => "secrets.key_malformed",
             Self::DotenvRead { .. } => "secrets.dotenv_read",
             Self::KeyringRead { .. } => "secrets.keyring_read",
             Self::KeyringTimeout => "secrets.keyring_timeout",
+            Self::KeyringConstructionRefused => "secrets.keyring_construction_refused",
         }
     }
 
     fn message(&self) -> String {
         match self {
+            Self::InvalidLocation { option } => {
+                format!("{option} must contain 1..=255 UTF-8 bytes")
+            }
             Self::KeyMissing { var } => format!(
                 "no key found for {var}: it is unset or blank in the process environment, the repo-root .env file and the platform keyring"
             ),
@@ -101,23 +117,34 @@ impl ErrorId for SecretsError {
                 "the platform keyring did not answer within 15 s, or an earlier read is still stuck"
                     .to_owned()
             }
+            Self::KeyringConstructionRefused => {
+                "real platform keyring construction was refused by the active test guard".to_owned()
+            }
         }
     }
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
             Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source.clone(),
-            Self::KeyMissing { .. } | Self::KeyMalformed { .. } | Self::KeyringTimeout => None,
+            Self::InvalidLocation { .. }
+            | Self::KeyMissing { .. }
+            | Self::KeyMalformed { .. }
+            | Self::KeyringTimeout
+            | Self::KeyringConstructionRefused => None,
         }
     }
 
     fn recovery(&self) -> Option<&'static str> {
         match self {
+            Self::InvalidLocation { .. } => {
+                Some("provide a keyring location component of 1..=255 UTF-8 bytes")
+            }
             Self::KeyMissing { .. } => Some(KEY_MISSING_RECOVERY),
             Self::KeyMalformed { .. } => Some(KEY_MALFORMED_RECOVERY),
             Self::DotenvRead { .. } => Some(DOTENV_READ_RECOVERY),
             Self::KeyringRead { .. } => Some(KEYRING_READ_RECOVERY),
             Self::KeyringTimeout => Some(KEYRING_TIMEOUT_RECOVERY),
+            Self::KeyringConstructionRefused => Some(KEYRING_CONSTRUCTION_REFUSED_RECOVERY),
         }
     }
 }
@@ -134,7 +161,11 @@ impl std::error::Error for SecretsError {
             Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source
                 .as_ref()
                 .map(|source| source as &(dyn std::error::Error + 'static)),
-            Self::KeyMissing { .. } | Self::KeyMalformed { .. } | Self::KeyringTimeout => None,
+            Self::InvalidLocation { .. }
+            | Self::KeyMissing { .. }
+            | Self::KeyMalformed { .. }
+            | Self::KeyringTimeout
+            | Self::KeyringConstructionRefused => None,
         }
     }
 }

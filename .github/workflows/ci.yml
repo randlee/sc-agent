@@ -69,7 +69,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
-        run: cargo fmt --check --all
+        run: cargo --locked fmt --check --all
 
   clippy:
     name: Clippy
@@ -96,7 +96,33 @@ jobs:
           key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Test sc-lint release setup
+        run: |
+          python3 .github/scripts/tests/test_setup_sc_lint_checksum.py
+          python3 .github/scripts/tests/test_setup_sc_lint_release.py
+
+      - name: Install sc-lint
+        uses: ./.github/actions/setup-sc-lint
+        with:
+          version: "0.8.9"
+          smoke-family: "sc-runtime"
+
+      - name: Reject production panic constructs
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/sc-lint-runtime.json"
+          set +e
+          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008 > "${report}"
+          lint_rc=$?
+          set -e
+          if [ "${lint_rc}" -ne 0 ]; then
+            cat "${report}"
+            exit "${lint_rc}"
+          fi
+          export SC_LINT_RUNTIME_REPORT="${report}"
+          python3 .github/scripts/tests/test_runtime_panic_gate.py
 
   test:
     name: Test (${{ matrix.os }})
@@ -126,7 +152,7 @@ jobs:
           key: ${{ matrix.os }}-test-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run workspace tests
-        run: cargo test --workspace --all-features
+        run: cargo test --locked --workspace --all-features
 
   # sc-treesitter (sprint a-3): ADR-SAG-0005 feature gates, the grammar feature matrix and
   # the sc-treesitter-py wheel (REQ-QA-001, REQ-QA-002).
@@ -155,7 +181,7 @@ jobs:
 
       - name: Check ADR-SAG-0005 feature gates (cargo metadata)
         run: |
-          cargo metadata --format-version 1 --no-deps > metadata.json
+          cargo metadata --locked --format-version 1 --no-deps > metadata.json
           python3 - <<'PY'
           import json, sys
           packages = {p["name"]: p for p in json.load(open("metadata.json"))["packages"]}
@@ -178,15 +204,15 @@ jobs:
           PY
 
       - name: Test with only the Python grammar
-        run: cargo test -p sc-treesitter --no-default-features --features grammar-python
+        run: cargo test --locked -p sc-treesitter --no-default-features --features grammar-python
 
       - name: Test the sitr CLI crate
-        run: cargo test -p sitr
+        run: cargo test --locked -p sitr
 
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install maturin and pytest
         run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
@@ -225,15 +251,15 @@ jobs:
           key: ubuntu-sc-agent-py-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build the decidr binary (the parity and identity tests run it)
-        run: cargo build -p decidr
+        run: cargo build --locked -p decidr
 
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install maturin and pytest
-        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
+        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5" "sc-observability==1.5.0" "sc-compose==1.5.0"
 
       - name: Build the sc-agent wheel
         run: maturin build -m crates/sc-agent-py/Cargo.toml --out dist

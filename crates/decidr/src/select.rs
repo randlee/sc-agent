@@ -19,8 +19,8 @@ use sc_agent_http::{
 };
 use sc_agent_log::{GeneralLogger, Level, LogError, Repo, SessionIdentity, SessionLogger, Slug};
 use sc_agent_secrets::{
-    EnvSource, KeySources, KeyringSource, PlatformKeyring, ResolvedKey, SecretsError, resolve,
-    resolve_var,
+    DeferredPlatformKeyring, EnvSource, KeySources, KeyringSource, ResolvedKey, SecretsError,
+    resolve, resolve_var,
 };
 use sc_agent_types::{
     CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
@@ -35,7 +35,7 @@ use sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL};
 use sc_llm_provider::{LlmClient, LlmProvider};
 use serde_json::{Map, Value};
 
-use crate::DecidrError;
+use crate::{DecidrError, RequestTimeout};
 
 /// The general-log target of decidr's own records.
 pub(crate) const LOG_TARGET: &str = "decidr";
@@ -280,7 +280,7 @@ impl<'c> Keys<'c> {
             keyring: context
                 .keyring
                 .clone()
-                .unwrap_or_else(|| Arc::new(PlatformKeyring)),
+                .unwrap_or_else(|| Arc::new(DeferredPlatformKeyring)),
         })
     }
 
@@ -410,7 +410,11 @@ fn runner_key(
 }
 
 /// A `LocalBackend` for `runner`, with its REQ-SAG-0015 timeouts.
-fn local_backend(runner: &LocalRunner, context: &Context) -> Result<LocalBackend, DecidrError> {
+fn local_backend(
+    runner: &LocalRunner,
+    context: &Context,
+    timeout: Option<RequestTimeout>,
+) -> Result<LocalBackend, DecidrError> {
     let key = runner_key(runner, context)?;
     let backend = LocalBackend::new(
         DaemonKind::from(runner.kind),
@@ -422,7 +426,7 @@ fn local_backend(runner: &LocalRunner, context: &Context) -> Result<LocalBackend
     .map_err(DecidrError::from)?;
     Ok(backend.with_timeouts(LocalTimeouts {
         load: runner.load_timeout(),
-        request: runner.request_timeout(),
+        request: timeout.map_or_else(|| runner.request_timeout(), RequestTimeout::duration),
     }))
 }
 
@@ -478,11 +482,12 @@ fn backend(
     options: &SendOptions,
     config: &AgentConfig,
     general: &GeneralLogger,
+    timeout: Option<RequestTimeout>,
 ) -> Result<Chosen, DecidrError> {
     let (model, line) = match &options.model {
         ModelSelector::Runner(name) => {
             let runner = local_runner(config, name.as_str())?;
-            let backend = local_backend(runner, &options.context)?;
+            let backend = local_backend(runner, &options.context, timeout)?;
             return Ok(Chosen::Local {
                 name: name.clone(),
                 runner: runner.clone(),
@@ -531,21 +536,33 @@ impl TransportChoice {
     fn build(self) -> Arc<dyn Transport> {
         match self {
             Self::Injected(transport) => transport,
-            Self::Ureq(timeouts) => Arc::new(UreqTransport::new(timeouts)),
+            Self::Ureq(timeouts) => {
+                #[cfg(test)]
+                if let Some(recording) = tests::record_construction(timeouts) {
+                    return recording;
+                }
+                Arc::new(UreqTransport::new(timeouts))
+            }
         }
     }
 }
 
 /// The decision transport: the context's, else one `UreqTransport` per local runner with the
 /// runner's request timeout (REQ-SAG-0015), else `Timeouts::default()`.
-fn decision_transport(context: &Context, runner: Option<&LocalRunner>) -> TransportChoice {
+/// A per-call override replaces only the request timeout.
+fn decision_transport(
+    context: &Context,
+    runner: Option<&LocalRunner>,
+    timeout: Option<RequestTimeout>,
+) -> TransportChoice {
     if let Some(transport) = &context.transport {
         return TransportChoice::Injected(Arc::clone(transport));
     }
-    TransportChoice::Ureq(match runner {
+    let defaults = match runner {
         Some(runner) => Timeouts::default().with_request(runner.request_timeout()),
         None => Timeouts::default(),
-    })
+    };
+    TransportChoice::Ureq(timeout.map_or(defaults, |value| defaults.with_request(value.duration())))
 }
 
 /// The probe transport (models, doctor, load probes): the context's, else `Timeouts::probe()`.
@@ -602,17 +619,17 @@ enum Loaded {
 }
 
 impl Prepared {
-    fn new(options: &SendOptions) -> Result<Self, DecidrError> {
+    fn new(options: &SendOptions, timeout: Option<RequestTimeout>) -> Result<Self, DecidrError> {
         let context = &options.context;
         let config = load_config(context)?;
         let general = general_for(context, &config)?;
-        let chosen = backend(options, &config, &general)?;
+        let chosen = backend(options, &config, &general, timeout)?;
         let session = session_for(options, &config)?;
         let local = match &chosen {
             Chosen::Local { runner, .. } => Some(runner),
             Chosen::Remote { .. } => None,
         };
-        let transport = decision_transport(context, local).build();
+        let transport = decision_transport(context, local, timeout).build();
         let runner = runner(
             context.clock(),
             &config,
@@ -770,7 +787,23 @@ pub fn send(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options)?;
+    send_with_timeout(options, request, cancel, None, on_result)
+}
+
+/// As [`send`], with an optional checked per-call request timeout.
+/// The override changes the default decision transport and local request deadline;
+/// local load/probe timeouts and injected transports retain their own controls.
+///
+/// # Errors
+/// Returns the same errors as [`send`].
+pub fn send_with_timeout(
+    options: &SendOptions,
+    request: DecisionRequest,
+    cancel: &CancelToken,
+    timeout: Option<RequestTimeout>,
+    on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
+) -> Result<(), DecidrError> {
+    let prepared = Prepared::new(options, timeout)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -805,7 +838,23 @@ pub fn send_batch(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options)?;
+    send_batch_with_timeout(options, requests, cancel, None, on_result)
+}
+
+/// As [`send_batch`], with an optional checked per-call request timeout.
+/// The override changes the default decision transport and local request deadline;
+/// local load/probe timeouts and injected transports retain their own controls.
+///
+/// # Errors
+/// Returns the same errors as [`send_batch`].
+pub fn send_batch_with_timeout(
+    options: &SendOptions,
+    requests: Vec<DecisionRequest>,
+    cancel: &CancelToken,
+    timeout: Option<RequestTimeout>,
+    on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
+) -> Result<(), DecidrError> {
+    let prepared = Prepared::new(options, timeout)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -1087,7 +1136,7 @@ fn list_models(
 }
 
 #[cfg(test)]
-mod tests {
+mod select_tests {
     use super::*;
 
     struct NoKeyring;
@@ -1278,26 +1327,56 @@ mod tests {
         let context = Context::new("decidr");
         let laya = local_runner(&config, "laya").expect("laya");
         assert_eq!(
-            ureq_timeouts(decision_transport(&context, Some(laya))),
+            ureq_timeouts(decision_transport(&context, Some(laya), None)),
             Some(Timeouts::default().with_request(std::time::Duration::from_secs(300)))
         );
         assert_eq!(laya.load_timeout().as_secs(), 600);
         let slow = local_runner(&config, "slow").expect("slow");
         assert_eq!(
-            ureq_timeouts(decision_transport(&context, Some(slow))),
+            ureq_timeouts(decision_transport(&context, Some(slow), None)),
             Some(Timeouts::default().with_request(std::time::Duration::from_secs(900)))
         );
         assert_eq!(slow.load_timeout().as_secs(), 1200);
         assert_eq!(
-            ureq_timeouts(decision_transport(&context, None)),
+            ureq_timeouts(decision_transport(&context, None, None)),
             Some(Timeouts::default())
         );
         let mut injected = Context::new("decidr");
         injected.transport = Some(Arc::new(UreqTransport::new(Timeouts::probe())));
         assert_eq!(
-            ureq_timeouts(decision_transport(&injected, Some(laya))),
+            ureq_timeouts(decision_transport(&injected, Some(laya), None)),
             None
         );
+        let timeout = RequestTimeout::from_secs(30.5).expect("checked timeout");
+        for selected in [None, Some(laya), Some(slow)] {
+            assert_eq!(
+                ureq_timeouts(decision_transport(&context, selected, Some(timeout))),
+                Some(Timeouts::default().with_request(std::time::Duration::from_millis(30_500))),
+            );
+        }
+        assert_eq!(
+            ureq_timeouts(decision_transport(&injected, Some(laya), Some(timeout))),
+            None,
+            "a caller-owned injected transport keeps its controls",
+        );
+        let request = crate::input::build_request(
+            br#"{"model":"m","state":"s","questions":{"q":{"type":"noul"}}}"#,
+            &[],
+            false,
+            None,
+        )
+        .expect("request");
+        let local = local_backend(laya, &context, Some(timeout)).expect("local backend");
+        assert_eq!(
+            local
+                .encode(&request)
+                .expect("encode first request")
+                .deadline(),
+            Some(laya.load_timeout() + std::time::Duration::from_millis(30_500)),
+            "first-request loading retains its configured load allowance",
+        );
+        assert_eq!(laya.request_timeout(), std::time::Duration::from_secs(300));
+        assert_eq!(laya.load_timeout(), std::time::Duration::from_secs(600));
         let error = local_runner(&config, "nope").expect_err("unknown");
         assert_eq!(error.id(), "decidr.unknown_runner");
     }
@@ -1362,5 +1441,213 @@ mod tests {
             Some(std::time::Duration::from_secs(17)),
             "the runner's load_timeout_secs reached the wait"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::cell::RefCell;
+    use std::ffi::OsString;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use sc_agent_http::testing::ScriptedTransport;
+    use sc_agent_http::{HttpResponse, Timeouts, Transport};
+    use sc_agent_log::testing::MemoryLog;
+    use sc_agent_log::{Repo, SessionIdentity, Slug};
+    use sc_agent_types::CancelToken;
+
+    use super::{Context, ModelSelector, SendOptions};
+    use crate::{RequestTimeout, send_batch_with_timeout, send_with_timeout};
+
+    const REQUEST: &[u8] =
+        br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
+    const RESPONSE: &[u8] = br#"{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.25}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
+
+    thread_local! {
+        // Scoped to the calling test thread. Production has no constructor substitution.
+        static CONSTRUCTION: RefCell<Option<(ScriptedTransport, Vec<Timeouts>)>> = const { RefCell::new(None) };
+    }
+
+    /// The default-transport constructor's controlled test substitute. The public path
+    /// selects the timeouts; only construction is substituted, leaving backend/runner intact.
+    pub(super) fn record_construction(timeouts: Timeouts) -> Option<Arc<dyn Transport>> {
+        CONSTRUCTION.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            let (transport, seen) = slot.as_mut()?;
+            seen.push(timeouts);
+            Some(Arc::new(transport.clone()) as Arc<dyn Transport>)
+        })
+    }
+
+    struct Recording;
+
+    impl Recording {
+        fn install(transport: ScriptedTransport) -> Self {
+            CONSTRUCTION.with(|slot| {
+                assert!(
+                    slot.borrow().is_none(),
+                    "no nested constructor substitutions"
+                );
+                *slot.borrow_mut() = Some((transport, Vec::new()));
+            });
+            Self
+        }
+
+        fn timeouts(&self) -> Vec<Timeouts> {
+            CONSTRUCTION.with(|slot| slot.borrow().as_ref().expect("installed").1.clone())
+        }
+    }
+
+    impl Drop for Recording {
+        fn drop(&mut self) {
+            CONSTRUCTION.with(|slot| *slot.borrow_mut() = None);
+        }
+    }
+
+    fn options(
+        local: bool,
+        transport: &ScriptedTransport,
+        log: &MemoryLog,
+    ) -> (tempfile::TempDir, SendOptions) {
+        let dir = tempfile::tempdir().expect("config dir");
+        std::fs::write(
+            dir.path().join("default.json"),
+            if local {
+                r#"{"local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"jev-latest","request_timeout_secs":900,"load_timeout_secs":17}}}"#
+            } else {
+                "{}"
+            },
+        ).expect("write config");
+        let mut context = Context::new("decidr");
+        context.config_dir = Some(dir.path().to_owned());
+        context.repo_root = Some(dir.path().to_owned());
+        context.environment = Some(vec![(
+            OsString::from(sc_agent_secrets::TYPESAFE_API_KEY),
+            OsString::from("timeout-test-key"),
+        )]);
+        context.general = Some(log.general());
+        context.clock = Some(sc_agent_http::testing::ManualClock::new().clock());
+        if local {
+            context.transport = Some(Arc::new(transport.clone()));
+        }
+        let config = super::load_config(&context).expect("config");
+        let model =
+            ModelSelector::parse(if local { "laya" } else { "jev" }, &config).expect("model");
+        let identity =
+            SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "proj", "role")
+                .expect("identity");
+        (
+            dir,
+            SendOptions {
+                model,
+                provider: None,
+                project: Slug::new("project", "proj").expect("project"),
+                agent_role: Slug::new("agent_role", "role").expect("role"),
+                context,
+                session: Some(log.session(identity)),
+            },
+        )
+    }
+
+    fn run(batch: bool, options: &SendOptions, timeout: Option<RequestTimeout>) {
+        let request = crate::input::build_request(REQUEST, &[], false, None).expect("request");
+        let mut count = 0;
+        let mut delivered = |result: sc_decision_schema::DecisionResult| {
+            assert!(result.outcome.is_ok(), "{:?}", result.outcome);
+            count += 1;
+            Ok(())
+        };
+        if batch {
+            send_batch_with_timeout(
+                options,
+                vec![request],
+                &CancelToken::new(),
+                timeout,
+                &mut delivered,
+            )
+        } else {
+            send_with_timeout(
+                options,
+                request,
+                &CancelToken::new(),
+                timeout,
+                &mut delivered,
+            )
+        }
+        .expect("public send");
+        assert_eq!(
+            count, 1,
+            "one successful decision reached the public callback"
+        );
+    }
+
+    fn hosted(batch: bool) {
+        for seconds in [None, Some(30.5)] {
+            let transport = ScriptedTransport::responses(vec![HttpResponse::new(
+                200,
+                vec![],
+                RESPONSE.to_vec(),
+            )]);
+            let recording = Recording::install(transport.clone());
+            let log = MemoryLog::new().expect("log");
+            let (_dir, options) = options(false, &transport, &log);
+            let timeout = seconds.map(|value| RequestTimeout::from_secs(value).expect("timeout"));
+            run(batch, &options, timeout);
+            assert_eq!(
+                recording.timeouts(),
+                [Timeouts {
+                    connect: Duration::from_secs(10),
+                    request: Duration::from_secs_f64(seconds.unwrap_or(120.0)),
+                }],
+                "the hosted default transport constructor received the per-call value"
+            );
+            let requests = transport.requests();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].endpoint().host(), "api.typesafe.ai");
+        }
+    }
+
+    fn local(batch: bool) {
+        for seconds in [None, Some(30.5)] {
+            let transport = ScriptedTransport::responses(vec![
+                HttpResponse::new(200, vec![], br#"{"status":"ok","loaded":[]}"#.to_vec()),
+                HttpResponse::new(200, vec![], RESPONSE.to_vec()),
+            ]);
+            let log = MemoryLog::new().expect("log");
+            let (_dir, options) = options(true, &transport, &log);
+            let timeout = seconds.map(|value| RequestTimeout::from_secs(value).expect("timeout"));
+            run(batch, &options, timeout);
+            let requests = transport.requests();
+            assert_eq!(requests.len(), 2, "one health probe, then one decision");
+            assert_eq!(requests[0].deadline(), None, "the probe was not overridden");
+            assert!(requests[1].endpoint().as_str().ends_with("/v1/systemone"));
+            assert_eq!(
+                requests[1].deadline(),
+                Some(Duration::from_secs(17) + Duration::from_secs_f64(seconds.unwrap_or(900.0))),
+                "the decision transport received configured load allowance + per-call request timeout"
+            );
+        }
+    }
+
+    #[test]
+    fn public_send_delivers_hosted_timeout_to_transport() {
+        hosted(false);
+    }
+
+    #[test]
+    fn public_batch_delivers_hosted_timeout_to_transport() {
+        hosted(true);
+    }
+
+    #[test]
+    fn public_send_delivers_local_timeout_to_transport() {
+        local(false);
+    }
+
+    #[test]
+    fn public_batch_delivers_local_timeout_to_transport() {
+        local(true);
     }
 }

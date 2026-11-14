@@ -326,6 +326,7 @@ fn map_detail(detail: ErrorDetail, map: &impl Fn(String) -> String) -> ErrorDeta
         message: map(detail.message),
         recovery: detail.recovery,
         cause: detail.cause.map(|cause| Box::new(map_detail(*cause, map))),
+        status: detail.status,
     }
 }
 
@@ -402,6 +403,18 @@ impl ErrorId for HttpError {
             | Self::ResponseTooLarge { .. }
             | Self::InvalidEndpoint { .. }
             | Self::InvalidRequest { .. } => None,
+        }
+    }
+
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ProviderBusy { last, .. } => Some(last.status),
+            Self::QuotaExhausted { .. }
+            | Self::Network { .. }
+            | Self::ResponseTooLarge { .. }
+            | Self::InvalidEndpoint { .. }
+            | Self::InvalidRequest { .. }
+            | Self::KeyOnPlainHttp { .. } => None,
         }
     }
 }
