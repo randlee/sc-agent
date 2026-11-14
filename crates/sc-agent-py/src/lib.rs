@@ -28,7 +28,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
-use sc_agent_types::{ErrorId, Provider};
+use sc_agent_types::{ErrorDetail, ErrorId, Provider};
 use sc_decision_schema::DecisionResult;
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
@@ -487,11 +487,11 @@ fn keyring_override(
 
 fn invalid_option(option: &str, bound: &str) -> PyErr {
     let id = "sc_agent_py.invalid_option";
-    SagError::new_err((
-        id,
-        format!("{option} {bound}"),
-        serde_json::json!({"id": id, "option": option, "allowed_bound": bound}).to_string(),
-    ))
+    let message = format!("{option} {bound}");
+    let detail = ErrorDetail::new(id, message.clone(), None)
+        .with_recovery("Correct the named option and retry.");
+    let detail_json = serde_json::to_string(&detail).unwrap_or_else(|_| "{}".to_owned());
+    SagError::new_err((id, message, detail_json))
 }
 
 /// `decidr send`: one request, always `Decision::decide`; returns its result line (JSON).

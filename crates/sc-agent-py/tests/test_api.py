@@ -315,8 +315,10 @@ def test_keyring_location_invalid_before_any_send(env, args, operation, option, 
         operation(request, **args, **{option: value})
     ident, detail = error_of(info)
     assert ident == "sc_agent_py.invalid_option"
-    assert detail["option"] == option
-    assert "255" in detail["allowed_bound"]
+    assert detail["id"] == ident
+    assert option in detail["message"]
+    assert "255" in detail["message"]
+    assert detail["recovery"] == "Correct the named option and retry."
     assert loopback.requests == []
     assert not session_files(log_root)
 
@@ -329,7 +331,10 @@ def test_keyring_override_requires_named_provider(env, args, operation):
         operation(request, **args, keyring_service="consumer")
     ident, detail = error_of(info)
     assert ident == "sc_agent_py.invalid_option"
-    assert detail["option"] == "provider"
+    assert detail["id"] == ident
+    assert "provider" in detail["message"]
+    assert "required with a keyring override" in detail["message"]
+    assert detail["recovery"] == "Correct the named option and retry."
     assert loopback.requests == []
 
 
