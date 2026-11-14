@@ -13,17 +13,17 @@ workspace = true
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "raw_value"] }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
-sc-agent-config = { path = "../sc-agent-config", version = "0.1.0" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
-sc-agent-http = { path = "../sc-agent-http", version = "0.1.0" }
-sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.0" }
-sc-decision-systemone = { path = "../sc-decision-systemone", version = "0.1.0" }
-sc-decision-local = { path = "../sc-decision-local", version = "0.1.0" }
-sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.0" }
-sc-decision-llm = { path = "../sc-decision-llm", version = "0.1.0" }
-sc-decision-runner = { path = "../sc-decision-runner", version = "0.1.0" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.1" }
+sc-agent-config = { path = "../sc-agent-config", version = "0.1.1" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.1" }
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.1" }
+sc-agent-http = { path = "../sc-agent-http", version = "0.1.1" }
+sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.1" }
+sc-decision-systemone = { path = "../sc-decision-systemone", version = "0.1.1" }
+sc-decision-local = { path = "../sc-decision-local", version = "0.1.1" }
+sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.1" }
+sc-decision-llm = { path = "../sc-decision-llm", version = "0.1.1" }
+sc-decision-runner = { path = "../sc-decision-runner", version = "0.1.1" }
 
 ctrlc = { version = "3", features = ["termination"] }   # sync; SIGINT/SIGTERM, Ctrl-C/Ctrl-Break; no tokio (REQ-SAG-0011)
 

@@ -7,10 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-sc-agent-http = { path = "../sc-agent-http", version = "0.1.0" }
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.0" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
+sc-agent-http = { path = "../sc-agent-http", version = "0.1.1" }
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.1" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.1" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.1" }
 serde_json = "1"
 
 [dev-dependencies]
