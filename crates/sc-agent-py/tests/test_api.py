@@ -40,7 +40,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 def test_python_module_exposes_its_module_documentation():
     assert sc_agent.__doc__ == (
-        "The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+        "The `sc_agent` module: `integration_cases`, `validate_integration_results`, `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
     )
 
 

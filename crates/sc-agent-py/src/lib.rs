@@ -714,7 +714,7 @@ fn validate_integration_results(results_json: &str, source_commit: &str) -> PyRe
         .map_err(|error| sag_error(&error))
 }
 
-/// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
+/// The `sc_agent` module: `integration_cases`, `validate_integration_results`, `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
 #[pymodule]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(integration_cases, module)?)?;
