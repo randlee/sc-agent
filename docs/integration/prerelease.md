@@ -48,11 +48,13 @@ keyring. Invalid-ENV cases execute outside git in a fresh directory with no
 higher-priority `.env`; their generated invalid credential must not appear in
 output or logs.
 
-The owner must select the XHTML source before report acceptance. Place that source
-at `templates/integration-report/platform.xhtml.j2`; it receives the run object's
-`run_id`, `platform`, `source_commit`, `prerelease_tag`, `artifacts` and `results`.
-No substitute template is supplied while `agt-phase-b.1` remains unresolved.
-Missing credentials produce SKIP, which cannot pass the publication gate.
+The owner selected the XHTML structure from atm-core's integration step panel.
+`templates/integration-report/platform.xhtml.j2` retains its XML prolog, XHTML 1.0
+Strict DOCTYPE, namespace, self-closed elements, facts table and CSS. The .xhtml.j2
+extension selects XML escaping; consumer text is never marked safe. The template
+receives the run identity, artifact and per-case results plus the overall status
+and generation timestamp. CI renders it and parses the result as XML. Missing
+credentials produce SKIP, which cannot pass the publication gate.
 
 ```sh
 python3 scripts/integration/run.py \
@@ -127,8 +129,8 @@ SC_LINT=/path/to/sc-lint-0.8.9 python3 .github/scripts/tests/test_runtime_panic_
 python3 -m pytest crates/sc-agent-py/tests crates/sc-treesitter-py/tests
 ```
 
-Build and install both wheels into a Python 3.11 environment before running the
-Python suites. Formula/gate/transport tests use controlled inputs and temporary git
+Build and install both wheels into a Python 3.11 environment and install
+`sc-observability==1.5.0` before running the Python suites. Formula/gate/transport tests use controlled inputs and temporary git
 histories; their fixture PASS records are parser/composition tests and are never
 live acceptance evidence. The workspace logging test `forty_thousand_sessions`
 retains the NFR-SAG-0001 capacity check.

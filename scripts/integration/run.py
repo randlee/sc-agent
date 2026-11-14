@@ -198,7 +198,9 @@ def publish_report(state, run_dir, template):
     directory = ROOT / "site/reports/integration"
     directory.mkdir(parents=True, exist_ok=True)
     report = directory / f"{state['run_id']}.html"
-    render_report(state, run_dir, template, report)
+    import datetime
+    context = {**state, "status": "PASS" if all(result["status"] == "PASS" for result in state["results"]) else "FAIL", "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    render_report(context, run_dir, template, report)
     state["report"] = str(report.relative_to(ROOT))
     state["report_sha256"] = digest(report)
     record = directory / f"{state['run_id']}.json"

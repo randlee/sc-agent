@@ -1641,6 +1641,7 @@ dependencies = [
  "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
+ "sc-observability",
  "serde_json",
 ]
 

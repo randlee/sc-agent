@@ -109,6 +109,8 @@ pub(crate) struct Writer {
     service: ServiceName,
     ledger: Arc<Ledger>,
     kind: LogKind,
+    #[cfg(feature = "testing")]
+    timestamp: Option<Timestamp>,
 }
 
 impl Writer {
@@ -137,7 +139,23 @@ impl Writer {
             closed: false,
             ledger,
             kind,
+            #[cfg(feature = "testing")]
+            timestamp: None,
         }
+    }
+
+    #[cfg(feature = "testing")]
+    pub(crate) fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    fn timestamp(&self) -> Timestamp {
+        #[cfg(feature = "testing")]
+        if let Some(timestamp) = self.timestamp {
+            return timestamp;
+        }
+        Timestamp::now_utc()
     }
 
     /// Builds and admits one event; any Err is counted before it is returned.
@@ -176,7 +194,7 @@ impl Writer {
             version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).map_err(|error| {
                 LogError::invalid_name("version", OBSERVATION_ENVELOPE_VERSION, &error)
             })?,
-            timestamp: Timestamp::now_utc(),
+            timestamp: self.timestamp(),
             level,
             service: self.service.clone(),
             target: TargetCategory::new(target)

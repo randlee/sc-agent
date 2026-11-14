@@ -233,7 +233,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install maturin and pytest
-        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5"
+        run: python -m pip install "maturin==1.9.4" "pytest==8.3.5" "sc-observability==1.5.0" "sc-compose==1.5.0"
 
       - name: Build the sc-agent wheel
         run: maturin build -m crates/sc-agent-py/Cargo.toml --out dist

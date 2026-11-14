@@ -15,6 +15,7 @@ sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.0" }
 serde_json = "1"
 
 [dev-dependencies]
+sc-observability = "=1.5.0"
 sc-agent-testkit = { path = "../sc-agent-testkit" }
 sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
 sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }

@@ -8,7 +8,8 @@
 //! The decidr call runs on a scoped worker thread; the Python thread waits on its result
 //! channel with a 100 ms timed wait outside the GIL and calls `check_signals` between waits,
 //! so `KeyboardInterrupt` cancels the run, drains it and is re-raised (REQ-SAG-0011).
-//! `general_log` and `session_log` take `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
+//! `general_log` and `session_log` take a caller-owned `sc_observability.Logger` or
+//! `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
 //! (a path) names the configuration directory; absent, it is `~/.sc-agent`.
 
 use std::collections::BTreeMap;
@@ -22,9 +23,9 @@ use decidr::{
     Context, DecidrError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, general_logger,
     load_config, session_identity, session_logger,
 };
-use pyo3::exceptions::{PyException, PyRuntimeWarning};
+use pyo3::exceptions::{PyException, PyRuntimeError, PyRuntimeWarning, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyDict, PyModule};
 use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
 use sc_agent_types::{ErrorId, Provider};
@@ -105,17 +106,17 @@ impl From<BatchItem> for BatchInput {
     }
 }
 
-/// Calls a Python `Callable[[dict], None]` with each record under the GIL.
+/// Forwards each record to the caller-owned Python Logger or callable under the GIL.
 ///
 /// The dict is `{"level", "target", "action", "fields"}`. A raised exception makes the
 /// write a refused write (counted by sc-agent-log, reported by its flush); it never changes a
 /// decision result.
-struct PyCallableSink {
+struct PyLogSink {
     callable: Py<PyAny>,
     name: SinkName,
 }
 
-impl PyCallableSink {
+impl PyLogSink {
     fn record(event: &LogEvent) -> Value {
         let mut record = Map::new();
         record.insert(
@@ -133,22 +134,80 @@ impl PyCallableSink {
             context: Box::new(ErrorContext::new(
                 sc_observability::error_codes::LOGGER_SINK_WRITE_FAILED,
                 message,
-                Remediation::not_recoverable("the Python log callable raised; fix the callable"),
+                Remediation::not_recoverable(
+                    "inspect the injected Python logger or callable failure and restore its admission",
+                ),
             )),
         }
     }
 }
 
-impl LogSink for PyCallableSink {
+impl LogSink for PyLogSink {
     fn write(&self, event: &LogEvent) -> Result<(), LogSinkError> {
-        let text = Self::record(event).to_string();
         Python::attach(|py| {
-            let record = py
-                .import("json")
-                .and_then(|json| json.call_method1("loads", (text,)))?;
-            self.callable.call1(py, (record,)).map(drop)
+            if self.callable.bind(py).is_callable() {
+                let record = py
+                    .import("json")?
+                    .call_method1("loads", (Self::record(event).to_string(),))?;
+                self.callable.call1(py, (record,))?;
+                return Ok(());
+            }
+            let obs = py.import("sc_observability")?;
+            let target = self.callable.bind(py);
+            if !target.is_instance(&obs.getattr("Logger")?)?
+                && !target.is_instance(&obs.getattr("AttachedLogger")?)?
+            {
+                return Err(PyTypeError::new_err(
+                    "expected an sc_observability.Logger or log callable",
+                ));
+            }
+            // Internal trait bridge: the consumer passes its Logger unchanged. It receives
+            // the public LogEvent type, not a consumer-owned adapter or record mapping.
+            let level = match event.level {
+                sc_observability::Level::Trace => "trace",
+                sc_observability::Level::Debug => "debug",
+                sc_observability::Level::Info => "info",
+                sc_observability::Level::Warn => "warn",
+                sc_observability::Level::Error => "error",
+            };
+            let payload = serde_json::json!({
+                "level": level, "target": event.target, "action": event.action,
+                "message": event.message, "request_id": event.request_id,
+                "correlation_id": event.correlation_id, "outcome": event.outcome,
+                "trace": event.trace, "fields": event.fields,
+            });
+            let kwargs = py
+                .import("json")?
+                .call_method1("loads", (payload.to_string(),))?;
+            let kwargs = kwargs.cast::<PyDict>()?;
+            if let Some(trace) = kwargs.get_item("trace")?
+                && !trace.is_none()
+            {
+                let typed = obs
+                    .getattr("TraceContext")?
+                    .call((), Some(trace.cast::<PyDict>()?))?;
+                kwargs.set_item("trace", typed)?;
+            }
+            let event = obs.getattr("LogEvent")?.call((), Some(kwargs))?;
+            let result = target.call_method1("log", (event,))?;
+            match result.getattr("kind")?.extract::<String>()?.as_str() {
+                "ok" => Ok(()),
+                "error" => {
+                    let error = result.getattr("error")?;
+                    let code = error.getattr("code")?.extract::<String>()?;
+                    let message = error.getattr("message")?.extract::<String>()?;
+                    Err(PyRuntimeError::new_err(format!("{code}: {message}")))
+                }
+                _ => Err(PyTypeError::new_err(
+                    "Logger.log must return sc_observability.Ok or Err",
+                )),
+            }
         })
-        .map_err(|error| Self::refused(format!("the log callable raised: {error}")))
+        .map_err(|error| {
+            Self::refused(format!(
+                "the injected Python logger refused the record: {error}"
+            ))
+        })
     }
 
     fn health(&self) -> SinkHealth {
@@ -160,8 +219,9 @@ impl LogSink for PyCallableSink {
     }
 }
 
-/// A logger whose only sink is `callable` (file and console sinks off, as `MemoryLog`).
-fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecidrError> {
+/// A logger whose only sink is the caller-owned Python Logger or callable.
+/// Only the bridge is managed here; caller flush/shutdown remain caller-owned.
+fn python_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecidrError> {
     let log_kind = if service == SessionLogger::SERVICE {
         LogKind::Session
     } else {
@@ -182,7 +242,7 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
     config.enable_console_sink = false;
     config.queue_capacity = sc_agent_log::QUEUE_CAPACITY;
     let name = SinkName::new("python").map_err(|error| name_error("sink", "python", &error))?;
-    let sink: Arc<dyn LogSink> = Arc::new(PyCallableSink { callable, name });
+    let sink: Arc<dyn LogSink> = Arc::new(PyLogSink { callable, name });
     let start = |source| {
         DecidrError::from(LogError::Start {
             log: log_kind,
@@ -326,7 +386,7 @@ fn context(
     let mut context = Context::new(SERVICE);
     context.config_dir = config_dir;
     let general = match general_log {
-        Some(callable) => GeneralLogger::injected(callable_logger(callable, SERVICE)?),
+        Some(callable) => GeneralLogger::injected(python_logger(callable, SERVICE)?),
         None => general_logger(&context)?,
     };
     context.general = Some(general);
@@ -354,7 +414,7 @@ fn send_options(
     let context = context(general_log, config_dir)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
-            callable_logger(callable, SessionLogger::SERVICE)?,
+            python_logger(callable, SessionLogger::SERVICE)?,
             session_identity(&project, &agent_role)?,
         )),
         None => None,
