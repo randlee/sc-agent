@@ -1,1 +1,3 @@
 {"sprint":"bjj-1"}
+{"sprint":"bjj-2"}
+{"sprint":"bjj-3","depends_on":["bjj-2"]}
