@@ -1,6 +1,7 @@
 """Deterministic integration composition tests. Fixture outcomes are never live acceptance evidence."""
 import base64
 import json
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -110,11 +111,27 @@ class GateHistory(unittest.TestCase):
             remote = root / "origin.git"
             producer = root / "producer"
             shallow = root / "shallow"
-            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True, text=True)
-            subprocess.run(["git", "init", str(producer)], check=True, capture_output=True, text=True)
+            git_env = os.environ.copy()
+            git_env.update({
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_CONFIG_GLOBAL": "/dev/null",
+                "GIT_CONFIG_NOSYSTEM": "1",
+            })
 
             def run_git(cwd, *args):
-                return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+                return subprocess.run(
+                    ["git", "-c", "commit.gpgsign=false", *args],
+                    cwd=cwd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    stdin=subprocess.DEVNULL,
+                    timeout=60,
+                    env=git_env,
+                ).stdout.strip()
+
+            run_git(root, "init", "--bare", str(remote))
+            run_git(root, "init", str(producer))
 
             run_git(producer, "config", "user.email", "fixture@example.invalid")
             run_git(producer, "config", "user.name", "Controlled fixture")
