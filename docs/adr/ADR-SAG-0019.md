@@ -1,7 +1,7 @@
 # Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, an error catalog with chain categories, per-call limits and a generated consumer module
 
 **Status:** Proposed  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
@@ -80,12 +80,12 @@ Every consumer concern except prompt authoring and result interpretation belongs
 | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
 | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-**The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module:
+**The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose 1.8.0 or newer. sc-compose is an external render tool, not a dependency of either wheel:
 
 - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
 - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
-- **Versioning.** The template ships inside the sc-decidr wheel as package data, so its version is the installed wheel's by construction. The wheel moves to maturin's mixed layout (`python-source`, the native module re-exported by `sc_agent/__init__.py`, so `import sc_agent` is unchanged) to carry the file. The generated file's header records the sc-decidr version, and the sitr version when the sitr section is on. On import the module raises `RuntimeError` naming both versions when either differs from the installed one.
-- **Feature variables.** Features are chosen only by template variables: `logging` (`general`, `session` or `both`), `models` and `sitr` (`true` or `false`). The same variables give byte-identical code.
+- **Versioning.** The template ships inside the sc-decidr wheel as package data, so its version is the installed wheel's by construction. The wheel moves to maturin's mixed layout (`python-source`, the native module re-exported by `sc_agent/__init__.py`, so `import sc_agent` is unchanged) to carry the file. sitr is a separate wheel, version-locked with sc-decidr: both are released together at the same version (decision 4), and the template is tested against both at that version. A rendered module consumes sc-decidr, plus sitr when the sitr section is on. Mixed sc-decidr and sitr versions are not supported; this is documented, not enforced. The generated file's header records the sc-decidr version, and the sitr version when the sitr section is on, as troubleshooting information only. Nothing checks it at runtime: a fail-fast check would only make troubleshooting and development harder.
+- **Feature variables.** Features are chosen only by template variables: `logging` (`general`, `session` or `both`), `models` and `sitr` (`true` or `false`). Rendering is sc-compose's responsibility; this ADR adds no rules about the sc-compose version or its output beyond the consumer CI check below.
 - **Consumer CI.** Consumer CI renders the file again and diffs it, so any hand edit fails.
 - **README.** `crates/sc-agent-py/README.md` keeps a short pointer to the template, with the render command and the CI check.
 
@@ -180,7 +180,7 @@ The Rust change breaks SemVer:
 
 The crates are published on crates.io (`release/publish-artifacts.toml`). Below 1.0 a minor bump is the breaking bump, so `^0.1` dependents are not moved silently, and a 0.1.1 would break them. For Python the change only adds things, except the batch return order (decision 8), which the CHANGELOG states.
 
-Everything on the sc-agent release version moves from 0.1.5 to 0.2.0: every workspace crate, sc-treesitter and sitr included, and both wheels. sc-decidr and sitr are pinned to the same sc-agent release, so one version gives one tag and one pin. The files to bump are:
+Everything on the sc-agent release version moves from 0.1.5 to 0.2.0: every workspace crate, sc-treesitter and sitr included, and both wheels. sc-decidr and sitr are version-locked: they are released together at the same version, so one version gives one tag and one pin. Mixed versions are not supported, and this is documented, not enforced. The files to bump are:
 
 - `Cargo.toml` (`[workspace.package]`);
 - `crates/sc-agent-py/Cargo.toml` and `pyproject.toml`, and `crates/sc-treesitter-py/Cargo.toml` and `pyproject.toml`, whose literal 0.1.5 becomes 0.2.0;
@@ -402,8 +402,7 @@ The template's sitr section is kept separate from the decidr call: tree-sitter e
 - **Order.** `send_batch` returns its list in input order while `on_result` sees finish order.
 - **Consumer template (REQ-SAG-0018).**
   - Every feature combination renders and runs against the loopback runner: success, error-to-code mapping, session-log records and general-logger events.
-  - Rendering twice gives byte-identical files.
-  - A version mismatch raises `RuntimeError` on import.
+  - The rendered header records the installed sc-decidr version, and the sitr version when `sitr` is true.
   - The sitr offline test: extraction from a checked-in source file reaches a dry-run request; with `sitr` false the module imports without `sc_treesitter`.
   - The rendered modules reference only the public API and the standard library.
 - **Python floor (NFR-SAG-0003).** Both built wheels are tagged `cp311-abi3`.
@@ -413,7 +412,11 @@ The template's sitr section is kept separate from the decidr call: tree-sitter e
 
 ### Delivery
 
-The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits, in phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. This includes the consumer template and its tests, the abi3 and CI changes, and the CHANGELOG. Deliverables beyond the code:
+The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits, in phase b sprints the planner cuts from this ADR. A `/prerelease` is cut from the stack top for the consumers to validate. This includes the consumer template and its tests, the abi3 and CI changes, and the CHANGELOG.
+
+The 0.2.0 release MUST publish both sc-decidr and sitr to PyPI at the same version, not only as GitHub prerelease assets. Today PyPI has only 0.1.0; 0.1.2 to 0.1.5 exist only on GitHub, and consumers can pin only what is on PyPI.
+
+Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor can delete:
   - the pinned id lists;
@@ -428,6 +431,7 @@ The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
 - The version files listed in decision 4.
+- sc-decidr 0.2.0 and sitr 0.2.0 on PyPI.
 
 Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope, including plan-anchor dropping its Python 3.9 CI floor.
 
@@ -436,7 +440,7 @@ Changes inside judge-jev, plan-anchor and other consumer repositories are out of
 **Positive:**
 
 - Prerelease tooling no longer ships in the product crate or wheel.
-- Every Python consumer renders the same integration module from the installed wheel and contains only its own prompts and result handling; a hand edit or a version skew fails CI or import.
+- Every Python consumer renders the same integration module from the installed wheel and contains only its own prompts and result handling; a hand edit fails the consumer's CI.
 - No consumer parses error text or pins id lists.
 - A missing catalog row is a compile error, and copy-up needs no per-wrapper code.
 - `#[non_exhaustive]` on `ErrorDetail`, `ErrorCategory` and `CallLimits` makes future additions non-breaking.
