@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -41,8 +42,8 @@ class FormulaAndTransport(unittest.TestCase):
                 self.assertIn("controlled", step["title"])
             steps = {step["id"].replace("_", "-"): step for step in formula["steps"]}
             self.assertEqual(len(steps), 12)
-            self.assertEqual({value.replace("_", "-") for value in steps["report"]["needs"]}, set(run.formula_cases()))
-            for case in run.formula_cases():
+            self.assertEqual({value.replace("_", "-") for value in steps["report"]["needs"]}, set(run.required_cases()))
+            for case in run.required_cases():
                 self.assertEqual(steps[case]["needs"], ["verify_assets"])
 
     def test_xhtml_render_uses_sc_compose_and_rejects_invalid_xml(self):
@@ -81,6 +82,25 @@ class FormulaAndTransport(unittest.TestCase):
         self.assertEqual(run.result_outcome("typesafe-decision-wheel", '{"error":{"id":"secrets.key_missing"}}', 1)[0], "SKIP")
         answer = {"session_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV", "response": {"answers": {"q": {"type": "noul", "noul": 0.5}}}}
         self.assertEqual(run.result_outcome("anthropic-decision-wheel", json.dumps(answer), 0)[0], "PASS")
+
+    def test_case_manifest_is_the_source_for_python_and_formula(self):
+        case_records = preflight.integration_case_records()
+        case_ids = list(case_records)
+        formula = tomllib.loads((ROOT / "formulas/integration.formula.toml").read_text())
+        formula_ids = [step["id"].replace("_", "-") for step in formula["steps"] if step["id"] not in {"verify_assets", "report"}]
+        self.assertEqual(run.required_cases(), case_ids)
+        self.assertEqual(formula_ids, case_ids)
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/integration/generate_formula.py"), "--check"], check=False, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected_fields = {"id", "provider", "model", "operation", "client", "artifact"}
+        self.assertTrue(case_records)
+        for case_id, record in case_records.items():
+            self.assertEqual(set(record), expected_fields)
+            self.assertEqual(record["id"], case_id)
+            self.assertIn(record["provider"], {"typesafe", "anthropic"})
+            self.assertIn(record["operation"], {"models", "decision", "invalid-key"})
+            self.assertIn(record["client"], {"cli", "wheel"})
+            self.assertEqual(record["artifact"] == "sc-decidr-wheel", record["client"] == "wheel")
 
 
 class GateHistory(unittest.TestCase):
@@ -147,7 +167,7 @@ class GateHistory(unittest.TestCase):
             report.write_text('<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Fixture</title></head><body>controlled</body></html>')
             git("add", ".");git("commit", "-qm", "report")
             candidate = git("rev-parse", "HEAD")
-            run_record = {"source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifacts": [{"name": "binary.tar.gz", "sha256": "b" * 64}], "results": [{"case_id": "future-cli", "source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifact_sha256": "b" * 64}], "report": "site/reports/integration/run.html", "report_sha256": preflight.digest(report)}
+            run_record = {"source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifacts": [{"name": "binary.tar.gz", "sha256": "b" * 64}], "results": [{"case_id": "anthropic-decision-cli", "source_commit": source, "platform": "fixture", "prerelease_tag": "prerelease/v0.1.1", "artifact_sha256": "b" * 64}], "report": "site/reports/integration/run.html", "report_sha256": preflight.digest(report)}
             # The real installed Rust parser has separate boundary tests; this seam isolates git/artifact composition.
             validator = lambda results, _: results
             verified = []

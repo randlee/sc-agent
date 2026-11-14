@@ -1,0 +1,12 @@
+[
+  {"id":"typesafe-models-cli","provider":"typesafe","model":"jev","operation":"models","client":"cli","artifact":"archive"},
+  {"id":"typesafe-models-wheel","provider":"typesafe","model":"jev","operation":"models","client":"wheel","artifact":"sc-decidr-wheel"},
+  {"id":"typesafe-decision-cli","provider":"typesafe","model":"jev","operation":"decision","client":"cli","artifact":"archive"},
+  {"id":"typesafe-decision-wheel","provider":"typesafe","model":"jev","operation":"decision","client":"wheel","artifact":"sc-decidr-wheel"},
+  {"id":"anthropic-decision-cli","provider":"anthropic","model":"haiku","operation":"decision","client":"cli","artifact":"archive"},
+  {"id":"anthropic-decision-wheel","provider":"anthropic","model":"haiku","operation":"decision","client":"wheel","artifact":"sc-decidr-wheel"},
+  {"id":"typesafe-invalid-key-cli","provider":"typesafe","model":"jev","operation":"invalid-key","client":"cli","artifact":"archive"},
+  {"id":"typesafe-invalid-key-wheel","provider":"typesafe","model":"jev","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel"},
+  {"id":"anthropic-invalid-key-cli","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"cli","artifact":"archive"},
+  {"id":"anthropic-invalid-key-wheel","provider":"anthropic","model":"haiku","operation":"invalid-key","client":"wheel","artifact":"sc-decidr-wheel"}
+]

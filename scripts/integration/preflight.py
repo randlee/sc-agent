@@ -14,7 +14,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-from configuration import Refusal, distribution_wheel, module_distribution, platform_target, release_manifest
+from configuration import Refusal, case_specs, distribution_wheel, integration_case_records, module_distribution, platform_target, release_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_ROOT = PurePosixPath("site/reports/integration")
@@ -153,7 +153,10 @@ def validate_run(run, candidate, *, root=ROOT, validator=None, artifact_verifier
     if any(result["artifact_sha256"] not in verified for result in results):
         raise Refusal("case names an artifact not verified by this run")
     for result in results:
-        if result["case_id"].endswith("-wheel"):
+        case = case_specs(ROOT).get(result["case_id"])
+        if case is None:
+            raise Refusal("unknown integration case")
+        if case["interface"] == "wheel":
             helper = prerelease_helper()
             manifest = release_manifest(root)
             version = run["prerelease_tag"].removeprefix(manifest["prerelease"]["tag_prefix"])
