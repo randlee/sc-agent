@@ -16,7 +16,7 @@
 
 Definitions:
 
-- The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose 1.8.0 or newer, an external tool that is not a dependency of either wheel.
+- The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum declared in the consumer template's front matter; sc-compose is an external tool, not a dependency of either wheel.
 - sc-decidr and sitr are version-locked: they are released together at the same version. Mixed versions are not supported; this is documented, not enforced.
 - The consumer module is the Python file a consumer renders from the consumer template.
 - A feature variable is a template variable that selects a section of the consumer module: `logging` (`general`, `session` or `both`), `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
@@ -30,6 +30,9 @@ Definitions:
 - A matched release is an sc-decidr wheel and a sitr wheel of the same version.
 - A decision call is a call to `send` or `send_batch`.
 - A covered release is an sc-agent release of version 0.2.0 or later.
+- The permitted API is the public API plus the Python standard library.
+- `provider` is the keyword argument of `send` and `send_batch` that forces a provider instead of resolving it from the model selector.
+- The consumer module's header is its leading comment block written by the consumer template.
 - PyPI is the Python Package Index, pypi.org.
 
 **MUST statements:**
@@ -45,10 +48,9 @@ Definitions:
 - Feature variables MUST be the only template input that changes the consumer module's code.
 - The consumer template MUST be tested against a matched release.
 - PyPI MUST hold the matched release of every covered release.
-- The sitr section MUST import `sc_treesitter` lazily, inside that section.
+- The consumer module MUST import `sc_treesitter` only inside the sitr section.
 - The sitr section MUST stay separate from the decision call.
-- The consumer module MUST call only the public API and the Python standard library.
-- Every sc-decidr call in the consumer module MUST also be callable directly by a consumer through the public API.
+- The consumer module MUST call only the permitted API.
 - The public API MUST stay documented in `sc_agent.pyi`.
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
@@ -75,7 +77,7 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
   - with `logging` set to `session` or `both`, the session log has one record per query and response;
   - with `logging` set to `general` or `both`, the injected general logger receives the call's events.
 - [ ] A rendered module's header records the installed sc-decidr version, and the sitr version when `sitr` is true, and importing it with a different installed version does not raise.
-- [ ] sc-decidr 0.2.0 and sitr 0.2.0 are both installable from PyPI.
+- [ ] The matched release of the released version is installable from PyPI.
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
 - [ ] A rendered module with `sitr` false imports with `sc_treesitter` absent.
 - [ ] Scanning the rendered modules finds only public-API and standard-library references.

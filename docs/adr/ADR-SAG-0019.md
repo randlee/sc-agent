@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the error catalog), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), NFR-SAG-0002 (0.1.0 detail JSON still reads) and NFR-SAG-0003 (the Python 3.11 floor) are new with this ADR. REQ-SAG-0007 (no rounding of returned values) is amended here so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0002 (errors carried from bottom to top) is unchanged; this ADR only adds detail. REQ-SAG-0601 and REQ-SAG-0602 (busy resend and quota) are the sources of the status, send count and Retry-After. REQ-SAG-0701 is the configured worker count; its default of 8 is unchanged. REQ-SAG-0013 and REQ-SAG-0015 set the worker cap of 64 and the local-runner timeouts with their 10..=3600 s bounds. ADR-SAG-0004 sets the crate layering and has a lower error reach a higher one as an id, message and cause chain; this ADR extends that chain with typed fields. CLI and Python parity (one keyword per `decidr send` flag) is ANC-006.
+REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the error catalog), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), NFR-SAG-0002 (0.1.0 detail JSON still reads) and NFR-SAG-0003 (one Python floor) are new with this ADR. REQ-SAG-0007 (no rounding of returned values) is amended here so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0002 (errors carried from bottom to top) is unchanged; this ADR only adds detail. REQ-SAG-0601 and REQ-SAG-0602 (busy resend and quota) are the sources of the status, send count and Retry-After. REQ-SAG-0701 is the configured worker count; its default of 8 is unchanged. REQ-SAG-0013 and REQ-SAG-0015 set the worker cap of 64 and the local-runner timeouts with their 10..=3600 s bounds. ADR-SAG-0004 sets the crate layering and has a lower error reach a higher one as an id, message and cause chain; this ADR extends that chain with typed fields. CLI and Python parity (one keyword per `decidr send` flag) is ANC-006.
 
 **Requirements:**
 
@@ -90,7 +90,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | Limits | `timeout_secs`, `workers`, resends, the 90 s start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns its list in input order, while `on_result` still streams in finish order (decision 8). | Nothing. |
 
-   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose 1.8.0 or newer. sc-compose is an external render tool, not a dependency of either wheel:
+   **The integration artifact is a generated module, not a recipe** (REQ-SAG-0018). A README recipe is copied by hand, and two copies already diverged. Instead the wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, from which each consumer renders its integration module with sc-compose at or above the minimum declared in the template's front matter. sc-compose is an external render tool, not a dependency of either wheel:
 
    - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
    - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
@@ -350,11 +350,12 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
     The template's sitr section is kept separate from the decidr call: tree-sitter extraction runs outside the decision path, and its output is passed into the consumer's prompt authoring. In this phase the section only imports `sc_treesitter` lazily, inside the section, and one offline test shows extraction output from a checked-in source file reaching a dry-run request. It is not used beyond that yet.
 
-12. **Python 3.11 is the floor (NFR-SAG-0003).**
+12. **One Python floor (NFR-SAG-0003).**
 
-    - pyo3 `abi3-py310` becomes `abi3-py311` in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3), so the wheel tag matches the `requires-python >=3.11` both wheels already declare.
-    - CI builds both wheels and runs their pytest suites on 3.11. The `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already use 3.11; this decision keeps 3.11 as the tested floor.
-    - The generated consumer module's script header declares `requires-python = ">=3.11"`.
+    - The Python floor is the minimum declared by `[project].requires-python` in `crates/sc-agent-py/pyproject.toml`; every other place that repeats it is checked against it in CI.
+    - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3) moves from `abi3-py310` to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels already declare.
+    - CI builds both wheels and runs their pytest suites on the Python floor; the `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already do.
+    - The generated consumer module's script header declares the Python floor as its `requires-python`.
 
 ### Rationale
 
@@ -475,7 +476,7 @@ Tests, written with the implementation:
   - The rendered header records the installed sc-decidr version, and the sitr version when `sitr` is true.
   - The sitr offline test: extraction from a checked-in source file reaches a dry-run request; with `sitr` false the module imports without `sc_treesitter`.
   - The rendered modules reference only the public API and the standard library.
-- **Python floor (NFR-SAG-0003).** Both built wheels are tagged `cp311-abi3`.
+- **Python floor (NFR-SAG-0003).** Both built wheels carry the abi3 tag of the Python floor, and the CI check fails when a repeated floor differs from it.
 - **Compatibility (NFR-SAG-0002).** A checked-in 0.1.0 detail JSON with a two-level chain:
   - deserializes with every new field `None`;
   - serializes back to the original bytes.

@@ -1,4 +1,4 @@
-# Requirement: Python 3.11 is the floor for sc-agent's wheels and their consumers
+# Requirement: One Python floor for sc-agent's wheels and their consumers
 
 **Status:** Proposed  
 **Version:** 0.2.0  
@@ -8,7 +8,7 @@
 
 ---
 
-## NFR-SAG-0003: Python 3.11 is the floor for sc-agent's wheels and their consumers
+## NFR-SAG-0003: One Python floor for sc-agent's wheels and their consumers
 
 **Status:** Proposed  
 
@@ -16,8 +16,9 @@
 
 Definitions:
 
+- The Python floor is the minimum Python version declared by `[project].requires-python` in `crates/sc-agent-py/pyproject.toml`.
 - The wheels are sc-decidr (`crates/sc-agent-py`) and sitr (`crates/sc-treesitter-py`).
-- The abi3 floor is the `abi3-py3NN` feature of pyo3 that sets a wheel's stable-ABI tag.
+- The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel's stable-ABI tag. The abi3 tag of the Python floor is the `cp3NN-abi3` wheel tag whose `3NN` is the Python floor.
 - The Python binding crates are `crates/sc-agent-py`, `crates/sc-treesitter-py` and `crates/sc-treesitter` (its optional pyo3).
 - CI (continuous integration) is the GitHub Actions workflow `.github/workflows/ci.yml`.
 - A wheel job is a CI job that builds one wheel and runs that wheel's pytest suite.
@@ -25,27 +26,29 @@ Definitions:
 
 **MUST statements:**
 
-- The abi3 floor of every Python binding crate MUST be `abi3-py311`.
-- Each wheel's `requires-python` MUST be `>=3.11`.
-- The file name of each built wheel MUST carry the tag `cp311-abi3`.
-- CI MUST run every wheel job on Python 3.11.
-- The consumer module MUST declare `requires-python = ">=3.11"` in its script header.
+- The abi3 feature of every Python binding crate MUST match the Python floor.
+- Each wheel's `requires-python` MUST declare the Python floor.
+- The file name of each built wheel MUST carry the abi3 tag of the Python floor.
+- CI MUST run every wheel job on the Python floor.
+- The consumer module's script header MUST declare the Python floor as its `requires-python`.
+- A CI check MUST fail when any of these differs from the Python floor: the abi3 feature of a Python binding crate, a wheel's `requires-python`, the Python version of a wheel job, or the consumer template's script header.
 
 **MUST NOT statements:**
 
-- The file name of a built wheel MUST NOT carry an abi3 tag below the `requires-python` floor.
+- The file name of a built wheel MUST NOT carry an abi3 tag below the Python floor.
 
 ### Rationale
 
-`requires-python` already says `>=3.11` while pyo3 builds `cp310-abi3` wheels, so the tag claims support the package metadata refuses. One floor for sc-agent and every consumer removes that mismatch and lets consumers drop older CI floors.
+At the time of writing the Python floor is 3.11, while pyo3 builds `cp310-abi3` wheels, so the tag claims support the package metadata refuses. One floor, declared in one file and checked everywhere it is repeated, removes that mismatch, lets consumers drop older CI floors, and makes raising the floor a one-line change.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] The built sc-decidr and sitr wheels are tagged `cp311-abi3`.
-- [ ] The CI wheel and pytest jobs for both wheels run on Python 3.11.
-- [ ] A rendered consumer module's script header declares `requires-python = ">=3.11"`.
+- [ ] The built sc-decidr and sitr wheels carry the abi3 tag of the Python floor.
+- [ ] The CI wheel jobs for both wheels run on the Python floor.
+- [ ] A rendered consumer module's script header declares the Python floor as its `requires-python`.
+- [ ] Changing the Python floor without changing the abi3 features, the other wheel's `requires-python`, the wheel-job Python and the consumer template's script header makes the CI check fail.
 
 ### Dependencies
 
