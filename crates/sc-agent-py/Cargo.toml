@@ -1,6 +1,6 @@
 [package]
 name = "sc-agent-py"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -15,12 +15,12 @@ crate-type = ["cdylib"]
 workspace = true
 
 [dependencies]
-decidr = { path = "../decidr", version = "0.1.1" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.1" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.1" }
-sc-agent-config = { path = "../sc-agent-config", version = "0.1.1" }
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.1" }
-sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.1" }
+decidr = { path = "../decidr", version = "0.1.2" }
+sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.2" }
+sc-agent-types = { path = "../sc-agent-types", version = "0.1.2" }
+sc-agent-config = { path = "../sc-agent-config", version = "0.1.2" }
+sc-agent-log = { path = "../sc-agent-log", version = "0.1.2" }
+sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.2" }
 sc-observability = "=1.5.0"   # the LogSink trait (PyCallableSink)
 pyo3 = { version = "=0.29.2", features = ["abi3-py310", "extension-module"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
