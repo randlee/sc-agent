@@ -1,7 +1,7 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Proposed  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
@@ -14,33 +14,63 @@
 
 ### Requirement Statement
 
-Definitions: An error detail is `ErrorDetail`, the data form of an error that the CLI, the Python binding, session rows and result lines carry. A status-bearing error is one built from an HTTP reply.
+Definitions:
+
+- An error detail is `ErrorDetail`, the data form of an error that the CLI, the Python binding, session rows and result lines carry.
+- A leaf variant is an error variant that holds data of its own.
+- A wrapper is a variant whose cause is a whole lower error.
 
 **MUST statements:**
 
-- `ErrorDetail` MUST have the optional fields `status` (HTTP status, `u16`), `attempts` (sends made, the first included, `u32`) and `retry_after_ms` (the last reply's valid `Retry-After` in whole milliseconds, rounded up, `u64`).
-- Every error variant that holds an HTTP status, a send count or a `Retry-After` MUST set the matching field in its detail. The variants are listed in ADR-SAG-0019 decision 2.
-- A variant that wraps a whole lower error MUST carry that error's fields at its own level as well as in its cause.
+- `ErrorDetail` MUST have these optional fields:
+  - `status`, the HTTP status, a `u16`;
+  - `attempts`, the sends made with the first included, a `u32`;
+  - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`.
 - Each field MUST be omitted from serialized JSON when it is not set.
-- `ErrorId::detail()` MUST remain the only builder of an error's detail, and it MUST take the fields from `ErrorId::fields()`.
-- `sc_agent.SagError` MUST expose `status`, `attempts` and `retry_after_ms` attributes equal to its top-level detail's fields, `None` when not set.
+- Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
+- `ErrorId::detail()` MUST remain the only builder of a detail. It MUST take each field from the variant's own accessor and, when that is `None`, from the cause's detail.
+- `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
+  - as the ceiling in milliseconds;
+  - saturating at `u64::MAX`;
+  - without clamping;
+  - with `0` giving `0`.
+- `ErrorDetail::map_text` MUST rewrite id and message text throughout the chain and keep `recovery` and every field.
+- `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`. It MUST expose:
+  - the read-only attributes `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`;
+  - the field values taken from its top-level detail.
+- These attributes MUST be present on a `SagError` built in Python and on one that has been pickled and restored.
 
 **MUST NOT statements:**
 
 - `ErrorDetail` MUST NOT lose `Eq`.
+- A consumer-facing error value MUST NOT require parsing message text to obtain a status, send count or Retry-After.
 
 ### Rationale
 
-Consumers decide retries, back-off and authentication fixes from the status, send count and `Retry-After`. Today these values exist only inside English message text, so consumers parse prose. `retry_after_ms` is a transport timing hint, not a decision value; REQ-SAG-0007 governs decision values (owner, 2026-11-14).
+Consumers decide whether to retry or back off, and how to fix authentication, from the status, the send count and the Retry-After. Today most of these values exist only in English message text. `retry_after_ms` is a transport timing hint; REQ-SAG-0007 governs decision values.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] For each variant in ADR-SAG-0019 decision 2, a test builds the error and serializes its detail. In Python, the test reads the exact `status`, `attempts` and `retry_after_ms` values from `SagError` or from the result line's `error`.
-- [ ] A `ProviderBusy` wrapped as `decision.http` has the same `status`, `attempts` and `retry_after_ms` at the top level as at the `http.provider_busy` cause.
-- [ ] A `Retry-After: 2.0001` reply yields `retry_after_ms == 2001`.
-- [ ] Each crate's test that `detail()` equals the value built from the trait methods includes `fields()`.
+- [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
+- [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields at the top level.
+- [ ] `http.response_too_large` with status 0 has `status` `None`.
+- [ ] `decision.cancelled` carries `attempts` equal to its sends.
+- [ ] `RetryAfter::parse` gives these `retry_after_ms` values:
+
+  | Header | `retry_after_ms` |
+  | --- | --- |
+  | `1.1` | 1100 |
+  | `2.0001` | 2001 |
+  | `0` | 0 |
+  | `0.0000001` | 1 |
+  | 32 nines | `u64::MAX` |
+  | a malformed header | `None` |
+- [ ] `map_text` keeps `status`, `attempts`, `retry_after_ms` and `recovery`.
+- [ ] `SagError("x", "y", "{}")` has `status` `None` and `category` `"other"`.
+- [ ] A pickle round trip of a `SagError` keeps its `status`.
+- [ ] Each crate's test that `detail()` equals the value built from the accessors covers all three fields and the copy-up.
 
 ### Dependencies
 
