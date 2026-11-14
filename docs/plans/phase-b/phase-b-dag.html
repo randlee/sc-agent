@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="phase-root-bead" content="agt-phase-b">
+  <meta name="wyvern:width" content="1536">
+  <meta name="wyvern:height" content="864">
+  <title>Sprint review · Phase B</title>
+  <script id="wyvern-initial-size">
+    (() => {
+      function sizeWindow(event) {
+        const bounds = (event && event.detail) || window.__wyvernViewportBounds || {};
+        const screen = window.screen || {};
+        const width = Math.round(0.8 * (bounds.available_width || screen.availWidth || 1920));
+        const height = Math.round(0.8 * (bounds.available_height || screen.availHeight || 1080));
+        document.querySelector('meta[name="wyvern:width"]').content = String(width);
+        document.querySelector('meta[name="wyvern:height"]').content = String(height);
+        if (window.ipc && typeof window.ipc.postMessage === 'function') {
+          window.ipc.postMessage('resize:' + width + 'x' + height);
+        }
+      }
+      window.addEventListener('wyvern:viewport-bounds', sizeWindow);
+      sizeWindow();
+    })();
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172b43; background: white; font: 14px system-ui, sans-serif; }
+    header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px;
+      padding: 12px 18px; background: #f8fafc; border-bottom: 1px solid #dbe3ed; }
+    h1 { margin: 0 auto 0 0; font-size: 17px; }
+    button { font: inherit; color: inherit; background: white; border: 1px solid #a8b7c9;
+      border-radius: 5px; padding: 5px 12px; cursor: pointer; }
+    button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    output { min-width: 45px; text-align: center; }
+    main { overflow: auto; height: calc(100vh - 59px); padding: 12px; }
+    #diagram { width: 100%; }
+    #diagram > svg { display: block; width: 100%; height: auto; }
+    @media print { header { position: static; } button, output { display: none; }
+      main { height: auto; overflow: visible; } #diagram { width: 100% !important; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sprint review · Phase B</h1>
+    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+    <output id="zoom-level" aria-live="polite">100%</output>
+    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="fit" type="button">Fit</button>
+  </header>
+  <main aria-label="Sprint dependency diagram">
+    <div id="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="919pt" height="406.0pt" viewBox="0.0 0.0 919 406.0">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(28.8 288.8)">
+<title>execution</title>
+<polygon fill="white" stroke="none" points="-28.8,28.8 -28.8,-288.8 803.98,-288.8 803.98,28.8 -28.8,28.8" />
+<text xml:space="preserve" text-anchor="middle" x="387.59" y="-238" font-family="Arial" font-size="20.00">Phase B — execution order</text>
+<text xml:space="preserve" text-anchor="middle" x="387.59" y="-214" font-family="Arial" font-size="20.00">Sprint completes → its gate passes → downstream sprint starts</text>
+<g id="clust1" class="cluster">
+<title>cluster_agt-b-1.group-dev</title>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_agt-b-2.group-dev</title>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_agt-b-3.group-dev</title>
+</g>
+
+<g id="node1" class="node">
+<title>agt-b-1.group-dev — Blocked by unfinished prerequisites</title>
+<path fill="#edf3fb" stroke="#9caec2" d="M124.62,-119C124.62,-119 28,-119 28,-119 22,-119 16,-113 16,-107 16,-107 16,-95 16,-95 16,-89 22,-83 28,-83 28,-83 124.62,-83 124.62,-83 130.62,-83 136.62,-89 136.62,-95 136.62,-95 136.62,-107 136.62,-107 136.62,-113 130.62,-119 124.62,-119" />
+<text xml:space="preserve" text-anchor="middle" x="76.31" y="-97.1" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-1.group-dev</text>
+</g>
+
+<g id="node2" class="node">
+<title>agt-b-1.group-sanity — Blocked by unfinished prerequisites; completed sanity iterations: 0</title>
+<path fill="#e6f1e9" stroke="#a0b8a8" d="M360.02,-108.24C360.02,-108.24 329.92,-130.99 329.92,-130.99 325.13,-134.61 314.35,-138.23 308.35,-138.23 308.35,-138.23 233.86,-138.23 233.86,-138.23 227.86,-138.23 217.08,-134.61 212.29,-130.99 212.29,-130.99 182.19,-108.24 182.19,-108.24 177.41,-104.62 177.41,-97.38 182.19,-93.76 182.19,-93.76 212.29,-71.01 212.29,-71.01 217.08,-67.39 227.86,-63.77 233.86,-63.77 233.86,-63.77 308.35,-63.77 308.35,-63.77 314.35,-63.77 325.13,-67.39 329.92,-71.01 329.92,-71.01 360.02,-93.76 360.02,-93.76 364.81,-97.38 364.81,-104.62 360.02,-108.24" />
+<text xml:space="preserve" text-anchor="middle" x="271.11" y="-104.9" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-1.group-dev</text>
+<text xml:space="preserve" text-anchor="middle" x="271.11" y="-89.3" font-family="Arial" font-size="13.00" fill="#172b43">sanity gate</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>agt-b-1.group-dev-&gt;agt-b-1.group-sanity</title>
+<path fill="none" stroke="#647a94" stroke-width="1.15" d="M136.99,-101C145.37,-101 154.18,-101 163.12,-101" />
+<polygon fill="#647a94" stroke="#647a94" stroke-width="1.15" points="162.84,-103.63 170.34,-101 162.84,-98.38 162.84,-103.63" />
+</g>
+
+<g id="node3" class="node">
+<title>agt-b-2.group-dev — Blocked by unfinished prerequisites</title>
+<path fill="#edf3fb" stroke="#9caec2" d="M514.21,-159C514.21,-159 417.59,-159 417.59,-159 411.59,-159 405.59,-153 405.59,-147 405.59,-147 405.59,-135 405.59,-135 405.59,-129 411.59,-123 417.59,-123 417.59,-123 514.21,-123 514.21,-123 520.21,-123 526.21,-129 526.21,-135 526.21,-135 526.21,-147 526.21,-147 526.21,-153 520.21,-159 514.21,-159" />
+<text xml:space="preserve" text-anchor="middle" x="465.9" y="-137.1" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-2.group-dev</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>agt-b-1.group-sanity-&gt;agt-b-2.group-dev</title>
+<path fill="none" stroke="#647a94" stroke-width="1.15" d="M349.13,-116.98C364.74,-120.22 381.05,-123.6 396.34,-126.78" />
+<polygon fill="#647a94" stroke="#647a94" stroke-width="1.15" points="395.64,-129.31 403.51,-128.26 396.7,-124.17 395.64,-129.31" />
+</g>
+
+<g id="node5" class="node">
+<title>agt-b-3.group-dev — Blocked by unfinished prerequisites</title>
+<path fill="#edf3fb" stroke="#9caec2" d="M514.21,-80C514.21,-80 417.59,-80 417.59,-80 411.59,-80 405.59,-74 405.59,-68 405.59,-68 405.59,-56 405.59,-56 405.59,-50 411.59,-44 417.59,-44 417.59,-44 514.21,-44 514.21,-44 520.21,-44 526.21,-50 526.21,-56 526.21,-56 526.21,-68 526.21,-68 526.21,-74 520.21,-80 514.21,-80" />
+<text xml:space="preserve" text-anchor="middle" x="465.9" y="-58.1" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-3.group-dev</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>agt-b-1.group-sanity-&gt;agt-b-3.group-dev</title>
+<path fill="none" stroke="#647a94" stroke-width="1.15" d="M349.41,-85.36C365,-82.21 381.28,-78.92 396.54,-75.83" />
+<polygon fill="#647a94" stroke="#647a94" stroke-width="1.15" points="396.85,-78.44 403.68,-74.38 395.81,-73.3 396.85,-78.44" />
+</g>
+
+<g id="node4" class="node">
+<title>agt-b-2.group-sanity — Blocked by unfinished prerequisites; completed sanity iterations: 0</title>
+<path fill="#e6f1e9" stroke="#a0b8a8" d="M749.61,-158.24C749.61,-158.24 719.51,-180.99 719.51,-180.99 714.73,-184.61 703.94,-188.23 697.94,-188.23 697.94,-188.23 623.45,-188.23 623.45,-188.23 617.45,-188.23 606.67,-184.61 601.88,-180.99 601.88,-180.99 571.78,-158.24 571.78,-158.24 567,-154.62 567,-147.38 571.78,-143.76 571.78,-143.76 601.88,-121.01 601.88,-121.01 606.67,-117.39 617.45,-113.77 623.45,-113.77 623.45,-113.77 697.94,-113.77 697.94,-113.77 703.94,-113.77 714.73,-117.39 719.51,-121.01 719.51,-121.01 749.61,-143.76 749.61,-143.76 754.4,-147.38 754.4,-154.62 749.61,-158.24" />
+<text xml:space="preserve" text-anchor="middle" x="660.7" y="-154.9" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-2.group-dev</text>
+<text xml:space="preserve" text-anchor="middle" x="660.7" y="-139.3" font-family="Arial" font-size="13.00" fill="#172b43">sanity gate</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>agt-b-2.group-dev-&gt;agt-b-2.group-sanity</title>
+<path fill="none" stroke="#647a94" stroke-width="1.15" d="M526.58,-144.1C536.78,-144.62 547.62,-145.19 558.54,-145.75" />
+<polygon fill="#647a94" stroke="#647a94" stroke-width="1.15" points="558.35,-148.37 565.98,-146.14 558.63,-143.13 558.35,-148.37" />
+</g>
+
+<g id="node6" class="node">
+<title>agt-b-3.group-sanity — Blocked by unfinished prerequisites; completed sanity iterations: 0</title>
+<path fill="#e6f1e9" stroke="#a0b8a8" d="M749.61,-60.24C749.61,-60.24 719.51,-82.99 719.51,-82.99 714.73,-86.61 703.94,-90.23 697.94,-90.23 697.94,-90.23 623.45,-90.23 623.45,-90.23 617.45,-90.23 606.67,-86.61 601.88,-82.99 601.88,-82.99 571.78,-60.24 571.78,-60.24 567,-56.62 567,-49.38 571.78,-45.76 571.78,-45.76 601.88,-23.01 601.88,-23.01 606.67,-19.39 617.45,-15.77 623.45,-15.77 623.45,-15.77 697.94,-15.77 697.94,-15.77 703.94,-15.77 714.73,-19.39 719.51,-23.01 719.51,-23.01 749.61,-45.76 749.61,-45.76 754.4,-49.38 754.4,-56.62 749.61,-60.24" />
+<text xml:space="preserve" text-anchor="middle" x="660.7" y="-56.9" font-family="Arial" font-size="13.00" fill="#172b43">agt-b-3.group-dev</text>
+<text xml:space="preserve" text-anchor="middle" x="660.7" y="-41.3" font-family="Arial" font-size="13.00" fill="#172b43">sanity gate</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>agt-b-3.group-dev-&gt;agt-b-3.group-sanity</title>
+<path fill="none" stroke="#647a94" stroke-width="1.15" d="M526.58,-59.21C536.69,-58.74 547.43,-58.24 558.26,-57.74" />
+<polygon fill="#647a94" stroke="#647a94" stroke-width="1.15" points="558.25,-60.36 565.62,-57.39 558.01,-55.12 558.25,-60.36" />
+</g>
+<g class="state-badges"><g class="state-badge" transform="translate(66.31 -128)"><rect width="20" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text></g><g class="qa-badge" transform="translate(66.31 -92)"><rect width="20" height="18" rx="6" fill="white" stroke="#64748b" stroke-width="1.2" /><path d="M4 10V14H16V10 M10 3V10 M7 7L10 10L13 7" fill="none" stroke="#64748b" stroke-width="1.5" /><title>QA IN PROGRESS; agt-b-1.group-qa</title></g><g class="state-badge" transform="translate(252.11 -147.23)"><rect width="38" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text><text x="27" y="13" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#b91c1c">0</text></g><g class="state-badge" transform="translate(455.9 -168)"><rect width="20" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text></g><g class="qa-badge" transform="translate(455.9 -132)"><rect width="20" height="18" rx="6" fill="white" stroke="#64748b" stroke-width="1.2" /><path d="M4 10V14H16V10 M10 3V10 M7 7L10 10L13 7" fill="none" stroke="#64748b" stroke-width="1.5" /><title>QA IN PROGRESS; agt-b-2.group-qa</title></g><g class="state-badge" transform="translate(455.9 -89)"><rect width="20" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text></g><g class="qa-badge" transform="translate(455.9 -53)"><rect width="20" height="18" rx="6" fill="white" stroke="#64748b" stroke-width="1.2" /><path d="M4 10V14H16V10 M10 3V10 M7 7L10 10L13 7" fill="none" stroke="#64748b" stroke-width="1.5" /><title>QA IN PROGRESS; agt-b-3.group-qa</title></g><g class="state-badge" transform="translate(641.7 -197.23)"><rect width="38" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text><text x="27" y="13" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#b91c1c">0</text></g><g class="state-badge" transform="translate(641.7 -99.23)"><rect width="38" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text><text x="27" y="13" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#b91c1c">0</text></g></g></g>
+<g class="state-legend" font-family="Arial" font-size="14" fill="#334155"><rect x="0" y="318.0" width="833.0" height="88" fill="white" /><g class="state-badge" transform="translate(30 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#15803d" stroke-width="1.2" /><path d="M 5 9 L 8 12 L 14 5" fill="none" stroke="#15803d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" /></g><text x="56" y="341.0">Complete / sanity PASS</text><g class="state-badge" transform="translate(232 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#64748b" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#64748b">○</text></g><text x="258" y="341.0">Pending</text><g class="state-badge" transform="translate(329 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text></g><text x="355" y="341.0">Blocked</text><g class="state-badge" transform="translate(426 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#2563eb" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#2563eb">↻</text></g><text x="452" y="341.0">Active</text><g class="state-badge" transform="translate(516 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#b91c1c" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b91c1c">!</text></g><text x="542" y="341.0">Findings</text><g class="state-badge" transform="translate(620 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#b45309" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#b45309">?</text></g><text x="646" y="341.0">Unconfirmed</text><g class="state-badge" transform="translate(745 327)"><rect width="20" height="18" rx="6" fill="white" stroke="#7e22ce" stroke-width="1.2" /><text x="10" y="13" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#7e22ce">↷</text></g><text x="771" y="341.0">User override</text><text x="30" y="370.0" font-size="12">Top = dev/sanity; gate number = completed sanity iterations; ? = unavailable. Dev check requires sanity PASS. Snapshot: 2026-11-14T02:42:50.946053+00:00</text><text x="30" y="392.0" font-size="12">Bottom = QA: assigned / active / pass, or open blocking:important:minor findings after FAIL. Blank = undispatched.</text></g></svg></div>
+  </main>
+  <script>
+    const diagram = document.getElementById('diagram');
+    let zoom = 1;
+    function setZoom(value) {
+      zoom = Math.max(0.5, Math.min(4, value));
+      diagram.style.width = (zoom * 100) + '%';
+      document.getElementById('zoom-level').textContent = Math.round(zoom * 100) + '%';
+    }
+    document.getElementById('zoom-out').addEventListener('click', () => setZoom(zoom / 1.25));
+    document.getElementById('zoom-in').addEventListener('click', () => setZoom(zoom * 1.25));
+    document.getElementById('fit').addEventListener('click', () => setZoom(1));
+  </script>
+</body>
+</html>
