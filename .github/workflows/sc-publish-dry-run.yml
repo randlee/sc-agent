@@ -3,17 +3,16 @@
 #
 # The kit's release-preflight.yml is workflow_dispatch-only and needs release
 # secrets, environments, and immutable releases, so it cannot run on a PR; the
-# publisher dispatches it at release time. This job runs the same local recipe
-# on every PR: kit drift check, manifest validation, version lockstep, consumer
-# preflight, cargo publish --dry-run, and a maturin wheel build. It never tags
-# or publishes.
+# publisher dispatches it at release time. This workflow is manually
+# dispatched for kit drift check, manifest validation, version lockstep,
+# consumer preflight, cargo publish --dry-run, and a maturin wheel build. It
+# never tags or publishes.
 #
 # Determinism: every action is pinned to a commit SHA, the runner image,
 # toolchain, Python, and maturin are exact, and no step retries.
 name: sc-publish dry-run
 
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:
