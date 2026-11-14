@@ -90,7 +90,7 @@ class Errors(unittest.TestCase):
             root = Path(directory)
             report = root / "site/reports/integration/run.json"
             report.parent.mkdir(parents=True)
-            report.write_text(json.dumps({"report": "site/reports/integration/run.html"}))
+            report.write_text(json.dumps({"schema_version": preflight.RUN_SCHEMA_VERSION, "report": "site/reports/integration/run.html"}))
             failure = errors.Refusal("stale source", code="integration.stale_source", remediation="Run the new prerelease.")
             output = io.StringIO()
             with patch.object(preflight, "ROOT", root), patch.object(preflight, "git", return_value="candidate"), \
@@ -102,6 +102,35 @@ class Errors(unittest.TestCase):
             self.assertEqual(result["error"], "integration.no_passing_platform")
             self.assertEqual(result["reports"], ["run.json: stale source"])
             self.assertEqual(result["failures"][0]["error"], {"id": "integration.stale_source", "message": "stale source", "remediation": "Run the new prerelease."})
+
+    def test_preflight_rejects_unversioned_evidence_before_reading_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = root / "site/reports/integration/legacy.json"
+            record.parent.mkdir(parents=True)
+            record.write_text(json.dumps({"report": "missing.html"}))
+            output = io.StringIO()
+            with patch.object(preflight, "ROOT", root), patch.object(preflight, "git", return_value="candidate"), \
+                    patch.object(sys, "argv", ["preflight"]), contextlib.redirect_stdout(output):
+                self.assertEqual(preflight.main(), 1)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["failures"][0]["error"]["id"], "integration.invalid_run_schema")
+
+    def test_run_schema_requires_supported_integer_version(self):
+        self.assertIsNone(preflight.validate_run_schema({"schema_version": preflight.RUN_SCHEMA_VERSION}))
+        for record in ({}, {"schema_version": 2}, {"schema_version": True}, {"schema_version": "1"}):
+            with self.subTest(record=record), self.assertRaises(errors.Refusal) as caught:
+                preflight.validate_run_schema(record)
+            self.assertEqual(caught.exception.code, "integration.invalid_run_schema")
+
+    def test_resume_rejects_unversioned_run_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "run.json").write_text(json.dumps({"run_id": "controlled", "platform": "macos-aarch64", "prerelease_tag": "prerelease/v0.1.5"}))
+            args = type("Args", (), {"run_id": "controlled", "tag": "prerelease/v0.1.5", "platform": "macos-aarch64", "run_dir": run_dir})()
+            with self.assertRaises(errors.Refusal) as caught:
+                run.prepare(args)
+            self.assertEqual(caught.exception.code, "integration.invalid_run_schema")
 
     def test_lower_json_parse_error_is_preserved_with_typed_recovery(self):
         try:

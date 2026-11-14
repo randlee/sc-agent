@@ -19,6 +19,16 @@ from configuration import Refusal, case_specs, distribution_wheel, integration_c
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_ROOT = PurePosixPath("site/reports/integration")
+RUN_SCHEMA_VERSION = 1
+
+
+def validate_run_schema(run):
+    if not isinstance(run, dict) or type(run.get("schema_version")) is not int or run["schema_version"] != RUN_SCHEMA_VERSION:
+        raise Refusal(
+            'run record has no supported schema_version',
+            code="integration.invalid_run_schema",
+            remediation=f'Rerun integration with the current scripts to produce schema_version {RUN_SCHEMA_VERSION} evidence.',
+        )
 
 
 def command(args, *, cwd=ROOT):
@@ -157,6 +167,7 @@ def installed_validator(run):
 
 
 def validate_run(run, candidate, *, root=ROOT, validator=None, artifact_verifier=verify_artifacts):
+    validate_run_schema(run)
     if validator is None:
         with installed_validator(run) as candidate_validator:
             return validate_run(run, candidate, root=root, validator=candidate_validator, artifact_verifier=artifact_verifier)
@@ -224,6 +235,7 @@ def main():
             git("ls-files", "--error-unmatch", "--", str(path.relative_to(ROOT)))
             git("diff", "--exit-code", "HEAD", "--", str(path.relative_to(ROOT)))
             run = json.loads(path.read_text())
+            validate_run_schema(run)
             record_commit = git("log", "-1", "--format=%H", "--", str(path.relative_to(ROOT)))
             report_commit = git("log", "-1", "--format=%H", "--", str(report_path(run["report"])))
             if record_commit != report_commit or not pushed_ref_contains(record_commit):
