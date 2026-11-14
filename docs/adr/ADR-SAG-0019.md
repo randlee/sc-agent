@@ -49,7 +49,7 @@ Their integration code should be identical. They should differ only in prompt au
   - judge-jev refuses `--timeout`.
   - plan-anchor calls `timeout_secs`, which phase b added (agt-b-1.8, 05902db) and which is not yet released.
 
-Phase b's b-stack fix branches already changed the error type, and this ADR builds on that base. Those commits are not yet on `integrate/phase-b` or `develop`; the implementation of this ADR is cut on top of them.
+Phase b already changed the error type, and this ADR builds on that base. Those commits are on `integrate/phase-b` (merged by #86 at 745c1fb), not yet on `develop`; the implementation of this ADR is cut from `integrate/phase-b`.
 
 - agt-zii (d827a04) added `ErrorDetail.status: Option<u16>` and a provided method `ErrorId::status()`, set for `http.provider_busy` and `decision.api_status`.
 - It changed `recovery` to `Option<Box<str>>`.
@@ -132,7 +132,7 @@ Leaf variants and their fields (`—` means not set):
 | `local.probe_status` | `status` | — | — |
 | `decision.cancelled` | — | `sends` | — |
 
-`decision.schema_mismatch` and `decision.backend` set no fields of their own. They inherit from their cause through the copy-up; a schema mismatch normally has none, because its reply was 2xx.
+`decision.schema_mismatch` and `decision.backend` set no fields of their own. `decision.backend` is a wrapper (rule `inherit`) and takes all three fields from its cause through the copy-up. `decision.schema_mismatch` has its own category, `response_invalid`, so it reports only its own fields, all `None`; its reply was 2xx in any case.
 
 **Deriving `retry_after_ms`.** It is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser already holds, not from the `f64`:
 
