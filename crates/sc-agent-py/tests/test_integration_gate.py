@@ -15,7 +15,8 @@ def passing_records():
 def test_installed_rust_case_contract_matches_formula():
     root = Path(__file__).resolve().parents[3]
     formula = tomllib.loads((root / "formulas/integration.formula.toml").read_text())
-    assert set(sc_agent.integration_cases()) == {step["id"] for step in formula["steps"] if step["id"] not in {"verify-assets", "report"}}
+    cases = {step["id"].replace("_", "-") for step in formula["steps"]} - {"verify-assets", "report"}
+    assert set(sc_agent.integration_cases()) == cases
     records = passing_records()
     assert json.loads(sc_agent.validate_integration_results(json.dumps(records), SOURCE)) == records
 
