@@ -2,7 +2,8 @@ name: Setup sc-lint
 description: >-
   Install and verify the pinned sc-lint release and sibling analyzers, or an
   explicitly selected immutable source revision. Release defaults retain the
-  shared ecosystem pin and .just utilities; source mode builds the same-commit
+  shared ecosystem pin; legacy releases retain .just utilities while verified
+  self-contained releases need no Python helper copy. Source mode builds the same-commit
   Python wheel into the consumer .sc-lint/venv.
 inputs:
   source-revision:
@@ -163,11 +164,13 @@ runs:
         set -euo pipefail
         version_json="$(sc-lint version --json)"
         jq -e --arg expected "${SC_LINT_VERSION}" \
-          '.ok == true and .data.version == $expected' \
+          '.ok == true and .data.version == $expected and ((.data.self_contained // false) | type == "boolean")' \
           <<<"${version_json}" >/dev/null || {
           echo "sc-lint setup: version contract failed; expected ${SC_LINT_VERSION}" >&2
           exit 1
         }
+        self_contained="$(jq -r '.data.self_contained // false' <<<"${version_json}")"
+        echo "SC_LINT_SELF_CONTAINED=${self_contained}" >> "${GITHUB_ENV}"
     - name: Verify sc-lint version contract (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: pwsh
@@ -179,8 +182,16 @@ runs:
         if (-not $value.ok -or $value.data.version -ne $env:SC_LINT_VERSION) {
           throw "sc-lint setup: expected version $env:SC_LINT_VERSION, got $($value.data.version)"
         }
+        $selfContained = $false
+        if ($null -ne $value.data.self_contained) {
+          if ($value.data.self_contained -isnot [bool]) {
+            throw 'sc-lint setup: self_contained must be a boolean'
+          }
+          $selfContained = $value.data.self_contained
+        }
+        Add-Content -Path $env:GITHUB_ENV -Value "SC_LINT_SELF_CONTAINED=$($selfContained.ToString().ToLowerInvariant())"
     - name: Materialize pinned sc-lint Python utilities (Unix)
-      if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
+      if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == '' && env.SC_LINT_SELF_CONTAINED != 'true'
       shell: bash
       env:
         SC_LINT_VERSION: ${{ inputs.version }}
@@ -197,9 +208,12 @@ runs:
         mkdir -p "${GITHUB_WORKSPACE}/.just"
         cp "${source_root}/.just/"*.py "${GITHUB_WORKSPACE}/.just/"
         printf '%s\n' "${SC_LINT_VERSION}" > "${GITHUB_WORKSPACE}/.just/.sc-lint-runtime-version"
-        test -f "${GITHUB_WORKSPACE}/.just/run_lint.py"
+        test -f "${GITHUB_WORKSPACE}/.just/run_lint.py" || {
+          echo 'sc-lint setup: legacy source archive is missing .just/run_lint.py' >&2
+          exit 1
+        }
     - name: Materialize pinned sc-lint Python utilities (Windows)
-      if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
+      if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == '' && env.SC_LINT_SELF_CONTAINED != 'true'
       shell: pwsh
       env:
         SC_LINT_VERSION: ${{ inputs.version }}

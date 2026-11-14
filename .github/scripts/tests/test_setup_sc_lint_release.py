@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tarfile
@@ -95,6 +96,8 @@ class ReleaseSetupTests(unittest.TestCase):
         block = block.split('      run: |\n', 1)[1].split('\n    - name:', 1)[0]
         cases = (
             ({'ok': True, 'data': {'version': '0.8.9'}}, True),
+            ({'ok': True, 'data': {'version': '0.8.9', 'self_contained': True}}, True),
+            ({'ok': True, 'data': {'version': '0.8.9', 'self_contained': 'true'}}, False),
             ({'ok': True, 'data': {'version': '0.8.8'}}, False),
             ({'ok': False, 'data': {'version': '0.8.9'}}, False),
             ({'ok': True, 'data': {'crate_version': '0.8.9'}}, False),
@@ -105,12 +108,15 @@ class ReleaseSetupTests(unittest.TestCase):
                 command = root / 'sc-lint'
                 command.write_text('#!/usr/bin/env python3\nimport json\nprint(' + repr(json.dumps(payload)) + ')\n')
                 command.chmod(0o755)
-                env = dict(os.environ, SC_LINT_VERSION='0.8.9', PATH=str(root) + os.pathsep + os.environ['PATH'])
+                env = dict(os.environ, SC_LINT_VERSION='0.8.9', GITHUB_ENV=str(root / 'github-env'), PATH=str(root) + os.pathsep + os.environ['PATH'])
                 result = subprocess.run(['bash', '-c', textwrap.dedent(block)], cwd=ROOT, env=env,
                                         capture_output=True, text=True, timeout=30)
                 self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
                 if not accepted:
                     self.assertIn('version contract failed', result.stderr)
+                else:
+                    expected = 'true' if payload['data'].get('self_contained') is True else 'false'
+                    self.assertEqual((root / 'github-env').read_text().strip(), 'SC_LINT_SELF_CONTAINED=' + expected)
 
     def test_root_probe_selects_family_and_distinguishes_findings_from_errors(self):
         block = ACTION.read_text().split('    - name: Smoke-test repository root discovery (Unix)\n', 1)[1]
@@ -139,6 +145,30 @@ class ReleaseSetupTests(unittest.TestCase):
                 self.assertEqual(json.loads(argv.read_text()), ['--json', '--root', str(root), 'lint', 'sc-runtime'])
                 if code == 10:
                     self.assertIn('controlled finding', result.stdout)
+
+    @unittest.skipUnless(shutil.which('pwsh'), 'PowerShell is not installed')
+    def test_windows_version_capability_is_typed_and_retains_legacy_fallback(self):
+        block = ACTION.read_text().split('    - name: Verify sc-lint version contract (Windows)\n', 1)[1]
+        block = block.split('      run: |\n', 1)[1].split('\n    - name:', 1)[0]
+        cases = (
+            ({'ok': True, 'data': {'version': '0.8.9', 'self_contained': True}}, True, 'true'),
+            ({'ok': True, 'data': {'version': '0.8.9'}}, True, 'false'),
+            ({'ok': True, 'data': {'version': '0.8.9', 'self_contained': 'true'}}, False, None),
+            ({'ok': True, 'data': {'version': '0.8.8', 'self_contained': True}}, False, None),
+        )
+        for payload, accepted, flag in cases:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                command = root / 'sc-lint'
+                command.write_text('#!/usr/bin/env python3\nprint(' + repr(json.dumps(payload)) + ')\n')
+                command.chmod(0o755)
+                env = dict(os.environ, SC_LINT_VERSION='0.8.9', GITHUB_ENV=str(root / 'github-env'),
+                           PATH=str(root) + os.pathsep + os.environ['PATH'])
+                result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', textwrap.dedent(block)],
+                                        cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+                if accepted:
+                    self.assertEqual((root / 'github-env').read_text().strip(), 'SC_LINT_SELF_CONTAINED=' + flag)
 
 
 if __name__ == '__main__':
