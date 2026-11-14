@@ -25,7 +25,7 @@ class Loopback:
     """A runner on 127.0.0.1 in a background thread."""
 
     def __init__(self, mode: str, status: int | None = None) -> None:
-        if mode not in ("hang", "error", "ok", "status"):
+        if mode not in ("hang", "error", "ok", "status", "echo-key", "echo-model-key"):
             raise ValueError(mode)
         self.mode = mode
         self.status = status
@@ -53,7 +53,10 @@ class Loopback:
                 if self.path == "/health":
                     self._reply(200, {"ok": True, "model": MODEL})
                 elif self.path == "/v1/models":
-                    if loopback.mode == "status":
+                    if loopback.mode == "echo-model-key":
+                        key = self.headers.get("authorization", "").removeprefix("Bearer ")
+                        self._reply(200, {"models": key})
+                    elif loopback.mode == "status":
                         self._reply(loopback.status, {"detail": "controlled status"})
                     else:
                         self._reply(200, {"models": [{"name": MODEL, "description": "loopback", "release_date": "2026-09-15"}]})
@@ -71,6 +74,12 @@ class Loopback:
                 if loopback.mode == "hang":
                     loopback.release.wait(60.0)
                     self.close_connection = True
+                    return
+                if loopback.mode == "echo-key":
+                    key = self.headers.get("authorization", "").removeprefix("Bearer ")
+                    response = json.loads(OK_RESPONSE)
+                    response["answers"]["q"]["noul"] = key
+                    self._reply(loopback.status or 200, response if loopback.status == 200 else {"detail": f"echo {key}"})
                     return
                 if loopback.mode == "ok":
                     data = OK_RESPONSE.encode()
