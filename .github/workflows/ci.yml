@@ -98,13 +98,16 @@ jobs:
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Test sc-lint release checksum verification
-        run: python3 .github/scripts/tests/test_setup_sc_lint_checksum.py
+      - name: Test sc-lint release setup
+        run: |
+          python3 .github/scripts/tests/test_setup_sc_lint_checksum.py
+          python3 .github/scripts/tests/test_setup_sc_lint_release.py
 
       - name: Install sc-lint
         uses: ./.github/actions/setup-sc-lint
         with:
           version: "0.8.9"
+          smoke-family: "sc-runtime"
 
       - name: Reject production panic constructs
         run: |
