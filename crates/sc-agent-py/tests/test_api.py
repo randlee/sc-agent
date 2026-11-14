@@ -51,6 +51,26 @@ def error_of(info: pytest.ExceptionInfo) -> tuple[str, dict]:
     return ident, json.loads(detail)
 
 
+def find_status(detail: dict) -> int | None:
+    if "status" in detail:
+        return detail["status"]
+    cause = detail.get("cause")
+    return find_status(cause) if cause else None
+
+
+@pytest.mark.parametrize("status", [429, 503, 529, 401, 422])
+def test_structured_http_status_on_batch_and_exception(env, args, status):
+    """Controlled loopback statuses remain numeric in batch errors and SagError details."""
+    _loopback, _log_root = env
+    result = json.loads(sc_agent.send_batch([NOUL], **args)[0])
+    assert find_status(result["error"]) == status
+
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+    _ident, detail = error_of(info)
+    assert find_status(detail) == status
+
+
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
     """AC: ANC-006."""
     text = subprocess.run(

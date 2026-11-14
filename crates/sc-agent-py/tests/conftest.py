@@ -20,18 +20,17 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 HANG_GUARD = 60.0
 
 
-def _write_config(root: pathlib.Path, port: int) -> pathlib.Path:
+def _write_config(root: pathlib.Path, port: int, max_sends: int | None = None) -> pathlib.Path:
     log_root = root / "logs-root"
     config = root / ".sc-agent"
     config.mkdir(parents=True, exist_ok=True)
-    (config / "default.json").write_text(
-        json.dumps(
-            {
-                "log_root": str(log_root),
-                "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": port, "model": MODEL}},
-            }
-        )
-    )
+    data = {
+        "log_root": str(log_root),
+        "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": port, "model": MODEL}},
+    }
+    if max_sends is not None:
+        data["max_sends"] = max_sends
+    (config / "default.json").write_text(json.dumps(data))
     return log_root
 
 
@@ -40,11 +39,16 @@ def env(tmp_path, monkeypatch, request):
     """`(loopback, log_root)`; the config is `tmp_path/.sc-agent` (see `args`), the log root is
     set in it. The mode comes from `@pytest.mark.mode`. No environment variable points at it."""
     marker = request.node.get_closest_marker("mode")
-    loopback = Loopback(marker.args[0] if marker else "error")
+    callspec = getattr(request.node, "callspec", None)
+    status = callspec.params.get("status") if callspec else None
+    loopback = Loopback(
+        marker.args[0] if marker else ("status" if status is not None else "error"),
+        status,
+    )
     for name in list(os.environ):
         if name.startswith("SC_AGENT__") or name.endswith("_API_KEY"):
             monkeypatch.delenv(name)
-    log_root = _write_config(tmp_path, loopback.port)
+    log_root = _write_config(tmp_path, loopback.port, max_sends=1 if status is not None else None)
     try:
         yield loopback, log_root
     finally:

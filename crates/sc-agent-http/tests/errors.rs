@@ -144,12 +144,16 @@ mod cases {
             if let Some(recovery) = error.recovery() {
                 expected = expected.with_recovery(recovery);
             }
+            if let Some(status) = error.status() {
+                expected = expected.with_status(status);
+            }
             assert_eq!(error.detail(), expected);
             assert_eq!(
                 std::error::Error::source(error).is_some(),
                 error.cause_detail().is_some()
             );
         }
+        assert_eq!(errors[0].detail().status, Some(429));
         let with_recovery: HashSet<&str> = errors
             .iter()
             .filter(|error| error.recovery().is_some())
