@@ -105,7 +105,7 @@ impl PrereleaseTag {
 }
 
 /// A case outcome. SKIP and FAIL are preserved as evidence and never pass the gate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 enum Status {
     /// The actual case passed.
     #[serde(rename = "PASS")]
@@ -116,6 +116,17 @@ enum Status {
     /// The case could not run.
     #[serde(rename = "SKIP")]
     Skip,
+}
+
+impl Status {
+    fn parse(value: &str) -> Result<Self, DecidrError> {
+        match value {
+            "PASS" => Ok(Self::Pass),
+            "FAIL" => Ok(Self::Fail),
+            "SKIP" => Ok(Self::Skip),
+            _ => Err(invalid("status", "must be PASS, FAIL or SKIP")),
+        }
+    }
 }
 
 /// A bounded printable reason supplied by the producer after credential redaction.
@@ -187,12 +198,7 @@ struct RawResult {
 impl TryFrom<RawResult> for CaseResult {
     type Error = DecidrError;
     fn try_from(raw: RawResult) -> Result<Self, Self::Error> {
-        let status = match raw.status.as_str() {
-            "PASS" => Status::Pass,
-            "FAIL" => Status::Fail,
-            "SKIP" => Status::Skip,
-            _ => return Err(invalid("status", "must be PASS, FAIL or SKIP")),
-        };
+        let status = Status::parse(&raw.status)?;
         let session_id = raw.session_id.map(Session::new).transpose()?;
         Ok(Self {
             case_id: Identifier::new(raw.case_id, "case_id")?,
@@ -279,6 +285,23 @@ mod tests {
     fn validate(results: Vec<Value>) -> Result<Vec<CaseResult>, DecidrError> {
         validate_results(&serde_json::to_string(&results).unwrap(), &"a".repeat(40))
     }
+
+    #[test]
+    fn status_owns_parsing_and_serde_for_the_wire_values() {
+        for (wire, expected) in [
+            ("PASS", Status::Pass),
+            ("FAIL", Status::Fail),
+            ("SKIP", Status::Skip),
+        ] {
+            assert_eq!(Status::parse(wire).unwrap(), expected);
+            assert_eq!(
+                serde_json::from_value::<Status>(json!(wire)).unwrap(),
+                expected
+            );
+            assert_eq!(serde_json::to_value(expected).unwrap(), json!(wire));
+        }
+    }
+
     #[test]
     fn generated_required_cases_match_the_packaged_case_manifest() {
         let records: Vec<Value> =
