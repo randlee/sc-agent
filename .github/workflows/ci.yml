@@ -98,6 +98,26 @@ jobs:
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+      - name: Install sc-lint
+        uses: ./.github/actions/setup-sc-lint
+        with:
+          version: "0.8.9"
+
+      - name: Reject production panic constructs
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/sc-lint-runtime.json"
+          set +e
+          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008 > "${report}"
+          lint_rc=$?
+          set -e
+          if [ "${lint_rc}" -ne 0 ]; then
+            cat "${report}"
+            exit "${lint_rc}"
+          fi
+          export SC_LINT_RUNTIME_REPORT="${report}"
+          python3 .github/scripts/tests/test_runtime_panic_gate.py
+
   test:
     name: Test (${{ matrix.os }})
     needs: [detect, fmt]
@@ -243,81 +263,6 @@ jobs:
           python -m pip install --no-index --find-links dist sc-decidr
           python -m pytest crates/sc-agent-py/tests
 
-  runtime:
-    name: Production panic prohibition
-    needs: [detect]
-    if: ${{ needs.detect.outputs.rust == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - name: Install checksum-verified sc-lint release
-        env:
-          SC_LINT_VERSION: "0.8.9"
-          SC_LINT_REPOSITORY: "randlee/sc-lint"
-        run: |
-          set -euo pipefail
-          case "${RUNNER_OS}:${RUNNER_ARCH}" in
-            Linux:X64) target="x86_64-unknown-linux-gnu" ;;
-            Linux:ARM64) target="aarch64-unknown-linux-gnu" ;;
-            *)
-              echo "sc-lint setup: unsupported runner ${RUNNER_OS}/${RUNNER_ARCH}" >&2
-              exit 1
-              ;;
-          esac
-          archive="sc-lint_${SC_LINT_VERSION}_${target}.tar.gz"
-          release_url="https://github.com/${SC_LINT_REPOSITORY}/releases/download/v${SC_LINT_VERSION}"
-          archive_path="${RUNNER_TEMP}/${archive}"
-          checksums_path="${RUNNER_TEMP}/sc-lint-${SC_LINT_VERSION}-checksums.txt"
-          curl --fail --location --retry 4 --retry-all-errors --silent --show-error \
-            --output "${archive_path}" "${release_url}/${archive}"
-          curl --fail --location --retry 4 --retry-all-errors --silent --show-error \
-            --output "${checksums_path}" "${release_url}/checksums.txt"
-          awk -v asset="${archive}" '$2 == asset { found = 1 } END { exit !found }' "${checksums_path}" || {
-            echo "sc-lint release checksums do not include ${archive}" >&2
-            exit 1
-          }
-          (cd "${RUNNER_TEMP}" && sha256sum --check --ignore-missing "$(basename "${checksums_path}")")
-          tar -xzf "${archive_path}" -C "${RUNNER_TEMP}"
-          archive_root="${RUNNER_TEMP}/sc-lint_${SC_LINT_VERSION}_${target}"
-          for binary in sc-lint sc-lint-boundary sc-lint-portability sc-lint-runtime; do
-            test -x "${archive_root}/bin/${binary}" || {
-              echo "sc-lint archive is missing executable ${binary}" >&2
-              exit 1
-            }
-          done
-          export PATH="${archive_root}/bin:${PATH}"
-          echo "${archive_root}/bin" >> "${GITHUB_PATH}"
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-
-          result = json.loads(subprocess.run(
-              ["sc-lint", "version", "--json"], check=True, capture_output=True, text=True
-          ).stdout)
-          if not result.get("ok") or result.get("data", {}).get("version") != os.environ["SC_LINT_VERSION"]:
-              raise SystemExit(f"unexpected sc-lint version: {result}")
-          print(f"Installed sc-lint {result['data']['version']} from the verified release archive")
-          PY
-      - name: Reject production panic constructs
-        run: |
-          set -euo pipefail
-          report="${RUNNER_TEMP}/sc-lint-runtime.json"
-          set +e
-          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008 > "${report}"
-          lint_rc=$?
-          set -e
-          if [ "${lint_rc}" -ne 0 ]; then
-            cat "${report}"
-            exit "${lint_rc}"
-          fi
-          export SC_LINT_RUNTIME_REPORT="${report}"
-          python3 .github/scripts/tests/test_runtime_panic_gate.py
-
   # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).
   # Exact pins such as ureq =3.5.1 are not floated, so this job is how a
   # published advisory against a pinned crate reaches the merge gate.
@@ -340,7 +285,7 @@ jobs:
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, runtime, deny]
+    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, deny]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
