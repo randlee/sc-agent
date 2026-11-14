@@ -1,0 +1,700 @@
+{
+  "schema": "plan-anchoring/anchors/1",
+  "plan": "phase-b",
+  "intent_ref": "docs/plans/phase-b/intent.md",
+  "anchors": [
+    {
+      "id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The sc-agent consumer template must be built from the plan-anchor shared client after that client is defined and working.",
+      "quote": "define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Working client precedes template",
+      "scope": "Sprints that build the shared plan-anchor client or the sc-agent consumer template.",
+      "deterministic_check": "Compare the completed client revision with the template source and sprint ordering.",
+      "fixtures": {
+        "pass": [
+          "Build and test the plan-anchor shared client, then derive the sc-agent template from it."
+        ],
+        "fail": [
+          "Build the sc-agent template before implementing the shared plan-anchor client."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The sc-agent consumer template must be built from the plan-anchor client after the client passes its tests."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The plan-anchor shared-client integration must preserve all existing plan-anchor functionality.",
+      "quote": "integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Plan-anchor functional parity",
+      "scope": "The plan-anchor sprint that integrates the shared client into existing plan-anchor features.",
+      "deterministic_check": "Run existing plan-anchor behavior and installation tests against the integrated client.",
+      "fixtures": {
+        "pass": [
+          "Integrate the shared client and keep existing plan-anchor commands and behavior working."
+        ],
+        "fail": [
+          "Replace plan-anchor behavior with a reduced set of commands."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The plan-anchor shared-client integration must preserve existing plan-anchor command behavior."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The judge-jev track must use the template and preserve its current features before adding sitr support.",
+      "quote": "judge-jev : template -> current features -> sitr support",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Judge-jev sitr sequence",
+      "scope": "Judge-jev template adoption, feature parity and sitr integration sprints.",
+      "deterministic_check": "Inspect the judge-jev sprint order and run feature and sitr tests.",
+      "fixtures": {
+        "pass": [
+          "Adopt the shared template and preserve judge-jev features before adding sitr."
+        ],
+        "fail": [
+          "Add sitr first and defer all existing judge-jev feature integration."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The judge-jev integration must preserve its existing features before adding sitr support."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Manual live integration runs must use unit tests with real providers, reusing existing mocked tests where applicable.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Reuse existing tests for live runs",
+      "scope": "Sprints that implement or run live integration tests for sc-agent or its consumers.",
+      "deterministic_check": "Inspect live and controlled test selections and run the existing unit suite.",
+      "fixtures": {
+        "pass": [
+          "Run existing mocked unit tests manually against real providers for integration."
+        ],
+        "fail": [
+          "Create an unrelated live-only test suite and retain the old unit tests separately."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Live integration runs must reuse existing unit tests with real provider calls."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The integration test process must commit and push its test report.",
+      "quote": "The test report MUST be committed/pushed as part of the integration test process.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Reports committed and pushed",
+      "scope": "Sprints defining or executing the integration test reporting process.",
+      "deterministic_check": "Inspect the integration run procedure and the resulting git commit and remote.",
+      "fixtures": {
+        "pass": [
+          "Commit and push the generated integration report during the integration run."
+        ],
+        "fail": [
+          "Leave the integration report only on the local machine."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Each integration test run must commit and push its XHTML report."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "One successful integration test run on one supported platform must satisfy the platform requirement.",
+      "quote": "integration testing should be set up flexably where ONE integration test run should be required (one platform) which would typically be this mac or colima.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "One platform suffices",
+      "scope": "Sprints defining integration test platform requirements or acceptance.",
+      "deterministic_check": "Run the integration procedure with exactly one supported platform result.",
+      "fixtures": {
+        "pass": [
+          "Accept one passing macOS run as the required platform run."
+        ],
+        "fail": [
+          "Require both macOS and Windows runs before the platform requirement is satisfied."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "A single successful integration test run must satisfy the platform requirement."
+        },
+        {
+          "at": "2026-11-14T23:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Any phase-b test identified as flaky must be redesigned using controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Deterministic tests",
+      "scope": "Sprints that add or change tests.",
+      "deterministic_check": "Review changed tests for timing, sleep and event-order dependence.",
+      "fixtures": {
+        "pass": [
+          "Replace the timing-dependent test with controlled synchronization."
+        ],
+        "fail": [
+          "Repeat the flaky test until a timing race passes."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Phase-b tests must use controlled inputs instead of relying on timing or scheduling races."
+        },
+        {
+          "at": "2026-11-14T23:33:20+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev work must be planned as three parallel tracks.",
+      "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "Three parallel tracks",
+      "scope": "The phase-b plan and sprints following completion of the shared plan-anchor client.",
+      "deterministic_check": "Inspect the sprint graph and the lead dispatch order.",
+      "fixtures": {
+        "pass": [
+          "After the shared client is complete, schedule sc-agent, plan-anchor and judge-jev as parallel tracks with their stated prerequisites."
+        ],
+        "fail": [
+          "Run all plan-anchor work to completion before starting either other track."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:32:07+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:32:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The sc-agent, plan-anchor and judge-jev tracks must run in parallel after the shared plan-anchor client is complete."
+        },
+        {
+          "at": "2026-11-14T23:33:20+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check",
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-009",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The integration test process must produce one XHTML report for each platform tested.",
+      "quote": "There should be one xhtml report per platform tested.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "phase-b planning",
+      "summary": "One XHTML report per tested platform",
+      "scope": "Sprints defining integration test reports and platform coverage.",
+      "deterministic_check": "Inspect the report output from separate platform runs.",
+      "fixtures": {
+        "pass": [
+          "Render one XHTML integration report for each tested platform."
+        ],
+        "fail": [
+          "Combine the results from every tested platform into a single report."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:34:02+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-14T23:34:08+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ADR-SAG-0004",
+      "source_type": "ADR",
+      "source_ref": "ADR-SAG-0004",
+      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.",
+      "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
+      "summary": "No crate depends on a crate above it in the layering",
+      "scope": "adds or changes a crate dependency in a Cargo.toml",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "sc-agent-http's Cargo.toml depends only on sc-agent-types, sc-agent-secrets and sc-agent-log, all lower layers; the only crate that depends on sc-decision-runner is decidr, which sits above the runner."
+        ],
+        "fail": [
+          "sc-agent-types adds sc-decision-schema to its [dependencies] so it can name DecisionRequest."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-mud",
+        "plan_questions": "agt-mud.1",
+        "dev_questions": "agt-mud.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:42:41+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-mud",
+            "plan_questions": "agt-mud.1",
+            "dev_questions": "agt-mud.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0002",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0002",
+      "statement": "Every error returned by a public sc-agent function must carry the id and message of each lower-layer error that caused it.",
+      "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
+      "summary": "Each crate returns its own error union carrying lower errors",
+      "scope": "adds or changes an error type or a public function's return type",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "HttpError::Network wraps the ureq error and a test asserts the outer error's chain carries the ureq error's id and message."
+        ],
+        "fail": [
+          "The backend maps every lower-layer failure to a new error with the message \"request failed\", dropping the original error."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-t70",
+        "plan_questions": "agt-t70.1",
+        "dev_questions": "agt-t70.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-t70",
+            "plan_questions": "agt-t70.1",
+            "dev_questions": "agt-t70.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0006",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0006",
+      "statement": "No type, field or constant in the sc-agent-types or sc-decision-schema crates must be specific to plan-anchor, judge-jev or another application built on sc-agent.",
+      "quote": "`sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
+      "summary": "No consumer-app or Jev-mock types in shared crates",
+      "scope": "adds or changes a type in sc-agent-types or sc-decision-schema",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "Add the TypeSafe API request and response types to sc-decision-schema; no type, field or constant names plan-anchor or judge-jev."
+        ],
+        "fail": [
+          "sc-agent-types adds a PlanAnchorVerdict enum for the plan-anchor gate."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-qyd",
+        "plan_questions": "agt-qyd.1",
+        "dev_questions": "agt-qyd.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-qyd",
+            "plan_questions": "agt-qyd.1",
+            "dev_questions": "agt-qyd.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REQ-SAG-0010",
+      "source_type": "REQ",
+      "source_ref": "REQ-SAG-0010",
+      "statement": "sc-agent source code must not call std::thread::sleep, tokio::time::sleep or any other sleep function.",
+      "quote": "sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-09",
+      "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
+      "summary": "No sleep calls in sc-agent source",
+      "scope": "adds or changes Rust source in an sc-agent crate",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "The sc-agent runner waits out holdoffs with CancelToken::wait_until and a clippy rule forbids sleep calls."
+        ],
+        "fail": [
+          "The sc-agent retry loop calls std::thread::sleep(Duration::from_secs(1)) between attempts."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-6dm",
+        "plan_questions": "agt-6dm.1",
+        "dev_questions": "agt-6dm.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-14T23:42:42+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-6dm",
+            "plan_questions": "agt-6dm.1",
+            "dev_questions": "agt-6dm.2"
+          }
+        }
+      ]
+    }
+  ]
+}
