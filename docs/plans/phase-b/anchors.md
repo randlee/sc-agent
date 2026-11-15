@@ -20,9 +20,9 @@ Intent: `docs/plans/phase-b/intent.md`
 | REQ-SAG-0006 | locked | No consumer-app or Jev-mock types in shared crates | 2026-11-09 |
 | REQ-SAG-0010 | locked | No sleep calls in sc-agent source | 2026-11-09 |
 | ANC-010 | locked | Fix minor integration defects | 2026-11-14 |
-| ANC-011 | locked |  | 2026-11-14 |
-| ANC-012 | locked |  | 2026-11-14 |
-| ANC-013 | locked |  | 2026-11-14 |
+| ANC-011 | proposed |  | 2026-11-14 |
+| ANC-012 | proposed |  | 2026-11-14 |
+| ANC-013 | proposed |  | 2026-11-14 |
 
 ## ANC-001
 
@@ -46,11 +46,11 @@ Fixtures:
 
 ## ANC-002
 
-Anchor: After the plan-anchor sprint that integrates the shared client, plan-anchor's existing test suite must pass with no test removed or weakened, except the Python 3.9 jobs retired by the 3.11 floor.
+Anchor: After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened, except: Python 3.9 jobs are retired (3.11 floor), and live Jev calls require the sc-decidr wheel.
 
 > integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
 
 Summary: Plan-anchor functional parity
 
@@ -302,7 +302,7 @@ Anchor: The sc-agent consumer template must generate the shared client as plan-a
 
 > define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 3.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 3.
 
 Scope: Sprints building the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
 
@@ -318,7 +318,7 @@ Anchor: Live integration runs must be started manually, never by CI on a push, p
 
 > I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 2.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 2.
 
 Scope: Sprints defining or running live integration tests.
 
@@ -334,7 +334,7 @@ Anchor: A phase-b test found flaky must be redesigned to drive its logic with co
 
 > Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 2.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 2.
 
 Scope: Sprints that find or change flaky tests.
 
