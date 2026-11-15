@@ -72,27 +72,60 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
 def test_actual_publish_shell_uses_standalone_manifest_with_mock_cargo(tmp_path, workflow_name):
-    import os
     import re
+    import shutil
     import subprocess
     import yaml
+    bash = shutil.which('bash')
+    assert bash is not None, 'Bash is required by the publish workflow'
     workflow = yaml.safe_load((INSTALL.PACKAGE_ROOT / '.github/workflows' / workflow_name).read_text())
     step = next(step for job in workflow['jobs'].values() for step in job.get('steps', []) if step.get('name') == 'Publish crates in order (idempotent)')
     shell = re.sub(r'\$\{\{[^}]+\}\}', '1.2.3', step['run'])
     stub = tmp_path / 'python3'
     stub.write_text('''#!/bin/sh
+[ "$1" = ".github/scripts/release_artifacts.py" ] || exit 2
 case "$2" in
- list-publish-plan) printf 'standalone|0|bindings/standalone/Cargo.toml\\n' ;;
+ list-publish-plan) printf 'standalone|0|bindings/standalone/Cargo.toml|false\\n' ;;
  public-registry-inquiry-plan) printf '{"checks":[{"version_lookup_url":"https://example.invalid"}]}\\n' ;;
  registry-status) printf 'absent\\n' ;;
  *) exit 2 ;;
 esac
 ''')
     stub.chmod(0o755)
+    jq = tmp_path / 'jq'
+    jq.write_text('''#!/bin/sh
+[ "$1" = "-r" ] && [ "$2" = ".checks[0].version_lookup_url" ] || exit 2
+IFS= read -r input || exit 2
+[ "$input" = '{"checks":[{"version_lookup_url":"https://example.invalid"}]}' ] || exit 2
+printf '%s\\n' 'https://example.invalid'
+''')
+    jq.chmod(0o755)
+    dirname = tmp_path / 'dirname'
+    dirname.write_text('''#!/bin/sh
+[ "$#" -eq 1 ] && [ "$1" = "release/publish-artifacts.toml" ] || exit 2
+printf '%s\\n' 'release'
+''')
+    dirname.chmod(0o755)
+    sleep = tmp_path / 'sleep'
+    # The plan sets wait_seconds=0; fail immediately if the shell ever waits.
+    sleep.write_text('#!/bin/sh\nprintf "%s\\n" "unexpected sleep" >&2\nexit 99\n')
+    sleep.chmod(0o755)
     cargo = tmp_path / 'cargo'
     cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > cargo-args\n')
     cargo.chmod(0o755)
-    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True)
+    result = subprocess.run(
+        [bash, '-c', shell],
+        cwd=tmp_path,
+        env={
+            'PATH': str(tmp_path),
+            'CARGO_REGISTRY_TOKEN': '',
+            'RELEASE_ARTIFACT_MANIFEST': 'release/publish-artifacts.toml',
+            'RELEASE_TAG': 'v1.2.3',
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / 'cargo-args').read_text().splitlines() == ['publish', '--manifest-path', 'bindings/standalone/Cargo.toml', '--locked']
 
