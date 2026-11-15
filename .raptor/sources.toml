@@ -3,4 +3,4 @@ schema_version = "1.0.0"
 [[sources]]
 root = "docs"
 include = ["**/*.md"]
-exclude = ["plans/**"]
+exclude = ["plans/**", "consumer-preflight-and-docli.md", "development/sc-publish.md", "getting-started.md", "npm-channel-compatibility.md"]
