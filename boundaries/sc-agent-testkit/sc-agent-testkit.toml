@@ -1,0 +1,34 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScAgentTestkit"
+owner_package = "sc-agent-testkit"
+owner_crate_path = "sc_agent_testkit"
+name = "ScAgentTestkitLayer"
+
+[public]
+facade = "Gate"
+
+[implementation]
+type = "Gate"
+module = "sc_agent_testkit"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["Gate"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["sc-agent-types"]
+allowed_dev_dependents = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
+allowed_dev_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

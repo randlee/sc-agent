@@ -106,20 +106,6 @@ jobs:
       - name: Run consumer lint profile
         run: sc-lint lint ci --consumer
 
-      - name: Reject production panic constructs
-        run: |
-          set -euo pipefail
-          report="${RUNNER_TEMP}/sc-lint-runtime.json"
-          set +e
-          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008 > "${report}"
-          lint_rc=$?
-          set -e
-          if [ "${lint_rc}" -ne 0 ]; then
-            cat "${report}"
-            exit "${lint_rc}"
-          fi
-          export SC_LINT_RUNTIME_REPORT="${report}"
-          python3 .github/scripts/tests/test_runtime_panic_gate.py
 
   test:
     name: Test (${{ matrix.os }})

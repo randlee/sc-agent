@@ -1,2 +1,4 @@
+# Required by sc-lint 0.8.9 boundary inventory parsing when records exist;
+# this is analyzer input, not the authority for sprint progress (Beads is).
 [planning]
 current_sprint = "B.13"

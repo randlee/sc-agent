@@ -1,0 +1,34 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-Sitr"
+owner_package = "sitr"
+owner_crate_path = "sitr"
+name = "SitrLayer"
+
+[public]
+facade = "main"
+
+[implementation]
+type = "main"
+module = "sitr"
+visibility = "private"
+constructor = "none"
+
+[composition]
+roots = ["main"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["sc-treesitter"]
+allowed_dev_dependents = []
+allowed_dev_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"
