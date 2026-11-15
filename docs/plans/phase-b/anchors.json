@@ -25,13 +25,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-09m",
+        "plan_questions": "agt-09m.1",
+        "dev_questions": "agt-09m.2"
       },
       "history": [
         {
@@ -54,6 +54,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:25+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-09m",
+            "plan_questions": "agt-09m.1",
+            "dev_questions": "agt-09m.2"
+          }
         }
       ]
     },
@@ -79,13 +93,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-z25",
+        "plan_questions": "agt-z25.1",
+        "dev_questions": "agt-z25.2"
       },
       "history": [
         {
@@ -108,6 +122,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:27+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-z25",
+            "plan_questions": "agt-z25.1",
+            "dev_questions": "agt-z25.2"
+          }
         }
       ]
     },
@@ -133,13 +161,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-08a",
+        "plan_questions": "agt-08a.1",
+        "dev_questions": "agt-08a.2"
       },
       "history": [
         {
@@ -162,6 +190,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:29+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-08a",
+            "plan_questions": "agt-08a.1",
+            "dev_questions": "agt-08a.2"
+          }
         }
       ]
     },
@@ -187,13 +229,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-8s2",
+        "plan_questions": "agt-8s2.1",
+        "dev_questions": "agt-8s2.2"
       },
       "history": [
         {
@@ -216,6 +258,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:31+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-8s2",
+            "plan_questions": "agt-8s2.1",
+            "dev_questions": "agt-8s2.2"
+          }
         }
       ]
     },
@@ -241,13 +297,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-ate",
+        "plan_questions": "agt-ate.1",
+        "dev_questions": "agt-ate.2"
       },
       "history": [
         {
@@ -270,6 +326,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:34+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ate",
+            "plan_questions": "agt-ate.1",
+            "dev_questions": "agt-ate.2"
+          }
         }
       ]
     },
@@ -295,13 +365,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-2yh",
+        "plan_questions": "agt-2yh.1",
+        "dev_questions": "agt-2yh.2"
       },
       "history": [
         {
@@ -324,6 +394,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:39+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-2yh",
+            "plan_questions": "agt-2yh.1",
+            "dev_questions": "agt-2yh.2"
+          }
         }
       ]
     },
@@ -331,7 +415,7 @@
       "id": "ANC-007",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Any phase-b test identified as flaky must be redesigned using controlled inputs.",
+      "statement": "Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs.",
       "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
       "kind": "directive",
       "stated_by": "user",
@@ -342,20 +426,21 @@
       "deterministic_check": "Review changed tests for timing, sleep and event-order dependence.",
       "fixtures": {
         "pass": [
-          "Replace the timing-dependent test with controlled synchronization."
+          "Use controlled synchronization for tests and redesign any discovered flaky test with controlled inputs."
         ],
         "fail": [
-          "Repeat the flaky test until a timing race passes."
+          "Use sleeps and event-loop timing as synchronization in a phase-b test.",
+          "Leave a known flaky test unchanged instead of redesigning it with controlled inputs."
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 5,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-0qk",
+        "plan_questions": "agt-0qk.1",
+        "dev_questions": "agt-0qk.2"
       },
       "history": [
         {
@@ -378,6 +463,29 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:55:59+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "Any phase-b test identified as flaky must be redesigned using controlled inputs."
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:42+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-0qk",
+            "plan_questions": "agt-0qk.1",
+            "dev_questions": "agt-0qk.2"
+          }
         }
       ]
     },
@@ -403,13 +511,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-8ug",
+        "plan_questions": "agt-8ug.1",
+        "dev_questions": "agt-8ug.2"
       },
       "history": [
         {
@@ -432,6 +540,20 @@
             "deterministic_check",
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:44+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-8ug",
+            "plan_questions": "agt-8ug.1",
+            "dev_questions": "agt-8ug.2"
+          }
         }
       ]
     },
@@ -457,13 +579,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-rvm",
+        "plan_questions": "agt-rvm.1",
+        "dev_questions": "agt-rvm.2"
       },
       "history": [
         {
@@ -477,6 +599,20 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:46+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-rvm",
+            "plan_questions": "agt-rvm.1",
+            "dev_questions": "agt-rvm.2"
+          }
         }
       ]
     },
@@ -736,13 +872,13 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "agt-uw0",
+        "plan_questions": "agt-uw0.1",
+        "dev_questions": "agt-uw0.2"
       },
       "history": [
         {
@@ -756,6 +892,20 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-14T23:58:09+00:00",
+          "event": "locked",
+          "approval": "owner confirmation conveyed by ai-lead on 2026-11-14"
+        },
+        {
+          "at": "2026-11-15T00:03:47+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-uw0",
+            "plan_questions": "agt-uw0.1",
+            "dev_questions": "agt-uw0.2"
+          }
         }
       ]
     }

@@ -1,0 +1,202 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.6,
+    "dry_run": false,
+    "fixture": false,
+    "path": "docs/plans/phase-b/anchors.json",
+    "anchors": [
+      {
+        "id": "ANC-007",
+        "statement": "Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs.",
+        "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+        "scope": "Sprints that add or change tests.",
+        "verdict": "inconclusive",
+        "failing": [
+          "faithful",
+          "observable",
+          "self_contained",
+          "single_constraint"
+        ],
+        "answers": {
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.31,
+            "probabilities": {
+              "yes": 0.54,
+              "no": 0.44,
+              "unclear": 0.02
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.55,
+            "probabilities": {
+              "no": 0.11,
+              "unclear": 0.19,
+              "yes": 0.7
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.96,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.02,
+              "yes": 0.97
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.34,
+            "probabilities": {
+              "no": 0.4,
+              "unclear": 0.04,
+              "yes": 0.56
+            }
+          },
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.44,
+            "probabilities": {
+              "no": 0.36,
+              "unclear": 0.01,
+              "yes": 0.63
+            }
+          }
+        },
+        "lint": {
+          "warnings": [],
+          "errors": []
+        },
+        "inputs": {
+          "question_seal": "85d01cf23ced89614226e27e9fcf33bc5ed0ef61c6e21720619cf36f64cea007",
+          "request_sha256": "f9472643c5cceb34e966ddcd0dabd02fe6fe757440d24c0ff2b2a389fa49ac19"
+        },
+        "answers_second": {
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.52,
+            "probabilities": {
+              "yes": 0.68,
+              "no": 0.3,
+              "unclear": 0.02
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.56,
+            "probabilities": {
+              "no": 0.12,
+              "unclear": 0.17,
+              "yes": 0.71
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.96,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.02,
+              "yes": 0.97
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.33,
+            "probabilities": {
+              "no": 0.42,
+              "unclear": 0.03,
+              "yes": 0.55
+            }
+          },
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.42,
+            "probabilities": {
+              "no": 0.39,
+              "unclear": 0.0,
+              "yes": 0.61
+            }
+          }
+        },
+        "attempts": 2,
+        "confirmations": {
+          "verdict": "inconclusive",
+          "failing": [
+            "faithful",
+            "observable",
+            "self_contained",
+            "single_constraint"
+          ],
+          "low_confidence": [
+            "faithful",
+            "observable",
+            "self_contained",
+            "single_constraint"
+          ],
+          "unstable": [],
+          "initial_disagreements": [],
+          "resolved": {
+            "faithful": {
+              "choice": "yes",
+              "confidence": 0.31,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "observable": {
+              "choice": "yes",
+              "confidence": 0.55,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "scoped": {
+              "choice": "yes",
+              "confidence": 0.96,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "self_contained": {
+              "choice": "yes",
+              "confidence": 0.33,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "single_constraint": {
+              "choice": "yes",
+              "confidence": 0.42,
+              "matching_calls": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "next": "Plan diagnosis: run `judge` on the item, then `report --run <run>` for triage answers and routes. A disputed rubric role on a locked anchor: anchor-tuning `triage` with `gate: testability`."
+      }
+    ],
+    "needs_work": [
+      "ANC-007"
+    ],
+    "pass": false
+  },
+  "error": null
+}
