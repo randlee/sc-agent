@@ -1,16 +1,16 @@
 # Requirement: One Python floor for sc-agent's wheels and their consumers
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.2.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-14  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 
 ---
 
 ## NFR-SAG-0003: One Python floor for sc-agent's wheels and their consumers
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 

@@ -1,16 +1,16 @@
 # Requirement: A send or batch call may override the send timeout and the worker count for that call only
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.2.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-14  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0702: A send or batch call may override the send timeout and the worker count for that call only
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 

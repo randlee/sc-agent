@@ -1,6 +1,6 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-15  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0016: Error details carry the HTTP status, send count and Retry-After as typed fields
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
