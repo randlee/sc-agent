@@ -292,6 +292,8 @@ mod tests {
     #[test]
     fn there_are_seven_llm_ids() {
         let ids: std::collections::BTreeSet<&str> = every().iter().map(ErrorId::id).collect();
+        let samples = every();
+        sc_agent_testkit::assert_catalog_rows(&samples);
         assert_eq!(ids.len(), 7, "{ids:?}");
         assert!(ids.iter().all(|id| id.starts_with("llm.")), "{ids:?}");
     }

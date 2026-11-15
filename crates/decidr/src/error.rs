@@ -452,6 +452,71 @@ mod tests {
     use super::*;
     use sc_agent_types::ShortName;
 
+    #[test]
+    fn every_decidr_error_matches_its_own_catalog() {
+        let io = || std::io::Error::other("failure");
+        let mut errors = samples();
+        errors.extend([
+            DecidrError::InvalidRequestTimeout { source: None },
+            DecidrError::Usage {
+                source: Box::new(clap::Error::raw(
+                    clap::error::ErrorKind::InvalidValue,
+                    "bad",
+                )),
+            },
+            DecidrError::from(sc_agent_config::AgentConfigError::HomeUnknown),
+            DecidrError::from(sc_agent_log::LogError::InvalidSlug {
+                field: "project",
+                value: "bad".into(),
+            }),
+            DecidrError::from(sc_decision_local::LocalError::LoadTimeout {
+                runner: "x".into(),
+                waited: std::time::Duration::ZERO,
+            }),
+            DecidrError::from(sc_agent_http::HttpError::network(
+                sc_agent_http::NetworkKind::Connect,
+                1,
+                "down",
+            )),
+            DecidrError::from(sc_llm_provider::LlmError::NoText {
+                provider: sc_llm_provider::LlmProvider::Anthropic,
+            }),
+            DecidrError::from(sc_decision_runner::RunnerError::InvalidConfig {
+                workers: 0,
+                max: 64,
+            }),
+            DecidrError::UnknownRunner {
+                name: "x".into(),
+                known: vec![],
+            },
+            DecidrError::InputNotFound { input: "x".into() },
+            DecidrError::LineNotUtf8 {
+                line: 1,
+                byte_offset: 0,
+            },
+            DecidrError::ImageRead {
+                name: "x".into(),
+                path: "x".into(),
+                source: io(),
+            },
+            DecidrError::ImageFormat {
+                name: "x".into(),
+                path: "x".into(),
+            },
+            DecidrError::RequestInvalid {
+                line: None,
+                source: Box::new(sc_decision_schema::DecisionError::Cancelled { sends: 0 }),
+            },
+            DecidrError::Encode {
+                source: serde_json::from_str::<serde_json::Value>("{").expect_err("invalid json"),
+            },
+            DecidrError::Signal {
+                source: ctrlc::Error::MultipleHandlers,
+            },
+        ]);
+        sc_agent_testkit::assert_catalog_rows(&errors);
+    }
+
     fn samples() -> Vec<DecidrError> {
         let io = || std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
         vec![

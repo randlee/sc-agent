@@ -17,6 +17,7 @@ roots = ["CancelToken"]
 
 [dependencies]
 allowed_dependents = []
+allowed_dev_dependencies = ["sc-agent-testkit"]
 allowed_dependencies = ["decidr", "sc-agent-config", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema"]
 forbidden_edges = []
 

@@ -236,6 +236,7 @@ mod tests {
             }
         }
         let ids: std::collections::BTreeSet<&str> = all.iter().map(ErrorId::id).collect();
+        sc_agent_testkit::assert_catalog_rows(&all);
         assert_eq!(ids.len(), 6, "{ids:?}");
         assert!(
             ids.iter().all(|id| id.starts_with("decision_llm.")),

@@ -1554,6 +1554,7 @@ dependencies = [
  "sc-agent-config",
  "sc-agent-log",
  "sc-agent-secrets",
+ "sc-agent-testkit",
  "sc-agent-types",
  "sc-decision-schema",
  "sc-observability",

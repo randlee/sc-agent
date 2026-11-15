@@ -477,6 +477,7 @@ mod tests {
             },
         ];
         let ids: BTreeSet<&str> = errors.iter().map(ErrorId::id).collect();
+        sc_agent_testkit::assert_catalog_rows(&errors);
         assert_eq!(ids.len(), 6);
         assert!(ids.iter().all(|id| id.starts_with("local.")));
         for error in &errors {

@@ -120,6 +120,7 @@ mod cases {
     #[test]
     fn http_error_ids() {
         let errors = one_of_each();
+        sc_agent_testkit::assert_catalog_rows(&errors);
         let ids: HashSet<&str> = errors.iter().map(ErrorId::id).collect();
         assert_eq!(errors.len(), 7);
         assert_eq!(

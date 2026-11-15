@@ -12,7 +12,10 @@
 //! `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
 //! (a path) names the configuration directory; absent, it is `~/.sc-agent`.
 
+mod binding_error;
 mod keyring_options;
+
+use binding_error::PyBindingError;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -30,7 +33,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
-use sc_agent_types::{ErrorCategory, ErrorDetail, ErrorId, Provider};
+use sc_agent_types::{ErrorId, Provider};
 use sc_decision_schema::DecisionResult;
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
@@ -272,49 +275,6 @@ enum Message<T> {
 
 /// The callback a decidr call reports each result to.
 type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>;
-
-#[derive(Debug)]
-enum PyBindingError {
-    WorkerPanicked { message: String },
-    InvalidOption { option: String, bound: String },
-}
-
-sc_agent_types::error_catalog! { PyBindingError {
-    PyBindingError::WorkerPanicked { .. } => ("sc_agent_py.worker_panicked", Some(ErrorCategory::Other)),
-    PyBindingError::InvalidOption { .. } => ("sc_agent_py.invalid_option", Some(ErrorCategory::Validation)),
-} }
-
-impl std::fmt::Display for PyBindingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.id(), self.message())
-    }
-}
-
-impl std::error::Error for PyBindingError {}
-
-impl ErrorId for PyBindingError {
-    fn id(&self) -> &'static str {
-        self.catalog_row().0
-    }
-    fn base_category(&self) -> Option<ErrorCategory> {
-        self.catalog_row().1
-    }
-    fn message(&self) -> String {
-        match self {
-            Self::WorkerPanicked { message } => message.clone(),
-            Self::InvalidOption { option, bound } => format!("{option} {bound}"),
-        }
-    }
-    fn cause_detail(&self) -> Option<ErrorDetail> {
-        None
-    }
-    fn recovery(&self) -> Option<&'static str> {
-        match self {
-            Self::InvalidOption { .. } => Some("Correct the named option and retry."),
-            Self::WorkerPanicked { .. } => None,
-        }
-    }
-}
 
 fn py_binding_error(error: &PyBindingError) -> PyErr {
     let detail = serde_json::to_string(&error.detail()).unwrap_or_else(|_| "{}".to_owned());

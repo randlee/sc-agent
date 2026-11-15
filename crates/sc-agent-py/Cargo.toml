@@ -29,6 +29,7 @@ pyo3 = { version = "=0.29.2", features = ["abi3-py311", "extension-module"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [dev-dependencies]
+sc-agent-testkit = { workspace = true }
 sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
 tempfile = "3"
 

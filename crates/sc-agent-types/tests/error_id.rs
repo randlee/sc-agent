@@ -33,6 +33,7 @@ fn every_types_error() -> Vec<TypesError> {
 #[test]
 fn test_types_error_ids_display_and_detail() {
     let errors = every_types_error();
+    sc_agent_testkit::assert_catalog_rows(&errors);
     let ids: Vec<&str> = errors.iter().map(ErrorId::id).collect();
     assert_eq!(
         ids,

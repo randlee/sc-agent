@@ -82,6 +82,7 @@ mod tests {
     #[test]
     fn error_ids() {
         let errors = every_variant();
+        sc_agent_testkit::assert_catalog_rows(&errors);
         let mut ids: Vec<&str> = errors.iter().map(ErrorId::id).collect();
         for id in &ids {
             let rest = id
