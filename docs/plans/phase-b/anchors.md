@@ -23,6 +23,8 @@ Intent: `docs/plans/phase-b/intent.md`
 | ANC-011 | proposed |  | 2026-11-14 |
 | ANC-012 | proposed |  | 2026-11-14 |
 | ANC-013 | proposed |  | 2026-11-14 |
+| ANC-014 | proposed | Python 3.11 or newer | 2026-11-14 |
+| ANC-015 | proposed | Judge template adoption follows the sc-agent template | 2026-11-14 |
 
 ## ANC-001
 
@@ -46,11 +48,11 @@ Fixtures:
 
 ## ANC-002
 
-Anchor: After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened, except: Python 3.9 jobs are retired (3.11 floor), and live Jev calls require the sc-decidr wheel.
+Anchor: After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened.
 
 > integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 8.
 
 Summary: Plan-anchor functional parity
 
@@ -106,11 +108,11 @@ Fixtures:
 
 ## ANC-005
 
-Anchor: An integration run must end with its test report on the remote branch the run was made from.
+Anchor: The integration test process must push a commit containing its test report.
 
 > The test report MUST be committed/pushed as part of the integration test process.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Reports committed and pushed
 
@@ -166,11 +168,11 @@ Fixtures:
 
 ## ANC-008
 
-Anchor: In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint.
+Anchor: After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev sprints must run as three parallel tracks.
 
 > 3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
 
 Summary: Three parallel tracks
 
@@ -206,11 +208,11 @@ Fixtures:
 
 ## ADR-SAG-0004
 
-Anchor: No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner.
+Anchor: No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner, which handles decision models only.
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 3.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
 
 Summary: No crate depends on a crate above it in the layering
 
@@ -330,16 +332,52 @@ Fixtures:
 
 ## ANC-013
 
-Anchor: A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout.
+Anchor: A phase-b test found flaky must be redesigned to be deterministic by driving its logic with controlled inputs.
 
 > Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 2.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 3.
 
 Scope: Sprints that find or change flaky tests.
 
 Beads: anchor `agt-e0a`, plan questions `agt-e0a.1`, dev questions `agt-e0a.2`
 
 Fixtures:
-- pass: Redesign the flaky test to control its inputs and ordering.
-- fail: Retry the flaky test and increase its timeout instead of redesigning it.
+- pass: Redesign the flaky test using controlled inputs so it is deterministic.
+- fail: Leave the flaky test unchanged and continue with the release.
+
+## ANC-014
+
+Anchor: sc-agent, judge-jev and plan-anchor must require Python 3.11 or newer.
+
+> sc-agent, judge-jev, prompt-anchor all must be 3.11+
+
+Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: proposed. Version 2.
+
+Summary: Python 3.11 or newer
+
+Scope: Sprints setting the supported Python floor in sc-agent, judge-jev or plan-anchor.
+
+Beads: anchor `agt-27n`, plan questions `agt-27n.1`, dev questions `agt-27n.2`
+
+Fixtures:
+- pass: sc-agent, judge-jev and plan-anchor require Python 3.11 or newer.
+- fail: plan-anchor continues to support Python 3.9.
+
+## ANC-015
+
+Anchor: judge-jev's template-adoption sprint must depend on the sc-agent consumer template sprint.
+
+> 3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support
+
+Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: proposed. Version 2.
+
+Summary: Judge template adoption follows the sc-agent template
+
+Scope: Sprints building or adopting the sc-agent consumer template.
+
+Beads: anchor `agt-spz`, plan questions `agt-spz.1`, dev questions `agt-spz.2`
+
+Fixtures:
+- pass: The judge-jev template-adoption sprint depends on the sc-agent consumer template sprint.
+- fail: The judge-jev template-adoption sprint runs before the sc-agent consumer template sprint.

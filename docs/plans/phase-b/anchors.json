@@ -90,7 +90,7 @@
       "id": "ANC-002",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened, except: Python 3.9 jobs are retired (3.11 floor), and live Jev calls require the sc-decidr wheel.",
+      "statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened.",
       "quote": "integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor",
       "kind": "directive",
       "stated_by": "user",
@@ -108,7 +108,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 7,
+      "version": 8,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -174,6 +174,14 @@
             "statement"
           ],
           "previous_statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing test suite must pass with no test removed or weakened, except the Python 3.9 jobs retired by the 3.11 floor."
+        },
+        {
+          "at": "2026-11-15T01:04:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened, except: Python 3.9 jobs are retired (3.11 floor), and live Jev calls require the sc-decidr wheel."
         }
       ]
     },
@@ -333,7 +341,7 @@
       "id": "ANC-005",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "An integration run must end with its test report on the remote branch the run was made from.",
+      "statement": "The integration test process must push a commit containing its test report.",
       "quote": "The test report MUST be committed/pushed as part of the integration test process.",
       "kind": "directive",
       "stated_by": "user",
@@ -351,7 +359,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -402,6 +410,14 @@
             "statement"
           ],
           "previous_statement": "The integration test process must commit and push its test report."
+        },
+        {
+          "at": "2026-11-15T01:04:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "An integration run must end with its test report on the remote branch the run was made from."
         }
       ]
     },
@@ -571,7 +587,7 @@
       "id": "ANC-008",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint.",
+      "statement": "After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev sprints must run as three parallel tracks.",
       "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
       "kind": "directive",
       "stated_by": "user",
@@ -589,7 +605,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
+      "version": 7,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -647,6 +663,14 @@
           "fields": [
             "scope"
           ]
+        },
+        {
+          "at": "2026-11-15T01:04:31+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint."
         }
       ]
     },
@@ -713,7 +737,7 @@
       "id": "ADR-SAG-0004",
       "source_type": "ADR",
       "source_ref": "ADR-SAG-0004",
-      "statement": "No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner.",
+      "statement": "No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner, which handles decision models only.",
       "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
       "kind": "prohibition",
       "stated_by": "Rand Lee",
@@ -731,7 +755,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -768,6 +792,14 @@
             "statement"
           ],
           "previous_statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner."
+        },
+        {
+          "at": "2026-11-15T01:04:32+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner."
         }
       ]
     },
@@ -1154,7 +1186,7 @@
       "id": "ANC-013",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout.",
+      "statement": "A phase-b test found flaky must be redesigned to be deterministic by driving its logic with controlled inputs.",
       "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
       "kind": "directive",
       "stated_by": "user",
@@ -1165,14 +1197,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "Redesign the flaky test to control its inputs and ordering."
+          "Redesign the flaky test using controlled inputs so it is deterministic."
         ],
         "fail": [
-          "Retry the flaky test and increase its timeout instead of redesigning it."
+          "Leave the flaky test unchanged and continue with the release."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1206,6 +1238,125 @@
           "at": "2026-11-15T00:35:52+00:00",
           "event": "approval_conditional",
           "note": "Owner approved contingent on each anchor passing; latest requested check has not established a pass."
+        },
+        {
+          "at": "2026-11-15T01:04:31+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout."
+        }
+      ]
+    },
+    {
+      "id": "ANC-014",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent, judge-jev and plan-anchor must require Python 3.11 or newer.",
+      "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "Owner-directed phase-b anchor fix",
+      "summary": "Python 3.11 or newer",
+      "scope": "Sprints setting the supported Python floor in sc-agent, judge-jev or plan-anchor.",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "sc-agent, judge-jev and plan-anchor require Python 3.11 or newer."
+        ],
+        "fail": [
+          "plan-anchor continues to support Python 3.9."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-27n",
+        "plan_questions": "agt-27n.1",
+        "dev_questions": "agt-27n.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-15T01:04:32+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-15T01:17:35+00:00",
+          "event": "updated",
+          "fields": [
+            "summary",
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-15T01:17:36+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-27n",
+            "plan_questions": "agt-27n.1",
+            "dev_questions": "agt-27n.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "judge-jev's template-adoption sprint must depend on the sc-agent consumer template sprint.",
+      "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "Owner-directed phase-b anchor fix",
+      "summary": "Judge template adoption follows the sc-agent template",
+      "scope": "Sprints building or adopting the sc-agent consumer template.",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "The judge-jev template-adoption sprint depends on the sc-agent consumer template sprint."
+        ],
+        "fail": [
+          "The judge-jev template-adoption sprint runs before the sc-agent consumer template sprint."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-spz",
+        "plan_questions": "agt-spz.1",
+        "dev_questions": "agt-spz.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-15T01:04:32+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-11-15T01:17:35+00:00",
+          "event": "updated",
+          "fields": [
+            "summary",
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-15T01:18:00+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-spz",
+            "plan_questions": "agt-spz.1",
+            "dev_questions": "agt-spz.2"
+          }
         }
       ]
     }
