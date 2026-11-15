@@ -211,15 +211,15 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    ```rust
    error_catalog! { HttpError {
-       ProviderBusy { .. } => ("http.provider_busy", Busy),
-       Network { .. }      => ("http.network", Network),
+       ProviderBusy { .. } => ("http.provider_busy", Some(Busy)),
+       Network { .. }      => ("http.network", Some(Network)),
        ...
    } }
    ```
 
    The macro expands to two items:
 
-   - an inherent exhaustive `catalog_row` match for the enum's id and leaf category.
+   - an inherent exhaustive `catalog_row` match returning the enum's id and optional leaf category (`None` for wrappers).
    - that enum's own catalog rows; wrapper variants take their cause's fields instead of supplying a category.
 
    `ErrorId::id()` becomes `self.catalog_row().0` in each impl.
