@@ -1,4 +1,4 @@
-# Requirement: Every error id has a category rule in its crate's catalog table, and the category is stored in the detail
+# Requirement: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
 **Status:** Proposed  
 **Version:** 0.2.0  
@@ -8,7 +8,7 @@
 
 ---
 
-## REQ-SAG-0017: Every error id has a category rule in its crate's catalog table, and the category is stored in the detail
+## REQ-SAG-0017: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
 **Status:** Proposed  
 
@@ -16,17 +16,17 @@
 
 Definitions:
 
-- A crate's catalog table is the `error_catalog!` table that crate writes for one of its error enums. Each row gives a variant's id and its category rule. sc-agent-py's `PyBindingError` has its own table.
+- A crate's catalog table is the `error_catalog!` table that crate writes for one of its error enums. Each row gives a variant's id and its category or wrapper designation. sc-agent-py's `PyBindingError` has its own table.
 - The catalog is every id in the catalog tables of the decidr-reachable workspace crates and sc-agent-py.
 - A foreign id, such as `io.ConnectionRefused` or `foreign.source`, is not in the catalog.
 - The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
-- A wrapper id has the rule `inherit`.
+- A wrapper takes its cause's fields.
 
 **MUST statements:**
 
-- Each variant's id and category rule MUST be written once, in its crate's catalog table, from which `id()` is generated.
+- Each variant's id and category or wrapper designation MUST be written once, in its crate's catalog table, from which `id()` is generated.
 - A variant with no row MUST fail to compile.
-- Every catalog row MUST have the base category or the `inherit` rule given in ADR-SAG-0019 decision 6.
+- Every catalog row MUST have the leaf category or wrapper designation given in ADR-SAG-0019 decision 6.
 - A leaf's `detail()` MUST store the base category from its own crate's row.
 - For `llm.api_status`, `decision.api_status` and `local.probe_status`, `detail()` MUST store the category refined by the level's status:
   - `auth` for 401 or 403;
@@ -52,7 +52,6 @@ Consumers that branch on error ids pin their own lists and add fallbacks today, 
 
 **Acceptance Criteria:**
 
-- [ ] A `compile_fail` doctest shows that an enum with a variant missing from its `error_catalog!` table does not compile.
 - [ ] Each crate's sample values of every variant map to ids in that enum's catalog rows.
 - [ ] No crate's catalog table has a duplicate id.
 - [ ] The stored `category` is:

@@ -95,7 +95,7 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 - [ ] A loopback test with a ranked model selector and a keyring override reads the key from the override only for the provider the selector resolves to.
 - [ ] A decision call with a keyring override, more than one eligible provider and no other key is refused with a typed error that names the eligible providers.
 - [ ] Scanning the rendered modules finds only public-API and standard-library references.
-- [ ] The README of `crates/sc-agent-py` names the template and its render command, and the consumer CI check (regenerate and diff) is documented there.
+- [ ] The README of `crates/sc-agent-py` names the template and its render command.
 
 ### Dependencies
 

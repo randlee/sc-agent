@@ -30,14 +30,13 @@ Definitions:
 - Each field MUST be omitted from serialized JSON when it is not set.
 - Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
 - `ErrorId::detail()` MUST remain the only builder of a detail.
-- A level whose catalog rule is `inherit` MUST take all four fields from its cause's detail. A level whose rule is `base` MUST keep its own fields.
-- The top-level fields MUST be those of the deciding level, the first level from the top whose rule is `base`.
+- A wrapper MUST take all four fields from its cause's detail. A leaf MUST keep its own fields.
+- The top-level fields MUST be those of the first leaf in the chain.
 - `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
   - as the ceiling in milliseconds;
   - saturating at `u64::MAX`;
   - without clamping;
   - with `0` giving `0`.
-- `ErrorDetail::map_text` MUST rewrite id and message text throughout the chain and keep `recovery` and every field.
 - `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`. It MUST expose:
   - the read-only attributes `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`;
   - the field values taken from its top-level detail, with `category` `"other"` when the detail has none.
@@ -58,7 +57,7 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 
 - [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
 - [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields, `category` included, at the top level.
-- [ ] A base-rule level over a cause that has a status reports its own fields and its own `category` only.
+- [ ] A leaf reports its own fields and its own `category`.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.
 - [ ] `decision.cancelled` carries `attempts` equal to its sends.
 - [ ] `RetryAfter::parse` gives these `retry_after_ms` values:
@@ -71,7 +70,6 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
   | `0.0000001` | 1 |
   | 32 nines | `u64::MAX` |
   | a malformed header | `None` |
-- [ ] `map_text` keeps `status`, `attempts`, `retry_after_ms`, `category` and `recovery`.
 - [ ] `SagError("x", "y", "{}")` has `status` `None` and `category` `"other"`.
 - [ ] A pickle round trip of a `SagError` keeps its `status`.
 - [ ] Each crate's test that `detail()` equals the value built from the accessors covers all four fields and the copy-up.

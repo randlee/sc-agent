@@ -95,9 +95,8 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    - **What it covers.** The call; passing the model selector through unchanged, never pinning `provider`; API keys; general-logger and session-log wiring; and error → category → consumer code. The consumer passes in its own category-to-code map.
    - **What it leaves out.** Prompt authoring and result and decision-tree processing stay in the consumer.
    - **Versioning.** The template ships inside the sc-decidr wheel as package data, so its version is the installed wheel's by construction. The wheel moves to maturin's mixed layout (`python-source`, the native module re-exported by `sc_agent/__init__.py`, so `import sc_agent` is unchanged) to carry the file. sitr is a separate wheel, version-locked with sc-decidr: both are released together at the same version (decision 4), and the template is tested against both at that version. A rendered module consumes sc-decidr, plus sitr when the sitr section is on. Mixed sc-decidr and sitr versions are not supported; this is documented, not enforced. The generated file's header records the sc-decidr version, and the sitr version when the sitr section is on, as troubleshooting information only. Nothing checks it at runtime: a fail-fast check would only make troubleshooting and development harder.
-   - **Feature variables.** Features are chosen only by template variables: `logging` (`general`, `session` or `both`), `models` and `sitr` (`true` or `false`). Rendering is sc-compose's responsibility; this ADR adds no rules about the sc-compose version or its output beyond the consumer CI check below.
-   - **Consumer CI.** Consumer CI renders the file again and diffs it, so any hand edit fails.
-   - **README.** `crates/sc-agent-py/README.md` keeps a short pointer to the template, with the render command and the CI check.
+   - **Feature variables.** Features are chosen only by template variables: `logging` (`general`, `session` or `both`), `models` and `sitr` (`true` or `false`). Rendering is sc-compose's responsibility.
+   - **README.** `crates/sc-agent-py/README.md` keeps a short pointer to the template, with the render command.
 
    **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken` remain public and documented. The generated code uses only them and the standard library, and nothing is reachable only through generated code. A sc-agent test renders the template with every feature combination and runs each result against the loopback runner.
 
@@ -122,12 +121,12 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    There is still no extension map: it would be untyped, would show no field names in Python or rustdoc, and would turn every new datum into a convention instead of a reviewed field.
 
-   `detail()` remains the only builder and must not be overridden. It sets `category` and does the copy-up in one place, using only the level's own catalog rule (decision 6), so that the top-level fields and the category always describe the same level:
+   `detail()` remains the only builder and must not be overridden. It sets `category` and does the copy-up in one place, using the variant's own fields or its cause (decision 6), so that the top-level fields and the category always describe the same level:
 
-   - A level whose rule is `inherit` (a wrapper) takes `status`, `attempts`, `retry_after_ms` and `category` from its cause's detail and none of its own.
-   - A level whose rule is `base` keeps its own accessors and its own category and does not fill from its cause.
+   - A wrapper takes `status`, `attempts`, `retry_after_ms` and `category` from its cause's detail and none of its own.
+   - A leaf keeps its own accessors and its own category.
 
-   The top-level fields are therefore exactly the fields of the deciding level: the first level from the top whose rule is `base`, and the stored `category` is that level's. The result:
+   The top-level fields are therefore the fields of the first leaf in the chain, and the stored `category` is that leaf's. The result:
 
    - every wrapper carries its cause's fields with no code of its own, including wrappers added later;
    - a leaf variant overrides only the methods for data it holds;
@@ -150,7 +149,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | `local.probe_status` | `status` | — | — |
    | `decision.cancelled` | — | `sends` | — |
 
-   `decision.schema_mismatch` and `decision.backend` set no fields of their own. `decision.backend` is a wrapper (rule `inherit`) and takes all three fields from its cause through the copy-up. `decision.schema_mismatch` has its own category, `response_invalid`, so it reports only its own fields, all `None`; its reply was 2xx in any case.
+   `decision.schema_mismatch` and `decision.backend` set no fields of their own. `decision.backend` is a wrapper and takes all three fields from its cause through the copy-up. `decision.schema_mismatch` has its own category, `response_invalid`, so it reports only its own fields, all `None`; its reply was 2xx in any case.
 
    **Deriving `retry_after_ms`.** It is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser already holds, not from the `f64`:
 
@@ -163,30 +162,13 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    **REQ-SAG-0007.** The owner ruled on 2026-11-14 that the rule protects decision-model values (Jev probabilities, confidences and values computed from them). This PR amends REQ-SAG-0007 to say so, and to allow transport timing hints to be rounded as their owning ADR states. The exact value stays available in Rust and in the message text.
 
-   **Not typed in 0.2.0:** `NetworkKind` (timeout, connect, tls, other). The category is `network` whatever the kind. The kind can be added as a later field without breaking anything (decision 3).
-
-3. **`#[non_exhaustive]` on `ErrorDetail`.**
-
-   `ErrorDetail` becomes `#[non_exhaustive]`, and its fields stay `pub` so they can still be read. Phase b already broke struct literals by adding `status`. With `#[non_exhaustive]`, this release makes the last field addition that breaks anything.
-
-   Outside `sc-agent-types`, a value is built with:
-
-   - `new`
-   - `with_recovery`
-   - `with_status`, which exists
-   - `with_attempts` (new)
-   - `with_retry_after_ms` (new)
-   - `foreign`
-   - `map_text` (new)
-
-   `map_text(self, f: &impl Fn(String) -> String)` rewrites `id` and `message` throughout the chain and keeps `recovery` and every field. It replaces the struct literal in `sc-agent-http`'s production redaction code (`map_detail`), which `#[non_exhaustive]` would make illegal. A redaction test asserts that all three fields survive it.
+   **Not typed in 0.2.0:** `NetworkKind` (timeout, connect, tls, other). The category is `network` whatever the kind. The kind is outside this decision.
 
 4. **Version 0.2.0.**
 
    The Rust change breaks SemVer:
 
    - fields are added to an exhaustive public struct;
-   - `#[non_exhaustive]` is added;
    - `recovery` changes type (phase b);
    - the call-limits API changes (decision 7).
 
@@ -224,22 +206,21 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    **Rust.** `sc-agent-types` gains:
 
-   - `ErrorCategory`, a `#[non_exhaustive]` enum with `as_str` and `retryable()`. Its values are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
-   - `CategoryRule`, either `Base(ErrorCategory)` or `Inherit` (for wrappers).
+   - `ErrorCategory`, an enum with `as_str` and `retryable()`. Its values are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
    - The macro `error_catalog!`. Each crate writes one table per enum, and each row carries the variant's shape:
 
    ```rust
    error_catalog! { HttpError {
-       ProviderBusy { .. } => ("http.provider_busy", Base(Busy)),
-       Network { .. }      => ("http.network", Base(Network)),
+       ProviderBusy { .. } => ("http.provider_busy", Busy),
+       Network { .. }      => ("http.network", Network),
        ...
    } }
    ```
 
    The macro expands to two items:
 
-   - an inherent `const fn catalog_row(&self) -> (&'static str, CategoryRule)`, holding the exhaustive match. Inside its own crate, `#[non_exhaustive]` does not relax exhaustiveness, so a variant with no row fails to compile.
-   - `impl ErrorCatalog for E { const ROWS: &'static [(&'static str, CategoryRule)] }`.
+   - an inherent exhaustive `catalog_row` match for the enum's id and leaf category.
+   - that enum's own catalog rows; wrapper variants take their cause's fields instead of supplying a category.
 
    `ErrorId::id()` becomes `self.catalog_row().0` in each impl.
 
@@ -248,7 +229,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    **The category is stored when the detail is built.** `category` is an optional `ErrorDetail` field, set by `detail()`:
 
    1. A leaf sets it from its own crate's `error_catalog!` row. For `llm.api_status`, `decision.api_status` and `local.probe_status` it sets the status-refined category below.
-   2. A wrapper copies it up with `status`, `attempts` and `retry_after_ms`, using only its own rule (decision 2).
+   2. A wrapper copies it up with `status`, `attempts` and `retry_after_ms`, from its cause (decision 2).
    3. It is omitted from JSON when it is not set, so 0.1.0-shaped JSON still round-trips unchanged (NFR-SAG-0002).
 
    The status refinement applies only to `llm.api_status`, `decision.api_status` and `local.probe_status`, whose base category is `other`:
@@ -273,7 +254,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    A detail without a stored `category` (written by 0.1.0, or foreign) gives `other` and does not raise.
 
-   **Base categories** (the `error_catalog!` rows). `inherit` is a wrapper whose category is its cause's.
+   **Categories** (the `error_catalog!` rows). A wrapper takes its cause's fields.
 
    | Category | Ids |
    | --- | --- |
@@ -287,13 +268,13 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
    | log | `log.*` except `log.invalid_slug` |
    | other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
-   | inherit | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
+   | wrapper (takes cause fields) | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
 
    The implementing sprint adds any id that lands on the b stack after this ADR, with a category, in the same table. A missing row fails to compile, so none can be forgotten.
 
 7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
 
-   Both limits travel together in `decidr::CallLimits { timeout: Option<RequestTimeout>, workers: Option<Workers> }`, which is `#[non_exhaustive]` and implements `Default`:
+   Both limits travel together in `decidr::CallLimits { timeout: Option<RequestTimeout>, workers: Option<Workers> }`, which implements `Default`:
 
    - `send_with` and `send_batch_with` take `&CallLimits`. They replace phase b's unreleased `send_with_timeout` and `send_batch_with_timeout`.
    - `SendOptions` is unchanged, so its literals keep compiling.
@@ -360,22 +341,20 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 ### Rationale
 
-Two consumers rebuilt the wheel boundary on their own and the copies diverged (Context), so every concern except prompt authoring and result interpretation moves into sc-decidr (decision 1), and the integration code is generated from one template rather than copied from a recipe. Typed fields and a catalog with chain categories replace message-text parsing and pinned id lists (decisions 2 and 6). Copy-up keyed by the catalog rule makes the top-level fields and the category describe the same level, so `status` and `category` never disagree. Per-call limits and input-order batch results remove the consumer code that worked around their absence (decisions 7 and 8). Prerelease tooling leaves the product API so it does not freeze into the error contract (decision 9). The changes break SemVer for Rust dependents, so the version is 0.2.0 (decision 4).
+Two consumers rebuilt the wheel boundary on their own and the copies diverged (Context), so every concern except prompt authoring and result interpretation moves into sc-decidr (decision 1), and the integration code is generated from one template rather than copied from a recipe. Typed fields and a catalog with chain categories replace message-text parsing and pinned id lists (decisions 2 and 6). Copy-up from a wrapper's cause makes the top-level fields and the category describe the same level, so `status` and `category` never disagree. Per-call limits and input-order batch results remove the consumer code that worked around their absence (decisions 7 and 8). Prerelease tooling leaves the product API so it does not freeze into the error contract (decision 9). The changes break SemVer for Rust dependents, so the version is 0.2.0 (decision 4).
 
 ### Consequences
 
 **Positive:**
 
 - Prerelease tooling no longer ships in the product crate or wheel.
-- Every Python consumer renders the same integration module from the installed wheel and contains only its own prompts and result handling; a hand edit fails the consumer's CI.
+- Every Python consumer renders the same integration module from the installed wheel and contains only its own prompts and result handling.
 - No consumer parses error text or pins id lists.
 - A missing catalog row is a compile error, and copy-up needs no per-wrapper code.
-- `#[non_exhaustive]` on `ErrorDetail`, `ErrorCategory` and `CallLimits` makes future additions non-breaking.
 
 **Negative:**
 
 - This is a breaking 0.2.0 for Rust dependents:
-  - `ErrorDetail` literals become builder calls;
   - `recovery` changes type;
   - `send_with_timeout` becomes `send_with`.
 - `id()` moves into the macro across 12 enums, which is a one-time mechanical diff.
@@ -426,7 +405,6 @@ Tests, written with the implementation:
 - **Copy-up.**
   - `decision.http` over `ProviderBusy` carries the busy fields and `category` at the top level.
   - `decision.backend` over a 401 `llm.api_status` carries `status == 401`.
-  - `map_text` keeps all four fields.
 - **`retry_after_ms`.** These values from `RetryAfter::parse`:
 
   | Retry-After | `retry_after_ms` |
@@ -438,7 +416,6 @@ Tests, written with the implementation:
   | 32 nines | `u64::MAX` |
   | `abc` | `None` |
 - **Catalog.**
-  - A `compile_fail` doctest in sc-agent-types shows that a variant with no row does not compile.
   - Each crate's `every()` sample values map to ids that are in `ROWS`.
   - No crate's table has a duplicate id.
 - **Category** (the stored field).
@@ -498,7 +475,7 @@ Deliverables beyond the code:
   - the `--timeout` refusal and the ignored `--max-workers`;
   - the `provider="typesafe"` pin;
   - the result re-sorting;
-  - their hand-written integration glue, replaced by the rendered consumer module, with the render command and the CI regenerate-and-diff check.
+  - their hand-written integration glue, replaced by the rendered consumer module, with the render command.
 - The consumer template, `sc_agent/templates/consumer.py.j2`, and the README pointer to it.
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
@@ -506,15 +483,10 @@ Deliverables beyond the code:
 - `floors.toml` at the repository root. It only writes down floor values, to feed sc-compose templates:
 
   ```toml
-  schema_version = 1
   [python]
   floor = "<the Python floor>"
-  [rust]
-  msrv = "<the workspace rust-version>"
   [tools]
   sc-compose = "<the sc-compose minimum>"
-  # optional per-manifest overrides
-  [packages."<manifest dir>"]
   ```
 - sc-decidr 0.2.0 and sitr 0.2.0 on PyPI.
 
