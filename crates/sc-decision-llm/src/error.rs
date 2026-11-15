@@ -200,6 +200,34 @@ impl Error for DecisionLlmError {
 mod tests {
     use super::*;
 
+    #[test]
+    fn backend_preserves_provider_auth_fields_and_causes() {
+        let reply = sc_agent_http::ProviderReply::read(
+            &sc_agent_http::HttpResponse::new(401, vec![], b"unauthorized".to_vec()),
+            None,
+        );
+        let lower = LlmError::ApiStatus {
+            provider: sc_llm_provider::LlmProvider::Anthropic,
+            reply: Box::new(reply),
+        };
+        let lower_detail = lower.detail();
+        let wrapped = DecisionLlmError::Llm(lower);
+        let wrapped_detail = wrapped.detail();
+        let top = sc_decision_schema::DecisionError::Backend {
+            backend: "llm",
+            detail: Box::new(wrapped_detail.clone()),
+        }
+        .detail();
+        assert_eq!(
+            (top.status, top.category),
+            (Some(401), Some(sc_agent_types::ErrorCategory::Auth))
+        );
+        assert_eq!(top.cause.as_deref(), Some(&wrapped_detail));
+        assert_eq!(wrapped_detail.id, "decision_llm.llm");
+        assert_eq!(wrapped_detail.cause.as_deref(), Some(&lower_detail));
+        assert_eq!(lower_detail.id, "llm.api_status");
+    }
+
     /// a-7 REQ-SAG-0002: exactly 6 distinct `decision_llm.*` ids; the exhaustive match fails
     /// to compile when a variant is added or removed.
     #[test]

@@ -149,6 +149,13 @@ impl ErrorId for LocalError {
         }
     }
 
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ProbeStatus { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
     fn recovery(&self) -> Option<&'static str> {
         match self {
             Self::ModelNotServed { .. } => Some(MODEL_NOT_SERVED_RECOVERY),

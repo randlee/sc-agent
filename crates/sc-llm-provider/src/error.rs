@@ -140,6 +140,20 @@ impl ErrorId for LlmError {
         }
     }
 
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ApiStatus { reply, .. } => Some(reply.status),
+            _ => None,
+        }
+    }
+
+    fn retry_after_ms(&self) -> Option<u64> {
+        match self {
+            Self::ApiStatus { reply, .. } => reply.retry_after_ms,
+            _ => None,
+        }
+    }
+
     fn recovery(&self) -> Option<&'static str> {
         match self {
             Self::Http { source, .. } => source.recovery(),
@@ -206,6 +220,30 @@ mod tests {
                 stop_reason: "length".to_owned(),
             },
         ];
+        for (status, category, retry_after_ms) in [
+            (401, sc_agent_types::ErrorCategory::Auth, None),
+            (503, sc_agent_types::ErrorCategory::Busy, Some(2000)),
+            (418, sc_agent_types::ErrorCategory::Other, None),
+        ] {
+            let headers = if status == 503 {
+                vec![("retry-after".to_owned(), "2".to_owned())]
+            } else {
+                vec![]
+            };
+            let reply = ProviderReply::read(
+                &sc_agent_http::HttpResponse::new(status, headers, b"response".to_vec()),
+                None,
+            );
+            let detail = LlmError::ApiStatus {
+                provider: LlmProvider::Anthropic,
+                reply: Box::new(reply),
+            }
+            .detail();
+            assert_eq!(
+                (detail.status, detail.category, detail.retry_after_ms),
+                (Some(status), Some(category), retry_after_ms)
+            );
+        }
         for error in errors {
             let detail = error.detail();
             assert_eq!(detail.id, error.id());
