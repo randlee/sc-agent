@@ -7,8 +7,8 @@
 mod tests {
     use std::error::Error;
 
-    use sc_agent_http::{HttpError, NetworkKind};
-    use sc_agent_types::{ErrorDetail, ErrorId};
+    use sc_agent_http::{BusyReason, HttpError, HttpResponse, NetworkKind, ProviderReply};
+    use sc_agent_types::{ErrorCategory, ErrorDetail, ErrorId};
     use sc_decision_schema::{DecisionError, HttpBadRequestError, HttpValidationError, LimitKind};
 
     fn network() -> HttpError {
@@ -70,7 +70,7 @@ mod tests {
         },
         DecisionError::SchemaMismatch {
             backend: "systemone",
-            detail: Box::new(ErrorDetail::new("decision.schema", "answer `q` is missing", None)),
+            detail: Box::new(DecisionError::ResponseParse { status: 200, expected: "response", message: "answer missing".to_owned() }.detail()),
         },
         DecisionError::Cancelled { sends: 1 },
         DecisionError::Shutdown {
@@ -113,22 +113,77 @@ mod tests {
             assert_eq!(
                 detail.status,
                 match error {
-                    DecisionError::ApiStatus { status, .. } => Some(*status),
+                    DecisionError::ApiBadRequest { .. } => Some(400),
+                    DecisionError::ApiValidation { .. } => Some(422),
+                    DecisionError::ApiStatus { status, .. }
+                    | DecisionError::ResponseParse { status, .. } => Some(*status),
                     _ => None,
                 }
             );
+            assert_eq!(
+                detail.attempts,
+                match error {
+                    DecisionError::Http(_) | DecisionError::Cancelled { .. } => Some(1),
+                    _ => None,
+                }
+            );
+            let expected_category = match error {
+                DecisionError::RequestParse { .. }
+                | DecisionError::DuplicateKey { .. }
+                | DecisionError::ImageParts { .. }
+                | DecisionError::Limits { .. }
+                | DecisionError::ApiBadRequest { .. }
+                | DecisionError::ApiValidation { .. } => ErrorCategory::Validation,
+                DecisionError::ResponseParse { .. } | DecisionError::SchemaMismatch { .. } => {
+                    ErrorCategory::ResponseInvalid
+                }
+                DecisionError::ApiStatus { .. } => ErrorCategory::Busy,
+                DecisionError::Http(_) => ErrorCategory::Network,
+                DecisionError::Cancelled { .. } => ErrorCategory::Cancelled,
+                _ => ErrorCategory::Other,
+            };
+            let expected_category = if matches!(error, DecisionError::Backend { .. }) {
+                None
+            } else {
+                Some(expected_category)
+            };
+            assert_eq!(detail.category, expected_category, "{}", error.id());
         }
     }
 
     #[test]
     fn http_wraps_unchanged() {
-        let error = DecisionError::Http(network());
+        let reply = ProviderReply::read(
+            &HttpResponse::new(
+                429,
+                vec![("retry-after".to_owned(), "1.1".to_owned())],
+                b"busy".to_vec(),
+            ),
+            None,
+        );
+        let http = HttpError::ProviderBusy {
+            reason: BusyReason::Sends,
+            attempts: 5,
+            retry_after_seconds: Some(99.0),
+            last: Box::new(reply),
+        };
+        let expected = http.detail();
+        let source_text = http.to_string();
+        let error = DecisionError::Http(http);
+        let detail = error.detail();
+        assert_eq!(
+            (
+                detail.status,
+                detail.attempts,
+                detail.retry_after_ms,
+                detail.category
+            ),
+            (Some(429), Some(5), Some(1100), Some(ErrorCategory::Busy))
+        );
         let cause = error.cause_detail().expect("cause");
-        assert_eq!(cause.id, "http.network");
-        assert_eq!(cause, network().detail());
-        assert!(matches!(&error, DecisionError::Http(inner) if *inner == network()));
-        let source = error.source().expect("source");
-        assert_eq!(source.to_string(), network().to_string());
+        assert_eq!(cause.id, "http.provider_busy");
+        assert_eq!(cause, expected);
+        assert_eq!(error.source().expect("source").to_string(), source_text);
         assert!(matches!(
             DecisionError::from(network()),
             DecisionError::Http(_)
@@ -137,11 +192,18 @@ mod tests {
 
     #[test]
     fn backend_chain_kept() {
+        let mut cause = llm_chain();
+        cause.status = Some(401);
+        cause.category = Some(ErrorCategory::Auth);
         let error = DecisionError::Backend {
             backend: "llm",
-            detail: Box::new(llm_chain()),
+            detail: Box::new(cause),
         };
         let detail = error.detail();
+        assert_eq!(
+            (detail.status, detail.category),
+            (Some(401), Some(ErrorCategory::Auth))
+        );
         let first = detail.cause.expect("first level");
         assert_eq!(
             (first.id.as_str(), first.message.as_str()),
@@ -158,6 +220,44 @@ mod tests {
         );
         // Display is this level only.
         assert!(!error.to_string().contains("the provider is busy"));
+    }
+
+    #[test]
+    fn schema_mismatch_keeps_cause_without_inheriting_fields() {
+        let cause = DecisionError::ResponseParse {
+            status: 200,
+            expected: "response",
+            message: "invalid body".to_owned(),
+        }
+        .detail();
+        let error = DecisionError::SchemaMismatch {
+            backend: "systemone",
+            detail: Box::new(cause.clone()),
+        };
+        let detail = error.detail();
+        assert_eq!(
+            (
+                detail.status,
+                detail.attempts,
+                detail.retry_after_ms,
+                detail.category
+            ),
+            (None, None, None, Some(ErrorCategory::ResponseInvalid))
+        );
+        assert_eq!(detail.cause.as_deref(), Some(&cause));
+        assert_eq!(
+            (cause.id.as_str(), cause.status),
+            ("decision.response_parse", Some(200))
+        );
+    }
+
+    #[test]
+    fn cancelled_carries_send_count() {
+        let detail = DecisionError::Cancelled { sends: 3 }.detail();
+        assert_eq!(
+            (detail.attempts, detail.category),
+            (Some(3), Some(ErrorCategory::Cancelled))
+        );
     }
 
     /// RBP-F004: these variants carry a static recovery hint, kept out of the message.

@@ -221,7 +221,16 @@ impl ErrorId for DecisionError {
 
     fn status(&self) -> Option<u16> {
         match self {
-            Self::ApiStatus { status, .. } => Some(*status),
+            Self::ApiBadRequest { .. } => Some(400),
+            Self::ApiValidation { .. } => Some(422),
+            Self::ApiStatus { status, .. } | Self::ResponseParse { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
+    fn attempts(&self) -> Option<u32> {
+        match self {
+            Self::Cancelled { sends } => Some(*sends),
             _ => None,
         }
     }
