@@ -36,6 +36,10 @@ Phase A first release surfaces are **crates.io** (thirteen workspace crates), **
 - PyPI distribution names remain **sc-agent** and **sc-treesitter**.
 - No ad-hoc per-channel workflow literals for crate lists or binary names.
 
+### Rationale
+
+- One manifest-driven kit drives all five consumer channels from the same tag.
+
 ### Consequences
 
 **Positive:**

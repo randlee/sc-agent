@@ -34,6 +34,10 @@ Edit `release/sc-publish-consumer-input.json` and re-run `install.py` from the p
 - Pin a single qualified 40-character kit SHA in `release/sc-publish-pin.toml`.
 - Consumer input is the sole source of crate order, binaries, channels, and optional **docli** preflight checks.
 
+### Rationale
+
+- The pinned kit renders release workflows and channel contracts from consumer input.
+
 ### Consequences
 
 **Positive:**

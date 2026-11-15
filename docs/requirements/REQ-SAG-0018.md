@@ -1,9 +1,9 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Proposed  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-14  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 
 ---
@@ -21,9 +21,11 @@ Definitions:
 - `floors.toml` is the file at the repository root that writes down the workspace's Python floor and sc-compose minimum.
 - sc-decidr and sitr are version-locked: they are released together at the same version. Mixed versions are not supported; this is documented, not enforced.
 - The consumer module is the Python file a consumer renders from the consumer template.
-- A feature variable is a template variable that selects a section of the consumer module: `logging` (`general`, `session` or `both`), `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
+- A feature variable is a template variable that selects a section of the consumer module: `general_log` (`true` or `false`: whether the consumer module passes the consumer's general logger), `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
 - The public API is `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_treesitter` for the sitr section.
-- The logging wiring is the consumer module's code that passes the consumer's general logger and session log to the public API, as the `logging` feature variable selects.
+- The session tags are the `project` and `agent_role` arguments of `send` and `send_batch`. They tag each session-log record with the consumer's repository and the calling agent's role.
+- The session log is the wheel's record of every query and response, written to the wheel's default location. `session_log` is the argument of `send` and `send_batch` that redirects it.
+- The logging wiring is the consumer module's code that passes the consumer's general logger to the public API when `general_log` is true.
 - The error mapping is the consumer module's code that maps an error to its category with `category`, and that category to a consumer code through a category-to-code map the consumer passes in.
 - The sitr section is the part of the consumer module that runs tree-sitter extraction; its output is passed into the consumer's prompt authoring.
 - Consumer logic is prompt authoring and the processing of results and decision trees. It stays in the consumer.
@@ -44,7 +46,8 @@ Definitions:
 - The consumer module MUST make the decision call through `send` or `send_batch`.
 - The consumer module MUST pass the model selector through unchanged.
 - Every decision call in the consumer module MUST pass the keyring overrides.
-- The consumer module's source MUST contain the logging wiring.
+- Every decision call in the consumer module MUST pass the session tags.
+- When `general_log` is true, the consumer module MUST contain the logging wiring.
 - The consumer module MUST contain the error mapping.
 - The consumer module's header MUST record the sc-decidr version that rendered it.
 - When `sitr` is true, the consumer module's header MUST record the sitr version.
@@ -71,12 +74,13 @@ Definitions:
 
 - The consumer module MUST NOT contain consumer logic.
 - The consumer module MUST NOT set `provider`.
+- The consumer module MUST NOT pass `session_log`.
 - The consumer module MUST NOT parse error message text.
 - The consumer module MUST NOT check the recorded versions at runtime.
 
 ### Rationale
 
-The owner requires judge-jev, plan-anchor and every later Python consumer to integrate identically for errors, API keys, model selection (the jev, haiku, luna, decider and laya alternates), the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context). One template rendered by every consumer removes that divergence. Shipping the template as package data makes its version the installed wheel's version. Leaving `provider` unset keeps the jev, haiku, luna, decider and laya alternates available. The header's recorded versions are troubleshooting information only.
+The owner requires judge-jev, plan-anchor and every later Python consumer to integrate identically for errors, API keys, model selection (the jev, haiku, luna, decider and laya alternates), the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees. Session logging is always on and always at the wheel's default location, so every consumer's Jev data takes the same path and can be filtered by repository and agent. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context). One template rendered by every consumer removes that divergence. Shipping the template as package data makes its version the installed wheel's version. Leaving `provider` unset keeps the jev, haiku, luna, decider and laya alternates available. The header's recorded versions are troubleshooting information only.
 
 ### Success Criteria
 
@@ -87,8 +91,8 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 - [ ] A sc-agent test renders the consumer template with every combination of feature variables and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
   - a success returns the response;
   - an error returns the consumer code from the passed map for its category;
-  - with `logging` set to `session` or `both`, the session log has one record per query and response;
-  - with `logging` set to `general` or `both`, the injected general logger receives the call's events.
+  - the session log has one record per query and response, carrying the session tags the call was given;
+  - with `general_log` true, the injected general logger receives the call's events.
 - [ ] A rendered module's header records the installed sc-decidr version, and the sitr version when `sitr` is true, and importing it with a different installed version does not raise.
 - [ ] The matched release of the released version is installable from PyPI.
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.

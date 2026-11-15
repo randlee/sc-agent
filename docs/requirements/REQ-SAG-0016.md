@@ -1,9 +1,9 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Proposed  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-14  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 
 ---
@@ -19,33 +19,49 @@ Definitions:
 - An error detail is `ErrorDetail`, the data form of an error that the CLI, the Python binding, session rows and result lines carry.
 - A leaf variant is an error variant that holds data of its own.
 - A wrapper is a variant whose cause is a whole lower error.
-
-**MUST statements:**
-
-- `ErrorDetail` MUST have these optional fields:
+- The typed fields are four optional fields of an error detail:
   - `status`, the HTTP status, a `u16`;
   - `attempts`, the sends made with the first included, a `u32`;
   - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`;
-  - `category`, the error category that REQ-SAG-0017 assigns, stored when the detail is built.
-- Each field MUST be omitted from serialized JSON when it is not set.
-- Every leaf variant listed in ADR-SAG-0019 decision 2 MUST set the fields that table gives it.
-- `ErrorId::detail()` MUST remain the only builder of a detail.
-- A wrapper MUST take all four fields from its cause's detail. A leaf MUST keep its own fields.
-- The top-level fields MUST be those of the first leaf in the chain.
-- `retry_after_ms` MUST be computed from the parsed integer seconds and nanoseconds:
-  - as the ceiling in milliseconds;
-  - saturating at `u64::MAX`;
-  - without clamping;
-  - with `0` giving `0`.
-- `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`. It MUST expose:
-  - the read-only attributes `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`;
-  - the field values taken from its top-level detail, with `category` `"other"` when the detail has none.
-- These attributes MUST be present on a `SagError` built in Python and on one that has been pickled and restored.
+  - `category`, the error category that REQ-SAG-0017 assigns.
+- The parsed Retry-After is the integer seconds and nanoseconds that `RetryAfter::parse` holds for a valid `Retry-After` header.
+- The SagError attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`. The last five take their values from the error's top-level detail; `category` is `"other"` when that detail has none.
+- The leaf field table gives the typed fields each leaf variant sets (`—` means not set):
+
+  | Id | status | attempts | retry_after_ms |
+  | --- | --- | --- | --- |
+  | `http.provider_busy` | the last reply's status | its send count | the last reply's `retry_after_ms` |
+  | `http.quota_exhausted` | the reply's status | its send count | the reply's `retry_after_ms` |
+  | `http.network` | — | its send count | — |
+  | `http.response_too_large` | the reply's status, not set when 0 | — | — |
+  | `llm.api_status` | the reply's status | — | the reply's `retry_after_ms` |
+  | `decision.api_bad_request` | 400 | — | — |
+  | `decision.api_validation` | 422 | — | — |
+  | `decision.api_status` | the reply's status | — | — |
+  | `decision.response_parse` | the reply's status | — | — |
+  | `local.probe_status` | the reply's status | — | — |
+  | `decision.cancelled` | — | its send count | — |
+
+**MUST statements:**
+
+- `ErrorDetail` MUST have the typed fields.
+- A typed field that is not set MUST be omitted from serialized JSON.
+- Each leaf variant in the leaf field table MUST set the typed fields that the table gives it.
+- `ErrorId::detail()` MUST be the only builder of an error detail.
+- A wrapper's detail MUST carry the typed fields of its cause's detail.
+- A leaf variant's detail MUST carry the leaf variant's own typed fields.
+- `retry_after_ms` MUST be the parsed Retry-After rounded up to whole milliseconds.
+- A `retry_after_ms` too large for a `u64` MUST be `u64::MAX`.
+- `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`.
+- `sc_agent.SagError` MUST expose the SagError attributes as read-only attributes.
+- A `SagError` built in Python MUST have the SagError attributes.
+- A `SagError` restored from a pickle MUST have the SagError attributes.
 
 **MUST NOT statements:**
 
 - `ErrorDetail` MUST NOT lose `Eq`.
-- A consumer-facing error value MUST NOT require parsing message text to obtain a status, send count or Retry-After.
+- `retry_after_ms` MUST NOT be clamped.
+- A consumer MUST NOT need to parse message text to obtain a status, send count or Retry-After.
 
 ### Rationale
 
@@ -55,7 +71,7 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 
 **Acceptance Criteria:**
 
-- [ ] For each leaf row in ADR-SAG-0019 decision 2, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
+- [ ] For each row of the leaf field table, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
 - [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields, `category` included, at the top level.
 - [ ] A leaf reports its own fields and its own `category`.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.
