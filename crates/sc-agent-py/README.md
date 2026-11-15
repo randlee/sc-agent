@@ -58,7 +58,7 @@ except sc_agent.SagError as error:
 
 ## Features
 
-None. The crate builds as a `cdylib` named `sc_agent` with PyO3's `abi3-py310` and `extension-module`.
+None. The crate builds as a `cdylib` named `sc_agent` with PyO3's `abi3-py311` and `extension-module`.
 
 ## Depends on
 

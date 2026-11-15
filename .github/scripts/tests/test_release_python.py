@@ -30,7 +30,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
     distribution = tomllib.loads(output.read_text())["python_distributions"][0]
     assert distribution["wheels"] == TARGETS
     assert len(wheel_targets(distribution)) == 5
-    paths = [Path(f'example-1.2.3-cp310-abi3-{target["platform"]}.whl') for target in TARGETS]
+    paths = [Path(f'example-1.2.3-cp311-abi3-{target["platform"]}.whl') for target in TARGETS]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
         verify_platforms(distribution, paths[:-1])
@@ -38,7 +38,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
         verify_platforms(distribution, paths[:-1] + paths[:1])
 
 
-@pytest.mark.parametrize("wheel", ["cp310-abi3-win_amd64", {**TARGETS[0],"os":"windows-latest"}, {**TARGETS[2],"deployment_target":"11.0"}, {**TARGETS[0],"manylinux":"off"}])
+@pytest.mark.parametrize("wheel", ["cp311-abi3-win_amd64", {**TARGETS[0],"os":"windows-latest"}, {**TARGETS[2],"deployment_target":"11.0"}, {**TARGETS[0],"manylinux":"off"}])
 def test_bad_wheel_contracts_rejected(wheel):
     with pytest.raises(ValueError):
         wheel_targets({"wheels":[wheel]})
@@ -111,7 +111,7 @@ def test_declared_wheel_verifier_executes_bash_environment_contract(tmp_path, pl
     for source in (INSTALL.PACKAGE_ROOT / ".github/scripts").glob("*.py"):
         shutil.copy2(source, scripts / source.name)
     (tmp_path / "dist").mkdir()
-    (tmp_path / "dist/example-1.4.0-cp310-abi3-win_amd64.whl").touch()
+    (tmp_path / "dist/example-1.4.0-cp311-abi3-win_amd64.whl").touch()
     result = subprocess.run(["bash", "-c", step["run"]], cwd=tmp_path,
         env={**os.environ, "WHEEL_PLATFORM": platform}, capture_output=True, text=True, timeout=30)
     assert (result.returncode == 0) is accepted, result.stderr
@@ -187,10 +187,27 @@ def test_windows_arm64_mismatches_rejected(wheel):
 def test_six_wheel_manifest_with_windows_arm64_verifies():
     distribution = {"name": "example", "sdist": False, "wheels": TARGETS + [WIN_ARM64]}
     assert len(wheel_targets(distribution)) == 6
-    paths = [Path(f'example-1.2.3-cp310-abi3-{item["platform"]}.whl') for item in TARGETS + [WIN_ARM64]]
+    paths = [Path(f'example-1.2.3-cp311-abi3-{item["platform"]}.whl') for item in TARGETS + [WIN_ARM64]]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
         verify_platforms(distribution, paths[:-1])
+
+
+def test_python_binding_abi3_features_match_floor():
+    import tomllib
+    root = INSTALL.PACKAGE_ROOT
+    floor = tomllib.loads((root / "floors.toml").read_text())["python"]["floor"]
+    expected = f"abi3-py{floor.replace('.', '')}"
+    manifests = [
+        root / "crates/sc-agent-py/Cargo.toml",
+        root / "crates/sc-treesitter-py/Cargo.toml",
+        root / "crates/sc-treesitter/Cargo.toml",
+    ]
+    for manifest_path in manifests:
+        manifest = tomllib.loads(manifest_path.read_text())
+        features = manifest["dependencies"]["pyo3"]["features"]
+        abi3_features = [feature for feature in features if feature.startswith("abi3-py")]
+        assert abi3_features == [expected], manifest_path
 
 
 def test_existing_forms_unchanged_by_windows_arm64_support():
