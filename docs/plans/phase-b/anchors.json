@@ -7,14 +7,14 @@
       "id": "ANC-001",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "The sc-agent consumer template must be built from the plan-anchor shared client after that client is defined and working.",
+      "statement": "In the phase-b bead dependency graph, the sprint that builds the sc-agent consumer template must depend on the plan-anchor sprint that delivers the shared client with its tests passing.",
       "quote": "define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.",
       "kind": "directive",
       "stated_by": "user",
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Working client precedes template",
-      "scope": "Sprints that build the shared plan-anchor client or the sc-agent consumer template.",
+      "scope": "Sprints that build the shared plan-anchor client or the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
       "deterministic_check": "Compare the completed client revision with the template source and sprint ordering.",
       "fixtures": {
         "pass": [
@@ -25,7 +25,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -68,6 +68,21 @@
             "plan_questions": "agt-09m.1",
             "dev_questions": "agt-09m.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The sc-agent consumer template must be built from the plan-anchor shared client after that client is defined and working."
+        },
+        {
+          "at": "2026-11-15T00:33:23+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
         }
       ]
     },
@@ -75,14 +90,14 @@
       "id": "ANC-002",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "The plan-anchor shared-client integration must preserve all existing plan-anchor functionality.",
+      "statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing test suite must pass with no test removed or weakened, except the Python 3.9 jobs retired by the 3.11 floor.",
       "quote": "integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor",
       "kind": "directive",
       "stated_by": "user",
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Plan-anchor functional parity",
-      "scope": "The plan-anchor sprint that integrates the shared client into existing plan-anchor features.",
+      "scope": "The plan-anchor sprint that integrates the shared client into existing plan-anchor features. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
       "deterministic_check": "Run existing plan-anchor behavior and installation tests against the integrated client.",
       "fixtures": {
         "pass": [
@@ -93,7 +108,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -136,6 +151,21 @@
             "plan_questions": "agt-z25.1",
             "dev_questions": "agt-z25.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The plan-anchor shared-client integration must preserve all existing plan-anchor functionality."
+        },
+        {
+          "at": "2026-11-15T00:33:23+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
         }
       ]
     },
@@ -143,7 +173,7 @@
       "id": "ANC-003",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "The judge-jev track must use the template and preserve its current features before adding sitr support.",
+      "statement": "In the phase-b bead dependency graph, judge-jev's sitr sprint must depend on its feature-parity sprint, and that sprint must depend on its template-adoption sprint.",
       "quote": "judge-jev : template -> current features -> sitr support",
       "kind": "directive",
       "stated_by": "user",
@@ -161,7 +191,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -204,6 +234,14 @@
             "plan_questions": "agt-08a.1",
             "dev_questions": "agt-08a.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The judge-jev track must use the template and preserve its current features before adding sitr support."
         }
       ]
     },
@@ -211,7 +249,7 @@
       "id": "ANC-004",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Manual live integration runs must use unit tests with real providers, reusing existing mocked tests where applicable.",
+      "statement": "Each live integration test must be a unit test that also runs against mocked providers, reusing an existing mocked test where one exists; the live run executes that same test against real providers.",
       "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
       "kind": "directive",
       "stated_by": "user",
@@ -229,7 +267,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -272,6 +310,14 @@
             "plan_questions": "agt-8s2.1",
             "dev_questions": "agt-8s2.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Manual live integration runs must use unit tests with real providers, reusing existing mocked tests where applicable."
         }
       ]
     },
@@ -279,7 +325,7 @@
       "id": "ANC-005",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "The integration test process must commit and push its test report.",
+      "statement": "An integration run must end with its test report on the remote branch the run was made from.",
       "quote": "The test report MUST be committed/pushed as part of the integration test process.",
       "kind": "directive",
       "stated_by": "user",
@@ -297,7 +343,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -340,6 +386,14 @@
             "plan_questions": "agt-ate.1",
             "dev_questions": "agt-ate.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The integration test process must commit and push its test report."
         }
       ]
     },
@@ -347,7 +401,7 @@
       "id": "ANC-006",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "One successful integration test run on one supported platform must satisfy the platform requirement.",
+      "statement": "One passing integration run on any one platform, such as local macOS or Colima Linux, must be sufficient for the integration requirement; no second platform run is required.",
       "quote": "integration testing should be set up flexably where ONE integration test run should be required (one platform) which would typically be this mac or colima.",
       "kind": "directive",
       "stated_by": "user",
@@ -365,7 +419,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -408,6 +462,14 @@
             "plan_questions": "agt-2yh.1",
             "dev_questions": "agt-2yh.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "One successful integration test run on one supported platform must satisfy the platform requirement."
         }
       ]
     },
@@ -415,7 +477,7 @@
       "id": "ANC-007",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs.",
+      "statement": "Phase-b tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load.",
       "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
       "kind": "directive",
       "stated_by": "user",
@@ -426,15 +488,14 @@
       "deterministic_check": "Review changed tests for timing, sleep and event-order dependence.",
       "fixtures": {
         "pass": [
-          "Use controlled synchronization for tests and redesign any discovered flaky test with controlled inputs."
+          "Coordinate test execution with controlled inputs and no wall-clock or scheduling assumptions."
         ],
         "fail": [
-          "Use sleeps and event-loop timing as synchronization in a phase-b test.",
-          "Leave a known flaky test unchanged instead of redesigning it with controlled inputs."
+          "Use sleep and event-loop scheduling order to synchronize the test."
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -486,6 +547,15 @@
             "plan_questions": "agt-0qk.1",
             "dev_questions": "agt-0qk.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs."
         }
       ]
     },
@@ -493,14 +563,14 @@
       "id": "ANC-008",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev work must be planned as three parallel tracks.",
+      "statement": "In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint.",
       "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
       "kind": "directive",
       "stated_by": "user",
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Three parallel tracks",
-      "scope": "The phase-b plan and sprints following completion of the shared plan-anchor client.",
+      "scope": "The phase-b plan and sprints following completion of the shared plan-anchor client. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
       "deterministic_check": "Inspect the sprint graph and the lead dispatch order.",
       "fixtures": {
         "pass": [
@@ -511,7 +581,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -554,6 +624,21 @@
             "plan_questions": "agt-8ug.1",
             "dev_questions": "agt-8ug.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev work must be planned as three parallel tracks."
+        },
+        {
+          "at": "2026-11-15T00:33:23+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
         }
       ]
     },
@@ -620,7 +705,7 @@
       "id": "ADR-SAG-0004",
       "source_type": "ADR",
       "source_ref": "ADR-SAG-0004",
-      "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.",
+      "statement": "No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner.",
       "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
       "kind": "prohibition",
       "stated_by": "Rand Lee",
@@ -638,7 +723,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -667,6 +752,14 @@
             "plan_questions": "agt-mud.1",
             "dev_questions": "agt-mud.2"
           }
+        },
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner."
         }
       ]
     },
@@ -674,7 +767,7 @@
       "id": "REQ-SAG-0002",
       "source_type": "REQ",
       "source_ref": "REQ-SAG-0002",
-      "statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.",
+      "statement": "Every error returned by a public sc-agent function must carry, in its cause chain, the id and message of each lower-layer error that caused it.",
       "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -685,16 +778,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "When no API key was attached, HttpError::Network wraps the ureq error and the outer error chain retains the lower error ID and message.",
-          "Return the lower-layer error ID and message while replacing the attached API key with [redacted]."
+          "HttpError wraps the lower error with its id and message in the cause chain."
         ],
         "fail": [
-          "The backend returns only a generic request-failed error and discards the lower-layer error ID and message.",
-          "The returned lower-layer error reveals the API key attached to the request."
+          "The backend discards the lower error id and message and returns only a generic error."
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -739,6 +830,15 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002."
         }
       ]
     },
@@ -854,7 +954,7 @@
       "id": "ANC-010",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Phase-b integration work must fix minor implementation defects when requirements have not changed.",
+      "statement": "An integration sprint that finds a defect whose fix changes no REQ, ADR or anchor must fix it in that sprint, not defer it to a follow-up bead.",
       "quote": "If minor issues are encountered, I expect them fixed (assuming no requirements changed).",
       "kind": "directive",
       "stated_by": "user",
@@ -872,7 +972,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -905,6 +1005,183 @@
             "anchor": "agt-uw0",
             "plan_questions": "agt-uw0.1",
             "dev_questions": "agt-uw0.2"
+          }
+        },
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Phase-b integration work must fix minor implementation defects when requirements have not changed."
+        }
+      ]
+    },
+    {
+      "id": "ANC-011",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The sc-agent consumer template must generate the shared client as plan-anchor delivered it.",
+      "quote": "define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "Owner-approved split in phase-b planning",
+      "summary": "",
+      "scope": "Sprints building the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "The generated module preserves the delivered plan-anchor shared client behavior."
+        ],
+        "fail": [
+          "The template generates a different client with missing shared behavior."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-eue",
+        "plan_questions": "agt-eue.1",
+        "dev_questions": "agt-eue.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-15T00:33:23+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T00:34:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-15T00:34:15+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-eue",
+            "plan_questions": "agt-eue.1",
+            "dev_questions": "agt-eue.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Live integration runs must be started manually, never by CI on a push, pull request or schedule.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "Owner-approved split in phase-b planning",
+      "summary": "",
+      "scope": "Sprints defining or running live integration tests.",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "The owner starts live integration tests manually; CI never starts them."
+        ],
+        "fail": [
+          "Run live provider tests on every pull request in CI."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-9cc",
+        "plan_questions": "agt-9cc.1",
+        "dev_questions": "agt-9cc.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-15T00:34:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-15T00:34:17+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-9cc",
+            "plan_questions": "agt-9cc.1",
+            "dev_questions": "agt-9cc.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "kind": "directive",
+      "stated_by": "user",
+      "stated_at": "2026-11-14",
+      "context": "Owner-approved split in phase-b planning",
+      "summary": "",
+      "scope": "Sprints that find or change flaky tests.",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "Redesign the flaky test to control its inputs and ordering."
+        ],
+        "fail": [
+          "Retry the flaky test and increase its timeout instead of redesigning it."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-e0a",
+        "plan_questions": "agt-e0a.1",
+        "dev_questions": "agt-e0a.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-15T00:33:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-15T00:34:09+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-15T00:34:18+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-e0a",
+            "plan_questions": "agt-e0a.1",
+            "dev_questions": "agt-e0a.2"
           }
         }
       ]

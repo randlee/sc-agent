@@ -20,18 +20,21 @@ Intent: `docs/plans/phase-b/intent.md`
 | REQ-SAG-0006 | locked | No consumer-app or Jev-mock types in shared crates | 2026-11-09 |
 | REQ-SAG-0010 | locked | No sleep calls in sc-agent source | 2026-11-09 |
 | ANC-010 | locked | Fix minor integration defects | 2026-11-14 |
+| ANC-011 | locked |  | 2026-11-14 |
+| ANC-012 | locked |  | 2026-11-14 |
+| ANC-013 | locked |  | 2026-11-14 |
 
 ## ANC-001
 
-Anchor: The sc-agent consumer template must be built from the plan-anchor shared client after that client is defined and working.
+Anchor: In the phase-b bead dependency graph, the sprint that builds the sc-agent consumer template must depend on the plan-anchor sprint that delivers the shared client with its tests passing.
 
 > define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Working client precedes template
 
-Scope: Sprints that build the shared plan-anchor client or the sc-agent consumer template.
+Scope: Sprints that build the shared plan-anchor client or the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
 
 Deterministic check to pair with the development gate: Compare the completed client revision with the template source and sprint ordering.
 
@@ -43,15 +46,15 @@ Fixtures:
 
 ## ANC-002
 
-Anchor: The plan-anchor shared-client integration must preserve all existing plan-anchor functionality.
+Anchor: After the plan-anchor sprint that integrates the shared client, plan-anchor's existing test suite must pass with no test removed or weakened, except the Python 3.9 jobs retired by the 3.11 floor.
 
 > integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Plan-anchor functional parity
 
-Scope: The plan-anchor sprint that integrates the shared client into existing plan-anchor features.
+Scope: The plan-anchor sprint that integrates the shared client into existing plan-anchor features. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
 
 Deterministic check to pair with the development gate: Run existing plan-anchor behavior and installation tests against the integrated client.
 
@@ -63,11 +66,11 @@ Fixtures:
 
 ## ANC-003
 
-Anchor: The judge-jev track must use the template and preserve its current features before adding sitr support.
+Anchor: In the phase-b bead dependency graph, judge-jev's sitr sprint must depend on its feature-parity sprint, and that sprint must depend on its template-adoption sprint.
 
 > judge-jev : template -> current features -> sitr support
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
 
 Summary: Judge-jev sitr sequence
 
@@ -83,11 +86,11 @@ Fixtures:
 
 ## ANC-004
 
-Anchor: Manual live integration runs must use unit tests with real providers, reusing existing mocked tests where applicable.
+Anchor: Each live integration test must be a unit test that also runs against mocked providers, reusing an existing mocked test where one exists; the live run executes that same test against real providers.
 
 > I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
 
 Summary: Reuse existing tests for live runs
 
@@ -103,11 +106,11 @@ Fixtures:
 
 ## ANC-005
 
-Anchor: The integration test process must commit and push its test report.
+Anchor: An integration run must end with its test report on the remote branch the run was made from.
 
 > The test report MUST be committed/pushed as part of the integration test process.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
 
 Summary: Reports committed and pushed
 
@@ -123,11 +126,11 @@ Fixtures:
 
 ## ANC-006
 
-Anchor: One successful integration test run on one supported platform must satisfy the platform requirement.
+Anchor: One passing integration run on any one platform, such as local macOS or Colima Linux, must be sufficient for the integration requirement; no second platform run is required.
 
 > integration testing should be set up flexably where ONE integration test run should be required (one platform) which would typically be this mac or colima.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
 
 Summary: One platform suffices
 
@@ -143,11 +146,11 @@ Fixtures:
 
 ## ANC-007
 
-Anchor: Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs.
+Anchor: Phase-b tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load.
 
 > Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Deterministic tests
 
@@ -158,21 +161,20 @@ Deterministic check to pair with the development gate: Review changed tests for 
 Beads: anchor `agt-0qk`, plan questions `agt-0qk.1`, dev questions `agt-0qk.2`
 
 Fixtures:
-- pass: Use controlled synchronization for tests and redesign any discovered flaky test with controlled inputs.
-- fail: Use sleeps and event-loop timing as synchronization in a phase-b test.
-- fail: Leave a known flaky test unchanged instead of redesigning it with controlled inputs.
+- pass: Coordinate test execution with controlled inputs and no wall-clock or scheduling assumptions.
+- fail: Use sleep and event-loop scheduling order to synchronize the test.
 
 ## ANC-008
 
-Anchor: After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev work must be planned as three parallel tracks.
+Anchor: In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint.
 
 > 3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Three parallel tracks
 
-Scope: The phase-b plan and sprints following completion of the shared plan-anchor client.
+Scope: The phase-b plan and sprints following completion of the shared plan-anchor client. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
 
 Deterministic check to pair with the development gate: Inspect the sprint graph and the lead dispatch order.
 
@@ -204,11 +206,11 @@ Fixtures:
 
 ## ADR-SAG-0004
 
-Anchor: No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.
+Anchor: No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner.
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 3.
 
 Summary: No crate depends on a crate above it in the layering
 
@@ -222,11 +224,11 @@ Fixtures:
 
 ## REQ-SAG-0002
 
-Anchor: A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.
+Anchor: Every error returned by a public sc-agent function must carry, in its cause chain, the id and message of each lower-layer error that caused it.
 
 > An error MUST carry the error id and message of every lower-layer error that caused it.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 5.
 
 Summary: Each crate returns its own error union carrying lower errors
 
@@ -235,10 +237,8 @@ Scope: adds or changes an error type or a public function's return type
 Beads: anchor `agt-t70`, plan questions `agt-t70.1`, dev questions `agt-t70.2`
 
 Fixtures:
-- pass: When no API key was attached, HttpError::Network wraps the ureq error and the outer error chain retains the lower error ID and message.
-- pass: Return the lower-layer error ID and message while replacing the attached API key with [redacted].
-- fail: The backend returns only a generic request-failed error and discards the lower-layer error ID and message.
-- fail: The returned lower-layer error reveals the API key attached to the request.
+- pass: HttpError wraps the lower error with its id and message in the cause chain.
+- fail: The backend discards the lower error id and message and returns only a generic error.
 
 ## REQ-SAG-0006
 
@@ -278,11 +278,11 @@ Fixtures:
 
 ## ANC-010
 
-Anchor: Phase-b integration work must fix minor implementation defects when requirements have not changed.
+Anchor: An integration sprint that finds a defect whose fix changes no REQ, ADR or anchor must fix it in that sprint, not defer it to a follow-up bead.
 
 > If minor issues are encountered, I expect them fixed (assuming no requirements changed).
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 3.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
 
 Summary: Fix minor integration defects
 
@@ -295,3 +295,51 @@ Beads: anchor `agt-uw0`, plan questions `agt-uw0.1`, dev questions `agt-uw0.2`
 Fixtures:
 - pass: Fix minor integration defects discovered while implementing the unchanged requirements.
 - fail: Leave a discovered minor integration defect unfixed even though the requirements did not change.
+
+## ANC-011
+
+Anchor: The sc-agent consumer template must generate the shared client as plan-anchor delivered it.
+
+> define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.
+
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 3.
+
+Scope: Sprints building the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
+
+Beads: anchor `agt-eue`, plan questions `agt-eue.1`, dev questions `agt-eue.2`
+
+Fixtures:
+- pass: The generated module preserves the delivered plan-anchor shared client behavior.
+- fail: The template generates a different client with missing shared behavior.
+
+## ANC-012
+
+Anchor: Live integration runs must be started manually, never by CI on a push, pull request or schedule.
+
+> I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
+
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 2.
+
+Scope: Sprints defining or running live integration tests.
+
+Beads: anchor `agt-9cc`, plan questions `agt-9cc.1`, dev questions `agt-9cc.2`
+
+Fixtures:
+- pass: The owner starts live integration tests manually; CI never starts them.
+- fail: Run live provider tests on every pull request in CI.
+
+## ANC-013
+
+Anchor: A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout.
+
+> Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
+
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 2.
+
+Scope: Sprints that find or change flaky tests.
+
+Beads: anchor `agt-e0a`, plan questions `agt-e0a.1`, dev questions `agt-e0a.2`
+
+Fixtures:
+- pass: Redesign the flaky test to control its inputs and ordering.
+- fail: Retry the flaky test and increase its timeout instead of redesigning it.
