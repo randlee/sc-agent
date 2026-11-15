@@ -1,0 +1,515 @@
+{
+  "schema_version": "1.0.0",
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "testability",
+    "gate": "testability",
+    "accepted": true,
+    "rubric_version": 2,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "corpus_sha256": "ce5f4efcfee74ecc767bb8c140bf749ef2e33c779f82397d5c42d96698a7b1bc",
+    "corpus_case_count": 17,
+    "rubric_question_set": {
+      "questions": {
+        "faithful": {
+          "criteria": {
+            "yes": "The duty is supported by the quote after meaning-preserving normalization.",
+            "no": "An obligation, implementation choice, strength or condition needs information beyond the quote and these normalizations.",
+            "unclear": "Ordinary normalization leaves substantive support genuinely ambiguous."
+          },
+          "instructions": "Is the formal statement supported by the quote after meaning-preserving normalization? Informal commands become must. Printing is stdout. Logs and errors may be expressed as stdout and stderr. JSON output may be expressed as a JSON object. Extracting one directive from a compound quote is valid. Added algorithms or strengths such as AES-256-GCM are substantive changes. Ignore vague wording.",
+          "type": "choice"
+        },
+        "observable": {
+          "criteria": {
+            "no": "It supplies only a subjective quality, undefined shorthand, or an approval with no observable record.",
+            "unclear": "Some evidence is named, but the observation needed to settle compliance remains ambiguous.",
+            "yes": "It names evidence or behavior that can be inspected with a determinate outcome."
+          },
+          "instructions": "Does anchor.statement define a checkable behavior or artifact without relying on an undefined label or an approval that has no identified record? Judge only whether the stated outcome can be observed.",
+          "type": "choice"
+        },
+        "scoped": {
+          "criteria": {
+            "no": "No work area or applicability set is identifiable.",
+            "unclear": "An area is named but its applicability cannot be determined.",
+            "yes": "A reviewer can identify the work area where this anchor applies, including an explicit all-items set."
+          },
+          "instructions": "Do anchor.statement and anchor.scope identify the governed activity, component, artifact, or explicit global set, independent of whether the requirement itself is vague or otherwise defective?",
+          "type": "choice"
+        },
+        "self_contained": {
+          "criteria": {
+            "no": "At least one decisive term is an undefined quality or private label, or compliance depends on an approval with no identified record.",
+            "unclear": "A possible outside-context dependency exists but the statement does not show whether it is decisive.",
+            "yes": "None of those outside-context dependencies is needed; ordinary technical terms, concrete prohibitions, lists, and explicit input/action/outcome conditions are sufficient."
+          },
+          "instructions": "Is anchor.statement independently understandable and applicable without any of these disqualifiers: an undefined subjective quality (for example robust), private shorthand, or a human approval that has no identified recorded artifact? Ignore grammar, bundling, fidelity, and scope.",
+          "type": "choice"
+        },
+        "single_constraint": {
+          "criteria": {
+            "no": "At least two independently enforceable duties are joined in the statement.",
+            "unclear": "The statement leaves independence of its duties ambiguous.",
+            "yes": "All details enforce the same invariant and would be evaluated together."
+          },
+          "instructions": "Is anchor.statement one invariant applied to a subject, trigger, and possibly several output surfaces? Do not count the number of nouns or listed artifacts; count independently enforceable duties.",
+          "type": "choice"
+        }
+      },
+      "digest": "85d01cf23ced89614226e27e9fcf33bc5ed0ef61c6e21720619cf36f64cea007"
+    },
+    "candidate_rankings": [
+      {
+        "candidate_id": "candidate-7",
+        "accepted": true,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 85
+        },
+        "complexity_bytes": 3078,
+        "minimum_confidence": 0.64
+      },
+      {
+        "candidate_id": "baseline",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 83
+        },
+        "complexity_bytes": 3013,
+        "minimum_confidence": 0.42
+      },
+      {
+        "candidate_id": "candidate-6",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 84
+        },
+        "complexity_bytes": 3146,
+        "minimum_confidence": 0.58
+      },
+      {
+        "candidate_id": "candidate-8",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 82
+        },
+        "complexity_bytes": 3165,
+        "minimum_confidence": 0.34
+      },
+      {
+        "candidate_id": "candidate-1",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 67
+        },
+        "complexity_bytes": 2957,
+        "minimum_confidence": 0.07
+      },
+      {
+        "candidate_id": "candidate-3",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 78
+        },
+        "complexity_bytes": 2998,
+        "minimum_confidence": 0.25
+      },
+      {
+        "candidate_id": "candidate-4",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 71
+        },
+        "complexity_bytes": 3070,
+        "minimum_confidence": 0.25
+      },
+      {
+        "candidate_id": "candidate-5",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 77
+        },
+        "complexity_bytes": 3089,
+        "minimum_confidence": 0.26
+      },
+      {
+        "candidate_id": "candidate-2",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 82,
+          "stable_cells": 84,
+          "confident_cells": 75
+        },
+        "complexity_bytes": 2988,
+        "minimum_confidence": 0.26
+      }
+    ],
+    "acceptance_table": [
+      {
+        "candidate_id": "candidate-7",
+        "accepted": true,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 85
+        },
+        "failure_count": 0
+      },
+      {
+        "candidate_id": "baseline",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 83
+        },
+        "failure_count": 2
+      },
+      {
+        "candidate_id": "candidate-6",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 84
+        },
+        "failure_count": 1
+      },
+      {
+        "candidate_id": "candidate-8",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 85,
+          "stable_cells": 85,
+          "confident_cells": 82
+        },
+        "failure_count": 3
+      },
+      {
+        "candidate_id": "candidate-1",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 67
+        },
+        "failure_count": 18
+      },
+      {
+        "candidate_id": "candidate-3",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 78
+        },
+        "failure_count": 7
+      },
+      {
+        "candidate_id": "candidate-4",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 71
+        },
+        "failure_count": 14
+      },
+      {
+        "candidate_id": "candidate-5",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 84,
+          "stable_cells": 85,
+          "confident_cells": 77
+        },
+        "failure_count": 8
+      },
+      {
+        "candidate_id": "candidate-2",
+        "accepted": false,
+        "semantic_score": {
+          "total_cells": 85,
+          "exact_cells": 82,
+          "stable_cells": 84,
+          "confident_cells": 75
+        },
+        "failure_count": 11
+      }
+    ],
+    "confirmation_summary": {
+      "two_call_cells": 85,
+      "third_call_cells": 0,
+      "inconclusive_cells": 0,
+      "unstable_cells": 0
+    },
+    "deterministic_lint": {
+      "passed": true,
+      "cases": [
+        {
+          "id": "lint-01-must",
+          "expected": "pass",
+          "actual": "pass",
+          "warnings": []
+        },
+        {
+          "id": "lint-02-prohibition",
+          "expected": "pass",
+          "actual": "pass",
+          "warnings": []
+        },
+        {
+          "id": "lint-03-is",
+          "expected": "pass",
+          "actual": "pass",
+          "warnings": []
+        },
+        {
+          "id": "lint-04-first-person",
+          "expected": "fail",
+          "actual": "fail",
+          "warnings": [
+            "written as speech, not as a requirement",
+            "not phrased as a testable requirement"
+          ]
+        },
+        {
+          "id": "lint-05-second-person",
+          "expected": "fail",
+          "actual": "fail",
+          "warnings": [
+            "written as speech, not as a requirement",
+            "not phrased as a testable requirement"
+          ]
+        },
+        {
+          "id": "lint-06-suggestion",
+          "expected": "fail",
+          "actual": "fail",
+          "warnings": [
+            "hedged wording; state the requirement",
+            "written as speech, not as a requirement",
+            "not phrased as a testable requirement"
+          ]
+        },
+        {
+          "id": "lint-07-question",
+          "expected": "fail",
+          "actual": "fail",
+          "warnings": [
+            "hedged wording; state the requirement",
+            "not phrased as a testable requirement"
+          ]
+        },
+        {
+          "id": "lint-08-imperative",
+          "expected": "fail",
+          "actual": "fail",
+          "warnings": [
+            "not phrased as a testable requirement"
+          ]
+        }
+      ]
+    },
+    "dedupe": {
+      "statement_only": true,
+      "quote_fields_sent": false,
+      "cases": [
+        {
+          "case_id": "dup-01-shared-quote-distinct",
+          "role": "duplicate",
+          "expected": "no",
+          "choices": [
+            "no",
+            "no"
+          ],
+          "confidence": [
+            1.0,
+            1.0
+          ],
+          "exact": true,
+          "stable": true,
+          "confident": true,
+          "status": "accepted",
+          "rationale": "Same quote, distinct atomic obligations.",
+          "request_ids": [
+            "phase-b-rubric-calibration/dedupe/dup-01-shared-quote-distinct/r1",
+            "phase-b-rubric-calibration/dedupe/dup-01-shared-quote-distinct/r2"
+          ],
+          "third_request_id": null
+        },
+        {
+          "case_id": "dup-02-same-statement-different-quotes",
+          "role": "duplicate",
+          "expected": "yes",
+          "choices": [
+            "yes",
+            "yes"
+          ],
+          "confidence": [
+            1.0,
+            1.0
+          ],
+          "exact": true,
+          "stable": true,
+          "confident": true,
+          "status": "accepted",
+          "rationale": "Identical statement, different provenance.",
+          "request_ids": [
+            "phase-b-rubric-calibration/dedupe/dup-02-same-statement-different-quotes/r1",
+            "phase-b-rubric-calibration/dedupe/dup-02-same-statement-different-quotes/r2"
+          ],
+          "third_request_id": null
+        },
+        {
+          "case_id": "dup-03-paraphrased-duplicate",
+          "role": "duplicate",
+          "expected": "yes",
+          "choices": [
+            "yes",
+            "yes"
+          ],
+          "confidence": [
+            0.76,
+            0.79
+          ],
+          "exact": true,
+          "stable": true,
+          "confident": true,
+          "status": "accepted",
+          "rationale": "Mutually entailing paraphrases.",
+          "request_ids": [
+            "phase-b-rubric-calibration/dedupe/dup-03-paraphrased-duplicate/r1",
+            "phase-b-rubric-calibration/dedupe/dup-03-paraphrased-duplicate/r2"
+          ],
+          "third_request_id": null
+        },
+        {
+          "case_id": "dup-04-related-distinct",
+          "role": "duplicate",
+          "expected": "no",
+          "choices": [
+            "no",
+            "no"
+          ],
+          "confidence": [
+            1.0,
+            1.0
+          ],
+          "exact": true,
+          "stable": true,
+          "confident": true,
+          "status": "accepted",
+          "rationale": "Related subject, different obligations.",
+          "request_ids": [
+            "phase-b-rubric-calibration/dedupe/dup-04-related-distinct/r1",
+            "phase-b-rubric-calibration/dedupe/dup-04-related-distinct/r2"
+          ],
+          "third_request_id": null
+        }
+      ]
+    },
+    "evidence": {
+      "directory": "/tmp/sc-agent-02-planning/rubric-calibration",
+      "results_jsonl": "/tmp/sc-agent-02-planning/rubric-calibration/results.jsonl",
+      "results_sha256": "186283ef116f5991dec9b08eeab8f47d922641e5fe64036110ed645ac674b58d",
+      "scores": "/tmp/sc-agent-02-planning/rubric-calibration/scores.json",
+      "selected_acceptance_table": "/tmp/sc-agent-02-planning/rubric-calibration/selected-acceptance-table.json",
+      "candidate_files": [
+        "candidates.round2.frozen.json",
+        "candidates.frozen.json"
+      ],
+      "frozen_request_files": [
+        "requests.frozen.json",
+        "requests.round2.frozen.json"
+      ],
+      "oracle_file": "oracle.frozen.json",
+      "selected_candidate": "candidate-7",
+      "total_live_requests": 315,
+      "total_attempts": 315,
+      "all_candidates_retained": true,
+      "disagreements": [
+        {
+          "candidate_id": "candidate-2",
+          "case_id": "a0-02-valid-prohibition",
+          "third_request_id": "phase-b-rubric-calibration/candidate-2/a0-02-valid-prohibition/r3"
+        }
+      ],
+      "max_parallel_evaluators": 4,
+      "confidence_minimum": 0.64,
+      "rank_order": [
+        "semantic_acceptance",
+        "exact_cells",
+        "stable_cells",
+        "complexity_bytes",
+        "candidate_id"
+      ],
+      "evaluator": "Scratch evaluator imports supplied jev_judge.py transport and validation; testability is unsupported by its tournament command. Every request and raw response retained. Bounded retry is immediate without sleep.",
+      "authority_scope": "Frozen corpus only. Active plan, anchors and question beads were never read or written."
+    },
+    "explanation": "Candidate-7 is the only accepted role-complete rubric among nine candidates. All 85 semantic cells have two byte-identical requests with agreeing oracle-matching answers at confidence >= 0.6. All four statement-only deduplication cases pass the same confirmation rule. All eight deterministic requirement-form cases match. Its fidelity wording makes the frozen corpus technical normalizations explicit. One disagreement in candidate-2 received a diagnostic third request and remains rejected. Selection followed correctness and stability before size. Calibration evidence was scored locally and awaits independent verification by the parent agent.",
+    "authority_recommendations": [],
+    "candidate_count": 9,
+    "semantic_score": {
+      "total_cells": 85,
+      "exact_cells": 85,
+      "stable_cells": 85,
+      "confident_cells": 85
+    },
+    "dedupe_case_count": 4,
+    "dedupe_score": {
+      "total_cells": 4,
+      "exact_cells": 4,
+      "stable_cells": 4,
+      "confident_cells": 4
+    },
+    "repeat_requests_byte_identical": true
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 69876,
+    "tool_calls": 315,
+    "retry_count": 0,
+    "correlation_id": "phase-b-rubric-calibration",
+    "jev_run_ids": [],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

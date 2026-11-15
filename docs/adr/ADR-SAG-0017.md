@@ -37,6 +37,10 @@ Phase A first release surfaces are **crates.io** (fourteen workspace crates, inc
 - PyPI distribution names are **sc-decidr** and **sitr**.
 - No ad-hoc per-channel workflow literals for crate lists or binary names.
 
+### Rationale
+
+- One manifest-driven kit drives all five consumer channels from the same tag.
+
 ### Consequences
 
 **Positive:**

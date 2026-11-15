@@ -1,0 +1,3 @@
+The calibration response reports `duration_ms: 69876`. The evaluator subsequently explained that this value was inferred from scratch-file modification times, not measured as the agent invocation duration. It is retained unchanged as part of the original response but must not be used as invocation timing evidence.
+
+`attestation.json` records the observed agent lifecycle instead: the `spawn_agent` call at 2026-11-14T23:51:51.337Z through its first `FINAL_ANSWER` at 2026-11-14T23:57:39.687Z, as recorded by the session event log. Its elapsed time is 348350 ms. The calibration's request, answer and confidence evidence is independently checked separately.
