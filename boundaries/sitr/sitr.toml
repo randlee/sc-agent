@@ -4,10 +4,9 @@ owner_crate_path = "sitr"
 name = "SitrLayer"
 
 [public]
-facade = "main"
+notes = "CLI entry function delegates to sc-treesitter; no Rust facade type."
 
 [implementation]
-type = "main"
 module = "sitr"
 visibility = "private"
 constructor = "none"

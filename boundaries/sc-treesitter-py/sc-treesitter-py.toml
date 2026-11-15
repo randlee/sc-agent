@@ -4,10 +4,9 @@ owner_crate_path = "sc_treesitter"
 name = "ScTreesitterPyLayer"
 
 [public]
-facade = "sc_treesitter"
+notes = "PyO3 module entry function registers sc-treesitter bindings; no Rust facade type."
 
 [implementation]
-type = "sc_treesitter"
 module = "sc_treesitter"
 visibility = "private"
 constructor = "none"
