@@ -7,6 +7,20 @@ default_lint_profile = "ci"
 # Keep production packages here; sc-agent-testkit is dev-only.
 panic_rule_packages = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sc-treesitter", "sc-treesitter-py", "sitr"]
 
+# Acknowledged by the lead: only Source::Manual (feature="testing") reaches
+# this untimed wait; SystemClock always uses wait_timeout. sc-lint#980:
+# https://github.com/randlee/sc-lint/issues/980. Remove when analysis is fixed.
+[tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+"SCB-RUNTIME-001" = ["crates/sc-agent-types/src/clock.rs"]
+
+[[tool.sc-lint.lint]]
+name = "fmt"
+command = ["cargo", "fmt", "--all", "--check"]
+
+[[tool.sc-lint.lint]]
+name = "clippy"
+command = ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
 [[tool.sc-lint.lint]]
 name = "boundary"
 command = ["sc-lint", "lint", "sc-boundary", "--root", ".", "--config", "sc-lint.toml"]
@@ -16,11 +30,11 @@ name = "portability"
 command = ["sc-lint", "lint", "sc-portability", "--root", ".", "--config", "sc-lint.toml"]
 
 [[tool.sc-lint.lint]]
-name = "runtime-panic"
-command = ["sc-lint", "lint", "sc-runtime", "--root", ".", "--config", "sc-lint.toml", "--rule-filter", "SCB-RUNTIME-008"]
+name = "runtime"
+command = ["sc-lint", "lint", "sc-runtime", "--root", ".", "--config", "sc-lint.toml"]
 
 [tool.sc-lint.lint_profiles]
-ci = ["boundary", "portability", "runtime-panic"]
+ci = ["fmt", "clippy", "boundary", "portability", "runtime"]
 
 [tool.sc-lint.analyzers.portability]
 fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008", "PORT-009", "PORT-010"]
