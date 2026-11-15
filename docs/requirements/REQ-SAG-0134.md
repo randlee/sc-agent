@@ -1,6 +1,6 @@
 # Requirement: Python 3.11 minimum
 
-**Status:** Approved  
+**Status:** Superseded
 **Version:** 0.1.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
@@ -10,7 +10,9 @@
 
 ## REQ-SAG-0134: Python 3.11 minimum
 
-**Status:** Approved
+**Status:** Superseded
+
+Superseded by NFR-SAG-0003, which governs the Python floor.
 
 ### Requirement Statement
 

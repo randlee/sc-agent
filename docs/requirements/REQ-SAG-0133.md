@@ -1,6 +1,6 @@
 # Requirement: Live prerelease provider integration and publication gate
 
-**Status:** Approved  
+**Status:** Superseded
 **Version:** 0.1.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
@@ -10,7 +10,9 @@
 
 ## REQ-SAG-0133: Live prerelease provider integration and publication gate
 
-**Status:** Approved
+**Status:** Superseded
+
+Superseded by ADR-SAG-0019 decision 9: prerelease verification is hand-run live tests with a committed XHTML report per tested platform; the publication gate is removed.
 
 ### Requirement Statement
 
