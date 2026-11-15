@@ -36,7 +36,7 @@ sc-agent-http = { path = "crates/sc-agent-http", version = "0.1.5" }
 sc-agent-log = { path = "crates/sc-agent-log", version = "0.1.5" }
 sc-agent-py = { path = "crates/sc-agent-py", version = "0.1.5" }
 sc-agent-secrets = { path = "crates/sc-agent-secrets", version = "0.1.5" }
-sc-agent-testkit = { path = "crates/sc-agent-testkit", version = "0.1.5" }
+sc-agent-testkit = { path = "crates/sc-agent-testkit" }
 sc-agent-types = { path = "crates/sc-agent-types", version = "0.1.5" }
 sc-decision-llm = { path = "crates/sc-decision-llm", version = "0.1.5" }
 sc-decision-local = { path = "crates/sc-decision-local", version = "0.1.5" }

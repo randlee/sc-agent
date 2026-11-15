@@ -25,6 +25,10 @@ fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-
 
 # false positive, randlee/sc-lint#974
 [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+# Path-only self dev-dependency enables existing tests without requiring this
+# unpublished version from crates.io: https://github.com/randlee/sc-lint/issues/976.
+# Normal/build dependencies keep their publishable workspace versions.
+"SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml"]
 "SCB-CYCLE-003" = [
     "crates/sc-agent-http/src/transport.rs",
     "crates/sc-decision-schema/src/models.rs",

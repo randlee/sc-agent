@@ -28,3 +28,14 @@ and local-log assertions. The platform-keyring trap remains armed for them.
 These are hand-run product checks. No integration evidence, report or publication
 gate is produced. Actual credentialed runs require lead coordination and owner
 attendance; agents must not run this live command unattended.
+
+The pinned sc-publish kit still carries its legacy sc-lint source installer;
+[sc-publish#187](https://github.com/randlee/sc-publish/issues/187) tracks its
+removal. Retained kit files include `.github/scripts/setup_sc_lint_source.py`,
+`.github/scripts/tests/test_setup_sc_lint_source.py`,
+`.github/scripts/tests/test_release_artifacts.py` and
+`.github/scripts/tests/test_npm_release.py`. Some still reference the removed
+`.github/actions/setup-sc-lint/action.yml`; the source-setup tests therefore
+currently fail on that missing file. These files await a pinned kit fix and
+installer regeneration; do not hand-edit them. CI uses the official sc-lint
+action above, independently of that retained release-kit path.
