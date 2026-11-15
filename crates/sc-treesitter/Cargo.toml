@@ -1,9 +1,12 @@
 [package]
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 name = "sc-treesitter"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "MIT"
+license.workspace = true
 description = "Load tree-sitter grammars and run any query against them."
 include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "assets/queries/**"]
 

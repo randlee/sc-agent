@@ -16,6 +16,8 @@ constructor = "none"
 roots = ["HttpClient"]
 
 [dependencies]
+allowed_dev_dependents = ["sc-agent-http"]
+allowed_dev_dependencies = ["sc-agent-http", "sc-agent-testkit"]
 allowed_dependents = ["decidr", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
 allowed_dependencies = ["sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
 forbidden_edges = []

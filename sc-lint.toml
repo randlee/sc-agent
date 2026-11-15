@@ -23,6 +23,15 @@ ci = ["boundary", "portability", "runtime-panic"]
 [tool.sc-lint.analyzers.portability]
 fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008", "PORT-009", "PORT-010"]
 
+# false positive, randlee/sc-lint#974
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-003" = [
+    "crates/sc-agent-http/src/transport.rs",
+    "crates/sc-decision-schema/src/models.rs",
+    "crates/sc-decision-schema/src/request.rs",
+    "crates/sc-decision-schema/src/response.rs",
+]
+
 # This mirrors the existing cross-platform CI test job; `lint ci --consumer`
 # validates its presence but does not execute test selectors.
 [[tool.sc-lint.test]]
