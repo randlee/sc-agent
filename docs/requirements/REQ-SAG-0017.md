@@ -1,6 +1,6 @@
 # Requirement: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-15  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0017: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
