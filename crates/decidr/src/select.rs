@@ -19,8 +19,8 @@ use sc_agent_http::{
 };
 use sc_agent_log::{GeneralLogger, Level, LogError, Repo, SessionIdentity, SessionLogger, Slug};
 use sc_agent_secrets::{
-    DeferredPlatformKeyring, EnvSource, KeySources, KeyringSource, ResolvedKey, SecretsError,
-    resolve, resolve_var,
+    DeferredPlatformKeyring, EnvSource, KeySources, KeyringLocation, KeyringSource,
+    ProviderKeyring, ResolvedKey, SecretsError, resolve, resolve_var,
 };
 use sc_agent_types::{
     CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
@@ -35,7 +35,7 @@ use sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL};
 use sc_llm_provider::{LlmClient, LlmProvider};
 use serde_json::{Map, Value};
 
-use crate::{DecidrError, RequestTimeout};
+use crate::{CallLimits, DecidrError, RequestTimeout};
 
 /// The general-log target of decidr's own records.
 pub(crate) const LOG_TARGET: &str = "decidr";
@@ -55,6 +55,8 @@ pub struct Context {
     pub environment: Option<Vec<(OsString, OsString)>>,
     /// The keyring read last for keys; `None` is the platform keyring.
     pub keyring: Option<Arc<dyn KeyringSource + Send + Sync>>,
+    /// Optional checked keyring location, applied only after provider selection.
+    pub keyring_override: Option<KeyringLocation>,
     /// Every send; `None` is a `UreqTransport` with the operation's timeouts.
     pub transport: Option<Arc<dyn Transport>>,
     /// The general log; `None` is `GeneralLogger::open_default(log_root, service)`.
@@ -76,6 +78,7 @@ impl Context {
             repo_root: None,
             environment: None,
             keyring: None,
+            keyring_override: None,
             transport: None,
             general: None,
             clock: None,
@@ -266,6 +269,7 @@ struct Keys<'c> {
     env: VarsEnv<'c>,
     repo_root: Option<PathBuf>,
     keyring: Arc<dyn KeyringSource + Send + Sync>,
+    keyring_override: Option<KeyringLocation>,
 }
 
 impl<'c> Keys<'c> {
@@ -281,6 +285,7 @@ impl<'c> Keys<'c> {
                 .keyring
                 .clone()
                 .unwrap_or_else(|| Arc::new(DeferredPlatformKeyring)),
+            keyring_override: context.keyring_override.clone(),
         })
     }
 
@@ -308,6 +313,20 @@ impl<'c> Keys<'c> {
         Ok(resolve(provider, &self.sources())?)
     }
 
+    fn require_selected(&self, provider: Provider) -> Result<ResolvedKey, DecidrError> {
+        let Some(location) = &self.keyring_override else {
+            return self.require(provider);
+        };
+        let wrapped = ProviderKeyring::new(provider, location.clone(), self.keyring.clone());
+        let sources = KeySources {
+            env: &self.env,
+            repo_root: self.repo_root.as_deref(),
+            keyring: &wrapped,
+        };
+        self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
+        Ok(resolve(provider, &sources)?)
+    }
+
     /// The key held by variable `var` (a runner's `key_env`).
     fn require_var(&self, var: &sc_agent_types::VarName) -> Result<ResolvedKey, DecidrError> {
         self.env.check_utf8(var.as_str())?;
@@ -324,9 +343,27 @@ fn choose_provider(
     keys: &Keys<'_>,
 ) -> Result<(Provider, ResolvedKey), DecidrError> {
     if let Some(provider) = choice {
-        return Ok((provider, keys.require(provider)?));
+        return Ok((provider, keys.require_selected(provider)?));
     }
     let ranking = Provider::ranking(line);
+    if keys.keyring_override.is_some() {
+        let mut eligible = Vec::new();
+        for provider in ranking {
+            if keys.find(*provider)?.is_some() {
+                eligible.push(*provider);
+            }
+        }
+        if eligible.is_empty() {
+            eligible.extend_from_slice(ranking);
+        }
+        let [provider] = eligible.as_slice() else {
+            return Err(DecidrError::AmbiguousKeyringOverride {
+                candidates: eligible,
+            });
+        };
+        let provider = *provider;
+        return Ok((provider, keys.require_selected(provider)?));
+    }
     for provider in ranking {
         if let Some(key) = keys.find(*provider)? {
             return Ok((*provider, key));
@@ -582,9 +619,13 @@ fn runner(
     session: SessionLogger,
     general: GeneralLogger,
     backend: Arc<dyn Backend>,
+    limits: CallLimits,
 ) -> Result<DecisionRunner, DecidrError> {
     // `runner.invalid_config` (workers out of bounds) maps through `DecidrError::Runner`.
-    let runner_config = RunnerConfig::from_config(config)?;
+    let runner_config = match limits.workers {
+        Some(workers) => RunnerConfig::new(workers.get())?,
+        None => RunnerConfig::from_config(config)?,
+    };
     let http = HttpClient::new(
         transport,
         ResendPolicy::new(config.max_sends),
@@ -619,7 +660,8 @@ enum Loaded {
 }
 
 impl Prepared {
-    fn new(options: &SendOptions, timeout: Option<RequestTimeout>) -> Result<Self, DecidrError> {
+    fn new(options: &SendOptions, limits: CallLimits) -> Result<Self, DecidrError> {
+        let timeout = limits.timeout;
         let context = &options.context;
         let config = load_config(context)?;
         let general = general_for(context, &config)?;
@@ -637,6 +679,7 @@ impl Prepared {
             session,
             general.clone(),
             chosen.backend(),
+            limits,
         )?;
         Ok(Self {
             runner,
@@ -787,7 +830,7 @@ pub fn send(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_with_timeout(options, request, cancel, None, on_result)
+    send_with(options, request, cancel, CallLimits::default(), on_result)
 }
 
 /// As [`send`], with an optional checked per-call request timeout.
@@ -796,14 +839,14 @@ pub fn send(
 ///
 /// # Errors
 /// Returns the same errors as [`send`].
-pub fn send_with_timeout(
+pub fn send_with(
     options: &SendOptions,
     request: DecisionRequest,
     cancel: &CancelToken,
-    timeout: Option<RequestTimeout>,
+    limits: CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, timeout)?;
+    let prepared = Prepared::new(options, limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -838,7 +881,7 @@ pub fn send_batch(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_batch_with_timeout(options, requests, cancel, None, on_result)
+    send_batch_with(options, requests, cancel, CallLimits::default(), on_result)
 }
 
 /// As [`send_batch`], with an optional checked per-call request timeout.
@@ -847,14 +890,14 @@ pub fn send_batch(
 ///
 /// # Errors
 /// Returns the same errors as [`send_batch`].
-pub fn send_batch_with_timeout(
+pub fn send_batch_with(
     options: &SendOptions,
     requests: Vec<DecisionRequest>,
     cancel: &CancelToken,
-    timeout: Option<RequestTimeout>,
+    limits: CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, timeout)?;
+    let prepared = Prepared::new(options, limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -1156,6 +1199,7 @@ mod select_tests {
             )),
             repo_root: None,
             keyring: Arc::new(NoKeyring),
+            keyring_override: None,
         }
     }
 
@@ -1223,6 +1267,85 @@ mod select_tests {
         );
     }
 
+    #[test]
+    fn keyring_override_is_scoped_and_ambiguous_selection_refused() {
+        struct Recording(std::sync::Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "chosen").then(|| "test-key".to_owned()))
+            }
+        }
+        let location = KeyringLocation::new(
+            Some(sc_agent_secrets::KeyringService::new("consumer").unwrap()),
+            Some(sc_agent_secrets::KeyringAccount::new("chosen").unwrap()),
+        );
+        let source = Arc::new(Recording(std::sync::Mutex::new(Vec::new())));
+        let mut input = keys(&[]);
+        input.keyring = source.clone();
+        input.keyring_override = Some(location);
+        let selected = choose_provider(
+            Some(Provider::Anthropic),
+            Some(ShortName::Haiku),
+            &ModelSelector::Short(ShortName::Haiku),
+            &input,
+        )
+        .unwrap();
+        assert_eq!(selected.0, Provider::Anthropic);
+        assert_eq!(
+            &*source.0.lock().unwrap(),
+            &[("consumer".to_owned(), "chosen".to_owned())]
+        );
+        source.0.lock().unwrap().clear();
+        let error = choose_provider(
+            None,
+            Some(ShortName::Haiku),
+            &ModelSelector::Short(ShortName::Haiku),
+            &input,
+        )
+        .expect_err("multiple providers");
+        assert_eq!(error.id(), "decidr.ambiguous_keyring_override");
+        assert_eq!(
+            error.detail().category,
+            Some(sc_agent_types::ErrorCategory::Config)
+        );
+        assert!(error.message().contains("anthropic"));
+        assert!(
+            source
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(service, _)| service != "consumer")
+        );
+        source.0.lock().unwrap().clear();
+        let selected = choose_provider(
+            None,
+            Some(ShortName::Jev),
+            &ModelSelector::Short(ShortName::Jev),
+            &input,
+        )
+        .unwrap();
+        assert_eq!(selected.0, Provider::TypeSafe);
+        assert_eq!(
+            source
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(service, account)| service == "consumer" && account == "chosen")
+                .count(),
+            1
+        );
+    }
+
     /// RBP-F008: a key variable that is set to a non-UTF-8 value is a malformed key, not an
     /// empty one.
     #[cfg(unix)]
@@ -1236,6 +1359,7 @@ mod select_tests {
             )])),
             repo_root: None,
             keyring: Arc::new(NoKeyring),
+            keyring_override: None,
         };
         let error = keys.find(Provider::TypeSafe).expect_err("not UTF-8");
         assert_eq!(error.id(), "decidr.secrets");
@@ -1459,7 +1583,7 @@ mod tests {
     use sc_agent_types::CancelToken;
 
     use super::{Context, ModelSelector, SendOptions};
-    use crate::{RequestTimeout, send_batch_with_timeout, send_with_timeout};
+    use crate::{CallLimits, RequestTimeout, send_batch_with, send_with};
 
     const REQUEST: &[u8] =
         br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
@@ -1560,19 +1684,25 @@ mod tests {
             Ok(())
         };
         if batch {
-            send_batch_with_timeout(
+            send_batch_with(
                 options,
                 vec![request],
                 &CancelToken::new(),
-                timeout,
+                CallLimits {
+                    timeout,
+                    workers: None,
+                },
                 &mut delivered,
             )
         } else {
-            send_with_timeout(
+            send_with(
                 options,
                 request,
                 &CancelToken::new(),
-                timeout,
+                CallLimits {
+                    timeout,
+                    workers: None,
+                },
                 &mut delivered,
             )
         }

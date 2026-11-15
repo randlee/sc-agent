@@ -35,8 +35,15 @@ use crate::input::LimitKind;
 pub enum DecidrError {
     /// A per-call timeout is non-finite or outside the request-timeout bounds.
     InvalidRequestTimeout {
+        /// The refused value in seconds.
+        value: f64,
         /// A lower-level duration-conversion failure, when present.
         source: Option<Box<ErrorDetail>>,
+    },
+    /// A per-call worker count is outside the supported range.
+    InvalidWorkers {
+        /// The refused worker count.
+        value: i64,
     },
     /// The command line does not parse; the clap error is the cause.
     Usage {
@@ -62,6 +69,11 @@ pub enum DecidrError {
     Llm(Box<sc_llm_provider::LlmError>),
     /// `flush_session_log` failed after the results were printed.
     Runner(Box<sc_decision_runner::RunnerError>),
+    /// An override cannot be assigned to a unique ranked provider.
+    AmbiguousKeyringOverride {
+        /// Eligible providers, in ranking order.
+        candidates: Vec<Provider>,
+    },
     /// No provider in `Provider::ranking` for the model has a detected key, and no
     /// `--provider` was given.
     NoProviderKey {
@@ -221,6 +233,8 @@ fn foreign(id: &str, error: &(dyn Error + 'static)) -> Option<ErrorDetail> {
 }
 
 sc_agent_types::error_catalog! { DecidrError {
+    DecidrError::AmbiguousKeyringOverride { .. } => ("decidr.ambiguous_keyring_override", Some(sc_agent_types::ErrorCategory::Config)),
+    DecidrError::InvalidWorkers { .. } => ("decidr.invalid_workers", Some(sc_agent_types::ErrorCategory::Validation)),
     DecidrError::InvalidRequestTimeout { .. } => ("decidr.invalid_request_timeout", Some(sc_agent_types::ErrorCategory::Validation)),
     DecidrError::Usage { .. } => ("decidr.usage", Some(sc_agent_types::ErrorCategory::Validation)),
     DecidrError::Config(_) => ("decidr.config", None),
@@ -256,8 +270,9 @@ impl ErrorId for DecidrError {
 
     fn message(&self) -> String {
         match self {
-            Self::InvalidRequestTimeout { .. } => format!(
-                "timeout_secs must be finite and within {}..={} seconds",
+            Self::InvalidWorkers { value } => format!("workers must be within 1..=64, got {value}"),
+            Self::InvalidRequestTimeout { value, .. } => format!(
+                "timeout_secs must be finite and within {}..={} seconds, got {value}",
                 sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.start(),
                 sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.end(),
             ),
@@ -279,6 +294,14 @@ impl ErrorId for DecidrError {
             Self::Http(error) => format!("the send failed ({})", error.id()),
             Self::Llm(error) => format!("the LLM provider failed ({})", error.id()),
             Self::Runner(error) => format!("the session log failed ({})", error.id()),
+            Self::AmbiguousKeyringOverride { candidates } => format!(
+                "keyring override has multiple eligible providers: {}",
+                candidates
+                    .iter()
+                    .map(|provider| provider.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Self::NoProviderKey { model, tried } => {
                 let tried: Vec<&str> = tried.iter().map(|provider| provider.as_str()).collect();
                 format!(
@@ -339,7 +362,7 @@ impl ErrorId for DecidrError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
-            Self::InvalidRequestTimeout { source } => source.as_deref().cloned(),
+            Self::InvalidRequestTimeout { source, .. } => source.as_deref().cloned(),
             Self::Usage { source } => foreign("clap", &**source),
             Self::Config(error) => Some(error.detail()),
             Self::Types(error) => Some(error.detail()),
@@ -357,7 +380,9 @@ impl ErrorId for DecidrError {
             | Self::Write { source } => foreign("io", source),
             Self::Encode { source } => foreign("serde_json", source),
             Self::Signal { source } => foreign("ctrlc", source),
-            Self::NoProviderKey { .. }
+            Self::InvalidWorkers { .. }
+            | Self::AmbiguousKeyringOverride { .. }
+            | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
             | Self::InputNotFound { .. }
             | Self::LimitExceeded { .. }
@@ -371,6 +396,7 @@ impl ErrorId for DecidrError {
             Self::InvalidRequestTimeout { .. } => {
                 Some("omit timeout_secs or pass finite seconds within the reported bounds")
             }
+            Self::InvalidWorkers { .. } => Some("pass workers from 1 to 64"),
             Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),
@@ -381,6 +407,9 @@ impl ErrorId for DecidrError {
             Self::Http(error) => error.recovery(),
             Self::Llm(error) => error.recovery(),
             Self::Runner(error) => error.recovery(),
+            Self::AmbiguousKeyringOverride { .. } => {
+                Some("select a provider explicitly for the keyring override")
+            }
             Self::NoProviderKey { .. } => {
                 Some("set one of the listed providers' key variables, or pass --provider")
             }
@@ -419,7 +448,7 @@ impl fmt::Display for DecidrError {
 impl Error for DecidrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::InvalidRequestTimeout { source } => {
+            Self::InvalidRequestTimeout { source, .. } => {
                 source.as_ref().map(|error| &**error as &dyn Error)
             }
             Self::Usage { source } => Some(&**source),
@@ -437,7 +466,9 @@ impl Error for DecidrError {
             | Self::Write { source } => Some(source),
             Self::Encode { source } => Some(source),
             Self::Signal { source } => Some(source),
-            Self::NoProviderKey { .. }
+            Self::InvalidWorkers { .. }
+            | Self::AmbiguousKeyringOverride { .. }
+            | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
             | Self::InputNotFound { .. }
             | Self::LimitExceeded { .. }
@@ -457,7 +488,12 @@ mod tests {
         let io = || std::io::Error::other("failure");
         let mut errors = samples();
         errors.extend([
-            DecidrError::InvalidRequestTimeout { source: None },
+            DecidrError::InvalidRequestTimeout {
+                value: 0.0,
+                source: None,
+            },
+            DecidrError::InvalidWorkers { value: 0 },
+            DecidrError::AmbiguousKeyringOverride { candidates: vec![] },
             DecidrError::Usage {
                 source: Box::new(clap::Error::raw(
                     clap::error::ErrorKind::InvalidValue,

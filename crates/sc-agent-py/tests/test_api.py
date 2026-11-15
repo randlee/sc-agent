@@ -350,18 +350,13 @@ def test_keyring_location_invalid_before_any_send(env, args, operation, option, 
 
 
 @pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
-def test_keyring_override_requires_named_provider(env, args, operation):
+def test_keyring_override_does_not_require_provider_for_local_runner(env, args, operation):
     loopback, _ = env
     request = [NOUL] if operation is sc_agent.send_batch else NOUL
-    with pytest.raises(sc_agent.SagError) as info:
-        operation(request, **args, keyring_service="consumer")
-    ident, detail = error_of(info)
-    assert ident == "sc_agent_py.invalid_option"
-    assert detail["id"] == ident
-    assert "provider" in detail["message"]
-    assert "required with a keyring override" in detail["message"]
-    assert detail["recovery"] == "Correct the named option and retry."
-    assert loopback.requests == []
+    result = operation(request, **args, keyring_service="consumer")
+    lines = result if isinstance(result, list) else [result]
+    assert all("error" in json.loads(line) for line in lines)
+    assert len(loopback.requests) == 1
 
 
 def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch, tmp_path):

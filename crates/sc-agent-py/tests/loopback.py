@@ -25,13 +25,15 @@ class Loopback:
     """A runner on 127.0.0.1 in a background thread."""
 
     def __init__(self, mode: str, status: int | None = None) -> None:
-        if mode not in ("hang", "error", "ok", "status", "echo-key", "echo-model-key"):
+        if mode not in ("hang", "error", "ok", "status", "echo-key", "echo-model-key", "ordered"):
             raise ValueError(mode)
         self.mode = mode
         self.status = status
         self.requests: list[dict] = []
         self.started = threading.Event()
         self.release = threading.Event()
+        self.ordered_started = [threading.Event() for _ in range(3)]
+        self.ordered_release = [threading.Event() for _ in range(3)]
         self._lock = threading.Lock()
         loopback = self
 
@@ -81,6 +83,18 @@ class Loopback:
                     response["answers"]["q"]["noul"] = key
                     self._reply(loopback.status or 200, response if loopback.status == 200 else {"detail": f"echo {key}"})
                     return
+                if loopback.mode == "ordered":
+                    index = int(json.loads(body)["state"])
+                    loopback.ordered_started[index].set()
+                    if not loopback.ordered_release[index].wait(60.0):
+                        raise RuntimeError("request was not released")
+                    data = OK_RESPONSE.encode()
+                    self.send_response(200)
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
                 if loopback.mode == "ok":
                     data = OK_RESPONSE.encode()
                     self.send_response(200)
@@ -102,5 +116,7 @@ class Loopback:
 
     def close(self) -> None:
         self.release.set()
+        for event in self.ordered_release:
+            event.set()
         self.server.shutdown()
         self.server.server_close()

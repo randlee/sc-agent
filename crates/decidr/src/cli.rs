@@ -58,6 +58,12 @@ pub(crate) struct SendArgs {
     /// Send TypeSafe-Danger-Zone-Long-Context: true; single-request mode only.
     #[arg(long, conflicts_with = "batch")]
     pub(crate) long_context: bool,
+    /// Per-request timeout in seconds (10..=3600).
+    #[arg(long, allow_hyphen_values = true)]
+    pub(crate) timeout_secs: Option<f64>,
+    /// Batch worker count (1..=64).
+    #[arg(long, requires = "batch", allow_hyphen_values = true)]
+    pub(crate) workers: Option<i64>,
     /// Request file, or - for stdin.
     #[arg(value_name = "FILE|-", default_value = "-", value_parser = non_empty_text)]
     pub(crate) input: String,

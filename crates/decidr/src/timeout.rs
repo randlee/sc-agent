@@ -21,11 +21,15 @@ impl RequestTimeout {
         let min = f64::from(*RUNNER_REQUEST_TIMEOUT_SECS.start());
         let max = f64::from(*RUNNER_REQUEST_TIMEOUT_SECS.end());
         if !seconds.is_finite() || !(min..=max).contains(&seconds) {
-            return Err(DecidrError::InvalidRequestTimeout { source: None });
+            return Err(DecidrError::InvalidRequestTimeout {
+                value: seconds,
+                source: None,
+            });
         }
         Duration::try_from_secs_f64(seconds)
             .map(Self)
             .map_err(|source| DecidrError::InvalidRequestTimeout {
+                value: seconds,
                 source: Some(Box::new(ErrorDetail::foreign(
                     "std.time.float_duration",
                     &source,
@@ -38,10 +42,52 @@ impl RequestTimeout {
     }
 }
 
+/// Validated per-call batch worker count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Workers(usize);
+
+impl Workers {
+    /// Validate a worker count within 1..=64.
+    ///
+    /// # Errors
+    /// Returns `decidr.invalid_workers` if outside the supported range.
+    pub fn new(count: i64) -> Result<Self, DecidrError> {
+        if !(1..=64).contains(&count) {
+            return Err(DecidrError::InvalidWorkers { value: count });
+        }
+        Ok(Self(count as usize))
+    }
+
+    pub(crate) fn get(self) -> usize {
+        self.0
+    }
+}
+
+/// Optional per-call request and batch concurrency limits.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CallLimits {
+    /// Per-request timeout.
+    pub timeout: Option<RequestTimeout>,
+    /// Batch worker count.
+    pub workers: Option<Workers>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sc_agent_types::ErrorId;
+
+    #[test]
+    fn workers_are_validated() {
+        for count in [1, 8, 64] {
+            assert_eq!(Workers::new(count).unwrap().get(), count as usize);
+        }
+        for count in [i64::MIN, 0, 65, i64::MAX] {
+            let error = Workers::new(count).unwrap_err();
+            assert_eq!(error.id(), "decidr.invalid_workers");
+            assert!(error.message().contains(&count.to_string()));
+        }
+    }
 
     #[test]
     fn finite_integer_and_fractional_seconds_are_checked_without_panics() {
@@ -67,6 +113,7 @@ mod tests {
             assert_eq!(error.id(), "decidr.invalid_request_timeout");
             assert!(error.message().contains("timeout_secs"));
             assert!(error.message().contains("10..=3600"));
+            assert!(error.message().contains(&seconds.to_string()));
         }
     }
 }

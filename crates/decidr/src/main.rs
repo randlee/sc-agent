@@ -23,7 +23,7 @@ use decidr::input::{build_request, read_batch, request_bytes};
 use decidr::signal::{EXIT_INTERRUPTED, SignalWatch};
 use decidr::{
     Context, DecidrError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, doctor,
-    general_logger, load_config, models, send, send_batch, session_logger,
+    general_logger, load_config, models, session_logger,
 };
 use sc_agent_log::{GeneralLogger, LogError, Slug};
 use sc_agent_types::{CancelToken, ErrorId, Provider};
@@ -111,6 +111,13 @@ fn run_send(
     stdin: &mut dyn Read,
     stdout: &mut dyn Write,
 ) -> Result<ExitCode, DecidrError> {
+    let limits = decidr::CallLimits {
+        timeout: args
+            .timeout_secs
+            .map(decidr::RequestTimeout::from_secs)
+            .transpose()?,
+        workers: args.workers.map(decidr::Workers::new).transpose()?,
+    };
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
     let project = Slug::new("project", &args.project)?;
     let agent_role = Slug::new("agent_role", &args.agent_role)?;
@@ -164,7 +171,7 @@ fn run_send(
     let outcome = match input {
         Input::Batch(requests) => {
             let mut all_ok = true;
-            send_batch(&options, requests, cancel, &mut |result| {
+            decidr::send_batch_with(&options, requests, cancel, limits, &mut |result| {
                 all_ok &= result.outcome.is_ok();
                 write_result(stdout, &result)
             })
@@ -174,7 +181,7 @@ fn run_send(
             // The result is printed as soon as it exists; a session-log flush failure after
             // it is a command error (exit 1) printed after it, never instead (QA-006).
             let mut success = false;
-            send(&options, *request, cancel, &mut |result| {
+            decidr::send_with(&options, *request, cancel, limits, &mut |result| {
                 success = result.outcome.is_ok();
                 write_result(stdout, &result)
             })
