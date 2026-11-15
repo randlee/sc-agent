@@ -59,7 +59,7 @@ impl ErrorCategory {
 
 /// Refine the category for a status-bearing provider error.
 #[must_use]
-pub const fn refine_status(base: ErrorCategory, status: Option<u16>) -> ErrorCategory {
+pub(crate) const fn refine_status(base: ErrorCategory, status: Option<u16>) -> ErrorCategory {
     match status {
         Some(401 | 403) => ErrorCategory::Auth,
         Some(402) => ErrorCategory::Quota,

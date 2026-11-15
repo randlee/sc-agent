@@ -37,7 +37,7 @@ pub use clock::{AdvanceHook, Clock, SystemClock, Waker};
 #[doc(inline)]
 pub use error::TypesError;
 #[doc(inline)]
-pub use error_id::{ErrorCatalog, ErrorCategory, ErrorDetail, ErrorId, refine_status};
+pub use error_id::{ErrorCatalog, ErrorCategory, ErrorDetail, ErrorId};
 #[doc(inline)]
 pub use model::{MODELS, ModelDescriptor, ModelId};
 #[doc(inline)]
