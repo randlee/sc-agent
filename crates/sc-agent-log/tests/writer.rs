@@ -20,8 +20,10 @@ use common::{events, identity, payload};
 use sc_agent_log::testing::MemoryLog;
 use sc_agent_log::{GeneralLogger, Level, LogContext, LogError, SessionLogger};
 use sc_agent_types::{ErrorDetail, ErrorId, SessionId};
+#[cfg(unix)]
+use sc_observability::v2::InitError;
 use sc_observability::v2::{
-    EventError, InitError, LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig,
+    EventError, LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig,
     SinkRegistration,
 };
 use sc_observability::{ServiceName, SinkHealth, SinkHealthState, SinkName};

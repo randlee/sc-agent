@@ -33,8 +33,17 @@ command = ["sc-lint", "lint", "sc-portability", "--root", ".", "--config", "sc-l
 name = "runtime"
 command = ["sc-lint", "lint", "sc-runtime", "--root", ".", "--config", "sc-lint.toml"]
 
+# Cross-target validation is explicit: just lint windows all.
+# sc-lint selects cargo-xwin on non-Windows and native Cargo on Windows.
+[[tool.sc-lint.lint]]
+name = "windows-clippy"
+command = ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+platform = "windows"
+target = "x86_64-pc-windows-msvc"
+
 [tool.sc-lint.lint_profiles]
 ci = ["fmt", "clippy", "boundary", "portability", "runtime"]
+windows = ["windows-clippy"]
 
 [tool.sc-lint.analyzers.portability]
 fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008", "PORT-009", "PORT-010"]
