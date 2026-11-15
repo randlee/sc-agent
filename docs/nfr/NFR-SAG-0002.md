@@ -1,16 +1,16 @@
 # Requirement: Error detail JSON written by 0.1.0 still reads in 0.2.0
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.2.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-14  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 
 ---
 
 ## NFR-SAG-0002: Error detail JSON written by 0.1.0 still reads in 0.2.0
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
