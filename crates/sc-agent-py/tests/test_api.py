@@ -1,11 +1,10 @@
-"""The sc-agent Python API over the maturin build, against a loopback runner.
+"""The sc-agent Python API over the maturin build.
 
-Each call passes `config_dir=` (a tempdir whose default.json names the loopback runner `dec`
-and sets the log root); the one `decidr` CLI child gets the same directory as `--config-dir`.
-No environment variable, HOME or USERPROFILE is set anywhere. No test reaches an
-external network. Each test names the acceptance line it proves.
-Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
-depends on elapsed time.
+Default runs use a controlled loopback runner and pass its tempdir config explicitly.
+Only live_outcome-marked cases opt into owner-attended real config/keys on
+SC_AGENT_LIVE=1. All other tests keep loopback, fixed-answer and log assertions.
+No test changes HOME or USERPROFILE. Orderings are driven by events, with bounded
+waits used only as failure backstops and no elapsed-time assertions.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ import warnings
 import pytest
 
 import sc_agent
-from conftest import HANG_GUARD
+from conftest import HANG_GUARD, _call_outcome
 from loopback import FIXED_ERROR
 
 NOUL = json.dumps({"model": "jev-latest", "state": "s", "questions": {"q": {"type": "noul"}}})
@@ -40,7 +39,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 def test_python_module_exposes_its_module_documentation():
     assert sc_agent.__doc__ == (
-        "The `sc_agent` module: `integration_cases`, `validate_integration_results`, `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+        "The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
     )
 
 
@@ -389,3 +388,94 @@ def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch
         "use an injected keyring source in tests; do not access the platform keyring from a test"
     )
     assert loopback.requests == []
+
+
+@pytest.mark.live_outcome
+@pytest.mark.mode("ok")
+def test_models_list_outcome(outcome_models_args, outcome_call):
+    """SC_AGENT_LIVE=1 checks default TypeSafe models with provider omitted.
+
+    Only a native missing key skips; jev/haiku/luna are exercised by the send
+    outcomes through conftest.outcome_model, since models() takes no model.
+    """
+    models = json.loads(outcome_call(sc_agent.models, **outcome_models_args))["models"]
+    assert isinstance(models, list) and models
+    assert all(isinstance(model["name"], str) and model["name"] for model in models)
+
+
+@pytest.mark.live_outcome
+@pytest.mark.mode("ok")
+def test_noul_send_outcome(outcome_args, outcome_call):
+    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
+
+    Provider is omitted; only a native missing key skips the owner-run case.
+    """
+    line = json.loads(outcome_call(sc_agent.send, NOUL, **outcome_args))
+    assert "error" not in line
+    assert line["position"] == 0
+    assert len(line["session_id"]) == 26
+    answer = line["response"]["answers"]["q"]
+    assert answer["type"] == "noul"
+    assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+
+
+@pytest.mark.live_outcome
+@pytest.mark.mode("ok")
+def test_noul_send_batch_outcome(outcome_args, outcome_call):
+    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
+
+    Provider is omitted; only a native missing key skips the owner-run case.
+    """
+    lines = [json.loads(line) for line in outcome_call(sc_agent.send_batch, [NOUL] * 3, **outcome_args)]
+    assert sorted(line["position"] for line in lines) == [0, 1, 2]
+    for line in lines:
+        assert "error" not in line
+        assert len(line["session_id"]) == 26
+        answer = line["response"]["answers"]["q"]
+        assert answer["type"] == "noul"
+        assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+
+
+@pytest.mark.mode("ok")
+def test_nonmarked_outcome_stays_loopback_on_explicit_live_switch(explicit_live_switch, outcome_args, outcome_call, env):
+    loopback, _ = env
+    assert outcome_args["model"] == "dec"
+    assert "config_dir" in outcome_args
+    assert os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] == "1"
+    line = json.loads(outcome_call(sc_agent.send, NOUL, **outcome_args))
+    assert line["response"]["answers"]["q"]["noul"] == 0.123456789
+    assert len(loopback.requests) == 1
+
+
+@pytest.mark.parametrize("identity", ["decidr.no_provider_key", "secrets.key_missing"])
+def test_live_outcome_skips_only_native_missing_keys(identity):
+    error = sc_agent.SagError("decidr.secrets", "controlled absence", json.dumps({"id": "decidr.secrets", "cause": {"id": identity}}))
+    def missing():
+        raise error
+    with pytest.raises(pytest.skip.Exception, match="no applicable API key"):
+        _call_outcome(missing, _live=True)
+    # The same absence is a failure unless this is an explicitly live call.
+    with pytest.raises(sc_agent.SagError) as caught:
+        _call_outcome(missing)
+    assert caught.value is error
+
+
+def test_live_outcome_propagates_other_native_failures():
+    error = sc_agent.SagError("decidr.config", "controlled config error", json.dumps({"id": "decidr.config"}))
+    def refused():
+        raise error
+    with pytest.raises(sc_agent.SagError) as caught:
+        _call_outcome(refused, _live=True)
+    assert caught.value is error
+
+
+@pytest.mark.parametrize("outcome_model", ["jev", "haiku", "luna"])
+def test_explicit_live_outcome_keeps_native_provider_selection(monkeypatch, request, outcome_model):
+    # Exercise only fixture argument construction; no native call or key lookup.
+    monkeypatch.setenv("SC_AGENT_LIVE", "1")
+    request.node.add_marker("live_outcome")
+    args = request.getfixturevalue("outcome_args")
+    assert args["model"] == outcome_model
+    assert "provider" not in args
+    assert "config_dir" not in args
+    assert os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] == "1"

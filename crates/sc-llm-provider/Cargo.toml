@@ -1,4 +1,7 @@
 [package]
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 name = "sc-llm-provider"
 version.workspace = true
 description = "Sans-IO LLM provider wire for sc-agent: Anthropic Messages and OpenAI-compatible Chat Completions, JSON-schema output."
@@ -7,17 +10,17 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-sc-agent-http = { path = "../sc-agent-http", version = "0.1.5" }
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.5" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.5" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.5" }
+sc-agent-http = { workspace = true }
+sc-agent-log = { workspace = true }
+sc-agent-secrets = { workspace = true }
+sc-agent-types = { workspace = true }
 serde_json = "1"
 
 [dev-dependencies]
-sc-agent-secrets = { path = "../sc-agent-secrets", features = ["test-keyring-guard"] }
-sc-agent-testkit = { path = "../sc-agent-testkit" }
-sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
-sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
+sc-agent-testkit = { workspace = true }
+sc-agent-http = { workspace = true, features = ["testing"] }
+sc-agent-log = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

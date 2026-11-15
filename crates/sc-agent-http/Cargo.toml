@@ -1,4 +1,7 @@
 [package]
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 name = "sc-agent-http"
 version.workspace = true
 description = "Sync HTTP layer for sc-agent: one send per call, busy and quota classification, resend holdoffs as not-before instants, secret redaction."
@@ -12,9 +15,9 @@ license.workspace = true
 testing = ["sc-agent-types/testing"]
 
 [dependencies]
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.5" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.5" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.5" }
+sc-agent-log = { workspace = true }
+sc-agent-secrets = { workspace = true }
+sc-agent-types = { workspace = true }
 serde_json = "1"
 # Exact pin: the transport depends on ureq 3.5 config APIs (Agent::config_builder,
 # timeout_connect / timeout_global, Agent::configure_request for the per-request
@@ -24,10 +27,10 @@ serde_json = "1"
 ureq = "=3.5.1"
 
 [dev-dependencies]
-sc-agent-secrets = { path = "../sc-agent-secrets", features = ["test-keyring-guard"] }
-sc-agent-testkit = { path = "../sc-agent-testkit" }
-sc-agent-http = { path = ".", features = ["testing"] }
-sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
+sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
+sc-agent-testkit = { workspace = true }
+sc-agent-http = { workspace = true, features = ["testing"] }
+sc-agent-log = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

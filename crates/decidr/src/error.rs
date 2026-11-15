@@ -38,15 +38,6 @@ pub enum DecidrError {
         /// A lower-level duration-conversion failure, when present.
         source: Option<Box<ErrorDetail>>,
     },
-    /// Integration evidence failed boundary validation.
-    IntegrationEvidence {
-        /// The invalid field or contract element.
-        field: &'static str,
-        /// The constraint to correct, without the rejected value.
-        reason: &'static str,
-        /// An underlying parsing failure, when present.
-        source: Option<Box<ErrorDetail>>,
-    },
     /// The command line does not parse; the clap error is the cause.
     Usage {
         /// clap's error, unchanged.
@@ -233,7 +224,6 @@ impl ErrorId for DecidrError {
     fn id(&self) -> &'static str {
         match self {
             Self::InvalidRequestTimeout { .. } => "decidr.invalid_request_timeout",
-            Self::IntegrationEvidence { .. } => "decidr.integration_evidence",
             Self::Usage { .. } => "decidr.usage",
             Self::Config(_) => "decidr.config",
             Self::Types(_) => "decidr.types",
@@ -266,9 +256,6 @@ impl ErrorId for DecidrError {
                 sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.start(),
                 sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.end(),
             ),
-            Self::IntegrationEvidence { field, reason, .. } => {
-                format!("integration evidence {field}: {reason}")
-            }
             Self::Usage { source } => format!(
                 "invalid command line ({})",
                 source.kind().as_str().unwrap_or("usage error")
@@ -347,9 +334,7 @@ impl ErrorId for DecidrError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
-            Self::InvalidRequestTimeout { source } | Self::IntegrationEvidence { source, .. } => {
-                source.as_deref().cloned()
-            }
+            Self::InvalidRequestTimeout { source } => source.as_deref().cloned(),
             Self::Usage { source } => foreign("clap", &**source),
             Self::Config(error) => Some(error.detail()),
             Self::Types(error) => Some(error.detail()),
@@ -381,9 +366,6 @@ impl ErrorId for DecidrError {
             Self::InvalidRequestTimeout { .. } => {
                 Some("omit timeout_secs or pass finite seconds within the reported bounds")
             }
-            Self::IntegrationEvidence { .. } => Some(
-                "rerun every required integration case against checksum-verified candidate assets",
-            ),
             Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),
@@ -432,7 +414,7 @@ impl fmt::Display for DecidrError {
 impl Error for DecidrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::InvalidRequestTimeout { source } | Self::IntegrationEvidence { source, .. } => {
+            Self::InvalidRequestTimeout { source } => {
                 source.as_ref().map(|error| &**error as &dyn Error)
             }
             Self::Usage { source } => Some(&**source),

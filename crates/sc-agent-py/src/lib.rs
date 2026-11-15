@@ -717,24 +717,9 @@ fn doctor(
     Ok(text)
 }
 
-/// Required live case identifiers for the installed candidate's integration contract.
-#[pyfunction]
-fn integration_cases() -> Vec<&'static str> {
-    decidr::integration_cases()
-}
-
-/// Validates a complete passing prerelease platform run at the Rust boundary.
-#[pyfunction]
-fn validate_integration_results(results_json: &str, source_commit: &str) -> PyResult<String> {
-    decidr::validate_integration_results(results_json, source_commit)
-        .map_err(|error| sag_error(&error))
-}
-
-/// The `sc_agent` module: `integration_cases`, `validate_integration_results`, `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
+/// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
 #[pymodule]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(integration_cases, module)?)?;
-    module.add_function(wrap_pyfunction!(validate_integration_results, module)?)?;
     module.add_function(wrap_pyfunction!(send, module)?)?;
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
     module.add_function(wrap_pyfunction!(models, module)?)?;

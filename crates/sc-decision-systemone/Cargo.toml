@@ -1,4 +1,7 @@
 [package]
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 name = "sc-decision-systemone"
 version.workspace = true
 description = "System One decision backend for sc-agent: sans-IO encode/decode of POST /v1/systemone and GET /v1/models for Jev and any System One server."
@@ -7,10 +10,10 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-sc-agent-http = { path = "../sc-agent-http", version = "0.1.5" }
-sc-agent-secrets = { path = "../sc-agent-secrets", version = "0.1.5" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.5" }
-sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.5" }
+sc-agent-http = { workspace = true }
+sc-agent-secrets = { workspace = true }
+sc-agent-types = { workspace = true }
+sc-decision-schema = { workspace = true }
 # preserve_order: bodies keep the request's key order; float_roundtrip: probabilities decode
 # unrounded (REQ-SAG-0007).
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
@@ -18,9 +21,9 @@ serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 ulid = "1"
 
 [dev-dependencies]
-sc-agent-secrets = { path = "../sc-agent-secrets", features = ["test-keyring-guard"] }
-sc-agent-testkit = { path = "../sc-agent-testkit" }
-sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
+sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
+sc-agent-testkit = { workspace = true }
+sc-agent-http = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

@@ -98,31 +98,14 @@ jobs:
       - name: Run clippy
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 
-      - name: Test sc-lint release setup
-        run: |
-          python3 .github/scripts/tests/test_setup_sc_lint_checksum.py
-          python3 .github/scripts/tests/test_setup_sc_lint_release.py
-
       - name: Install sc-lint
-        uses: ./.github/actions/setup-sc-lint
+        uses: randlee/sc-lint@bce8a2bfba7f64736616b2fb8f53847e22d8c406 # expose installed sibling analyzers to action subprocesses, randlee/sc-lint#977
         with:
           version: "0.8.9"
-          smoke-family: "sc-runtime"
 
-      - name: Reject production panic constructs
-        run: |
-          set -euo pipefail
-          report="${RUNNER_TEMP}/sc-lint-runtime.json"
-          set +e
-          sc-lint --json lint sc-runtime --rule-filter SCB-RUNTIME-008 > "${report}"
-          lint_rc=$?
-          set -e
-          if [ "${lint_rc}" -ne 0 ]; then
-            cat "${report}"
-            exit "${lint_rc}"
-          fi
-          export SC_LINT_RUNTIME_REPORT="${report}"
-          python3 .github/scripts/tests/test_runtime_panic_gate.py
+      - name: Run consumer lint profile
+        run: sc-lint lint ci --consumer
+
 
   test:
     name: Test (${{ matrix.os }})
