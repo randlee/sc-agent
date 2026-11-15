@@ -84,7 +84,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-          components: clippy
+          components: clippy,rustfmt
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -95,16 +95,27 @@ jobs:
             target
           key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run clippy
-        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-
-      - name: Install sc-lint
-        uses: randlee/sc-lint@bce8a2bfba7f64736616b2fb8f53847e22d8c406 # expose installed sibling analyzers to action subprocesses, randlee/sc-lint#977
+      - name: Install just
+        uses: taiki-e/install-action@v2
         with:
-          version: "0.8.9"
+          tool: just@1.58.0
+
+      - name: Set up released sc-lint
+        run: just setup
+
+      - name: Install Windows cross-lint tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes llvm nasm
+          llvm_lib="$(command -v llvm-lib || find /usr/bin -maxdepth 1 -name 'llvm-lib-*' -executable -print -quit)"
+          test -n "${llvm_lib}"
+          sudo ln -sf "${llvm_lib}" /usr/local/bin/llvm-lib
 
       - name: Run consumer lint profile
-        run: sc-lint lint ci --consumer
+        run: just lint ci all
 
 
   test:
