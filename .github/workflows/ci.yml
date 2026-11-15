@@ -99,7 +99,7 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 
       - name: Install sc-lint
-        uses: randlee/sc-lint@a2cb3e90b55f5df7671598382a49f0d0cb04263c # fix POSIX PAX archive path extraction, randlee/sc-lint#975
+        uses: randlee/sc-lint@a2cb3e9098ba0bc470d6f244395d2ef8cf3a9f8f # fix POSIX PAX archive path extraction, randlee/sc-lint#975
         with:
           version: "0.8.9"
 
