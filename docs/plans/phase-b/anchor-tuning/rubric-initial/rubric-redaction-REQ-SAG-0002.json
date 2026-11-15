@@ -1,0 +1,196 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.6,
+    "dry_run": false,
+    "fixture": false,
+    "path": "docs/plans/phase-b/anchors.json",
+    "anchors": [
+      {
+        "id": "REQ-SAG-0002",
+        "statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002.",
+        "quote": "An error MUST carry the error id and message of every lower-layer error that caused it.",
+        "scope": "adds or changes an error type or a public function's return type",
+        "verdict": "inconclusive",
+        "failing": [
+          "single_constraint",
+          "faithful",
+          "observable",
+          "self_contained"
+        ],
+        "answers": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.76,
+            "probabilities": {
+              "no": 0.84,
+              "unclear": 0.01,
+              "yes": 0.15
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.3,
+            "probabilities": {
+              "no": 0.17,
+              "unclear": 0.3,
+              "yes": 0.53
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.99,
+              "unclear": 0.0,
+              "yes": 0.01
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.83,
+            "probabilities": {
+              "no": 0.02,
+              "unclear": 0.09,
+              "yes": 0.89
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.4,
+            "probabilities": {
+              "no": 0.6,
+              "unclear": 0.18,
+              "yes": 0.22
+            }
+          }
+        },
+        "lint": {
+          "warnings": [],
+          "errors": []
+        },
+        "answers_second": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.74,
+            "probabilities": {
+              "no": 0.83,
+              "unclear": 0.01,
+              "yes": 0.16
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.2,
+            "probabilities": {
+              "no": 0.22,
+              "unclear": 0.31,
+              "yes": 0.47
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.99,
+              "unclear": 0.0,
+              "yes": 0.01
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.89,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.06,
+              "yes": 0.93
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.5,
+            "probabilities": {
+              "no": 0.67,
+              "unclear": 0.15,
+              "yes": 0.18
+            }
+          }
+        },
+        "attempts": 2,
+        "confirmations": {
+          "verdict": "inconclusive",
+          "failing": [
+            "single_constraint",
+            "faithful",
+            "observable",
+            "self_contained"
+          ],
+          "low_confidence": [
+            "observable",
+            "self_contained"
+          ],
+          "unstable": [],
+          "initial_disagreements": [],
+          "resolved": {
+            "single_constraint": {
+              "choice": "no",
+              "confidence": 0.74,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "observable": {
+              "choice": "yes",
+              "confidence": 0.2,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "faithful": {
+              "choice": "no",
+              "confidence": 0.98,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "scoped": {
+              "choice": "yes",
+              "confidence": 0.83,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "self_contained": {
+              "choice": "no",
+              "confidence": 0.4,
+              "matching_calls": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "next": "Plan diagnosis: run `judge` on the item, then `report --run <run>` for triage answers and routes. A disputed rubric role on a locked anchor: anchor-tuning `triage` with `gate: testability`."
+      }
+    ],
+    "needs_work": [
+      "REQ-SAG-0002"
+    ],
+    "pass": false
+  },
+  "error": null
+}

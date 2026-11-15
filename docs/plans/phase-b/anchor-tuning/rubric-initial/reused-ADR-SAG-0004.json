@@ -1,0 +1,189 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.6,
+    "dry_run": false,
+    "fixture": false,
+    "path": "docs/plans/phase-b/anchors.json",
+    "anchors": [
+      {
+        "id": "ADR-SAG-0004",
+        "statement": "No sc-agent crate's Cargo.toml may depend on a crate in a higher layer, where the layers from the bottom are: types; config, secrets and log; http; decision schema; decision backends (sc-decision-local over sc-decision-systemone, sc-decision-llm over sc-llm-provider); runner.",
+        "quote": "Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.",
+        "scope": "adds or changes a crate dependency in a Cargo.toml",
+        "verdict": "needs_work",
+        "failing": [
+          "faithful"
+        ],
+        "answers": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.0,
+              "yes": 0.99
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.85,
+            "probabilities": {
+              "no": 0.03,
+              "unclear": 0.07,
+              "yes": 0.9
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.68,
+            "probabilities": {
+              "no": 0.79,
+              "unclear": 0.05,
+              "yes": 0.16
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.01,
+              "yes": 0.99
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.73,
+            "probabilities": {
+              "no": 0.12,
+              "unclear": 0.06,
+              "yes": 0.82
+            }
+          }
+        },
+        "lint": {
+          "warnings": [
+            "too long; split into one constraint per anchor"
+          ],
+          "errors": []
+        },
+        "answers_second": {
+          "single_constraint": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.0,
+              "yes": 0.99
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.85,
+            "probabilities": {
+              "no": 0.03,
+              "unclear": 0.07,
+              "yes": 0.9
+            }
+          },
+          "faithful": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.72,
+            "probabilities": {
+              "no": 0.81,
+              "unclear": 0.03,
+              "yes": 0.16
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.01,
+              "yes": 0.99
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.8,
+            "probabilities": {
+              "no": 0.09,
+              "unclear": 0.04,
+              "yes": 0.87
+            }
+          }
+        },
+        "attempts": 2,
+        "confirmations": {
+          "verdict": "needs_work",
+          "failing": [
+            "faithful"
+          ],
+          "low_confidence": [],
+          "unstable": [],
+          "initial_disagreements": [],
+          "resolved": {
+            "single_constraint": {
+              "choice": "yes",
+              "confidence": 0.98,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "observable": {
+              "choice": "yes",
+              "confidence": 0.85,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "faithful": {
+              "choice": "no",
+              "confidence": 0.68,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "scoped": {
+              "choice": "yes",
+              "confidence": 0.98,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "self_contained": {
+              "choice": "yes",
+              "confidence": 0.73,
+              "matching_calls": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "next": "Plan diagnosis: run `judge` on the item, then `report --run <run>` for triage answers and routes. A disputed rubric role on a locked anchor: anchor-tuning `triage` with `gate: testability`."
+      }
+    ],
+    "needs_work": [
+      "ADR-SAG-0004"
+    ],
+    "pass": false
+  },
+  "error": null
+}
