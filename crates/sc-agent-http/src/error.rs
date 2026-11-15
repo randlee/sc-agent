@@ -413,8 +413,32 @@ impl ErrorId for HttpError {
     fn status(&self) -> Option<u16> {
         match self {
             Self::ProviderBusy { last, .. } => Some(last.status),
-            Self::QuotaExhausted { .. }
-            | Self::Network { .. }
+            Self::QuotaExhausted { reply, .. } => Some(reply.status),
+            Self::ResponseTooLarge { status, .. } => (*status != 0).then_some(*status),
+            Self::Network { .. }
+            | Self::InvalidEndpoint { .. }
+            | Self::InvalidRequest { .. }
+            | Self::KeyOnPlainHttp { .. } => None,
+        }
+    }
+
+    fn attempts(&self) -> Option<u32> {
+        match self {
+            Self::ProviderBusy { attempts, .. }
+            | Self::QuotaExhausted { attempts, .. }
+            | Self::Network { attempts, .. } => Some(*attempts),
+            Self::ResponseTooLarge { .. }
+            | Self::InvalidEndpoint { .. }
+            | Self::InvalidRequest { .. }
+            | Self::KeyOnPlainHttp { .. } => None,
+        }
+    }
+
+    fn retry_after_ms(&self) -> Option<u64> {
+        match self {
+            Self::ProviderBusy { last, .. } => last.retry_after_ms,
+            Self::QuotaExhausted { reply, .. } => reply.retry_after_ms,
+            Self::Network { .. }
             | Self::ResponseTooLarge { .. }
             | Self::InvalidEndpoint { .. }
             | Self::InvalidRequest { .. }
