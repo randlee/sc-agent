@@ -20,11 +20,11 @@ Intent: `docs/plans/phase-b/intent.md`
 | REQ-SAG-0006 | locked | No consumer-app or Jev-mock types in shared crates | 2026-11-09 |
 | REQ-SAG-0010 | locked | No sleep calls in sc-agent source | 2026-11-09 |
 | ANC-010 | locked | Fix minor integration defects | 2026-11-14 |
-| ANC-011 | proposed |  | 2026-11-14 |
-| ANC-012 | proposed |  | 2026-11-14 |
-| ANC-013 | proposed |  | 2026-11-14 |
-| ANC-014 | proposed | Python 3.11 or newer | 2026-11-14 |
-| ANC-015 | proposed | Judge template adoption follows the sc-agent template | 2026-11-14 |
+| ANC-011 | locked |  | 2026-11-14 |
+| ANC-012 | locked |  | 2026-11-14 |
+| ANC-013 | locked |  | 2026-11-14 |
+| ANC-014 | locked | Python 3.11 or newer | 2026-11-14 |
+| ANC-015 | locked | Judge template adoption follows the sc-agent template | 2026-11-14 |
 
 ## ANC-001
 
@@ -32,13 +32,27 @@ Anchor: In the phase-b bead dependency graph, the sprint that builds the sc-agen
 
 > define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 8.
 
 Summary: Working client precedes template
 
-Scope: Sprints that build the shared plan-anchor client or the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bpa-2. The shared client is plan-anchor’s Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
 
 Deterministic check to pair with the development gate: Compare the completed client revision with the template source and sprint ordering.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-09m`, plan questions `agt-09m.1`, dev questions `agt-09m.2`
 
@@ -52,13 +66,28 @@ Anchor: After the plan-anchor sprint that integrates the shared client, plan-anc
 
 > integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 8.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 9.
 
 Summary: Plan-anchor functional parity
 
-Scope: The plan-anchor sprint that integrates the shared client into existing plan-anchor features. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
+Scope: Owner-approved governed sprints: agt-bpa-3.
 
 Deterministic check to pair with the development gate: Run existing plan-anchor behavior and installation tests against the integrated client.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-z25`, plan questions `agt-z25.1`, dev questions `agt-z25.2`
 
@@ -72,13 +101,26 @@ Anchor: In the phase-b bead dependency graph, judge-jev's sitr sprint must depen
 
 > judge-jev : template -> current features -> sitr support
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Judge-jev sitr sequence
 
-Scope: Judge-jev template adoption, feature parity and sitr integration sprints.
+Scope: Owner-approved governed sprints: agt-bjj-2, agt-bjj-3, agt-bjj-4.
 
 Deterministic check to pair with the development gate: Inspect the judge-jev sprint order and run feature and sitr tests.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-08a`, plan questions `agt-08a.1`, dev questions `agt-08a.2`
 
@@ -92,13 +134,27 @@ Anchor: Each live integration test must be a unit test that also runs against mo
 
 > I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: Reuse existing tests for live runs
 
-Scope: Sprints that implement or run live integration tests for sc-agent or its consumers.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bjj-4.
 
 Deterministic check to pair with the development gate: Inspect live and controlled test selections and run the existing unit suite.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-8s2`, plan questions `agt-8s2.1`, dev questions `agt-8s2.2`
 
@@ -112,13 +168,27 @@ Anchor: The integration test process must push a commit containing its test repo
 
 > The test report MUST be committed/pushed as part of the integration test process.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
 
 Summary: Reports committed and pushed
 
-Scope: Sprints defining or executing the integration test reporting process.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bjj-4.
 
 Deterministic check to pair with the development gate: Inspect the integration run procedure and the resulting git commit and remote.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-ate`, plan questions `agt-ate.1`, dev questions `agt-ate.2`
 
@@ -132,13 +202,27 @@ Anchor: One passing integration run on any one platform, such as local macOS or 
 
 > integration testing should be set up flexably where ONE integration test run should be required (one platform) which would typically be this mac or colima.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
 
 Summary: One platform suffices
 
-Scope: Sprints defining integration test platform requirements or acceptance.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bjj-4.
 
 Deterministic check to pair with the development gate: Run the integration procedure with exactly one supported platform result.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-2yh`, plan questions `agt-2yh.1`, dev questions `agt-2yh.2`
 
@@ -152,13 +236,17 @@ Anchor: Phase-b tests must not depend on races, wall-clock timing, sleeps, event
 
 > Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 6.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
 
 Summary: Deterministic tests
 
-Scope: Sprints that add or change tests.
+Scope: Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9, agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-2, agt-bpa-3.
 
 Deterministic check to pair with the development gate: Review changed tests for timing, sleep and event-order dependence.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-0qk`, plan questions `agt-0qk.1`, dev questions `agt-0qk.2`
 
@@ -172,13 +260,29 @@ Anchor: After the shared plan-anchor client is complete, the sc-agent, plan-anch
 
 > 3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 7.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 8.
 
 Summary: Three parallel tracks
 
-Scope: The phase-b plan and sprints following completion of the shared plan-anchor client. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
+Scope: Graph-only check; no per-sprint Jev judgment.
 
-Deterministic check to pair with the development gate: Inspect the sprint graph and the lead dispatch order.
+Deterministic check to pair with the development gate: Check bpa-2 completion precedes all three track starts; bpa-3 and b-12 can proceed independently, and judge-jev starts through b-12 -> bjj-2; verify actual bd dependency graph and phase indexes.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-8ug`, plan questions `agt-8ug.1`, dev questions `agt-8ug.2`
 
@@ -192,13 +296,27 @@ Anchor: The integration test process must produce one XHTML report for each plat
 
 > There should be one xhtml report per platform tested.
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 3.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
 
 Summary: One XHTML report per tested platform
 
-Scope: Sprints defining integration test reports and platform coverage.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bjj-4.
 
 Deterministic check to pair with the development gate: Inspect the report output from separate platform runs.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-rvm`, plan questions `agt-rvm.1`, dev questions `agt-rvm.2`
 
@@ -212,11 +330,19 @@ Anchor: No sc-agent crate may depend on a crate in a higher layer. Layers from t
 
 > Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 6.
 
 Summary: No crate depends on a crate above it in the layering
 
-Scope: adds or changes a crate dependency in a Cargo.toml
+Scope: Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-15, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Cargo.toml dependency changes.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-mud`, plan questions `agt-mud.1`, dev questions `agt-mud.2`
 
@@ -230,11 +356,21 @@ Anchor: Every error returned by a public sc-agent function must carry, in its ca
 
 > An error MUST carry the error id and message of every lower-layer error that caused it.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 5.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 7.
 
 Summary: Each crate returns its own error union carrying lower errors
 
-Scope: adds or changes an error type or a public function's return type
+Scope: Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-t70`, plan questions `agt-t70.1`, dev questions `agt-t70.2`
 
@@ -248,11 +384,21 @@ Anchor: No type, field or constant in the sc-agent-types or sc-decision-schema c
 
 > `sc-agent-types` and `sc-decision-schema` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
 
 Summary: No consumer-app or Jev-mock types in shared crates
 
-Scope: adds or changes a type in sc-agent-types or sc-decision-schema
+Scope: Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-qyd`, plan questions `agt-qyd.1`, dev questions `agt-qyd.2`
 
@@ -266,11 +412,21 @@ Anchor: sc-agent source code must not call std::thread::sleep, tokio::time::slee
 
 > sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.
 
-Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 2.
+Said by Rand Lee, Previously approved phase-a anchor; governing record remains approved in phase-b, 2026-11-09. Status: locked. Version 4.
 
 Summary: No sleep calls in sc-agent source
 
-Scope: adds or changes Rust source in an sc-agent crate
+Scope: Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-6dm`, plan questions `agt-6dm.1`, dev questions `agt-6dm.2`
 
@@ -284,13 +440,25 @@ Anchor: An integration sprint that finds a defect whose fix changes no REQ, ADR 
 
 > If minor issues are encountered, I expect them fixed (assuming no requirements changed).
 
-Said by user, phase-b planning, 2026-11-14. Status: locked. Version 4.
+Said by user, phase-b planning, 2026-11-14. Status: locked. Version 5.
 
 Summary: Fix minor integration defects
 
-Scope: Sprints integrating the sc-agent client with plan-anchor or judge-jev.
+Scope: Owner-approved governed sprints: agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-3.
 
 Deterministic check to pair with the development gate: Inspect integration changes and defect tests against existing requirements.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-uw0`, plan questions `agt-uw0.1`, dev questions `agt-uw0.2`
 
@@ -304,9 +472,24 @@ Anchor: The sc-agent consumer template must generate the shared client as plan-a
 
 > define/build the shared client layer (on plan-anchor) first.  once the layer is defined and working, then build sc-compose template to generate it.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 3.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 4.
 
-Scope: Sprints building the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.
+Scope: Owner-approved governed sprints: agt-b-12.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-eue`, plan questions `agt-eue.1`, dev questions `agt-eue.2`
 
@@ -320,9 +503,23 @@ Anchor: Live integration runs must be started manually, never by CI on a push, p
 
 > I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 2.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 3.
 
-Scope: Sprints defining or running live integration tests.
+Scope: Owner-approved governed sprints: agt-b-12, agt-bjj-4.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-9cc`, plan questions `agt-9cc.1`, dev questions `agt-9cc.2`
 
@@ -336,9 +533,13 @@ Anchor: A phase-b test found flaky must be redesigned to be deterministic by dri
 
 > Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
 
-Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: proposed. Version 3.
+Said by user, Owner-approved split in phase-b planning, 2026-11-14. Status: locked. Version 4.
 
-Scope: Sprints that find or change flaky tests.
+Scope: Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9, agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-2, agt-bpa-3.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-e0a`, plan questions `agt-e0a.1`, dev questions `agt-e0a.2`
 
@@ -352,11 +553,23 @@ Anchor: sc-agent, judge-jev and plan-anchor must require Python 3.11 or newer.
 
 > sc-agent, judge-jev, prompt-anchor all must be 3.11+
 
-Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: proposed. Version 2.
+Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: locked. Version 3.
 
 Summary: Python 3.11 or newer
 
-Scope: Sprints setting the supported Python floor in sc-agent, judge-jev or plan-anchor.
+Scope: Owner-approved governed sprints: agt-b-11, agt-bjj-2, agt-bpa-2, agt-bpa-3.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-27n`, plan questions `agt-27n.1`, dev questions `agt-27n.2`
 
@@ -370,11 +583,29 @@ Anchor: judge-jev's template-adoption sprint must depend on the sc-agent consume
 
 > 3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support
 
-Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: proposed. Version 2.
+Said by user, Owner-directed phase-b anchor fix, 2026-11-14. Status: locked. Version 3.
 
 Summary: Judge template adoption follows the sc-agent template
 
-Scope: Sprints building or adopting the sc-agent consumer template.
+Scope: Graph-only check; no per-sprint Jev judgment.
+
+Deterministic check to pair with the development gate: Check bd dep list: agt-bjj-2.group-dev depends on agt-b-12.group-sanity.
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-b-13`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-5`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-6`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-7`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-8`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-9`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-11`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-12`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-b-15`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bpa-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-2`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-4`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
+- `agt-bjj-3`: Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.
 
 Beads: anchor `agt-spz`, plan questions `agt-spz.1`, dev questions `agt-spz.2`
 

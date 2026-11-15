@@ -14,7 +14,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Working client precedes template",
-      "scope": "Sprints that build the shared plan-anchor client or the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bpa-2. The shared client is plan-anchor’s Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
       "deterministic_check": "Compare the completed client revision with the template source and sprint ordering.",
       "fixtures": {
         "pass": [
@@ -25,7 +25,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
+      "version": 8,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -83,6 +83,154 @@
           "fields": [
             "scope"
           ]
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T03:01:52+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -97,7 +245,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Plan-anchor functional parity",
-      "scope": "The plan-anchor sprint that integrates the shared client into existing plan-anchor features. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
+      "scope": "Owner-approved governed sprints: agt-bpa-3.",
       "deterministic_check": "Run existing plan-anchor behavior and installation tests against the integrated client.",
       "fixtures": {
         "pass": [
@@ -108,7 +256,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 8,
+      "version": 9,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -182,6 +330,158 @@
             "statement"
           ],
           "previous_statement": "After the plan-anchor sprint that integrates the shared client, plan-anchor's existing tests must pass with no test removed or weakened, except: Python 3.9 jobs are retired (3.11 floor), and live Jev calls require the sc-decidr wheel."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -196,7 +496,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Judge-jev sitr sequence",
-      "scope": "Judge-jev template adoption, feature parity and sitr integration sprints.",
+      "scope": "Owner-approved governed sprints: agt-bjj-2, agt-bjj-3, agt-bjj-4.",
       "deterministic_check": "Inspect the judge-jev sprint order and run feature and sitr tests.",
       "fixtures": {
         "pass": [
@@ -207,7 +507,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -258,6 +558,136 @@
             "statement"
           ],
           "previous_statement": "The judge-jev track must use the template and preserve its current features before adding sitr support."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -272,7 +702,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Reuse existing tests for live runs",
-      "scope": "Sprints that implement or run live integration tests for sc-agent or its consumers.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bjj-4.",
       "deterministic_check": "Inspect live and controlled test selections and run the existing unit suite.",
       "fixtures": {
         "pass": [
@@ -283,7 +713,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -334,6 +764,147 @@
             "statement"
           ],
           "previous_statement": "Manual live integration runs must use unit tests with real providers, reusing existing mocked tests where applicable."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -348,7 +919,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Reports committed and pushed",
-      "scope": "Sprints defining or executing the integration test reporting process.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bjj-4.",
       "deterministic_check": "Inspect the integration run procedure and the resulting git commit and remote.",
       "fixtures": {
         "pass": [
@@ -359,7 +930,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
+      "version": 7,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -418,6 +989,147 @@
             "statement"
           ],
           "previous_statement": "An integration run must end with its test report on the remote branch the run was made from."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -432,7 +1144,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "One platform suffices",
-      "scope": "Sprints defining integration test platform requirements or acceptance.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bjj-4.",
       "deterministic_check": "Run the integration procedure with exactly one supported platform result.",
       "fixtures": {
         "pass": [
@@ -443,7 +1155,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -494,6 +1206,147 @@
             "statement"
           ],
           "previous_statement": "One successful integration test run on one supported platform must satisfy the platform requirement."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -508,7 +1361,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Deterministic tests",
-      "scope": "Sprints that add or change tests.",
+      "scope": "Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9, agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-2, agt-bpa-3.",
       "deterministic_check": "Review changed tests for timing, sleep and event-order dependence.",
       "fixtures": {
         "pass": [
@@ -519,7 +1372,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
+      "version": 7,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -580,6 +1433,37 @@
             "fixtures"
           ],
           "previous_statement": "Phase-b tests must be deterministic by design, never relying on races, timing, sleeps, event-loop ordering or load, and any test found flaky must be redesigned to use controlled inputs."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -589,13 +1473,13 @@
       "source_ref": null,
       "statement": "After the shared plan-anchor client is complete, the sc-agent, plan-anchor and judge-jev sprints must run as three parallel tracks.",
       "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
-      "kind": "directive",
+      "kind": "structural",
       "stated_by": "user",
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Three parallel tracks",
-      "scope": "The phase-b plan and sprints following completion of the shared plan-anchor client. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
-      "deterministic_check": "Inspect the sprint graph and the lead dispatch order.",
+      "scope": "Graph-only check; no per-sprint Jev judgment.",
+      "deterministic_check": "Check bpa-2 completion precedes all three track starts; bpa-3 and b-12 can proceed independently, and judge-jev starts through b-12 -> bjj-2; verify actual bd dependency graph and phase indexes.",
       "fixtures": {
         "pass": [
           "After the shared client is complete, schedule sc-agent, plan-anchor and judge-jev as parallel tracks with their stated prerequisites."
@@ -605,7 +1489,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 7,
+      "version": 8,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -671,6 +1555,171 @@
             "statement"
           ],
           "previous_statement": "In the phase-b bead dependency graph, the first sprint of each of the sc-agent, plan-anchor and judge-jev tracks must depend on the shared-client sprint, and no track's sprint may depend on another track's sprint except judge-jev's template-adoption sprint on the sc-agent consumer template sprint."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "deterministic_check",
+            "kind"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -685,7 +1734,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "One XHTML report per tested platform",
-      "scope": "Sprints defining integration test reports and platform coverage.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bjj-4.",
       "deterministic_check": "Inspect the report output from separate platform runs.",
       "fixtures": {
         "pass": [
@@ -696,7 +1745,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -730,6 +1779,147 @@
             "plan_questions": "agt-rvm.1",
             "dev_questions": "agt-rvm.2"
           }
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -744,7 +1934,7 @@
       "stated_at": "2026-11-09",
       "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
       "summary": "No crate depends on a crate above it in the layering",
-      "scope": "adds or changes a crate dependency in a Cargo.toml",
+      "scope": "Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-15, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Cargo.toml dependency changes.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -755,7 +1945,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 6,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -800,6 +1990,88 @@
             "statement"
           ],
           "previous_statement": "No sc-agent crate may depend on a crate in a higher layer. Layers from the bottom: sc-agent-types; sc-agent-config, sc-agent-secrets and sc-agent-log; sc-agent-http; sc-decision-schema; the decision backends sc-decision-systemone, sc-decision-local and sc-decision-llm (over sc-llm-provider); sc-decision-runner."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T03:02:44+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -814,7 +2086,7 @@
       "stated_at": "2026-11-09",
       "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
       "summary": "Each crate returns its own error union carrying lower errors",
-      "scope": "adds or changes an error type or a public function's return type",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -825,7 +2097,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
+      "version": 7,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -879,6 +2151,110 @@
             "fixtures"
           ],
           "previous_statement": "A public sc-agent error must retain each lower-layer error ID and message, with attached API keys redacted as required by REQ-SAG-0002."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T03:02:44+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -893,7 +2269,7 @@
       "stated_at": "2026-11-09",
       "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
       "summary": "No consumer-app or Jev-mock types in shared crates",
-      "scope": "adds or changes a type in sc-agent-types or sc-decision-schema",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -904,7 +2280,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -933,6 +2309,110 @@
             "plan_questions": "agt-qyd.1",
             "dev_questions": "agt-qyd.2"
           }
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T03:02:44+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -947,7 +2427,7 @@
       "stated_at": "2026-11-09",
       "context": "Previously approved phase-a anchor; governing record remains approved in phase-b",
       "summary": "No sleep calls in sc-agent source",
-      "scope": "adds or changes Rust source in an sc-agent crate",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9. Applies only to sc-agent Rust.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -958,7 +2438,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -987,6 +2467,110 @@
             "plan_questions": "agt-6dm.1",
             "dev_questions": "agt-6dm.2"
           }
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T03:02:44+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1001,7 +2585,7 @@
       "stated_at": "2026-11-14",
       "context": "phase-b planning",
       "summary": "Fix minor integration defects",
-      "scope": "Sprints integrating the sc-agent client with plan-anchor or judge-jev.",
+      "scope": "Owner-approved governed sprints: agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-3.",
       "deterministic_check": "Inspect integration changes and defect tests against existing requirements.",
       "fixtures": {
         "pass": [
@@ -1012,7 +2596,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1054,6 +2638,125 @@
             "statement"
           ],
           "previous_statement": "Phase-b integration work must fix minor implementation defects when requirements have not changed."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1068,7 +2771,7 @@
       "stated_at": "2026-11-14",
       "context": "Owner-approved split in phase-b planning",
       "summary": "",
-      "scope": "Sprints building the sc-agent consumer template. The shared client is plan-anchor's Python module wrapping sc-decidr calls for errors, API keys, model selection, general logger and session log.",
+      "scope": "Owner-approved governed sprints: agt-b-12.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -1079,8 +2782,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
         "anchor": "agt-eue",
@@ -1120,6 +2823,164 @@
           "at": "2026-11-15T00:35:52+00:00",
           "event": "approval_conditional",
           "note": "Owner approved contingent on each anchor passing; latest requested check has not established a pass."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56.842433+00:00",
+          "event": "locked",
+          "status": "locked",
+          "reason": "Owner explicitly approved the anchor as worded."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1134,7 +2995,7 @@
       "stated_at": "2026-11-14",
       "context": "Owner-approved split in phase-b planning",
       "summary": "",
-      "scope": "Sprints defining or running live integration tests.",
+      "scope": "Owner-approved governed sprints: agt-b-12, agt-bjj-4.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -1145,8 +3006,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
         "anchor": "agt-9cc",
@@ -1179,6 +3040,153 @@
           "at": "2026-11-15T00:35:52+00:00",
           "event": "approval_conditional",
           "note": "Owner approved contingent on each anchor passing; latest requested check has not established a pass."
+        },
+        {
+          "at": "2026-11-15T02:57:55+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56.842433+00:00",
+          "event": "locked",
+          "status": "locked",
+          "reason": "Owner explicitly approved the anchor as worded."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1193,7 +3201,7 @@
       "stated_at": "2026-11-14",
       "context": "Owner-approved split in phase-b planning",
       "summary": "",
-      "scope": "Sprints that find or change flaky tests.",
+      "scope": "Owner-approved governed sprints: agt-b-11, agt-b-12, agt-b-5, agt-b-6, agt-b-7, agt-b-8, agt-b-9, agt-bjj-2, agt-bjj-3, agt-bjj-4, agt-bpa-2, agt-bpa-3.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -1204,8 +3212,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
         "anchor": "agt-e0a",
@@ -1247,6 +3255,43 @@
             "fixtures"
           ],
           "previous_statement": "A phase-b test found flaky must be redesigned to drive its logic with controlled inputs, never retried or given a longer timeout."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56.842433+00:00",
+          "event": "locked",
+          "status": "locked",
+          "reason": "Owner explicitly approved the anchor as worded."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1261,7 +3306,7 @@
       "stated_at": "2026-11-14",
       "context": "Owner-directed phase-b anchor fix",
       "summary": "Python 3.11 or newer",
-      "scope": "Sprints setting the supported Python floor in sc-agent, judge-jev or plan-anchor.",
+      "scope": "Owner-approved governed sprints: agt-b-11, agt-bjj-2, agt-bpa-2, agt-bpa-3.",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -1272,8 +3317,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
         "anchor": "agt-27n",
@@ -1302,6 +3347,131 @@
             "plan_questions": "agt-27n.1",
             "dev_questions": "agt-27n.2"
           }
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56.842433+00:00",
+          "event": "locked",
+          "status": "locked",
+          "reason": "Owner explicitly approved the anchor as worded."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     },
@@ -1311,13 +3481,13 @@
       "source_ref": null,
       "statement": "judge-jev's template-adoption sprint must depend on the sc-agent consumer template sprint.",
       "quote": "3 parallel tracks once plan-anchor client is complete.  template -> integration tests (sc-agent)  || integration w/ current plan-anchor (so plan anchor is unchanged functionally) on plan anchor || judge-jev : template -> current features -> sitr support",
-      "kind": "directive",
+      "kind": "structural",
       "stated_by": "user",
       "stated_at": "2026-11-14",
       "context": "Owner-directed phase-b anchor fix",
       "summary": "Judge template adoption follows the sc-agent template",
-      "scope": "Sprints building or adopting the sc-agent consumer template.",
-      "deterministic_check": "",
+      "scope": "Graph-only check; no per-sprint Jev judgment.",
+      "deterministic_check": "Check bd dep list: agt-bjj-2.group-dev depends on agt-b-12.group-sanity.",
       "fixtures": {
         "pass": [
           "The judge-jev template-adoption sprint depends on the sc-agent consumer template sprint."
@@ -1327,8 +3497,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
         "anchor": "agt-spz",
@@ -1357,6 +3527,177 @@
             "plan_questions": "agt-spz.1",
             "dev_questions": "agt-spz.2"
           }
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "deterministic_check",
+            "kind"
+          ]
+        },
+        {
+          "at": "2026-11-15T02:57:56.842433+00:00",
+          "event": "locked",
+          "status": "locked",
+          "reason": "Owner explicitly approved the anchor as worded."
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-15T02:57:56+00:00",
+          "event": "excluded",
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-b-13",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-5",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-6",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-7",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-8",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-9",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-11",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-12",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-b-15",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bpa-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-2",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-4",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
+        },
+        {
+          "item": "agt-bjj-3",
+          "reason": "Owner-approved mechanical scope excludes this sprint; graph-only anchors are checked directly in the dependency graph."
         }
       ]
     }
