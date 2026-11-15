@@ -153,12 +153,12 @@ impl LlmDecisionBackend {
             self.log_mismatch(&error, ctx);
             DecisionError::SchemaMismatch {
                 backend: BACKEND,
-                detail,
+                detail: Box::new(detail),
             }
         } else {
             DecisionError::Backend {
                 backend: BACKEND,
-                detail,
+                detail: Box::new(detail),
             }
         }
     }

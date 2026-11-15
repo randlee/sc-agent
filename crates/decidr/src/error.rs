@@ -220,33 +220,38 @@ fn foreign(id: &str, error: &(dyn Error + 'static)) -> Option<ErrorDetail> {
     Some(ErrorDetail::foreign(id, error))
 }
 
+sc_agent_types::error_catalog! { DecidrError {
+    DecidrError::InvalidRequestTimeout { .. } => ("decidr.invalid_request_timeout", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Usage { .. } => ("decidr.usage", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Config(_) => ("decidr.config", None),
+    DecidrError::Types(_) => ("decidr.types", None),
+    DecidrError::Secrets(_) => ("decidr.secrets", None),
+    DecidrError::Log(_) => ("decidr.log", None),
+    DecidrError::Local(_) => ("decidr.local", None),
+    DecidrError::Decision(_) => ("decidr.decision", None),
+    DecidrError::Http(_) => ("decidr.http", None),
+    DecidrError::Llm(_) => ("decidr.llm", None),
+    DecidrError::Runner(_) => ("decidr.runner", None),
+    DecidrError::NoProviderKey { .. } => ("decidr.no_provider_key", Some(sc_agent_types::ErrorCategory::Auth)),
+    DecidrError::UnknownRunner { .. } => ("decidr.unknown_runner", Some(sc_agent_types::ErrorCategory::Config)),
+    DecidrError::InputNotFound { .. } => ("decidr.input_not_found", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::InputRead { .. } => ("decidr.input_read", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::LimitExceeded { .. } => ("decidr.limit_exceeded", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::LineNotUtf8 { .. } => ("decidr.line_not_utf8", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::ImageRead { .. } => ("decidr.image_read", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::ImageFormat { .. } => ("decidr.image_format", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::RequestInvalid { .. } => ("decidr.request_invalid", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Encode { .. } => ("decidr.encode", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::Write { .. } => ("decidr.write", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::Signal { .. } => ("decidr.signal", Some(sc_agent_types::ErrorCategory::Cancelled)),
+} }
+
 impl ErrorId for DecidrError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::InvalidRequestTimeout { .. } => "decidr.invalid_request_timeout",
-            Self::Usage { .. } => "decidr.usage",
-            Self::Config(_) => "decidr.config",
-            Self::Types(_) => "decidr.types",
-            Self::Secrets(_) => "decidr.secrets",
-            Self::Log(_) => "decidr.log",
-            Self::Local(_) => "decidr.local",
-            Self::Decision(_) => "decidr.decision",
-            Self::Http(_) => "decidr.http",
-            Self::Llm(_) => "decidr.llm",
-            Self::Runner(_) => "decidr.runner",
-            Self::NoProviderKey { .. } => "decidr.no_provider_key",
-            Self::UnknownRunner { .. } => "decidr.unknown_runner",
-            Self::InputNotFound { .. } => "decidr.input_not_found",
-            Self::InputRead { .. } => "decidr.input_read",
-            Self::LimitExceeded { .. } => "decidr.limit_exceeded",
-            Self::LineNotUtf8 { .. } => "decidr.line_not_utf8",
-            Self::ImageRead { .. } => "decidr.image_read",
-            Self::ImageFormat { .. } => "decidr.image_format",
-            Self::RequestInvalid { .. } => "decidr.request_invalid",
-            Self::Encode { .. } => "decidr.encode",
-            Self::Write { .. } => "decidr.write",
-            Self::Signal { .. } => "decidr.signal",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {

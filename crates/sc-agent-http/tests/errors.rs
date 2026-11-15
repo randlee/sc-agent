@@ -147,6 +147,7 @@ mod cases {
             if let Some(status) = error.status() {
                 expected = expected.with_status(status);
             }
+            expected.category = error.base_category();
             assert_eq!(error.detail(), expected);
             assert_eq!(
                 std::error::Error::source(error).is_some(),

@@ -66,11 +66,11 @@ mod tests {
         DecisionError::Http(network()),
         DecisionError::Backend {
             backend: "llm",
-            detail: llm_chain(),
+            detail: Box::new(llm_chain()),
         },
         DecisionError::SchemaMismatch {
             backend: "systemone",
-            detail: ErrorDetail::new("decision.schema", "answer `q` is missing", None),
+            detail: Box::new(ErrorDetail::new("decision.schema", "answer `q` is missing", None)),
         },
         DecisionError::Cancelled { sends: 1 },
         DecisionError::Shutdown {
@@ -138,7 +138,7 @@ mod tests {
     fn backend_chain_kept() {
         let error = DecisionError::Backend {
             backend: "llm",
-            detail: llm_chain(),
+            detail: Box::new(llm_chain()),
         };
         let detail = error.detail();
         let first = detail.cause.expect("first level");

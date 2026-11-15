@@ -30,7 +30,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
-use sc_agent_types::{ErrorDetail, ErrorId, Provider};
+use sc_agent_types::{ErrorCategory, ErrorDetail, ErrorId, Provider};
 use sc_decision_schema::DecisionResult;
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
@@ -234,7 +234,10 @@ fn python_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logge
             DecidrError::from(LogError::InvalidName {
                 what,
                 value: value.to_owned(),
-                cause: sc_agent_types::ErrorDetail::foreign("sc_observability.invalid_name", error),
+                cause: Box::new(sc_agent_types::ErrorDetail::foreign(
+                    "sc_observability.invalid_name",
+                    error,
+                )),
             })
         };
     let service_name =
@@ -270,17 +273,59 @@ enum Message<T> {
 /// The callback a decidr call reports each result to.
 type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>;
 
-/// The stable id of a worker that panicked or ended without a result (RBP-F003).
-const WORKER_PANICKED: &str = "sc_agent_py.worker_panicked";
+#[derive(Debug)]
+enum PyBindingError {
+    WorkerPanicked { message: String },
+    InvalidOption { option: String, bound: String },
+}
+
+sc_agent_types::error_catalog! { PyBindingError {
+    PyBindingError::WorkerPanicked { .. } => ("sc_agent_py.worker_panicked", Some(ErrorCategory::Other)),
+    PyBindingError::InvalidOption { .. } => ("sc_agent_py.invalid_option", Some(ErrorCategory::Validation)),
+} }
+
+impl std::fmt::Display for PyBindingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.id(), self.message())
+    }
+}
+
+impl std::error::Error for PyBindingError {}
+
+impl ErrorId for PyBindingError {
+    fn id(&self) -> &'static str {
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<ErrorCategory> {
+        self.catalog_row().1
+    }
+    fn message(&self) -> String {
+        match self {
+            Self::WorkerPanicked { message } => message.clone(),
+            Self::InvalidOption { option, bound } => format!("{option} {bound}"),
+        }
+    }
+    fn cause_detail(&self) -> Option<ErrorDetail> {
+        None
+    }
+    fn recovery(&self) -> Option<&'static str> {
+        match self {
+            Self::InvalidOption { .. } => Some("Correct the named option and retry."),
+            Self::WorkerPanicked { .. } => None,
+        }
+    }
+}
+
+fn py_binding_error(error: &PyBindingError) -> PyErr {
+    let detail = serde_json::to_string(&error.detail()).unwrap_or_else(|_| "{}".to_owned());
+    SagError::new_err((error.id(), error.message(), detail))
+}
 
 /// `SagError(sc_agent_py.worker_panicked, message, detail)`.
 fn worker_panicked(message: String) -> PyErr {
-    let detail = sc_agent_types::ErrorDetail::new(WORKER_PANICKED, message.clone(), None);
-    let detail = decidr::output::to_json(&detail).unwrap_or_else(|_| "{}".to_owned());
-    SagError::new_err((WORKER_PANICKED, message, detail))
+    py_binding_error(&PyBindingError::WorkerPanicked { message })
 }
 
-/// The text of a panic payload (`&str` or `String`), else a fixed note.
 fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
@@ -497,12 +542,10 @@ fn keyring_override(
 }
 
 fn invalid_option(option: &str, bound: &str) -> PyErr {
-    let id = "sc_agent_py.invalid_option";
-    let message = format!("{option} {bound}");
-    let detail = ErrorDetail::new(id, message.clone(), None)
-        .with_recovery("Correct the named option and retry.");
-    let detail_json = serde_json::to_string(&detail).unwrap_or_else(|_| "{}".to_owned());
-    SagError::new_err((id, message, detail_json))
+    py_binding_error(&PyBindingError::InvalidOption {
+        option: option.to_owned(),
+        bound: bound.to_owned(),
+    })
 }
 
 /// `decidr send`: one request, always `Decision::decide`; returns its result line (JSON).

@@ -39,12 +39,17 @@ pub enum RunnerError {
     },
 }
 
+sc_agent_types::error_catalog! { RunnerError {
+    RunnerError::SessionLog(_) => ("runner.session_log", None),
+    RunnerError::InvalidConfig { .. } => ("runner.invalid_config", Some(sc_agent_types::ErrorCategory::Config)),
+} }
+
 impl ErrorId for RunnerError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::SessionLog(_) => "runner.session_log",
-            Self::InvalidConfig { .. } => "runner.invalid_config",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {

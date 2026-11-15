@@ -56,7 +56,7 @@ fn rows_lost_reported_once() {
     let last = last.as_ref().expect("the latest failure");
     assert!(!last.message.is_empty(), "{last:?}");
     assert_eq!(error.id(), "log.rows_lost");
-    assert_eq!(error.detail().cause.as_deref(), Some(last));
+    assert_eq!(error.detail().cause.as_deref(), Some(last.as_ref()));
     log.flush().expect("reported once");
 
     // A healthy writer afterwards reports nothing new.

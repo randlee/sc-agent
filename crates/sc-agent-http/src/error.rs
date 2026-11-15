@@ -327,20 +327,28 @@ fn map_detail(detail: ErrorDetail, map: &impl Fn(String) -> String) -> ErrorDeta
         recovery: detail.recovery,
         cause: detail.cause.map(|cause| Box::new(map_detail(*cause, map))),
         status: detail.status,
+        attempts: detail.attempts,
+        retry_after_ms: detail.retry_after_ms,
+        category: detail.category,
     }
 }
 
+sc_agent_types::error_catalog! { HttpError {
+    HttpError::ProviderBusy { .. } => ("http.provider_busy", Some(sc_agent_types::ErrorCategory::Busy)),
+    HttpError::QuotaExhausted { .. } => ("http.quota_exhausted", Some(sc_agent_types::ErrorCategory::Quota)),
+    HttpError::Network { .. } => ("http.network", Some(sc_agent_types::ErrorCategory::Network)),
+    HttpError::ResponseTooLarge { .. } => ("http.response_too_large", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    HttpError::InvalidEndpoint { .. } => ("http.invalid_endpoint", Some(sc_agent_types::ErrorCategory::Config)),
+    HttpError::InvalidRequest { .. } => ("http.invalid_request", Some(sc_agent_types::ErrorCategory::Validation)),
+    HttpError::KeyOnPlainHttp { .. } => ("http.key_on_plain_http", Some(sc_agent_types::ErrorCategory::Config)),
+} }
+
 impl ErrorId for HttpError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::ProviderBusy { .. } => "http.provider_busy",
-            Self::QuotaExhausted { .. } => "http.quota_exhausted",
-            Self::Network { .. } => "http.network",
-            Self::ResponseTooLarge { .. } => "http.response_too_large",
-            Self::InvalidEndpoint { .. } => "http.invalid_endpoint",
-            Self::InvalidRequest { .. } => "http.invalid_request",
-            Self::KeyOnPlainHttp { .. } => "http.key_on_plain_http",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
@@ -456,7 +464,11 @@ mod tests {
 
     #[test]
     fn map_text_reaches_every_cause_level() {
-        let inner = ErrorDetail::new("io.Other", "inner SECRET", None);
+        let mut inner = ErrorDetail::new("io.Other", "inner SECRET", None);
+        inner.status = Some(429);
+        inner.attempts = Some(3);
+        inner.retry_after_ms = Some(1100);
+        inner.category = Some(sc_agent_types::ErrorCategory::Busy);
         let outer = ErrorDetail::new("ureq.Io", "outer SECRET", Some(inner));
         let error = HttpError::network(NetworkKind::Other, 1, "msg SECRET").with_cause(outer);
         let mapped = error.map_text(&|text: String| text.replace("SECRET", "[redacted]"));
@@ -464,9 +476,21 @@ mod tests {
         assert!(!rendered.contains("SECRET"), "{rendered}");
         let cause = mapped.cause_detail().expect("cause");
         assert_eq!(cause.message, "outer [redacted]");
+        let inner = cause.cause.expect("inner detail");
+        assert_eq!(inner.message, "inner [redacted]");
         assert_eq!(
-            cause.cause.map(|inner| inner.message),
-            Some("inner [redacted]".to_owned())
+            (
+                inner.status,
+                inner.attempts,
+                inner.retry_after_ms,
+                inner.category
+            ),
+            (
+                Some(429),
+                Some(3),
+                Some(1100),
+                Some(sc_agent_types::ErrorCategory::Busy)
+            )
         );
         assert!(std::error::Error::source(&mapped).is_some());
     }

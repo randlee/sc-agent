@@ -97,16 +97,21 @@ impl From<LlmError> for DecisionLlmError {
     }
 }
 
+sc_agent_types::error_catalog! { DecisionLlmError {
+    DecisionLlmError::Llm(_) => ("decision_llm.llm", None),
+    DecisionLlmError::Encode { .. } => ("decision_llm.encode", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionLlmError::AnswerIds { .. } => ("decision_llm.answer_ids", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionLlmError::AnswerInvalid { .. } => ("decision_llm.answer_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionLlmError::InvalidMaxTokens { .. } => ("decision_llm.invalid_max_tokens", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionLlmError::Invariant { .. } => ("decision_llm.invariant", Some(sc_agent_types::ErrorCategory::Other)),
+} }
+
 impl ErrorId for DecisionLlmError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Llm(_) => "decision_llm.llm",
-            Self::Encode { .. } => "decision_llm.encode",
-            Self::AnswerIds { .. } => "decision_llm.answer_ids",
-            Self::AnswerInvalid { .. } => "decision_llm.answer_invalid",
-            Self::InvalidMaxTokens { .. } => "decision_llm.invalid_max_tokens",
-            Self::Invariant { .. } => "decision_llm.invariant",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {

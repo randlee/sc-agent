@@ -86,16 +86,25 @@ pub enum LocalError {
     },
 }
 
+sc_agent_types::error_catalog! { LocalError {
+    LocalError::Http(_) => ("local.http", None),
+    LocalError::Decision(_) => ("local.decision", None),
+    LocalError::ProbeStatus { .. } => ("local.probe_status", Some(sc_agent_types::ErrorCategory::Other)),
+    LocalError::ProbeParse { .. } => ("local.probe_parse", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LocalError::ModelNotServed { .. } => ("local.model_not_served", Some(sc_agent_types::ErrorCategory::Config)),
+    LocalError::LoadTimeout { .. } => ("local.load_timeout", Some(sc_agent_types::ErrorCategory::Network)),
+} }
+
 impl ErrorId for LocalError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Http(_) => "local.http",
-            Self::Decision(_) => "local.decision",
-            Self::ProbeStatus { .. } => "local.probe_status",
-            Self::ProbeParse { .. } => "local.probe_parse",
-            Self::ModelNotServed { .. } => "local.model_not_served",
-            Self::LoadTimeout { .. } => "local.load_timeout",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
+    }
+
+    fn refines_status(&self) -> bool {
+        matches!(self, Self::ProbeStatus { .. })
     }
 
     fn message(&self) -> String {
@@ -162,7 +171,7 @@ pub enum ParseCause {
     /// The serde_json error, unchanged (no key was attached to the probe).
     Json(serde_json::Error),
     /// The serde_json error as data, with the attached key redacted from its message.
-    Redacted(ErrorDetail),
+    Redacted(Box<ErrorDetail>),
 }
 
 impl ParseCause {
@@ -172,14 +181,14 @@ impl ParseCause {
     pub fn detail(&self) -> ErrorDetail {
         match self {
             Self::Json(error) => ErrorDetail::foreign(json_error_id(error), error),
-            Self::Redacted(detail) => detail.clone(),
+            Self::Redacted(detail) => (**detail).clone(),
         }
     }
 
     fn as_error(&self) -> &(dyn Error + 'static) {
         match self {
             Self::Json(error) => error,
-            Self::Redacted(detail) => detail,
+            Self::Redacted(detail) => detail.as_ref(),
         }
     }
 }
@@ -219,7 +228,7 @@ impl LocalError {
                 Self::ProbeParse {
                     daemon,
                     path,
-                    source: ParseCause::Redacted(ErrorDetail::new(id, message, None)),
+                    source: ParseCause::Redacted(Box::new(ErrorDetail::new(id, message, None))),
                 }
             }
             Self::Decision(DecisionError::ResponseParse {

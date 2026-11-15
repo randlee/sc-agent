@@ -83,17 +83,26 @@ pub enum LlmError {
     },
 }
 
+sc_agent_types::error_catalog! { LlmError {
+    LlmError::Http { .. } => ("llm.http", None),
+    LlmError::ApiStatus { .. } => ("llm.api_status", Some(sc_agent_types::ErrorCategory::Other)),
+    LlmError::ReplyInvalid { .. } => ("llm.reply_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::NoText { .. } => ("llm.no_text", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::Truncated { .. } => ("llm.truncated", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::Refused { .. } => ("llm.refused", Some(sc_agent_types::ErrorCategory::Other)),
+    LlmError::OutputNotJson { .. } => ("llm.output_not_json", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+} }
+
 impl ErrorId for LlmError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Http { .. } => "llm.http",
-            Self::ApiStatus { .. } => "llm.api_status",
-            Self::ReplyInvalid { .. } => "llm.reply_invalid",
-            Self::NoText { .. } => "llm.no_text",
-            Self::Truncated { .. } => "llm.truncated",
-            Self::Refused { .. } => "llm.refused",
-            Self::OutputNotJson { .. } => "llm.output_not_json",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
+    }
+
+    fn refines_status(&self) -> bool {
+        matches!(self, Self::ApiStatus { .. })
     }
 
     fn message(&self) -> String {

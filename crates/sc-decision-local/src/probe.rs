@@ -196,7 +196,7 @@ impl<'a> LocalProbe<'a> {
             LoadOutcome::Cancelled => Err(DecisionError::Cancelled { sends: 0 }),
             LoadOutcome::Failed(error) => Err(DecisionError::Backend {
                 backend: BACKEND_NAME,
-                detail: error.detail(),
+                detail: Box::new(error.detail()),
             }),
         }
     }

@@ -276,7 +276,7 @@ impl Writer {
         Err(LogError::RowsLost {
             log: self.kind,
             count,
-            last: writer_last.or(refused_last),
+            last: writer_last.or(refused_last).map(Box::new),
         })
     }
 

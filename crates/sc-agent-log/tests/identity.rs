@@ -385,7 +385,7 @@ fn ids() {
         LogError::InvalidName {
             what: "target",
             value: "a b".into(),
-            cause: detail.clone(),
+            cause: Box::new(detail.clone()),
         },
         LogError::OpenSink {
             path: PathBuf::from("f"),
@@ -412,7 +412,7 @@ fn ids() {
         LogError::RowsLost {
             log: LogKind::Memory,
             count: 2,
-            last: Some(detail),
+            last: Some(Box::new(detail)),
         },
     ];
     let ids: HashSet<_> = errors.iter().map(ErrorId::id).collect();

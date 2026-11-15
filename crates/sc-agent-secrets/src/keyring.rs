@@ -307,10 +307,10 @@ fn keyring_unavailable(error: &keyring::Error) -> SecretsError {
     SecretsError::KeyringRead {
         kind,
         cause: sanitized_keyring_cause(error),
-        source: Some(sc_agent_types::ErrorDetail::foreign(
+        source: Some(Box::new(sc_agent_types::ErrorDetail::foreign(
             format!("keyring.{kind}"),
             error,
-        )),
+        ))),
     }
 }
 

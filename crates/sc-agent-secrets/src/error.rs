@@ -62,7 +62,7 @@ pub enum SecretsError {
         /// This layer's label of the failure.
         cause: &'static str,
         /// The io error, id and message whole.
-        source: Option<ErrorDetail>,
+        source: Option<Box<ErrorDetail>>,
     },
     /// The platform keyring could not be read.
     ///
@@ -75,7 +75,7 @@ pub enum SecretsError {
         /// This layer's label of the failure.
         cause: &'static str,
         /// The keyring error, id and message whole.
-        source: Option<ErrorDetail>,
+        source: Option<Box<ErrorDetail>>,
     },
     /// The keyring did not answer within 15 s, or an earlier read is still stuck.
     KeyringTimeout,
@@ -83,17 +83,22 @@ pub enum SecretsError {
     KeyringConstructionRefused,
 }
 
+sc_agent_types::error_catalog! { SecretsError {
+    SecretsError::InvalidLocation { .. } => ("secrets.invalid_location", Some(sc_agent_types::ErrorCategory::Config)),
+    SecretsError::KeyMissing { .. } => ("secrets.key_missing", Some(sc_agent_types::ErrorCategory::Auth)),
+    SecretsError::KeyMalformed { .. } => ("secrets.key_malformed", Some(sc_agent_types::ErrorCategory::Auth)),
+    SecretsError::DotenvRead { .. } => ("secrets.dotenv_read", Some(sc_agent_types::ErrorCategory::Config)),
+    SecretsError::KeyringRead { .. } => ("secrets.keyring_read", Some(sc_agent_types::ErrorCategory::Auth)),
+    SecretsError::KeyringTimeout => ("secrets.keyring_timeout", Some(sc_agent_types::ErrorCategory::Auth)),
+    SecretsError::KeyringConstructionRefused => ("secrets.keyring_construction_refused", Some(sc_agent_types::ErrorCategory::Auth)),
+} }
+
 impl ErrorId for SecretsError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::InvalidLocation { .. } => "secrets.invalid_location",
-            Self::KeyMissing { .. } => "secrets.key_missing",
-            Self::KeyMalformed { .. } => "secrets.key_malformed",
-            Self::DotenvRead { .. } => "secrets.dotenv_read",
-            Self::KeyringRead { .. } => "secrets.keyring_read",
-            Self::KeyringTimeout => "secrets.keyring_timeout",
-            Self::KeyringConstructionRefused => "secrets.keyring_construction_refused",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
@@ -125,7 +130,9 @@ impl ErrorId for SecretsError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
-            Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source.clone(),
+            Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => {
+                source.as_deref().cloned()
+            }
             Self::InvalidLocation { .. }
             | Self::KeyMissing { .. }
             | Self::KeyMalformed { .. }
@@ -159,7 +166,7 @@ impl std::error::Error for SecretsError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::DotenvRead { source, .. } | Self::KeyringRead { source, .. } => source
-                .as_ref()
+                .as_deref()
                 .map(|source| source as &(dyn std::error::Error + 'static)),
             Self::InvalidLocation { .. }
             | Self::KeyMissing { .. }
