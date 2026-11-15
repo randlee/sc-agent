@@ -204,6 +204,7 @@ Two consumers rebuilt the wheel boundary and the copies diverged, so every conce
 **Negative:**
 
 - This is a breaking 0.2.0 for Rust dependents: `ErrorDetail` gains fields and `send_with_timeout` becomes `send_with`.
+- `ErrorId` gains a required method, `base_category()`, so implementors outside the workspace must add it.
 - `id()` moves into the macro across the error enums, a one-time mechanical diff.
 - The order of the list `send_batch` returns changes.
 - The wheel moves to maturin's mixed layout.
