@@ -1,0 +1,94 @@
+{
+  "schema_version": "2.0.0",
+  "operation": "testability",
+  "template": {
+    "id": "anchor-tuning-testability-request",
+    "version": "0.4.1",
+    "sha256": "63a243019416001d3aa034523e510b0817e9af21058592961e413b13ff10b909"
+  },
+  "correlation_id": "phase-b-rubric-calibration",
+  "runtime": {
+    "agent": "anchor-tuning",
+    "contract_script": "/Users/randlee/github/sc-agent-worktrees/plan/phase-b-anchors/.codex/skills/plan-anchoring/scripts/anchor_tuning_contract.py",
+    "contract_sha256": "357b58b6de3b438d8945b5e087ea13eb265af22871e2b6032394786a66930e62",
+    "harness": "codex",
+    "model": "sol",
+    "script": "/Users/randlee/github/sc-agent-worktrees/plan/phase-b-anchors/.codex/skills/plan-anchoring/scripts/jev_judge.py",
+    "sha256": "906335de770b6393c6b0922aff177e579d1c216ed20d13b80f198cab7ed8ed0a",
+    "version": "0.11.0",
+    "workspace": "/Users/randlee/github/sc-agent-worktrees/plan/phase-b-anchors"
+  },
+  "authority": {
+    "intent": {
+      "content": "# Intent - phase-a\n\nWritten 2026-11-09 by Rand Lee (owner), recorded by the planning session. One page at most. This is the \"why\" that frames every anchor beneath it; Jev questions are judged against anchors, not against this document, so keep it short and let the anchors carry the testable facts.\n\n## What this plan is for\n\nDefine the low-level sc-agent libraries: `sc-agent-types`, `sc-decision-schema` with the decision trait, and the shared HTTP layer. Jev, Haiku, Luna, Strands Decider and Laya sit behind one decision trait. The goal is sc-agent with streaming and session logging, so the owner can analyse 10,000 to 20,000 or more decisions and tune consumer code quickly.\n\n## What success looks like\n\n- Every TypeSafe API request and response can be sent and received through sc-agent with the minimum code needed.\n- A batch of decision requests runs in parallel behind the decision trait, and every send is session-logged.\n\n## What is deliberately out of scope\n\n- The decide CLI design beyond what the low-level libraries must support.\n- Decision-model caching.\n\n## Anchors\n\nAnchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. Requirements and ADRs that govern this plan are listed there too, under their own IDs.\n",
+      "id": "phase-a-intent",
+      "sha256": "5908af69c31e7ca46243005ac725420e801cad90b65d6c250335d3632511be8c",
+      "version": 1
+    },
+    "anchors": {
+      "records": [],
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "gate": "testability",
+  "calibration_corpus": {
+    "case_count": 17,
+    "frozen_before_live": true,
+    "path": "/Users/randlee/github/sc-agent-worktrees/plan/phase-b-anchors/.codex/skills/plan-anchoring/assets/fixtures/testability-calibration.v2.json",
+    "schema": "plan-anchor/testability-calibration/2",
+    "sha256": "ce5f4efcfee74ecc767bb8c140bf749ef2e33c779f82397d5c42d96698a7b1bc",
+    "version": 2
+  },
+  "current_questions": {
+    "faithful": {
+      "criteria": {
+        "no": "Even after ordinary normalization, the statement requires a new policy, implementation choice, strength, trigger, or outcome.",
+        "unclear": "Ordinary normalization does not settle whether the meaning was preserved.",
+        "yes": "Those normalization rules are sufficient and no substantive requirement was invented."
+      },
+      "instructions": "Is anchor.statement a faithful formal requirement derived from anchor.quote? Preserve meaning, not wording: informal directives may become must, print may become emit to stdout, machine-readable JSON may become JSON, and one directive in a compound quote may become one anchor. Do not penalize vagueness here.",
+      "type": "choice"
+    },
+    "observable": {
+      "criteria": {
+        "no": "It supplies only a subjective quality, undefined shorthand, or an approval with no observable record.",
+        "unclear": "Some evidence is named, but the observation needed to settle compliance remains ambiguous.",
+        "yes": "It names evidence or behavior that can be inspected with a determinate outcome."
+      },
+      "instructions": "Does anchor.statement define a checkable behavior or artifact without relying on an undefined label or an approval that has no identified record? Judge only whether the stated outcome can be observed.",
+      "type": "choice"
+    },
+    "scoped": {
+      "criteria": {
+        "no": "No work area or applicability set is identifiable.",
+        "unclear": "An area is named but its applicability cannot be determined.",
+        "yes": "A reviewer can identify the work area where this anchor applies, including an explicit all-items set."
+      },
+      "instructions": "Do anchor.statement and anchor.scope identify the governed activity, component, artifact, or explicit global set, independent of whether the requirement itself is vague or otherwise defective?",
+      "type": "choice"
+    },
+    "self_contained": {
+      "criteria": {
+        "no": "At least one decisive term is an undefined quality or private label, or compliance depends on an approval with no identified record.",
+        "unclear": "A possible outside-context dependency exists but the statement does not show whether it is decisive.",
+        "yes": "None of those outside-context dependencies is needed; ordinary technical terms, concrete prohibitions, lists, and explicit input/action/outcome conditions are sufficient."
+      },
+      "instructions": "Is anchor.statement independently understandable and applicable without any of these disqualifiers: an undefined subjective quality (for example robust), private shorthand, or a human approval that has no identified recorded artifact? Ignore grammar, bundling, fidelity, and scope.",
+      "type": "choice"
+    },
+    "single_constraint": {
+      "criteria": {
+        "no": "At least two independently enforceable duties are joined in the statement.",
+        "unclear": "The statement leaves independence of its duties ambiguous.",
+        "yes": "All details enforce the same invariant and would be evaluated together."
+      },
+      "instructions": "Is anchor.statement one invariant applied to a subject, trigger, and possibly several output surfaces? Do not count the number of nouns or listed artifacts; count independently enforceable duties.",
+      "type": "choice"
+    }
+  },
+  "candidate_minimum": 3,
+  "repeat_count": 2,
+  "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+  "production_confidence_threshold": 0.6,
+  "confidence_reference_threshold": 0.8
+}

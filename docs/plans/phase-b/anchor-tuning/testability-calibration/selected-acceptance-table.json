@@ -1,0 +1,1957 @@
+[
+  {
+    "case_id": "a0-01-valid-directive",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "One supported, observable, scoped directive.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-01-valid-directive",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "One supported, observable, scoped directive.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-01-valid-directive",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "One supported, observable, scoped directive.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-01-valid-directive",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "One supported, observable, scoped directive.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-01-valid-directive",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.92
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "One supported, observable, scoped directive.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-01-valid-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-02-valid-prohibition",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete negative prose is a valid, self-contained prohibition.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-02-valid-prohibition",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.94
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete negative prose is a valid, self-contained prohibition.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-02-valid-prohibition",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete negative prose is a valid, self-contained prohibition.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-02-valid-prohibition",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete negative prose is a valid, self-contained prohibition.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-02-valid-prohibition",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete negative prose is a valid, self-contained prohibition.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-02-valid-prohibition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-03-structural-scope",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A path is observable and structural scope is identifiable.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-03-structural-scope",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A path is observable and structural scope is identifiable.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-03-structural-scope",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A path is observable and structural scope is identifiable.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-03-structural-scope",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.94,
+      0.94
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A path is observable and structural scope is identifiable.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-03-structural-scope",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A path is observable and structural scope is identifiable.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-03-structural-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-04-global-scope",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "An explicit global command boundary is valid scope.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-04-global-scope",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.89,
+      0.83
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "An explicit global command boundary is valid scope.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-04-global-scope",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.96,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "An explicit global command boundary is valid scope.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-04-global-scope",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "An explicit global command boundary is valid scope.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-04-global-scope",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.91,
+      0.91
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "An explicit global command boundary is valid scope.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-04-global-scope/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-05-atomic-from-multi-directive",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.68,
+      0.7
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The statement may capture one supported directive without exhausting the quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-05-atomic-from-multi-directive",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The statement may capture one supported directive without exhausting the quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-05-atomic-from-multi-directive",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.94,
+      0.91
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The statement may capture one supported directive without exhausting the quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-05-atomic-from-multi-directive",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The statement may capture one supported directive without exhausting the quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-05-atomic-from-multi-directive",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The statement may capture one supported directive without exhausting the quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-05-atomic-from-multi-directive/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-06-genuinely-bundled",
+    "role": "single_constraint",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Two independently satisfiable obligations must split.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-06-genuinely-bundled",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Two independently satisfiable obligations must split.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-06-genuinely-bundled",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.82,
+      0.83
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Two independently satisfiable obligations must split.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-06-genuinely-bundled",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Two independently satisfiable obligations must split.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-06-genuinely-bundled",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.76,
+      0.8
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Two independently satisfiable obligations must split.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-06-genuinely-bundled/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-07-unsupported-elaboration",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The algorithm and strength are an unsupported added policy.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-07-unsupported-elaboration",
+    "role": "faithful",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The algorithm and strength are an unsupported added policy.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-07-unsupported-elaboration",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The algorithm and strength are an unsupported added policy.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-07-unsupported-elaboration",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The algorithm and strength are an unsupported added policy.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-07-unsupported-elaboration",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "The algorithm and strength are an unsupported added policy.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-07-unsupported-elaboration/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-08-vague-outcome",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Robust has no observable outcome and requires private interpretation.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-08-vague-outcome",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.91
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Robust has no observable outcome and requires private interpretation.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-08-vague-outcome",
+    "role": "observable",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Robust has no observable outcome and requires private interpretation.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-08-vague-outcome",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Robust has no observable outcome and requires private interpretation.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-08-vague-outcome",
+    "role": "self_contained",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Robust has no observable outcome and requires private interpretation.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-08-vague-outcome/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-09-explicit-testable-condition",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A trigger/action/outcome condition is self-contained.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-09-explicit-testable-condition",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.79,
+      0.82
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A trigger/action/outcome condition is self-contained.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-09-explicit-testable-condition",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A trigger/action/outcome condition is self-contained.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-09-explicit-testable-condition",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.91,
+      0.92
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A trigger/action/outcome condition is self-contained.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-09-explicit-testable-condition",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.86,
+      0.86
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "A trigger/action/outcome condition is self-contained.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-09-explicit-testable-condition/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-10-api-key-redaction",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.83,
+      0.88
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete input/action/outcome proves redaction without literal statement-token dependence.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-10-api-key-redaction",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.89,
+      0.92
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete input/action/outcome proves redaction without literal statement-token dependence.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-10-api-key-redaction",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete input/action/outcome proves redaction without literal statement-token dependence.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-10-api-key-redaction",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete input/action/outcome proves redaction without literal statement-token dependence.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-10-api-key-redaction",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.86,
+      0.89
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Concrete input/action/outcome proves redaction without literal statement-token dependence.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-10-api-key-redaction/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-11-private-shorthand",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "R7 is undefined private shorthand.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-11-private-shorthand",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "R7 is undefined private shorthand.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-11-private-shorthand",
+    "role": "observable",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      0.88,
+      0.88
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "R7 is undefined private shorthand.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-11-private-shorthand",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.94,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "R7 is undefined private shorthand.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-11-private-shorthand",
+    "role": "self_contained",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "R7 is undefined private shorthand.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-11-private-shorthand/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-12-unrecorded-approval",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "No recorded approval artifact or decision rule is identified.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-12-unrecorded-approval",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "No recorded approval artifact or decision rule is identified.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-12-unrecorded-approval",
+    "role": "observable",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      0.72,
+      0.73
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "No recorded approval artifact or decision rule is identified.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-12-unrecorded-approval",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.88,
+      0.82
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "No recorded approval artifact or decision rule is identified.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-12-unrecorded-approval",
+    "role": "self_contained",
+    "expected": "no",
+    "choices": [
+      "no",
+      "no"
+    ],
+    "confidence": [
+      0.72,
+      0.68
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "No recorded approval artifact or decision rule is identified.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-12-unrecorded-approval/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-13-shared-quote-first-atomic",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.89,
+      0.89
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "First of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-13-shared-quote-first-atomic",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "First of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-13-shared-quote-first-atomic",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "First of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-13-shared-quote-first-atomic",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.88,
+      0.89
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "First of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-13-shared-quote-first-atomic",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "First of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-13-shared-quote-first-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-14-shared-quote-second-atomic",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.88,
+      0.89
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Second of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-14-shared-quote-second-atomic",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Second of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-14-shared-quote-second-atomic",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.91
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Second of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-14-shared-quote-second-atomic",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Second of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-14-shared-quote-second-atomic",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.83,
+      0.86
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Second of two distinct atomic anchors from one quote.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-14-shared-quote-second-atomic/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-15-duplicate-first",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Individually valid; dedupe is statement-based.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-15-duplicate-first",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.96,
+      0.96
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Individually valid; dedupe is statement-based.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-15-duplicate-first",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Individually valid; dedupe is statement-based.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-15-duplicate-first",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Individually valid; dedupe is statement-based.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-15-duplicate-first",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Individually valid; dedupe is statement-based.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-15-duplicate-first/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-16-duplicate-second",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Same testable statement despite different provenance.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-16-duplicate-second",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.92
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Same testable statement despite different provenance.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-16-duplicate-second",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.92
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Same testable statement despite different provenance.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-16-duplicate-second",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      1.0
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Same testable statement despite different provenance.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-16-duplicate-second",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.92,
+      0.91
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Same testable statement despite different provenance.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-16-duplicate-second/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-17-nondeclarative-form",
+    "role": "single_constraint",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      1.0,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Semantic cells are positive, but deterministic grammar lint must reject second-person instruction form.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-17-nondeclarative-form",
+    "role": "faithful",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.98,
+      0.98
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Semantic cells are positive, but deterministic grammar lint must reject second-person instruction form.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-17-nondeclarative-form",
+    "role": "observable",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.85,
+      0.88
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Semantic cells are positive, but deterministic grammar lint must reject second-person instruction form.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-17-nondeclarative-form",
+    "role": "scoped",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.97,
+      0.97
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Semantic cells are positive, but deterministic grammar lint must reject second-person instruction form.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r2"
+    ],
+    "third_request_id": null
+  },
+  {
+    "case_id": "a0-17-nondeclarative-form",
+    "role": "self_contained",
+    "expected": "yes",
+    "choices": [
+      "yes",
+      "yes"
+    ],
+    "confidence": [
+      0.7,
+      0.64
+    ],
+    "exact": true,
+    "stable": true,
+    "confident": true,
+    "status": "accepted",
+    "rationale": "Semantic cells are positive, but deterministic grammar lint must reject second-person instruction form.",
+    "request_ids": [
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r1",
+      "phase-b-rubric-calibration/candidate-7/a0-17-nondeclarative-form/r2"
+    ],
+    "third_request_id": null
+  }
+]
