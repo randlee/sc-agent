@@ -170,6 +170,10 @@ mod tests {
         let expected = http.detail();
         let source_text = http.to_string();
         let error = DecisionError::Http(http);
+        assert!(matches!(
+            &error,
+            DecisionError::Http(inner) if inner.detail() == expected
+        ));
         let detail = error.detail();
         assert_eq!(
             (
