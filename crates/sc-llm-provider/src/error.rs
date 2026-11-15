@@ -244,6 +244,20 @@ mod tests {
                 (Some(status), Some(category), retry_after_ms)
             );
         }
+        let long_reply = ProviderReply::read(
+            &sc_agent_http::HttpResponse::new(
+                503,
+                vec![("retry-after".to_owned(), "120".to_owned())],
+                Vec::new(),
+            ),
+            None,
+        );
+        let long_detail = LlmError::ApiStatus {
+            provider: LlmProvider::Anthropic,
+            reply: Box::new(long_reply),
+        }
+        .detail();
+        assert_eq!(long_detail.retry_after_ms, Some(120_000));
         for error in errors {
             let detail = error.detail();
             assert_eq!(detail.id, error.id());
@@ -269,6 +283,12 @@ mod tests {
             Some(source.to_string())
         );
         assert_eq!(error.cause_detail(), Some(source.detail()));
+        let detail = error.detail();
+        assert_eq!(
+            (detail.attempts, detail.category),
+            (Some(1), Some(sc_agent_types::ErrorCategory::Network))
+        );
+        assert_eq!(detail.cause.as_deref(), Some(&source.detail()));
     }
 
     /// Every variant once. The exhaustive match below fails to compile when a variant is
