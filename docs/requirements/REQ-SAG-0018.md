@@ -1,6 +1,6 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-15  
@@ -10,7 +10,7 @@
 
 ## REQ-SAG-0018: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
