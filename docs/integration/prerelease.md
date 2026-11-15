@@ -1,12 +1,11 @@
 # Owner-run prerelease checks
 
 The prerelease manifest installs and verifies staged wheels through
-`scripts/install_wheels.py`. CI installs sc-lint with
-`randlee/sc-lint@5b9b7d78cf865d4f5e98c97aa35934be7d4e839a` with the
-literal version `0.8.9` (matching `sc-lint.toml`) and runs
-`sc-lint lint ci --consumer`, including the production panic rule.
-The action commit is pinned because `v1` is unloadable; see
-[sc-lint#973](https://github.com/randlee/sc-lint/issues/973).
+`scripts/install_wheels.py`. CI uses the generated sc-lint Just integration:
+`just setup` installs the released version selected by `sc-lint.toml` (0.8.9),
+then `just lint ci all` runs format, native and Windows-target Clippy,
+boundary, portability and the full runtime rules. The Clippy toolchain includes
+both Clippy and rustfmt. CI uses no sc-lint source checkout or action commit.
 Release Preflight keeps the docli freshness check; the live-provider
 publication preflight has been removed.
 

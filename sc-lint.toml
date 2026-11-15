@@ -2,16 +2,31 @@
 minimum_version = "0.8.9"
 default_lint_profile = "ci"
 
-[tool.sc-lint.analyzers.runtime]
-# sc-lint 0.8.9 accepts explicit package names only, with no workspace wildcard.
-# Keep production packages here; sc-agent-testkit is dev-only.
-panic_rule_packages = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sc-treesitter", "sc-treesitter-py", "sitr"]
+[tool.sc-lint.analyzers.boundary]
+enabled = true
+reason = "Enforce the declared crate boundaries and publishable Cargo dependencies."
+# A path-only self dev-dependency enables the crate's existing tests; pinning
+# its unpublished version makes Cargo resolve it from crates.io during package.
+# Normal/build dependencies retain their publishable workspace versions.
+# Forwarding to Arc<T>/&T calls T's implementation, not the forwarding method;
+# serde remote=Self resolves to the generated serializer, not the wrapper method.
+exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/transport.rs", "crates/sc-decision-schema/src/models.rs", "crates/sc-decision-schema/src/request.rs", "crates/sc-decision-schema/src/response.rs"] }
 
-# Acknowledged by the lead: only Source::Manual (feature="testing") reaches
-# this untimed wait; SystemClock always uses wait_timeout. sc-lint#980:
-# https://github.com/randlee/sc-lint/issues/980. Remove when analysis is fixed.
-[tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
-"SCB-RUNTIME-001" = ["crates/sc-agent-types/src/clock.rs"]
+[tool.sc-lint.analyzers.portability]
+enabled = true
+reason = "Both product binaries and Python bindings support Linux, macOS and Windows."
+targets = ["linux", "macos", "windows"]
+fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008", "PORT-009", "PORT-010"]
+
+[tool.sc-lint.analyzers.runtime]
+enabled = true
+reason = "Enforce bounded production waits, runtime safety and production panic prohibition."
+# The released analyzer requires exact package names to enable its panic rule.
+# The dev-only testkit is excluded because its helpers intentionally fail tests.
+panic_rule_packages = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sc-treesitter", "sc-treesitter-py", "sitr"]
+# Only the feature-gated manual clock reaches the untimed wait; real-clock
+# production waits always use wait_timeout. Manual time advances by notification.
+exclude_paths_by_rule = { "SCB-RUNTIME-001" = ["crates/sc-agent-types/src/clock.rs"] }
 
 [[tool.sc-lint.lint]]
 name = "fmt"
@@ -22,18 +37,18 @@ name = "clippy"
 command = ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
 
 [[tool.sc-lint.lint]]
-name = "boundary"
-command = ["sc-lint", "lint", "sc-boundary", "--root", ".", "--config", "sc-lint.toml"]
+name = "sc-boundary"
+command = ["sc-lint", "lint", "sc-boundary", "--config", "sc-lint.toml"]
 
 [[tool.sc-lint.lint]]
-name = "portability"
-command = ["sc-lint", "lint", "sc-portability", "--root", ".", "--config", "sc-lint.toml"]
+name = "sc-portability"
+command = ["sc-lint", "lint", "sc-portability", "--config", "sc-lint.toml"]
 
 [[tool.sc-lint.lint]]
-name = "runtime"
-command = ["sc-lint", "lint", "sc-runtime", "--root", ".", "--config", "sc-lint.toml"]
+name = "sc-runtime"
+command = ["sc-lint", "lint", "sc-runtime", "--config", "sc-lint.toml"]
 
-# Cross-target validation is explicit: just lint windows all.
+# All platform scopes add cross-target validation: just lint ci all.
 # sc-lint selects cargo-xwin on non-Windows and native Cargo on Windows.
 [[tool.sc-lint.lint]]
 name = "windows-clippy"
@@ -42,28 +57,8 @@ platform = "windows"
 target = "x86_64-pc-windows-msvc"
 
 [tool.sc-lint.lint_profiles]
-ci = ["fmt", "clippy", "boundary", "portability", "runtime"]
-windows = ["windows-clippy"]
+ci = ["fmt", "clippy", "sc-boundary", "sc-portability", "sc-runtime", "windows-clippy"]
 
-[tool.sc-lint.analyzers.portability]
-fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008", "PORT-009", "PORT-010"]
-
-[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
-# Path-only self dev-dependency enables existing tests without requiring this
-# unpublished version from crates.io: https://github.com/randlee/sc-lint/issues/976.
-# Normal/build dependencies keep their publishable workspace versions.
-"SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml"]
-# Forwarding/serde-remote false positives: https://github.com/randlee/sc-lint/issues/974.
-# Remove these four exclusions when the pinned sc-lint version contains its fix.
-"SCB-CYCLE-003" = [
-    "crates/sc-agent-http/src/transport.rs",
-    "crates/sc-decision-schema/src/models.rs",
-    "crates/sc-decision-schema/src/request.rs",
-    "crates/sc-decision-schema/src/response.rs",
-]
-
-# This mirrors the existing cross-platform CI test job; `lint ci --consumer`
-# validates its presence but does not execute test selectors.
 [[tool.sc-lint.test]]
 name = "workspace"
 command = ["cargo", "test", "--locked", "--workspace", "--all-features"]
