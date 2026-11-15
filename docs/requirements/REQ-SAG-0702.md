@@ -30,10 +30,8 @@ Definitions:
   - `decidr.invalid_request_timeout` for a bad timeout;
   - `decidr.invalid_workers` for a bad worker count.
 
-  A refusal MUST happen before any logger opens or any request is sent, and MUST name the value and the allowed range.
-- A `bool` MUST be refused for both overrides. (An unknown keyword, such as `workers` on `send`, raises Python's own `TypeError`.)
+  A range refusal MUST happen before any logger opens or any request is sent, and MUST name the value and the allowed range. `InvalidRequestTimeout` carries the rejected value.
 - `decidr send --workers` without `--batch` MUST be refused with `decidr.invalid_workers`.
-- `timeout_secs` with an injected transport MUST be refused with `decidr.invalid_request_timeout`.
 - A send that exceeds the timeout MUST be resent under `max_sends` and the start budget.
 - `sc_agent.send_batch` MUST return its list in input order, while `on_result` receives each line as it finishes.
 
@@ -46,7 +44,7 @@ Definitions:
 
 ### Rationale
 
-Different callers in one process need different parallelism and different patience. Today both are fixed by configuration, so consumers refuse or ignore their own flags. `timeout_secs` was added on the phase b stack (agt-b-1.8) and is recorded here. `workers`, the CLI flags, the injected-transport rule and the batch order are new.
+Different callers in one process need different parallelism and different patience. Today both are fixed by configuration, so consumers refuse or ignore their own flags. `timeout_secs` was added on the phase b stack (agt-b-1.8) and is recorded here. `workers`, the CLI flags, and the batch order are new.
 
 ### Success Criteria
 
@@ -54,15 +52,14 @@ Different callers in one process need different parallelism and different patien
 
 - [ ] A Rust test shows the runner built for a call with `workers` 2 has 2 workers.
 - [ ] A Python `send_batch(workers=2)` call reads `workers == 2` from the `runner.stream.start` event passed to its `general_log` callable.
-- [ ] `workers` of 0, 65, -1, 2.5, `"2"` or `True` raises `SagError` `decidr.invalid_workers`, and the loopback runner receives no request.
+- [ ] `workers` of 0, 65 or -1 raises `SagError` `decidr.invalid_workers`, and the loopback runner receives no request.
 - [ ] `decidr send --workers 2` without `--batch` exits with `decidr.invalid_workers`.
 - [ ] `decidr send --timeout-secs 10` and `--batch --workers 2` reach the effective timeout and worker count, as shown by Rust tests.
 - [ ] With `max_sends = 1` and a loopback runner that never answers, `timeout_secs=10` returns a line with:
   - top id `decision.http`;
   - cause `http.network` with `attempts == 1`;
   - a message that begins `timeout failure`.
-- [ ] `timeout_secs` of 9.99, 3600.01, NaN, infinity or `True` raises `SagError` `decidr.invalid_request_timeout`.
-- [ ] `timeout_secs` with an injected transport raises `decidr.invalid_request_timeout`.
+- [ ] `timeout_secs` of 9.99, 3600.01, NaN or infinity raises `SagError` `decidr.invalid_request_timeout`.
 - [ ] Rust tests show the override at both sites:
   - the cloud-provider transport timeout;
   - the local-runner request timeout, where the Laya deadline equals `load_timeout + timeout_secs`.

@@ -153,7 +153,8 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    **Deriving `retry_after_ms`.** It is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser already holds, not from the `f64`:
 
-   - It is the ceiling in milliseconds, so a caller that waits that long never retries early.
+   - Fractional digits past the ninth are truncated before converting seconds and nanoseconds to milliseconds.
+   - The retained nanoseconds are rounded up to whole milliseconds.
    - It saturates at `u64::MAX`, because 32 digits are valid input.
    - It is not clamped. The 0–30 s clamp applies only to the resend holdoff.
    - `0` gives `Some(0)`, and a malformed header gives `None`.
@@ -174,12 +175,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    The crates are published on crates.io (`release/publish-artifacts.toml`). Below 1.0 a minor bump is the breaking bump, so `^0.1` dependents are not moved silently, and a 0.1.1 would break them. For Python the change only adds things, except the batch return order (decision 8), which the CHANGELOG states.
 
-   Everything on the sc-agent release version moves from 0.1.5 to 0.2.0: every workspace crate, sc-treesitter and sitr included, and both wheels. sc-decidr and sitr are version-locked: they are released together at the same version, so one version gives one tag and one pin. Mixed versions are not supported, and this is documented, not enforced. The files to bump are:
-
-   - `Cargo.toml` (`[workspace.package]`);
-   - `crates/sc-agent-py/Cargo.toml` and `pyproject.toml`, and `crates/sc-treesitter-py/Cargo.toml` and `pyproject.toml`, whose literal 0.1.5 becomes 0.2.0;
-   - `Cargo.lock`;
-   - `fixtures/cli/decidr-cli-model.json` and the generated CLI docs (`scripts/generate-cli-docs.sh`), which also change because of the new flags.
+   All workspace crate and wheel versions move together to 0.2.0. `verify-version-lockstep` enforces this. sc-decidr and sitr are version-locked at the same release version.
 
    Publishing follows `publish_order`.
 
@@ -263,9 +259,9 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | auth | `decidr.no_provider_key`, `secrets.key_missing`, `secrets.key_malformed`, `secrets.keyring_read`, `secrets.keyring_timeout`, `secrets.keyring_construction_refused` |
    | network | `http.network`, `local.load_timeout` |
    | response_invalid | `decision.response_parse`, `decision.schema_mismatch`, `http.response_too_large`, `llm.reply_invalid`, `llm.no_text`, `llm.truncated`, `llm.output_not_json`, `decision_llm.answer_ids`, `decision_llm.answer_invalid`, `local.probe_parse` |
-   | validation | `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers` (new), `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
+   | validation | `decision.context_exceeded`, `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers` (new), `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
    | cancelled | `decision.cancelled`, `decidr.signal` |
-   | config | `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
+   | config | `decidr.ambiguous_keyring_override`, `config.*` (all eight), `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
    | log | `log.*` except `log.invalid_slug` |
    | other | `decision.api_status`, `llm.api_status`, `local.probe_status` (status-refined), `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
    | wrapper (takes cause fields) | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
@@ -290,10 +286,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
    | `decidr send` | `--workers N` (new; refused without `--batch`, with `decidr.invalid_workers`) | `--timeout-secs SECS` (new) |
 
    - **Scope.** A limit applies to its own call only. It never writes the configuration and never affects another call. `None` means the configured value.
-   - **Python argument handling.** Arguments are taken as `Bound<PyAny>` and extracted by hand, so every bad value of an accepted keyword raises `SagError`, never `TypeError` or `OverflowError`. An unknown keyword, such as `workers` on `send`, raises Python's own `TypeError`:
-     - `bool` is refused for both arguments;
-     - `timeout_secs` accepts an `int` or a `float`;
-     - `workers` accepts an `int` only.
+   - **Validation.** `RequestTimeout::from_secs` and `Workers::new` check their specified ranges once. `InvalidRequestTimeout` carries the rejected value so its message names it.
    - **`workers`.**
      - A value below the configured `workers` is honored, and so is any value above it up to 64. The configured value is a default (REQ-SAG-0701), not a floor or a cap.
      - The queue capacity follows the effective count.
@@ -304,7 +297,6 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
        - `decision_transport`, for every send to a cloud provider;
        - `local_backend`, where for a load-on-first-request runner (Laya) the sends before the first 2xx get the deadline `load_timeout + timeout_secs`.
      - The 10 s connect timeout is unchanged.
-   - **Injected transport.** A context with an injected transport has no request timeout to replace, so `timeout_secs` with an injected transport is refused with `decidr.invalid_request_timeout`. Ignoring it silently would break the no-silent-no-op rule.
    - **Interaction with resends.**
      - Every send gets the full timeout, resends included.
      - A send that times out is `http.network`, and it is resent under `max_sends` and the 90 s start budget (REQ-SAG-0601).
@@ -334,10 +326,10 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 12. **One Python floor (NFR-SAG-0003).**
 
-    - The Python floor is the `[python].floor` value in `floors.toml` at the repository root. `floors.toml` only writes down floor values, to feed sc-compose templates; the consumer template reads them. Checking floors belongs to the tools: sc-lint#972 (a `floors` lint step) and sc-compose#1046 (floors as template input and a minimum-version diagnostic).
+    - The Python floor is the `[python].floor` value in `floors.toml` at the repository root. `floors.toml` records the source floor values. Until sc-compose#1046 ships, the template contains literals updated to match those values and checked by one sc-agent unit test.
     - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` (its optional pyo3) moves from `abi3-py310` to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels already declare.
     - CI builds both wheels and runs their pytest suites on the Python floor; the `sc-agent-py` and `treesitter` jobs on `integrate/phase-b` already do.
-    - The generated consumer module's script header declares the Python floor as its `requires-python`.
+    - The template's literal Python floor and sc-compose minimum match `floors.toml`; its sc-decidr and sitr header version literals are updated by b-11. One sc-agent unit test checks these literals.
 
 ### Rationale
 
@@ -433,7 +425,7 @@ Tests, written with the implementation:
 - **`workers`.**
   - A Rust test shows the `RunnerConfig` built from `CallLimits` has the requested count.
   - A Python test with `workers=2` reads `workers == 2` from the `runner.stream.start` event received by its `general_log` callable.
-  - `0`, `65`, `-1`, `2.5`, `"2"` and `True` each raise `SagError` with `decidr.invalid_workers` before any request is sent.
+  - `0`, `65` and `-1` each raise `SagError` with `decidr.invalid_workers` before any request is sent.
   - The CLI refuses `--workers` without `--batch`.
   - None of these use sleeps or timing assertions.
 - **`timeout_secs`.**
@@ -444,7 +436,6 @@ Tests, written with the implementation:
 
     The server never answers, so the outcome does not depend on timing.
   - The existing phase b tests cover the bounds and the two sites. New tests cover:
-    - the refusal with an injected transport;
     - the CLI flag;
     - a ManualClock Rust test with `timeout_secs` above 90 s showing the send is not cut.
 - **Isolation.** A call with overrides followed by a call without them shows the second uses the configured values.
@@ -479,8 +470,8 @@ Deliverables beyond the code:
 - The consumer template, `sc_agent/templates/consumer.py.j2`, and the README pointer to it.
 - `sc_agent.pyi`.
 - The regenerated CLI model and docs.
-- The version files listed in decision 4.
-- `floors.toml` at the repository root. It only writes down floor values, to feed sc-compose templates:
+- The version updates checked by `verify-version-lockstep`.
+- `floors.toml` at the repository root. It records the source floor values that the template literals must match:
 
   ```toml
   [python]

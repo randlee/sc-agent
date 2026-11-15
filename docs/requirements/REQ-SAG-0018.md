@@ -18,7 +18,7 @@ Definitions:
 
 - The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum. sc-compose is an external tool, not a dependency of either wheel.
 - The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
-- `floors.toml` is the file at the repository root that writes down the workspace's floor values for sc-compose templates to read.
+- `floors.toml` is the file at the repository root that writes down the workspace's Python floor and sc-compose minimum.
 - sc-decidr and sitr are version-locked: they are released together at the same version. Mixed versions are not supported; this is documented, not enforced.
 - The consumer module is the Python file a consumer renders from the consumer template.
 - A feature variable is a template variable that selects a section of the consumer module: `logging` (`general`, `session` or `both`), `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
@@ -58,9 +58,10 @@ Definitions:
 - The consumer module MUST cancel that `CancelToken` on `KeyboardInterrupt`.
 - `abort_on` MUST have no default; each consumer passes it.
 - The consumer module MUST cancel the remaining batch on the first result whose category is in the `abort_on` set.
-- The consumer template MUST read its floor values from `floors.toml`.
+- The template's Python floor and sc-compose minimum MUST match `floors.toml`.
+- The template header's sc-decidr and sitr version literals MUST match the version updated by b-11.
 - When a keyring override is passed, it MUST apply only to the provider the model selector resolves to.
-- A decision call with a keyring override MUST be refused with a typed error when more than one provider is eligible and the override is the only available key.
+- A decision call with a keyring override MUST be refused with a typed error when more than one provider ranks, with `decidr.ambiguous_keyring_override` (category `config`).
 - The public API MUST stay documented in `sc_agent.pyi`.
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
@@ -81,6 +82,8 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 
 **Acceptance Criteria:**
 
+- [ ] One sc-agent unit test compares the template's Python floor and sc-compose minimum literals with `floors.toml` and its sc-decidr/sitr version literals with the b-11 version.
+
 - [ ] A sc-agent test renders the consumer template with every combination of feature variables and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
   - a success returns the response;
   - an error returns the consumer code from the passed map for its category;
@@ -93,7 +96,7 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 - [ ] One loopback test per `abort_on` set: with the empty set a batch runs to completion past an `auth` failure; with {`auth`} the remaining batch is cancelled after the first `auth` result; with {`auth`, `quota`} it is cancelled after the first `auth` or `quota` result.
 - [ ] A `KeyboardInterrupt` during a rendered module's batch cancels the `CancelToken` passed to its decision call.
 - [ ] A loopback test with a ranked model selector and a keyring override reads the key from the override only for the provider the selector resolves to.
-- [ ] A decision call with a keyring override, more than one eligible provider and no other key is refused with a typed error that names the eligible providers.
+- [ ] A decision call with a keyring override, more than one ranked provider is refused with `decidr.ambiguous_keyring_override` (category `config`) naming the ranked providers.
 - [ ] Scanning the rendered modules finds only public-API and standard-library references.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command.
 
