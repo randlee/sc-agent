@@ -324,12 +324,8 @@ fn map_detail(detail: ErrorDetail, map: &impl Fn(String) -> String) -> ErrorDeta
     ErrorDetail {
         id: map(detail.id),
         message: map(detail.message),
-        recovery: detail.recovery,
         cause: detail.cause.map(|cause| Box::new(map_detail(*cause, map))),
-        status: detail.status,
-        attempts: detail.attempts,
-        retry_after_ms: detail.retry_after_ms,
-        category: detail.category,
+        ..detail
     }
 }
 

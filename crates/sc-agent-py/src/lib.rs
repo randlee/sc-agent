@@ -286,6 +286,7 @@ fn worker_panicked(message: String) -> PyErr {
     py_binding_error(&PyBindingError::WorkerPanicked { message })
 }
 
+/// The text of a panic payload (`&str` or `String`), else a fixed note.
 fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
