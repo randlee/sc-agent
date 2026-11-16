@@ -116,13 +116,7 @@ fn run_send(
     {
         return Err(DecidrError::InvalidWorkers { value: workers });
     }
-    let limits = decidr::CallLimits {
-        timeout: args
-            .timeout_secs
-            .map(decidr::RequestTimeout::from_secs)
-            .transpose()?,
-        workers: args.workers.map(decidr::Workers::new).transpose()?,
-    };
+    let limits = args.call_limits()?;
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
     let project = Slug::new("project", &args.project)?;
     let agent_role = Slug::new("agent_role", &args.agent_role)?;

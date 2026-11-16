@@ -69,6 +69,18 @@ pub(crate) struct SendArgs {
     pub(crate) input: String,
 }
 
+impl SendArgs {
+    pub(crate) fn call_limits(&self) -> Result<decidr::CallLimits, DecidrError> {
+        Ok(decidr::CallLimits {
+            timeout: self
+                .timeout_secs
+                .map(decidr::RequestTimeout::from_secs)
+                .transpose()?,
+            workers: self.workers.map(decidr::Workers::new).transpose()?,
+        })
+    }
+}
+
 /// `decidr models`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct ModelsArgs {

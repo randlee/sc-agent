@@ -1778,4 +1778,201 @@ mod tests {
     fn public_batch_delivers_local_timeout_to_transport() {
         local(true);
     }
+
+    /// REQ-SAG-0702 (a), (e): limits change the real runner, then the same options
+    /// construct a fresh runner with configured concurrency and timeout.
+    #[test]
+    fn call_overrides_do_not_change_the_next_calls_configured_limits() {
+        use crate::Workers;
+        for configured in [1, 4] {
+            let transport =
+                ScriptedTransport::responses(vec![
+                    HttpResponse::new(200, vec![], RESPONSE.to_vec());
+                    6
+                ]);
+            let recording = Recording::install(transport.clone());
+            let log = MemoryLog::new().expect("log");
+            let (dir, options) = options(false, &transport, &log);
+            let config = format!(r#"{{"workers":{configured}}}"#);
+            std::fs::write(dir.path().join("default.json"), &config).expect("config");
+            for limits in [
+                CallLimits {
+                    timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
+                    workers: Some(Workers::new(2).expect("workers")),
+                },
+                CallLimits::default(),
+            ] {
+                let mut count = 0;
+                send_batch_with(
+                    &options,
+                    (0..3)
+                        .map(|_| {
+                            crate::input::build_request(REQUEST, &[], false, None).expect("request")
+                        })
+                        .collect(),
+                    &CancelToken::new(),
+                    limits,
+                    &mut |result| {
+                        assert!(result.outcome.is_ok());
+                        count += 1;
+                        Ok(())
+                    },
+                )
+                .expect("batch");
+                assert_eq!(count, 3);
+            }
+            assert_eq!(
+                recording
+                    .timeouts()
+                    .iter()
+                    .map(|t| t.request.as_secs())
+                    .collect::<Vec<_>>(),
+                [10, 120]
+            );
+            let records = log.records().expect("records");
+            let starts: Vec<_> = records
+                .iter()
+                .filter(|r| r.action == "runner.stream.start")
+                .collect();
+            assert_eq!(starts.len(), 2);
+            for (record, workers) in starts.iter().zip([2, configured]) {
+                assert_eq!(record.fields["workers"], workers);
+                assert_eq!(record.fields["queue_capacity"], workers * 4);
+            }
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("default.json")).expect("config"),
+                config
+            );
+        }
+    }
+
+    /// REQ-SAG-0702 (b): the actual CLI parser and command's limit conversion
+    /// feed the effective transport and runner, not just the argument struct.
+    #[test]
+    fn cli_flags_reach_effective_timeout_and_batch_workers() {
+        for batch in [false, true] {
+            let mut argv = vec![
+                "decidr",
+                "send",
+                "--model",
+                "jev",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                "--timeout-secs",
+                "10",
+            ];
+            if batch {
+                argv.extend(["--batch", "--workers", "2"]);
+            }
+            let parsed = match crate::cli::parse(argv).expect("CLI") {
+                crate::cli::Parsed::Run(parsed) => parsed,
+                crate::cli::Parsed::Print(text) => panic!("expected command, got {text}"),
+            };
+            let crate::cli::Command::Send(args) = parsed.command else {
+                panic!("send");
+            };
+            let limits = args.call_limits().expect("limits");
+            let transport = ScriptedTransport::responses(vec![HttpResponse::new(
+                200,
+                vec![],
+                RESPONSE.to_vec(),
+            )]);
+            let recording = Recording::install(transport.clone());
+            let log = MemoryLog::new().expect("log");
+            let (_dir, options) = options(false, &transport, &log);
+            let request = crate::input::build_request(REQUEST, &[], false, None).expect("request");
+            let mut count = 0;
+            let mut delivered = |result: sc_decision_schema::DecisionResult| {
+                assert!(result.outcome.is_ok());
+                count += 1;
+                Ok(())
+            };
+            if args.batch {
+                send_batch_with(
+                    &options,
+                    vec![request],
+                    &CancelToken::new(),
+                    limits,
+                    &mut delivered,
+                )
+            } else {
+                send_with(
+                    &options,
+                    request,
+                    &CancelToken::new(),
+                    limits,
+                    &mut delivered,
+                )
+            }
+            .expect("CLI send");
+            assert_eq!(count, 1);
+            assert_eq!(recording.timeouts()[0].request, Duration::from_secs(10));
+            let records = log.records().expect("records");
+            let start = records
+                .iter()
+                .find(|r| r.action == "runner.stream.start")
+                .expect("start");
+            assert_eq!(start.fields["workers"], if batch { 2 } else { 1 });
+        }
+    }
+
+    /// REQ-SAG-0702 (c): drive a transport timeout at the selected deadline on
+    /// ManualClock; the runner gets no reply and returns the public error line.
+    #[test]
+    fn one_send_timeout_returns_the_typed_error_line() {
+        use sc_agent_types::ErrorId;
+        let clock = sc_agent_http::testing::ManualClock::new();
+        let transport = ScriptedTransport::new(vec![Err(sc_agent_http::HttpError::network(
+            sc_agent_http::NetworkKind::Timeout,
+            1,
+            "controlled unanswered send",
+        ))])
+        .with_send_duration(clock.clone(), Duration::from_secs(10));
+        let recording = Recording::install(transport.clone());
+        let log = MemoryLog::new().expect("log");
+        let (dir, mut options) = options(false, &transport, &log);
+        std::fs::write(dir.path().join("default.json"), r#"{"max_sends":1}"#).expect("config");
+        options.context.clock = Some(clock.clock());
+        let start = clock.now();
+        let mut lines = Vec::new();
+        send_with(
+            &options,
+            crate::input::build_request(REQUEST, &[], false, None).expect("request"),
+            &CancelToken::new(),
+            CallLimits {
+                timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
+                workers: None,
+            },
+            &mut |result| {
+                assert_eq!(
+                    result.outcome.as_ref().expect_err("timeout").id(),
+                    "decision.http"
+                );
+                lines.push(
+                    serde_json::from_slice::<serde_json::Value>(&crate::output::result_line(
+                        &result,
+                    )?)
+                    .expect("line"),
+                );
+                Ok(())
+            },
+        )
+        .expect("send");
+        assert_eq!(transport.sends(), 1);
+        assert_eq!(clock.now() - start, Duration::from_secs(10));
+        assert_eq!(recording.timeouts()[0].request, Duration::from_secs(10));
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0]["error"]["id"], "decision.http");
+        let cause = &lines[0]["error"]["cause"];
+        assert_eq!(cause["id"], "http.network");
+        assert_eq!(cause["attempts"], 1);
+        assert!(
+            cause["message"]
+                .as_str()
+                .expect("message")
+                .starts_with("timeout failure")
+        );
+    }
 }
