@@ -57,6 +57,11 @@ pub enum LogError {
         /// The host name read failure, if any.
         source: Option<std::io::Error>,
     },
+    /// The process's current working directory could not be read.
+    WorkingDirUnknown {
+        /// The current-directory read failure.
+        source: std::io::Error,
+    },
     /// The working folder has no final name component, or that name is not UTF-8.
     FolderUnknown {
         /// The folder.
@@ -151,6 +156,7 @@ sc_agent_types::error_catalog! { LogError {
     LogError::GitUnavailable { .. } => ("log.git_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::GitOutput { .. } => ("log.git_output", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::HostUnknown { .. } => ("log.host_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::WorkingDirUnknown { .. } => ("log.working_dir_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::FolderUnknown { .. } => ("log.folder_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::InvalidName { .. } => ("log.invalid_name", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::OpenSink { .. } => ("log.open_sink", Some(sc_agent_types::ErrorCategory::Log)),
@@ -184,6 +190,9 @@ impl ErrorId for LogError {
             }
             Self::HostUnknown { source: Some(_) } => "the host name could not be read".to_owned(),
             Self::HostUnknown { source: None } => "the host name is not UTF-8".to_owned(),
+            Self::WorkingDirUnknown { .. } => {
+                "the current working directory could not be read".to_owned()
+            }
             Self::FolderUnknown { path } => format!(
                 "the folder {} has no final name component in UTF-8",
                 path.display()
@@ -216,7 +225,10 @@ impl ErrorId for LogError {
             Self::GitUnavailable { source }
             | Self::HostUnknown {
                 source: Some(source),
-            } => Some(ErrorDetail::foreign(io_id(source), source)),
+            }
+            | Self::WorkingDirUnknown { source } => {
+                Some(ErrorDetail::foreign(io_id(source), source))
+            }
             Self::InvalidName { cause, .. } => Some((**cause).clone()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
@@ -254,6 +266,7 @@ impl Error for LogError {
             | Self::HostUnknown {
                 source: Some(source),
             } => Some(source),
+            Self::WorkingDirUnknown { source } => Some(source),
             Self::InvalidName { cause, .. } => Some(cause.as_ref()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),

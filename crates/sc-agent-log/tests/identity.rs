@@ -361,7 +361,7 @@ fn context() -> Box<ErrorContext> {
     ))
 }
 
-/// A8-16: 14 distinct log.* ids (13 + log.row_too_large, RSH-003); Display is "<id>: <message>" only.
+/// A8-16: 15 distinct log.* ids (14 + log.row_too_large, RSH-003); Display is "<id>: <message>" only.
 #[test]
 fn ids() {
     let detail = ErrorDetail::new("x.y", "lower", None);
@@ -379,6 +379,9 @@ fn ids() {
         },
         LogError::GitOutput { command: "config" },
         LogError::HostUnknown { source: None },
+        LogError::WorkingDirUnknown {
+            source: std::io::Error::other("cwd unavailable"),
+        },
         LogError::FolderUnknown {
             path: PathBuf::from("/"),
         },
@@ -417,7 +420,7 @@ fn ids() {
     ];
     let ids: HashSet<_> = errors.iter().map(ErrorId::id).collect();
     sc_agent_testkit::assert_catalog_rows(&errors);
-    assert_eq!(ids.len(), 14);
+    assert_eq!(ids.len(), 15);
     for error in &errors {
         assert!(error.id().starts_with("log."), "{}", error.id());
         assert_eq!(

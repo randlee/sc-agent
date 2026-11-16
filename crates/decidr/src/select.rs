@@ -232,11 +232,7 @@ fn working_dir() -> Result<PathBuf, DecidrError> {
 fn working_dir_from(
     current_dir: impl FnOnce() -> std::io::Result<PathBuf>,
 ) -> Result<PathBuf, DecidrError> {
-    current_dir().map_err(|source| {
-        DecidrError::from(LogError::HostUnknown {
-            source: Some(source),
-        })
-    })
+    current_dir().map_err(|source| DecidrError::from(LogError::WorkingDirUnknown { source }))
 }
 
 /// The caller's environment as an [`EnvSource`]; the last setting of a name wins.
@@ -1150,6 +1146,7 @@ fn list_models(
 #[cfg(test)]
 mod select_tests {
     use super::*;
+    use std::error::Error as _;
 
     #[test]
     fn working_dir_keeps_current_dir_error_as_cause() {
@@ -1158,10 +1155,22 @@ mod select_tests {
 
         assert_eq!(error.id(), "decidr.log");
         let cause = error.cause_detail().expect("log cause");
-        assert_eq!(cause.id, "log.host_unknown");
+        assert_eq!(cause.id, "log.working_dir_unknown");
+        assert_eq!(
+            cause.message,
+            "the current working directory could not be read"
+        );
         let io_cause = cause.cause.expect("io cause");
         assert_eq!(io_cause.id, "io.Other");
         assert_eq!(io_cause.message, "cwd unavailable");
+
+        let log_source = error.source().expect("log source");
+        assert_eq!(
+            log_source.to_string(),
+            "log.working_dir_unknown: the current working directory could not be read"
+        );
+        let io_source = log_source.source().expect("io source");
+        assert_eq!(io_source.to_string(), "cwd unavailable");
     }
 
     struct NoKeyring;
