@@ -21,7 +21,8 @@ class ConsumerFormatTest(unittest.TestCase):
             variables.write_text(json.dumps({"general_log": False, "sitr": True, "models": ["dec"],
                                              "sc_decidr_version": "1.2.3", "sitr_version": "4.5.6"}))
             subprocess.run(["sc-compose", "render", "--root", str(TEMPLATE.parent), "--file", str(TEMPLATE),
-                            "--var-file", str(variables), "--strict", "--output", str(output)], check=True)
+                            "--var-file", str(variables), "--strict", "--output", str(output)],
+                           check=True, stdin=subprocess.DEVNULL, timeout=60)
             namespace = {}
             exec(compile(output.read_text(), str(output), "exec"), namespace)
             with mock.patch.dict(sys.modules, {"sc_treesitter": None}):
