@@ -76,6 +76,23 @@ def test_structured_http_status_on_batch_and_exception(env, args, status):
     assert find_status(detail) == status
 
 
+@pytest.mark.parametrize("status,body,expected_id,category", [
+    (400, "private MAX_TOKENS exceeded", "decision.context_exceeded", "validation"),
+    (400, "ordinary refusal", "decision.api_bad_request", "validation"),
+    (401, "max_tokens exceeded", "decision.api_status", "auth"),
+])
+def test_context_overflow_through_python_wheel(env, args, status, body, expected_id, category):
+    loopback, _ = env
+    loopback.response_body = {"detail": body}
+    result = json.loads(sc_agent.send(NOUL, **args))
+    error = result["error"]
+    assert error["id"] == expected_id
+    assert error["category"] == category
+    assert error["status"] == status
+    if expected_id == "decision.context_exceeded":
+        assert body not in json.dumps(result)
+
+
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
     """AC: ANC-006."""
     text = subprocess.run(

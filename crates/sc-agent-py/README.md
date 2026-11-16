@@ -17,6 +17,30 @@ A failed decision is data in the returned line, not an exception. `KeyboardInter
 
 Keyring overrides apply only to the provider selected by the model. An ambiguous ranked model with an override raises `decidr.ambiguous_keyring_override`; no provider argument is required. Each supplied service/account must be 1–255 UTF-8 bytes. Omitted components independently use the provider credential-variable name and the current OS account. Lookup order is repository-root `.env`, process environment, then keyring; a present invalid higher-priority key never falls back. Invalid options raise `SagError("sc_agent_py.invalid_option", message, detail_json)` before network I/O.
 
+On macOS, Keychain may ask for access for each new Python interpreter binary.
+For a trusted interpreter, choose **Always Allow** to permit future reads by that
+interpreter; a different interpreter may prompt again. If access is not resolved
+within 15 seconds, the call raises `SagError` with id `decidr.secrets`, category
+`auth`, and cause id `secrets.keyring_timeout`; no provider request was sent.
+Keychain read errors likewise have cause id `secrets.keyring_read`. These are
+credential lookup failures, not provider authentication responses. Consumers
+should inspect the cause id before interpreting `auth` as a provider rejection:
+
+```python
+import json
+import sc_agent
+
+try:
+    sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
+except sc_agent.SagError as error:
+    if error.id == "decidr.secrets":
+        cause = json.loads(error.detail).get("cause") or {}
+        if cause.get("id") in {"secrets.keyring_timeout", "secrets.keyring_read"}:
+            print("Could not read the credential from the keychain")
+            raise
+    raise
+```
+
 `send` and `send_batch` accept optional `timeout_secs`: finite numeric seconds in
 10..=3600, including fractional seconds. It bounds each decision request’s connect,
 headers and body read together, not the whole batch or retry budget. An omitted
@@ -84,16 +108,37 @@ The wheel ships `sc_agent/templates/consumer.py.j2`, derived from the working
 plan-anchor client at `fff69b2`. Render it with sc-compose >=1.8.0 and Python >=3.11:
 
 ```bash
+VARS=$(mktemp)
+trap 'rm -f "$VARS"' EXIT
+python - "$VARS" <<'PY'
+import json
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import sys
+
+try:
+    sitr_version = version("sitr")
+except PackageNotFoundError:
+    sitr_version = ""
+
+Path(sys.argv[1]).write_text(json.dumps({
+    "general_log": False,
+    "models": ["jev"],
+    "sitr": False,
+    "sc_decidr_version": version("sc-decidr"),
+    "sitr_version": sitr_version,
+}, indent=2) + "\n")
+PY
 TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")')
-SC_DECIDR_VERSION=$(python -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')
-SITR_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("sitr") if any(d.metadata["Name"] == "sitr" for d in m.distributions()) else "")')
 sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
-  --var 'general_log=true' --var 'models=["jev","haiku","luna"]' --var 'sitr=false' \
-  --var "sc_decidr_version=$SC_DECIDR_VERSION" --var "sitr_version=$SITR_VERSION" \
+  --var-file "$VARS" \
   --strict --output consumer.py
 ```
 
-`models` records the selectors the consumer offers; each call passes its chosen
+The JSON vars file preserves booleans and the model list as typed values;
+`--var` values are strings and do not represent these options correctly.
+
+`models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `general_log` includes or omits forwarding the caller's general
 logger. Session logging always uses the wheel default; the generated module does
 not accept or forward `session_log` (REQ-SAG-0018). Keyring service and account are

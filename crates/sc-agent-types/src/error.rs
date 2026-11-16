@@ -103,10 +103,10 @@ impl ErrorId for TypesError {
                 "use a non-empty model id with no control characters, or a short name such as haiku"
             }
             Self::UnknownShortName { .. } => {
-                "use one of: jev, haiku, sonnet, opus, fable, luna, terra, sol, astra"
+                "use a short name from the sc-agent-types ShortName registry"
             }
             Self::UnknownProvider { .. } => {
-                "use one of: typesafe, anthropic, openai, openrouter, nous, together"
+                "use a provider from the sc-agent-types Provider registry"
             }
             Self::InvalidReleaseDate { .. } => {
                 "write the date as YYYY-MM-DD, for example 2026-10-14"

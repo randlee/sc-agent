@@ -1,6 +1,13 @@
 # sc-agent-secrets
 
-API key resolution for sc-agent. It sits in the config, secrets and logging layer, above `sc-agent-types`. A key is looked up by its variable name in the process environment, then in the repo-root `.env` file, then in the platform keyring (service = variable name, account = OS user).
+API key resolution for sc-agent. It sits in the config, secrets and logging layer, above `sc-agent-types`. A key is looked up by its variable name in the repo-root `.env` file, then in the process environment, then in the platform keyring (service = variable name, account = OS user).
+
+On macOS, a new interpreter or executable may prompt for Keychain access; choose
+**Always Allow** for a trusted binary to permit future reads by that binary. A
+read that does not complete within 15 seconds returns `secrets.keyring_timeout`;
+other keyring read failures return `secrets.keyring_read`. Both have category
+`auth`. A decision call reports these under `decidr.secrets` before sending a
+provider request; inspect the cause id to distinguish them from provider auth.
 
 The crate logs nothing and never puts key bytes in an error.
 

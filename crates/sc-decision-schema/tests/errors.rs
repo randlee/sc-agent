@@ -63,6 +63,7 @@ mod tests {
             status: 503,
             body: b"down".to_vec(),
         },
+        DecisionError::ContextExceeded { status: 400 },
         DecisionError::Http(network()),
         DecisionError::Backend {
             backend: "llm",
@@ -97,7 +98,7 @@ mod tests {
         assert!(!ids.contains(&"decision.digest"));
         ids.sort_unstable();
         ids.dedup();
-        assert_eq!(ids.len(), 14);
+        assert_eq!(ids.len(), 15);
 
         for error in &errors {
             assert_eq!(
@@ -116,6 +117,7 @@ mod tests {
                     DecisionError::ApiBadRequest { .. } => Some(400),
                     DecisionError::ApiValidation { .. } => Some(422),
                     DecisionError::ApiStatus { status, .. }
+                    | DecisionError::ContextExceeded { status }
                     | DecisionError::ResponseParse { status, .. } => Some(*status),
                     _ => None,
                 }
@@ -133,7 +135,8 @@ mod tests {
                 | DecisionError::ImageParts { .. }
                 | DecisionError::Limits { .. }
                 | DecisionError::ApiBadRequest { .. }
-                | DecisionError::ApiValidation { .. } => ErrorCategory::Validation,
+                | DecisionError::ApiValidation { .. }
+                | DecisionError::ContextExceeded { .. } => ErrorCategory::Validation,
                 DecisionError::ResponseParse { .. } | DecisionError::SchemaMismatch { .. } => {
                     ErrorCategory::ResponseInvalid
                 }
@@ -285,6 +288,7 @@ mod tests {
                     | "decision.limits"
                     | "decision.api_bad_request"
                     | "decision.api_validation"
+                    | "decision.context_exceeded"
                     | "decision.schema_mismatch"
                     | "decision.shutdown"
             );

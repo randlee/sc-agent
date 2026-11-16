@@ -87,6 +87,11 @@ pub enum DecisionError {
         /// The reply body, unchanged.
         body: Vec<u8>,
     },
+    /// The provider reports that the request exceeds its context window.
+    ContextExceeded {
+        /// The reply's HTTP status.
+        status: u16,
+    },
     /// The send failed in sc-agent-http (provider busy, quota exhausted, network, ...),
     /// wrapped unchanged.
     Http(HttpError),
@@ -138,6 +143,7 @@ sc_agent_types::error_catalog! { DecisionError {
     DecisionError::ApiBadRequest { .. } => ("decision.api_bad_request", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ApiValidation { .. } => ("decision.api_validation", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ApiStatus { .. } => ("decision.api_status", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionError::ContextExceeded { .. } => ("decision.context_exceeded", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::Http(_) => ("decision.http", None),
     DecisionError::Backend { .. } => ("decision.backend", None),
     DecisionError::SchemaMismatch { .. } => ("decision.schema_mismatch", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
@@ -193,6 +199,11 @@ impl ErrorId for DecisionError {
                 "the API answered HTTP {status}: {}",
                 String::from_utf8_lossy(body)
             ),
+            Self::ContextExceeded { status } => {
+                format!(
+                    "the API answered HTTP {status}: request exceeds the model's context window"
+                )
+            }
             Self::Http(error) => format!("the send failed ({})", error.id()),
             Self::Backend { backend, detail } => {
                 format!("the {backend} backend failed ({})", detail.id)
@@ -223,7 +234,9 @@ impl ErrorId for DecisionError {
         match self {
             Self::ApiBadRequest { .. } => Some(400),
             Self::ApiValidation { .. } => Some(422),
-            Self::ApiStatus { status, .. } | Self::ResponseParse { status, .. } => Some(*status),
+            Self::ApiStatus { status, .. }
+            | Self::ContextExceeded { status }
+            | Self::ResponseParse { status, .. } => Some(*status),
             _ => None,
         }
     }
@@ -256,6 +269,7 @@ impl ErrorId for DecisionError {
             Self::ApiValidation { .. } => {
                 Some("fix each field named in `loc` as its `msg` says and send again")
             }
+            Self::ContextExceeded { .. } => Some("shorten the request and send again"),
             Self::SchemaMismatch { .. } => Some(
                 "the provider kept replying outside the schema; try another model or backend, or raise max_sends",
             ),

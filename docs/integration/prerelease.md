@@ -23,8 +23,9 @@ just integration --results /tmp/sc-agent-local-results
 
 The command creates a fresh Python 3.11 venv, installs maturin/pytest, builds and
 installs this checkout's wheel, renders its shipped consumer, and runs the same
-suite once per provider. TypeSafe uses `jev`, Anthropic uses `haiku`, OpenAI uses
-`luna`. Each run sends a meaningful noul question singly and in a batch, then
+suite once per provider selected in [the runner](../../scripts/integration.py),
+using [the suite's model mapping](../../crates/sc-agent-py/integration/test_providers.py).
+Each run sends a meaningful noul question singly and in a batch, then
 checks invalid-key HTTP401/auth, cancellation, a cancelled follow-up and redaction.
 Provider selection stays automatic; the consumer never forces a provider.
 

@@ -19,8 +19,9 @@ use binding_error::PyBindingError;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::Duration;
 
 use decidr::input::{BatchInput, build_batch, build_request_bytes};
@@ -150,6 +151,24 @@ impl From<BatchItem> for BatchInput {
     }
 }
 
+// The exit hook runs while Python is still usable. Close admission before
+// releasing the GIL, then wait for every writer that might be attaching. The
+// read guard covers attachment, the callback and Python error formatting.
+static PYTHON_LOGS_OPEN: AtomicBool = AtomicBool::new(true);
+static PYTHON_LOG_WRITES: RwLock<()> = RwLock::new(());
+
+#[pyfunction]
+fn _shutdown_python_logs(py: Python<'_>) {
+    PYTHON_LOGS_OPEN.store(false, Ordering::Release);
+    py.detach(|| {
+        drop(
+            PYTHON_LOG_WRITES
+                .write()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+    });
+}
+
 /// Forwards each record to the caller-owned Python Logger or callable under the GIL.
 ///
 /// The dict is `{"level", "target", "action", "fields"}`. A raised exception makes the
@@ -188,6 +207,14 @@ impl PyLogSink {
 
 impl LogSink for PyLogSink {
     fn write(&self, event: &LogEvent) -> Result<(), LogSinkError> {
+        let _active = PYTHON_LOG_WRITES
+            .read()
+            .unwrap_or_else(PoisonError::into_inner);
+        if !PYTHON_LOGS_OPEN.load(Ordering::Acquire) {
+            return Err(Self::refused(
+                "the Python logging bridge is shut down".to_owned(),
+            ));
+        }
         Python::attach(|py| {
             if self.callable.bind(py).is_callable() {
                 let record = py
@@ -415,7 +442,10 @@ fn run_interruptible<T: Send>(
             let text =
                 decidr::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
             let message = std::ffi::CString::new(text).unwrap_or_default();
-            PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
+            if let Err(warning) = PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1) {
+                // A warning filter must not replace the decision (or its error).
+                warning.write_unraisable(py, None);
+            }
         }
         if let Some(error) = raised {
             return Err(error);
@@ -773,6 +803,10 @@ fn doctor(
 /// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
 #[pymodule(name = "_native")]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.py().import("atexit")?.call_method1(
+        "register",
+        (wrap_pyfunction!(_shutdown_python_logs, module)?,),
+    )?;
     module.add_function(wrap_pyfunction!(send, module)?)?;
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
     module.add_function(wrap_pyfunction!(category, module)?)?;
@@ -787,6 +821,8 @@ class SagError(Exception):
     def __init__(self, id, message, detail_json):
         super().__init__(id, message, detail_json)
         self._fields = _sag_error_fields(detail_json)
+    def __str__(self):
+        return f"{self.id}: {self.message}"
     @property
     def id(self): return self.args[0]
     @property

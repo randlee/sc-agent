@@ -165,6 +165,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn context_overflow_is_typed_without_exposing_the_body() {
+        use sc_agent_types::ErrorCategory;
+
+        for (status, body) in [
+            (400, b"secret MAX_TOKENS limit".as_slice()),
+            (422, b"secret Token limit Exceeded".as_slice()),
+        ] {
+            let error = decode(status, body).expect_err("context overflow");
+            let detail = error.detail();
+            assert_eq!(detail.id, "decision.context_exceeded");
+            assert_eq!(detail.category, Some(ErrorCategory::Validation));
+            assert_eq!(detail.status, Some(status));
+            assert!(!format!("{error:?} {error} {detail:?}").contains("secret"));
+        }
+        let ordinary = decode(400, b"ordinary validation failure").expect_err("400");
+        assert_eq!(ordinary.id(), "decision.api_status");
+        let auth = decode(401, b"max_tokens token exceeded").expect_err("401");
+        assert_eq!(auth.id(), "decision.api_status");
+        assert_eq!(auth.detail().category, Some(ErrorCategory::Auth));
+        let server = decode(503, b"max_tokens exceeded").expect_err("503");
+        assert_eq!(server.id(), "decision.api_status");
+    }
+
     /// AC 11: a 503 from Laya or Mapika/decider is a final reply, decision.api_status with its
     /// body, not a busy signal.
     #[test]

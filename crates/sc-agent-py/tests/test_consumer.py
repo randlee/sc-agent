@@ -6,6 +6,8 @@ import importlib.metadata
 from itertools import takewhile
 import json
 import pathlib
+import re
+import subprocess
 import sys
 import threading
 import tomllib
@@ -18,6 +20,19 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 
 from consumer_support import render_consumer
+
+
+def test_readme_render_command_preserves_json_feature_types(tmp_path):
+    readme = (ROOT / "crates/sc-agent-py/README.md").read_text().split("## Generated consumer", 1)[1]
+    match = re.search(r"```bash\n(.*?)\n```", readme, re.DOTALL)
+    assert match, "README must document the consumer render command in a bash block"
+    subprocess.run(["bash", "-e", "-c", match.group(1)], cwd=tmp_path, check=True)
+
+    generated = (tmp_path / "consumer.py").read_text()
+    assert 'MODELS = ["jev"]' in generated
+    assert "def extract(" not in generated
+    assert "general_log: Optional[LogSink] = None" not in generated
+    assert 'kwargs["general_log"] = general_log' not in generated
 
 
 @pytest.mark.parametrize("sitr", [False, True])

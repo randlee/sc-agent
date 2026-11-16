@@ -1,5 +1,7 @@
 """Caller-owned sc-observability 1.5.0 Logger injection through the installed wheel."""
 import json
+import sys
+import warnings
 from unittest.mock import patch
 
 import pytest
@@ -81,3 +83,26 @@ def test_closed_caller_logger_reports_lost_rows_and_preserves_decision(env, args
     messages = "\n".join(str(warning.message) for warning in warnings)
     assert "log.rows_lost" in messages
     assert "SC_OBSERVABILITY_BINDING_CLOSED" in messages
+
+
+@pytest.mark.mode("ok")
+@pytest.mark.parametrize("operation", ["send", "send_batch"])
+def test_close_warning_as_error_keeps_result_and_records_diagnostic(env, args, tmp_path, monkeypatch, operation):
+    logger = ok(obs.create_logger(obs.LoggerConfig(service="consumer", log_root=str(tmp_path / "caller"))))
+    ok(logger.shutdown())
+    recorded = []
+    monkeypatch.setattr(sys, "unraisablehook", recorded.append)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        result = (sc_agent.send(NOUL, **args, general_log=logger) if operation == "send"
+                  else sc_agent.send_batch([NOUL, NOUL], **args, general_log=logger))
+    lines = [result] if operation == "send" else result
+    assert len(lines) == (1 if operation == "send" else 2)
+    assert all("response" in json.loads(line) for line in lines)
+    assert recorded, "the rejected close warning must remain visible"
+    assert all(event.exc_type is RuntimeWarning for event in recorded)
+    details = [json.loads(str(event.exc_value)) for event in recorded]
+    assert all(detail["id"] == "decidr.log" for detail in details)
+    text = json.dumps(details)
+    assert "log.rows_lost" in text
+    assert "SC_OBSERVABILITY_BINDING_CLOSED" in text
