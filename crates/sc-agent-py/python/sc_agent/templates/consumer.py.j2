@@ -92,8 +92,10 @@ def call(
     config_dir: Optional[str] = None,
     keyring_service: Optional[str] = None,
     keyring_account: Optional[str] = None,
-    {% if general_log %}general_log: Optional[LogSink] = None,
-    {% endif %}timeout_secs: Optional[float] = None,
+{% if general_log %}
+    general_log: Optional[LogSink] = None,
+{% endif %}
+    timeout_secs: Optional[float] = None,
 ) -> tuple[str, Optional[str]]:
     """Send one decision request and return its result JSON and mapped error code."""
     _validate_abort_on(abort_on)
@@ -103,8 +105,10 @@ def call(
         raise ClientError("DEPENDENCY.SC_DECIDR", f"sc-decidr {{ sc_decidr_version }} is required for live calls: {exc}") from exc
     kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel,
                   images=images, long_context=long_context, config_dir=config_dir,
-                  keyring_service=keyring_service, keyring_account=keyring_account,
-                  {% if general_log %}general_log=general_log,{% endif %})
+                  keyring_service=keyring_service, keyring_account=keyring_account)
+{% if general_log %}
+    kwargs["general_log"] = general_log
+{% endif %}
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     try:
@@ -133,8 +137,10 @@ def call_batch(
     config_dir: Optional[str] = None,
     keyring_service: Optional[str] = None,
     keyring_account: Optional[str] = None,
-    {% if general_log %}general_log: Optional[LogSink] = None,
-    {% endif %}timeout_secs: Optional[float] = None,
+{% if general_log %}
+    general_log: Optional[LogSink] = None,
+{% endif %}
+    timeout_secs: Optional[float] = None,
     workers: Optional[int] = None,
     on_result: Optional[Callable[[str], None]] = None,
 ) -> list[tuple[str, Optional[str]]]:
@@ -159,7 +165,10 @@ def call_batch(
 
     kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel,
                   on_result=handle, config_dir=config_dir, keyring_service=keyring_service,
-                  keyring_account=keyring_account, {% if general_log %}general_log=general_log,{% endif %})
+                  keyring_account=keyring_account)
+{% if general_log %}
+    kwargs["general_log"] = general_log
+{% endif %}
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:
