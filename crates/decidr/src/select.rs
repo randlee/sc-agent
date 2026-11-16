@@ -161,6 +161,8 @@ pub struct SendOptions {
     /// The model, line or local runner.
     pub model: ModelSelector,
     /// The provider override; `None` chooses by ranking among detected keys (REQ-SAG-0103).
+    /// With a keyring override, more than one ranked provider is refused as
+    /// `decidr.ambiguous_keyring_override` (REQ-SAG-0018).
     pub provider: Option<Provider>,
     /// The project slug of the session rows.
     pub project: Slug,
@@ -326,7 +328,9 @@ impl<'c> Keys<'c> {
 }
 
 /// The provider of a request and its key: the override, else the first of
-/// `Provider::ranking(line)` with a detected key (REQ-SAG-0103).
+/// `Provider::ranking(line)` with a detected key (REQ-SAG-0103). With a keyring override,
+/// more than one ranked provider is refused as `decidr.ambiguous_keyring_override`
+/// (REQ-SAG-0018).
 fn choose_provider(
     choice: Option<Provider>,
     line: Option<ShortName>,
