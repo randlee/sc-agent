@@ -182,9 +182,9 @@ Put consumer-specific bookkeeping in `data`.
 The envelope's existing `recoverable` name carries the error's `retryable` value.
 For wheel failures, message and action come unchanged from Rust's ErrorDetail
 `message` and `recovery`. The template keeps no wheel message/action tables and
-accepts no action override. Auth response bodies are withheld by Rust. Codes use
-the shared category/id maps; a partial `category_codes` map may override codes.
-The default `context_exceeded` entry already maps decision.context_exceeded.
+accepts no action override. Auth response bodies are withheld by Rust. Defaults use `DECIDR.*`, `AUTH.CREDENTIALS` and `CANCELED`.
+Override categories through `category_codes`, including `context_exceeded` for
+`decision.context_exceeded`; the redundant `DECIDR_ERROR_CODES` export is removed.
 
 A single result is `{"ok": true, "value": response, "position": n, "line": wire,
 "attempts": sends}` or `{"ok": false, "error": ClientError, ...}`. Result attempts
@@ -206,7 +206,7 @@ does not log a rewritten copy.
 | SC_DECIDR_VERSION, MODELS | Rendered version and offered model selectors. |
 | LogSink, CategoryCodes, AbortOn, BatchItem | Log callback, code map, abort set and batch-input aliases. |
 | ClientError | The single error type and envelope described above. |
-| DECIDR_CATEGORY_CODES, DECIDR_ERROR_CODES | Shared default code mappings. |
+| DECIDR_CATEGORY_CODES | Shared category-to-code defaults. |
 | new_cancel_token() | Lazily creates a wheel token or raises ClientError if the wheel is missing. |
 | error_metadata(detail) | Optional integer status/retry_after_ms/attempts; rejects bool. |
 | wheel_error(detail, *, category_codes=None) | Converts a Rust detail into ClientError without rewriting its text. |

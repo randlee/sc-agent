@@ -308,7 +308,7 @@ def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_resul
 @pytest.mark.parametrize("method", ["call_result", "call_batch_results"])
 @pytest.mark.parametrize("error_id,codes,expected", [
     ("decision.context_exceeded", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "CONTEXT"),
-    ("decision.context_exceeded", {"validation": "INVALID"}, "JEV.CONTEXT_EXCEEDED"),
+    ("decision.context_exceeded", {"validation": "INVALID"}, "DECIDR.CONTEXT_EXCEEDED"),
     ("decision.request_parse", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "INVALID"),
 ])
 def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes, expected):

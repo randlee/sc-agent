@@ -8,9 +8,9 @@ import sc_agent
 
 COMMON = dict(model="jev", project="consumer", agent_role="judge", abort_on=frozenset({"auth"}))
 CATEGORY_CASES = [
-    ("auth", "AUTH.CREDENTIALS", False), ("quota", "JEV.RATE_LIMITED", False),
-    ("busy", "JEV.OVERLOADED", True), ("network", "JEV.NETWORK", True),
-    ("response_invalid", "JEV.RESPONSE_INVALID", False), ("validation", "JEV.VALIDATION", False),
+    ("auth", "AUTH.CREDENTIALS", False), ("quota", "DECIDR.RATE_LIMITED", False),
+    ("busy", "DECIDR.OVERLOADED", True), ("network", "DECIDR.NETWORK", True),
+    ("response_invalid", "DECIDR.RESPONSE_INVALID", False), ("validation", "DECIDR.VALIDATION", False),
     ("cancelled", "CANCELED", False), ("config", "DECIDR.CONFIG", False),
     ("log", "DECIDR.LOG", False), ("other", "DECIDR.ERROR", False),
 ]
@@ -41,10 +41,10 @@ def test_each_shared_category(consumer, category, code, retryable):
 
 
 @pytest.mark.parametrize("identifier,category,expected", [
-    ("decision.context_exceeded", "validation", "JEV.CONTEXT_EXCEEDED"),
-    ("decision.api_bad_request", "validation", "JEV.VALIDATION"),
-    ("decision.api_validation", "validation", "JEV.VALIDATION"),
-    ("decision.response_parse", "response_invalid", "JEV.RESPONSE_INVALID"),
+    ("decision.context_exceeded", "validation", "DECIDR.CONTEXT_EXCEEDED"),
+    ("decision.api_bad_request", "validation", "DECIDR.VALIDATION"),
+    ("decision.api_validation", "validation", "DECIDR.VALIDATION"),
+    ("decision.response_parse", "response_invalid", "DECIDR.RESPONSE_INVALID"),
 ])
 def test_each_shared_id(consumer, identifier, category, expected):
     detail = dict(id=identifier, category=category, message="failure")
@@ -73,7 +73,7 @@ def test_metadata_rejects_non_integer_fields(consumer, value):
         status=None, attempts=None, retry_after_ms=None)
     result = consumer.decode_result(wire(sends=value, error=dict(id="x", category="busy", message="busy", attempts=7)))
     assert result["attempts"] is None and result["error"].attempts is None
-    assert result["error"].code == "JEV.OVERLOADED"
+    assert result["error"].code == "DECIDR.OVERLOADED"
 
 
 def test_metadata_zero_and_unknown_sends(consumer):
@@ -83,7 +83,7 @@ def test_metadata_zero_and_unknown_sends(consumer):
     assert result["ok"] and result["attempts"] is None
     result = consumer.decode_result('{"error": {"id":"x", "category":"busy", "message":"busy", "attempts":8}}')
     assert result["error"].attempts is None
-    assert result["error"].code == "JEV.OVERLOADED"
+    assert result["error"].code == "DECIDR.OVERLOADED"
 
 
 @pytest.mark.parametrize("line", ["bad json", "[]", "null", "{}", '{"response":null}', '{"error":true}'])
@@ -98,7 +98,7 @@ def test_sag_error_retains_typed_fields(consumer):
                   retry_after_ms=900, status=503)
     exc = sc_agent.SagError(detail["id"], detail["message"], json.dumps(detail))
     result = consumer.exception_result(exc)
-    assert error_fields(result["error"]) == dict(code="JEV.NETWORK", message="transport details", retryable=True,
+    assert error_fields(result["error"]) == dict(code="DECIDR.NETWORK", message="transport details", retryable=True,
                                    action=detail.get("recovery"), attempts=4,
                                    retry_after_ms=900, status=503, data=detail)
 
@@ -271,3 +271,27 @@ def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, a
         assert fields["action"] == native["recovery"]
         common_fields.append({key: fields[key] for key in ("id", "category", "provider", "status", "message", "action")})
     assert common_fields[0] == common_fields[1]
+
+
+@pytest.mark.parametrize("batch", [False, True])
+def test_each_wire_line_is_parsed_once(consumer, monkeypatch, batch):
+    line = wire(error={"id": "decision.context_exceeded", "category": "validation", "message": "too large"})
+    loads, seen = json.loads, []
+
+    def tracked(value, *args, **kwargs):
+        if value == line:
+            seen.append(value)
+        return loads(value, *args, **kwargs)
+
+    def send_batch(requests, *, on_result, **kwargs):
+        on_result(line)
+        return [line]
+
+    monkeypatch.setattr(consumer.json, "loads", tracked)
+    monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
+    monkeypatch.setattr(sc_agent, "send_batch", send_batch)
+    result = (consumer.call_batch_results(["request"], **COMMON)["value"][0] if batch else
+              consumer.call_result("request", **COMMON))
+    assert result["error"].code == "DECIDR.CONTEXT_EXCEEDED"
+    assert result["attempts"] == 3
+    assert seen == [line]

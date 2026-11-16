@@ -61,6 +61,10 @@ class ConsumerFormatTest(unittest.TestCase):
                         self.assertIn("timeout_secs", arguments)
                         self.assertEqual("general_log" in arguments, general_log)
                     self.assertNotIn("general_log=general_log,)", text)
+                    if sitr:
+                        lines = text.splitlines()
+                        index = functions["extract"].lineno - 1
+                        self.assertEqual(lines[index - 2:index], ["", ""])
 
 
 if __name__ == "__main__":

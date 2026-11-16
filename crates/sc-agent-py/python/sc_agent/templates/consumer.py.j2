@@ -33,7 +33,7 @@ BatchItem = Union[str, tuple[str, Optional[dict[str, bytes]], bool]]
 
 __all__ = [
     "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
-    "DECIDR_CATEGORY_CODES", "DECIDR_ERROR_CODES", "new_cancel_token", "error_metadata", "wheel_error",
+    "DECIDR_CATEGORY_CODES", "new_cancel_token", "error_metadata", "wheel_error",
     "decode_result", "exception_result", "call_result", "call_batch_results",
 {% if sitr %}
     "extract",
@@ -43,18 +43,14 @@ _ALLOWED_ABORT_ON = (frozenset(), frozenset({"auth"}), frozenset({"auth", "quota
 
 
 DECIDR_CATEGORY_CODES = {
-    "auth": "AUTH.CREDENTIALS", "quota": "JEV.RATE_LIMITED", "busy": "JEV.OVERLOADED",
-    "network": "JEV.NETWORK", "response_invalid": "JEV.RESPONSE_INVALID",
-    "validation": "JEV.VALIDATION", "cancelled": "CANCELED",
+    "auth": "AUTH.CREDENTIALS", "quota": "DECIDR.RATE_LIMITED", "busy": "DECIDR.OVERLOADED",
+    "network": "DECIDR.NETWORK", "response_invalid": "DECIDR.RESPONSE_INVALID",
+    "validation": "DECIDR.VALIDATION", "cancelled": "CANCELED",
     "config": "DECIDR.CONFIG", "log": "DECIDR.LOG", "other": "DECIDR.ERROR",
-    "context_exceeded": "JEV.CONTEXT_EXCEEDED",
+    "context_exceeded": "DECIDR.CONTEXT_EXCEEDED",
 }
-DECIDR_ERROR_CODES = {
-    "decision.context_exceeded": DECIDR_CATEGORY_CODES["context_exceeded"],
-    "decision.api_bad_request": DECIDR_CATEGORY_CODES["validation"],
-    "decision.api_validation": DECIDR_CATEGORY_CODES["validation"],
-    "decision.response_parse": DECIDR_CATEGORY_CODES["response_invalid"],
-}
+
+
 class ClientError(RuntimeError):
     """The shared error for wheel failures and consumer validation/usage errors."""
 
@@ -114,7 +110,7 @@ def wheel_error(error: dict, *, category_codes=None) -> ClientError:
         raise _invalid("sc-decidr returned an invalid typed error")
     codes = {**DECIDR_CATEGORY_CODES, **(category_codes or {})}
     key = "context_exceeded" if error.get("id") == "decision.context_exceeded" else category
-    code = codes.get(key) or DECIDR_ERROR_CODES.get(error.get("id")) or codes["other"]
+    code = codes.get(key) or codes["other"]
     return ClientError(code, error["message"], retryable, error.get("recovery"),
                        **error_metadata(error), data=dict(error))
 
@@ -260,6 +256,8 @@ def call_batch_results(
 
 {% if sitr %}
 # Extraction is separate from every decision call.
+
+
 def extract(language: str, query: str, source: Union[str, bytes], captures=None):
     try:
         import sc_treesitter
