@@ -168,11 +168,11 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    The returned list is sorted by `position`. `on_result` still receives each line as it finishes.
 
-9. **Prerelease verification is hand-run live tests; the integration gate is removed.**
+9. **Prerelease verification is real-provider integration tests; the integration gate is removed.**
 
    `decidr::integration_gate`, its re-exports `integration_cases` and `validate_integration_results`, the matching `sc_agent` functions and the surrounding report and gate tooling are removed before 0.2.0. `decidr.integration_evidence` is not an error id.
 
-   Prerelease verification becomes live tests that the owner runs by hand against the installed prerelease wheel, covering `jev`, `haiku` and `luna`; a model whose API key is not available is skipped. Each tested platform's report is an XHTML file that is committed and pushed. One passing platform is sufficient. REQ-SAG-0133 is superseded by this decision.
+   Integration tests send real queries through the rendered consumer. One suite runs once per provider (TypeSafe, Anthropic, OpenAI); each run's environment holds only that provider's key, so the consumer's automatic selection resolves to it. A provider with no key is reported as not run; any other error fails. The developer runs the suite on a locally built wheel and fixes every failure before the prerelease is cut. The same suite then runs on the installed prerelease wheels on a clean install, and each run renders one XHTML panel (provider x platform) recording the prerelease tag and commit; the panels are committed and pushed. One passing platform is sufficient. REQ-SAG-0133 is superseded by this decision.
 
 10. **Category assignments are part of the contract.**
 
