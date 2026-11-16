@@ -37,8 +37,6 @@ pub enum DecidrError {
     InvalidRequestTimeout {
         /// The refused value in seconds.
         value: f64,
-        /// A lower-level duration-conversion failure, when present.
-        source: Option<Box<ErrorDetail>>,
     },
     /// A per-call worker count is outside the supported range.
     InvalidWorkers {
@@ -366,7 +364,6 @@ impl ErrorId for DecidrError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
-            Self::InvalidRequestTimeout { source, .. } => source.as_deref().cloned(),
             Self::Usage { source } => foreign("clap", &**source),
             Self::Config(error) => Some(error.detail()),
             Self::Types(error) => Some(error.detail()),
@@ -384,7 +381,8 @@ impl ErrorId for DecidrError {
             | Self::Write { source } => foreign("io", source),
             Self::Encode { source } => foreign("serde_json", source),
             Self::Signal { source } => foreign("ctrlc", source),
-            Self::InvalidWorkers { .. }
+            Self::InvalidRequestTimeout { .. }
+            | Self::InvalidWorkers { .. }
             | Self::AmbiguousKeyringOverride { .. }
             | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
@@ -454,9 +452,6 @@ impl fmt::Display for DecidrError {
 impl Error for DecidrError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::InvalidRequestTimeout { source, .. } => {
-                source.as_ref().map(|error| &**error as &dyn Error)
-            }
             Self::Usage { source } => Some(&**source),
             Self::Config(error) => Some(&**error),
             Self::Types(error) => Some(&**error),
@@ -472,7 +467,8 @@ impl Error for DecidrError {
             | Self::Write { source } => Some(source),
             Self::Encode { source } => Some(source),
             Self::Signal { source } => Some(source),
-            Self::InvalidWorkers { .. }
+            Self::InvalidRequestTimeout { .. }
+            | Self::InvalidWorkers { .. }
             | Self::AmbiguousKeyringOverride { .. }
             | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
@@ -494,10 +490,7 @@ mod tests {
         let io = || std::io::Error::other("failure");
         let mut errors = samples();
         errors.extend([
-            DecidrError::InvalidRequestTimeout {
-                value: 0.0,
-                source: None,
-            },
+            DecidrError::InvalidRequestTimeout { value: 0.0 },
             DecidrError::InvalidWorkers { value: 0 },
             DecidrError::AmbiguousKeyringOverride { candidates: vec![] },
             DecidrError::Usage {

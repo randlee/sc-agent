@@ -2,10 +2,8 @@
 
 use std::time::Duration;
 
-use sc_agent_config::{MAX_WORKERS, RUNNER_REQUEST_TIMEOUT_SECS};
-use sc_agent_types::ErrorDetail;
-
 use crate::DecidrError;
+use sc_agent_config::{MAX_WORKERS, RUNNER_REQUEST_TIMEOUT_SECS};
 
 /// A finite per-call request timeout within the configured runner request bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,20 +19,9 @@ impl RequestTimeout {
         let min = f64::from(*RUNNER_REQUEST_TIMEOUT_SECS.start());
         let max = f64::from(*RUNNER_REQUEST_TIMEOUT_SECS.end());
         if !seconds.is_finite() || !(min..=max).contains(&seconds) {
-            return Err(DecidrError::InvalidRequestTimeout {
-                value: seconds,
-                source: None,
-            });
+            return Err(DecidrError::InvalidRequestTimeout { value: seconds });
         }
-        Duration::try_from_secs_f64(seconds)
-            .map(Self)
-            .map_err(|source| DecidrError::InvalidRequestTimeout {
-                value: seconds,
-                source: Some(Box::new(ErrorDetail::foreign(
-                    "std.time.float_duration",
-                    &source,
-                ))),
-            })
+        Ok(Self(Duration::from_secs_f64(seconds)))
     }
 
     pub(crate) fn duration(self) -> Duration {
@@ -126,6 +113,8 @@ mod tests {
             assert!(error.message().contains("timeout_secs"));
             assert!(error.message().contains("10..=3600"));
             assert!(error.message().contains(&seconds.to_string()));
+            assert!(matches!(error, DecidrError::InvalidRequestTimeout { .. }));
+            assert!(error.cause_detail().is_none());
         }
     }
 }
