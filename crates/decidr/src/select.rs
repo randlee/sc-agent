@@ -226,9 +226,15 @@ pub fn session_identity(project: &Slug, agent_role: &Slug) -> Result<SessionIden
 }
 
 fn working_dir() -> Result<PathBuf, DecidrError> {
-    std::env::current_dir().map_err(|_| {
-        DecidrError::from(LogError::FolderUnknown {
-            path: PathBuf::from("."),
+    working_dir_from(std::env::current_dir)
+}
+
+fn working_dir_from(
+    current_dir: impl FnOnce() -> std::io::Result<PathBuf>,
+) -> Result<PathBuf, DecidrError> {
+    current_dir().map_err(|source| {
+        DecidrError::from(LogError::HostUnknown {
+            source: Some(source),
         })
     })
 }
@@ -1165,6 +1171,19 @@ fn list_models(
 #[cfg(test)]
 mod select_tests {
     use super::*;
+
+    #[test]
+    fn working_dir_keeps_current_dir_error_as_cause() {
+        let error = working_dir_from(|| Err(std::io::Error::other("cwd unavailable")))
+            .expect_err("current_dir failure");
+
+        assert_eq!(error.id(), "decidr.log");
+        let cause = error.cause_detail().expect("log cause");
+        assert_eq!(cause.id, "log.host_unknown");
+        let io_cause = cause.cause.expect("io cause");
+        assert_eq!(io_cause.id, "io.Other");
+        assert_eq!(io_cause.message, "cwd unavailable");
+    }
 
     struct NoKeyring;
 
