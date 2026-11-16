@@ -163,3 +163,10 @@ def call_batch(
         raise
     # The wheel returns input order; callbacks above retain finish order.
     return [_map_result(line, category_codes, abort_on, cancel, sc_agent) for line in lines]
+
+{% if sitr %}
+# Optional sitr 0.2.0; extraction is separate from every decision call.
+def extract(language: str, query: str, source: Union[str, bytes], captures=None):
+    import sc_treesitter
+    return sc_treesitter.run_query(language, query, source, captures=captures)
+{% endif %}

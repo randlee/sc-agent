@@ -115,18 +115,25 @@ def outcome_model(request):
 
 
 @pytest.fixture
-def outcome_args(request, outcome_model):
+def outcome_args(request, outcome_model, record_property):
     if _live_outcome(request):
         # Omit provider/config overrides: the wheel selects the actual provider,
         # resolves credentials and uses the owner's real configuration.
-        return dict(model=outcome_model, project="owner-check", agent_role="pytest")
+        record_property("model", outcome_model)
+        record_property("mode", "live")
+        def record(event):
+            fields = event.get("fields", {})
+            if fields.get("provider"):
+                record_property("provider", fields["provider"])
+                record_property("resolved_model", fields.get("model", outcome_model))
+        return dict(model=outcome_model, project="owner-check", agent_role="pytest", general_log=record)
     return request.getfixturevalue("args")
 
 
 @pytest.fixture
 def outcome_models_args(request):
     if _live_outcome(request):
-        return {}  # models() is TypeSafe by default in the 0.1.5 API.
+        return {}  # Default TypeSafe models list.
     args = request.getfixturevalue("args")
     return dict(runner="dec", config_dir=args["config_dir"])
 
@@ -143,6 +150,6 @@ def outcome_call(request, monkeypatch):
 
 
 @pytest.fixture
-def explicit_live_switch(monkeypatch):
-    """Controlled guard regression: a nonmarked test still uses loopback on opt-in."""
-    monkeypatch.setenv("SC_AGENT_LIVE", "1")
+def consumer(tmp_path):
+    from test_consumer import render_consumer
+    return render_consumer(tmp_path)

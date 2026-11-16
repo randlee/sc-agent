@@ -116,3 +116,10 @@ and result interpretation remain in the consumer; there is no additional retry l
 
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).
+
+Set `sitr=true` to include `extract(language, query, source, captures=None)`.
+It imports the separate, version-matched sitr wheel only when called and delegates
+to `sc_treesitter.run_query`. Extraction stays outside the decision path: use its
+captures when authoring a request, then call the same decision function. The
+header records both wheel versions when sitr is enabled. Mixed versions are
+unsupported and are not checked at import time.

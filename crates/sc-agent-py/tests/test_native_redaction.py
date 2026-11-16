@@ -3,6 +3,9 @@
 No OS keychain or external provider is used; the suite's keychain trap stays armed.
 """
 import json
+import os
+import pathlib
+import re
 import subprocess
 
 import pytest
@@ -88,3 +91,50 @@ def test_post_credential_decision_error_stays_redacted_in_actual_sagerror(env, c
     assert detail["cause"]["id"] == "decision.response_parse"
     assert "[redacted]" in detail["cause"]["message"]
     assert KEY not in str(caught.value.args)
+
+
+@pytest.mark.live_outcome
+@pytest.mark.mode("echo-key")
+@pytest.mark.parametrize("provider", ["typesafe", "anthropic"])
+@pytest.mark.parametrize("status", [401])
+def test_invalid_environment_key_auth_cancels_and_redacts(
+    request, tmp_path, monkeypatch, consumer, provider, status, record_property,
+):
+    """Existing echo-key redaction path, also manually selectable against real providers."""
+    live = os.environ.get("SC_AGENT_LIVE") == "1"
+    key = "invalid-environment-key-b12-auth-0001"
+    monkeypatch.chdir(tmp_path)  # No repository .env may override the explicit invalid key.
+    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
+    if live:
+        for name in list(os.environ):
+            if name.endswith("_API_KEY") or name.startswith("SC_AGENT__"):
+                monkeypatch.delenv(name)
+        # Read the credential spelling from its sole owner, not a second Python catalog.
+        source = pathlib.Path(__file__).resolve().parents[3] / "crates/sc-agent-secrets/src/vars.rs"
+        variables = dict(re.findall(r'pub const ([A-Z_]+): &str = "([^"]+)";', source.read_text()))
+        monkeypatch.setenv(variables[f"{provider.upper()}_API_KEY"], key)
+        config = tmp_path / "config"
+        config.mkdir()
+        (config / "default.json").write_text(json.dumps({"max_sends": 1, "log_root": str(tmp_path / "logs")}))
+        options = dict(model="jev" if provider == "typesafe" else "haiku", project="owner-check", agent_role="pytest", config_dir=str(config))
+    else:
+        request.getfixturevalue("env")
+        config = request.getfixturevalue("config_dir")
+        keyed_runner(config)
+        monkeypatch.setenv(KEY_ENV, key)
+        options = request.getfixturevalue("args")
+    record_property("provider", provider if live else "local")
+    record_property("model", options["model"])
+    record_property("mode", "live" if live else "loopback")
+    cancel = sc_agent.CancelToken()
+    text, code = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+                               category_codes={"auth": "AUTH"}, cancel=cancel)
+    detail = json.loads(text)["error"]
+    assert detail["status"] == 401 and detail["category"] == "auth"
+    assert code == "AUTH" and cancel.is_cancelled()
+    cancelled, _ = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+                                 category_codes={}, cancel=cancel)
+    assert json.loads(cancelled)["error"]["category"] == "cancelled"
+    assert key not in text + cancelled
+    assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))
+    record_property("result", "HTTP 401; category auth; token and follow-up cancelled; key absent from results/logs")
