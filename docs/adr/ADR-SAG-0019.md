@@ -1,9 +1,9 @@
 # Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.6.1  
+**Version:** 0.6.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-16  
+**Last Updated:** 2026-11-15  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
