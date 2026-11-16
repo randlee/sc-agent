@@ -112,12 +112,12 @@ TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.reso
 SC_DECIDR_VERSION=$(python -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')
 SITR_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("sitr") if any(d.metadata["Name"] == "sitr" for d in m.distributions()) else "")')
 sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
-  --var 'general_log=true' --var 'models=["jev","haiku","luna"]' --var 'sitr=false' \
+  --var 'general_log=true' --var 'models=["jev"]' --var 'sitr=false' \
   --var "sc_decidr_version=$SC_DECIDR_VERSION" --var "sitr_version=$SITR_VERSION" \
   --strict --output consumer.py
 ```
 
-`models` records the selectors the consumer offers; each call passes its chosen
+`models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `general_log` includes or omits forwarding the caller's general
 logger. Session logging always uses the wheel default; the generated module does
 not accept or forward `session_log` (REQ-SAG-0018). Keyring service and account are

@@ -18,7 +18,7 @@ decidr doctor
 ```
 
 - `send`: one JSON request, or a JSONL batch with `--batch`. The input is a file, or `-` for stdin (the default). One result line is printed per request.
-  - `--model` takes a short name (`jev`, `haiku`, `luna`, ...), a model id, or the name of a configured local runner.
+  - `--model` takes a [short name](../sc-agent-types/src/short_name.rs), a model id, or the name of a configured local runner.
   - `--project` and `--agent-role` are required slugs for the session rows (lowercase letters, digits, `.`, `_`, `-`).
   - `--provider` overrides the provider. Without it, the provider is chosen by ranking the keys that are found.
   - `--image NAME=FILE` (repeatable) and `--long-context` apply to a single request, not to `--batch`.
