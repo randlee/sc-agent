@@ -160,6 +160,114 @@ mod tests {
         );
     }
 
+    #[test]
+    fn resolved_provider_uses_only_its_override_key_on_loopback() {
+        use sc_agent_http::{
+            Endpoint, HttpError, HttpRequest, HttpResponse, Timeouts, Transport, UreqTransport,
+        };
+        use sc_agent_secrets::{
+            KeyringAccount, KeyringLocation, KeyringService, KeyringSource, SecretsError,
+        };
+        use std::io::{BufRead, BufReader, Read, Write};
+        use std::sync::{Mutex, mpsc};
+
+        struct Recording(Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "account")
+                    .then(|| "loopback-test-key".to_owned()))
+            }
+        }
+        // Preserve the actual request and its secret, changing only the destination to loopback.
+        struct LoopbackTransport {
+            port: u16,
+            inner: UreqTransport,
+        }
+        impl Transport for LoopbackTransport {
+            fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+                assert_eq!(request.endpoint().host(), "api.typesafe.ai");
+                let endpoint =
+                    Endpoint::parse_local(&format!("http://127.0.0.1:{}/v1/systemone", self.port))
+                        .unwrap();
+                let mut local =
+                    HttpRequest::new(request.method(), endpoint, request.body().to_vec());
+                for (name, value) in request.headers() {
+                    local = local.with_header(name.clone(), value.clone())?;
+                }
+                if let Some(secret) = request.secret() {
+                    local = local.with_secret(secret.clone())?;
+                }
+                self.inner.send(&local)
+            }
+        }
+        let (sender, receiver) = mpsc::channel();
+        let server = sc_agent_testkit::serve_each(move |stream| {
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut writer = stream;
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let mut auth = None;
+            let mut length = 0;
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some((name, value)) = line.split_once(':') {
+                    if name.eq_ignore_ascii_case("authorization") {
+                        auth = Some(value.trim().to_owned());
+                    }
+                    if name.eq_ignore_ascii_case("content-length") {
+                        length = value.trim().parse().unwrap();
+                    }
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).unwrap();
+            sender.send(auth).unwrap();
+            let response = crate::common::NOUL_RESPONSE;
+            write!(writer, "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}", response.len(), response).unwrap();
+        });
+        let source = Arc::new(Recording(Mutex::new(Vec::new())));
+        let log = MemoryLog::new().unwrap();
+        let dir = empty_config_dir();
+        let transport = LoopbackTransport {
+            port: server.port(),
+            inner: UreqTransport::new(Timeouts::default()),
+        };
+        let mut ctx = context(dir.path(), &[], Arc::new(transport), &log);
+        ctx.keyring = Some(source.clone());
+        ctx.keyring_override = Some(KeyringLocation::new(
+            Some(KeyringService::new("consumer").unwrap()),
+            Some(KeyringAccount::new("account").unwrap()),
+        ));
+        let chosen = options("jev", None, ctx, &log);
+        assert!(
+            send(&chosen, request(NOUL), &CancelToken::new())
+                .unwrap()
+                .outcome
+                .is_ok()
+        );
+        assert_eq!(
+            sc_agent_testkit::recv_within(&receiver, sc_agent_testkit::HANG_GUARD).as_deref(),
+            Some("Bearer loopback-test-key")
+        );
+        assert_eq!(
+            &*source.0.lock().unwrap(),
+            &[("consumer".to_owned(), "account".to_owned())]
+        );
+        assert_eq!(server.stop(), 1);
+    }
+
     /// The ids of an ErrorDetail chain, top first.
     fn chain(detail: sc_agent_types::ErrorDetail) -> Vec<(String, String)> {
         let mut levels = Vec::new();

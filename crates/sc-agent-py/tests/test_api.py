@@ -483,5 +483,5 @@ def test_keyring_override_refuses_ambiguous_ranking_before_send(env, args):
     assert caught.value.id == "decidr.ambiguous_keyring_override"
     assert caught.value.category == "config"
     assert "anthropic" in caught.value.message
-    assert "openrouter" in caught.value.message
+    assert all(provider in caught.value.message for provider in ("anthropic", "openrouter", "together"))
     assert loopback.requests == []

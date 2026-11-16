@@ -1326,6 +1326,9 @@ mod select_tests {
         )
         .expect_err("multiple ranked providers even with one key");
         assert_eq!(error.id(), "decidr.ambiguous_keyring_override");
+        for provider in Provider::ranking(Some(ShortName::Haiku)) {
+            assert!(error.message().contains(provider.as_str()));
+        }
         assert!(source.0.lock().unwrap().is_empty());
         source.0.lock().unwrap().clear();
         let selected = choose_provider(
