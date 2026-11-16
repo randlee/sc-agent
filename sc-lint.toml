@@ -8,8 +8,12 @@ reason = "Enforce the declared crate boundaries and publishable Cargo dependenci
 # A path-only self dev-dependency enables the crate's existing tests; pinning
 # its unpublished version makes Cargo resolve it from crates.io during package.
 # Normal/build dependencies retain their publishable workspace versions.
+# SCB-MANIFEST-002: https://github.com/randlee/sc-lint/issues/976; remove its
+# exclusion when the pinned sc-lint version contains the fix.
 # Forwarding to Arc<T>/&T calls T's implementation, not the forwarding method;
 # serde remote=Self resolves to the generated serializer, not the wrapper method.
+# SCB-CYCLE-003: https://github.com/randlee/sc-lint/issues/974; remove these
+# four exclusions when the pinned sc-lint version contains the fix.
 exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/transport.rs", "crates/sc-decision-schema/src/models.rs", "crates/sc-decision-schema/src/request.rs", "crates/sc-decision-schema/src/response.rs"] }
 
 [tool.sc-lint.analyzers.portability]
