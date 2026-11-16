@@ -1,8 +1,7 @@
 """The sc-agent Python API over the maturin build.
 
 Default runs use a controlled loopback runner and pass its tempdir config explicitly.
-Only live_outcome-marked cases opt into owner-attended real config/keys on
-SC_AGENT_LIVE=1. All other tests keep loopback, fixed-answer and log assertions.
+Real-provider cases run separately through just integration.
 No test changes HOME or USERPROFILE. Orderings are driven by events, with bounded
 waits used only as failure backstops and no elapsed-time assertions.
 """
@@ -385,14 +384,9 @@ def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch
     assert loopback.requests == []
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_models_list_outcome(outcome_models_args, outcome_call, record_property):
-    """SC_AGENT_LIVE=1 checks default TypeSafe models with provider omitted.
-
-    Only a native missing key skips; jev/haiku/luna are exercised by the send
-    outcomes through conftest.outcome_model, since models() takes no model.
-    """
+    """The unit outcome uses the local models endpoint."""
     models = json.loads(outcome_call(sc_agent.models, **outcome_models_args))["models"]
     assert isinstance(models, list) and models
     assert all(isinstance(model["name"], str) and model["name"] for model in models)
@@ -400,13 +394,9 @@ def test_models_list_outcome(outcome_models_args, outcome_call, record_property)
     record_property("result", f"{len(models)} models listed")
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
-    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
-
-    Provider is omitted; only a native missing key skips the owner-run case.
-    """
+    """The rendered consumer returns a valid noul response over loopback."""
     text, code = outcome_call(consumer.call, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
     assert code is None
     line = json.loads(text)
@@ -419,13 +409,9 @@ def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property
     record_property("result", json.dumps(answer))
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
 def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
-    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
-
-    Provider is omitted; only a native missing key skips the owner-run case.
-    """
+    """The rendered consumer returns a valid noul response over loopback."""
     results = outcome_call(consumer.call_batch, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
     assert all(code is None for _, code in results)
     lines = [json.loads(line) for line, _ in results]

@@ -16,3 +16,7 @@ test *layer:
 
 upgrade:
     {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml
+
+# Consumer-owned recipe; generated sc-lint lint/test/setup recipes remain intact.
+integration *args:
+    {{python}} scripts/integration.py {{args}}

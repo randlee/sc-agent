@@ -26,3 +26,16 @@ def test_platform_report_preserves_results_and_escapes_text(tmp_path):
     assert "source" in text and "wheel" in text and "loopback" in text
     assert "secret-in-raw-diagnostics" not in output.read_text()
     assert not tree.findall(".//tag")
+
+
+def test_integration_command_requires_typesafe_and_deletes_temporary_dotenv(tmp_path):
+    import subprocess
+    import sys
+    root = Path(__file__).resolve().parents[3]
+    empty = tmp_path / "keys.env"
+    empty.write_text("")
+    result = subprocess.run([sys.executable, str(root / "scripts/integration.py"), "--env-file", str(empty)],
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "TypeSafe key is required" in result.stderr
+    assert not empty.exists()

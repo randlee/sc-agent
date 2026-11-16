@@ -109,7 +109,6 @@ def test_sag_error_constructor_caches_fields_and_rebuilds(monkeypatch, category,
     assert parsed == [detail, detail, detail]
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("error")
 def test_outcome_category_matches_returned_error(outcome_args, outcome_call):
     request = '{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}'
