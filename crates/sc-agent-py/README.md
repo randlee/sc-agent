@@ -167,6 +167,56 @@ The optional `context_exceeded` map key overrides the category code for
 the error uses its category's code as usual. Other validation errors keep their
 category mapping; this override does not change the stored category or cancellation.
 
+### Shared result helpers
+
+`call_result(request, *, model, project, agent_role, abort_on, ...)` and
+`call_batch_results(requests, *, model, project, agent_role, abort_on, ...)`
+handle the wheel boundary and return plain dictionaries. Consumers keep their
+prompts, response validation and local result/error types, converting each shared
+record once. Both helpers accept `category_codes` and `error_actions` overrides,
+`cancel` (or create a token when omitted), `config_dir`, `keyring_service`,
+`keyring_account` and `timeout_secs`. Single calls also accept `images` and
+`long_context`; batches also accept `workers` and `on_result`. When rendered with
+`general_log=true`, both accept that logger. Session logging stays at the wheel's
+default location.
+
+A successful single record is `{"ok": true, "value": response, "position": n,
+"line": original_json, "attempts": sends}`. A failed record instead contains
+`"ok": false` and `"error": failure`. A failure is a plain dictionary with
+`code`, `message`, `retryable`, `action`, `status`, `retry_after_ms`, `attempts`
+and `data` (the original typed detail). Numeric metadata rejects booleans and
+negative values. `attempts` is the wire line's `sends`, or `None` when unknown;
+exceptions retain their typed attempts. `retryable` comes from the wheel, including
+for context overflow; the template has no separate retry policy. Message text is
+preserved, and the wheel owns API-key redaction.
+
+A successful batch is `{"ok": true, "value": [records in input order]}`;
+a whole-call failure is a failed record. `on_result(record)` receives each
+completion immediately in finish order, before the batch returns. Correlate by
+`record["position"]`, never by arrival order. The helper checks the result count
+and positions, does not deliver a completion twice, and preserves callbacks already
+delivered if interrupted. ClientError and SagError become failure records; other
+caller exceptions propagate. No result helper adds retries.
+
+The generated module's exported names are:
+
+| Export | Contract |
+| --- | --- |
+| `SC_DECIDR_VERSION`, `MODELS` | Rendered wheel version and offered model selectors. |
+| `LogSink`, `CategoryCodes`, `AbortOn`, `BatchItem` | Type aliases for log callbacks, category mappings, abort sets and batch input items. |
+| `DECIDR_CATEGORY_CODES` | Complete default category-to-code map, plus the `context_exceeded` override key. Partial caller maps overlay these defaults in result helpers. |
+| `DECIDR_ERROR_CODES` | Default codes for known typed error ids, including `decision.context_exceeded`. |
+| `DECIDR_ERROR_ACTIONS` | One corrective action per shared code, including missing-wheel and invalid-result failures. |
+| `ClientError` | Low-level client exception with `.code` for dependency or protocol failures. |
+| `new_cancel_token()` | Lazily creates a wheel token; missing wheel raises `ClientError`. |
+| `error_metadata(detail)` | Returns optional `status`, `retry_after_ms` and `attempts` as nonnegative integers or `None`. |
+| `wheel_error(detail, mapped_code=None, *, category_codes=None, error_actions=None)` | Adapts a typed wheel detail to a failure dictionary using wheel retryability. |
+| `decode_result(line, mapped_code=None, *, category_codes=None, error_actions=None)` | Adapts a wire line to a response/failure record, retaining its position and sends. |
+| `exception_result(exc, *, category_codes=None, error_actions=None)` | Adapts `ClientError` or `SagError` to a failure record. |
+| `call`, `call_batch` | Compatible lower-level APIs returning `(wire_line, mapped_code)` tuples, raising typed command errors. |
+| `call_result`, `call_batch_results` | Plain-record single and streaming batch helpers described above. |
+| `extract` | Exported only with `sitr=true`; the separate tree-sitter helper described below. |
+
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).
 
