@@ -6,6 +6,10 @@ import inspect
 import sc_agent
 
 
+def test_installed_wheel_contains_pep561_marker():
+    assert (importlib.resources.files(sc_agent) / "py.typed").is_file()
+
+
 def test_stub_covers_native_public_exports():
     tree = ast.parse((importlib.resources.files(sc_agent) / "__init__.pyi").read_text())
     declared = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef))}
