@@ -53,6 +53,7 @@ class ConsumerFormatTest(unittest.TestCase):
                         "--strict", "--output", str(output),
                     ], check=True)
                     text = output.read_text()
+                    self.assertIn("Rendered from sc-decidr 0.2.2 sc_agent/templates/consumer.py.j2", text)
                     tree = ast.parse(text)
                     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
                     for name in ("call_result", "call_batch_results"):
