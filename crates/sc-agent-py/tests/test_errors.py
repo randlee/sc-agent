@@ -27,6 +27,23 @@ def test_error_fields_and_pickle(env, args):
         error.category = "busy"
 
 
+@pytest.mark.parametrize("rebuild", [copy.copy, copy.deepcopy, lambda error: pickle.loads(pickle.dumps(error))])
+def test_sag_error_string_and_reconstruction_keep_message_and_details(rebuild):
+    detail = json.dumps({"id": "decidr.http", "message": "provider failed (http.network)",
+                         "cause": {"id": "http.network", "message": "connection closed"},
+                         "category": "network", "attempts": 2})
+    error = sc_agent.SagError("decidr.http", "provider failed (http.network)", detail)
+    expected = "decidr.http: provider failed (http.network)"
+    assert str(error) == expected
+    restored = rebuild(error)
+    assert restored is not error
+    assert type(restored) is sc_agent.SagError
+    assert str(restored) == expected
+    assert restored.args == (error.id, error.message, detail)
+    assert restored.detail == detail
+    assert (restored.category, restored.attempts, restored.retryable) == ("network", 2, True)
+
+
 def test_stored_category_from_real_loopback_error(env, args):
     line = json.loads(sc_agent.send('{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}', **args))
     detail = json.dumps(line["error"])

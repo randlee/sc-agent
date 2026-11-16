@@ -818,6 +818,8 @@ class SagError(Exception):
     def __init__(self, id, message, detail_json):
         super().__init__(id, message, detail_json)
         self._fields = _sag_error_fields(detail_json)
+    def __str__(self):
+        return f"{self.id}: {self.message}"
     @property
     def id(self): return self.args[0]
     @property
