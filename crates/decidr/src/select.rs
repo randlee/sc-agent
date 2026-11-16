@@ -528,9 +528,7 @@ fn backend(
     let keys = Keys::new(&options.context)?;
     let (provider, key) = choose_provider(options.provider, line, &options.model, &keys)?;
     let backend: Arc<dyn Backend> = match LlmProvider::from_provider(provider) {
-        None => Arc::new(
-            SystemOneBackend::new(TYPESAFE_BASE_URL, Some(key.key)).map_err(DecidrError::from)?,
-        ),
+        None => Arc::new(typesafe_backend(key)?),
         Some(llm) => {
             let client = LlmClient::new(llm, key.key)
                 .map_err(DecidrError::from)?
