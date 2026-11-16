@@ -52,7 +52,7 @@ class ConsumerFormatTest(unittest.TestCase):
                         "sc-compose", "render", "--root", str(TEMPLATE.parent),
                         "--file", str(TEMPLATE), "--var-file", str(variables),
                         "--strict", "--output", str(output),
-                    ], check=True)
+                    ], check=True, stdin=subprocess.DEVNULL, timeout=60)
                     text = output.read_text()
                     self.assertIn("Rendered from sc-decidr 0.2.2 sc_agent/templates/consumer.py.j2", text)
                     tree = ast.parse(text)
