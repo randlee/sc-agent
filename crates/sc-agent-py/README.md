@@ -108,14 +108,35 @@ The wheel ships `sc_agent/templates/consumer.py.j2`, derived from the working
 plan-anchor client at `fff69b2`. Render it with sc-compose >=1.8.0 and Python >=3.11:
 
 ```bash
+VARS=$(mktemp)
+trap 'rm -f "$VARS"' EXIT
+python - "$VARS" <<'PY'
+import json
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import sys
+
+try:
+    sitr_version = version("sitr")
+except PackageNotFoundError:
+    sitr_version = ""
+
+Path(sys.argv[1]).write_text(json.dumps({
+    "general_log": False,
+    "models": ["jev"],
+    "sitr": False,
+    "sc_decidr_version": version("sc-decidr"),
+    "sitr_version": sitr_version,
+}, indent=2) + "\n")
+PY
 TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")')
-SC_DECIDR_VERSION=$(python -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')
-SITR_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("sitr") if any(d.metadata["Name"] == "sitr" for d in m.distributions()) else "")')
 sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
-  --var 'general_log=true' --var 'models=["jev"]' --var 'sitr=false' \
-  --var "sc_decidr_version=$SC_DECIDR_VERSION" --var "sitr_version=$SITR_VERSION" \
+  --var-file "$VARS" \
   --strict --output consumer.py
 ```
+
+The JSON vars file preserves booleans and the model list as typed values;
+`--var` values are strings and do not represent these options correctly.
 
 `models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `general_log` includes or omits forwarding the caller's general
