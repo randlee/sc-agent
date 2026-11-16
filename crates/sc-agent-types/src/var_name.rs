@@ -53,9 +53,7 @@ impl FromStr for VarName {
         if valid {
             Ok(Self(text.to_owned()))
         } else {
-            Err(TypesError::InvalidVarName {
-                text: text.to_owned(),
-            })
+            Err(TypesError::InvalidVarName)
         }
     }
 }

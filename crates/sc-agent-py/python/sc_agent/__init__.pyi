@@ -44,3 +44,10 @@ def send_batch(requests: Sequence[BatchItem], *, model: str, project: str,
          config_dir: str | None = None, keyring_service: str | None = None,
          keyring_account: str | None = None, timeout_secs: float | None = None,
          workers: int | None = None) -> list[str]: ...
+
+def models(runner: str | None = None, cancel: CancelToken | None = None,
+           general_log: Callable[[dict[str, Any]], None] | None = None,
+           config_dir: str | None = None) -> str: ...
+def doctor(cancel: CancelToken | None = None,
+           general_log: Callable[[dict[str, Any]], None] | None = None,
+           config_dir: str | None = None) -> str: ...
