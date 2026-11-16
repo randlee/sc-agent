@@ -1,9 +1,9 @@
 # Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.6.0  
+**Version:** 0.6.1  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-16  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -119,7 +119,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 5. **Python errors.**
 
-   `SagError` becomes a real exception class, `#[pyclass(extends = PyException)]`, whose `__init__(id, message, detail)` parses the detail JSON once. `args` stays `(id, message, detail_json)`, so copying and pickling rebuild it. Its read-only attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` (`other` when the detail has none) and `retryable` (REQ-SAG-0016).
+   `SagError` is one exception class importable from `sc_agent`. Its constructor takes `(id, message, detail)` and parses the detail JSON once. `args` stays `(id, message, detail_json)`, so copying and pickling rebuild it. Its read-only attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` (`other` when the detail has none) and `retryable` (REQ-SAG-0016). This decision states behaviour, not mechanism, because pyo3 cannot subclass `PyException` in an abi3 wheel below Python 3.12, and the floor is 3.11.
 
    Result lines keep their shape; each level of `error` gains the new fields when they are set. A failed decision stays as data in its line; `SagError` is for command errors.
 
