@@ -474,3 +474,16 @@ def test_explicit_live_outcome_keeps_native_provider_selection(monkeypatch, requ
     assert "provider" not in args
     assert "config_dir" not in args
     assert os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] == "1"
+
+
+def test_keyring_override_refuses_ambiguous_ranking_with_one_detected_key(env, args, monkeypatch):
+    loopback, _ = env
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    with pytest.raises(sc_agent.SagError) as caught:
+        sc_agent.send(NOUL, **{**args, "model": "haiku"}, keyring_service="consumer")
+    assert caught.value.id == "decidr.ambiguous_keyring_override"
+    assert caught.value.category == "config"
+    assert "anthropic" in caught.value.message
+    assert "openrouter" in caught.value.message
+    assert "test-anthropic-key" not in caught.value.detail
+    assert loopback.requests == []

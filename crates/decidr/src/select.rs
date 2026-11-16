@@ -289,48 +289,39 @@ impl<'c> Keys<'c> {
         })
     }
 
-    fn sources(&self) -> KeySources<'_> {
+    fn sources<'a>(&'a self, override_source: Option<&'a dyn KeyringSource>) -> KeySources<'a> {
         KeySources {
             env: &self.env,
             repo_root: self.repo_root.as_deref(),
-            keyring: &*self.keyring,
+            keyring: override_source.unwrap_or(&*self.keyring),
         }
     }
 
     /// The key of `provider`; `Ok(None)` when no source has one.
     fn find(&self, provider: Provider) -> Result<Option<ResolvedKey>, DecidrError> {
         self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
-        match resolve(provider, &self.sources()) {
+        match resolve(provider, &self.sources(None)) {
             Ok(key) => Ok(Some(key)),
             Err(SecretsError::KeyMissing { .. }) => Ok(None),
             Err(error) => Err(DecidrError::from(error)),
         }
     }
 
-    /// The key of `provider`, which must exist.
+    /// The key of `provider`, which must exist; apply an override only to that provider.
     fn require(&self, provider: Provider) -> Result<ResolvedKey, DecidrError> {
         self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
-        Ok(resolve(provider, &self.sources())?)
-    }
-
-    fn require_selected(&self, provider: Provider) -> Result<ResolvedKey, DecidrError> {
-        let Some(location) = &self.keyring_override else {
-            return self.require(provider);
-        };
-        let wrapped = ProviderKeyring::new(provider, location.clone(), self.keyring.clone());
-        let sources = KeySources {
-            env: &self.env,
-            repo_root: self.repo_root.as_deref(),
-            keyring: &wrapped,
-        };
-        self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
-        Ok(resolve(provider, &sources)?)
+        let wrapped = self
+            .keyring_override
+            .as_ref()
+            .map(|location| ProviderKeyring::new(provider, location.clone(), self.keyring.clone()));
+        let selected = wrapped.as_ref().map(|source| source as &dyn KeyringSource);
+        Ok(resolve(provider, &self.sources(selected))?)
     }
 
     /// The key held by variable `var` (a runner's `key_env`).
     fn require_var(&self, var: &sc_agent_types::VarName) -> Result<ResolvedKey, DecidrError> {
         self.env.check_utf8(var.as_str())?;
-        Ok(resolve_var(var, &self.sources())?)
+        Ok(resolve_var(var, &self.sources(None))?)
     }
 }
 
@@ -343,26 +334,16 @@ fn choose_provider(
     keys: &Keys<'_>,
 ) -> Result<(Provider, ResolvedKey), DecidrError> {
     if let Some(provider) = choice {
-        return Ok((provider, keys.require_selected(provider)?));
+        return Ok((provider, keys.require(provider)?));
     }
     let ranking = Provider::ranking(line);
     if keys.keyring_override.is_some() {
-        let mut eligible = Vec::new();
-        for provider in ranking {
-            if keys.find(*provider)?.is_some() {
-                eligible.push(*provider);
-            }
-        }
-        if eligible.is_empty() {
-            eligible.extend_from_slice(ranking);
-        }
-        let [provider] = eligible.as_slice() else {
+        let [provider] = ranking else {
             return Err(DecidrError::AmbiguousKeyringOverride {
-                candidates: eligible,
+                candidates: ranking.to_vec(),
             });
         };
-        let provider = *provider;
-        return Ok((provider, keys.require_selected(provider)?));
+        return Ok((*provider, keys.require(*provider)?));
     }
     for provider in ranking {
         if let Some(key) = keys.find(*provider)? {
@@ -1168,7 +1149,8 @@ fn list_models(
         }
         None => {
             let keys = Keys::new(&options.context)?;
-            let key = resolve(Provider::TypeSafe, &keys.sources()).map_err(DecidrError::from)?;
+            let key =
+                resolve(Provider::TypeSafe, &keys.sources(None)).map_err(DecidrError::from)?;
             typesafe_backend(key)?
         }
     };
@@ -1291,18 +1273,21 @@ mod select_tests {
         let mut input = keys(&[]);
         input.keyring = source.clone();
         input.keyring_override = Some(location);
-        let selected = choose_provider(
-            Some(Provider::Anthropic),
-            Some(ShortName::Haiku),
-            &ModelSelector::Short(ShortName::Haiku),
-            &input,
-        )
-        .unwrap();
-        assert_eq!(selected.0, Provider::Anthropic);
-        assert_eq!(
-            &*source.0.lock().unwrap(),
-            &[("consumer".to_owned(), "chosen".to_owned())]
-        );
+        for provider in Provider::ALL {
+            source.0.lock().unwrap().clear();
+            let selected = choose_provider(
+                Some(*provider),
+                Some(ShortName::Haiku),
+                &ModelSelector::Short(ShortName::Haiku),
+                &input,
+            )
+            .unwrap();
+            assert_eq!(selected.0, *provider);
+            assert_eq!(
+                &*source.0.lock().unwrap(),
+                &[("consumer".to_owned(), "chosen".to_owned())]
+            );
+        }
         source.0.lock().unwrap().clear();
         let error = choose_provider(
             None,
@@ -1325,6 +1310,19 @@ mod select_tests {
                 .iter()
                 .all(|(service, _)| service != "consumer")
         );
+        source.0.lock().unwrap().clear();
+        let mut one_key = keys(&[(sc_agent_secrets::ANTHROPIC_API_KEY, "one-key")]);
+        one_key.keyring = source.clone();
+        one_key.keyring_override = input.keyring_override.clone();
+        let error = choose_provider(
+            None,
+            Some(ShortName::Haiku),
+            &ModelSelector::Short(ShortName::Haiku),
+            &one_key,
+        )
+        .expect_err("multiple ranked providers even with one key");
+        assert_eq!(error.id(), "decidr.ambiguous_keyring_override");
+        assert!(source.0.lock().unwrap().is_empty());
         source.0.lock().unwrap().clear();
         let selected = choose_provider(
             None,

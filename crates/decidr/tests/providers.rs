@@ -105,6 +105,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn provider_override_sends_key_only_to_the_selected_provider() {
+        use sc_agent_secrets::{
+            KeyringAccount, KeyringLocation, KeyringService, KeyringSource, SecretsError,
+        };
+        use std::sync::Mutex;
+        struct Recording(Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "account")
+                    .then(|| "test-selected-key".to_owned()))
+            }
+        }
+        let source = Arc::new(Recording(Mutex::new(Vec::new())));
+        let transport = ScriptedTransport::responses(vec![anthropic_noul()]);
+        let log = MemoryLog::new().unwrap();
+        let dir = empty_config_dir();
+        let mut ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
+        ctx.keyring = Some(source.clone());
+        ctx.keyring_override = Some(KeyringLocation::new(
+            Some(KeyringService::new("consumer").unwrap()),
+            Some(KeyringAccount::new("account").unwrap()),
+        ));
+        let send_options = options("haiku", Some(Provider::Anthropic), ctx, &log);
+        assert!(
+            send(&send_options, request(NOUL), &CancelToken::new())
+                .unwrap()
+                .outcome
+                .is_ok()
+        );
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].endpoint().host(), "api.anthropic.com");
+        assert_eq!(
+            requests[0]
+                .secret()
+                .unwrap()
+                .key()
+                .redact_text("test-selected-key"),
+            "[redacted]"
+        );
+        assert_eq!(
+            &*source.0.lock().unwrap(),
+            &[("consumer".to_owned(), "account".to_owned())]
+        );
+    }
+
     /// The ids of an ErrorDetail chain, top first.
     fn chain(detail: sc_agent_types::ErrorDetail) -> Vec<(String, String)> {
         let mut levels = Vec::new();
