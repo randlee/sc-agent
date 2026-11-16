@@ -94,7 +94,9 @@ mod tests {
             assert_eq!(error.id(), "decidr.invalid_workers");
             assert_eq!(
                 error.message(),
-                format!("workers must be within 1..={MAX_WORKERS}, got {count}")
+                format!(
+                    "workers must be within 1..={MAX_WORKERS}; CLI --workers requires --batch, got {count}"
+                )
             );
         }
     }
