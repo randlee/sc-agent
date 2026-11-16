@@ -171,6 +171,7 @@ mod tests {
 
         for (status, body) in [
             (400, b"secret MAX_TOKENS limit".as_slice()),
+            (413, b"secret MAX_TOKENS limit".as_slice()),
             (422, b"secret Token limit Exceeded".as_slice()),
         ] {
             let error = decode(status, body).expect_err("context overflow");
@@ -185,6 +186,9 @@ mod tests {
         let auth = decode(401, b"max_tokens token exceeded").expect_err("401");
         assert_eq!(auth.id(), "decision.api_status");
         assert_eq!(auth.detail().category, Some(ErrorCategory::Auth));
+        let quota = decode(402, b"max_tokens token exceeded").expect_err("402");
+        assert_eq!(quota.id(), "decision.api_status");
+        assert_eq!(quota.detail().category, Some(ErrorCategory::Quota));
         let server = decode(503, b"max_tokens exceeded").expect_err("503");
         assert_eq!(server.id(), "decision.api_status");
     }
