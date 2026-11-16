@@ -111,6 +111,11 @@ fn run_send(
     stdin: &mut dyn Read,
     stdout: &mut dyn Write,
 ) -> Result<ExitCode, DecidrError> {
+    if let Some(workers) = args.workers
+        && !args.batch
+    {
+        return Err(DecidrError::InvalidWorkers { value: workers });
+    }
     let limits = decidr::CallLimits {
         timeout: args
             .timeout_secs

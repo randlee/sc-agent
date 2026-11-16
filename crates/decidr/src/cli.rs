@@ -62,7 +62,7 @@ pub(crate) struct SendArgs {
     #[arg(long, allow_hyphen_values = true)]
     pub(crate) timeout_secs: Option<f64>,
     /// Batch worker count; decidr validates it against the supported range.
-    #[arg(long, requires = "batch", allow_hyphen_values = true)]
+    #[arg(long, allow_hyphen_values = true)]
     pub(crate) workers: Option<i64>,
     /// Request file, or - for stdin.
     #[arg(value_name = "FILE|-", default_value = "-", value_parser = non_empty_text)]

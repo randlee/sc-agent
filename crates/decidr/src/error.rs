@@ -271,7 +271,9 @@ impl ErrorId for DecidrError {
     fn message(&self) -> String {
         match self {
             Self::InvalidWorkers { value } => {
-                format!("workers must be within 1..={MAX_WORKERS}, got {value}")
+                format!(
+                    "workers must be within 1..={MAX_WORKERS}; CLI --workers requires --batch, got {value}"
+                )
             }
             Self::InvalidRequestTimeout { value, .. } => format!(
                 "timeout_secs must be finite and within {}..={} seconds, got {value}",
@@ -398,7 +400,9 @@ impl ErrorId for DecidrError {
             Self::InvalidRequestTimeout { .. } => {
                 Some("omit timeout_secs or pass finite seconds within the reported bounds")
             }
-            Self::InvalidWorkers { .. } => Some("pass a worker count within the supported range"),
+            Self::InvalidWorkers { .. } => {
+                Some("use --batch for CLI workers and pass a count within the supported range")
+            }
             Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),
