@@ -168,6 +168,7 @@ pub trait ErrorId: Error {
     }
 
     /// This error as data: id, message, recovery, HTTP status and the cause chain.
+    /// Recovery falls back to the cause when this wrapper supplies none.
     ///
     /// Must not be overridden (see the trait docs); workspace review rejects an override.
     fn detail(&self) -> ErrorDetail {
@@ -194,7 +195,10 @@ pub trait ErrorId: Error {
         ErrorDetail {
             id: self.id().to_owned(),
             message: self.message(),
-            recovery: self.recovery().map(Box::<str>::from),
+            recovery: self
+                .recovery()
+                .map(Box::<str>::from)
+                .or_else(|| cause.as_ref().and_then(|detail| detail.recovery.clone())),
             cause: cause.map(Box::new),
             status,
             attempts,

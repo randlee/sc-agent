@@ -96,7 +96,7 @@ pub enum DecisionError {
     /// wrapped unchanged.
     Http(HttpError),
     /// A backend crate above this one failed (e.g. an LLM provider error chain), carried whole.
-    /// Its recovery hint is the carried `detail().cause.recovery`; `recovery()` is `None` here.
+    /// `detail().recovery` forwards the carried cause hint; `recovery()` is `None` here.
     Backend {
         /// The backend's name.
         backend: &'static str,
@@ -195,6 +195,10 @@ impl ErrorId for DecisionError {
                     .join("; ");
                 format!("the API refused the request (HTTP 422): {fields}")
             }
+            Self::ApiStatus {
+                status: status @ (401 | 403),
+                ..
+            } => format!("authentication failed (HTTP {status}); provider response body withheld"),
             Self::ApiStatus { status, body } => format!(
                 "the API answered HTTP {status}: {}",
                 String::from_utf8_lossy(body)
@@ -275,10 +279,23 @@ impl ErrorId for DecisionError {
             ),
             Self::Shutdown { .. } => Some("start a new decision runner and send the request again"),
             Self::Http(error) => error.recovery(),
-            Self::ResponseParse { .. }
-            | Self::ApiStatus { .. }
-            | Self::Backend { .. }
-            | Self::Cancelled { .. } => None,
+            Self::ResponseParse { .. } => {
+                Some("check the response schema and selected model, then retry")
+            }
+            Self::ApiStatus { status: 402, .. } => {
+                Some("add provider credit or raise the account spending limit before trying again")
+            }
+            Self::ApiStatus { status: 429, .. } => {
+                Some("wait for the provider rate limit to clear before trying again")
+            }
+            Self::ApiStatus {
+                status: 401 | 403, ..
+            } => Some("check the API key for the selected provider"),
+            Self::ApiStatus { .. } => {
+                Some("check the provider status and the reported request details")
+            }
+            Self::Cancelled { .. } => Some("start a new call when ready"),
+            Self::Backend { .. } => None,
         }
     }
 }

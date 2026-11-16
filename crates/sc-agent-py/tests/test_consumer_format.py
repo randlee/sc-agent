@@ -29,7 +29,7 @@ class ConsumerFormatTest(unittest.TestCase):
                     text = output.read_text()
                     tree = ast.parse(text)
                     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
-                    for name in ("call", "call_batch", "call_result", "call_batch_results"):
+                    for name in ("call_result", "call_batch_results"):
                         arguments = {arg.arg for arg in functions[name].args.kwonlyargs}
                         self.assertIn("timeout_secs", arguments)
                         self.assertEqual("general_log" in arguments, general_log)

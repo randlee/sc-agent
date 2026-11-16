@@ -417,9 +417,9 @@ def test_models_list_outcome(outcome_models_args, outcome_call, record_property)
 @pytest.mark.mode("ok")
 def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    text, code = outcome_call(consumer.call, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
-    assert code is None
-    line = json.loads(text)
+    result = outcome_call(consumer.call_result, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert result["ok"] is True
+    line = json.loads(result["line"])
     assert "error" not in line
     assert line["position"] == 0
     assert len(line["session_id"]) == 26
@@ -432,9 +432,10 @@ def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property
 @pytest.mark.mode("ok")
 def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    results = outcome_call(consumer.call_batch, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
-    assert all(code is None for _, code in results)
-    lines = [json.loads(line) for line, _ in results]
+    result = outcome_call(consumer.call_batch_results, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert result["ok"] is True
+    assert all(record["ok"] for record in result["value"])
+    lines = [json.loads(record["line"]) for record in result["value"]]
     assert sorted(line["position"] for line in lines) == [0, 1, 2]
     for line in lines:
         assert "error" not in line

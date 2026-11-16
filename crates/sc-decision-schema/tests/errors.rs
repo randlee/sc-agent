@@ -202,6 +202,7 @@ mod tests {
         let mut cause = llm_chain();
         cause.status = Some(401);
         cause.category = Some(ErrorCategory::Auth);
+        cause.recovery = Some("check the selected provider key".into());
         let error = DecisionError::Backend {
             backend: "llm",
             detail: Box::new(cause),
@@ -210,6 +211,10 @@ mod tests {
         assert_eq!(
             (detail.status, detail.category),
             (Some(401), Some(ErrorCategory::Auth))
+        );
+        assert_eq!(
+            detail.recovery.as_deref(),
+            Some("check the selected provider key")
         );
         let first = detail.cause.expect("first level");
         assert_eq!(
@@ -291,6 +296,9 @@ mod tests {
                     | "decision.context_exceeded"
                     | "decision.schema_mismatch"
                     | "decision.shutdown"
+                    | "decision.response_parse"
+                    | "decision.api_status"
+                    | "decision.cancelled"
             );
             match error.recovery() {
                 Some(recovery) => {

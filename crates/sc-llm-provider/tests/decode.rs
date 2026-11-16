@@ -254,6 +254,13 @@ fn non_2xx_is_api_status_without_the_key() {
     );
     let error = decode(LlmProvider::Anthropic, json_output(), reply).expect_err("401");
     assert_eq!(error.id(), "llm.api_status");
+    assert!(
+        error
+            .message()
+            .contains(sc_agent_secrets::ANTHROPIC_API_KEY)
+    );
+    assert!(error.message().contains("body withheld"));
+    assert!(!error.message().contains("invalid x-api-key"));
     let LlmError::ApiStatus { provider, reply } = &error else {
         panic!("not ApiStatus: {error:?}");
     };

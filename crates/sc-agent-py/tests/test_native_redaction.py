@@ -109,14 +109,15 @@ def test_invalid_environment_key_auth_cancels_and_redacts(
     record_property("model", options["model"])
     record_property("mode", "loopback")
     cancel = sc_agent.CancelToken()
-    text, code = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+    result = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
                                category_codes={"auth": "AUTH"}, cancel=cancel)
+    text = result["line"]
     detail = json.loads(text)["error"]
     assert detail["status"] == 401 and detail["category"] == "auth"
-    assert code == "AUTH" and cancel.is_cancelled()
-    cancelled, _ = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+    assert result["error"].code == "AUTH" and cancel.is_cancelled()
+    cancelled = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
                                  category_codes={}, cancel=cancel)
-    assert json.loads(cancelled)["error"]["category"] == "cancelled"
-    assert key not in text + cancelled
+    assert json.loads(cancelled["line"])["error"]["category"] == "cancelled"
+    assert key not in text + cancelled["line"]
     assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))
     record_property("result", "HTTP 401; category auth; token and follow-up cancelled; key absent from results/logs")

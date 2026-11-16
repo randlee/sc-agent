@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4 (unreleased)
+
+- Generated consumers use one raisable ClientError for wheel and local errors, with the common error envelope and unchanged Rust messages and recovery text.
+- Remove the redundant generated call/call_batch transport APIs; use call_result/call_batch_results.
+- Complete Rust recovery guidance and log each failed runner result once with native id, category, provider, status, message and action. Missing-provider errors name credential variables; authentication messages withhold response bodies.
+
 ## 0.2.3 (unreleased)
 
 - Preserve quota classification for context-overflow-shaped responses with a quota HTTP status.
