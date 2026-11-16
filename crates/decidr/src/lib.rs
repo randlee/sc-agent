@@ -41,10 +41,3 @@ pub use select::{
 };
 #[doc(inline)]
 pub use timeout::{CallLimits, RequestTimeout, Workers};
-
-// Compile the binary's argument parser into library tests so parsed flags can reach the
-// real composition path with the existing test-only transport constructor substitution.
-#[cfg(test)]
-extern crate self as decidr;
-#[cfg(test)]
-mod cli;

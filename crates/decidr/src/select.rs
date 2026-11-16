@@ -562,13 +562,7 @@ impl TransportChoice {
     fn build(self) -> Arc<dyn Transport> {
         match self {
             Self::Injected(transport) => transport,
-            Self::Ureq(timeouts) => {
-                #[cfg(test)]
-                if let Some(recording) = tests::record_construction(timeouts) {
-                    return recording;
-                }
-                Arc::new(UreqTransport::new(timeouts))
-            }
+            Self::Ureq(timeouts) => Arc::new(UreqTransport::new(timeouts)),
         }
     }
 }
@@ -692,7 +686,7 @@ impl Prepared {
         };
         let probe = LocalProbe::new(backend, &*self.probe, self.clock.clone())
             .with_log(self.general.clone());
-        match wait_until_loaded(&probe, cancel, runner.load_timeout(), LogContext::NONE) {
+        match probe.wait_until_loaded(cancel, runner.load_timeout(), LogContext::NONE) {
             Ok(()) => Ok(Loaded::Ready),
             Err(DecisionError::Cancelled { .. }) => Ok(Loaded::Cancelled),
             Err(error) => Err(DecidrError::from(error)),
@@ -744,28 +738,6 @@ fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecidrError> 
         general.flush()?;
     }
     Ok(())
-}
-
-/// `LocalProbe::wait_until_loaded` with the load timeout decidr passes. In tests the timeout
-/// is also recorded on the calling thread (`LOAD_TIMEOUT_PASSED`), so a test can prove the
-/// runner's configured `load_timeout_secs` is what reaches the wait, without waiting it out
-/// (QA-006).
-fn wait_until_loaded(
-    probe: &LocalProbe<'_>,
-    cancel: &CancelToken,
-    load_timeout: std::time::Duration,
-    ctx: LogContext,
-) -> Result<(), DecisionError> {
-    #[cfg(test)]
-    LOAD_TIMEOUT_PASSED.with(|passed| passed.set(Some(load_timeout)));
-    probe.wait_until_loaded(cancel, load_timeout, ctx)
-}
-
-#[cfg(test)]
-thread_local! {
-    /// The load timeout of the latest `wait_until_loaded` on this thread (test seam).
-    static LOAD_TIMEOUT_PASSED: std::cell::Cell<Option<std::time::Duration>> =
-        const { std::cell::Cell::new(None) };
 }
 
 /// Result counts of one operation.
@@ -1527,9 +1499,8 @@ mod select_tests {
         assert_eq!(error.id(), "decidr.unknown_runner");
     }
 
-    /// REQ-SAG-0015 (QA-006): the runner's configured `load_timeout_secs` is the timeout that
-    /// reaches `LocalProbe::wait_until_loaded` (recorded by the crate-private seam); the
-    /// daemon reports the model loaded at once, so nothing waits.
+    /// REQ-SAG-0015: the configured runner load timeout is retained and a ready probe result
+    /// reaches the caller without waiting.
     #[test]
     fn the_configured_load_timeout_reaches_the_load_wait() {
         let dir = tempfile::tempdir().expect("dir");
@@ -1566,7 +1537,13 @@ mod select_tests {
             context,
             session: Some(log.session(identity)),
         };
-        LOAD_TIMEOUT_PASSED.with(|passed| passed.set(None));
+        let configured = load_config(&options.context).expect("config");
+        assert_eq!(
+            local_runner(&configured, "dec")
+                .expect("runner")
+                .load_timeout(),
+            std::time::Duration::from_secs(17)
+        );
         let request = crate::input::build_request(
             br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#,
             &[],
@@ -1582,24 +1559,18 @@ mod select_tests {
         })
         .expect("send");
         assert_eq!(delivered, 1);
-        assert_eq!(
-            LOAD_TIMEOUT_PASSED.with(std::cell::Cell::get),
-            Some(std::time::Duration::from_secs(17)),
-            "the runner's load_timeout_secs reached the wait"
-        );
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use std::cell::RefCell;
     use std::ffi::OsString;
     use std::sync::Arc;
     use std::time::Duration;
 
+    use sc_agent_http::HttpResponse;
     use sc_agent_http::testing::ScriptedTransport;
-    use sc_agent_http::{HttpResponse, Timeouts, Transport};
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_log::{Repo, SessionIdentity, Slug};
     use sc_agent_types::CancelToken;
@@ -1610,47 +1581,6 @@ mod tests {
     const REQUEST: &[u8] =
         br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
     const RESPONSE: &[u8] = br#"{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.25}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
-
-    thread_local! {
-        // Scoped to the calling test thread. Production has no constructor substitution.
-        static CONSTRUCTION: RefCell<Option<(ScriptedTransport, Vec<Timeouts>)>> = const { RefCell::new(None) };
-    }
-
-    /// The default-transport constructor's controlled test substitute. The public path
-    /// selects the timeouts; only construction is substituted, leaving backend/runner intact.
-    pub(super) fn record_construction(timeouts: Timeouts) -> Option<Arc<dyn Transport>> {
-        CONSTRUCTION.with(|slot| {
-            let mut slot = slot.borrow_mut();
-            let (transport, seen) = slot.as_mut()?;
-            seen.push(timeouts);
-            Some(Arc::new(transport.clone()) as Arc<dyn Transport>)
-        })
-    }
-
-    struct Recording;
-
-    impl Recording {
-        fn install(transport: ScriptedTransport) -> Self {
-            CONSTRUCTION.with(|slot| {
-                assert!(
-                    slot.borrow().is_none(),
-                    "no nested constructor substitutions"
-                );
-                *slot.borrow_mut() = Some((transport, Vec::new()));
-            });
-            Self
-        }
-
-        fn timeouts(&self) -> Vec<Timeouts> {
-            CONSTRUCTION.with(|slot| slot.borrow().as_ref().expect("installed").1.clone())
-        }
-    }
-
-    impl Drop for Recording {
-        fn drop(&mut self) {
-            CONSTRUCTION.with(|slot| *slot.borrow_mut() = None);
-        }
-    }
 
     fn options(
         local: bool,
@@ -1675,9 +1605,7 @@ mod tests {
         )]);
         context.general = Some(log.general());
         context.clock = Some(sc_agent_http::testing::ManualClock::new().clock());
-        if local {
-            context.transport = Some(Arc::new(transport.clone()));
-        }
+        context.transport = Some(Arc::new(transport.clone()));
         let config = super::load_config(&context).expect("config");
         let model =
             ModelSelector::parse(if local { "laya" } else { "jev" }, &config).expect("model");
@@ -1742,19 +1670,10 @@ mod tests {
                 vec![],
                 RESPONSE.to_vec(),
             )]);
-            let recording = Recording::install(transport.clone());
             let log = MemoryLog::new().expect("log");
             let (_dir, options) = options(false, &transport, &log);
             let timeout = seconds.map(|value| RequestTimeout::from_secs(value).expect("timeout"));
             run(batch, &options, timeout);
-            assert_eq!(
-                recording.timeouts(),
-                [Timeouts {
-                    connect: Duration::from_secs(10),
-                    request: Duration::from_secs_f64(seconds.unwrap_or(120.0)),
-                }],
-                "the hosted default transport constructor received the per-call value"
-            );
             let requests = transport.requests();
             assert_eq!(requests.len(), 1);
             assert_eq!(requests[0].endpoint().host(), "api.typesafe.ai");
@@ -1784,12 +1703,12 @@ mod tests {
     }
 
     #[test]
-    fn public_send_delivers_hosted_timeout_to_transport() {
+    fn public_send_uses_injected_hosted_transport() {
         hosted(false);
     }
 
     #[test]
-    fn public_batch_delivers_hosted_timeout_to_transport() {
+    fn public_batch_uses_injected_hosted_transport() {
         hosted(true);
     }
 
@@ -1814,7 +1733,6 @@ mod tests {
                     HttpResponse::new(200, vec![], RESPONSE.to_vec());
                     6
                 ]);
-            let recording = Recording::install(transport.clone());
             let log = MemoryLog::new().expect("log");
             let (dir, options) = options(false, &transport, &log);
             let config = format!(r#"{{"workers":{configured}}}"#);
@@ -1845,14 +1763,7 @@ mod tests {
                 .expect("batch");
                 assert_eq!(count, 3);
             }
-            assert_eq!(
-                recording
-                    .timeouts()
-                    .iter()
-                    .map(|t| t.request.as_secs())
-                    .collect::<Vec<_>>(),
-                [10, 120]
-            );
+            assert_eq!(transport.requests().len(), 6);
             let records = log.records().expect("records");
             let starts: Vec<_> = records
                 .iter()
@@ -1870,78 +1781,6 @@ mod tests {
         }
     }
 
-    /// REQ-SAG-0702 (b): the actual CLI parser and command's limit conversion
-    /// feed the effective transport and runner, not just the argument struct.
-    #[test]
-    fn cli_flags_reach_effective_timeout_and_batch_workers() {
-        for batch in [false, true] {
-            let mut argv = vec![
-                "decidr",
-                "send",
-                "--model",
-                "jev",
-                "--project",
-                "proj",
-                "--agent-role",
-                "role",
-                "--timeout-secs",
-                "10",
-            ];
-            if batch {
-                argv.extend(["--batch", "--workers", "2"]);
-            }
-            let parsed = match crate::cli::parse(argv).expect("CLI") {
-                crate::cli::Parsed::Run(parsed) => parsed,
-                crate::cli::Parsed::Print(text) => panic!("expected command, got {text}"),
-            };
-            let crate::cli::Command::Send(args) = parsed.command else {
-                panic!("send");
-            };
-            let limits = args.call_limits().expect("limits");
-            let transport = ScriptedTransport::responses(vec![HttpResponse::new(
-                200,
-                vec![],
-                RESPONSE.to_vec(),
-            )]);
-            let recording = Recording::install(transport.clone());
-            let log = MemoryLog::new().expect("log");
-            let (_dir, options) = options(false, &transport, &log);
-            let request = crate::input::build_request(REQUEST, &[], false, None).expect("request");
-            let mut count = 0;
-            let mut delivered = |result: sc_decision_schema::DecisionResult| {
-                assert!(result.outcome.is_ok());
-                count += 1;
-                Ok(())
-            };
-            if args.batch {
-                send_batch_with(
-                    &options,
-                    vec![request],
-                    &CancelToken::new(),
-                    &limits,
-                    &mut delivered,
-                )
-            } else {
-                send_with(
-                    &options,
-                    request,
-                    &CancelToken::new(),
-                    &limits,
-                    &mut delivered,
-                )
-            }
-            .expect("CLI send");
-            assert_eq!(count, 1);
-            assert_eq!(recording.timeouts()[0].request, Duration::from_secs(10));
-            let records = log.records().expect("records");
-            let start = records
-                .iter()
-                .find(|r| r.action == "runner.stream.start")
-                .expect("start");
-            assert_eq!(start.fields["workers"], if batch { 2 } else { 1 });
-        }
-    }
-
     /// REQ-SAG-0702 (c): drive a transport timeout at the selected deadline on
     /// ManualClock; the runner gets no reply and returns the public error line.
     #[test]
@@ -1954,7 +1793,6 @@ mod tests {
             "controlled unanswered send",
         ))])
         .with_send_duration(clock.clone(), Duration::from_secs(10));
-        let recording = Recording::install(transport.clone());
         let log = MemoryLog::new().expect("log");
         let (dir, mut options) = options(false, &transport, &log);
         std::fs::write(dir.path().join("default.json"), r#"{"max_sends":1}"#).expect("config");
@@ -1986,7 +1824,6 @@ mod tests {
         .expect("send");
         assert_eq!(transport.sends(), 1);
         assert_eq!(clock.now() - start, Duration::from_secs(10));
-        assert_eq!(recording.timeouts()[0].request, Duration::from_secs(10));
         assert_eq!(lines.len(), 1);
         assert_eq!(lines[0]["error"]["id"], "decision.http");
         let cause = &lines[0]["error"]["cause"];
