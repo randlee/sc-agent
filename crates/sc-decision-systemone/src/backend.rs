@@ -207,6 +207,8 @@ impl Backend for SystemOneBackend {
     /// # Errors
     ///
     /// - 2xx whose body is not a `SystemOneResponse`: [`DecisionError::ResponseParse`];
+    /// - a 4xx context-window refusal (except 401): [`DecisionError::ContextExceeded`],
+    ///   with the response body withheld;
     /// - 400 with the documented body: [`DecisionError::ApiBadRequest`];
     /// - 422 with the documented body: [`DecisionError::ApiValidation`];
     /// - any other status (402 and 503 included), or a 400/422 of another shape (a string
@@ -262,6 +264,13 @@ fn redact_bytes(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
 
 /// The error for a non-2xx final reply of HTTP `status` with `body` (already redacted).
 fn refusal(status: u16, body: Vec<u8>) -> DecisionError {
+    // Authentication remains authentication even if its body mentions tokens.
+    if (400..500).contains(&status) && status != 401 {
+        let text = String::from_utf8_lossy(&body).to_lowercase();
+        if text.contains("max_tokens") || (text.contains("token") && text.contains("exceed")) {
+            return DecisionError::ContextExceeded { status };
+        }
+    }
     match status {
         400 => match serde_json::from_slice::<HttpBadRequestError>(&body) {
             Ok(body) => DecisionError::ApiBadRequest { body },
