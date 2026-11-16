@@ -1,7 +1,9 @@
 """Wheel-shipped consumer, rendered by sc-compose and exercised over real loopback I/O."""
+import ast
 import importlib.resources
 import json
 import pathlib
+import sys
 import threading
 import tomllib
 
@@ -13,6 +15,33 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 
 from consumer_support import render_consumer
+
+
+@pytest.mark.parametrize("sitr", [False, True])
+@pytest.mark.parametrize("general_log", [False, True])
+@pytest.mark.parametrize("models", [["dec"], ["dec", "jev", "haiku", "luna"]])
+def test_rendered_consumer_uses_only_public_apis(tmp_path, general_log, models, sitr):
+    render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
+    tree = ast.parse((tmp_path / "consumer.py").read_text())
+    public = {
+        "sc_agent": {"send", "send_batch", "category", "retryable", "SagError", "CancelToken"},
+        "sc_treesitter": {"run_query"},
+    }
+    aliases = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                assert imported.name in public or imported.name.split(".")[0] in sys.stdlib_module_names
+                if imported.name in public:
+                    aliases[imported.asname or imported.name] = imported.name
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0 and node.module
+            assert node.module in public or node.module.split(".")[0] in sys.stdlib_module_names
+            if node.module in public:
+                assert all(imported.name in public[node.module] for imported in node.names)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in aliases:
+            assert node.attr in public[aliases[node.value.id]]
 
 
 def test_template_floor_and_versions_match_workspace():
