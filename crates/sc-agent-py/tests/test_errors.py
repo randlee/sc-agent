@@ -1,4 +1,5 @@
 """Python exception attributes and stored error categories."""
+import copy
 import json
 import pathlib
 import pickle
@@ -69,6 +70,43 @@ def test_category_fallback_for_empty_and_legacy_details():
     ).read_text()
     assert sc_agent.category(legacy_detail) == "other"
     assert sc_agent.retryable(legacy_detail) is False
+
+
+@pytest.mark.parametrize("category,retryable", [("busy", True), ("network", True), (None, False)])
+def test_sag_error_constructor_caches_fields_and_rebuilds(monkeypatch, category, retryable):
+    """Each construction parses once; properties and reconstruction keep the contract."""
+    fields = {"id": "sample.error", "message": "sample", "status": 429,
+              "attempts": 3, "retry_after_ms": 2001}
+    if category is not None:
+        fields["category"] = category
+    detail = json.dumps(fields)
+    globals_ = sc_agent.SagError.__init__.__globals__
+    parse = globals_["_sag_error_fields"]
+    parsed = []
+
+    def record(detail_json):
+        parsed.append(detail_json)
+        return parse(detail_json)
+
+    monkeypatch.setitem(globals_, "_sag_error_fields", record)
+    error = sc_agent.SagError("sample.error", "sample", detail)
+    expected = {"id": "sample.error", "message": "sample", "detail": detail,
+                "status": 429, "attempts": 3, "retry_after_ms": 2001,
+                "category": category or "other", "retryable": retryable}
+    for _ in range(2):
+        assert error.args == ("sample.error", "sample", detail)
+        assert {name: getattr(error, name) for name in expected} == expected
+    assert parsed == [detail]
+    for name in expected:
+        with pytest.raises(AttributeError):
+            setattr(error, name, None)
+    for rebuild in [copy.copy, lambda error: pickle.loads(pickle.dumps(error))]:
+        restored = rebuild(error)
+        assert restored is not error
+        assert type(restored) is sc_agent.SagError
+        assert restored.args == error.args
+        assert {name: getattr(restored, name) for name in expected} == expected
+    assert parsed == [detail, detail, detail]
 
 
 @pytest.mark.live_outcome

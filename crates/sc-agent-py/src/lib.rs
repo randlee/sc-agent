@@ -69,6 +69,23 @@ fn retryable(detail: &str) -> bool {
         .retryable()
 }
 
+/// Parse once for SagError construction; properties read only the returned values.
+#[pyfunction]
+fn _sag_error_fields(detail: &str) -> (Option<u16>, Option<u32>, Option<u64>, &'static str, bool) {
+    let detail = parse_detail(detail);
+    let category = detail
+        .as_ref()
+        .and_then(|detail| detail.category)
+        .unwrap_or(sc_agent_types::ErrorCategory::Other);
+    (
+        detail.as_ref().and_then(|detail| detail.status),
+        detail.as_ref().and_then(|detail| detail.attempts),
+        detail.as_ref().and_then(|detail| detail.retry_after_ms),
+        category.as_str(),
+        category.retryable(),
+    )
+}
+
 fn make_sag_error(id: &str, message: String, detail: String) -> PyErr {
     Python::attach(|py| {
         py.import("sc_agent")
@@ -759,36 +776,32 @@ fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
     module.add_function(wrap_pyfunction!(category, module)?)?;
     module.add_function(wrap_pyfunction!(retryable, module)?)?;
+    module.add_function(wrap_pyfunction!(_sag_error_fields, module)?)?;
     module.add_function(wrap_pyfunction!(models, module)?)?;
     module.add_function(wrap_pyfunction!(doctor, module)?)?;
     module.add_class::<CancelToken>()?;
     module.py().run(
         cr#"
-import json as _json
 class SagError(Exception):
     def __init__(self, id, message, detail_json):
         super().__init__(id, message, detail_json)
+        self._fields = _sag_error_fields(detail_json)
     @property
     def id(self): return self.args[0]
     @property
     def message(self): return self.args[1]
     @property
     def detail(self): return self.args[2]
-    def _field(self, name):
-        try:
-            return _json.loads(self.detail).get(name)
-        except (ValueError, TypeError, AttributeError):
-            return None
     @property
-    def status(self): return self._field('status')
+    def status(self): return self._fields[0]
     @property
-    def attempts(self): return self._field('attempts')
+    def attempts(self): return self._fields[1]
     @property
-    def retry_after_ms(self): return self._field('retry_after_ms')
+    def retry_after_ms(self): return self._fields[2]
     @property
-    def category(self): return category(self.detail)
+    def category(self): return self._fields[3]
     @property
-    def retryable(self): return retryable(self.detail)
+    def retryable(self): return self._fields[4]
 "#,
         Some(&module.dict()),
         None,
