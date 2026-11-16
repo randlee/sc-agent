@@ -17,6 +17,30 @@ A failed decision is data in the returned line, not an exception. `KeyboardInter
 
 Keyring overrides apply only to the provider selected by the model. An ambiguous ranked model with an override raises `decidr.ambiguous_keyring_override`; no provider argument is required. Each supplied service/account must be 1–255 UTF-8 bytes. Omitted components independently use the provider credential-variable name and the current OS account. Lookup order is repository-root `.env`, process environment, then keyring; a present invalid higher-priority key never falls back. Invalid options raise `SagError("sc_agent_py.invalid_option", message, detail_json)` before network I/O.
 
+On macOS, Keychain may ask for access for each new Python interpreter binary.
+For a trusted interpreter, choose **Always Allow** to permit future reads by that
+interpreter; a different interpreter may prompt again. If access is not resolved
+within 15 seconds, the call raises `SagError` with id `decidr.secrets`, category
+`auth`, and cause id `secrets.keyring_timeout`; no provider request was sent.
+Keychain read errors likewise have cause id `secrets.keyring_read`. These are
+credential lookup failures, not provider authentication responses. Consumers
+should inspect the cause id before interpreting `auth` as a provider rejection:
+
+```python
+import json
+import sc_agent
+
+try:
+    sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
+except sc_agent.SagError as error:
+    if error.id == "decidr.secrets":
+        cause = json.loads(error.detail).get("cause") or {}
+        if cause.get("id") in {"secrets.keyring_timeout", "secrets.keyring_read"}:
+            print("Could not read the credential from the keychain")
+            raise
+    raise
+```
+
 `send` and `send_batch` accept optional `timeout_secs`: finite numeric seconds in
 10..=3600, including fractional seconds. It bounds each decision request’s connect,
 headers and body read together, not the whole batch or retry budget. An omitted
