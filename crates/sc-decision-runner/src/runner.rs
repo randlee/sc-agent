@@ -334,7 +334,7 @@ impl Decision for DecisionRunner {
                 reason: "the runner ended without a result".to_owned(),
             });
             return finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
-                || decision_result(&identity, Err(cancelled(0))),
+                || decision_result(&identity, Err(cancelled(0)), 0),
                 Finished::into_result,
             );
         };
@@ -475,6 +475,7 @@ fn cancelled(sends: u32) -> DecisionError {
 fn decision_result(
     identity: &Identity,
     outcome: Result<SystemOneResponse, DecisionError>,
+    sends: u32,
 ) -> DecisionResult {
     DecisionResult::new(
         identity.session_id,
@@ -482,6 +483,7 @@ fn decision_result(
         identity.digests.clone(),
         outcome,
     )
+    .with_sends(sends)
 }
 
 /// Finishes the request of `identity` with `outcome`: wins its claim, writes its row,
@@ -497,10 +499,11 @@ fn finish(
     mode: Mode,
 ) -> Option<Finished> {
     let proof = identity.claim.win()?;
+    let tally = identity.progress.tally();
     let row = Row {
         position: identity.position,
         model: &identity.model,
-        tally: identity.progress.tally(),
+        tally,
         digests: &identity.digests,
         outcome: &outcome,
     };
@@ -512,7 +515,10 @@ fn finish(
         &row,
         mode,
     );
-    Some(Finished::new(written, decision_result(identity, outcome)))
+    Some(Finished::new(
+        written,
+        decision_result(identity, outcome, tally.sends),
+    ))
 }
 
 /// Finishes `identity` as cancelled after the sends it made (non-blocking row write).
@@ -1099,7 +1105,7 @@ impl Failed {
             reason: self.reason.clone(),
         });
         let result = finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
-            || decision_result(&identity, Err(cancelled(0))),
+            || decision_result(&identity, Err(cancelled(0)), 0),
             Finished::into_result,
         );
         Some(self.counts.yielded(result))

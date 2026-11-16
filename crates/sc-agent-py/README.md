@@ -2,7 +2,7 @@
 
 The `sc_agent` Python module: one function per `decidr` operation. It is a thin PyO3 layer over the `decidr` library (ADR-SAG-0004) and adds no wiring of its own. It is the top of the stack with `decidr`, and it has `publish = false`. Python users build it with maturin.
 
-Each function returns the same JSON text that the CLI prints.
+Each function returns the same JSON text that the CLI prints. Decision result objects contain `session_id`, `position`, `sends` (provider requests started for that item, including retries), and `digests`, plus either `response` or `error`. `sends` is zero before any request is sent.
 
 ## What it provides
 

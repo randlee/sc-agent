@@ -68,6 +68,7 @@ def test_structured_http_status_on_batch_and_exception(env, args, status):
     """Controlled loopback statuses remain numeric in batch errors and SagError details."""
     _loopback, _log_root = env
     result = json.loads(sc_agent.send_batch([NOUL], **args)[0])
+    assert result["sends"] == 1
     assert find_status(result["error"]) == status
 
     with pytest.raises(sc_agent.SagError) as info:
@@ -120,6 +121,7 @@ def test_send_and_send_batch_return_the_decided_response(env, args):
     line = json.loads(text)
     assert "error" not in line
     assert line["position"] == 0
+    assert line["sends"] == 1
     assert len(line["session_id"]) == 26
     assert line["response"]["answers"]["q"] == {"type": "noul", "noul": 0.123456789}
     assert '"noul":0.123456789' in text
@@ -141,6 +143,7 @@ def test_a_cancelled_token_stops_send_and_send_batch(env, args):
     assert token.is_cancelled()
     line = json.loads(sc_agent.send(NOUL, cancel=token, **args))
     assert line["error"]["id"] == "decision.cancelled"
+    assert line["sends"] == 0
     lines = sc_agent.send_batch([NOUL, NOUL], cancel=token, **args)
     assert [json.loads(item)["error"]["id"] for item in lines] == ["decision.cancelled"] * 2
     assert loopback.requests == []

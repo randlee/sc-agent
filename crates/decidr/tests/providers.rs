@@ -612,6 +612,10 @@ mod tests {
                 .expect("worker")
                 .expect("send");
             assert_eq!(transport.sends(), sends);
+            let line: serde_json::Value =
+                serde_json::from_slice(&decidr::output::result_line(&result).expect("result line"))
+                    .expect("JSON");
+            assert_eq!(line["sends"], sends);
             let error = result.outcome.expect_err("busy");
             assert_eq!(
                 error.detail().cause.expect("cause").id,
