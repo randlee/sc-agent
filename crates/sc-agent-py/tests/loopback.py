@@ -88,6 +88,9 @@ class Loopback:
                     loopback.ordered_started[index].set()
                     if not loopback.ordered_release[index].wait(60.0):
                         raise RuntimeError("request was not released")
+                    if loopback.status is not None:
+                        self._reply(loopback.status, {"detail": "controlled status"})
+                        return
                     data = OK_RESPONSE.encode()
                     self.send_response(200)
                     self.send_header("content-type", "application/json")

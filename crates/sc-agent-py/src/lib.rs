@@ -770,7 +770,7 @@ fn doctor(
 }
 
 /// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
-#[pymodule]
+#[pymodule(name = "_native")]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(send, module)?)?;
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
