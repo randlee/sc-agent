@@ -1,9 +1,9 @@
-plan = "docs/plans/phase-bjj.jsonl"
-root = "agt-phase-bjj"
-integration_branch = "integrate/phase-b"
+plan = "docs/plans/phase-c.jsonl"
+root = "agt-phase-c"
+integration_branch = "integrate/phase-c"
 lead = "ai-lead"
 
-code_checkout = "../judge-jev"
+code_checkout = "../plan-anchor"
 
 [templates]
 dev = ".claude/skills/atm-bd-orchestration/templates/dev-template.xml.j2"
