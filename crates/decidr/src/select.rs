@@ -528,7 +528,14 @@ fn backend(
         }
         ModelSelector::Version(model) => {
             let catalog = config.catalog().map_err(DecidrError::from)?;
-            (model.clone(), catalog.line_of(model))
+            // The TypeSafe API's stable alias is not a dated catalog row. Keep
+            // its spelling while using the Jev line to select its provider.
+            let line = if model.as_str() == "jev-latest" {
+                Some(ShortName::Jev)
+            } else {
+                catalog.line_of(model)
+            };
+            (model.clone(), line)
         }
     };
     let keys = Keys::new(&options.context)?;

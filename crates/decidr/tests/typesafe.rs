@@ -39,6 +39,45 @@ mod tests {
     /// The request examples sent as multipart in `every_part_example_is_sent_as_multipart`.
     const PART_REQUESTS: [&str; 2] = ["request_assets_part", "docs_box_request_1"];
 
+    #[test]
+    fn jev_latest_uses_typesafe_with_keyring_override_and_other_provider_keys() {
+        use crate::common::{MapKeyring, NOUL, NOUL_RESPONSE, request};
+        use sc_agent_secrets::{KeyringAccount, KeyringLocation, KeyringService};
+
+        let dir = empty_config_dir();
+        let transport = ScriptedTransport::responses(vec![json_response(200, NOUL_RESPONSE)]);
+        let log = MemoryLog::new().expect("log");
+        let mut ctx = context(
+            dir.path(),
+            &[
+                (sc_agent_secrets::OPENROUTER_API_KEY, "other-openrouter-key"),
+                (sc_agent_secrets::TOGETHER_API_KEY, "other-together-key"),
+                (sc_agent_secrets::NOUS_API_KEY, "other-nous-key"),
+            ],
+            Arc::new(transport.clone()),
+            &log,
+        );
+        ctx.keyring = Some(Arc::new(MapKeyring(std::collections::HashMap::from([(
+            "plan-anchor".to_owned(),
+            TYPESAFE_KEY.to_owned(),
+        )]))));
+        ctx.keyring_override = Some(KeyringLocation::new(
+            Some(KeyringService::new("plan-anchor").expect("service")),
+            Some(KeyringAccount::new("typesafe-api-key").expect("account")),
+        ));
+        let opts = options("jev-latest", None, ctx, &log);
+        let result = send(&opts, request(NOUL), &CancelToken::new()).expect("send");
+        assert!(result.outcome.is_ok());
+        let sent = transport.requests();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(
+            sent[0].endpoint().as_str(),
+            "https://api.typesafe.ai/v1/systemone"
+        );
+        let body: serde_json::Value = serde_json::from_slice(sent[0].body()).expect("body");
+        assert_eq!(body["model"], "jev-latest");
+    }
+
     /// REQ-SAG-0501 AC1: every request fixture (openapi.json and the guides) is sent by one
     /// of the two tests; none is left out.
     #[test]
