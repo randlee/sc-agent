@@ -15,6 +15,8 @@ pub struct ResultLine<'a> {
     pub session_id: &'a SessionId,
     /// The request's index in the input; 0 for a single request.
     pub position: u64,
+    /// Provider requests started for this item, including retries.
+    pub sends: u32,
     /// One digest per question.
     pub digests: &'a OrderedMap<String, QuestionDigest>,
     /// The decided response, when the decision succeeded.
@@ -36,6 +38,7 @@ impl<'a> ResultLine<'a> {
         Self {
             session_id: &result.session_id,
             position: result.position,
+            sends: result.sends,
             digests: &result.digests,
             response,
             error,

@@ -7,7 +7,7 @@ The decision-layer contract of sc-agent: the TypeSafe System One API types and t
 - **The one request form:** `SystemOneRequest` (POST /v1/systemone) with its `Question`s, `Asset`s and `State`. `DecisionRequest` wraps it with its image parts (`ImagePart`) and is valid by construction (`DecisionRequest::new`, or `DecisionRequest::try_from` a `SystemOneRequest`). `MAX_IMAGES` and `MAX_IMAGE_BYTES` are its limits.
 - **The one response form:** `SystemOneResponse` with its `Answer`s, `Usage` and `BoxCoordinates`. Also `ModelMetadataList` (GET /v1/models) and the documented 400 and 422 bodies (`HttpBadRequestError`, `HttpValidationError`).
 - **`Backend`:** the sans-IO translation each backend implements. `encode` builds one `HttpRequest`; `decode` turns the final `HttpResponse` into a `SystemOneResponse`.
-- **`Decision`:** the sync `decide` and `decide_stream` API that the runner implements. It returns `DecisionResult`s.
+- **`Decision`:** the sync `decide` and `decide_stream` API that the runner implements. It returns `DecisionResult`s with `sends`, the number of provider requests started for the item, including retries. `DecisionResult::new` defaults to zero; other implementations set the count with `with_sends`.
 - **`QuestionDigest`:** the per-question sc-sha digest of everything sent.
 - **`DecisionError`:** the one error type, with stable `decision.*` ids, and `LimitKind`.
 - `OrderedMap`: key order is kept, so a document round-trips.
