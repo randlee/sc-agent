@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 (unreleased)
+
+- Preserve quota classification for context-overflow-shaped responses with a quota HTTP status.
+- Let generated consumers map `decision.context_exceeded` through the optional `context_exceeded` key, falling back to its stored category code.
+
 ## 0.2.2 (unreleased)
 
 ### Breaking (Rust API)

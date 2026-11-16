@@ -307,6 +307,33 @@ def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_resul
         assert caught.value.__cause__ is category_result
 
 
+@pytest.mark.parametrize("method", ["call", "call_batch"])
+@pytest.mark.parametrize("error_id,codes,expected", [
+    ("decision.context_exceeded", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "CONTEXT"),
+    ("decision.context_exceeded", {"validation": "INVALID"}, "INVALID"),
+    ("decision.request_parse", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "INVALID"),
+])
+def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes, expected):
+    line = json.dumps({"error": {"id": error_id, "category": "validation", "message": "controlled error"}})
+    monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
+    callbacks = []
+
+    def batch(requests, *, on_result, **kwargs):
+        on_result(line)
+        return [line]
+
+    monkeypatch.setattr(sc_agent, "send_batch", batch)
+    cancel = sc_agent.CancelToken()
+    common = dict(model="jev", project="p", agent_role="r", abort_on=frozenset({"auth", "quota"}),
+                  category_codes=codes, cancel=cancel)
+    if method == "call":
+        assert consumer.call(REQUEST, **common) == (line, expected)
+    else:
+        assert consumer.call_batch([REQUEST], **common, on_result=callbacks.append) == [(line, expected)]
+        assert callbacks == [line]
+    assert not cancel.is_cancelled()
+
+
 def test_rebuilt_classifies_once_and_retains_callback_order(consumer, monkeypatch):
     lines = ['{"error":{"id":"auth","message":"denied","category":"auth"}}',
              '{"error":{"id":"quota","message":"exhausted","category":"quota"}}']
