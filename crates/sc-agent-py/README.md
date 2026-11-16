@@ -85,8 +85,11 @@ plan-anchor client at `fff69b2`. Render it with sc-compose >=1.8.0 and Python >=
 
 ```bash
 TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")')
+SC_DECIDR_VERSION=$(python -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')
+SITR_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("sitr") if any(d.metadata["Name"] == "sitr" for d in m.distributions()) else "")')
 sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
   --var 'general_log=true' --var 'models=["jev","haiku","luna"]' --var 'sitr=false' \
+  --var "sc_decidr_version=$SC_DECIDR_VERSION" --var "sitr_version=$SITR_VERSION" \
   --strict --output consumer.py
 ```
 
