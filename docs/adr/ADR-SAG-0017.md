@@ -28,12 +28,12 @@ Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter C
 
 ### Decision
 
-Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (`sc-agent` and `sc-treesitter` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Production uploads wait for owner dispatch.
+Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Production uploads wait for owner dispatch.
 
 **Key Principles:**
 
 - Customer-facing CLI names on channels are **decidr** and **sitr**.
-- PyPI distribution names remain **sc-agent** and **sc-treesitter**.
+- PyPI distribution names are **sc-decidr** and **sitr**.
 - No ad-hoc per-channel workflow literals for crate lists or binary names.
 
 ### Rationale
