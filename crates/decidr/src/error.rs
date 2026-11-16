@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
-use sc_agent_config::RunnerName;
+use sc_agent_config::{MAX_WORKERS, RunnerName};
 use sc_agent_types::{ErrorDetail, ErrorId, Provider};
 
 use crate::ModelSelector;
@@ -270,7 +270,9 @@ impl ErrorId for DecidrError {
 
     fn message(&self) -> String {
         match self {
-            Self::InvalidWorkers { value } => format!("workers must be within 1..=64, got {value}"),
+            Self::InvalidWorkers { value } => {
+                format!("workers must be within 1..={MAX_WORKERS}, got {value}")
+            }
             Self::InvalidRequestTimeout { value, .. } => format!(
                 "timeout_secs must be finite and within {}..={} seconds, got {value}",
                 sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.start(),
@@ -396,7 +398,7 @@ impl ErrorId for DecidrError {
             Self::InvalidRequestTimeout { .. } => {
                 Some("omit timeout_secs or pass finite seconds within the reported bounds")
             }
-            Self::InvalidWorkers { .. } => Some("pass workers from 1 to 64"),
+            Self::InvalidWorkers { .. } => Some("pass a worker count within the supported range"),
             Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),

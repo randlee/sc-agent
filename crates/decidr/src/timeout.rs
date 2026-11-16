@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS;
+use sc_agent_config::{MAX_WORKERS, RUNNER_REQUEST_TIMEOUT_SECS};
 use sc_agent_types::ErrorDetail;
 
 use crate::DecidrError;
@@ -47,15 +47,18 @@ impl RequestTimeout {
 pub struct Workers(usize);
 
 impl Workers {
-    /// Validate a worker count within 1..=64.
+    /// Validate a worker count within 1..=`MAX_WORKERS`.
     ///
     /// # Errors
     /// Returns `decidr.invalid_workers` if outside the supported range.
     pub fn new(count: i64) -> Result<Self, DecidrError> {
-        if !(1..=64).contains(&count) {
+        let Ok(workers) = usize::try_from(count) else {
+            return Err(DecidrError::InvalidWorkers { value: count });
+        };
+        if !(1..=MAX_WORKERS).contains(&workers) {
             return Err(DecidrError::InvalidWorkers { value: count });
         }
-        Ok(Self(count as usize))
+        Ok(Self(workers))
     }
 
     pub(crate) fn get(self) -> usize {
@@ -79,13 +82,20 @@ mod tests {
 
     #[test]
     fn workers_are_validated() {
-        for count in [1, 8, 64] {
-            assert_eq!(Workers::new(count).unwrap().get(), count as usize);
+        let max_workers = i64::try_from(MAX_WORKERS).expect("MAX_WORKERS fits in i64");
+        for count in [1, 8, max_workers] {
+            assert_eq!(
+                Workers::new(count).unwrap().get(),
+                usize::try_from(count).unwrap()
+            );
         }
-        for count in [i64::MIN, 0, 65, i64::MAX] {
+        for count in [i64::MIN, 0, max_workers + 1, i64::MAX] {
             let error = Workers::new(count).unwrap_err();
             assert_eq!(error.id(), "decidr.invalid_workers");
-            assert!(error.message().contains(&count.to_string()));
+            assert_eq!(
+                error.message(),
+                format!("workers must be within 1..={MAX_WORKERS}, got {count}")
+            );
         }
     }
 

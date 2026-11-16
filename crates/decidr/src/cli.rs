@@ -61,7 +61,7 @@ pub(crate) struct SendArgs {
     /// Per-request timeout in seconds (10..=3600).
     #[arg(long, allow_hyphen_values = true)]
     pub(crate) timeout_secs: Option<f64>,
-    /// Batch worker count (1..=64).
+    /// Batch worker count; decidr validates it against the supported range.
     #[arg(long, requires = "batch", allow_hyphen_values = true)]
     pub(crate) workers: Option<i64>,
     /// Request file, or - for stdin.

@@ -1,5 +1,6 @@
 """Python exception attributes and stored error categories."""
 import json
+import pathlib
 import pickle
 
 import pytest
@@ -30,6 +31,44 @@ def test_stored_category_from_real_loopback_error(env, args):
     detail = json.dumps(line["error"])
     assert sc_agent.category(detail) == "other"
     assert not sc_agent.retryable(detail)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_category", "expected_retryable"),
+    [(401, "auth", False), (429, "busy", True)],
+)
+def test_stored_category_and_retryable_from_status_loopback(
+    env, args, status, expected_category, expected_retryable
+):
+    """Status-mode loopback errors preserve their stored category and retryable outcome."""
+    request = '{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}'
+    line = json.loads(sc_agent.send(request, **args))
+    detail = json.dumps(line["error"])
+    assert sc_agent.category(detail) == expected_category
+    assert sc_agent.retryable(detail) is expected_retryable
+
+    with pytest.raises(sc_agent.SagError) as caught:
+        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+    error = caught.value
+    assert error.status == status
+    restored = pickle.loads(pickle.dumps(error))
+    assert restored.status == status
+    assert restored.category == expected_category
+    assert restored.retryable is expected_retryable
+
+
+def test_category_fallback_for_empty_and_legacy_details():
+    empty = sc_agent.SagError("x", "y", "{}")
+    assert empty.status is None
+    assert empty.category == "other"
+    assert empty.retryable is False
+
+    legacy_detail = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "crates/sc-agent-types/tests/fixtures/error-detail-v0.1.0.json"
+    ).read_text()
+    assert sc_agent.category(legacy_detail) == "other"
+    assert sc_agent.retryable(legacy_detail) is False
 
 
 @pytest.mark.live_outcome
