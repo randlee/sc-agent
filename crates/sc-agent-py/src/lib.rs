@@ -442,7 +442,10 @@ fn run_interruptible<T: Send>(
             let text =
                 decidr::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
             let message = std::ffi::CString::new(text).unwrap_or_default();
-            PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
+            if let Err(warning) = PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1) {
+                // A warning filter must not replace the decision (or its error).
+                warning.write_unraisable(py, None);
+            }
         }
         if let Some(error) = raised {
             return Err(error);
