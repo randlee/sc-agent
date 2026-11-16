@@ -156,3 +156,115 @@ def test_optional_sitr_is_lazy_and_extraction_reaches_a_dry_run(tmp_path, monkey
     enabled.call(json.dumps(request), model="jev", project="proj", agent_role="role",
                  abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
     assert sent[0]["state"] == prompt and "match" in prompt
+
+
+@pytest.mark.parametrize("method,operation,payload", [
+    ("call", "send", REQUEST), ("call_batch", "send_batch", [REQUEST]),
+])
+def test_rebuilt_default_keyring_and_forbidden_arguments(consumer, monkeypatch, method, operation, payload):
+    passed = []
+
+    def send(request, **kwargs):
+        passed.append(kwargs)
+        return '{"response": {}}' if operation == "send" else []
+
+    monkeypatch.setattr(sc_agent, operation, send)
+    getattr(consumer, method)(payload, model="jev", project="p", agent_role="r",
+                             abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert len(passed) == 1
+    assert passed[0]["keyring_service"] is None
+    assert passed[0]["keyring_account"] is None
+    assert "session_log" not in passed[0] and "provider" not in passed[0]
+
+
+@pytest.mark.parametrize("method,payload", [("call", REQUEST), ("call_batch", [REQUEST])])
+def test_rebuilt_abort_validation_precedes_optional_import(consumer, monkeypatch, method, payload):
+    import sys
+    monkeypatch.setitem(sys.modules, "sc_agent", None)
+    common = dict(model="jev", project="p", agent_role="r", category_codes={}, cancel=object())
+    with pytest.raises(ValueError):
+        getattr(consumer, method)(payload, **common, abort_on=frozenset({"quota"}))
+    with pytest.raises(consumer.ClientError) as caught:
+        getattr(consumer, method)(payload, **common, abort_on=frozenset())
+    assert caught.value.code == "DEPENDENCY.SC_DECIDR"
+
+
+@pytest.mark.parametrize("method,option,value,error_id", [
+    ("call", "timeout_secs", 9.99, "decidr.invalid_request_timeout"),
+    ("call_batch", "timeout_secs", 9.99, "decidr.invalid_request_timeout"),
+    ("call_batch", "workers", 0, "decidr.invalid_workers"),
+    ("call_batch", "workers", 65, "decidr.invalid_workers"),
+])
+def test_rebuilt_invalid_limits_reach_wheel_once(env, args, consumer, monkeypatch, method, option, value, error_id):
+    operation = "send" if method == "call" else "send_batch"
+    native = getattr(sc_agent, operation)
+    passed = []
+
+    def observed(*positional, **kwargs):
+        passed.append(kwargs)
+        return native(*positional, **kwargs)
+
+    monkeypatch.setattr(sc_agent, operation, observed)
+    cancel = sc_agent.CancelToken()
+    with pytest.raises(sc_agent.SagError) as caught:
+        getattr(consumer, method)(REQUEST if method == "call" else [REQUEST], **args,
+                                 abort_on=frozenset(), category_codes={}, cancel=cancel,
+                                 **{option: value})
+    assert caught.value.id == error_id
+    assert len(passed) == 1 and passed[0][option] == value
+    assert not cancel.is_cancelled() and env[0].requests == []
+
+
+@pytest.mark.parametrize("category_result", [RuntimeError("wheel failure"), None, 7])
+def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_result):
+    line = '{"error":{"id":"auth","category":"auth"}}'
+    monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
+
+    def category(error):
+        if isinstance(category_result, Exception):
+            raise category_result
+        return category_result
+
+    monkeypatch.setattr(sc_agent, "category", category)
+    with pytest.raises(consumer.ClientError) as caught:
+        consumer.call(REQUEST, model="jev", project="p", agent_role="r",
+                      abort_on=frozenset({"auth"}), category_codes={}, cancel=sc_agent.CancelToken())
+    assert caught.value.code == "DECIDR.INVALID_RESULT"
+    if isinstance(category_result, Exception):
+        assert caught.value.__cause__ is category_result
+
+
+def test_rebuilt_classifies_once_and_retains_callback_order(consumer, monkeypatch):
+    lines = ['{"error":{"id":"auth","message":"denied","category":"auth"}}',
+             '{"error":{"id":"quota","message":"exhausted","category":"quota"}}']
+    classified, callbacks, cancellations = [], [], []
+    native_category = sc_agent.category
+
+    def category(error):
+        classified.append(error)
+        return native_category(error)
+
+    class Cancel:
+        def cancel(self):
+            cancellations.append(True)
+
+    def batch(requests, *, on_result, **kwargs):
+        for line in reversed(lines):
+            on_result(line)
+        return lines + [lines[0]]
+
+    monkeypatch.setattr(sc_agent, "category", category)
+    monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: lines[0])
+    assert consumer.call(REQUEST, model="jev", project="p", agent_role="r",
+                         abort_on=frozenset(), category_codes={"auth": "AUTH"},
+                         cancel=Cancel()) == (lines[0], "AUTH")
+    assert len(classified) == 1
+    classified.clear()
+    monkeypatch.setattr(sc_agent, "send_batch", batch)
+    result = consumer.call_batch([REQUEST] * 3, model="jev", project="p", agent_role="r",
+                                abort_on=frozenset({"auth"}), category_codes={"auth": "AUTH", "quota": "QUOTA"},
+                                cancel=Cancel(), on_result=callbacks.append)
+    assert result == [(lines[0], "AUTH"), (lines[1], "QUOTA"), (lines[0], "AUTH")]
+    assert callbacks == list(reversed(lines))
+    assert len(classified) == 2
+    assert cancellations == [True]  # Return-list mapping does not cancel again.
