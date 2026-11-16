@@ -288,6 +288,7 @@ mod tests {
                     | "decision.limits"
                     | "decision.api_bad_request"
                     | "decision.api_validation"
+                    | "decision.context_exceeded"
                     | "decision.schema_mismatch"
                     | "decision.shutdown"
             );
