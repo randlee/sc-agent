@@ -27,10 +27,12 @@ class ConsumerFormatTest(unittest.TestCase):
                         "--strict", "--output", str(output),
                     ], check=True)
                     text = output.read_text()
-                    ast.parse(text)
-                    lines = text.splitlines()
-                    self.assertEqual(lines.count("    timeout_secs: Optional[float] = None,"), 2)
-                    self.assertEqual(lines.count("    general_log: Optional[LogSink] = None,"), 2 if general_log else 0)
+                    tree = ast.parse(text)
+                    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+                    for name in ("call", "call_batch", "call_result", "call_batch_results"):
+                        arguments = {arg.arg for arg in functions[name].args.kwonlyargs}
+                        self.assertIn("timeout_secs", arguments)
+                        self.assertEqual("general_log" in arguments, general_log)
                     self.assertNotIn("general_log=general_log,)", text)
 
 
