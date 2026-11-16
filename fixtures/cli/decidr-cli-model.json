@@ -180,7 +180,7 @@
           "name": "workers",
           "long": "--workers",
           "short": null,
-          "help": "Batch worker count (1..=64)",
+          "help": "Batch worker count; decidr validates it against the supported range",
           "long_help": "",
           "value_name": "WORKERS",
           "required": false,
