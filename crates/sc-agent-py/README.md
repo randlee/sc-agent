@@ -162,6 +162,11 @@ errors and on `KeyboardInterrupt`, and preserve the wheel's result lines. Batch
 callbacks run in finish order; returned tuples retain input order. Prompt authoring
 and result interpretation remain in the consumer; there is no additional retry loop.
 
+The optional `context_exceeded` map key overrides the category code for
+`decision.context_exceeded` in both single and batch calls. If the key is absent,
+the error uses its category's code as usual. Other validation errors keep their
+category mapping; this override does not change the stored category or cancellation.
+
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).
 
