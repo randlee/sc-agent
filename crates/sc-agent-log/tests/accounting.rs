@@ -4,7 +4,7 @@
 mod common;
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use common::{identity, payload};
@@ -12,6 +12,7 @@ use sc_agent_log::testing::MemoryLog;
 use sc_agent_log::{
     GeneralLogger, Level, LogContext, LogError, LogKind, Loggers, MAX_ROW_BYTES, SessionLogger,
 };
+use sc_agent_testkit::{ChildGuard, HANG_GUARD};
 use sc_agent_types::{ErrorId, SessionId};
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
@@ -36,10 +37,14 @@ fn failing_session(root: &Path) -> Result<SessionLogger, Box<dyn std::error::Err
 
 /// Runs this test binary's test `name` alone with `CHILD=scenario`; returns its stderr.
 fn child_stderr(name: &str, scenario: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new(std::env::current_exe()?)
+    let mut command = Command::new(std::env::current_exe()?);
+    command
         .args([name, "--exact", "--nocapture", "--test-threads=1"])
         .env(CHILD, scenario)
-        .output()?;
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let output = ChildGuard::spawn(&mut command).wait_with_output(HANG_GUARD);
     if !output.status.success() {
         return Err(format!("child {scenario} failed: {output:?}").into());
     }
@@ -183,24 +188,25 @@ fn memory_log_reports_once() {
     session.flush().expect("already reported");
 }
 
-/// RSH-003: a row whose fields serialize over MAX_ROW_BYTES is not written; the write returns
-/// log.row_too_large and flush counts it as a lost row. A row just under the cap is written.
+/// RSH-003: oversized complete events are refused and counted as lost rows.
+/// This accounting test accepts a small row; writer::tests::full_event_cap_includes_envelope_and_newline
+/// exercises the exact serialized cap and one byte over it.
 #[test]
 fn oversized_row_refused() {
     let memory = MemoryLog::new().expect("memory");
     let general = memory.general();
     // {"blob":"<n>"} is n + 11 bytes.
-    let under = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES - 11)))]);
+    let under = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES / 2 - 11)))]);
     general
         .write(Level::Info, "t", "a", LogContext::NONE, under)
-        .expect("at the cap");
+        .expect("small row below the cap");
     let over = payload(&[("blob", json!("x".repeat(MAX_ROW_BYTES - 10)))]);
     let error = general
         .write(Level::Info, "t", "a", LogContext::NONE, over)
         .expect_err("over the cap");
     assert!(
         matches!(error, LogError::RowTooLarge { log: LogKind::General, bytes, max }
-            if bytes == MAX_ROW_BYTES + 1 && max == MAX_ROW_BYTES),
+            if bytes > MAX_ROW_BYTES && max == MAX_ROW_BYTES),
         "{error:?}"
     );
     assert_eq!(error.id(), "log.row_too_large");
@@ -221,6 +227,6 @@ fn oversized_row_refused() {
     assert_eq!(
         memory.records().expect("records").len(),
         1,
-        "only the row at the cap"
+        "only the small accepted row"
     );
 }

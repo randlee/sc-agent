@@ -155,7 +155,7 @@ mod cases {
         // timeout, resent
         run(vec![Err(timeout())], 5);
         // connect failure
-        run(vec![Err(connect())], 5);
+        run(vec![Err(connect())], 1);
         // budget exhausted: the first send takes 90 s and ends with a busy reply
         let manual = ManualClock::new();
         let client = HttpClient::new(

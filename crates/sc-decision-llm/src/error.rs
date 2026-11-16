@@ -97,16 +97,21 @@ impl From<LlmError> for DecisionLlmError {
     }
 }
 
+sc_agent_types::error_catalog! { DecisionLlmError {
+    DecisionLlmError::Llm(_) => ("decision_llm.llm", None),
+    DecisionLlmError::Encode { .. } => ("decision_llm.encode", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionLlmError::AnswerIds { .. } => ("decision_llm.answer_ids", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionLlmError::AnswerInvalid { .. } => ("decision_llm.answer_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionLlmError::InvalidMaxTokens { .. } => ("decision_llm.invalid_max_tokens", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionLlmError::Invariant { .. } => ("decision_llm.invariant", Some(sc_agent_types::ErrorCategory::Other)),
+} }
+
 impl ErrorId for DecisionLlmError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Llm(_) => "decision_llm.llm",
-            Self::Encode { .. } => "decision_llm.encode",
-            Self::AnswerIds { .. } => "decision_llm.answer_ids",
-            Self::AnswerInvalid { .. } => "decision_llm.answer_invalid",
-            Self::InvalidMaxTokens { .. } => "decision_llm.invalid_max_tokens",
-            Self::Invariant { .. } => "decision_llm.invariant",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
@@ -195,6 +200,34 @@ impl Error for DecisionLlmError {
 mod tests {
     use super::*;
 
+    #[test]
+    fn backend_preserves_provider_auth_fields_and_causes() {
+        let reply = sc_agent_http::ProviderReply::read(
+            &sc_agent_http::HttpResponse::new(401, vec![], b"unauthorized".to_vec()),
+            None,
+        );
+        let lower = LlmError::ApiStatus {
+            provider: sc_llm_provider::LlmProvider::Anthropic,
+            reply: Box::new(reply),
+        };
+        let lower_detail = lower.detail();
+        let wrapped = DecisionLlmError::Llm(lower);
+        let wrapped_detail = wrapped.detail();
+        let top = sc_decision_schema::DecisionError::Backend {
+            backend: "llm",
+            detail: Box::new(wrapped_detail.clone()),
+        }
+        .detail();
+        assert_eq!(
+            (top.status, top.category),
+            (Some(401), Some(sc_agent_types::ErrorCategory::Auth))
+        );
+        assert_eq!(top.cause.as_deref(), Some(&wrapped_detail));
+        assert_eq!(wrapped_detail.id, "decision_llm.llm");
+        assert_eq!(wrapped_detail.cause.as_deref(), Some(&lower_detail));
+        assert_eq!(lower_detail.id, "llm.api_status");
+    }
+
     /// a-7 REQ-SAG-0002: exactly 6 distinct `decision_llm.*` ids; the exhaustive match fails
     /// to compile when a variant is added or removed.
     #[test]
@@ -231,6 +264,7 @@ mod tests {
             }
         }
         let ids: std::collections::BTreeSet<&str> = all.iter().map(ErrorId::id).collect();
+        sc_agent_testkit::assert_catalog_rows(&all);
         assert_eq!(ids.len(), 6, "{ids:?}");
         assert!(
             ids.iter().all(|id| id.starts_with("decision_llm.")),

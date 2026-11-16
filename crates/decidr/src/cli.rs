@@ -58,9 +58,27 @@ pub(crate) struct SendArgs {
     /// Send TypeSafe-Danger-Zone-Long-Context: true; single-request mode only.
     #[arg(long, conflicts_with = "batch")]
     pub(crate) long_context: bool,
+    /// Per-request timeout in seconds (10..=3600).
+    #[arg(long, allow_hyphen_values = true)]
+    pub(crate) timeout_secs: Option<f64>,
+    /// Batch worker count; decidr validates it against the supported range.
+    #[arg(long, allow_hyphen_values = true)]
+    pub(crate) workers: Option<i64>,
     /// Request file, or - for stdin.
     #[arg(value_name = "FILE|-", default_value = "-", value_parser = non_empty_text)]
     pub(crate) input: String,
+}
+
+impl SendArgs {
+    pub(crate) fn call_limits(&self) -> Result<decidr::CallLimits, DecidrError> {
+        Ok(decidr::CallLimits {
+            timeout: self
+                .timeout_secs
+                .map(decidr::RequestTimeout::from_secs)
+                .transpose()?,
+            workers: self.workers.map(decidr::Workers::new).transpose()?,
+        })
+    }
 }
 
 /// `decidr models`.
@@ -209,5 +227,41 @@ mod tests {
             assert_eq!(cli.config_dir, Some(PathBuf::from("/c")), "{args:?}");
         }
         assert!(parse(["decidr", "--config-dir", "", "doctor"]).is_err());
+    }
+
+    #[test]
+    fn send_flags_return_checked_call_limits() {
+        let parsed = parse([
+            "decidr",
+            "send",
+            "--model",
+            "jev",
+            "--project",
+            "proj",
+            "--agent-role",
+            "role",
+            "--batch",
+            "--workers",
+            "2",
+            "--timeout-secs",
+            "30.5",
+        ])
+        .expect("CLI");
+        let Parsed::Run(cli) = parsed else {
+            panic!("expected command");
+        };
+        let Command::Send(args) = cli.command else {
+            panic!("expected send");
+        };
+
+        let limits = args.call_limits().expect("checked call limits");
+        assert_eq!(
+            limits.timeout,
+            Some(decidr::RequestTimeout::from_secs(30.5).expect("expected timeout"))
+        );
+        assert_eq!(
+            limits.workers,
+            Some(decidr::Workers::new(2).expect("expected workers"))
+        );
     }
 }

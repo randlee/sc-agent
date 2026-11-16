@@ -43,10 +43,7 @@ pub enum TypesError {
         other_line: ShortName,
     },
     /// Not an environment-variable name, `^[A-Z_][A-Z0-9_]{0,127}$` (`types.invalid_var_name`).
-    InvalidVarName {
-        /// The rejected text.
-        text: String,
-    },
+    InvalidVarName,
     /// Not a canonical ULID, a UUID included (`types.invalid_session_id`).
     InvalidSessionId {
         /// The rejected text.
@@ -54,17 +51,22 @@ pub enum TypesError {
     },
 }
 
+crate::error_catalog! { TypesError {
+    TypesError::InvalidModelId { .. } => ("types.invalid_model_id", Some(crate::ErrorCategory::Validation)),
+    TypesError::UnknownShortName { .. } => ("types.unknown_short_name", Some(crate::ErrorCategory::Validation)),
+    TypesError::UnknownProvider { .. } => ("types.unknown_provider", Some(crate::ErrorCategory::Validation)),
+    TypesError::InvalidReleaseDate { .. } => ("types.invalid_release_date", Some(crate::ErrorCategory::Config)),
+    TypesError::ModelOnTwoLines { .. } => ("types.model_on_two_lines", Some(crate::ErrorCategory::Config)),
+    TypesError::InvalidVarName => ("types.invalid_var_name", Some(crate::ErrorCategory::Validation)),
+    TypesError::InvalidSessionId { .. } => ("types.invalid_session_id", Some(crate::ErrorCategory::Validation)),
+} }
+
 impl ErrorId for TypesError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::InvalidModelId { .. } => "types.invalid_model_id",
-            Self::UnknownShortName { .. } => "types.unknown_short_name",
-            Self::UnknownProvider { .. } => "types.unknown_provider",
-            Self::InvalidReleaseDate { .. } => "types.invalid_release_date",
-            Self::ModelOnTwoLines { .. } => "types.model_on_two_lines",
-            Self::InvalidVarName { .. } => "types.invalid_var_name",
-            Self::InvalidSessionId { .. } => "types.invalid_session_id",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<crate::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
@@ -84,9 +86,7 @@ impl ErrorId for TypesError {
             } => format!(
                 "model {model} already belongs to line {other_line}; it cannot also be {line}"
             ),
-            Self::InvalidVarName { text } => format!(
-                "{text:?} is not an environment-variable name (uppercase letters, digits and _, not starting with a digit, at most 128 characters)"
-            ),
+            Self::InvalidVarName => "invalid environment-variable name (uppercase letters, digits and _, not starting with a digit, at most 128 characters)".to_owned(),
             Self::InvalidSessionId { text } => format!(
                 "session id {text:?} is not a ULID (26 uppercase Crockford base32 characters)"
             ),
@@ -114,7 +114,7 @@ impl ErrorId for TypesError {
             Self::ModelOnTwoLines { .. } => {
                 "keep the model under its existing line or choose a different id"
             }
-            Self::InvalidVarName { .. } => {
+            Self::InvalidVarName => {
                 "use a name matching ^[A-Z_][A-Z0-9_]{0,127}$, for example MY_RUNNER_TOKEN"
             }
             Self::InvalidSessionId { .. } => {

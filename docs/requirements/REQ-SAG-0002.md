@@ -23,7 +23,7 @@ Definitions: A discriminated union is a tagged result type whose variant names t
 - An error MUST carry the error id and message of every lower-layer error that caused it.
 - A layer that changes an error MUST change it only by adding detail.
 - Error text received from a provider MUST be kept whole.
-- Exception (owner-approved 2026-11-10): every occurrence of an API key that was attached to the request MUST be replaced by `[redacted]` in error text, error causes and log fields. The error id and the rest of the message MUST be kept, and no other text may be removed or rewritten.
+- Exception (owner-approved): every occurrence of an API key that was attached to the request MUST be replaced by `[redacted]` in error text, error causes and log fields. The error id and the rest of the message MUST be kept, and no other text may be removed or rewritten.
 - Every error variant MUST have a stable id of the form `<crate>.<variant>`, such as `http.provider_busy`.
 
 **MUST NOT statements:**
@@ -41,7 +41,7 @@ Agents and tools act on errors programmatically. A dropped lower-layer id or a p
 
 - [ ] A test that injects a failure at the lowest layer of a call path receives, at the CLI and PyO3 entry points, that failure's error id and message in the returned error.
 - [ ] A test in which a provider or local runner echoes the attached key receives an error whose id is unchanged, whose message is otherwise whole, and which contains `[redacted]` in place of every copy of the key.
-- [ ] Clippy runs with `panic`, `unwrap_used`, `expect_used` and `indexing_slicing` denied in non-test code and passes.
+- [ ] Clippy passes with the workspace lint configuration (`[workspace.lints.clippy]` in `Cargo.toml`), which denies panicking constructs in non-test code.
 
 ### Product Applicability
 

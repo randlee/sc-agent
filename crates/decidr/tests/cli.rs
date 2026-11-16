@@ -25,6 +25,78 @@ fn help_lists_send_models_and_doctor() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("--batch"));
 }
 
+/// Invalid key_env is rejected before credential lookup, without retaining the pasted key.
+#[test]
+fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
+    use sc_agent_log::{GeneralLogger, Level, LogContext};
+    use serde_json::{Map, Value};
+    let key = "sk-pasted-credential-not-a-variable";
+    let root = tempfile::tempdir().expect("root");
+    let config = root.path().join("config");
+    std::fs::create_dir(&config).expect("config dir");
+    std::fs::write(
+        config.join("default.json"),
+        serde_json::json!({
+            "log_root": root.path(),
+            "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": 9100,
+                "model": "jev-latest", "key_env": key}}
+        })
+        .to_string(),
+    )
+    .expect("config");
+    let output = common::run_bounded(
+        std::process::Command::new(env!("CARGO_BIN_EXE_decidr"))
+            .arg("--config-dir")
+            .arg(&config)
+            .arg("models")
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
+            .current_dir(root.path()),
+    );
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8(output.stderr).expect("stderr UTF8");
+    let detail: Value =
+        serde_json::from_str(stderr.lines().last().expect("error line")).expect("typed detail");
+    assert_eq!(detail["id"], "decidr.config");
+    assert_eq!(detail["cause"]["id"], "config.invalid");
+    assert!(
+        detail["cause"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("local_runners.dec.key_env")
+    );
+    assert!(!stderr.contains(key));
+    assert!(
+        !serde_json::to_string(&detail)
+            .expect("detail JSON")
+            .contains(key)
+    );
+    assert!(output.stdout.is_empty());
+    // Config fails before the CLI can open its logger. Also exercise the actual
+    // general-log writer with the returned detail, as a caller logging it would.
+    let log = GeneralLogger::open_default(root.path(), "decidr").expect("general logger");
+    let mut fields = Map::new();
+    fields.insert("error".into(), detail.clone());
+    log.write(
+        Level::Error,
+        "decidr",
+        "decidr.config",
+        LogContext::NONE,
+        fields,
+    )
+    .expect("write error");
+    log.close().expect("close and flush");
+    let text =
+        std::fs::read_to_string(root.path().join("logs").join("decidr.log.jsonl")).expect("log");
+    assert!(!text.is_empty());
+    for line in text.lines() {
+        assert!(!line.contains(key));
+        let row: Value = serde_json::from_str(line).expect("log row");
+        assert_eq!(row["fields"]["error"], detail);
+    }
+}
+
 #[cfg(test)]
 #[cfg(unix)]
 mod tests {
@@ -218,6 +290,35 @@ mod tests {
         assert!(output.stdout.is_empty());
         assert!(sends.try_recv().is_err(), "nothing was sent");
         assert_eq!(rows(home.path()), 0);
+    }
+
+    #[test]
+    fn workers_without_batch_is_typed_and_does_not_send() {
+        let runner = serve_each(|_| {});
+        let home = home(runner.port());
+        let file = batch_file(home.path(), 1);
+        let output = run_bounded(&mut decidr(
+            home.path(),
+            &[
+                "send",
+                "--model",
+                "dec",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                "--workers",
+                "2",
+                file.to_str().expect("utf-8"),
+            ],
+        ));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decidr.invalid_workers");
+        let message = detail["message"].as_str().expect("message");
+        assert!(message.contains("2") && message.contains("--batch"));
+        assert!(output.stdout.is_empty());
+        assert_eq!(runner.stop(), 0, "no connection reached the runner");
     }
 
     /// AC: REQ-SAG-0504, end to end: a bad line stops decidr before the runner is contacted.

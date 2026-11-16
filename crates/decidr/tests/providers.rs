@@ -105,6 +105,169 @@ mod tests {
         );
     }
 
+    #[test]
+    fn provider_override_sends_key_only_to_the_selected_provider() {
+        use sc_agent_secrets::{
+            KeyringAccount, KeyringLocation, KeyringService, KeyringSource, SecretsError,
+        };
+        use std::sync::Mutex;
+        struct Recording(Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "account")
+                    .then(|| "test-selected-key".to_owned()))
+            }
+        }
+        let source = Arc::new(Recording(Mutex::new(Vec::new())));
+        let transport = ScriptedTransport::responses(vec![anthropic_noul()]);
+        let log = MemoryLog::new().unwrap();
+        let dir = empty_config_dir();
+        let mut ctx = context(dir.path(), &[], Arc::new(transport.clone()), &log);
+        ctx.keyring = Some(source.clone());
+        ctx.keyring_override = Some(KeyringLocation::new(
+            Some(KeyringService::new("consumer").unwrap()),
+            Some(KeyringAccount::new("account").unwrap()),
+        ));
+        let send_options = options("haiku", Some(Provider::Anthropic), ctx, &log);
+        assert!(
+            send(&send_options, request(NOUL), &CancelToken::new())
+                .unwrap()
+                .outcome
+                .is_ok()
+        );
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].endpoint().host(), "api.anthropic.com");
+        assert_eq!(
+            requests[0]
+                .secret()
+                .unwrap()
+                .key()
+                .redact_text("test-selected-key"),
+            "[redacted]"
+        );
+        assert_eq!(
+            &*source.0.lock().unwrap(),
+            &[("consumer".to_owned(), "account".to_owned())]
+        );
+    }
+
+    #[test]
+    fn resolved_provider_uses_only_its_override_key_on_loopback() {
+        use sc_agent_http::{
+            Endpoint, HttpError, HttpRequest, HttpResponse, Timeouts, Transport, UreqTransport,
+        };
+        use sc_agent_secrets::{
+            KeyringAccount, KeyringLocation, KeyringService, KeyringSource, SecretsError,
+        };
+        use std::io::{BufRead, BufReader, Read, Write};
+        use std::sync::{Mutex, mpsc};
+
+        struct Recording(Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "account")
+                    .then(|| "loopback-test-key".to_owned()))
+            }
+        }
+        // Preserve the actual request and its secret, changing only the destination to loopback.
+        struct LoopbackTransport {
+            port: u16,
+            inner: UreqTransport,
+        }
+        impl Transport for LoopbackTransport {
+            fn send(&self, request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+                assert_eq!(request.endpoint().host(), "api.typesafe.ai");
+                let endpoint =
+                    Endpoint::parse_local(&format!("http://127.0.0.1:{}/v1/systemone", self.port))
+                        .unwrap();
+                let mut local =
+                    HttpRequest::new(request.method(), endpoint, request.body().to_vec());
+                for (name, value) in request.headers() {
+                    local = local.with_header(name.clone(), value.clone())?;
+                }
+                if let Some(secret) = request.secret() {
+                    local = local.with_secret(secret.clone())?;
+                }
+                self.inner.send(&local)
+            }
+        }
+        let (sender, receiver) = mpsc::channel();
+        let server = sc_agent_testkit::serve_each(move |stream| {
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut writer = stream;
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let mut auth = None;
+            let mut length = 0;
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some((name, value)) = line.split_once(':') {
+                    if name.eq_ignore_ascii_case("authorization") {
+                        auth = Some(value.trim().to_owned());
+                    }
+                    if name.eq_ignore_ascii_case("content-length") {
+                        length = value.trim().parse().unwrap();
+                    }
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).unwrap();
+            sender.send(auth).unwrap();
+            let response = crate::common::NOUL_RESPONSE;
+            write!(writer, "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}", response.len(), response).unwrap();
+        });
+        let source = Arc::new(Recording(Mutex::new(Vec::new())));
+        let log = MemoryLog::new().unwrap();
+        let dir = empty_config_dir();
+        let transport = LoopbackTransport {
+            port: server.port(),
+            inner: UreqTransport::new(Timeouts::default()),
+        };
+        let mut ctx = context(dir.path(), &[], Arc::new(transport), &log);
+        ctx.keyring = Some(source.clone());
+        ctx.keyring_override = Some(KeyringLocation::new(
+            Some(KeyringService::new("consumer").unwrap()),
+            Some(KeyringAccount::new("account").unwrap()),
+        ));
+        let chosen = options("jev", None, ctx, &log);
+        assert!(
+            send(&chosen, request(NOUL), &CancelToken::new())
+                .unwrap()
+                .outcome
+                .is_ok()
+        );
+        assert_eq!(
+            sc_agent_testkit::recv_within(&receiver, sc_agent_testkit::HANG_GUARD).as_deref(),
+            Some("Bearer loopback-test-key")
+        );
+        assert_eq!(
+            &*source.0.lock().unwrap(),
+            &[("consumer".to_owned(), "account".to_owned())]
+        );
+        assert_eq!(server.stop(), 1);
+    }
+
     /// The ids of an ErrorDetail chain, top first.
     fn chain(detail: sc_agent_types::ErrorDetail) -> Vec<(String, String)> {
         let mut levels = Vec::new();
@@ -135,7 +298,8 @@ mod tests {
             )),
         ]);
         let log = MemoryLog::new().expect("log");
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let ctx = context(
             dir.path(),
             &[(sc_agent_secrets::ANTHROPIC_API_KEY, ANTHROPIC_KEY)],
@@ -162,7 +326,7 @@ mod tests {
     }
 
     /// REQ-SAG-0002 0.2.0 (attached-key redaction), end to end: a provider that echoes the
-    /// attached key in a 400, 422 or 503 body (TypeSafe, and a keyed local runner) yields a
+    /// attached key in a 400, 422 or 409 body (TypeSafe, and a keyed local runner) yields a
     /// result whose error has the same id, `[redacted]` where the key was, and the rest of
     /// the provider's text whole.
     #[test]
@@ -181,7 +345,7 @@ mod tests {
                 "decision.api_validation",
             ),
             (
-                503,
+                409,
                 format!("upstream refused Bearer {TYPESAFE_KEY}; retry later"),
                 "decision.api_status",
             ),
@@ -232,7 +396,7 @@ mod tests {
         let runner_key = "laya-decidr-test-secret-0005";
         let transport = ScriptedTransport::responses(vec![
             json_response(200, r#"{"ok":true,"model":"jev-latest"}"#),
-            json_response(503, &format!("loading, key {runner_key} accepted later")),
+            json_response(409, &format!("loading, key {runner_key} accepted later")),
         ]);
         let log = MemoryLog::new().expect("log");
         let ctx = context(
@@ -255,7 +419,7 @@ mod tests {
             "{line}"
         );
         assert_eq!(
-            sc_agent_types::ErrorId::id(&result.outcome.expect_err("503")),
+            sc_agent_types::ErrorId::id(&result.outcome.expect_err("409")),
             "decision.api_status"
         );
     }
@@ -272,7 +436,8 @@ mod tests {
         );
         let transport = ScriptedTransport::responses(vec![json_response(200, &body)]);
         let log = MemoryLog::new().expect("log");
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let ctx = context(
             dir.path(),
             &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
@@ -302,7 +467,8 @@ mod tests {
 
         let models_body = format!(r#"{{"models":"{TYPESAFE_KEY}"}}"#);
         let transport = ScriptedTransport::responses(vec![json_response(200, &models_body)]);
-        let dir = empty_config_dir();
+        // One-send configuration isolates final error-chain/redaction behavior.
+        let dir = config_dir(r#"{"max_sends":1}"#);
         let options = decidr::ModelsOptions {
             runner: None,
             context: context(

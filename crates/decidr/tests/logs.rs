@@ -295,6 +295,7 @@ mod tests {
                 TYPESAFE_KEY,
             )])),
             keyring: Some(Arc::new(MapKeyring(keyring))),
+            keyring_override: None,
             transport: Some(Arc::new(transport)),
             general: Some(log.general()),
             clock: None,

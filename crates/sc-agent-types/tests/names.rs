@@ -249,3 +249,20 @@ fn test_session_id_is_ulid() {
         );
     }
 }
+
+#[test]
+fn rejected_var_name_does_not_retain_a_pasted_key() {
+    let key = "sk-pasted-credential-not-a-variable";
+    let error = key.parse::<VarName>().expect_err("invalid variable name");
+    assert_eq!(error.id(), "types.invalid_var_name");
+    assert!(!error.to_string().contains(key));
+    assert!(!format!("{error:?}").contains(key));
+    assert!(
+        !serde_json::to_string(&error.detail())
+            .expect("detail")
+            .contains(key)
+    );
+    let serde_error = serde_json::from_value::<VarName>(serde_json::json!(key))
+        .expect_err("invalid variable name");
+    assert!(!serde_error.to_string().contains(key));
+}

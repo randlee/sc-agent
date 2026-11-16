@@ -5,7 +5,6 @@
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-10  
 **Owner:** Rand Lee  
-**Revision:** 0.2.0 (2026-11-10, owner): session logs move under <log_root>/logs/.  
 
 ---
 

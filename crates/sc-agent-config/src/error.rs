@@ -55,18 +55,23 @@ pub enum AgentConfigError {
     },
 }
 
+sc_agent_types::error_catalog! { AgentConfigError {
+    AgentConfigError::Load(_) => ("config.load", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::Catalog(_) => ("config.catalog", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::HomeUnknown => ("config.home_unknown", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::FileTooLarge { .. } => ("config.file_too_large", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::NotAFile { .. } => ("config.not_a_file", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::RunnerName { .. } => ("config.runner_name", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::Invalid { .. } => ("config.invalid", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::KeyOnPlainHttp { .. } => ("config.key_on_plain_http", Some(sc_agent_types::ErrorCategory::Config)),
+} }
+
 impl ErrorId for AgentConfigError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Load(_) => "config.load",
-            Self::Catalog(_) => "config.catalog",
-            Self::HomeUnknown => "config.home_unknown",
-            Self::FileTooLarge { .. } => "config.file_too_large",
-            Self::NotAFile { .. } => "config.not_a_file",
-            Self::RunnerName { .. } => "config.runner_name",
-            Self::Invalid { .. } => "config.invalid",
-            Self::KeyOnPlainHttp { .. } => "config.key_on_plain_http",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {

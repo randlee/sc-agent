@@ -24,13 +24,16 @@ OK_RESPONSE = (
 class Loopback:
     """A runner on 127.0.0.1 in a background thread."""
 
-    def __init__(self, mode: str) -> None:
-        if mode not in ("hang", "error", "ok"):
+    def __init__(self, mode: str, status: int | None = None) -> None:
+        if mode not in ("hang", "error", "ok", "status", "echo-key", "echo-model-key", "ordered"):
             raise ValueError(mode)
         self.mode = mode
+        self.status = status
         self.requests: list[dict] = []
         self.started = threading.Event()
         self.release = threading.Event()
+        self.ordered_started = [threading.Event() for _ in range(3)]
+        self.ordered_release = [threading.Event() for _ in range(3)]
         self._lock = threading.Lock()
         loopback = self
 
@@ -52,7 +55,13 @@ class Loopback:
                 if self.path == "/health":
                     self._reply(200, {"ok": True, "model": MODEL})
                 elif self.path == "/v1/models":
-                    self._reply(200, {"models": [{"name": MODEL, "description": "loopback", "release_date": "2026-09-15"}]})
+                    if loopback.mode == "echo-model-key":
+                        key = self.headers.get("authorization", "").removeprefix("Bearer ")
+                        self._reply(200, {"models": key})
+                    elif loopback.mode == "status":
+                        self._reply(loopback.status, {"detail": "controlled status"})
+                    else:
+                        self._reply(200, {"models": [{"name": MODEL, "description": "loopback", "release_date": "2026-09-15"}]})
                 else:
                     self._reply(404, {"detail": "not found"})
 
@@ -68,6 +77,27 @@ class Loopback:
                     loopback.release.wait(60.0)
                     self.close_connection = True
                     return
+                if loopback.mode == "echo-key":
+                    key = self.headers.get("authorization", "").removeprefix("Bearer ")
+                    response = json.loads(OK_RESPONSE)
+                    response["answers"]["q"]["noul"] = key
+                    self._reply(loopback.status or 200, response if loopback.status == 200 else {"detail": f"echo {key}"})
+                    return
+                if loopback.mode == "ordered":
+                    index = int(json.loads(body)["state"])
+                    loopback.ordered_started[index].set()
+                    if not loopback.ordered_release[index].wait(60.0):
+                        raise RuntimeError("request was not released")
+                    if loopback.status is not None:
+                        self._reply(loopback.status, {"detail": "controlled status"})
+                        return
+                    data = OK_RESPONSE.encode()
+                    self.send_response(200)
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
                 if loopback.mode == "ok":
                     data = OK_RESPONSE.encode()
                     self.send_response(200)
@@ -76,7 +106,10 @@ class Loopback:
                     self.end_headers()
                     self.wfile.write(data)
                     return
-                self._reply(503, FIXED_ERROR)
+                if loopback.mode == "status":
+                    self._reply(loopback.status, {"detail": "controlled status"})
+                    return
+                self._reply(409, FIXED_ERROR)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
@@ -86,5 +119,7 @@ class Loopback:
 
     def close(self) -> None:
         self.release.set()
+        for event in self.ordered_release:
+            event.set()
         self.server.shutdown()
         self.server.server_close()

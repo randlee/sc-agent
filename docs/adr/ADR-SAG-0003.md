@@ -17,7 +17,7 @@
 
 **External References:**
 
-- [randlee/raptor PR 98](https://github.com/randlee/raptor/pull/98)
+- [randlee/raptor](https://github.com/randlee/raptor) authoring templates
 
 ### Context
 
@@ -25,7 +25,7 @@ Requirements, non-functional requirements and architecture decisions are read by
 
 ### Decision
 
-Every REQ, NFR and ADR is one Markdown file written from the Raptor authoring templates (`req-new.md.j2`, `nfr-new.md.j2`, `adr-new.md.j2` on the `integration/judge-jev` branch of randlee/raptor). Repository-wide records are under `docs/requirements/`, `docs/nfr/` and `docs/adr/`; crate-specific records are under the same folders inside `docs/<crate>/`. Changes to any record are made only in plan review and approved by the owner.
+Every REQ, NFR and ADR is one Markdown file written from the Raptor authoring templates (`req-new.md.j2`, `nfr-new.md.j2`, `adr-new.md.j2` in randlee/raptor). Repository-wide records are under `docs/requirements/`, `docs/nfr/` and `docs/adr/`; crate-specific records are under the same folders inside `docs/<crate>/`. Changes to any record are made only in plan review and approved by the owner.
 
 ### Rationale
 

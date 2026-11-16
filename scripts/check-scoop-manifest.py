@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that the rendered Scoop manifest shims every released binary.
 
-Repo-owned guard (bead agt-0mi, REQ-SAG-0133). The kit's scoop-publish.yml
+Repo-owned guard (bead agt-0mi) for released binary shims. The kit's scoop-publish.yml
 builds the template variables from the consumer manifest and renders
 release/scoop/manifest.json.j2 with the published renderer. This script
 repeats that on the pinned kit: it takes the `binary` expression from the

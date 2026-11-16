@@ -1,0 +1,33 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScAgentConfig"
+owner_package = "sc-agent-config"
+owner_crate_path = "sc_agent_config"
+name = "ScAgentConfigLayer"
+
+[public]
+facade = "load"
+
+[implementation]
+type = "load"
+module = "sc_agent_config"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["load"]
+
+[dependencies]
+allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-local", "sc-decision-runner"]
+allowed_dependencies = ["sc-agent-types"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

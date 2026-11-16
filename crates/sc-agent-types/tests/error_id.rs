@@ -33,6 +33,7 @@ fn every_types_error() -> Vec<TypesError> {
 #[test]
 fn test_types_error_ids_display_and_detail() {
     let errors = every_types_error();
+    sc_agent_testkit::assert_catalog_rows(&errors);
     let ids: Vec<&str> = errors.iter().map(ErrorId::id).collect();
     assert_eq!(
         ids,
@@ -97,8 +98,12 @@ fn test_detail_is_built_from_the_four_methods() {
         let expected = ErrorDetail {
             id: error.id().to_owned(),
             message: error.message(),
-            recovery: error.recovery().map(std::borrow::Cow::Borrowed),
+            recovery: error.recovery().map(Box::<str>::from),
             cause: error.cause_detail().map(Box::new),
+            status: error.status(),
+            attempts: error.attempts(),
+            retry_after_ms: error.retry_after_ms(),
+            category: error.base_category(),
         };
         assert_eq!(error.detail(), expected, "{}", error.id());
         assert!(error.detail().recovery.is_some(), "{}", error.id());
@@ -127,6 +132,17 @@ fn test_error_detail_serde_roundtrip_and_recovery_omitted() {
     );
     let plain = serde_json::to_value(ErrorDetail::new("x.y", "z", None)).expect("serialize");
     assert_eq!(plain, serde_json::json!({ "id": "x.y", "message": "z" }));
+    let with_status = ErrorDetail::new("http.provider_busy", "busy", None).with_status(429);
+    assert_eq!(
+        serde_json::to_value(&with_status).expect("serialize")["status"],
+        429
+    );
+    assert_eq!(
+        serde_json::from_value::<ErrorDetail>(serde_json::to_value(with_status).unwrap())
+            .unwrap()
+            .status,
+        Some(429)
+    );
     assert_eq!(detail.to_string(), "decision.backend_failed: failed");
 }
 
@@ -187,6 +203,9 @@ impl Error for Wrapping {
 }
 
 impl ErrorId for Wrapping {
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        None
+    }
     fn id(&self) -> &'static str {
         "config.invalid_model"
     }
@@ -255,4 +274,79 @@ fn test_foreign_keeps_an_io_error_source_chain() {
     assert_eq!(cause.id, "foreign.source");
     assert_eq!(cause.message, io_text);
     assert!(cause.cause.is_none());
+}
+
+#[test]
+fn unknown_category_deserializes_as_other() {
+    let detail: ErrorDetail = serde_json::from_str(
+        r#"{"id":"foreign","message":"future","category":"new_future_category"}"#,
+    )
+    .expect("future category");
+    assert_eq!(detail.category, Some(sc_agent_types::ErrorCategory::Other));
+}
+
+#[derive(Debug)]
+struct DetailWrapper(ErrorDetail);
+impl fmt::Display for DetailWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "wrapped")
+    }
+}
+impl Error for DetailWrapper {}
+impl ErrorId for DetailWrapper {
+    fn id(&self) -> &'static str {
+        "test.wrapper"
+    }
+    fn message(&self) -> String {
+        "wrapped".into()
+    }
+    fn cause_detail(&self) -> Option<ErrorDetail> {
+        Some(self.0.clone())
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        None
+    }
+}
+
+#[test]
+fn wrapper_copies_all_typed_fields_and_preserves_cause() {
+    let cause: ErrorDetail = serde_json::from_str(
+        r#"{"id":"lower","message":"failed","status":429,"attempts":3,"retry_after_ms":1100,"category":"busy"}"#
+    ).expect("detail");
+    let detail = DetailWrapper(cause.clone()).detail();
+    assert_eq!(
+        (
+            detail.status,
+            detail.attempts,
+            detail.retry_after_ms,
+            detail.category
+        ),
+        (
+            Some(429),
+            Some(3),
+            Some(1100),
+            Some(sc_agent_types::ErrorCategory::Busy)
+        )
+    );
+    assert_eq!(detail.cause.as_deref(), Some(&cause));
+}
+
+#[test]
+fn v010_detail_chain_round_trips_byte_identically() {
+    let original = include_str!("fixtures/error-detail-v0.1.0.json");
+    let detail: ErrorDetail = serde_json::from_str(original).expect("0.1.0 detail");
+    let mut level = Some(&detail);
+    while let Some(current) = level {
+        assert_eq!(
+            (
+                current.status,
+                current.attempts,
+                current.retry_after_ms,
+                current.category
+            ),
+            (None, None, None, None)
+        );
+        level = current.cause.as_deref();
+    }
+    assert_eq!(serde_json::to_string(&detail).expect("serialize"), original);
 }
