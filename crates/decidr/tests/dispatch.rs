@@ -523,7 +523,7 @@ mod tests {
             &options,
             request(NOUL),
             &CancelToken::new(),
-            decidr::CallLimits {
+            &decidr::CallLimits {
                 timeout: Some(decidr::RequestTimeout::from_secs(120.0).expect("timeout")),
                 workers: None,
             },

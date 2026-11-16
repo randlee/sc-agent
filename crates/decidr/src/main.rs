@@ -170,7 +170,7 @@ fn run_send(
     let outcome = match input {
         Input::Batch(requests) => {
             let mut all_ok = true;
-            decidr::send_batch_with(&options, requests, cancel, limits, &mut |result| {
+            decidr::send_batch_with(&options, requests, cancel, &limits, &mut |result| {
                 all_ok &= result.outcome.is_ok();
                 write_result(stdout, &result)
             })
@@ -180,7 +180,7 @@ fn run_send(
             // The result is printed as soon as it exists; a session-log flush failure after
             // it is a command error (exit 1) printed after it, never instead (QA-006).
             let mut success = false;
-            decidr::send_with(&options, *request, cancel, limits, &mut |result| {
+            decidr::send_with(&options, *request, cancel, &limits, &mut |result| {
                 success = result.outcome.is_ok();
                 write_result(stdout, &result)
             })

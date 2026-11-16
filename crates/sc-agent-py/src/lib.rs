@@ -596,7 +596,7 @@ fn send(
             &options,
             request,
             &worker_cancel,
-            decidr::CallLimits {
+            &decidr::CallLimits {
                 timeout,
                 workers: None,
             },
@@ -686,7 +686,7 @@ fn send_batch(
             &options,
             requests,
             &worker_cancel,
-            decidr::CallLimits { timeout, workers },
+            &decidr::CallLimits { timeout, workers },
             forward,
         );
         let (general, session) = (options.context.general.take(), options.session.take());

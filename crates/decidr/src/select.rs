@@ -813,11 +813,11 @@ pub fn send(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_with(options, request, cancel, CallLimits::default(), on_result)
+    send_with(options, request, cancel, &CallLimits::default(), on_result)
 }
 
-/// As [`send`], with an optional checked per-call request timeout.
-/// The override changes the default decision transport and local request deadline;
+/// As [`send`], with optional checked per-call limits.
+/// The timeout changes the default decision transport and local request deadline;
 /// local load/probe timeouts and injected transports retain their own controls.
 ///
 /// # Errors
@@ -826,10 +826,10 @@ pub fn send_with(
     options: &SendOptions,
     request: DecisionRequest,
     cancel: &CancelToken,
-    limits: CallLimits,
+    limits: &CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, limits)?;
+    let prepared = Prepared::new(options, *limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -864,11 +864,11 @@ pub fn send_batch(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_batch_with(options, requests, cancel, CallLimits::default(), on_result)
+    send_batch_with(options, requests, cancel, &CallLimits::default(), on_result)
 }
 
-/// As [`send_batch`], with an optional checked per-call request timeout.
-/// The override changes the default decision transport and local request deadline;
+/// As [`send_batch`], with optional checked per-call limits.
+/// The timeout changes the default decision transport and local request deadline;
 /// local load/probe timeouts and injected transports retain their own controls.
 ///
 /// # Errors
@@ -877,10 +877,10 @@ pub fn send_batch_with(
     options: &SendOptions,
     requests: Vec<DecisionRequest>,
     cancel: &CancelToken,
-    limits: CallLimits,
+    limits: &CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, limits)?;
+    let prepared = Prepared::new(options, *limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -1691,7 +1691,7 @@ mod tests {
                 options,
                 vec![request],
                 &CancelToken::new(),
-                CallLimits {
+                &CallLimits {
                     timeout,
                     workers: None,
                 },
@@ -1702,7 +1702,7 @@ mod tests {
                 options,
                 request,
                 &CancelToken::new(),
-                CallLimits {
+                &CallLimits {
                     timeout,
                     workers: None,
                 },
@@ -1816,7 +1816,7 @@ mod tests {
                         })
                         .collect(),
                     &CancelToken::new(),
-                    limits,
+                    &limits,
                     &mut |result| {
                         assert!(result.outcome.is_ok());
                         count += 1;
@@ -1899,7 +1899,7 @@ mod tests {
                     &options,
                     vec![request],
                     &CancelToken::new(),
-                    limits,
+                    &limits,
                     &mut delivered,
                 )
             } else {
@@ -1907,7 +1907,7 @@ mod tests {
                     &options,
                     request,
                     &CancelToken::new(),
-                    limits,
+                    &limits,
                     &mut delivered,
                 )
             }
@@ -1946,7 +1946,7 @@ mod tests {
             &options,
             crate::input::build_request(REQUEST, &[], false, None).expect("request"),
             &CancelToken::new(),
-            CallLimits {
+            &CallLimits {
                 timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
                 workers: None,
             },
