@@ -185,6 +185,7 @@ mod tests {
                 "ts-signal-test".into(),
             )]),
             keyring: None,
+            keyring_override: None,
             transport: Some(interrupting.clone()),
             general: Some(log.general()),
             clock: None,

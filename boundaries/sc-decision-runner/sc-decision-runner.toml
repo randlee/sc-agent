@@ -1,0 +1,33 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScDecisionRunner"
+owner_package = "sc-decision-runner"
+owner_crate_path = "sc_decision_runner"
+name = "ScDecisionRunnerLayer"
+
+[public]
+facade = "DecisionRunner"
+
+[implementation]
+type = "DecisionRunner"
+module = "sc_decision_runner"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["DecisionRunner"]
+
+[dependencies]
+allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dependents = ["decidr"]
+allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-types", "sc-decision-schema"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

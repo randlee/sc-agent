@@ -13,9 +13,11 @@ mod tests {
 
     use sc_agent_config::RunnerKind;
     use sc_agent_http::testing::ScriptedTransport;
-    use sc_agent_http::{HttpError, LogContext, Method, NetworkKind};
-    use sc_agent_types::ErrorId;
+    use sc_agent_http::{
+        BusyReason, HttpError, HttpResponse, LogContext, Method, NetworkKind, ProviderReply,
+    };
     use sc_agent_types::testing::ManualClock;
+    use sc_agent_types::{ErrorCategory, ErrorId};
     use sc_decision_local::{
         Availability, DaemonKind, LocalBackend, LocalError, LocalProbe, LocalTimeouts, ModelState,
         ParseCause,
@@ -199,6 +201,17 @@ mod tests {
         }
         let error = up(DaemonKind::Generic, 500, "boom").expect_err("status");
         assert_eq!(error.id(), "local.probe_status");
+        assert_eq!(
+            (error.detail().status, error.detail().category),
+            (Some(500), Some(ErrorCategory::Busy))
+        );
+        let rate_limited = up(DaemonKind::Generic, 429, "busy")
+            .expect_err("status")
+            .detail();
+        assert_eq!(
+            (rate_limited.status, rate_limited.category),
+            (Some(429), Some(ErrorCategory::Busy))
+        );
         assert!(
             matches!(error, LocalError::ProbeStatus { status: 500, path: "/v1/models", ref body, .. } if body == b"boom")
         );
@@ -450,6 +463,36 @@ mod tests {
     /// detail() equals the value built from id, message, recovery and cause.
     #[test]
     fn test_local_error_ids() {
+        let cancelled = LocalError::Decision(DecisionError::Cancelled { sends: 3 }).detail();
+        assert_eq!(
+            (cancelled.attempts, cancelled.category),
+            (Some(3), Some(ErrorCategory::Cancelled))
+        );
+        let busy_reply = ProviderReply::read(
+            &HttpResponse::new(
+                529,
+                vec![("retry-after".to_owned(), "2.0001".to_owned())],
+                b"busy".to_vec(),
+            ),
+            None,
+        );
+        let busy = LocalError::Http(HttpError::ProviderBusy {
+            reason: BusyReason::Sends,
+            attempts: 5,
+            retry_after_seconds: Some(99.0),
+            last: Box::new(busy_reply),
+        })
+        .detail();
+        assert_eq!(
+            (
+                busy.status,
+                busy.attempts,
+                busy.retry_after_ms,
+                busy.category
+            ),
+            (Some(529), Some(5), Some(2001), Some(ErrorCategory::Busy))
+        );
+        assert_eq!(busy.cause.expect("http cause").id, "http.provider_busy");
         let errors = [
             LocalError::Http(HttpError::network(NetworkKind::Connect, 1, "down")),
             LocalError::Decision(DecisionError::Cancelled { sends: 0 }),
@@ -477,6 +520,7 @@ mod tests {
             },
         ];
         let ids: BTreeSet<&str> = errors.iter().map(ErrorId::id).collect();
+        sc_agent_testkit::assert_catalog_rows(&errors);
         assert_eq!(ids.len(), 6);
         assert!(ids.iter().all(|id| id.starts_with("local.")));
         for error in &errors {

@@ -44,7 +44,7 @@ Definitions:
 
 ### Rationale
 
-Different callers in one process need different parallelism and different patience. Today both are fixed by configuration, so consumers refuse or ignore their own flags. `timeout_secs` was added on the phase b stack (agt-b-1.8) and is recorded here. `workers`, the CLI flags, and the batch order are new.
+Different callers in one process need different parallelism and different patience. Without per-call overrides both are fixed by configuration, so consumers refuse or ignore their own flags.
 
 ### Success Criteria
 

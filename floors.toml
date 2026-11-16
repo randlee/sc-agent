@@ -1,0 +1,5 @@
+[python]
+floor = "3.11"
+
+[tools]
+sc-compose = "1.8.0"

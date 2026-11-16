@@ -1,17 +1,16 @@
-"""The sc-agent Python API over the maturin build, against a loopback runner.
+"""The sc-agent Python API over the maturin build.
 
-Each call passes `config_dir=` (a tempdir whose default.json names the loopback runner `dec`
-and sets the log root); the one `decidr` CLI child gets the same directory as `--config-dir`.
-No environment variable, HOME or USERPROFILE is set anywhere. No test reaches an
-external network. Each test names the acceptance line it proves.
-Orderings are forced with events; every wait is bounded by HANG_GUARD and no assertion
-depends on elapsed time.
+Default runs use a controlled loopback runner and pass its tempdir config explicitly.
+Real-provider cases run separately through just integration.
+No test changes HOME or USERPROFILE. Orderings are driven by events, with bounded
+waits used only as failure backstops and no elapsed-time assertions.
 """
 
 from __future__ import annotations
 
 import _thread
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -37,6 +36,12 @@ PART = json.dumps(
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 
+def test_python_module_exposes_its_module_documentation():
+    assert sc_agent.__doc__ == (
+        "The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`."
+    )
+
+
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
     root = log_root / "logs"
     return sorted(root.rglob("sessions.jsonl")) if root.exists() else []
@@ -49,6 +54,26 @@ def session_rows(log_root: pathlib.Path) -> list[dict]:
 def error_of(info: pytest.ExceptionInfo) -> tuple[str, dict]:
     ident, _message, detail = info.value.args
     return ident, json.loads(detail)
+
+
+def find_status(detail: dict) -> int | None:
+    if "status" in detail:
+        return detail["status"]
+    cause = detail.get("cause")
+    return find_status(cause) if cause else None
+
+
+@pytest.mark.parametrize("status", [429, 503, 529, 401, 422])
+def test_structured_http_status_on_batch_and_exception(env, args, status):
+    """Controlled loopback statuses remain numeric in batch errors and SagError details."""
+    _loopback, _log_root = env
+    result = json.loads(sc_agent.send_batch([NOUL], **args)[0])
+    assert find_status(result["error"]) == status
+
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+    _ident, detail = error_of(info)
+    assert find_status(detail) == status
 
 
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
@@ -116,11 +141,11 @@ def test_an_invalid_project_is_refused(env, args):
     assert session_files(log_root) == []
 
 
-def assert_lowest_503(error: dict) -> None:
-    """The loopback's 503 as the lowest-layer error: its id and its message with the body."""
+def assert_lowest_409(error: dict) -> None:
+    """The loopback's 409 as the lowest-layer error: its id and its message with the body."""
     assert error["id"] == "decision.api_status"
     assert "cause" not in error, error
-    assert error["message"] == "the API answered HTTP 503: " + json.dumps(FIXED_ERROR), error
+    assert error["message"] == "the API answered HTTP 409: " + json.dumps(FIXED_ERROR), error
 
 
 def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, args, config_dir):
@@ -147,10 +172,10 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, 
         timeout=HANG_GUARD,
     )
     assert child.returncode == 1, child.stderr  # the loopback answers a fixed error
-    # REQ-SAG-0002 AC1 at both entry points: the 503 is the lowest-layer failure, so it is the
+    # REQ-SAG-0002 AC1 at both entry points: the 409 is the lowest-layer failure, so it is the
     # error itself (no cause below it), and its message carries the provider's body whole.
     for error in (json.loads(child.stdout)["error"], json.loads(sc_agent.send(NOUL, **args))["error"]):
-        assert_lowest_503(error)
+        assert_lowest_409(error)
     rows = session_rows(log_root)
     assert len(rows) == 2
     identities = {(row["fields"]["project"], row["fields"]["agent_role"]) for row in rows}
@@ -302,4 +327,110 @@ def test_input_limits_raise_before_any_send(env, args):
         sc_agent.send(" " * (9 * 1024 * 1024), **args)
     ident, detail = error_of(info)
     assert ident == "decidr.limit_exceeded" and "request_bytes" in detail["message"]
+    assert loopback.requests == []
+
+
+@pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
+@pytest.mark.parametrize("option", ["keyring_service", "keyring_account"])
+@pytest.mark.parametrize("value", ["", "x" * 256, "é" * 128])
+def test_keyring_location_invalid_before_any_send(env, args, operation, option, value):
+    loopback, log_root = env
+    request = [NOUL] if operation is sc_agent.send_batch else NOUL
+    with pytest.raises(sc_agent.SagError) as info:
+        operation(request, **args, **{option: value})
+    ident, detail = error_of(info)
+    assert ident == "sc_agent_py.invalid_option"
+    assert detail["id"] == ident
+    assert option in detail["message"]
+    assert "255" in detail["message"]
+    assert detail["recovery"] == "Correct the named option and retry."
+    assert loopback.requests == []
+    assert not session_files(log_root)
+
+
+@pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
+def test_keyring_override_does_not_require_provider_for_local_runner(env, args, operation):
+    loopback, _ = env
+    request = [NOUL] if operation is sc_agent.send_batch else NOUL
+    result = operation(request, **args, keyring_service="consumer")
+    lines = result if isinstance(result, list) else [result]
+    assert all("error" in json.loads(line) for line in lines)
+    assert len(loopback.requests) == 1
+
+
+def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch, tmp_path):
+    """A missing remote credential reaches the real-backend constructor, which must refuse."""
+    loopback, _log_root = env
+    assert os.environ.get("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING") == "1"
+    # Avoid repository .env discovery so the test always reaches the keyring path.
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(sc_agent.SagError) as info:
+        sc_agent.send(
+            NOUL,
+            model="jev-latest",
+            project="proj",
+            agent_role="role",
+            provider="typesafe",
+            config_dir=args["config_dir"],
+            keyring_service="test-keyring-trap",
+        )
+    ident, detail = error_of(info)
+    assert ident == "decidr.secrets"
+    assert detail["cause"]["id"] == "secrets.keyring_construction_refused"
+    assert "refused by the active test guard" in detail["cause"]["message"]
+    assert detail["cause"]["recovery"] == (
+        "use an injected keyring source in tests; do not access the platform keyring from a test"
+    )
+    assert loopback.requests == []
+
+
+@pytest.mark.mode("ok")
+def test_models_list_outcome(outcome_models_args, outcome_call, record_property):
+    """The unit outcome uses the local models endpoint."""
+    models = json.loads(outcome_call(sc_agent.models, **outcome_models_args))["models"]
+    assert isinstance(models, list) and models
+    assert all(isinstance(model["name"], str) and model["name"] for model in models)
+    record_property("provider", "typesafe" if "runner" not in outcome_models_args else "local")
+    record_property("result", f"{len(models)} models listed")
+
+
+@pytest.mark.mode("ok")
+def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
+    """The rendered consumer returns a valid noul response over loopback."""
+    text, code = outcome_call(consumer.call, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert code is None
+    line = json.loads(text)
+    assert "error" not in line
+    assert line["position"] == 0
+    assert len(line["session_id"]) == 26
+    answer = line["response"]["answers"]["q"]
+    assert answer["type"] == "noul"
+    assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+    record_property("result", json.dumps(answer))
+
+
+@pytest.mark.mode("ok")
+def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
+    """The rendered consumer returns a valid noul response over loopback."""
+    results = outcome_call(consumer.call_batch, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert all(code is None for _, code in results)
+    lines = [json.loads(line) for line, _ in results]
+    assert sorted(line["position"] for line in lines) == [0, 1, 2]
+    for line in lines:
+        assert "error" not in line
+        assert len(line["session_id"]) == 26
+        answer = line["response"]["answers"]["q"]
+        assert answer["type"] == "noul"
+        assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+    record_property("result", json.dumps([line["response"]["answers"]["q"] for line in lines]))
+
+
+def test_keyring_override_refuses_ambiguous_ranking_before_send(env, args):
+    loopback, _ = env
+    with pytest.raises(sc_agent.SagError) as caught:
+        sc_agent.send(NOUL, **{**args, "model": "haiku"}, keyring_service="consumer")
+    assert caught.value.id == "decidr.ambiguous_keyring_override"
+    assert caught.value.category == "config"
+    assert "anthropic" in caught.value.message
+    assert all(provider in caught.value.message for provider in ("anthropic", "openrouter", "together"))
     assert loopback.requests == []

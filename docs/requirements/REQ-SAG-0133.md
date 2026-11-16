@@ -1,6 +1,6 @@
 # Requirement: Live prerelease provider integration and publication gate
 
-**Status:** Superseded
+**Status:** Superseded  
 **Version:** 0.1.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  
@@ -12,7 +12,7 @@
 
 **Status:** Superseded
 
-Superseded by ADR-SAG-0019 decision 9: prerelease verification is hand-run live tests with a committed XHTML report per tested platform; the publication gate is removed.
+Superseded by ADR-SAG-0019 decision 9: prerelease verification is real-provider integration tests, run by the developer on a local build and then on the prerelease wheels, with a committed XHTML panel per provider and platform; the publication gate is removed.
 
 ### Requirement Statement
 

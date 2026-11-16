@@ -7,7 +7,7 @@ use std::time::Duration;
 use crate::wait::HANG_GUARD;
 
 /// A counter and a condvar; every wait on it has a deadline.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Latch {
     count: Mutex<usize>,
     changed: Condvar,
@@ -78,7 +78,9 @@ impl Gate {
 
     /// An [`Opener`] that opens this gate when it is dropped (or by [`Opener::open`]).
     pub fn opener(&self) -> Opener {
-        Opener { gate: self.clone() }
+        Opener {
+            latch: Arc::clone(&self.latch),
+        }
     }
 
     /// Waits until the gate is open.
@@ -108,7 +110,7 @@ impl fmt::Debug for Gate {
 #[derive(Debug)]
 #[must_use = "dropping an Opener opens its gate at once"]
 pub struct Opener {
-    gate: Gate,
+    latch: Arc<Latch>,
 }
 
 impl Opener {
@@ -120,7 +122,7 @@ impl Opener {
 
 impl Drop for Opener {
     fn drop(&mut self) {
-        self.gate.open();
+        self.latch.add();
     }
 }
 

@@ -144,6 +144,22 @@ impl SessionLogger {
         Self::injected_in(logger, None, identity)
     }
 
+    /// Injects a caller-owned logger and a controlled timestamp for deterministic boundary tests.
+    /// Available only with the `testing` feature; it never transfers logger ownership.
+    #[cfg(feature = "testing")]
+    #[must_use]
+    pub fn injected_with_timestamp(
+        logger: Arc<Logger>,
+        identity: SessionIdentity,
+        timestamp: sc_observability::Timestamp,
+    ) -> Self {
+        Self {
+            writer: Arc::new(Writer::injected(logger, None, LOG).with_timestamp(timestamp)),
+            identity: Arc::new(identity),
+            path: None,
+        }
+    }
+
     /// A session logger on `logger` sharing `ledger`, the lost-row accounting of other writers
     /// on the same logger.
     pub(crate) fn injected_in(

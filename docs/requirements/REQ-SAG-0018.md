@@ -62,7 +62,7 @@ Definitions:
 - `abort_on` MUST have no default; each consumer passes it.
 - The consumer module MUST cancel the remaining batch on the first result whose category is in the `abort_on` set.
 - The template's Python floor and sc-compose minimum MUST match `floors.toml`.
-- The template header's sc-decidr and sitr version literals MUST match the version updated by b-11.
+- The template header's sc-decidr and sitr version literals MUST match the workspace version (`[workspace.package].version` in `Cargo.toml`).
 - When a keyring override is passed, it MUST apply only to the provider the model selector resolves to.
 - A decision call with a keyring override MUST be refused with a typed error when more than one provider ranks, with `decidr.ambiguous_keyring_override` (category `config`).
 - The public API MUST stay documented in `sc_agent.pyi`.
@@ -86,7 +86,7 @@ The owner requires judge-jev, plan-anchor and every later Python consumer to int
 
 **Acceptance Criteria:**
 
-- [ ] One sc-agent unit test compares the template's Python floor and sc-compose minimum literals with `floors.toml` and its sc-decidr/sitr version literals with the b-11 version.
+- [ ] One sc-agent unit test compares the template's Python floor and sc-compose minimum literals with `floors.toml` and its sc-decidr/sitr version literals with the workspace version in `Cargo.toml`.
 
 - [ ] A sc-agent test renders the consumer template with every combination of feature variables and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
   - a success returns the response;

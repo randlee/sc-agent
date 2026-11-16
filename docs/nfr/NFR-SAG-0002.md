@@ -1,4 +1,4 @@
-# Requirement: Error detail JSON written by 0.1.0 still reads in 0.2.0
+# Requirement: Error detail JSON written by 0.1.0 still reads in later releases
 
 **Status:** Approved  
 **Version:** 0.2.0  
@@ -8,7 +8,7 @@
 
 ---
 
-## NFR-SAG-0002: Error detail JSON written by 0.1.0 still reads in 0.2.0
+## NFR-SAG-0002: Error detail JSON written by 0.1.0 still reads in later releases
 
 **Status:** Approved  
 
@@ -30,7 +30,7 @@ Stored session logs and result files written by 0.1.0 must stay readable after t
 
 **Acceptance Criteria:**
 
-- [ ] A checked-in 0.1.0 detail JSON with a two-level cause chain deserializes in 0.2.0, and every new field is `None`.
+- [ ] A checked-in 0.1.0 detail JSON with a two-level cause chain deserializes in the current release, and every new field is `None`.
 - [ ] Re-serializing it yields the original bytes.
 - [ ] The CHANGELOG entry for any release that moves an id's category lists it under "Breaking".
 

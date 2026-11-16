@@ -1,4 +1,7 @@
 [package]
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 name = "sc-decision-llm"
 version.workspace = true
 description = "Haiku and Luna decision backends for sc-agent: the Jev request as a JSON-schema LLM call, self-reported probabilities and confidence."
@@ -8,20 +11,20 @@ license.workspace = true
 
 [dependencies]
 base64 = "0.22"
-sc-agent-http = { path = "../sc-agent-http", version = "0.1.0" }
-sc-agent-log = { path = "../sc-agent-log", version = "0.1.0" }
-sc-agent-types = { path = "../sc-agent-types", version = "0.1.0" }
-sc-decision-schema = { path = "../sc-decision-schema", version = "0.1.0" }
-sc-llm-provider = { path = "../sc-llm-provider", version = "0.1.0" }
+sc-agent-http = { workspace = true }
+sc-agent-log = { workspace = true }
+sc-agent-types = { workspace = true }
+sc-decision-schema = { workspace = true }
+sc-llm-provider = { workspace = true }
 # preserve_order: answers and probabilities keep request order; float_roundtrip: 0.123456789
 # is returned exactly (REQ-SAG-0007).
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [dev-dependencies]
-sc-agent-testkit = { path = "../sc-agent-testkit" }
-sc-agent-http = { path = "../sc-agent-http", features = ["testing"] }
-sc-agent-log = { path = "../sc-agent-log", features = ["testing"] }
-sc-agent-secrets = { path = "../sc-agent-secrets" }
+sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
+sc-agent-testkit = { workspace = true }
+sc-agent-http = { workspace = true, features = ["testing"] }
+sc-agent-log = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

@@ -30,7 +30,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
     distribution = tomllib.loads(output.read_text())["python_distributions"][0]
     assert distribution["wheels"] == TARGETS
     assert len(wheel_targets(distribution)) == 5
-    paths = [Path(f'example-1.2.3-cp310-abi3-{target["platform"]}.whl') for target in TARGETS]
+    paths = [Path(f'example-1.2.3-cp311-abi3-{target["platform"]}.whl') for target in TARGETS]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
         verify_platforms(distribution, paths[:-1])
@@ -38,7 +38,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
         verify_platforms(distribution, paths[:-1] + paths[:1])
 
 
-@pytest.mark.parametrize("wheel", ["cp310-abi3-win_amd64", {**TARGETS[0],"os":"windows-latest"}, {**TARGETS[2],"deployment_target":"11.0"}, {**TARGETS[0],"manylinux":"off"}])
+@pytest.mark.parametrize("wheel", ["cp311-abi3-win_amd64", {**TARGETS[0],"os":"windows-latest"}, {**TARGETS[2],"deployment_target":"11.0"}, {**TARGETS[0],"manylinux":"off"}])
 def test_bad_wheel_contracts_rejected(wheel):
     with pytest.raises(ValueError):
         wheel_targets({"wheels":[wheel]})
@@ -72,27 +72,60 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
 def test_actual_publish_shell_uses_standalone_manifest_with_mock_cargo(tmp_path, workflow_name):
-    import os
     import re
+    import shutil
     import subprocess
     import yaml
+    bash = shutil.which('bash')
+    assert bash is not None, 'Bash is required by the publish workflow'
     workflow = yaml.safe_load((INSTALL.PACKAGE_ROOT / '.github/workflows' / workflow_name).read_text())
     step = next(step for job in workflow['jobs'].values() for step in job.get('steps', []) if step.get('name') == 'Publish crates in order (idempotent)')
     shell = re.sub(r'\$\{\{[^}]+\}\}', '1.2.3', step['run'])
     stub = tmp_path / 'python3'
     stub.write_text('''#!/bin/sh
+[ "$1" = ".github/scripts/release_artifacts.py" ] || exit 2
 case "$2" in
- list-publish-plan) printf 'standalone|0|bindings/standalone/Cargo.toml\\n' ;;
+ list-publish-plan) printf 'standalone|0|bindings/standalone/Cargo.toml|false\\n' ;;
  public-registry-inquiry-plan) printf '{"checks":[{"version_lookup_url":"https://example.invalid"}]}\\n' ;;
  registry-status) printf 'absent\\n' ;;
  *) exit 2 ;;
 esac
 ''')
     stub.chmod(0o755)
+    jq = tmp_path / 'jq'
+    jq.write_text('''#!/bin/sh
+[ "$1" = "-r" ] && [ "$2" = ".checks[0].version_lookup_url" ] || exit 2
+IFS= read -r input || exit 2
+[ "$input" = '{"checks":[{"version_lookup_url":"https://example.invalid"}]}' ] || exit 2
+printf '%s\\n' 'https://example.invalid'
+''')
+    jq.chmod(0o755)
+    dirname = tmp_path / 'dirname'
+    dirname.write_text('''#!/bin/sh
+[ "$#" -eq 1 ] && [ "$1" = "release/publish-artifacts.toml" ] || exit 2
+printf '%s\\n' 'release'
+''')
+    dirname.chmod(0o755)
+    sleep = tmp_path / 'sleep'
+    # The plan sets wait_seconds=0; fail immediately if the shell ever waits.
+    sleep.write_text('#!/bin/sh\nprintf "%s\\n" "unexpected sleep" >&2\nexit 99\n')
+    sleep.chmod(0o755)
     cargo = tmp_path / 'cargo'
     cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > cargo-args\n')
     cargo.chmod(0o755)
-    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True)
+    result = subprocess.run(
+        [bash, '-c', shell],
+        cwd=tmp_path,
+        env={
+            'PATH': str(tmp_path),
+            'CARGO_REGISTRY_TOKEN': '',
+            'RELEASE_ARTIFACT_MANIFEST': 'release/publish-artifacts.toml',
+            'RELEASE_TAG': 'v1.2.3',
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / 'cargo-args').read_text().splitlines() == ['publish', '--manifest-path', 'bindings/standalone/Cargo.toml', '--locked']
 
@@ -111,7 +144,7 @@ def test_declared_wheel_verifier_executes_bash_environment_contract(tmp_path, pl
     for source in (INSTALL.PACKAGE_ROOT / ".github/scripts").glob("*.py"):
         shutil.copy2(source, scripts / source.name)
     (tmp_path / "dist").mkdir()
-    (tmp_path / "dist/example-1.4.0-cp310-abi3-win_amd64.whl").touch()
+    (tmp_path / "dist/example-1.4.0-cp311-abi3-win_amd64.whl").touch()
     result = subprocess.run(["bash", "-c", step["run"]], cwd=tmp_path,
         env={**os.environ, "WHEEL_PLATFORM": platform}, capture_output=True, text=True, timeout=30)
     assert (result.returncode == 0) is accepted, result.stderr
@@ -187,10 +220,27 @@ def test_windows_arm64_mismatches_rejected(wheel):
 def test_six_wheel_manifest_with_windows_arm64_verifies():
     distribution = {"name": "example", "sdist": False, "wheels": TARGETS + [WIN_ARM64]}
     assert len(wheel_targets(distribution)) == 6
-    paths = [Path(f'example-1.2.3-cp310-abi3-{item["platform"]}.whl') for item in TARGETS + [WIN_ARM64]]
+    paths = [Path(f'example-1.2.3-cp311-abi3-{item["platform"]}.whl') for item in TARGETS + [WIN_ARM64]]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
         verify_platforms(distribution, paths[:-1])
+
+
+def test_python_binding_abi3_features_match_floor():
+    import tomllib
+    root = INSTALL.PACKAGE_ROOT
+    floor = tomllib.loads((root / "floors.toml").read_text())["python"]["floor"]
+    expected = f"abi3-py{floor.replace('.', '')}"
+    manifests = [
+        root / "crates/sc-agent-py/Cargo.toml",
+        root / "crates/sc-treesitter-py/Cargo.toml",
+        root / "crates/sc-treesitter/Cargo.toml",
+    ]
+    for manifest_path in manifests:
+        manifest = tomllib.loads(manifest_path.read_text())
+        features = manifest["dependencies"]["pyo3"]["features"]
+        abi3_features = [feature for feature in features if feature.startswith("abi3-py")]
+        assert abi3_features == [expected], manifest_path
 
 
 def test_existing_forms_unchanged_by_windows_arm64_support():

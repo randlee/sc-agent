@@ -1,0 +1,34 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScAgentHttp"
+owner_package = "sc-agent-http"
+owner_crate_path = "sc_agent_http"
+name = "ScAgentHttpLayer"
+
+[public]
+facade = "HttpClient"
+
+[implementation]
+type = "HttpClient"
+module = "sc_agent_http"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["HttpClient"]
+
+[dependencies]
+allowed_dev_dependents = ["sc-agent-http"]
+allowed_dev_dependencies = ["sc-agent-http", "sc-agent-testkit"]
+allowed_dependents = ["decidr", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
+allowed_dependencies = ["sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

@@ -1,4 +1,4 @@
-"""Fixtures: a tempdir config dir naming a loopback runner `dec`, passed as `config_dir=`."""
+"""Deterministic unit fixtures; real providers run only through just integration."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import pathlib
 import sys
 
 import pytest
+
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
@@ -20,18 +21,17 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 HANG_GUARD = 60.0
 
 
-def _write_config(root: pathlib.Path, port: int) -> pathlib.Path:
+def _write_config(root: pathlib.Path, port: int, max_sends: int | None = None) -> pathlib.Path:
     log_root = root / "logs-root"
     config = root / ".sc-agent"
     config.mkdir(parents=True, exist_ok=True)
-    (config / "default.json").write_text(
-        json.dumps(
-            {
-                "log_root": str(log_root),
-                "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": port, "model": MODEL}},
-            }
-        )
-    )
+    data = {
+        "log_root": str(log_root),
+        "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": port, "model": MODEL}},
+    }
+    if max_sends is not None:
+        data["max_sends"] = max_sends
+    (config / "default.json").write_text(json.dumps(data))
     return log_root
 
 
@@ -40,11 +40,19 @@ def env(tmp_path, monkeypatch, request):
     """`(loopback, log_root)`; the config is `tmp_path/.sc-agent` (see `args`), the log root is
     set in it. The mode comes from `@pytest.mark.mode`. No environment variable points at it."""
     marker = request.node.get_closest_marker("mode")
-    loopback = Loopback(marker.args[0] if marker else "error")
+    callspec = getattr(request.node, "callspec", None)
+    status = callspec.params.get("status") if callspec else None
+    loopback = Loopback(
+        marker.args[0] if marker else ("status" if status is not None else "error"),
+        status,
+    )
     for name in list(os.environ):
         if name.startswith("SC_AGENT__") or name.endswith("_API_KEY"):
             monkeypatch.delenv(name)
-    log_root = _write_config(tmp_path, loopback.port)
+    # The extension and child CLI inherit this trap. Any real OS keyring
+    # backend construction during Python tests fails before contacting it.
+    monkeypatch.setenv("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
+    log_root = _write_config(tmp_path, loopback.port, max_sends=1 if status is not None else None)
     try:
         yield loopback, log_root
     finally:
@@ -53,6 +61,8 @@ def env(tmp_path, monkeypatch, request):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "mode(name): loopback runner mode, hang or error")
+    # Always armed for this unit suite. Real-provider integration is a separate directory.
+    os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] = "1"
 
 
 @pytest.fixture
@@ -74,3 +84,24 @@ def config_dir(tmp_path) -> pathlib.Path:
 def args(env, config_dir) -> dict:
     """Keyword arguments of one send to runner `dec` with the test's `config_dir`."""
     return dict(model="dec", project="proj", agent_role="role", config_dir=str(config_dir))
+
+
+@pytest.fixture
+def outcome_args(args):
+    return args
+
+
+@pytest.fixture
+def outcome_models_args(args):
+    return dict(runner="dec", config_dir=args["config_dir"])
+
+
+@pytest.fixture
+def outcome_call():
+    return lambda operation, *args, **kwargs: operation(*args, **kwargs)
+
+
+@pytest.fixture
+def consumer(tmp_path):
+    from consumer_support import render_consumer
+    return render_consumer(tmp_path)

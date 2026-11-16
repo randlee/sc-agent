@@ -45,3 +45,6 @@ tmp/
 .beads-credential-key
 .beads/proxieddb/
 anchors.json.lock
+
+# Local helper environment created by the sc-lint bootstrap
+.sc-lint/venv/
