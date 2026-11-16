@@ -81,7 +81,7 @@ Layer rule: a crate depends only on lower layers (ADR-SAG-0004). This crate call
 ## Generated consumer
 
 The wheel ships `sc_agent/templates/consumer.py.j2`, derived from the working
-plan-anchor client at `7632655`. Render it with sc-compose >=1.8.0 and Python >=3.11:
+plan-anchor client at `fff69b2`. Render it with sc-compose >=1.8.0 and Python >=3.11:
 
 ```bash
 TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")')
