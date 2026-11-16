@@ -70,11 +70,11 @@ def test_real_invalid_key_auth_cancel_redaction(tmp_path, monkeypatch, record_pr
     cancel = sc_agent.CancelToken()
     kwargs = options(tmp_path, record_property)
     text, code = client.call(REQUEST, **kwargs, abort_on=frozenset({"auth"}),
-                            category_codes={"auth": "AUTH"}, cancel=cancel)
+                            category_codes={"auth": "AUTH"}, cancel=cancel, timeout_secs=120)
     error = json.loads(text)["error"]
     assert error["category"] == "auth" and error["status"] == 401
     assert code == "AUTH" and cancel.is_cancelled()
-    followup, _ = client.call(REQUEST, **kwargs, abort_on=frozenset({"auth"}), category_codes={}, cancel=cancel)
+    followup, _ = client.call(REQUEST, **kwargs, abort_on=frozenset({"auth"}), category_codes={}, cancel=cancel, timeout_secs=120)
     assert json.loads(followup)["error"]["category"] == "cancelled"
     assert key not in text + followup
     assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))

@@ -39,3 +39,59 @@ def test_integration_command_requires_typesafe_and_deletes_temporary_dotenv(tmp_
     assert result.returncode != 0
     assert "TypeSafe key is required" in result.stderr
     assert not empty.exists()
+
+
+def integration_runner():
+    path = Path(__file__).resolve().parents[3] / "scripts/integration.py"
+    spec = importlib.util.spec_from_file_location("integration_runner", path)
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    return runner
+
+
+def test_integration_setup_timeout_is_terminal_and_preserves_cause(monkeypatch):
+    import subprocess
+    import pytest
+    runner = integration_runner()
+    calls = []
+
+    def expired(command, **kwargs):
+        calls.append((command, kwargs))
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(runner.subprocess, "run", expired)
+    for command, options, limit in ((["python", "-m", "pip", "install", "pytest"], {}, 600),
+                                    (["python", "-m", "maturin", "build"], {"timeout": 1800}, 1800)):
+        calls.clear()
+        with pytest.raises(RuntimeError, match="integration command timed out") as caught:
+            runner.run(command, **options)
+        assert len(calls) == 1 and calls[0][1]["timeout"] == limit
+        assert calls[0][1]["check"] is True
+        assert isinstance(caught.value.__cause__, subprocess.TimeoutExpired)
+
+
+def test_provider_timeout_names_provider_and_cleans_credentials(tmp_path, monkeypatch):
+    import subprocess
+    import pytest
+    runner = integration_runner()
+    credential = tmp_path / "temporary.env"
+    provider = "typesafe"
+    credential.write_text(runner.credential_variables()[f"{provider.upper()}_API_KEY"] + "=controlled-unit-key\n")
+    monkeypatch.setattr(runner.sys, "argv", ["integration.py", "--venv", str(tmp_path / "venv"),
+                                           "--env-file", str(credential), "--results", str(tmp_path / "results")])
+    # Setup is outside this failure-path unit; no binaries or network are invoked.
+    monkeypatch.setattr(runner, "run", lambda *args, **kwargs: None)
+    calls = []
+
+    def expired(command, **kwargs):
+        calls.append((command, kwargs))
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(runner.subprocess, "run", expired)
+    with pytest.raises(RuntimeError, match="typesafe: integration timed out") as caught:
+        runner.main()
+    assert len(calls) == 1 and calls[0][1]["timeout"] == 600
+    assert "pytest" in calls[0][0]
+    assert isinstance(caught.value.__cause__, subprocess.TimeoutExpired)
+    assert not credential.exists()
+    assert not Path(calls[0][1]["cwd"]).exists()

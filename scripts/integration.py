@@ -12,8 +12,12 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(argv, **kwargs):
-    subprocess.run([str(value) for value in argv], check=True, **kwargs)
+def run(argv, *, timeout=600, **kwargs):
+    command = [str(value) for value in argv]
+    try:
+        subprocess.run(command, check=True, timeout=timeout, **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"integration command timed out after {timeout}s: {' '.join(command)}") from exc
 
 
 def credential_variables():
@@ -95,7 +99,7 @@ def execute(args):
             if wheel is None:
                 wheels = scratch / "wheels"
                 run([python, "-m", "maturin", "build", "--manifest-path", ROOT / "crates/sc-agent-py/Cargo.toml",
-                     "--interpreter", python, "--out", wheels], cwd=ROOT)
+                     "--interpreter", python, "--out", wheels], cwd=ROOT, timeout=1800)
                 wheel, = wheels.glob("*.whl")
             run([python, "-m", "pip", "install", "--no-cache-dir", "--no-deps", wheel])
         failed = False
@@ -114,8 +118,12 @@ def execute(args):
                 env[variables[f"{provider.upper()}_API_KEY"]] = keys[provider]
                 env["SC_AGENT_INTEGRATION_PROVIDER"] = provider
                 print(f"{provider}: real-provider integration", flush=True)
-                completed = subprocess.run([str(python), "-m", "pytest", str(ROOT / "crates/sc-agent-py/integration"),
-                                           "-v", "-o", "junit_family=legacy", f"--junitxml={junit}"], cwd=scratch, env=env)
+                try:
+                    completed = subprocess.run([str(python), "-m", "pytest", str(ROOT / "crates/sc-agent-py/integration"),
+                                               "-v", "-o", "junit_family=legacy", f"--junitxml={junit}"],
+                                               cwd=scratch, env=env, timeout=600)
+                except subprocess.TimeoutExpired as exc:
+                    raise RuntimeError(f"{provider}: integration timed out after 600s") from exc
                 failed |= completed.returncode != 0
                 cases = list(ET.parse(junit).getroot().iter("testcase")) if junit.exists() else []
                 if not cases or all(case.find("skipped") is not None for case in cases):
