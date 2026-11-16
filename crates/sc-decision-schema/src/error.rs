@@ -96,7 +96,7 @@ pub enum DecisionError {
         /// The backend's name.
         backend: &'static str,
         /// The backend's error, with its whole chain.
-        detail: ErrorDetail,
+        detail: Box<ErrorDetail>,
     },
     /// The reply does not match the required schema.
     ///
@@ -106,7 +106,7 @@ pub enum DecisionError {
         /// The backend's name.
         backend: &'static str,
         /// What did not match.
-        detail: ErrorDetail,
+        detail: Box<ErrorDetail>,
     },
     /// The request did not finish before its `CancelToken` was cancelled (queued, held off,
     /// or in flight).
@@ -128,24 +128,33 @@ impl From<HttpError> for DecisionError {
     }
 }
 
+sc_agent_types::error_catalog! { DecisionError {
+    DecisionError::RequestParse { .. } => ("decision.request_parse", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::ResponseParse { .. } => ("decision.response_parse", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionError::DuplicateKey { .. } => ("decision.duplicate_key", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::Encode { .. } => ("decision.encode", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionError::ImageParts { .. } => ("decision.image_parts", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::Limits { .. } => ("decision.limits", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::ApiBadRequest { .. } => ("decision.api_bad_request", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::ApiValidation { .. } => ("decision.api_validation", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecisionError::ApiStatus { .. } => ("decision.api_status", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionError::Http(_) => ("decision.http", None),
+    DecisionError::Backend { .. } => ("decision.backend", None),
+    DecisionError::SchemaMismatch { .. } => ("decision.schema_mismatch", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionError::Cancelled { .. } => ("decision.cancelled", Some(sc_agent_types::ErrorCategory::Cancelled)),
+    DecisionError::Shutdown { .. } => ("decision.shutdown", Some(sc_agent_types::ErrorCategory::Other)),
+} }
+
 impl ErrorId for DecisionError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::RequestParse { .. } => "decision.request_parse",
-            Self::ResponseParse { .. } => "decision.response_parse",
-            Self::DuplicateKey { .. } => "decision.duplicate_key",
-            Self::Encode { .. } => "decision.encode",
-            Self::ImageParts { .. } => "decision.image_parts",
-            Self::Limits { .. } => "decision.limits",
-            Self::ApiBadRequest { .. } => "decision.api_bad_request",
-            Self::ApiValidation { .. } => "decision.api_validation",
-            Self::ApiStatus { .. } => "decision.api_status",
-            Self::Http(_) => "decision.http",
-            Self::Backend { .. } => "decision.backend",
-            Self::SchemaMismatch { .. } => "decision.schema_mismatch",
-            Self::Cancelled { .. } => "decision.cancelled",
-            Self::Shutdown { .. } => "decision.shutdown",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
+    }
+
+    fn refines_status(&self) -> bool {
+        matches!(self, Self::ApiStatus { .. })
     }
 
     fn message(&self) -> String {
@@ -204,8 +213,24 @@ impl ErrorId for DecisionError {
         match self {
             Self::Http(error) => Some(error.detail()),
             Self::Backend { detail, .. } | Self::SchemaMismatch { detail, .. } => {
-                Some(detail.clone())
+                Some((**detail).clone())
             }
+            _ => None,
+        }
+    }
+
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ApiBadRequest { .. } => Some(400),
+            Self::ApiValidation { .. } => Some(422),
+            Self::ApiStatus { status, .. } | Self::ResponseParse { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
+    fn attempts(&self) -> Option<u32> {
+        match self {
+            Self::Cancelled { sends } => Some(*sends),
             _ => None,
         }
     }
@@ -292,8 +317,39 @@ impl Error for DecisionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Http(error) => Some(error),
-            Self::Backend { detail, .. } | Self::SchemaMismatch { detail, .. } => Some(detail),
+            Self::Backend { detail, .. } | Self::SchemaMismatch { detail, .. } => {
+                Some(detail.as_ref())
+            }
             _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod category_contract_tests {
+    use super::*;
+    use sc_agent_types::ErrorCategory;
+
+    #[test]
+    fn api_status_refines_only_from_its_own_status() {
+        for (status, expected) in [
+            (400, ErrorCategory::Validation),
+            (401, ErrorCategory::Auth),
+            (402, ErrorCategory::Quota),
+            (403, ErrorCategory::Auth),
+            (422, ErrorCategory::Validation),
+            (429, ErrorCategory::Busy),
+            (500, ErrorCategory::Busy),
+            (503, ErrorCategory::Busy),
+            (504, ErrorCategory::Busy),
+            (501, ErrorCategory::Other),
+            (0, ErrorCategory::Other),
+        ] {
+            let error = DecisionError::ApiStatus {
+                status,
+                body: Vec::new(),
+            };
+            assert_eq!(error.detail().category, Some(expected), "status {status}");
         }
     }
 }

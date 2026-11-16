@@ -70,6 +70,13 @@ impl RetryAfter {
         Duration::new(self.seconds, self.nanos).min(WAIT_MAX)
     }
 
+    /// The unbounded hint rounded up to milliseconds, saturating on overflow.
+    pub(crate) fn milliseconds(self) -> u64 {
+        self.seconds
+            .saturating_mul(1000)
+            .saturating_add(u64::from(self.nanos).div_ceil(1_000_000))
+    }
+
     /// The value as sent, in seconds, unrounded and unclamped (REQ-SAG-0007).
     pub(crate) fn seconds(self) -> f64 {
         self.exact
@@ -79,6 +86,28 @@ impl RetryAfter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn milliseconds_round_up_and_saturate() {
+        let cases = [
+            ("1.1", Some(1100)),
+            ("2.0001", Some(2001)),
+            ("0", Some(0)),
+            ("0.0000001", Some(1)),
+            ("0.0000000001", Some(0)),
+            ("99999999999999999999999999999999", Some(u64::MAX)),
+            ("bad", None),
+            ("1.", None),
+            ("", None),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                RetryAfter::parse(Some(input)).map(RetryAfter::milliseconds),
+                expected,
+                "{input}"
+            );
+        }
+    }
 
     #[test]
     fn seconds_are_unrounded_and_unclamped() {

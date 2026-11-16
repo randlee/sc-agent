@@ -1,0 +1,33 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScLlmProvider"
+owner_package = "sc-llm-provider"
+owner_crate_path = "sc_llm_provider"
+name = "ScLlmProviderLayer"
+
+[public]
+facade = "LlmClient"
+
+[implementation]
+type = "LlmClient"
+module = "sc_llm_provider"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["LlmClient"]
+
+[dependencies]
+allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dependents = ["decidr", "sc-decision-llm"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

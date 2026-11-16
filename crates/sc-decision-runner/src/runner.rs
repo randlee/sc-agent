@@ -811,8 +811,16 @@ impl RunnerWork {
             },
             Ok(Next::Done { response, attempts }) => {
                 match self.shared.backend.decode(response, &core.request, &ctx) {
-                    Err(error @ DecisionError::SchemaMismatch { .. }) => Step::HoldOff {
-                        until: self.shared.clock.now(),
+                    Err(
+                        error @ (DecisionError::SchemaMismatch { .. }
+                        | DecisionError::ResponseParse {
+                            status: 200..=299, ..
+                        }),
+                    ) => Step::HoldOff {
+                        until: self
+                            .shared
+                            .http
+                            .invalid_response_at(&attempts, self.shared.clock.now()),
                         job: Job::prepared(
                             core,
                             SendState::Start {

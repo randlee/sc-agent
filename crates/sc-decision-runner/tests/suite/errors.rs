@@ -21,9 +21,9 @@ fn levels(detail: ErrorDetail) -> Vec<(String, String)> {
     levels
 }
 
-/// A 200 reply whose response row is over the 256 KiB row cap.
+/// A 200 reply whose response row is over the observability event cap.
 fn oversize() -> HttpResponse {
-    let blob = "x".repeat(300 * 1024);
+    let blob = "x".repeat(sc_agent_log::MAX_ROW_BYTES + 1);
     let body = format!(
         r#"{{"model":"m","answers":{{"q":{{"type":"noul","noul":0.5}}}},"usage":{{"input_tokens":1,"output_tokens":1}},"blob":"{blob}"}}"#
     );
@@ -66,11 +66,11 @@ fn lower_errors_reach_the_top() {
     let backend = ScriptedBackend::new().with_decode(|_, _, _, _| {
         Err(DecisionError::Backend {
             backend: "llm",
-            detail: ErrorDetail::new(
+            detail: Box::new(ErrorDetail::new(
                 "llm.provider_refused",
                 "the provider refused the prompt",
                 Some(ErrorDetail::new("provider.code", "content_filter", None)),
-            ),
+            )),
         })
     });
     let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1), 5);

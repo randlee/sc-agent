@@ -39,8 +39,45 @@ pub trait KeyringSource: Send + Sync {
 /// providers cost one wait, and at most one thread is stranded. A reader
 /// thread that fails or panics is [`SecretsError::KeyringRead`]; the panic is
 /// not propagated.
+#[derive(Debug, Clone, Copy)]
+pub struct PlatformKeyring {
+    _private: (),
+}
+
+impl PlatformKeyring {
+    /// Constructs the real OS keyring backend.
+    ///
+    /// Test builds with `test-keyring-guard`, and Python test runs setting
+    /// `SC_AGENT_TEST_TRAP_PLATFORM_KEYRING`, return a typed refusal before
+    /// any OS keyring call can occur.
+    pub fn new() -> Result<Self, SecretsError> {
+        #[cfg(any(test, feature = "test-keyring-guard"))]
+        {
+            Err(SecretsError::KeyringConstructionRefused)
+        }
+
+        #[cfg(not(any(test, feature = "test-keyring-guard")))]
+        {
+            if std::env::var_os("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING").as_deref()
+                == Some(std::ffi::OsStr::new("1"))
+            {
+                Err(SecretsError::KeyringConstructionRefused)
+            } else {
+                Ok(Self { _private: () })
+            }
+        }
+    }
+}
+
+/// Defers constructing the OS backend until a secret lookup actually needs it.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct PlatformKeyring;
+pub struct DeferredPlatformKeyring;
+
+impl KeyringSource for DeferredPlatformKeyring {
+    fn password(&self, service: &str, account: &str) -> Result<Option<String>, SecretsError> {
+        PlatformKeyring::new()?.password(service, account)
+    }
+}
 
 /// Longest a platform keyring read may take.
 ///
@@ -270,10 +307,10 @@ fn keyring_unavailable(error: &keyring::Error) -> SecretsError {
     SecretsError::KeyringRead {
         kind,
         cause: sanitized_keyring_cause(error),
-        source: Some(sc_agent_types::ErrorDetail::foreign(
+        source: Some(Box::new(sc_agent_types::ErrorDetail::foreign(
             format!("keyring.{kind}"),
             error,
-        )),
+        ))),
     }
 }
 
@@ -301,6 +338,14 @@ mod tests {
     use sc_agent_types::ErrorId;
 
     use super::*;
+
+    #[test]
+    fn test_build_traps_real_platform_keyring_construction() {
+        assert!(matches!(
+            PlatformKeyring::new(),
+            Err(SecretsError::KeyringConstructionRefused)
+        ));
+    }
 
     /// REQ-SAG-0002 0.2.0: a keyring failure keeps the keyring's own error whole as its
     /// cause (`keyring.<kind>` and the keyring's message); this layer only adds its label.

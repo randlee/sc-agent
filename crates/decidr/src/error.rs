@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
-use sc_agent_config::RunnerName;
+use sc_agent_config::{MAX_WORKERS, RunnerName};
 use sc_agent_types::{ErrorDetail, ErrorId, Provider};
 
 use crate::ModelSelector;
@@ -33,6 +33,16 @@ use crate::input::LimitKind;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum DecidrError {
+    /// A per-call timeout is non-finite or outside the request-timeout bounds.
+    InvalidRequestTimeout {
+        /// The refused value in seconds.
+        value: f64,
+    },
+    /// A per-call worker count is outside the supported range.
+    InvalidWorkers {
+        /// The refused worker count.
+        value: i64,
+    },
     /// The command line does not parse; the clap error is the cause.
     Usage {
         /// clap's error, unchanged.
@@ -57,6 +67,11 @@ pub enum DecidrError {
     Llm(Box<sc_llm_provider::LlmError>),
     /// `flush_session_log` failed after the results were printed.
     Runner(Box<sc_decision_runner::RunnerError>),
+    /// An override cannot be assigned to a unique ranked provider.
+    AmbiguousKeyringOverride {
+        /// Eligible providers, in ranking order.
+        candidates: Vec<Provider>,
+    },
     /// No provider in `Provider::ranking` for the model has a detected key, and no
     /// `--provider` was given.
     NoProviderKey {
@@ -215,36 +230,54 @@ fn foreign(id: &str, error: &(dyn Error + 'static)) -> Option<ErrorDetail> {
     Some(ErrorDetail::foreign(id, error))
 }
 
+sc_agent_types::error_catalog! { DecidrError {
+    DecidrError::AmbiguousKeyringOverride { .. } => ("decidr.ambiguous_keyring_override", Some(sc_agent_types::ErrorCategory::Config)),
+    DecidrError::InvalidWorkers { .. } => ("decidr.invalid_workers", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::InvalidRequestTimeout { .. } => ("decidr.invalid_request_timeout", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Usage { .. } => ("decidr.usage", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Config(_) => ("decidr.config", None),
+    DecidrError::Types(_) => ("decidr.types", None),
+    DecidrError::Secrets(_) => ("decidr.secrets", None),
+    DecidrError::Log(_) => ("decidr.log", None),
+    DecidrError::Local(_) => ("decidr.local", None),
+    DecidrError::Decision(_) => ("decidr.decision", None),
+    DecidrError::Http(_) => ("decidr.http", None),
+    DecidrError::Llm(_) => ("decidr.llm", None),
+    DecidrError::Runner(_) => ("decidr.runner", None),
+    DecidrError::NoProviderKey { .. } => ("decidr.no_provider_key", Some(sc_agent_types::ErrorCategory::Auth)),
+    DecidrError::UnknownRunner { .. } => ("decidr.unknown_runner", Some(sc_agent_types::ErrorCategory::Config)),
+    DecidrError::InputNotFound { .. } => ("decidr.input_not_found", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::InputRead { .. } => ("decidr.input_read", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::LimitExceeded { .. } => ("decidr.limit_exceeded", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::LineNotUtf8 { .. } => ("decidr.line_not_utf8", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::ImageRead { .. } => ("decidr.image_read", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::ImageFormat { .. } => ("decidr.image_format", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::RequestInvalid { .. } => ("decidr.request_invalid", Some(sc_agent_types::ErrorCategory::Validation)),
+    DecidrError::Encode { .. } => ("decidr.encode", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::Write { .. } => ("decidr.write", Some(sc_agent_types::ErrorCategory::Other)),
+    DecidrError::Signal { .. } => ("decidr.signal", Some(sc_agent_types::ErrorCategory::Cancelled)),
+} }
+
 impl ErrorId for DecidrError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Usage { .. } => "decidr.usage",
-            Self::Config(_) => "decidr.config",
-            Self::Types(_) => "decidr.types",
-            Self::Secrets(_) => "decidr.secrets",
-            Self::Log(_) => "decidr.log",
-            Self::Local(_) => "decidr.local",
-            Self::Decision(_) => "decidr.decision",
-            Self::Http(_) => "decidr.http",
-            Self::Llm(_) => "decidr.llm",
-            Self::Runner(_) => "decidr.runner",
-            Self::NoProviderKey { .. } => "decidr.no_provider_key",
-            Self::UnknownRunner { .. } => "decidr.unknown_runner",
-            Self::InputNotFound { .. } => "decidr.input_not_found",
-            Self::InputRead { .. } => "decidr.input_read",
-            Self::LimitExceeded { .. } => "decidr.limit_exceeded",
-            Self::LineNotUtf8 { .. } => "decidr.line_not_utf8",
-            Self::ImageRead { .. } => "decidr.image_read",
-            Self::ImageFormat { .. } => "decidr.image_format",
-            Self::RequestInvalid { .. } => "decidr.request_invalid",
-            Self::Encode { .. } => "decidr.encode",
-            Self::Write { .. } => "decidr.write",
-            Self::Signal { .. } => "decidr.signal",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
         match self {
+            Self::InvalidWorkers { value } => {
+                format!(
+                    "workers must be within 1..={MAX_WORKERS}; CLI --workers requires --batch, got {value}"
+                )
+            }
+            Self::InvalidRequestTimeout { value, .. } => format!(
+                "timeout_secs must be finite and within {}..={} seconds, got {value}",
+                sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.start(),
+                sc_agent_config::RUNNER_REQUEST_TIMEOUT_SECS.end(),
+            ),
             Self::Usage { source } => format!(
                 "invalid command line ({})",
                 source.kind().as_str().unwrap_or("usage error")
@@ -263,6 +296,14 @@ impl ErrorId for DecidrError {
             Self::Http(error) => format!("the send failed ({})", error.id()),
             Self::Llm(error) => format!("the LLM provider failed ({})", error.id()),
             Self::Runner(error) => format!("the session log failed ({})", error.id()),
+            Self::AmbiguousKeyringOverride { candidates } => format!(
+                "keyring override has multiple eligible providers: {}",
+                candidates
+                    .iter()
+                    .map(|provider| provider.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Self::NoProviderKey { model, tried } => {
                 let tried: Vec<&str> = tried.iter().map(|provider| provider.as_str()).collect();
                 format!(
@@ -340,7 +381,10 @@ impl ErrorId for DecidrError {
             | Self::Write { source } => foreign("io", source),
             Self::Encode { source } => foreign("serde_json", source),
             Self::Signal { source } => foreign("ctrlc", source),
-            Self::NoProviderKey { .. }
+            Self::InvalidRequestTimeout { .. }
+            | Self::InvalidWorkers { .. }
+            | Self::AmbiguousKeyringOverride { .. }
+            | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
             | Self::InputNotFound { .. }
             | Self::LimitExceeded { .. }
@@ -351,6 +395,12 @@ impl ErrorId for DecidrError {
 
     fn recovery(&self) -> Option<&'static str> {
         match self {
+            Self::InvalidRequestTimeout { .. } => {
+                Some("omit timeout_secs or pass finite seconds within the reported bounds")
+            }
+            Self::InvalidWorkers { .. } => {
+                Some("use --batch for CLI workers and pass a count within the supported range")
+            }
             Self::Usage { .. } => Some("See decidr --help."),
             Self::Config(error) => error.recovery(),
             Self::Types(error) => error.recovery(),
@@ -361,6 +411,9 @@ impl ErrorId for DecidrError {
             Self::Http(error) => error.recovery(),
             Self::Llm(error) => error.recovery(),
             Self::Runner(error) => error.recovery(),
+            Self::AmbiguousKeyringOverride { .. } => {
+                Some("select a provider explicitly for the keyring override")
+            }
             Self::NoProviderKey { .. } => {
                 Some("set one of the listed providers' key variables, or pass --provider")
             }
@@ -414,7 +467,10 @@ impl Error for DecidrError {
             | Self::Write { source } => Some(source),
             Self::Encode { source } => Some(source),
             Self::Signal { source } => Some(source),
-            Self::NoProviderKey { .. }
+            Self::InvalidRequestTimeout { .. }
+            | Self::InvalidWorkers { .. }
+            | Self::AmbiguousKeyringOverride { .. }
+            | Self::NoProviderKey { .. }
             | Self::UnknownRunner { .. }
             | Self::InputNotFound { .. }
             | Self::LimitExceeded { .. }
@@ -428,6 +484,73 @@ impl Error for DecidrError {
 mod tests {
     use super::*;
     use sc_agent_types::ShortName;
+
+    #[test]
+    fn every_decidr_error_matches_its_own_catalog() {
+        let io = || std::io::Error::other("failure");
+        let mut errors = samples();
+        errors.extend([
+            DecidrError::InvalidRequestTimeout { value: 0.0 },
+            DecidrError::InvalidWorkers { value: 0 },
+            DecidrError::AmbiguousKeyringOverride { candidates: vec![] },
+            DecidrError::Usage {
+                source: Box::new(clap::Error::raw(
+                    clap::error::ErrorKind::InvalidValue,
+                    "bad",
+                )),
+            },
+            DecidrError::from(sc_agent_config::AgentConfigError::HomeUnknown),
+            DecidrError::from(sc_agent_log::LogError::InvalidSlug {
+                field: "project",
+                value: "bad".into(),
+            }),
+            DecidrError::from(sc_decision_local::LocalError::LoadTimeout {
+                runner: "x".into(),
+                waited: std::time::Duration::ZERO,
+            }),
+            DecidrError::from(sc_agent_http::HttpError::network(
+                sc_agent_http::NetworkKind::Connect,
+                1,
+                "down",
+            )),
+            DecidrError::from(sc_llm_provider::LlmError::NoText {
+                provider: sc_llm_provider::LlmProvider::Anthropic,
+            }),
+            DecidrError::from(sc_decision_runner::RunnerError::InvalidConfig {
+                workers: 0,
+                max: 64,
+            }),
+            DecidrError::UnknownRunner {
+                name: "x".into(),
+                known: vec![],
+            },
+            DecidrError::InputNotFound { input: "x".into() },
+            DecidrError::LineNotUtf8 {
+                line: 1,
+                byte_offset: 0,
+            },
+            DecidrError::ImageRead {
+                name: "x".into(),
+                path: "x".into(),
+                source: io(),
+            },
+            DecidrError::ImageFormat {
+                name: "x".into(),
+                path: "x".into(),
+            },
+            DecidrError::RequestInvalid {
+                line: None,
+                source: Box::new(sc_decision_schema::DecisionError::Cancelled { sends: 0 }),
+            },
+            DecidrError::Encode {
+                source: serde_json::from_str::<serde_json::Value>("{").expect_err("invalid json"),
+            },
+            DecidrError::Signal {
+                source: ctrlc::Error::MultipleHandlers,
+            },
+        ]);
+        sc_agent_testkit::assert_catalog_rows(&errors);
+    }
 
     fn samples() -> Vec<DecidrError> {
         let io = || std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");

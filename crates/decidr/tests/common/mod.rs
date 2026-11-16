@@ -75,6 +75,7 @@ pub fn context(
         repo_root: Some(dir.to_path_buf()),
         environment: Some(environment(vars)),
         keyring: Some(Arc::new(MapKeyring::default())),
+        keyring_override: None,
         transport: Some(transport),
         general: Some(log.general()),
         clock: None,

@@ -220,6 +220,35 @@ mod tests {
         assert_eq!(rows(home.path()), 0);
     }
 
+    #[test]
+    fn workers_without_batch_is_typed_and_does_not_send() {
+        let runner = serve_each(|_| {});
+        let home = home(runner.port());
+        let file = batch_file(home.path(), 1);
+        let output = run_bounded(&mut decidr(
+            home.path(),
+            &[
+                "send",
+                "--model",
+                "dec",
+                "--project",
+                "proj",
+                "--agent-role",
+                "role",
+                "--workers",
+                "2",
+                file.to_str().expect("utf-8"),
+            ],
+        ));
+        assert_eq!(output.status.code(), Some(1));
+        let detail = stderr_detail(&output);
+        assert_eq!(detail["id"], "decidr.invalid_workers");
+        let message = detail["message"].as_str().expect("message");
+        assert!(message.contains("2") && message.contains("--batch"));
+        assert!(output.stdout.is_empty());
+        assert_eq!(runner.stop(), 0, "no connection reached the runner");
+    }
+
     /// AC: REQ-SAG-0504, end to end: a bad line stops decidr before the runner is contacted.
     #[test]
     fn a_bad_batch_line_contacts_no_runner() {

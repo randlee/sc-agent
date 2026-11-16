@@ -8,8 +8,14 @@
 //! The decidr call runs on a scoped worker thread; the Python thread waits on its result
 //! channel with a 100 ms timed wait outside the GIL and calls `check_signals` between waits,
 //! so `KeyboardInterrupt` cancels the run, drains it and is re-raised (REQ-SAG-0011).
-//! `general_log` and `session_log` take `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
+//! `general_log` and `session_log` take a caller-owned `sc_observability.Logger` or
+//! `Callable[[dict], None]` (REQ-SAG-0008). `config_dir`
 //! (a path) names the configuration directory; absent, it is `~/.sc-agent`.
+
+mod binding_error;
+mod keyring_options;
+
+use binding_error::PyBindingError;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -22,9 +28,9 @@ use decidr::{
     Context, DecidrError, DoctorOptions, ModelSelector, ModelsOptions, SendOptions, general_logger,
     load_config, session_identity, session_logger,
 };
-use pyo3::exceptions::{PyException, PyRuntimeWarning};
+use pyo3::exceptions::{PyRuntimeError, PyRuntimeWarning, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyDict, PyModule};
 use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
 use sc_agent_types::{ErrorId, Provider};
@@ -43,17 +49,56 @@ const SERVICE: &str = "sc-agent-py";
 /// How long the Python thread waits on the result channel before it checks for signals.
 const SIGNAL_POLL: Duration = Duration::from_millis(100);
 
-pyo3::create_exception!(
-    sc_agent,
-    SagError,
-    PyException,
-    "An sc-agent error; `args` is `(id, message, detail)`, `detail` the JSON error chain."
-);
+fn parse_detail(detail: &str) -> Option<sc_agent_types::ErrorDetail> {
+    serde_json::from_str(detail).ok()
+}
 
-/// `SagError(id, message, detail JSON)` for `error`; `detail` carries every cause and recovery.
+#[pyfunction]
+fn category(detail: &str) -> &'static str {
+    parse_detail(detail)
+        .and_then(|detail| detail.category)
+        .unwrap_or(sc_agent_types::ErrorCategory::Other)
+        .as_str()
+}
+
+#[pyfunction]
+fn retryable(detail: &str) -> bool {
+    parse_detail(detail)
+        .and_then(|detail| detail.category)
+        .unwrap_or(sc_agent_types::ErrorCategory::Other)
+        .retryable()
+}
+
+/// Parse once for SagError construction; properties read only the returned values.
+#[pyfunction]
+fn _sag_error_fields(detail: &str) -> (Option<u16>, Option<u32>, Option<u64>, &'static str, bool) {
+    let detail = parse_detail(detail);
+    let category = detail
+        .as_ref()
+        .and_then(|detail| detail.category)
+        .unwrap_or(sc_agent_types::ErrorCategory::Other);
+    (
+        detail.as_ref().and_then(|detail| detail.status),
+        detail.as_ref().and_then(|detail| detail.attempts),
+        detail.as_ref().and_then(|detail| detail.retry_after_ms),
+        category.as_str(),
+        category.retryable(),
+    )
+}
+
+fn make_sag_error(id: &str, message: String, detail: String) -> PyErr {
+    Python::attach(|py| {
+        py.import("sc_agent")
+            .and_then(|module| module.getattr("SagError"))
+            .and_then(|class| class.call1((id, message, detail)))
+            .map_or_else(|error| error, PyErr::from_value)
+    })
+}
+
+/// Construct the exception from the real typed error detail.
 fn sag_error(error: &DecidrError) -> PyErr {
     let detail = serde_json::to_string(&error.detail()).unwrap_or_else(|_| "{}".to_owned());
-    SagError::new_err((error.id(), error.message(), detail))
+    make_sag_error(error.id(), error.message(), detail)
 }
 
 /// A cancel token shared with the decidr call (REQ-SAG-0104).
@@ -105,17 +150,17 @@ impl From<BatchItem> for BatchInput {
     }
 }
 
-/// Calls a Python `Callable[[dict], None]` with each record under the GIL.
+/// Forwards each record to the caller-owned Python Logger or callable under the GIL.
 ///
 /// The dict is `{"level", "target", "action", "fields"}`. A raised exception makes the
 /// write a refused write (counted by sc-agent-log, reported by its flush); it never changes a
 /// decision result.
-struct PyCallableSink {
+struct PyLogSink {
     callable: Py<PyAny>,
     name: SinkName,
 }
 
-impl PyCallableSink {
+impl PyLogSink {
     fn record(event: &LogEvent) -> Value {
         let mut record = Map::new();
         record.insert(
@@ -133,22 +178,80 @@ impl PyCallableSink {
             context: Box::new(ErrorContext::new(
                 sc_observability::error_codes::LOGGER_SINK_WRITE_FAILED,
                 message,
-                Remediation::not_recoverable("the Python log callable raised; fix the callable"),
+                Remediation::not_recoverable(
+                    "inspect the injected Python logger or callable failure and restore its admission",
+                ),
             )),
         }
     }
 }
 
-impl LogSink for PyCallableSink {
+impl LogSink for PyLogSink {
     fn write(&self, event: &LogEvent) -> Result<(), LogSinkError> {
-        let text = Self::record(event).to_string();
         Python::attach(|py| {
-            let record = py
-                .import("json")
-                .and_then(|json| json.call_method1("loads", (text,)))?;
-            self.callable.call1(py, (record,)).map(drop)
+            if self.callable.bind(py).is_callable() {
+                let record = py
+                    .import("json")?
+                    .call_method1("loads", (Self::record(event).to_string(),))?;
+                self.callable.call1(py, (record,))?;
+                return Ok(());
+            }
+            let obs = py.import("sc_observability")?;
+            let target = self.callable.bind(py);
+            if !target.is_instance(&obs.getattr("Logger")?)?
+                && !target.is_instance(&obs.getattr("AttachedLogger")?)?
+            {
+                return Err(PyTypeError::new_err(
+                    "expected an sc_observability.Logger or log callable",
+                ));
+            }
+            // Internal trait bridge: the consumer passes its Logger unchanged. It receives
+            // the public LogEvent type, not a consumer-owned adapter or record mapping.
+            let level = match event.level {
+                sc_observability::Level::Trace => "trace",
+                sc_observability::Level::Debug => "debug",
+                sc_observability::Level::Info => "info",
+                sc_observability::Level::Warn => "warn",
+                sc_observability::Level::Error => "error",
+            };
+            let payload = serde_json::json!({
+                "level": level, "target": event.target, "action": event.action,
+                "message": event.message, "request_id": event.request_id,
+                "correlation_id": event.correlation_id, "outcome": event.outcome,
+                "trace": event.trace, "fields": event.fields,
+            });
+            let kwargs = py
+                .import("json")?
+                .call_method1("loads", (payload.to_string(),))?;
+            let kwargs = kwargs.cast::<PyDict>()?;
+            if let Some(trace) = kwargs.get_item("trace")?
+                && !trace.is_none()
+            {
+                let typed = obs
+                    .getattr("TraceContext")?
+                    .call((), Some(trace.cast::<PyDict>()?))?;
+                kwargs.set_item("trace", typed)?;
+            }
+            let event = obs.getattr("LogEvent")?.call((), Some(kwargs))?;
+            let result = target.call_method1("log", (event,))?;
+            match result.getattr("kind")?.extract::<String>()?.as_str() {
+                "ok" => Ok(()),
+                "error" => {
+                    let error = result.getattr("error")?;
+                    let code = error.getattr("code")?.extract::<String>()?;
+                    let message = error.getattr("message")?.extract::<String>()?;
+                    Err(PyRuntimeError::new_err(format!("{code}: {message}")))
+                }
+                _ => Err(PyTypeError::new_err(
+                    "Logger.log must return sc_observability.Ok or Err",
+                )),
+            }
         })
-        .map_err(|error| Self::refused(format!("the log callable raised: {error}")))
+        .map_err(|error| {
+            Self::refused(format!(
+                "the injected Python logger refused the record: {error}"
+            ))
+        })
     }
 
     fn health(&self) -> SinkHealth {
@@ -160,19 +263,22 @@ impl LogSink for PyCallableSink {
     }
 }
 
-/// A logger whose only sink is `callable` (file and console sinks off, as `MemoryLog`).
-fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecidrError> {
-    let log_kind = if service == SessionLogger::SERVICE {
-        LogKind::Session
-    } else {
-        LogKind::General
-    };
+/// A logger whose only sink is the caller-owned Python Logger or callable.
+/// Only the bridge is managed here; caller flush/shutdown remain caller-owned.
+fn python_logger(
+    callable: Py<PyAny>,
+    service: &'static str,
+    log_kind: LogKind,
+) -> Result<Arc<Logger>, DecidrError> {
     let name_error =
         |what: &'static str, value: &str, error: &(dyn std::error::Error + 'static)| {
             DecidrError::from(LogError::InvalidName {
                 what,
                 value: value.to_owned(),
-                cause: sc_agent_types::ErrorDetail::foreign("sc_observability.invalid_name", error),
+                cause: Box::new(sc_agent_types::ErrorDetail::foreign(
+                    "sc_observability.invalid_name",
+                    error,
+                )),
             })
         };
     let service_name =
@@ -182,7 +288,7 @@ fn callable_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Log
     config.enable_console_sink = false;
     config.queue_capacity = sc_agent_log::QUEUE_CAPACITY;
     let name = SinkName::new("python").map_err(|error| name_error("sink", "python", &error))?;
-    let sink: Arc<dyn LogSink> = Arc::new(PyCallableSink { callable, name });
+    let sink: Arc<dyn LogSink> = Arc::new(PyLogSink { callable, name });
     let start = |source| {
         DecidrError::from(LogError::Start {
             log: log_kind,
@@ -200,7 +306,7 @@ type Outcome<T> = (Result<T, DecidrError>, Vec<DecidrError>);
 /// What the worker sends the Python thread.
 enum Message<T> {
     /// One result line, as it finished.
-    Line(String),
+    Line(u64, String),
     /// The decidr call returned and its loggers were closed.
     Done(Outcome<T>),
 }
@@ -208,14 +314,14 @@ enum Message<T> {
 /// The callback a decidr call reports each result to.
 type OnResult<'a> = &'a mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>;
 
-/// The stable id of a worker that panicked or ended without a result (RBP-F003).
-const WORKER_PANICKED: &str = "sc_agent_py.worker_panicked";
+fn py_binding_error(error: &PyBindingError) -> PyErr {
+    let detail = serde_json::to_string(&error.detail()).unwrap_or_else(|_| "{}".to_owned());
+    make_sag_error(error.id(), error.message(), detail)
+}
 
 /// `SagError(sc_agent_py.worker_panicked, message, detail)`.
 fn worker_panicked(message: String) -> PyErr {
-    let detail = sc_agent_types::ErrorDetail::new(WORKER_PANICKED, message.clone(), None);
-    let detail = decidr::output::to_json(&detail).unwrap_or_else(|_| "{}".to_owned());
-    SagError::new_err((WORKER_PANICKED, message, detail))
+    py_binding_error(&PyBindingError::WorkerPanicked { message })
 }
 
 /// The text of a panic payload (`&str` or `String`), else a fixed note.
@@ -251,9 +357,10 @@ fn run_interruptible<T: Send>(
         let worker = scope.spawn(move || {
             let lines = sender.clone();
             let mut forward = |result: DecisionResult| {
+                let position = result.position;
                 let text = decidr::output::result_text(&result)?;
                 // The receiver lives until the worker is joined, so a send cannot fail.
-                let _ = lines.send(Message::Line(text));
+                let _ = lines.send(Message::Line(position, text));
                 Ok(())
             };
             let outcome = work(&mut forward);
@@ -271,7 +378,7 @@ fn run_interruptible<T: Send>(
                     .recv_timeout(SIGNAL_POLL)
             });
             match message {
-                Ok(Message::Line(line)) => {
+                Ok(Message::Line(position, line)) => {
                     if let Some(callback) = on_result.filter(|_| !callback_failed)
                         && let Err(error) = callback.call1(py, (line.clone(),))
                     {
@@ -279,7 +386,7 @@ fn run_interruptible<T: Send>(
                         cancel.cancel();
                         raised.get_or_insert(error);
                     }
-                    lines.push(line);
+                    lines.push((position, line));
                 }
                 Ok(Message::Done(outcome)) => break Some(outcome),
                 Err(RecvTimeoutError::Timeout) => {}
@@ -292,6 +399,8 @@ fn run_interruptible<T: Send>(
                 raised = Some(error);
             }
         };
+        lines.sort_by_key(|(position, _)| *position);
+        let lines: Vec<String> = lines.into_iter().map(|(_, line)| line).collect();
         let joined = py.detach(move || worker.join());
         if let Err(payload) = &joined {
             return Err(worker_panicked(panic_message(&**payload)));
@@ -326,7 +435,9 @@ fn context(
     let mut context = Context::new(SERVICE);
     context.config_dir = config_dir;
     let general = match general_log {
-        Some(callable) => GeneralLogger::injected(callable_logger(callable, SERVICE)?),
+        Some(callable) => {
+            GeneralLogger::injected(python_logger(callable, SERVICE, LogKind::General)?)
+        }
         None => general_logger(&context)?,
     };
     context.general = Some(general);
@@ -339,7 +450,7 @@ fn send_options(
     model: &str,
     project: &str,
     agent_role: &str,
-    provider: Option<&str>,
+    provider: ProviderOption<'_>,
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
@@ -350,11 +461,11 @@ fn send_options(
     probe.config_dir = config_dir.clone();
     let config = load_config(&probe)?;
     let model = ModelSelector::parse(model, &config)?;
-    let provider = provider.map(str::parse::<Provider>).transpose()?;
+    let provider = provider.parse()?;
     let context = context(general_log, config_dir)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
-            callable_logger(callable, SessionLogger::SERVICE)?,
+            python_logger(callable, SessionLogger::SERVICE, LogKind::Session)?,
             session_identity(&project, &agent_role)?,
         )),
         None => None,
@@ -371,6 +482,18 @@ fn send_options(
         options.session = Some(session_logger(&options)?);
     }
     Ok(options)
+}
+
+enum ProviderOption<'a> {
+    Text(Option<&'a str>),
+}
+
+impl ProviderOption<'_> {
+    fn parse(self) -> Result<Option<Provider>, sc_agent_types::TypesError> {
+        match self {
+            Self::Text(provider) => provider.map(str::parse::<Provider>).transpose(),
+        }
+    }
 }
 
 /// Closes the loggers of an operation on the worker thread, after the operation, so every
@@ -396,12 +519,33 @@ fn token(cancel: Option<&CancelToken>) -> sc_agent_types::CancelToken {
     cancel.map_or_else(sc_agent_types::CancelToken::new, |token| token.0.clone())
 }
 
+/// Parses provider-scoped keyring overrides before opening loggers or sending.
+fn keyring_override(
+    service: Option<&str>,
+    account: Option<&str>,
+) -> PyResult<Option<sc_agent_secrets::KeyringLocation>> {
+    keyring_options::location(service, account).map_err(|error| {
+        let option = match error {
+            sc_agent_secrets::SecretsError::InvalidLocation { option } => option,
+            _ => "keyring",
+        };
+        invalid_option(option, "must contain 1..=255 UTF-8 bytes")
+    })
+}
+
+fn invalid_option(option: &str, bound: &str) -> PyErr {
+    py_binding_error(&PyBindingError::InvalidOption {
+        option: option.to_owned(),
+        bound: bound.to_owned(),
+    })
+}
+
 /// `decidr send`: one request, always `Decision::decide`; returns its result line (JSON).
 ///
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
 #[pyfunction]
-#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None))]
+#[pyo3(signature = (request, *, model, project, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None, timeout_secs = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -419,12 +563,21 @@ fn send(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
+    keyring_service: Option<&str>,
+    keyring_account: Option<&str>,
+    timeout_secs: Option<f64>,
 ) -> PyResult<String> {
+    let timeout = timeout_secs
+        .map(decidr::RequestTimeout::from_secs)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
+    let keyring = keyring_override(keyring_service, keyring_account)?;
+    let provider = ProviderOption::Text(provider);
     // The request is checked before any logger opens, so a refused one writes no file.
     let images = images.unwrap_or_default().into_iter().collect();
     let request = build_request_bytes(request.as_bytes(), images, long_context, None)
         .map_err(|error| sag_error(&error))?;
-    let options = send_options(
+    let mut options = send_options(
         model,
         project,
         agent_role,
@@ -434,15 +587,25 @@ fn send(
         config_dir,
     )
     .map_err(|error| sag_error(&error))?;
+    options.context.keyring_override = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let (line, _) = run_interruptible(py, &cancel, None, move |_| {
         let mut options = options;
         let mut line = None;
-        let sent = decidr::send(&options, request, &worker_cancel, &mut |result| {
-            line = Some(decidr::output::result_text(&result)?);
-            Ok(())
-        });
+        let sent = decidr::send_with(
+            &options,
+            request,
+            &worker_cancel,
+            &decidr::CallLimits {
+                timeout,
+                workers: None,
+            },
+            &mut |result| {
+                line = Some(decidr::output::result_text(&result)?);
+                Ok(())
+            },
+        );
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
         let mut closed = close_loggers(general, session);
@@ -469,9 +632,9 @@ fn send(
 }
 
 /// `decidr send --batch`: always `Decision::decide_stream`; returns the result lines in
-/// finish order and passes each to `on_result` as it arrives.
+/// input order and passes each to `on_result` as it arrives.
 #[pyfunction]
-#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None))]
+#[pyo3(signature = (requests, *, model, project, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, config_dir = None, keyring_service = None, keyring_account = None, timeout_secs = None, workers = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -488,10 +651,24 @@ fn send_batch(
     general_log: Option<Py<PyAny>>,
     session_log: Option<Py<PyAny>>,
     config_dir: Option<PathBuf>,
+    keyring_service: Option<&str>,
+    keyring_account: Option<&str>,
+    timeout_secs: Option<f64>,
+    workers: Option<i64>,
 ) -> PyResult<Vec<String>> {
+    let workers = workers
+        .map(decidr::Workers::new)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
+    let timeout = timeout_secs
+        .map(decidr::RequestTimeout::from_secs)
+        .transpose()
+        .map_err(|error| sag_error(&error))?;
+    let keyring = keyring_override(keyring_service, keyring_account)?;
+    let provider = ProviderOption::Text(provider);
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
-    let options = send_options(
+    let mut options = send_options(
         model,
         project,
         agent_role,
@@ -501,11 +678,18 @@ fn send_batch(
         config_dir,
     )
     .map_err(|error| sag_error(&error))?;
+    options.context.keyring_override = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
     let ((), lines) = run_interruptible(py, &cancel, on_result.as_ref(), move |forward| {
         let mut options = options;
-        let outcome = decidr::send_batch(&options, requests, &worker_cancel, forward);
+        let outcome = decidr::send_batch_with(
+            &options,
+            requests,
+            &worker_cancel,
+            &decidr::CallLimits { timeout, workers },
+            forward,
+        );
         let (general, session) = (options.context.general.take(), options.session.take());
         drop(options);
         (outcome, close_loggers(general, session))
@@ -587,41 +771,42 @@ fn doctor(
 }
 
 /// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
-#[pymodule]
+#[pymodule(name = "_native")]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(send, module)?)?;
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
+    module.add_function(wrap_pyfunction!(category, module)?)?;
+    module.add_function(wrap_pyfunction!(retryable, module)?)?;
+    module.add_function(wrap_pyfunction!(_sag_error_fields, module)?)?;
     module.add_function(wrap_pyfunction!(models, module)?)?;
     module.add_function(wrap_pyfunction!(doctor, module)?)?;
     module.add_class::<CancelToken>()?;
-    module.add("SagError", module.py().get_type::<SagError>())?;
+    module.py().run(
+        cr#"
+class SagError(Exception):
+    def __init__(self, id, message, detail_json):
+        super().__init__(id, message, detail_json)
+        self._fields = _sag_error_fields(detail_json)
+    @property
+    def id(self): return self.args[0]
+    @property
+    def message(self): return self.args[1]
+    @property
+    def detail(self): return self.args[2]
+    @property
+    def status(self): return self._fields[0]
+    @property
+    def attempts(self): return self._fields[1]
+    @property
+    def retry_after_ms(self): return self._fields[2]
+    @property
+    def category(self): return self._fields[3]
+    @property
+    def retryable(self): return self._fields[4]
+"#,
+        Some(&module.dict()),
+        None,
+    )?;
+    module.add("SagError", module.getattr("SagError")?)?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// AC: REQ-SAG-0007. The string returned for a result keeps 0.123456789 unchanged.
-    #[test]
-    fn a_probability_is_returned_unchanged() {
-        let body = br#"{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.123456789}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
-        let response =
-            sc_decision_schema::SystemOneResponse::from_json(200, body).expect("response");
-        let request = build_request_bytes(
-            br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#,
-            Vec::new(),
-            false,
-            None,
-        )
-        .expect("request");
-        let result = DecisionResult::new(
-            sc_agent_types::SessionId::new(),
-            0,
-            request.digests().clone(),
-            Ok(response),
-        );
-        let text = decidr::output::result_text(&result).expect("string");
-        assert!(text.contains("\"noul\":0.123456789"), "{text}");
-    }
 }

@@ -50,6 +50,8 @@ pub struct ProviderReply {
     pub request_id: Option<String>,
     /// A valid `Retry-After` as sent, in seconds, unrounded (REQ-SAG-0007).
     pub retry_after_seconds: Option<f64>,
+    /// The Retry-After hint rounded up to milliseconds.
+    pub retry_after_ms: Option<u64>,
 }
 
 impl ProviderReply {
@@ -78,6 +80,7 @@ impl ProviderReply {
                 .or_else(|| response.header("x-request-id"))
                 .map(str::to_owned)
         });
+        let retry_after = RetryAfter::parse(response.header("retry-after"));
         Self {
             status: response.status(),
             provider_type: body.provider_type.map(scrub),
@@ -85,8 +88,8 @@ impl ProviderReply {
             message: scrub(message),
             param: body.param.map(scrub),
             request_id: request_id.map(scrub),
-            retry_after_seconds: RetryAfter::parse(response.header("retry-after"))
-                .map(RetryAfter::seconds),
+            retry_after_seconds: retry_after.map(RetryAfter::seconds),
+            retry_after_ms: retry_after.map(RetryAfter::milliseconds),
         }
     }
 
@@ -101,6 +104,7 @@ impl ProviderReply {
             param: self.param.map(map),
             request_id: self.request_id.map(map),
             retry_after_seconds: self.retry_after_seconds,
+            retry_after_ms: self.retry_after_ms,
         }
     }
 }

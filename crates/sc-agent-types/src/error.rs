@@ -54,17 +54,22 @@ pub enum TypesError {
     },
 }
 
+crate::error_catalog! { TypesError {
+    TypesError::InvalidModelId { .. } => ("types.invalid_model_id", Some(crate::ErrorCategory::Validation)),
+    TypesError::UnknownShortName { .. } => ("types.unknown_short_name", Some(crate::ErrorCategory::Validation)),
+    TypesError::UnknownProvider { .. } => ("types.unknown_provider", Some(crate::ErrorCategory::Validation)),
+    TypesError::InvalidReleaseDate { .. } => ("types.invalid_release_date", Some(crate::ErrorCategory::Config)),
+    TypesError::ModelOnTwoLines { .. } => ("types.model_on_two_lines", Some(crate::ErrorCategory::Config)),
+    TypesError::InvalidVarName { .. } => ("types.invalid_var_name", Some(crate::ErrorCategory::Validation)),
+    TypesError::InvalidSessionId { .. } => ("types.invalid_session_id", Some(crate::ErrorCategory::Validation)),
+} }
+
 impl ErrorId for TypesError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::InvalidModelId { .. } => "types.invalid_model_id",
-            Self::UnknownShortName { .. } => "types.unknown_short_name",
-            Self::UnknownProvider { .. } => "types.unknown_provider",
-            Self::InvalidReleaseDate { .. } => "types.invalid_release_date",
-            Self::ModelOnTwoLines { .. } => "types.model_on_two_lines",
-            Self::InvalidVarName { .. } => "types.invalid_var_name",
-            Self::InvalidSessionId { .. } => "types.invalid_session_id",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<crate::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {

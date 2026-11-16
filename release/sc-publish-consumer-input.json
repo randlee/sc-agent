@@ -366,5 +366,27 @@
       "site/cli/"
     ],
     "description": "CLI reference HTML for decidr and sitr matches the clap command trees"
-  }
+  },
+  "prerelease": {
+    "tag_prefix": "prerelease/v",
+    "tag_script": "scripts/prerelease_tag.py",
+    "install_root": "~/.sc-agent/prerelease",
+    "binaries": [
+      "decidr",
+      "sitr"
+    ],
+    "protected_branches": [
+      "develop",
+      "main",
+      "integrate/phase-b"
+    ],
+    "selector_dir": {
+      "darwin": "~/.local/bin",
+      "linux": "~/.local/bin",
+      "windows": "~/.local/bin"
+    },
+    "post_install": "{python} scripts/install_wheels.py --stage \"{stage_dir}\" {wheels}",
+    "verify": "{python} scripts/install_wheels.py --verify --stage \"{stage_dir}\" --version {version}"
+  },
+  "preflight_checks": []
 }

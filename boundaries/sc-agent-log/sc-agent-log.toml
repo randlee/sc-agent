@@ -1,0 +1,34 @@
+boundary_id = "BOUNDARY-ADR-SAG-0004-ScAgentLog"
+owner_package = "sc-agent-log"
+owner_crate_path = "sc_agent_log"
+name = "ScAgentLogLayer"
+
+[public]
+facade = "GeneralLogger"
+
+[implementation]
+type = "GeneralLogger"
+module = "sc_agent_log"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["GeneralLogger"]
+
+[dependencies]
+allowed_dev_dependents = ["sc-agent-log"]
+allowed_dev_dependencies = ["sc-agent-log", "sc-agent-testkit"]
+allowed_dependents = ["decidr", "sc-agent-http", "sc-agent-py", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-llm-provider"]
+allowed_dependencies = ["sc-agent-types"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

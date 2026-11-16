@@ -83,17 +83,26 @@ pub enum LlmError {
     },
 }
 
+sc_agent_types::error_catalog! { LlmError {
+    LlmError::Http { .. } => ("llm.http", None),
+    LlmError::ApiStatus { .. } => ("llm.api_status", Some(sc_agent_types::ErrorCategory::Other)),
+    LlmError::ReplyInvalid { .. } => ("llm.reply_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::NoText { .. } => ("llm.no_text", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::Truncated { .. } => ("llm.truncated", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    LlmError::Refused { .. } => ("llm.refused", Some(sc_agent_types::ErrorCategory::Other)),
+    LlmError::OutputNotJson { .. } => ("llm.output_not_json", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+} }
+
 impl ErrorId for LlmError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::Http { .. } => "llm.http",
-            Self::ApiStatus { .. } => "llm.api_status",
-            Self::ReplyInvalid { .. } => "llm.reply_invalid",
-            Self::NoText { .. } => "llm.no_text",
-            Self::Truncated { .. } => "llm.truncated",
-            Self::Refused { .. } => "llm.refused",
-            Self::OutputNotJson { .. } => "llm.output_not_json",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
+    }
+
+    fn refines_status(&self) -> bool {
+        matches!(self, Self::ApiStatus { .. })
     }
 
     fn message(&self) -> String {
@@ -128,6 +137,20 @@ impl ErrorId for LlmError {
             | Self::Truncated { .. }
             | Self::Refused { .. }
             | Self::OutputNotJson { .. } => None,
+        }
+    }
+
+    fn status(&self) -> Option<u16> {
+        match self {
+            Self::ApiStatus { reply, .. } => Some(reply.status),
+            _ => None,
+        }
+    }
+
+    fn retry_after_ms(&self) -> Option<u64> {
+        match self {
+            Self::ApiStatus { reply, .. } => reply.retry_after_ms,
+            _ => None,
         }
     }
 
@@ -197,6 +220,44 @@ mod tests {
                 stop_reason: "length".to_owned(),
             },
         ];
+        for (status, category, retry_after_ms) in [
+            (401, sc_agent_types::ErrorCategory::Auth, None),
+            (503, sc_agent_types::ErrorCategory::Busy, Some(2000)),
+            (418, sc_agent_types::ErrorCategory::Other, None),
+        ] {
+            let headers = if status == 503 {
+                vec![("retry-after".to_owned(), "2".to_owned())]
+            } else {
+                vec![]
+            };
+            let reply = ProviderReply::read(
+                &sc_agent_http::HttpResponse::new(status, headers, b"response".to_vec()),
+                None,
+            );
+            let detail = LlmError::ApiStatus {
+                provider: LlmProvider::Anthropic,
+                reply: Box::new(reply),
+            }
+            .detail();
+            assert_eq!(
+                (detail.status, detail.category, detail.retry_after_ms),
+                (Some(status), Some(category), retry_after_ms)
+            );
+        }
+        let long_reply = ProviderReply::read(
+            &sc_agent_http::HttpResponse::new(
+                503,
+                vec![("retry-after".to_owned(), "120".to_owned())],
+                Vec::new(),
+            ),
+            None,
+        );
+        let long_detail = LlmError::ApiStatus {
+            provider: LlmProvider::Anthropic,
+            reply: Box::new(long_reply),
+        }
+        .detail();
+        assert_eq!(long_detail.retry_after_ms, Some(120_000));
         for error in errors {
             let detail = error.detail();
             assert_eq!(detail.id, error.id());
@@ -222,6 +283,12 @@ mod tests {
             Some(source.to_string())
         );
         assert_eq!(error.cause_detail(), Some(source.detail()));
+        let detail = error.detail();
+        assert_eq!(
+            (detail.attempts, detail.category),
+            (Some(1), Some(sc_agent_types::ErrorCategory::Network))
+        );
+        assert_eq!(detail.cause.as_deref(), Some(&source.detail()));
     }
 
     /// Every variant once. The exhaustive match below fails to compile when a variant is
@@ -283,6 +350,8 @@ mod tests {
     #[test]
     fn there_are_seven_llm_ids() {
         let ids: std::collections::BTreeSet<&str> = every().iter().map(ErrorId::id).collect();
+        let samples = every();
+        sc_agent_testkit::assert_catalog_rows(&samples);
         assert_eq!(ids.len(), 7, "{ids:?}");
         assert!(ids.iter().all(|id| id.starts_with("llm.")), "{ids:?}");
     }
