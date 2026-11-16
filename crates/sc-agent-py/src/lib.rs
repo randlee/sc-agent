@@ -265,12 +265,11 @@ impl LogSink for PyLogSink {
 
 /// A logger whose only sink is the caller-owned Python Logger or callable.
 /// Only the bridge is managed here; caller flush/shutdown remain caller-owned.
-fn python_logger(callable: Py<PyAny>, service: &'static str) -> Result<Arc<Logger>, DecidrError> {
-    let log_kind = if service == SessionLogger::SERVICE {
-        LogKind::Session
-    } else {
-        LogKind::General
-    };
+fn python_logger(
+    callable: Py<PyAny>,
+    service: &'static str,
+    log_kind: LogKind,
+) -> Result<Arc<Logger>, DecidrError> {
     let name_error =
         |what: &'static str, value: &str, error: &(dyn std::error::Error + 'static)| {
             DecidrError::from(LogError::InvalidName {
@@ -436,7 +435,9 @@ fn context(
     let mut context = Context::new(SERVICE);
     context.config_dir = config_dir;
     let general = match general_log {
-        Some(callable) => GeneralLogger::injected(python_logger(callable, SERVICE)?),
+        Some(callable) => {
+            GeneralLogger::injected(python_logger(callable, SERVICE, LogKind::General)?)
+        }
         None => general_logger(&context)?,
     };
     context.general = Some(general);
@@ -464,7 +465,7 @@ fn send_options(
     let context = context(general_log, config_dir)?;
     let session = match session_log {
         Some(callable) => Some(SessionLogger::injected(
-            python_logger(callable, SessionLogger::SERVICE)?,
+            python_logger(callable, SessionLogger::SERVICE, LogKind::Session)?,
             session_identity(&project, &agent_role)?,
         )),
         None => None,
