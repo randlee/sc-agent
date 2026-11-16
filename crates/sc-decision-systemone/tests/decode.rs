@@ -203,7 +203,10 @@ mod tests {
         assert!(
             matches!(error, DecisionError::ApiStatus { status: 503, ref body } if body == laya)
         );
-        assert!(error.recovery().is_none());
+        assert_eq!(
+            error.recovery(),
+            Some("check the provider status and the reported request details")
+        );
     }
 
     /// AC 4: decode_models decodes the openapi example; non-2xx and non-JSON are errors.

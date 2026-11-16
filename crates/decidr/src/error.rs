@@ -305,7 +305,16 @@ impl ErrorId for DecidrError {
                     .join(", ")
             ),
             Self::NoProviderKey { model, tried } => {
-                let tried: Vec<&str> = tried.iter().map(|provider| provider.as_str()).collect();
+                let tried: Vec<String> = tried
+                    .iter()
+                    .map(|provider| {
+                        format!(
+                            "{} ({})",
+                            provider.as_str(),
+                            sc_agent_secrets::env_var(*provider)
+                        )
+                    })
+                    .collect();
                 format!(
                     "no provider key found for model {:?}; tried {}",
                     model.to_string(),
@@ -637,7 +646,7 @@ mod tests {
     fn no_provider_key_has_a_recovery() {
         let error = DecidrError::NoProviderKey {
             model: ModelSelector::Short(ShortName::Jev),
-            tried: vec![Provider::TypeSafe],
+            tried: vec![Provider::TypeSafe, Provider::Anthropic],
         };
         assert_eq!(error.id(), "decidr.no_provider_key");
         assert!(
@@ -645,7 +654,14 @@ mod tests {
                 .recovery()
                 .is_some_and(|text| text.contains("--provider"))
         );
-        assert!(error.message().contains("typesafe"));
+        assert!(error.message().contains(&format!(
+            "typesafe ({})",
+            sc_agent_secrets::TYPESAFE_API_KEY
+        )));
+        assert!(error.message().contains(&format!(
+            "anthropic ({})",
+            sc_agent_secrets::ANTHROPIC_API_KEY
+        )));
         assert!(error.message().contains("jev"));
     }
 }

@@ -149,73 +149,71 @@ import sc_agent
 import consumer
 
 cancel = sc_agent.CancelToken()
-line, code = consumer.call(
+result = consumer.call_result(
     request_json, model="jev", project="my-project", agent_role="judge",
-    abort_on=frozenset({"auth", "quota"}), category_codes={"auth": "AUTH", "quota": "QUOTA"},
+    abort_on=frozenset({"auth", "quota"}),
     cancel=cancel, keyring_service=None, keyring_account=None, timeout_secs=120,
 )
 ```
 
-`abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. Both single
-and batch calls map stored categories through the caller's map, cancel on selected
-errors and on `KeyboardInterrupt`, and preserve the wheel's result lines. Batch
-callbacks run in finish order; returned tuples retain input order. Prompt authoring
-and result interpretation remain in the consumer; there is no additional retry loop.
+`abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. The generated
+module's transport surface is `call_result` and `call_batch_results`; the redundant
+`call`/`call_batch` APIs are removed. Both accept model/project/agent_role, optional
+cancel, config_dir, keyring_service/keyring_account and timeout_secs. Single calls
+also accept images/long_context; batches accept workers/on_result. general_log is
+available only when that feature is rendered. Neither forces a provider or redirects
+the session log. The wheel owns retries and cancellation.
 
-The optional `context_exceeded` map key overrides the category code for
-`decision.context_exceeded` in both single and batch calls. If the key is absent,
-the error uses its category's code as usual. Other validation errors keep their
-category mapping; this override does not change the stored category or cancellation.
+### One shared error
 
-### Shared result helpers
+`ClientError(code, message, retryable=False, action=None, *, status=None,
+retry_after_ms=None, attempts=None, data=None)` is a RuntimeError that consumers
+can raise or carry directly for both wheel and local validation/usage errors.
+Its public fields are those constructor names; `message` is read-only. There are
+no recoverable/retry_after/meta aliases and no message-replacement or context API.
+Put consumer-specific bookkeeping in `data`.
 
-`call_result(request, *, model, project, agent_role, abort_on, ...)` and
-`call_batch_results(requests, *, model, project, agent_role, abort_on, ...)`
-handle the wheel boundary and return plain dictionaries. Consumers keep their
-prompts, response validation and local result/error types, converting each shared
-record once. Both helpers accept `category_codes` and `error_actions` overrides,
-`cancel` (or create a token when omitted), `config_dir`, `keyring_service`,
-`keyring_account` and `timeout_secs`. Single calls also accept `images` and
-`long_context`; batches also accept `workers` and `on_result`. When rendered with
-`general_log=true`, both accept that logger. Session logging stays at the wheel's
-default location.
+`error.to_json()` renders the common consumer envelope:
 
-A successful single record is `{"ok": true, "value": response, "position": n,
-"line": original_json, "attempts": sends}`. A failed record instead contains
-`"ok": false` and `"error": failure`. A failure is a plain dictionary with
-`code`, `message`, `retryable`, `action`, `status`, `retry_after_ms`, `attempts`
-and `data` (the original typed detail). Numeric metadata rejects booleans and
-negative values. `attempts` is the wire line's `sends`, or `None` when unknown;
-exceptions retain their typed attempts. `retryable` comes from the wheel, including
-for context overflow; the template has no separate retry policy. Message text is
-preserved, and the wheel owns API-key redaction.
+```json
+{"success": false, "data": null, "error": {"code": "INPUT.INVALID", "message": "missing field", "recoverable": false, "suggested_action": "Supply the field."}}
+```
 
-A successful batch is `{"ok": true, "value": [records in input order]}`;
-a whole-call failure is a failed record. `on_result(record)` receives each
-completion immediately in finish order, before the batch returns. Correlate by
-`record["position"]`, never by arrival order. The helper checks the result count
-and positions, does not deliver a completion twice, and preserves callbacks already
-delivered if interrupted. ClientError and SagError become failure records; other
-caller exceptions propagate. No result helper adds retries.
+The envelope's existing `recoverable` name carries the error's `retryable` value.
+For wheel failures, message and action come unchanged from Rust's ErrorDetail
+`message` and `recovery`. The template keeps no wheel message/action tables and
+accepts no action override. Auth response bodies are withheld by Rust. Codes use
+the shared category/id maps; a partial `category_codes` map may override codes.
+The default `context_exceeded` entry already maps decision.context_exceeded.
 
-The generated module's exported names are:
+A single result is `{"ok": true, "value": response, "position": n, "line": wire,
+"attempts": sends}` or `{"ok": false, "error": ClientError, ...}`. Result attempts
+come from Rust's sends (None if unknown), never an invented one. A successful batch
+is `{"ok": true, "value": [records in input order]}`; whole-call failures carry the
+same ClientError type. on_result receives each record immediately in finish order.
+Correlate with position, never arrival order. Completed callbacks are not repeated
+when returning the list. The record wrapper is not JSON-serializable when it holds
+an error: report that error with to_json().
+
+Rust writes each failed runner result once through the injected or default general
+logger as `runner.result.error`. Its fields are native id, category, provider, status,
+message, action, project and agent_role; the session id/position identify the request.
+Search across agents by native **id**, not a consumer's mapped code. The template
+does not log a rewritten copy.
 
 | Export | Contract |
 | --- | --- |
-| `SC_DECIDR_VERSION`, `MODELS` | Rendered wheel version and offered model selectors. |
-| `LogSink`, `CategoryCodes`, `AbortOn`, `BatchItem` | Type aliases for log callbacks, category mappings, abort sets and batch input items. |
-| `DECIDR_CATEGORY_CODES` | Complete default category-to-code map, plus the `context_exceeded` override key. Partial caller maps overlay these defaults in result helpers. |
-| `DECIDR_ERROR_CODES` | Default codes for known typed error ids, including `decision.context_exceeded`. |
-| `DECIDR_ERROR_ACTIONS` | One corrective action per shared code, including missing-wheel and invalid-result failures. |
-| `ClientError` | Low-level client exception with `.code` for dependency or protocol failures. |
-| `new_cancel_token()` | Lazily creates a wheel token; missing wheel raises `ClientError`. |
-| `error_metadata(detail)` | Returns optional `status`, `retry_after_ms` and `attempts` as nonnegative integers or `None`. |
-| `wheel_error(detail, mapped_code=None, *, category_codes=None, error_actions=None)` | Adapts a typed wheel detail to a failure dictionary using wheel retryability. |
-| `decode_result(line, mapped_code=None, *, category_codes=None, error_actions=None)` | Adapts a wire line to a response/failure record, retaining its position and sends. |
-| `exception_result(exc, *, category_codes=None, error_actions=None)` | Adapts `ClientError` or `SagError` to a failure record. |
-| `call`, `call_batch` | Compatible lower-level APIs returning `(wire_line, mapped_code)` tuples, raising typed command errors. |
-| `call_result`, `call_batch_results` | Plain-record single and streaming batch helpers described above. |
-| `extract` | Exported only with `sitr=true`; the separate tree-sitter helper described below. |
+| SC_DECIDR_VERSION, MODELS | Rendered version and offered model selectors. |
+| LogSink, CategoryCodes, AbortOn, BatchItem | Log callback, code map, abort set and batch-input aliases. |
+| ClientError | The single error type and envelope described above. |
+| DECIDR_CATEGORY_CODES, DECIDR_ERROR_CODES | Shared default code mappings. |
+| new_cancel_token() | Lazily creates a wheel token or raises ClientError if the wheel is missing. |
+| error_metadata(detail) | Optional integer status/retry_after_ms/attempts; rejects bool. |
+| wheel_error(detail, *, category_codes=None) | Converts a Rust detail into ClientError without rewriting its text. |
+| decode_result(line, *, category_codes=None) | Decodes a wire record, retaining position and sends. |
+| exception_result(exc, *, category_codes=None) | Retains ClientError identity or adapts SagError to that type. |
+| call_result, call_batch_results | The only single/batch transport helpers. |
+| extract | Only exported with sitr=true; separate tree-sitter extraction. |
 
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).

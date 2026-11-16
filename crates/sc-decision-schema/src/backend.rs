@@ -15,6 +15,11 @@ use crate::response::SystemOneResponse;
 /// runner sends through sc-agent-http. Open trait: any crate may implement it (ADR-SAG-0001).
 /// `request` is already valid ([`DecisionRequest::new`]).
 pub trait Backend: Send + Sync + fmt::Debug {
+    /// The remote provider, when this backend has one (for diagnostic events).
+    fn provider(&self) -> Option<sc_agent_types::Provider> {
+        None
+    }
+
     /// The HTTP request that sends `request` to this backend's provider.
     ///
     /// # Errors

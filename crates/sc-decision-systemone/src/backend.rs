@@ -162,6 +162,10 @@ impl SystemOneBackend {
 }
 
 impl Backend for SystemOneBackend {
+    fn provider(&self) -> Option<sc_agent_types::Provider> {
+        Some(sc_agent_types::Provider::TypeSafe)
+    }
+
     /// The `POST {base}/v1/systemone` request for `request`.
     ///
     /// JSON when `request.image_parts()` is empty, else multipart/form-data: part `request`

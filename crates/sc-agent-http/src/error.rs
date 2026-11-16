@@ -403,8 +403,14 @@ impl ErrorId for HttpError {
             Self::ProviderBusy { .. } => Some(PROVIDER_BUSY_RECOVERY),
             Self::QuotaExhausted { .. } => Some(QUOTA_EXHAUSTED_RECOVERY),
             Self::KeyOnPlainHttp { .. } => Some(KEY_ON_PLAIN_HTTP_RECOVERY),
-            Self::Network { .. }
-            | Self::ResponseTooLarge { .. }
+            Self::Network {
+                kind: NetworkKind::Timeout,
+                ..
+            } => Some(
+                "the request timed out; check provider availability or increase the request timeout before retrying",
+            ),
+            Self::Network { .. } => Some("check network access, DNS and TLS, then retry"),
+            Self::ResponseTooLarge { .. }
             | Self::InvalidEndpoint { .. }
             | Self::InvalidRequest { .. } => None,
         }
