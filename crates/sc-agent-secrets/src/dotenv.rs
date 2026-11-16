@@ -97,10 +97,10 @@ fn dotenv_read_error(error: &io::Error) -> SecretsError {
     SecretsError::DotenvRead {
         kind: format!("{:?}", error.kind()),
         cause: sanitized_io_cause(error),
-        source: Some(sc_agent_types::ErrorDetail::foreign(
+        source: Some(Box::new(sc_agent_types::ErrorDetail::foreign(
             format!("io.{:?}", error.kind()),
             error,
-        )),
+        ))),
     }
 }
 

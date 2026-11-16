@@ -1,8 +1,7 @@
 """The sc-agent Python API over the maturin build.
 
 Default runs use a controlled loopback runner and pass its tempdir config explicitly.
-Only live_outcome-marked cases opt into owner-attended real config/keys on
-SC_AGENT_LIVE=1. All other tests keep loopback, fixed-answer and log assertions.
+Real-provider cases run separately through just integration.
 No test changes HOME or USERPROFILE. Orderings are driven by events, with bounded
 waits used only as failure backstops and no elapsed-time assertions.
 """
@@ -22,7 +21,7 @@ import warnings
 import pytest
 
 import sc_agent
-from conftest import HANG_GUARD, _call_outcome
+from conftest import HANG_GUARD
 from loopback import FIXED_ERROR
 
 NOUL = json.dumps({"model": "jev-latest", "state": "s", "questions": {"q": {"type": "noul"}}})
@@ -350,18 +349,13 @@ def test_keyring_location_invalid_before_any_send(env, args, operation, option, 
 
 
 @pytest.mark.parametrize("operation", [sc_agent.send, sc_agent.send_batch])
-def test_keyring_override_requires_named_provider(env, args, operation):
+def test_keyring_override_does_not_require_provider_for_local_runner(env, args, operation):
     loopback, _ = env
     request = [NOUL] if operation is sc_agent.send_batch else NOUL
-    with pytest.raises(sc_agent.SagError) as info:
-        operation(request, **args, keyring_service="consumer")
-    ident, detail = error_of(info)
-    assert ident == "sc_agent_py.invalid_option"
-    assert detail["id"] == ident
-    assert "provider" in detail["message"]
-    assert "required with a keyring override" in detail["message"]
-    assert detail["recovery"] == "Correct the named option and retry."
-    assert loopback.requests == []
+    result = operation(request, **args, keyring_service="consumer")
+    lines = result if isinstance(result, list) else [result]
+    assert all("error" in json.loads(line) for line in lines)
+    assert len(loopback.requests) == 1
 
 
 def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch, tmp_path):
@@ -390,43 +384,37 @@ def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch
     assert loopback.requests == []
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
-def test_models_list_outcome(outcome_models_args, outcome_call):
-    """SC_AGENT_LIVE=1 checks default TypeSafe models with provider omitted.
-
-    Only a native missing key skips; jev/haiku/luna are exercised by the send
-    outcomes through conftest.outcome_model, since models() takes no model.
-    """
+def test_models_list_outcome(outcome_models_args, outcome_call, record_property):
+    """The unit outcome uses the local models endpoint."""
     models = json.loads(outcome_call(sc_agent.models, **outcome_models_args))["models"]
     assert isinstance(models, list) and models
     assert all(isinstance(model["name"], str) and model["name"] for model in models)
+    record_property("provider", "typesafe" if "runner" not in outcome_models_args else "local")
+    record_property("result", f"{len(models)} models listed")
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
-def test_noul_send_outcome(outcome_args, outcome_call):
-    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
-
-    Provider is omitted; only a native missing key skips the owner-run case.
-    """
-    line = json.loads(outcome_call(sc_agent.send, NOUL, **outcome_args))
+def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
+    """The rendered consumer returns a valid noul response over loopback."""
+    text, code = outcome_call(consumer.call, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert code is None
+    line = json.loads(text)
     assert "error" not in line
     assert line["position"] == 0
     assert len(line["session_id"]) == 26
     answer = line["response"]["answers"]["q"]
     assert answer["type"] == "noul"
     assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+    record_property("result", json.dumps(answer))
 
 
-@pytest.mark.live_outcome
 @pytest.mark.mode("ok")
-def test_noul_send_batch_outcome(outcome_args, outcome_call):
-    """SC_AGENT_LIVE=1 uses jev/haiku/luna via conftest.outcome_model.
-
-    Provider is omitted; only a native missing key skips the owner-run case.
-    """
-    lines = [json.loads(line) for line in outcome_call(sc_agent.send_batch, [NOUL] * 3, **outcome_args)]
+def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
+    """The rendered consumer returns a valid noul response over loopback."""
+    results = outcome_call(consumer.call_batch, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert all(code is None for _, code in results)
+    lines = [json.loads(line) for line, _ in results]
     assert sorted(line["position"] for line in lines) == [0, 1, 2]
     for line in lines:
         assert "error" not in line
@@ -434,48 +422,15 @@ def test_noul_send_batch_outcome(outcome_args, outcome_call):
         answer = line["response"]["answers"]["q"]
         assert answer["type"] == "noul"
         assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
+    record_property("result", json.dumps([line["response"]["answers"]["q"] for line in lines]))
 
 
-@pytest.mark.mode("ok")
-def test_nonmarked_outcome_stays_loopback_on_explicit_live_switch(explicit_live_switch, outcome_args, outcome_call, env):
+def test_keyring_override_refuses_ambiguous_ranking_before_send(env, args):
     loopback, _ = env
-    assert outcome_args["model"] == "dec"
-    assert "config_dir" in outcome_args
-    assert os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] == "1"
-    line = json.loads(outcome_call(sc_agent.send, NOUL, **outcome_args))
-    assert line["response"]["answers"]["q"]["noul"] == 0.123456789
-    assert len(loopback.requests) == 1
-
-
-@pytest.mark.parametrize("identity", ["decidr.no_provider_key", "secrets.key_missing"])
-def test_live_outcome_skips_only_native_missing_keys(identity):
-    error = sc_agent.SagError("decidr.secrets", "controlled absence", json.dumps({"id": "decidr.secrets", "cause": {"id": identity}}))
-    def missing():
-        raise error
-    with pytest.raises(pytest.skip.Exception, match="no applicable API key"):
-        _call_outcome(missing, _live=True)
-    # The same absence is a failure unless this is an explicitly live call.
     with pytest.raises(sc_agent.SagError) as caught:
-        _call_outcome(missing)
-    assert caught.value is error
-
-
-def test_live_outcome_propagates_other_native_failures():
-    error = sc_agent.SagError("decidr.config", "controlled config error", json.dumps({"id": "decidr.config"}))
-    def refused():
-        raise error
-    with pytest.raises(sc_agent.SagError) as caught:
-        _call_outcome(refused, _live=True)
-    assert caught.value is error
-
-
-@pytest.mark.parametrize("outcome_model", ["jev", "haiku", "luna"])
-def test_explicit_live_outcome_keeps_native_provider_selection(monkeypatch, request, outcome_model):
-    # Exercise only fixture argument construction; no native call or key lookup.
-    monkeypatch.setenv("SC_AGENT_LIVE", "1")
-    request.node.add_marker("live_outcome")
-    args = request.getfixturevalue("outcome_args")
-    assert args["model"] == outcome_model
-    assert "provider" not in args
-    assert "config_dir" not in args
-    assert os.environ["SC_AGENT_TEST_TRAP_PLATFORM_KEYRING"] == "1"
+        sc_agent.send(NOUL, **{**args, "model": "haiku"}, keyring_service="consumer")
+    assert caught.value.id == "decidr.ambiguous_keyring_override"
+    assert caught.value.category == "config"
+    assert "anthropic" in caught.value.message
+    assert all(provider in caught.value.message for provider in ("anthropic", "openrouter", "together"))
+    assert loopback.requests == []

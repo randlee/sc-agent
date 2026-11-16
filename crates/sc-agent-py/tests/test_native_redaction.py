@@ -88,3 +88,35 @@ def test_post_credential_decision_error_stays_redacted_in_actual_sagerror(env, c
     assert detail["cause"]["id"] == "decision.response_parse"
     assert "[redacted]" in detail["cause"]["message"]
     assert KEY not in str(caught.value.args)
+
+
+@pytest.mark.mode("echo-key")
+@pytest.mark.parametrize("provider", ["typesafe", "anthropic"])
+@pytest.mark.parametrize("status", [401])
+def test_invalid_environment_key_auth_cancels_and_redacts(
+    request, tmp_path, monkeypatch, consumer, provider, status, record_property,
+):
+    """The invalid-key unit path uses echo-key loopback; integration is separate."""
+    key = "invalid-environment-key-b12-auth-0001"
+    monkeypatch.chdir(tmp_path)  # No repository .env may override the explicit invalid key.
+    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
+    request.getfixturevalue("env")
+    config = request.getfixturevalue("config_dir")
+    keyed_runner(config)
+    monkeypatch.setenv(KEY_ENV, key)
+    options = request.getfixturevalue("args")
+    record_property("provider", "local")
+    record_property("model", options["model"])
+    record_property("mode", "loopback")
+    cancel = sc_agent.CancelToken()
+    text, code = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+                               category_codes={"auth": "AUTH"}, cancel=cancel)
+    detail = json.loads(text)["error"]
+    assert detail["status"] == 401 and detail["category"] == "auth"
+    assert code == "AUTH" and cancel.is_cancelled()
+    cancelled, _ = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+                                 category_codes={}, cancel=cancel)
+    assert json.loads(cancelled)["error"]["category"] == "cancelled"
+    assert key not in text + cancelled
+    assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))
+    record_property("result", "HTTP 401; category auth; token and follow-up cancelled; key absent from results/logs")

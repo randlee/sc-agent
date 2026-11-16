@@ -11,11 +11,11 @@ use crate::support::*;
 fn mismatch() -> DecisionError {
     DecisionError::SchemaMismatch {
         backend: "scripted",
-        detail: ErrorDetail::new(
+        detail: Box::new(ErrorDetail::new(
             "scripted.schema",
             "answers.q: missing field `probabilities`",
             None,
-        ),
+        )),
     }
 }
 

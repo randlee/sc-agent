@@ -42,3 +42,27 @@ pub use latch::{Gate, Opener, Started};
 pub use server::{Loopback, Server, serve_each, serve_once};
 #[doc(inline)]
 pub use wait::{HANG_GUARD, cancelled_within, join_within, recv_within};
+
+/// Assert that one sample per error variant matches an enum's unique catalog rows.
+///
+/// # Panics
+/// Panics when a sample is missing, an ID is duplicated, or a removed integration ID appears.
+pub fn assert_catalog_rows<E: sc_agent_types::ErrorId + sc_agent_types::ErrorCatalog>(
+    samples: &[E],
+) {
+    let rows = E::ROWS;
+    let mut seen = std::collections::BTreeSet::new();
+    for (id, _) in rows {
+        assert!(seen.insert(*id), "duplicate catalog id: {id}");
+        assert_ne!(*id, "decidr.integration_evidence");
+    }
+    assert_eq!(samples.len(), rows.len(), "one sample per catalog variant");
+    let sample_ids: std::collections::BTreeSet<_> =
+        samples.iter().map(|error| error.id()).collect();
+    assert_eq!(
+        sample_ids.len(),
+        samples.len(),
+        "sample IDs must be distinct"
+    );
+    assert_eq!(sample_ids, seen, "samples must match their enum's own rows");
+}

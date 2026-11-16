@@ -57,6 +57,11 @@ pub enum LogError {
         /// The host name read failure, if any.
         source: Option<std::io::Error>,
     },
+    /// The process's current working directory could not be read.
+    WorkingDirUnknown {
+        /// The current-directory read failure.
+        source: std::io::Error,
+    },
     /// The working folder has no final name component, or that name is not UTF-8.
     FolderUnknown {
         /// The folder.
@@ -69,7 +74,7 @@ pub enum LogError {
         /// The refused name.
         value: String,
         /// sc-observability's code and message.
-        cause: ErrorDetail,
+        cause: Box<ErrorDetail>,
     },
     /// The session or general log file could not be prepared.
     OpenSink {
@@ -121,7 +126,7 @@ pub enum LogError {
         /// Rows refused at write plus rows the writer could not write.
         count: u64,
         /// The latest failure, if known.
-        last: Option<ErrorDetail>,
+        last: Option<Box<ErrorDetail>>,
     },
 }
 
@@ -135,7 +140,7 @@ impl LogError {
         Self::InvalidName {
             what,
             value: value.to_owned(),
-            cause: ErrorDetail::foreign(cause.code().as_str(), cause),
+            cause: Box::new(ErrorDetail::foreign(cause.code().as_str(), cause)),
         }
     }
 }
@@ -145,24 +150,30 @@ fn io_id(error: &std::io::Error) -> String {
     format!("io.{:?}", error.kind())
 }
 
+sc_agent_types::error_catalog! { LogError {
+    LogError::InvalidSlug { .. } => ("log.invalid_slug", Some(sc_agent_types::ErrorCategory::Validation)),
+    LogError::InvalidRepo { .. } => ("log.invalid_repo", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::GitUnavailable { .. } => ("log.git_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::GitOutput { .. } => ("log.git_output", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::HostUnknown { .. } => ("log.host_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::WorkingDirUnknown { .. } => ("log.working_dir_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::FolderUnknown { .. } => ("log.folder_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::InvalidName { .. } => ("log.invalid_name", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::OpenSink { .. } => ("log.open_sink", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::Start { .. } => ("log.start", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::ReservedField { .. } => ("log.reserved_field", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::RowsLost { .. } => ("log.rows_lost", Some(sc_agent_types::ErrorCategory::Log)),
+} }
+
 impl ErrorId for LogError {
     fn id(&self) -> &'static str {
-        match self {
-            Self::InvalidSlug { .. } => "log.invalid_slug",
-            Self::InvalidRepo { .. } => "log.invalid_repo",
-            Self::GitUnavailable { .. } => "log.git_unavailable",
-            Self::GitOutput { .. } => "log.git_output",
-            Self::HostUnknown { .. } => "log.host_unknown",
-            Self::FolderUnknown { .. } => "log.folder_unknown",
-            Self::InvalidName { .. } => "log.invalid_name",
-            Self::OpenSink { .. } => "log.open_sink",
-            Self::Start { .. } => "log.start",
-            Self::ReservedField { .. } => "log.reserved_field",
-            Self::Rejected { .. } => "log.rejected",
-            Self::Flush { .. } => "log.flush",
-            Self::RowTooLarge { .. } => "log.row_too_large",
-            Self::RowsLost { .. } => "log.rows_lost",
-        }
+        self.catalog_row().0
+    }
+    fn base_category(&self) -> Option<sc_agent_types::ErrorCategory> {
+        self.catalog_row().1
     }
 
     fn message(&self) -> String {
@@ -179,6 +190,9 @@ impl ErrorId for LogError {
             }
             Self::HostUnknown { source: Some(_) } => "the host name could not be read".to_owned(),
             Self::HostUnknown { source: None } => "the host name is not UTF-8".to_owned(),
+            Self::WorkingDirUnknown { .. } => {
+                "the current working directory could not be read".to_owned()
+            }
             Self::FolderUnknown { path } => format!(
                 "the folder {} has no final name component in UTF-8",
                 path.display()
@@ -211,8 +225,11 @@ impl ErrorId for LogError {
             Self::GitUnavailable { source }
             | Self::HostUnknown {
                 source: Some(source),
-            } => Some(ErrorDetail::foreign(io_id(source), source)),
-            Self::InvalidName { cause, .. } => Some(cause.clone()),
+            }
+            | Self::WorkingDirUnknown { source } => {
+                Some(ErrorDetail::foreign(io_id(source), source))
+            }
+            Self::InvalidName { cause, .. } => Some((**cause).clone()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
             ),
@@ -224,7 +241,7 @@ impl ErrorId for LogError {
                 source.diagnostic().code.as_str(),
                 source,
             )),
-            Self::RowsLost { last, .. } => last.clone(),
+            Self::RowsLost { last, .. } => last.as_deref().cloned(),
             Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
@@ -249,11 +266,14 @@ impl Error for LogError {
             | Self::HostUnknown {
                 source: Some(source),
             } => Some(source),
-            Self::InvalidName { cause, .. } => Some(cause),
+            Self::WorkingDirUnknown { source } => Some(source),
+            Self::InvalidName { cause, .. } => Some(cause.as_ref()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),
             Self::Flush { source, .. } => Some(source),
-            Self::RowsLost { last, .. } => last.as_ref().map(|last| last as &(dyn Error + 'static)),
+            Self::RowsLost { last, .. } => {
+                last.as_deref().map(|last| last as &(dyn Error + 'static))
+            }
             Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }

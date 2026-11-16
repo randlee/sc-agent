@@ -51,3 +51,5 @@ Dev only: `sc-agent-testkit`.
 - ADR-SAG-0004: crate layering and per-crate error unions.
 
 License: MIT.
+
+`ErrorDetail` carries optional status, attempts, Retry-After milliseconds and category. `ErrorId` implementors provide a base category; wrappers copy these fields from their cause. Unknown serialized categories deserialize as `other`.

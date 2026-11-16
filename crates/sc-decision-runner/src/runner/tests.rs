@@ -43,7 +43,11 @@ impl Backend for NeverMatches {
         }
         Err(DecisionError::SchemaMismatch {
             backend: "never-matches",
-            detail: ErrorDetail::new("test.mismatch", "missing probabilities", None),
+            detail: Box::new(ErrorDetail::new(
+                "test.mismatch",
+                "missing probabilities",
+                None,
+            )),
         })
     }
 }
@@ -591,11 +595,11 @@ impl Backend for SchemaSequence {
             }
             return Err(DecisionError::SchemaMismatch {
                 backend: "scripted",
-                detail: ErrorDetail::new(
+                detail: Box::new(ErrorDetail::new(
                     "scripted.schema",
                     "answers.q: missing field `probabilities`",
                     None,
-                ),
+                )),
             });
         }
         SystemOneResponse::from_json(response.status(), response.body())

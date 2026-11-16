@@ -66,11 +66,11 @@ fn lower_errors_reach_the_top() {
     let backend = ScriptedBackend::new().with_decode(|_, _, _, _| {
         Err(DecisionError::Backend {
             backend: "llm",
-            detail: ErrorDetail::new(
+            detail: Box::new(ErrorDetail::new(
                 "llm.provider_refused",
                 "the provider refused the prompt",
                 Some(ErrorDetail::new("provider.code", "content_filter", None)),
-            ),
+            )),
         })
     });
     let harness = Harness::new(Arc::new(backend), Arc::new(transport), config(1), 5);

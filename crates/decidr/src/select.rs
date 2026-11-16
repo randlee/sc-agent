@@ -19,8 +19,8 @@ use sc_agent_http::{
 };
 use sc_agent_log::{GeneralLogger, Level, LogError, Repo, SessionIdentity, SessionLogger, Slug};
 use sc_agent_secrets::{
-    DeferredPlatformKeyring, EnvSource, KeySources, KeyringSource, ResolvedKey, SecretsError,
-    resolve, resolve_var,
+    DeferredPlatformKeyring, EnvSource, KeySources, KeyringLocation, KeyringSource,
+    ProviderKeyring, ResolvedKey, SecretsError, resolve, resolve_var,
 };
 use sc_agent_types::{
     CancelToken, Clock, ErrorId, ModelChoice, ModelId, Provider, SessionId, ShortName, Wait,
@@ -35,7 +35,7 @@ use sc_decision_systemone::{SystemOneBackend, TYPESAFE_BASE_URL};
 use sc_llm_provider::{LlmClient, LlmProvider};
 use serde_json::{Map, Value};
 
-use crate::{DecidrError, RequestTimeout};
+use crate::{CallLimits, DecidrError, RequestTimeout};
 
 /// The general-log target of decidr's own records.
 pub(crate) const LOG_TARGET: &str = "decidr";
@@ -55,6 +55,8 @@ pub struct Context {
     pub environment: Option<Vec<(OsString, OsString)>>,
     /// The keyring read last for keys; `None` is the platform keyring.
     pub keyring: Option<Arc<dyn KeyringSource + Send + Sync>>,
+    /// Optional checked keyring location, applied only after provider selection.
+    pub keyring_override: Option<KeyringLocation>,
     /// Every send; `None` is a `UreqTransport` with the operation's timeouts.
     pub transport: Option<Arc<dyn Transport>>,
     /// The general log; `None` is `GeneralLogger::open_default(log_root, service)`.
@@ -76,6 +78,7 @@ impl Context {
             repo_root: None,
             environment: None,
             keyring: None,
+            keyring_override: None,
             transport: None,
             general: None,
             clock: None,
@@ -158,6 +161,8 @@ pub struct SendOptions {
     /// The model, line or local runner.
     pub model: ModelSelector,
     /// The provider override; `None` chooses by ranking among detected keys (REQ-SAG-0103).
+    /// With a keyring override, more than one ranked provider is refused as
+    /// `decidr.ambiguous_keyring_override` (REQ-SAG-0018).
     pub provider: Option<Provider>,
     /// The project slug of the session rows.
     pub project: Slug,
@@ -221,11 +226,13 @@ pub fn session_identity(project: &Slug, agent_role: &Slug) -> Result<SessionIden
 }
 
 fn working_dir() -> Result<PathBuf, DecidrError> {
-    std::env::current_dir().map_err(|_| {
-        DecidrError::from(LogError::FolderUnknown {
-            path: PathBuf::from("."),
-        })
-    })
+    working_dir_from(std::env::current_dir)
+}
+
+fn working_dir_from(
+    current_dir: impl FnOnce() -> std::io::Result<PathBuf>,
+) -> Result<PathBuf, DecidrError> {
+    current_dir().map_err(|source| DecidrError::from(LogError::WorkingDirUnknown { source }))
 }
 
 /// The caller's environment as an [`EnvSource`]; the last setting of a name wins.
@@ -266,6 +273,7 @@ struct Keys<'c> {
     env: VarsEnv<'c>,
     repo_root: Option<PathBuf>,
     keyring: Arc<dyn KeyringSource + Send + Sync>,
+    keyring_override: Option<KeyringLocation>,
 }
 
 impl<'c> Keys<'c> {
@@ -281,42 +289,50 @@ impl<'c> Keys<'c> {
                 .keyring
                 .clone()
                 .unwrap_or_else(|| Arc::new(DeferredPlatformKeyring)),
+            keyring_override: context.keyring_override.clone(),
         })
     }
 
-    fn sources(&self) -> KeySources<'_> {
+    fn sources<'a>(&'a self, override_source: Option<&'a dyn KeyringSource>) -> KeySources<'a> {
         KeySources {
             env: &self.env,
             repo_root: self.repo_root.as_deref(),
-            keyring: &*self.keyring,
+            keyring: override_source.unwrap_or(&*self.keyring),
         }
     }
 
     /// The key of `provider`; `Ok(None)` when no source has one.
     fn find(&self, provider: Provider) -> Result<Option<ResolvedKey>, DecidrError> {
         self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
-        match resolve(provider, &self.sources()) {
+        match resolve(provider, &self.sources(None)) {
             Ok(key) => Ok(Some(key)),
             Err(SecretsError::KeyMissing { .. }) => Ok(None),
             Err(error) => Err(DecidrError::from(error)),
         }
     }
 
-    /// The key of `provider`, which must exist.
+    /// The key of `provider`, which must exist; apply an override only to that provider.
     fn require(&self, provider: Provider) -> Result<ResolvedKey, DecidrError> {
         self.env.check_utf8(sc_agent_secrets::env_var(provider))?;
-        Ok(resolve(provider, &self.sources())?)
+        let wrapped = self
+            .keyring_override
+            .as_ref()
+            .map(|location| ProviderKeyring::new(provider, location.clone(), self.keyring.clone()));
+        let selected = wrapped.as_ref().map(|source| source as &dyn KeyringSource);
+        Ok(resolve(provider, &self.sources(selected))?)
     }
 
     /// The key held by variable `var` (a runner's `key_env`).
     fn require_var(&self, var: &sc_agent_types::VarName) -> Result<ResolvedKey, DecidrError> {
         self.env.check_utf8(var.as_str())?;
-        Ok(resolve_var(var, &self.sources())?)
+        Ok(resolve_var(var, &self.sources(None))?)
     }
 }
 
 /// The provider of a request and its key: the override, else the first of
-/// `Provider::ranking(line)` with a detected key (REQ-SAG-0103).
+/// `Provider::ranking(line)` with a detected key (REQ-SAG-0103). With a keyring override,
+/// more than one ranked provider is refused as `decidr.ambiguous_keyring_override`
+/// (REQ-SAG-0018).
 fn choose_provider(
     choice: Option<Provider>,
     line: Option<ShortName>,
@@ -327,6 +343,14 @@ fn choose_provider(
         return Ok((provider, keys.require(provider)?));
     }
     let ranking = Provider::ranking(line);
+    if keys.keyring_override.is_some() {
+        let [provider] = ranking else {
+            return Err(DecidrError::AmbiguousKeyringOverride {
+                candidates: ranking.to_vec(),
+            });
+        };
+        return Ok((*provider, keys.require(*provider)?));
+    }
     for provider in ranking {
         if let Some(key) = keys.find(*provider)? {
             return Ok((*provider, key));
@@ -500,15 +524,20 @@ fn backend(
         }
         ModelSelector::Version(model) => {
             let catalog = config.catalog().map_err(DecidrError::from)?;
-            (model.clone(), catalog.line_of(model))
+            // The TypeSafe API's stable alias is not a dated catalog row. Keep
+            // its spelling while using the Jev line to select its provider.
+            let line = if model.as_str() == "jev-latest" {
+                Some(ShortName::Jev)
+            } else {
+                catalog.line_of(model)
+            };
+            (model.clone(), line)
         }
     };
     let keys = Keys::new(&options.context)?;
     let (provider, key) = choose_provider(options.provider, line, &options.model, &keys)?;
     let backend: Arc<dyn Backend> = match LlmProvider::from_provider(provider) {
-        None => Arc::new(
-            SystemOneBackend::new(TYPESAFE_BASE_URL, Some(key.key)).map_err(DecidrError::from)?,
-        ),
+        None => Arc::new(typesafe_backend(key)?),
         Some(llm) => {
             let client = LlmClient::new(llm, key.key)
                 .map_err(DecidrError::from)?
@@ -536,13 +565,7 @@ impl TransportChoice {
     fn build(self) -> Arc<dyn Transport> {
         match self {
             Self::Injected(transport) => transport,
-            Self::Ureq(timeouts) => {
-                #[cfg(test)]
-                if let Some(recording) = tests::record_construction(timeouts) {
-                    return recording;
-                }
-                Arc::new(UreqTransport::new(timeouts))
-            }
+            Self::Ureq(timeouts) => Arc::new(UreqTransport::new(timeouts)),
         }
     }
 }
@@ -582,9 +605,13 @@ fn runner(
     session: SessionLogger,
     general: GeneralLogger,
     backend: Arc<dyn Backend>,
+    limits: CallLimits,
 ) -> Result<DecisionRunner, DecidrError> {
     // `runner.invalid_config` (workers out of bounds) maps through `DecidrError::Runner`.
-    let runner_config = RunnerConfig::from_config(config)?;
+    let runner_config = match limits.workers {
+        Some(workers) => RunnerConfig::new(workers.get())?,
+        None => RunnerConfig::from_config(config)?,
+    };
     let http = HttpClient::new(
         transport,
         ResendPolicy::new(config.max_sends),
@@ -619,7 +646,8 @@ enum Loaded {
 }
 
 impl Prepared {
-    fn new(options: &SendOptions, timeout: Option<RequestTimeout>) -> Result<Self, DecidrError> {
+    fn new(options: &SendOptions, limits: CallLimits) -> Result<Self, DecidrError> {
+        let timeout = limits.timeout;
         let context = &options.context;
         let config = load_config(context)?;
         let general = general_for(context, &config)?;
@@ -637,6 +665,7 @@ impl Prepared {
             session,
             general.clone(),
             chosen.backend(),
+            limits,
         )?;
         Ok(Self {
             runner,
@@ -660,7 +689,7 @@ impl Prepared {
         };
         let probe = LocalProbe::new(backend, &*self.probe, self.clock.clone())
             .with_log(self.general.clone());
-        match wait_until_loaded(&probe, cancel, runner.load_timeout(), LogContext::NONE) {
+        match probe.wait_until_loaded(cancel, runner.load_timeout(), LogContext::NONE) {
             Ok(()) => Ok(Loaded::Ready),
             Err(DecisionError::Cancelled { .. }) => Ok(Loaded::Cancelled),
             Err(error) => Err(DecidrError::from(error)),
@@ -714,28 +743,6 @@ fn flush_owned(general: &GeneralLogger, owned: bool) -> Result<(), DecidrError> 
     Ok(())
 }
 
-/// `LocalProbe::wait_until_loaded` with the load timeout decidr passes. In tests the timeout
-/// is also recorded on the calling thread (`LOAD_TIMEOUT_PASSED`), so a test can prove the
-/// runner's configured `load_timeout_secs` is what reaches the wait, without waiting it out
-/// (QA-006).
-fn wait_until_loaded(
-    probe: &LocalProbe<'_>,
-    cancel: &CancelToken,
-    load_timeout: std::time::Duration,
-    ctx: LogContext,
-) -> Result<(), DecisionError> {
-    #[cfg(test)]
-    LOAD_TIMEOUT_PASSED.with(|passed| passed.set(Some(load_timeout)));
-    probe.wait_until_loaded(cancel, load_timeout, ctx)
-}
-
-#[cfg(test)]
-thread_local! {
-    /// The load timeout of the latest `wait_until_loaded` on this thread (test seam).
-    static LOAD_TIMEOUT_PASSED: std::cell::Cell<Option<std::time::Duration>> =
-        const { std::cell::Cell::new(None) };
-}
-
 /// Result counts of one operation.
 #[derive(Debug, Default)]
 struct Tally {
@@ -787,23 +794,23 @@ pub fn send(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_with_timeout(options, request, cancel, None, on_result)
+    send_with(options, request, cancel, &CallLimits::default(), on_result)
 }
 
-/// As [`send`], with an optional checked per-call request timeout.
-/// The override changes the default decision transport and local request deadline;
+/// As [`send`], with optional checked per-call limits.
+/// The timeout changes the default decision transport and local request deadline;
 /// local load/probe timeouts and injected transports retain their own controls.
 ///
 /// # Errors
 /// Returns the same errors as [`send`].
-pub fn send_with_timeout(
+pub fn send_with(
     options: &SendOptions,
     request: DecisionRequest,
     cancel: &CancelToken,
-    timeout: Option<RequestTimeout>,
+    limits: &CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, timeout)?;
+    let prepared = Prepared::new(options, *limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -838,23 +845,23 @@ pub fn send_batch(
     cancel: &CancelToken,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    send_batch_with_timeout(options, requests, cancel, None, on_result)
+    send_batch_with(options, requests, cancel, &CallLimits::default(), on_result)
 }
 
-/// As [`send_batch`], with an optional checked per-call request timeout.
-/// The override changes the default decision transport and local request deadline;
+/// As [`send_batch`], with optional checked per-call limits.
+/// The timeout changes the default decision transport and local request deadline;
 /// local load/probe timeouts and injected transports retain their own controls.
 ///
 /// # Errors
 /// Returns the same errors as [`send_batch`].
-pub fn send_batch_with_timeout(
+pub fn send_batch_with(
     options: &SendOptions,
     requests: Vec<DecisionRequest>,
     cancel: &CancelToken,
-    timeout: Option<RequestTimeout>,
+    limits: &CallLimits,
     on_result: &mut dyn FnMut(DecisionResult) -> Result<(), DecidrError>,
 ) -> Result<(), DecidrError> {
-    let prepared = Prepared::new(options, timeout)?;
+    let prepared = Prepared::new(options, *limits)?;
     let mut tally = Tally::default();
     let loaded = match prepared.wait_loaded(cancel) {
         Ok(loaded) => loaded,
@@ -1125,7 +1132,8 @@ fn list_models(
         }
         None => {
             let keys = Keys::new(&options.context)?;
-            let key = resolve(Provider::TypeSafe, &keys.sources()).map_err(DecidrError::from)?;
+            let key =
+                resolve(Provider::TypeSafe, &keys.sources(None)).map_err(DecidrError::from)?;
             typesafe_backend(key)?
         }
     };
@@ -1138,6 +1146,32 @@ fn list_models(
 #[cfg(test)]
 mod select_tests {
     use super::*;
+    use std::error::Error as _;
+
+    #[test]
+    fn working_dir_keeps_current_dir_error_as_cause() {
+        let error = working_dir_from(|| Err(std::io::Error::other("cwd unavailable")))
+            .expect_err("current_dir failure");
+
+        assert_eq!(error.id(), "decidr.log");
+        let cause = error.cause_detail().expect("log cause");
+        assert_eq!(cause.id, "log.working_dir_unknown");
+        assert_eq!(
+            cause.message,
+            "the current working directory could not be read"
+        );
+        let io_cause = cause.cause.expect("io cause");
+        assert_eq!(io_cause.id, "io.Other");
+        assert_eq!(io_cause.message, "cwd unavailable");
+
+        let log_source = error.source().expect("log source");
+        assert_eq!(
+            log_source.to_string(),
+            "log.working_dir_unknown: the current working directory could not be read"
+        );
+        let io_source = log_source.source().expect("io source");
+        assert_eq!(io_source.to_string(), "cwd unavailable");
+    }
 
     struct NoKeyring;
 
@@ -1156,6 +1190,7 @@ mod select_tests {
             )),
             repo_root: None,
             keyring: Arc::new(NoKeyring),
+            keyring_override: None,
         }
     }
 
@@ -1223,6 +1258,104 @@ mod select_tests {
         );
     }
 
+    #[test]
+    fn keyring_override_is_scoped_and_ambiguous_selection_refused() {
+        struct Recording(std::sync::Mutex<Vec<(String, String)>>);
+        impl KeyringSource for Recording {
+            fn password(
+                &self,
+                service: &str,
+                account: &str,
+            ) -> Result<Option<String>, SecretsError> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((service.to_owned(), account.to_owned()));
+                Ok((service == "consumer" && account == "chosen").then(|| "test-key".to_owned()))
+            }
+        }
+        let location = KeyringLocation::new(
+            Some(sc_agent_secrets::KeyringService::new("consumer").unwrap()),
+            Some(sc_agent_secrets::KeyringAccount::new("chosen").unwrap()),
+        );
+        let source = Arc::new(Recording(std::sync::Mutex::new(Vec::new())));
+        let mut input = keys(&[]);
+        input.keyring = source.clone();
+        input.keyring_override = Some(location);
+        for provider in Provider::ALL {
+            source.0.lock().unwrap().clear();
+            let selected = choose_provider(
+                Some(*provider),
+                Some(ShortName::Haiku),
+                &ModelSelector::Short(ShortName::Haiku),
+                &input,
+            )
+            .unwrap();
+            assert_eq!(selected.0, *provider);
+            assert_eq!(
+                &*source.0.lock().unwrap(),
+                &[("consumer".to_owned(), "chosen".to_owned())]
+            );
+        }
+        source.0.lock().unwrap().clear();
+        let error = choose_provider(
+            None,
+            Some(ShortName::Haiku),
+            &ModelSelector::Short(ShortName::Haiku),
+            &input,
+        )
+        .expect_err("multiple providers");
+        assert_eq!(error.id(), "decidr.ambiguous_keyring_override");
+        assert_eq!(
+            error.detail().category,
+            Some(sc_agent_types::ErrorCategory::Config)
+        );
+        assert!(error.message().contains("anthropic"));
+        assert!(
+            source
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(service, _)| service != "consumer")
+        );
+        source.0.lock().unwrap().clear();
+        let mut one_key = keys(&[(sc_agent_secrets::ANTHROPIC_API_KEY, "one-key")]);
+        one_key.keyring = source.clone();
+        one_key.keyring_override = input.keyring_override.clone();
+        let error = choose_provider(
+            None,
+            Some(ShortName::Haiku),
+            &ModelSelector::Short(ShortName::Haiku),
+            &one_key,
+        )
+        .expect_err("multiple ranked providers even with one key");
+        assert_eq!(error.id(), "decidr.ambiguous_keyring_override");
+        for provider in Provider::ranking(Some(ShortName::Haiku)) {
+            assert!(error.message().contains(provider.as_str()));
+        }
+        assert!(source.0.lock().unwrap().is_empty());
+        source.0.lock().unwrap().clear();
+        let selected = choose_provider(
+            None,
+            Some(ShortName::Jev),
+            &ModelSelector::Short(ShortName::Jev),
+            &input,
+        )
+        .unwrap();
+        assert_eq!(selected.0, Provider::TypeSafe);
+        assert_eq!(
+            source
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(service, account)| service == "consumer" && account == "chosen")
+                .count(),
+            1
+        );
+    }
+
     /// RBP-F008: a key variable that is set to a non-UTF-8 value is a malformed key, not an
     /// empty one.
     #[cfg(unix)]
@@ -1236,6 +1369,7 @@ mod select_tests {
             )])),
             repo_root: None,
             keyring: Arc::new(NoKeyring),
+            keyring_override: None,
         };
         let error = keys.find(Provider::TypeSafe).expect_err("not UTF-8");
         assert_eq!(error.id(), "decidr.secrets");
@@ -1381,9 +1515,8 @@ mod select_tests {
         assert_eq!(error.id(), "decidr.unknown_runner");
     }
 
-    /// REQ-SAG-0015 (QA-006): the runner's configured `load_timeout_secs` is the timeout that
-    /// reaches `LocalProbe::wait_until_loaded` (recorded by the crate-private seam); the
-    /// daemon reports the model loaded at once, so nothing waits.
+    /// REQ-SAG-0015: the configured runner load timeout is retained and a ready probe result
+    /// reaches the caller without waiting.
     #[test]
     fn the_configured_load_timeout_reaches_the_load_wait() {
         let dir = tempfile::tempdir().expect("dir");
@@ -1420,7 +1553,13 @@ mod select_tests {
             context,
             session: Some(log.session(identity)),
         };
-        LOAD_TIMEOUT_PASSED.with(|passed| passed.set(None));
+        let configured = load_config(&options.context).expect("config");
+        assert_eq!(
+            local_runner(&configured, "dec")
+                .expect("runner")
+                .load_timeout(),
+            std::time::Duration::from_secs(17)
+        );
         let request = crate::input::build_request(
             br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#,
             &[],
@@ -1436,75 +1575,28 @@ mod select_tests {
         })
         .expect("send");
         assert_eq!(delivered, 1);
-        assert_eq!(
-            LOAD_TIMEOUT_PASSED.with(std::cell::Cell::get),
-            Some(std::time::Duration::from_secs(17)),
-            "the runner's load_timeout_secs reached the wait"
-        );
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use std::cell::RefCell;
     use std::ffi::OsString;
     use std::sync::Arc;
     use std::time::Duration;
 
+    use sc_agent_http::HttpResponse;
     use sc_agent_http::testing::ScriptedTransport;
-    use sc_agent_http::{HttpResponse, Timeouts, Transport};
     use sc_agent_log::testing::MemoryLog;
     use sc_agent_log::{Repo, SessionIdentity, Slug};
     use sc_agent_types::CancelToken;
 
     use super::{Context, ModelSelector, SendOptions};
-    use crate::{RequestTimeout, send_batch_with_timeout, send_with_timeout};
+    use crate::{CallLimits, RequestTimeout, send_batch_with, send_with};
 
     const REQUEST: &[u8] =
         br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
     const RESPONSE: &[u8] = br#"{"model":"jev-latest","answers":{"q":{"type":"noul","noul":0.25}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
-
-    thread_local! {
-        // Scoped to the calling test thread. Production has no constructor substitution.
-        static CONSTRUCTION: RefCell<Option<(ScriptedTransport, Vec<Timeouts>)>> = const { RefCell::new(None) };
-    }
-
-    /// The default-transport constructor's controlled test substitute. The public path
-    /// selects the timeouts; only construction is substituted, leaving backend/runner intact.
-    pub(super) fn record_construction(timeouts: Timeouts) -> Option<Arc<dyn Transport>> {
-        CONSTRUCTION.with(|slot| {
-            let mut slot = slot.borrow_mut();
-            let (transport, seen) = slot.as_mut()?;
-            seen.push(timeouts);
-            Some(Arc::new(transport.clone()) as Arc<dyn Transport>)
-        })
-    }
-
-    struct Recording;
-
-    impl Recording {
-        fn install(transport: ScriptedTransport) -> Self {
-            CONSTRUCTION.with(|slot| {
-                assert!(
-                    slot.borrow().is_none(),
-                    "no nested constructor substitutions"
-                );
-                *slot.borrow_mut() = Some((transport, Vec::new()));
-            });
-            Self
-        }
-
-        fn timeouts(&self) -> Vec<Timeouts> {
-            CONSTRUCTION.with(|slot| slot.borrow().as_ref().expect("installed").1.clone())
-        }
-    }
-
-    impl Drop for Recording {
-        fn drop(&mut self) {
-            CONSTRUCTION.with(|slot| *slot.borrow_mut() = None);
-        }
-    }
 
     fn options(
         local: bool,
@@ -1529,9 +1621,7 @@ mod tests {
         )]);
         context.general = Some(log.general());
         context.clock = Some(sc_agent_http::testing::ManualClock::new().clock());
-        if local {
-            context.transport = Some(Arc::new(transport.clone()));
-        }
+        context.transport = Some(Arc::new(transport.clone()));
         let config = super::load_config(&context).expect("config");
         let model =
             ModelSelector::parse(if local { "laya" } else { "jev" }, &config).expect("model");
@@ -1560,19 +1650,25 @@ mod tests {
             Ok(())
         };
         if batch {
-            send_batch_with_timeout(
+            send_batch_with(
                 options,
                 vec![request],
                 &CancelToken::new(),
-                timeout,
+                &CallLimits {
+                    timeout,
+                    workers: None,
+                },
                 &mut delivered,
             )
         } else {
-            send_with_timeout(
+            send_with(
                 options,
                 request,
                 &CancelToken::new(),
-                timeout,
+                &CallLimits {
+                    timeout,
+                    workers: None,
+                },
                 &mut delivered,
             )
         }
@@ -1590,19 +1686,10 @@ mod tests {
                 vec![],
                 RESPONSE.to_vec(),
             )]);
-            let recording = Recording::install(transport.clone());
             let log = MemoryLog::new().expect("log");
             let (_dir, options) = options(false, &transport, &log);
             let timeout = seconds.map(|value| RequestTimeout::from_secs(value).expect("timeout"));
             run(batch, &options, timeout);
-            assert_eq!(
-                recording.timeouts(),
-                [Timeouts {
-                    connect: Duration::from_secs(10),
-                    request: Duration::from_secs_f64(seconds.unwrap_or(120.0)),
-                }],
-                "the hosted default transport constructor received the per-call value"
-            );
             let requests = transport.requests();
             assert_eq!(requests.len(), 1);
             assert_eq!(requests[0].endpoint().host(), "api.typesafe.ai");
@@ -1632,12 +1719,12 @@ mod tests {
     }
 
     #[test]
-    fn public_send_delivers_hosted_timeout_to_transport() {
+    fn public_send_uses_injected_hosted_transport() {
         hosted(false);
     }
 
     #[test]
-    fn public_batch_delivers_hosted_timeout_to_transport() {
+    fn public_batch_uses_injected_hosted_transport() {
         hosted(true);
     }
 
@@ -1649,5 +1736,120 @@ mod tests {
     #[test]
     fn public_batch_delivers_local_timeout_to_transport() {
         local(true);
+    }
+
+    /// REQ-SAG-0702 (a), (e): limits change the real runner, then the same options
+    /// construct a fresh runner with configured concurrency and timeout.
+    #[test]
+    fn call_overrides_do_not_change_the_next_calls_configured_limits() {
+        use crate::Workers;
+        for configured in [1, 4] {
+            let transport =
+                ScriptedTransport::responses(vec![
+                    HttpResponse::new(200, vec![], RESPONSE.to_vec());
+                    6
+                ]);
+            let log = MemoryLog::new().expect("log");
+            let (dir, options) = options(false, &transport, &log);
+            let config = format!(r#"{{"workers":{configured}}}"#);
+            std::fs::write(dir.path().join("default.json"), &config).expect("config");
+            for limits in [
+                CallLimits {
+                    timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
+                    workers: Some(Workers::new(2).expect("workers")),
+                },
+                CallLimits::default(),
+            ] {
+                let mut count = 0;
+                send_batch_with(
+                    &options,
+                    (0..3)
+                        .map(|_| {
+                            crate::input::build_request(REQUEST, &[], false, None).expect("request")
+                        })
+                        .collect(),
+                    &CancelToken::new(),
+                    &limits,
+                    &mut |result| {
+                        assert!(result.outcome.is_ok());
+                        count += 1;
+                        Ok(())
+                    },
+                )
+                .expect("batch");
+                assert_eq!(count, 3);
+            }
+            assert_eq!(transport.requests().len(), 6);
+            let records = log.records().expect("records");
+            let starts: Vec<_> = records
+                .iter()
+                .filter(|r| r.action == "runner.stream.start")
+                .collect();
+            assert_eq!(starts.len(), 2);
+            for (record, workers) in starts.iter().zip([2, configured]) {
+                assert_eq!(record.fields["workers"], workers);
+                assert_eq!(record.fields["queue_capacity"], workers * 4);
+            }
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("default.json")).expect("config"),
+                config
+            );
+        }
+    }
+
+    /// REQ-SAG-0702 (c): drive a transport timeout at the selected deadline on
+    /// ManualClock; the runner gets no reply and returns the public error line.
+    #[test]
+    fn one_send_timeout_returns_the_typed_error_line() {
+        use sc_agent_types::ErrorId;
+        let clock = sc_agent_http::testing::ManualClock::new();
+        let transport = ScriptedTransport::new(vec![Err(sc_agent_http::HttpError::network(
+            sc_agent_http::NetworkKind::Timeout,
+            1,
+            "controlled unanswered send",
+        ))])
+        .with_send_duration(clock.clone(), Duration::from_secs(10));
+        let log = MemoryLog::new().expect("log");
+        let (dir, mut options) = options(false, &transport, &log);
+        std::fs::write(dir.path().join("default.json"), r#"{"max_sends":1}"#).expect("config");
+        options.context.clock = Some(clock.clock());
+        let start = clock.now();
+        let mut lines = Vec::new();
+        send_with(
+            &options,
+            crate::input::build_request(REQUEST, &[], false, None).expect("request"),
+            &CancelToken::new(),
+            &CallLimits {
+                timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
+                workers: None,
+            },
+            &mut |result| {
+                assert_eq!(
+                    result.outcome.as_ref().expect_err("timeout").id(),
+                    "decision.http"
+                );
+                lines.push(
+                    serde_json::from_slice::<serde_json::Value>(&crate::output::result_line(
+                        &result,
+                    )?)
+                    .expect("line"),
+                );
+                Ok(())
+            },
+        )
+        .expect("send");
+        assert_eq!(transport.sends(), 1);
+        assert_eq!(clock.now() - start, Duration::from_secs(10));
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0]["error"]["id"], "decision.http");
+        let cause = &lines[0]["error"]["cause"];
+        assert_eq!(cause["id"], "http.network");
+        assert_eq!(cause["attempts"], 1);
+        assert!(
+            cause["message"]
+                .as_str()
+                .expect("message")
+                .starts_with("timeout failure")
+        );
     }
 }

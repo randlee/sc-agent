@@ -113,11 +113,11 @@ mod tests {
             SecretsError::KeyringRead {
                 kind: "controlled",
                 cause: "read refused",
-                source: Some(sc_agent_types::ErrorDetail::new(
+                source: Some(Box::new(sc_agent_types::ErrorDetail::new(
                     "keyring.controlled",
                     "vault unavailable",
                     None,
-                )),
+                ))),
             },
         ] {
             let dir = empty_config_dir();

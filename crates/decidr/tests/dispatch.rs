@@ -490,4 +490,53 @@ mod tests {
             }
         }
     }
+
+    /// REQ-SAG-0702 (d): a controlled send remains in flight while ManualClock
+    /// crosses the 90-second start budget; only the explicit release supplies a reply.
+    #[test]
+    fn an_in_flight_send_is_not_cut_by_the_start_budget() {
+        use std::time::Duration;
+        let clock = sc_agent_http::testing::ManualClock::new();
+        let gate = crate::common::Gate::new(ok_noul());
+        let log = MemoryLog::new().expect("log");
+        let dir = empty_config_dir();
+        let mut ctx = context(
+            dir.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(gate.clone()),
+            &log,
+        );
+        ctx.clock = Some(clock.clock());
+        let options = options("jev", None, ctx, &log);
+        let start = clock.now();
+        let observer = {
+            let gate = gate.clone();
+            let clock = clock.clone();
+            std::thread::spawn(move || {
+                gate.wait_started(1);
+                clock.advance(Duration::from_secs(91));
+                gate.release();
+            })
+        };
+        let mut count = 0;
+        decidr::send_with(
+            &options,
+            request(NOUL),
+            &CancelToken::new(),
+            &decidr::CallLimits {
+                timeout: Some(decidr::RequestTimeout::from_secs(120.0).expect("timeout")),
+                workers: None,
+            },
+            &mut |result| {
+                assert!(result.outcome.is_ok(), "{:?}", result.outcome);
+                count += 1;
+                Ok(())
+            },
+        )
+        .expect("send");
+        sc_agent_testkit::join_within(observer, sc_agent_testkit::HANG_GUARD).expect("observer");
+        assert_eq!(clock.now() - start, Duration::from_secs(91));
+        assert_eq!(gate.sends(), 1);
+        assert_eq!(count, 1);
+    }
 }

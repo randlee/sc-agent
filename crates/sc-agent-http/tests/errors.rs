@@ -20,7 +20,7 @@ mod cases {
     use sc_agent_secrets::{
         ApiKey, EnvSource, KeySources, KeyringSource, SecretsError, resolve_var,
     };
-    use sc_agent_types::{ErrorDetail, ErrorId};
+    use sc_agent_types::{ErrorCategory, ErrorDetail, ErrorId};
 
     /// A manual clock for sends whose timing is not under test: it never moves.
     fn test_clock() -> sc_agent_types::Clock {
@@ -66,7 +66,14 @@ mod cases {
                 reason: BusyReason::Sends,
                 attempts: 5,
                 retry_after_seconds: Some(1.5),
-                last: Box::new(reply(429, "busy")),
+                last: Box::new(ProviderReply::read(
+                    &HttpResponse::new(
+                        429,
+                        vec![("retry-after".to_owned(), "1.1".to_owned())],
+                        b"busy".to_vec(),
+                    ),
+                    None,
+                )),
             },
             HttpError::QuotaExhausted {
                 attempts: 1,
@@ -120,6 +127,7 @@ mod cases {
     #[test]
     fn http_error_ids() {
         let errors = one_of_each();
+        sc_agent_testkit::assert_catalog_rows(&errors);
         let ids: HashSet<&str> = errors.iter().map(ErrorId::id).collect();
         assert_eq!(errors.len(), 7);
         assert_eq!(
@@ -147,12 +155,25 @@ mod cases {
             if let Some(status) = error.status() {
                 expected = expected.with_status(status);
             }
+            expected.attempts = error.attempts();
+            expected.retry_after_ms = error.retry_after_ms();
+            expected.category = error.base_category();
             assert_eq!(error.detail(), expected);
             assert_eq!(
                 std::error::Error::source(error).is_some(),
                 error.cause_detail().is_some()
             );
         }
+        let busy = errors[0].detail();
+        assert_eq!(
+            (
+                busy.status,
+                busy.attempts,
+                busy.retry_after_ms,
+                busy.category,
+            ),
+            (Some(429), Some(5), Some(1100), Some(ErrorCategory::Busy),)
+        );
         assert_eq!(errors[0].detail().status, Some(429));
         let with_recovery: HashSet<&str> = errors
             .iter()
@@ -169,10 +190,104 @@ mod cases {
         );
     }
 
+    #[test]
+    fn http_leaf_details_include_reply_fields_and_send_counts() {
+        let busy = HttpError::ProviderBusy {
+            reason: BusyReason::Sends,
+            attempts: 5,
+            retry_after_seconds: Some(99.0),
+            last: Box::new(ProviderReply::read(
+                &HttpResponse::new(
+                    529,
+                    vec![("retry-after".to_owned(), "2.0001".to_owned())],
+                    b"busy".to_vec(),
+                ),
+                None,
+            )),
+        }
+        .detail();
+        assert_eq!(
+            (
+                busy.status,
+                busy.attempts,
+                busy.retry_after_ms,
+                busy.category,
+            ),
+            (Some(529), Some(5), Some(2001), Some(ErrorCategory::Busy),)
+        );
+
+        let quota = HttpError::QuotaExhausted {
+            attempts: 1,
+            reply: Box::new(ProviderReply::read(
+                &HttpResponse::new(
+                    429,
+                    vec![("retry-after".to_owned(), "0.0000001".to_owned())],
+                    b"quota".to_vec(),
+                ),
+                None,
+            )),
+        }
+        .detail();
+        assert_eq!(
+            (
+                quota.status,
+                quota.attempts,
+                quota.retry_after_ms,
+                quota.category,
+            ),
+            (Some(429), Some(1), Some(1), Some(ErrorCategory::Quota),)
+        );
+
+        let network = HttpError::network(NetworkKind::Timeout, 3, "timeout").detail();
+        assert_eq!(
+            (
+                network.status,
+                network.attempts,
+                network.retry_after_ms,
+                network.category,
+            ),
+            (None, Some(3), None, Some(ErrorCategory::Network))
+        );
+
+        let too_large = HttpError::ResponseTooLarge {
+            status: 413,
+            limit_bytes: 8 * 1024 * 1024,
+        }
+        .detail();
+        assert_eq!(
+            (
+                too_large.status,
+                too_large.attempts,
+                too_large.retry_after_ms,
+                too_large.category,
+            ),
+            (Some(413), None, None, Some(ErrorCategory::ResponseInvalid),)
+        );
+
+        let unknown_status = HttpError::ResponseTooLarge {
+            status: 0,
+            limit_bytes: 8 * 1024 * 1024,
+        }
+        .detail();
+        assert_eq!(
+            (
+                unknown_status.status,
+                unknown_status.attempts,
+                unknown_status.retry_after_ms,
+                unknown_status.category,
+            ),
+            (None, None, None, Some(ErrorCategory::ResponseInvalid),)
+        );
+    }
+
     /// A5-12: the key in a transport error and in a busy reply message is gone
     /// from every error text, Debug output and log event.
     #[test]
     fn key_never_leaks() {
+        let mut inner = ErrorDetail::new("foreign.source", format!("inner {KEY}"), None);
+        inner.status = Some(418);
+        inner.attempts = Some(9);
+        inner.retry_after_ms = Some(2001);
         let echo = HttpError::network(
             NetworkKind::Other,
             1,
@@ -181,11 +296,7 @@ mod cases {
         .with_cause(ErrorDetail::new(
             "io.Other",
             format!("echo {KEY}"),
-            Some(ErrorDetail::new(
-                "foreign.source",
-                format!("inner {KEY}"),
-                None,
-            )),
+            Some(inner),
         ));
         let error = send_err(
             Arc::new(ScriptedTransport::new(vec![Err(echo)])),
@@ -199,6 +310,14 @@ mod cases {
             cause.cause.map(|inner| inner.message),
             Some("inner [redacted]".to_owned())
         );
+        let inner = error
+            .cause_detail()
+            .and_then(|cause| cause.cause)
+            .expect("typed inner cause kept");
+        assert_eq!(
+            (inner.status, inner.attempts, inner.retry_after_ms),
+            (Some(418), Some(9), Some(2001))
+        );
 
         let busy_body = format!(
             r#"{{"error":{{"type":"overloaded","message":"key {KEY} is busy","code":"{KEY}"}}}}"#
@@ -206,7 +325,10 @@ mod cases {
         let memory = MemoryLog::new().expect("memory log");
         let transport = ScriptedTransport::responses(vec![HttpResponse::new(
             529,
-            vec![("x-request-id".to_owned(), format!("req-{KEY}"))],
+            vec![
+                ("x-request-id".to_owned(), format!("req-{KEY}")),
+                ("retry-after".to_owned(), "1.1".to_owned()),
+            ],
             busy_body.into_bytes(),
         )]);
         let client = HttpClient::new(
@@ -227,6 +349,15 @@ mod cases {
             panic!("{error:?}");
         };
         assert_eq!(last.message, "key [redacted] is busy");
+        assert_eq!(
+            (
+                error.detail().status,
+                error.detail().attempts,
+                error.detail().retry_after_ms,
+                error.detail().category,
+            ),
+            (Some(529), Some(1), Some(1100), Some(ErrorCategory::Busy),)
+        );
         assert!(!rendered(&error).contains(KEY), "{}", rendered(&error));
         assert!(!format!("{request:?}").contains(KEY));
         let records = memory.records().expect("records");

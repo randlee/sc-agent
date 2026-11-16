@@ -84,7 +84,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-          components: clippy
+          components: clippy,rustfmt
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -95,16 +95,27 @@ jobs:
             target
           key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run clippy
-        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-
-      - name: Install sc-lint
-        uses: randlee/sc-lint@bce8a2bfba7f64736616b2fb8f53847e22d8c406 # expose installed sibling analyzers to action subprocesses, randlee/sc-lint#977
+      - name: Install just
+        uses: taiki-e/install-action@v2
         with:
-          version: "0.8.9"
+          tool: just@1.58.0
+
+      - name: Set up released sc-lint
+        run: just setup
+
+      - name: Install Windows cross-lint tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes llvm nasm
+          llvm_lib="$(command -v llvm-lib || find /usr/bin -maxdepth 1 -name 'llvm-lib-*' -executable -print -quit)"
+          test -n "${llvm_lib}"
+          sudo ln -sf "${llvm_lib}" /usr/local/bin/llvm-lib
 
       - name: Run consumer lint profile
-        run: sc-lint lint ci --consumer
+        run: just lint ci all
 
 
   test:
@@ -244,12 +255,29 @@ jobs:
       - name: Install maturin and pytest
         run: python -m pip install "maturin==1.9.4" "pytest==8.3.5" "sc-observability==1.5.0" "sc-compose==1.5.0"
 
-      - name: Build the sc-agent wheel
-        run: maturin build -m crates/sc-agent-py/Cargo.toml --out dist
+      - name: Install sc-compose CLI at the template floor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("floors.toml", "rb"))["tools"]["sc-compose"])')
+          asset="sc-compose_${version}_x86_64-unknown-linux-gnu.tar.gz"
+          install_dir="${RUNNER_TEMP}/sc-compose-cli"
+          mkdir -p "${install_dir}"
+          gh release download "v${version}" --repo randlee/sc-compose \
+            --pattern "${asset}" --pattern checksums.txt --dir "${install_dir}"
+          (cd "${install_dir}" && sha256sum --check --ignore-missing checksums.txt)
+          tar -xzf "${install_dir}/${asset}" -C "${install_dir}" --strip-components=1
+          "${install_dir}/bin/sc-compose" --version
+          echo "${install_dir}/bin" >> "$GITHUB_PATH"
+
+      - name: Build the decision and optional sitr wheels
+        run: |
+          maturin build -m crates/sc-agent-py/Cargo.toml --out dist
+          maturin build -m crates/sc-treesitter-py/Cargo.toml --out dist
 
       - name: Run the sc-agent-py tests
         run: |
-          python -m pip install --no-index --find-links dist sc-decidr
+          python -m pip install --no-index --find-links dist sc-decidr sitr
           python -m pytest crates/sc-agent-py/tests
 
   # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).

@@ -4,13 +4,12 @@
 #[path = "../src/keyring_options.rs"]
 mod keyring_options;
 
-use std::cell::Cell;
 use std::sync::{Arc, Mutex};
 
 use decidr::input::build_request_bytes;
-use keyring_options::{KeyringOverrideError, with_factory};
+use keyring_options::location;
 use sc_agent_secrets::{KeyringSource, SecretsError};
-use sc_agent_types::{ErrorId, Provider};
+use sc_agent_types::Provider;
 use sc_decision_schema::DecisionResult;
 
 type Calls = Arc<Mutex<Vec<(String, String)>>>;
@@ -55,56 +54,30 @@ fn a_probability_is_returned_unchanged() -> Result<(), String> {
 }
 
 #[test]
-fn invalid_keyring_overrides_do_not_construct_a_backend() {
-    for (provider, service, account, expected) in [
-        (Some("typesafe"), Some(""), None, "keyring_service"),
-        (None, Some("consumer"), None, "provider"),
-        (
-            Some("not-a-provider"),
-            Some("consumer"),
-            None,
-            "types.unknown_provider",
-        ),
+fn invalid_keyring_overrides_are_rejected() {
+    for (service, account, expected) in [
+        (Some(""), None, "keyring_service"),
+        (None, Some(""), "keyring_account"),
     ] {
-        let constructed = Cell::new(false);
-        let result = with_factory(provider, service, account, |_, _| {
-            constructed.set(true);
-            Arc::new(RecordingKeyring(Arc::new(Mutex::new(Vec::new()))))
-        });
         assert!(
-            !constructed.get(),
-            "backend factory ran for a rejected override"
+            matches!(location(service, account), Err(SecretsError::InvalidLocation { option }) if option == expected)
         );
-        match result {
-            Err(KeyringOverrideError::InvalidOption { option, bound }) => {
-                assert_eq!(option, expected);
-                assert!(!bound.is_empty());
-            }
-            Err(KeyringOverrideError::Provider(error)) => assert_eq!(error.id(), expected),
-            Ok(_) => panic!("invalid override unexpectedly accepted"),
-        }
     }
+    assert!(location(Some("consumer"), None).unwrap().is_some());
+    assert!(location(None, None).unwrap().is_none());
 }
 
 #[test]
 fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() -> Result<(), String> {
     let calls = Arc::new(Mutex::new(Vec::new()));
-    let (provider, keyring) = with_factory(
-        Some("typesafe"),
-        Some("service"),
-        Some("account"),
-        |provider, location| {
-            assert_eq!(provider, Provider::TypeSafe);
-            Arc::new(sc_agent_secrets::ProviderKeyring::new(
-                provider,
-                location,
-                Arc::new(RecordingKeyring(calls.clone())),
-            ))
-        },
-    )
-    .map_err(|error| format!("{error:?}"))?;
-    assert_eq!(provider, Some(Provider::TypeSafe));
-    let keyring = keyring.ok_or("expected keyring override")?;
+    let location = location(Some("service"), Some("account"))
+        .map_err(|error| error.to_string())?
+        .ok_or("missing location")?;
+    let keyring = sc_agent_secrets::ProviderKeyring::new(
+        Provider::TypeSafe,
+        location,
+        Arc::new(RecordingKeyring(calls.clone())),
+    );
     keyring
         .password(sc_agent_secrets::TYPESAFE_API_KEY, "os-user")
         .map_err(|error| error.to_string())?;
@@ -121,16 +94,5 @@ fn valid_keyring_overrides_use_the_injected_provider_scoped_backend() -> Result<
             ),
         ]
     );
-    Ok(())
-}
-
-#[test]
-fn no_keyring_override_leaves_provider_parsing_to_send_options() -> Result<(), String> {
-    let (provider, keyring) = with_factory(Some("anthropic"), None, None, |_, _| {
-        Arc::new(RecordingKeyring(Arc::new(Mutex::new(Vec::new()))))
-    })
-    .map_err(|error| format!("{error:?}"))?;
-    assert_eq!(provider, None);
-    assert!(keyring.is_none());
     Ok(())
 }
