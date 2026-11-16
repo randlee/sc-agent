@@ -5,7 +5,6 @@
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-10  
 **Owner:** Rand Lee  
-Revision: 0.2.0 (2026-11-10, owner): a third interrupt after the logs open ends `decidr` at once (operator last resort).
 
 ---
 

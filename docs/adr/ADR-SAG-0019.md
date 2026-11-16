@@ -1,4 +1,4 @@
-# Decision: sc-decidr 0.2.0 is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
+# Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
 **Version:** 0.6.0  
@@ -9,7 +9,7 @@
 
 ---
 
-## ADR-SAG-0019: sc-decidr 0.2.0 is the one Python decision harness
+## ADR-SAG-0019: sc-decidr is the one Python decision harness
 
 **Status:** Approved  
 
@@ -45,23 +45,23 @@ The owner requires that judge-jev, plan-anchor and every later Python consumer h
 
 The two existing consumers each rebuilt the wheel boundary, and the copies diverged:
 
-- **Errors.** judge-jev pins the 0.1.0 id list and falls back to `JEV.UNMAPPED`. plan-anchor matches message text (`"http 401"`).
+- **Errors.** judge-jev pins the original id list and falls back to `JEV.UNMAPPED`. plan-anchor matches message text (`"http 401"`).
 - **Model.** judge-jev passes the model selector unchanged. plan-anchor pins `provider="typesafe"`, which disables Haiku and Luna.
 - **Order.** Both re-sort `send_batch` results into input order.
 - **Timeout.** judge-jev refuses `--timeout`. plan-anchor calls the unreleased `timeout_secs`.
 
-Phase b already changed the error type, and this ADR builds on that base (`integrate/phase-b`, merged by #86):
+Phase b already changed the error type, and this ADR builds on that base:
 
-- `ErrorDetail.status: Option<u16>` and the provided method `ErrorId::status()` exist (agt-zii).
+- `ErrorDetail.status: Option<u16>` and the provided method `ErrorId::status()` exist.
 - `recovery` is `Option<Box<str>>`.
-- `timeout_secs` exists on `send` and `send_batch`, validated as `RequestTimeout` (agt-b-1.8).
+- `timeout_secs` exists on `send` and `send_batch`, validated as `RequestTimeout`.
 - Python has the keyword arguments `keyring_service` and `keyring_account`.
 
 Three gaps remain: most errors still lose their typed data; consumers have no category to branch on, so they pin id lists; and there is no per-call worker count or CLI timeout flag.
 
 ### Decision
 
-sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision consumers, through these decisions. Decision numbers are stable; there is no decision 3.
+sc-decidr makes the wheel the one consumer boundary for Python decision consumers, through these decisions. Decision numbers are stable; there is no decision 3.
 
 1. **The wheel is the consumer boundary.**
 
@@ -89,7 +89,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
 2. **Typed fields: `status` (exists), `attempts`, `retry_after_ms` and `category` (new).**
 
-   `ErrorDetail` gains three optional fields beside phase b's `status`. Each is `#[serde(default, skip_serializing_if = "Option::is_none")]`, declared after `cause`. The struct keeps `Eq`.
+   `ErrorDetail` gains three optional fields beside phase b's `status`. Each is optional: absent on read means unset, and unset is not written. They are declared after `cause`. The struct keeps `Eq`.
 
    | Field | Type | Meaning |
    | --- | --- | --- |
@@ -111,11 +111,11 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    **`retry_after_ms`** is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser holds: rounded up to whole milliseconds, saturating at `u64::MAX`, never clamped. Fraction digits past the ninth are truncated by the parser. `ProviderReply` carries it beside the exact `retry_after_seconds`. REQ-SAG-0007 is amended to allow this rounding of a transport timing hint.
 
-4. **Version 0.2.0.**
+4. **Breaking minor release.**
 
    The Rust change breaks SemVer: fields are added to an exhaustive public struct, and the call-limits API changes (decision 7). Below 1.0 a minor bump is the breaking bump. For Python the change only adds things, except the batch return order (decision 8).
 
-   All workspace crate and wheel versions move together to 0.2.0; `verify-version-lockstep` enforces this. sc-decidr and sitr are released together at the same version, both to PyPI. Mixed versions are not supported; this is documented, not enforced.
+   All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. sc-decidr and sitr are released together at the same version, both to PyPI. Mixed versions are not supported; this is documented, not enforced.
 
 5. **Python errors.**
 
@@ -147,7 +147,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
    REQ-SAG-0017 holds the category table: the category of every id.
 
-   Python reads the stored field through `sc_agent.category(detail)` and `sc_agent.retryable(detail)`. A detail with no stored category (written by 0.1.0, or foreign) is `other`.
+   Python reads the stored field through `sc_agent.category(detail)` and `sc_agent.retryable(detail)`. A detail with no stored category (written before categories existed, or foreign) is `other`.
 
    **`retryable` means "worth resubmitting as a new call later, after the wheel's own resends have run out."** It is true for `busy` and `network` only. A consumer that resubmits waits first, at least `retry_after_ms` when it is set, and does not wrap the wheel in an immediate retry loop.
 
@@ -186,7 +186,7 @@ sc-decidr 0.2.0 makes the wheel the one consumer boundary for Python decision co
 
     - `floors.toml` at the repository root writes down the Python floor (`[python] floor`) and the sc-compose minimum (`[tools] sc-compose`). It only records values.
     - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels declare.
-    - Until sc-compose#1046 ships, the template carries these values as literals, and one sc-agent unit test compares them with `floors.toml`.
+    - Until sc-compose can read `floors.toml`, the template carries these values as literals, and one sc-agent unit test compares them with `floors.toml`.
 
 ### Rationale
 
@@ -203,7 +203,7 @@ Two consumers rebuilt the wheel boundary and the copies diverged, so every conce
 
 **Negative:**
 
-- This is a breaking 0.2.0 for Rust dependents: `ErrorDetail` gains fields and `send_with_timeout` becomes `send_with`.
+- This is a breaking release for Rust dependents: `ErrorDetail` gains fields and `send_with_timeout` becomes `send_with`.
 - `ErrorId` gains a required method, `base_category()`, so implementors outside the workspace must add it.
 - `id()` moves into the macro across the error enums, a one-time mechanical diff.
 - The order of the list `send_batch` returns changes.
@@ -253,13 +253,13 @@ sc-agent-types cannot see higher crates' rows (ADR-SAG-0004), and a detail read 
 
 ### Implementation
 
-The work lands in sc-agent on the `integrate/phase-b` line, as fixes on top with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702, NFR-SAG-0002 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
+The work lands in sc-agent as fixes on top of the integration stack, with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702, NFR-SAG-0002 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
 
 Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
 - The consumer template and the `sc_agent.pyi` stub.
 - `floors.toml`.
-- sc-decidr 0.2.0 and sitr 0.2.0 on PyPI.
+- sc-decidr and sitr released to PyPI at the same version.
 
 Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope.
