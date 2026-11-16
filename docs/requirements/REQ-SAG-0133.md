@@ -1,6 +1,6 @@
 # Requirement: Live prerelease provider integration and publication gate
 
-**Status:** Superseded
+**Status:** Superseded  
 **Version:** 0.1.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-14  

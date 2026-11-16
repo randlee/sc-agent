@@ -2,7 +2,7 @@
 
 The prerelease manifest installs and verifies staged wheels through
 `scripts/install_wheels.py`. CI uses the generated sc-lint Just integration:
-`just setup` installs the released version selected by `sc-lint.toml` (0.8.9),
+`just setup` installs the released version selected by `sc-lint.toml`,
 then `just lint ci all` runs format, native and Windows-target Clippy,
 boundary, portability and the full runtime rules. The Clippy toolchain includes
 both Clippy and rustfmt. CI uses no sc-lint source checkout or action commit.
@@ -49,7 +49,7 @@ just integration --venv /absolute/path/to/prerelease-venv --results /tmp/venv-re
 The local-build run produces per-case JUnit results, **no XHTML**. Once it passes,
 the lead cuts `/prerelease` from the fixed head and records the actual tag and SHA.
 The version selected by the publisher may differ from the used input tag
-`prerelease/v0.2.0`. Existing prerelease install/publish and checksum verification
+`<input-tag>`. Existing prerelease install/publish and checksum verification
 remain unchanged. Install/verify the selected published wheel with
 `/prerelease --install X.Y.Z` before the clean-account run below.
 

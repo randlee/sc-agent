@@ -22,6 +22,8 @@ decidr doctor
   - `--project` and `--agent-role` are required slugs for the session rows (lowercase letters, digits, `.`, `_`, `-`).
   - `--provider` overrides the provider. Without it, the provider is chosen by ranking the keys that are found.
   - `--image NAME=FILE` (repeatable) and `--long-context` apply to a single request, not to `--batch`.
+  - `--timeout-secs SECONDS` sets the per-request timeout (finite values from 10 through 3600 seconds; fractional seconds are accepted).
+  - `--workers COUNT` sets batch concurrency from 1 through 64 and requires `--batch`.
 - `models [--runner NAME]`: lists the models of TypeSafe, or of a configured local runner.
 - `doctor`: lists the keys found, in use order, and warns about provider models missing from the catalog.
 - `--config-dir PATH` (global): the configuration directory. The default is `~/.sc-agent`.
@@ -31,7 +33,8 @@ Exit codes: 0 when the command ran and every result succeeded, 1 otherwise, 130 
 ## What the library provides
 
 - `send`, `send_batch`, `models` and `doctor`, with `send_on` and `send_batch_on` over any `Decision`.
-- `SendOptions`, `ModelsOptions`, `DoctorOptions`, `ModelSelector` and `Context`. The context holds the seams (config directory, environment, keyring, transport, loggers, clock); every field `None` is the real default.
+- `SendOptions`, `ModelsOptions`, `DoctorOptions`, `ModelSelector` and `Context`. The context holds the seams (config directory, environment, keyring, transport, loggers, clock); every field `None` is the real default. `Context.keyring_override` optionally supplies a checked `KeyringLocation`; its service and account override the defaults only for the selected provider.
+- `CallLimits`, `RequestTimeout` and `Workers` for checked per-call limits. `send_with` and `send_batch_with` accept `&CallLimits`; the existing `send` and `send_batch` use default limits. A timeout applies to the default decision transport and request deadline; worker count controls batch concurrency.
 - `load_config`, `general_logger`, `session_logger` and `session_identity`.
 - `DoctorReport`, `DetectedKey`, `MissingModel` and `Tie`.
 - Modules `input` (`build_request`, `build_batch`, `read_batch`, limits), `output` (`result_line`, `result_text`) and `signal`.

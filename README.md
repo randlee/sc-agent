@@ -12,9 +12,9 @@ Every backend is launched the same way: one request form, one set of keys and co
 
 | Part | State |
 |---|---|
-| Decision models: Jev, local Jev-compatible runners, and Haiku and Luna answering in Jev's place | Done (phase A) |
-| `decidr` CLI and the `sc_agent` Python module | Done (phase A) |
-| `sitr` tree-sitter query tool and the `sc_treesitter` Python module | Done (phase A) |
+| Decision models: Jev, local Jev-compatible runners, and Haiku and Luna answering in Jev's place | Done |
+| `decidr` CLI and the `sc_agent` Python module | Done |
+| `sitr` tree-sitter query tool and the `sc_treesitter` Python module | Done |
 | CLI agents (Claude Code, Codex) and SDK agents | Planned: they get their own crates on the same lower layers |
 
 ## The `decidr` CLI
