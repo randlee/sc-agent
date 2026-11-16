@@ -12,7 +12,7 @@
 
 **Status:** Superseded
 
-Superseded by ADR-SAG-0019 decision 9: prerelease verification is hand-run live tests with a committed XHTML report per tested platform; the publication gate is removed.
+Superseded by ADR-SAG-0019 decision 9: prerelease verification is real-provider integration tests, run by the developer on a local build and then on the prerelease wheels, with a committed XHTML panel per provider and platform; the publication gate is removed.
 
 ### Requirement Statement
 

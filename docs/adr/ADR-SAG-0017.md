@@ -29,7 +29,7 @@ Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter C
 
 ### Decision
 
-Phase A first release surfaces are **crates.io** (fourteen workspace crates, including **decidr**), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
+Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
 
 **Key Principles:**
 

@@ -27,7 +27,7 @@ Definitions:
 
 ### Rationale
 
-At the time of writing the Python floor is 3.11, while pyo3 builds `cp310-abi3` wheels, so the tag claims support the package metadata refuses. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change.
+The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change.
 
 ### Success Criteria
 

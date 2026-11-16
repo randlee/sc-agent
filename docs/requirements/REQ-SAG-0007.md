@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one. A transport timing hint, such as `retry_after_ms` in an error detail, is not a decision value (owner, 2026-11-14); its owning ADR, ADR-SAG-0019, states how it is rounded.
+Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one. A transport timing hint, such as `retry_after_ms` in an error detail, is not a decision value; its owning ADR, ADR-SAG-0019, states how it is rounded.
 
 **MUST statements:**
 

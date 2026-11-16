@@ -91,7 +91,7 @@ Consumers that branch on error ids pin their own lists and add fallbacks today, 
   | `decision.api_status` with 402 | `quota` |
   | `decision.api_status` with 500, 503 or 504 | `busy` |
   | `decision.api_status` with 501 | `other` |
-- [ ] `sc_agent.category` of a checked-in 0.1.0 detail, which has no stored category, is `"other"`.
+- [ ] `sc_agent.category` of a checked-in detail written before `category` existed, which has no stored category, is `"other"`.
 - [ ] The published decidr crate exports no `integration_cases` or `validate_integration_results`, and the wheel has no `sc_agent.integration_cases` or `sc_agent.validate_integration_results`.
 
 ### Dependencies

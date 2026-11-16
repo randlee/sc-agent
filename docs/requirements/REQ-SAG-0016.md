@@ -65,7 +65,7 @@ Definitions:
 
 ### Rationale
 
-Consumers decide whether to retry or back off, and how to fix authentication, from the status, the send count and the Retry-After. Today most of these values exist only in English message text. `retry_after_ms` is a transport timing hint; REQ-SAG-0007 governs decision values.
+Consumers decide whether to retry or back off, and how to fix authentication, from the status, the send count and the Retry-After. Without typed fields these values exist only in English message text. `retry_after_ms` is a transport timing hint; REQ-SAG-0007 governs decision values.
 
 ### Success Criteria
 

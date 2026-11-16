@@ -29,7 +29,7 @@ Registry publish is manifest-driven via sc-publish; ambiguous workspace globs an
 **Acceptance Criteria:**
 
 - [ ] `release/sc-publish-pin.toml` records a full 40-character kit SHA.
-- [ ] Consumer input lists fourteen publish crates (**sc-treesitter**, then **sitr**, then **decidr**), release binaries **decidr** and **sitr**, PyPI names **sc-decidr** and **sitr**, and all five channels.
+- [ ] Consumer input lists every `[[crates]]` entry of `release/publish-artifacts.toml` in that file's publish order (**sc-treesitter**, then **sitr**, then **decidr**), release binaries **decidr** and **sitr**, PyPI names **sc-decidr** and **sitr**, and all five channels.
 - [ ] `python3 .github/scripts/release_artifacts.py validate-manifest --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml` exits 0.
 
 ### Dependencies
