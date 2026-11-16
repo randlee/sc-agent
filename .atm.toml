@@ -79,3 +79,21 @@ name = "ai-sanity"
 model = "sonnet"
 dir = "/Users/randlee/github/sc-agent"
 env = { ATM_IDENTITY = "ai-sanity", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+# Publisher: runs the Release Preflight and the gated PyPI publication of the
+# matched sc-decidr/sitr release (phase-b sprint b-15), but ONLY when ai-lead
+# dispatches it. It must not publish on its own initiative, so nothing here
+# schedules it - the startup prompt loads the role and the publishing skill, it
+# does not start a release.
+[[rmux.windows]]
+name = "publishing"
+layout = "even-horizontal"
+
+[[rmux.windows.panes]]
+name = "ai-publisher"
+model = "sonnet"
+dir = "/Users/randlee/github/sc-agent"
+env = { ATM_IDENTITY = "ai-publisher", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST_ID = "sc-ai" }
+
+[startup.ai-publisher]
+all = ["Read .claude/agents/publisher.md for your directive and run the publishing skill (.claude/skills/publishing): you are ai-publisher, and you act only when ai-lead dispatches you"]
