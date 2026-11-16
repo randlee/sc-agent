@@ -261,6 +261,10 @@ def call_batch_results(
 {% if sitr %}
 # Extraction is separate from every decision call.
 def extract(language: str, query: str, source: Union[str, bytes], captures=None):
-    import sc_treesitter
+    try:
+        import sc_treesitter
+    except ImportError as exc:
+        raise ClientError("DEPENDENCY.SITR", "sitr=={{ sitr_version }} is required for extraction",
+                          action="Install sitr=={{ sitr_version }} in the active Python environment.") from exc
     return sc_treesitter.run_query(language, query, source, captures=captures)
 {% endif %}
