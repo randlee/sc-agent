@@ -2,7 +2,7 @@
 name: sc-decidr-consumer
 version: {{ sc_decidr_version }}
 format: python
-required_variables: [general_log, models, sitr, sc_decidr_version, sitr_version]
+required_variables: [general_log, models, sitr, sc_decidr_version, sitr_version, batch_records, settings_module, settings_file, settings_set_command]
 requires:
   cli:
     - name: sc-compose
@@ -19,13 +19,15 @@ when a caller makes a decision request.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Mapping, NamedTuple, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from sc_agent import CancelToken
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 MODELS = {{ models | tojson }}
+REMOTE_JUDGE_SETTING = "{{ settings_file }}"
+REMOTE_JUDGE_SET = "{{ settings_set_command }}"
 LogSink = Callable[[dict], None]
 CategoryCodes = Mapping[str, str]
 AbortOn = frozenset[str]
@@ -35,9 +37,18 @@ BatchItem = Union[Request, tuple[Request, Optional[dict[str, bytes]], bool]]
 __all__ = [
     "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
     "DECIDR_CATEGORY_CODES", "new_cancel_token", "error_metadata", "wheel_error",
-    "decode_result", "exception_result", "call_result", "call_batch_results",
+    "decode_result", "exception_result", "call_result", "call_batch_results", "remote_judge_consent",
+    "remote_preflight", "CANCELED_EXIT", "canceled_envelope",
 {% if sitr %}
     "extract",
+{% endif %}
+{% if batch_records %}
+    "BatchSettings", "BatchJob", "BatchInputError", "StreamedResult", "BATCH_RESULT_SCHEMA",
+    "BATCH_MAX_WORKERS", "BATCH_RETRIES", "BATCH_FIXTURE_ERROR", "BATCH_ID_RE", "batch_request_id", "batch_run_id",
+    "questions_digest", "batch_settings", "_safe_id", "_fixture_keys", "_fixture_missing", "_fixture_attempt",
+    "_line", "validate_request_lines",
+    "check_fixture_coverage", "load_answers_fixture", "stream_batch", "pump_batch", "encode_result_line",
+    "write_stdout_line", "_add_attempts", "_total_attempts", "streamed_result",
 {% endif %}
 ]
 _ALLOWED_ABORT_ON = (frozenset(), frozenset({"auth"}), frozenset({"auth", "quota"}))
@@ -91,6 +102,54 @@ def _load_wheel():
 
 def new_cancel_token():
     return _load_wheel().CancelToken()
+
+
+def _settings_error(error) -> ClientError:
+    data = dict(error.data) if getattr(error, "data", None) is not None else None
+    return ClientError(error.code, error.message, action=getattr(error, "action", None), data=data)
+
+
+def remote_judge_consent(repository_root: str = ".", what: str = "The request text") -> None:
+    """Require an affirmative, repository-local consent setting before any remote send."""
+    try:
+        import importlib
+        import pathlib
+        settings = importlib.import_module("{{ settings_module }}")
+    except ImportError as exc:
+        raise ClientError("DEPENDENCY.SETTINGS", f"the consent settings module could not be imported: {exc}",
+                          action="Install the consumer's settings module before making a live Jev call.") from exc
+    start = pathlib.Path(repository_root or ".").resolve()
+    root = settings.find_repo_root(start)
+    if not root.ok:
+        raise _settings_error(root.error)
+    answer = settings.remote_judge_consent(start)
+    if answer.ok and answer.value is True:
+        return
+    disabled = f"Sending text to TypeSafe is disabled. {what} would leave this machine."
+    if answer.ok:
+        raise ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+                          f"{disabled} {REMOTE_JUDGE_SETTING} sets allow_remote_judge: false.",
+                          action="The user declined remote judging; only the user changes this setting and commits it. Use --dry-run to inspect the request instead.")
+    if answer.error.code == "SETTINGS.REMOTE_JUDGE_UNSET":
+        raise ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+                          f"{disabled} {REMOTE_JUDGE_SETTING} does not set allow_remote_judge.",
+                          action=f"Ask the user once whether this text may be sent to TypeSafe (Jev), record the answer with `{REMOTE_JUDGE_SET}`, and commit {REMOTE_JUDGE_SETTING}. Never infer consent from prior runs. Use --dry-run to inspect the request instead.")
+    raise _settings_error(answer.error)
+
+
+def remote_preflight(repository_root: str = ".", what: str = "The request text") -> None:
+    """Shared send gate; callers cannot inject or override the consent value."""
+    remote_judge_consent(repository_root, what)
+
+
+CANCELED_EXIT = 130
+
+
+def canceled_envelope() -> dict:
+    out = ClientError("CANCELED", "interrupted before the command finished", True,
+                      "Rerun the command; nothing partial was reported as complete.").to_json()
+    out.update(canceled=True, aborted_by="user")
+    return out
 
 
 def error_metadata(detail: dict) -> dict:
@@ -153,9 +212,13 @@ def decode_result(line: str, *, category_codes=None) -> dict:
         return _failed(exc)
 
 
-def _invoke(method, request, abort_on, kwargs, category_codes):
+def _invoke(method, request, abort_on, kwargs, category_codes, *, repository_root=".", consent_what="The request text"):
     if frozenset(abort_on) not in _ALLOWED_ABORT_ON:
         raise ClientError("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}")
+    try:
+        remote_preflight(repository_root, consent_what)
+    except ClientError as exc:
+        return _failed(exc)
     try:
         wheel = _load_wheel()
     except ClientError as exc:
@@ -204,6 +267,7 @@ def call_result(
     general_log: Optional[LogSink] = None,
 {% endif %}
     timeout_secs: Optional[float] = None,
+    repository_root: str = ".", consent_what: str = "The request text",
 ) -> dict:
     kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, images=images,
                   long_context=long_context, config_dir=config_dir, keyring_service=keyring_service,
@@ -213,7 +277,8 @@ def call_result(
 {% endif %}
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
-    sent = _invoke("send", request, abort_on, kwargs, category_codes)
+    sent = _invoke("send", request, abort_on, kwargs, category_codes,
+                   repository_root=repository_root, consent_what=consent_what)
     if not sent["ok"]:
         return sent
     result = decode_result(sent["value"], category_codes=category_codes)
@@ -231,6 +296,7 @@ def call_batch_results(
 {% endif %}
     timeout_secs: Optional[float] = None, workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
+    repository_root: str = ".", consent_what: str = "The request text",
 ) -> dict:
     completed, decoded = {}, {}
 
@@ -257,7 +323,8 @@ def call_batch_results(
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:
         kwargs["workers"] = workers
-    sent = _invoke("send_batch", requests, abort_on, kwargs, category_codes)
+    sent = _invoke("send_batch", requests, abort_on, kwargs, category_codes,
+                   repository_root=repository_root, consent_what=consent_what)
     if not sent["ok"]:
         return sent
     try:
@@ -270,6 +337,297 @@ def call_batch_results(
     except ClientError as exc:
         return _failed(exc)
     return dict(ok=True, value=[completed[position] for position in range(len(requests))])
+
+
+{% if batch_records %}
+# Shared batch records. Consumer-specific question sets and decision rules are callbacks,
+# so the record format and stream bookkeeping have one implementation.
+BATCH_RESULT_SCHEMA = "jev-batch-result/1"
+BATCH_MAX_WORKERS = 4
+BATCH_RETRIES = 1
+BATCH_FIXTURE_ERROR = "__error__"
+BATCH_ID_RE = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+
+
+class BatchSettings(NamedTuple):
+    gate: str
+    model: str
+    repeat: int
+    prefix: str
+    threshold: float
+    timeout: float
+    max_workers: int
+    max_request_bytes: int
+    dry_run: bool
+
+
+class BatchJob(NamedTuple):
+    item_id: str
+    anchor_id: Optional[str]
+    candidate_id: str
+    repeat: int
+    request_id: str
+    body: dict
+    questions: dict
+    roles: dict
+    kind: str
+
+
+class BatchInputError(Exception):
+    def __init__(self, error: ClientError):
+        super().__init__(error.message)
+        self.error = error
+
+
+class StreamedResult(NamedTuple):
+    failed: list
+    attempts: int
+
+
+def batch_request_id(prefix: str, item_id: str, anchor_id: Optional[str], candidate_id: str, repeat: int) -> str:
+    if anchor_id is None:
+        return f"{prefix}/{item_id}/{candidate_id}/r{repeat}"
+    return f"{prefix}/{item_id}/{anchor_id}/{candidate_id}/r{repeat}"
+
+
+def questions_digest(questions: dict) -> str:
+    """Keep the canonical questions digest; run IDs are derived separately from request IDs."""
+    import hashlib
+    import json
+    canonical = json.dumps(questions, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def batch_run_id(request_id: str) -> str:
+    """Keep run IDs stable: first 16 hex digits of SHA-256 over the unchanged request ID."""
+    import hashlib
+    return hashlib.sha256(request_id.encode("utf-8")).hexdigest()[:16]
+
+
+def _safe_id(value, what: str) -> str:
+    import re
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", value):
+        raise ClientError("VALIDATION.INPUT", f"{what} {value!r} is not a safe id (letters, digits and _.:- only)",
+                          action="See the consumer's Jev batch request schema.")
+    return value
+
+
+def _fixture_keys(job: BatchJob) -> tuple[str, ...]:
+    return (f"{job.item_id}/{job.candidate_id}/r{job.repeat}",
+            f"{job.item_id}/{job.candidate_id}", job.candidate_id, "*")
+
+
+def _fixture_missing(keys: tuple[str, ...]) -> ClientError:
+    return ClientError("FIXTURE.MISSING",
+                       f"answers fixture has no entry for {keys[0]} (or {keys[1]}, {keys[2]}, '*')",
+                       action=f"Add an entry for {keys[0]} to the answers file.")
+
+
+def _fixture_attempt(job: BatchJob, fixture: dict, attempt: int, *, transient_codes=frozenset()) -> dict:
+    keys = _fixture_keys(job)
+    entry = next((fixture[key] for key in keys if key in fixture), None)
+    if entry is None:
+        raise _fixture_missing(keys)
+    if isinstance(entry, list):
+        if not entry:
+            raise ClientError("FIXTURE.MISSING", f"answers fixture entry for {keys[0]} is an empty list")
+        entry = entry[min(attempt, len(entry)) - 1]
+    if isinstance(entry, dict) and BATCH_FIXTURE_ERROR in entry:
+        code = str(entry[BATCH_FIXTURE_ERROR])
+        raise ClientError(code, f"fixture failure {code}", code in transient_codes)
+    if not isinstance(entry, dict):
+        raise ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object")
+    return {"model": "fixture", "answers": entry}
+
+
+def batch_settings(args, prefix: str, *, check_threshold: Callable, request_cap: Callable):
+    """Assemble common batch settings while consumers supply their threshold and gate-cap rules."""
+    if getattr(args, "repeat", 1) < 1:
+        raise ClientError("VALIDATION.INPUT", "--repeat must be at least 1")
+    if not 1 <= args.max_workers <= BATCH_MAX_WORKERS:
+        raise ClientError("VALIDATION.INPUT", f"--max-workers must be between 1 and {BATCH_MAX_WORKERS}")
+    if not isinstance(prefix, str) or not prefix.strip() or any(char.isspace() for char in prefix):
+        raise ClientError("VALIDATION.INPUT", "--request-prefix must be non-empty and contain no whitespace")
+    threshold = check_threshold(getattr(args, "threshold", 0.6))
+    if not threshold.ok:
+        raise _settings_error(threshold.error)
+    cap = request_cap(getattr(args, "gate", "plan"), getattr(args, "max_request_bytes", None))
+    if not cap.ok:
+        raise _settings_error(cap.error)
+    return BatchSettings(getattr(args, "gate", "plan"), args.model, getattr(args, "repeat", 1), prefix,
+                         threshold.value, args.timeout, args.max_workers, cap.value, bool(args.dry_run))
+
+
+def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dry_run: bool, *,
+          result_fields: Optional[Callable[[BatchJob, BatchSettings, Any], dict]] = None,
+          error_message_limit: Optional[int] = None, redact: Optional[Callable[[dict], dict]] = None) -> dict:
+    """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
+    fields = result_fields(job, settings, raw) if result_fields is not None else {}
+    message = None if error is None else error.message
+    if message is not None and error_message_limit is not None:
+        message = message[:error_message_limit]
+    import hashlib
+    import json
+    request_text = json.dumps(job.body, allow_nan=False)
+    line = {
+        "schema": BATCH_RESULT_SCHEMA, "request_id": job.request_id, "run_id": batch_run_id(job.request_id),
+        "item_id": job.item_id, "anchor_id": job.anchor_id, "candidate_id": job.candidate_id, "repeat": job.repeat,
+        "request_sha256": hashlib.sha256(request_text.encode("utf-8")).hexdigest(),
+        "questions_sha256": questions_digest(job.questions), "request": job.body, "roles": job.roles, "kind": job.kind,
+        "dry_run": dry_run, "ok": raw is not None, "raw_response": raw,
+        "answers": raw.get("answers") if isinstance(raw, dict) else None,
+        "model_answered": raw.get("model") if isinstance(raw, dict) else None,
+        "sends": raw.get("sends") if isinstance(raw, dict) else None,
+        "threshold": settings.threshold, "verdict": None, "min_confidence": None, "leaning": None,
+        "retry_count": max(len(attempts) - 1, 0), "attempts": attempts,
+        "error": None if error is None else {"code": error.code, "message": message,
+                                               "recoverable": getattr(error, "recoverable", getattr(error, "retryable", False))},
+    }
+    line.update(fields)
+    return redact(line) if redact is not None else line
+
+
+def validate_request_lines(lines: list, settings: BatchSettings, question_sets,
+                           make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> int:
+    """Validate all input before sending; consumer question sets and parser are explicit callbacks."""
+    total, request_ids = 0, set()
+    for number, line in enumerate(lines, start=1):
+        jobs = make_jobs(line, number, settings, question_sets)
+        if not jobs.ok:
+            raise BatchInputError(_settings_error(jobs.error))
+        for job in jobs.value:
+            if job.request_id in request_ids:
+                raise ClientError("VALIDATION.INPUT", f"request {job.request_id} appears twice in the stream",
+                                  action="Pair each item, anchor and candidate once; use --repeat for repeats.")
+            request_ids.add(job.request_id)
+        total += len(jobs.value)
+    return total
+
+
+def check_fixture_coverage(lines: list, settings: BatchSettings, question_sets, make_jobs: Callable, fixture):
+    """Check every fixture key before the first request, so an incomplete fixture cannot partially run."""
+    if fixture is None or settings.dry_run:
+        return None
+    validate_request_lines(lines, settings, question_sets, make_jobs)
+    for number, line in enumerate(lines, start=1):
+        jobs = make_jobs(line, number, settings, question_sets)
+        if not jobs.ok:
+            raise BatchInputError(_settings_error(jobs.error))
+        for job in jobs.value:
+            keys = _fixture_keys(job)
+            if not any(key in fixture for key in keys):
+                raise _fixture_missing(keys)
+    return None
+
+
+async def _aiter(source):
+    if hasattr(source, "__aiter__"):
+        async for value in source:
+            yield value
+    else:
+        for value in source:
+            yield value
+
+
+async def stream_batch(source, settings: BatchSettings, *, make_jobs: Callable, run_job: Callable,
+                       question_sets, window_factor: int = 2):
+    """Run jobs in a bounded executor and yield completed results in input order."""
+    import asyncio
+    import concurrent.futures
+    import collections
+    loop = asyncio.get_running_loop()
+    pending = collections.deque()
+    window = max(settings.max_workers, settings.max_workers * window_factor)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=settings.max_workers) as pool:
+        number = 0
+        async for line in _aiter(source):
+            number += 1
+            jobs = make_jobs(line, number, settings, question_sets)
+            if not jobs.ok:
+                raise BatchInputError(_settings_error(jobs.error))
+            for job in jobs.value:
+                pending.append(loop.run_in_executor(pool, run_job, job, settings))
+                while len(pending) >= window:
+                    yield await pending.popleft()
+        while pending:
+            yield await pending.popleft()
+
+
+def pump_batch(lines, *, log_result: Callable[[dict], Any], echo: bool = False) -> list:
+    """Durably record each success and failure immediately as it arrives, then optionally echo its JSONL record."""
+    import asyncio
+    results = []
+
+    async def drive():
+        async for line in lines:
+            logged = log_result(line)
+            if isinstance(logged, ClientError):
+                raise logged
+            if hasattr(logged, "ok") and not logged.ok:
+                raise _settings_error(logged.error)
+            if echo:
+                write_stdout_line(encode_result_line(line))
+            results.append(line)
+
+    asyncio.run(drive())
+    return results
+
+
+def load_answers_fixture(path: str, keyed_by: str, loader: Callable, *, validate_envelope: Optional[Callable] = None):
+    """Load the consumer's answer fixture using its strict JSON/question schema parser."""
+    if not path:
+        return None
+    loaded = loader(path, "answers fixture")
+    if not loaded.ok:
+        raise BatchInputError(_settings_error(loaded.error))
+    fixture = loaded.value
+    if not isinstance(fixture, dict):
+        raise ClientError("INPUT.MALFORMED", f"answers fixture must be an object keyed by {keyed_by} (or '*')")
+    if validate_envelope is not None:
+        error = validate_envelope(fixture, f"answers fixture {path}")
+        if error is not None:
+            raise BatchInputError(_settings_error(error))
+    return fixture
+
+
+def write_stdout_line(text: str) -> None:
+    """Write a UTF-8 JSONL record without Windows text-mode newline translation."""
+    import sys
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+        return
+    sys.stdout.flush()
+    buffer.write(text.encode("utf-8"))
+    buffer.flush()
+
+
+def encode_result_line(line: dict) -> str:
+    import json
+    return json.dumps(line, ensure_ascii=False) + "\n"
+
+
+def _add_attempts(results: list) -> int:
+    total = 0
+    for result in results:
+        sends = result.get("sends")
+        if type(sends) is int and sends >= 0:
+            total += sends
+        else:
+            attempts = result.get("attempts")
+            total += len(attempts) if isinstance(attempts, list) else 0
+    return total
+
+
+def _total_attempts(results: list) -> int:
+    return _add_attempts(results)
+
+
+def streamed_result(results: list) -> StreamedResult:
+    return StreamedResult([line for line in results if not line.get("ok") and not line.get("dry_run")],
+                          _total_attempts(results))
+{% endif %}
 
 
 {% if sitr %}

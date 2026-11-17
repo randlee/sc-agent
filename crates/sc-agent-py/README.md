@@ -125,6 +125,10 @@ Path(sys.argv[1]).write_text(json.dumps({
     "general_log": False,
     "models": ["jev"],
     "sitr": False,
+    "batch_records": False,
+    "settings_module": "plan_anchor_settings",
+    "settings_file": ".sc/plan-anchor/settings.yaml",
+    "settings_set_command": "python3 scripts/plan_anchor_settings.py set allow_remote_judge true|false",
     "sc_decidr_version": version("sc-decidr"),
     "sitr_version": sitr_version,
 }, indent=2) + "\n")
@@ -137,6 +141,10 @@ sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
 
 The JSON vars file preserves booleans and the model list as typed values;
 `--var` values are strings and do not represent these options correctly.
+Set `settings_module`, `settings_file` and `settings_set_command` to the
+consumer's settings module and consent-setting instructions. The shared client
+reads that value before every single or batch send; there is no consent override
+argument. `batch_records` includes the optional shared batch-record helpers.
 
 `models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `general_log` includes or omits forwarding the caller's general
