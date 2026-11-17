@@ -59,22 +59,27 @@ fn main() -> ExitCode {
     };
     let result = parsed
         .and_then(|parsed| run(parsed, &mut fields))
-        .and_then(|bytes| {
-            let mut stdout = io::stdout().lock();
-            stdout
-                .write_all(&bytes)
-                .and_then(|()| stdout.flush())
-                .map_err(|error| Error::Write {
-                    kind: error.kind(),
-                    detail: error.to_string(),
-                })
-        });
+        .and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
     record(&logger, &fields, started, result.as_ref().err());
     // A log failure never changes the result.
     let _shutdown = logger.shutdown();
+    finish(result, &mut io::stderr().lock())
+}
+
+fn write_output(bytes: &[u8], output: &mut impl Write) -> Result<(), Error> {
+    output
+        .write_all(bytes)
+        .and_then(|()| output.flush())
+        .map_err(|error| Error::Write {
+            kind: error.kind(),
+            detail: error.to_string(),
+        })
+}
+
+fn finish(result: Result<(), Error>, stderr: &mut impl Write) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => emit(&error),
+        Err(error) => emit_to(&error, stderr),
     }
 }
 
@@ -131,11 +136,14 @@ fn json_line<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> 
 /// A failed stderr write is dropped on purpose: stderr is the last channel, so there is
 /// nowhere to report it, and exit code 1 is the only signal left.
 fn emit(error: &Error) -> ExitCode {
+    emit_to(error, &mut io::stderr().lock())
+}
+
+fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
     let line = json_line(error).unwrap_or_else(|_| {
         // Serializing two strings cannot fail; keep a well-formed line regardless.
         format!("{{\"id\":\"{}\",\"message\":\"\"}}\n", error.id()).into_bytes()
     });
-    let mut stderr = io::stderr().lock();
     let _written = stderr.write_all(&line).and_then(|()| stderr.flush());
     ExitCode::FAILURE
 }
@@ -231,4 +239,36 @@ fn command_event(
         state_transition: None,
         fields,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct BrokenWriter;
+
+    impl Write for BrokenWriter {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn closed_stdout_is_a_write_error() {
+        let result = write_output(b"[]\n", &mut BrokenWriter);
+        let mut stderr = Vec::new();
+        assert_eq!(finish(result, &mut stderr), ExitCode::FAILURE);
+        let value: serde_json::Value = serde_json::from_slice(&stderr).expect("stderr json");
+        assert_eq!(value["id"], "treesitter.write");
+        assert!(
+            value["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("broken pipe")),
+            "{value}"
+        );
+    }
 }
