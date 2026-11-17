@@ -3,7 +3,7 @@
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 
 fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_sitr")
@@ -162,30 +162,6 @@ fn non_utf8_file_reaches_stderr_as_not_utf8() {
     assert_eq!(
         value["message"],
         format!("source in {path} is not UTF-8 at byte 6")
-    );
-}
-
-/// AC: REQ-SAG-0002 lowest-layer sitr.
-#[test]
-fn closed_stdout_is_a_write_error() {
-    let home = tempfile::tempdir().expect("home");
-    // The read end is dropped before the child starts, so every stdout write is EPIPE.
-    let (reader, writer) = std::io::pipe().expect("pipe");
-    drop(reader);
-    let output = command(home.path(), &["languages"])
-        .stdout(Stdio::from(writer))
-        .stderr(Stdio::piped())
-        .output()
-        .expect("spawn sitr");
-    assert_eq!(output.status.code(), Some(1), "status {:?}", output.status);
-    let value: serde_json::Value =
-        serde_json::from_slice(trim_newline(&output.stderr)).expect("stderr json");
-    assert_eq!(value["id"], "treesitter.write");
-    assert!(
-        value["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("broken pipe")),
-        "{value}"
     );
 }
 

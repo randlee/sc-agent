@@ -26,7 +26,11 @@ def test_readme_render_command_preserves_json_feature_types(tmp_path):
     readme = (ROOT / "crates/sc-agent-py/README.md").read_text().split("## Generated consumer", 1)[1]
     match = re.search(r"```bash\n(.*?)\n```", readme, re.DOTALL)
     assert match, "README must document the consumer render command in a bash block"
-    subprocess.run(["bash", "-e", "-c", match.group(1)], cwd=tmp_path, check=True)
+    try:
+        subprocess.run(["bash", "-e", "-c", match.group(1)], cwd=tmp_path, check=True,
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired as exc:
+        raise AssertionError("README consumer render command timed out after 60 seconds") from exc
 
     generated = (tmp_path / "consumer.py").read_text()
     assert 'MODELS = ["jev"]' in generated
@@ -38,11 +42,11 @@ def test_readme_render_command_preserves_json_feature_types(tmp_path):
 @pytest.mark.parametrize("sitr", [False, True])
 @pytest.mark.parametrize("general_log", [False, True])
 @pytest.mark.parametrize("models", [["dec"], ["dec", "jev", "haiku", "luna"]])
-def test_rendered_consumer_uses_only_public_apis(tmp_path, general_log, models, sitr):
-    render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
+def test_rendered_consumer_uses_only_public_apis(tmp_path, monkeypatch, general_log, models, sitr):
+    render_consumer(tmp_path, monkeypatch=monkeypatch, general_log=general_log, models=models, sitr=sitr)
     tree = ast.parse((tmp_path / "consumer.py").read_text())
     public = {
-        "sc_agent": {"send", "send_batch", "category", "retryable", "SagError", "CancelToken"},
+        "sc_agent": {"send", "send_batch", "category", "retryable", "parse_result", "SagError", "CancelToken"},
         "sc_treesitter": {"run_query"},
     }
     aliases = {}
@@ -86,7 +90,7 @@ def test_rendered_feature_combinations_run_loopback(env, args, tmp_path, monkeyp
     installed_version = importlib.metadata.version
     monkeypatch.setattr(importlib.metadata, "version", lambda name:
                         "999.0.0" if name in {"sc-decidr", "sitr"} else installed_version(name))
-    client = render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, general_log=general_log, models=models, sitr=sitr)
     for operation in (client.call_result, client.call_batch_results):
         assert ("general_log" in inspect.signature(operation).parameters) is general_log
         if not general_log:
@@ -209,9 +213,9 @@ def test_rendered_command_error_and_keyboard_interrupt_cancel(env, args, consume
 def test_optional_sitr_is_lazy_and_extraction_reaches_a_dry_run(tmp_path, monkeypatch):
     import sys
     monkeypatch.setitem(sys.modules, "sc_treesitter", None)
-    disabled = render_consumer(tmp_path, sitr=False)
+    disabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=False)
     assert not hasattr(disabled, "extract")
-    enabled = render_consumer(tmp_path, sitr=True)
+    enabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=True)
     assert callable(enabled.extract)  # Import itself does not need sitr.
     monkeypatch.delitem(sys.modules, "sc_treesitter")
     source = (ROOT / "crates/sc-treesitter/tests/fixtures/match.rs").read_text()
@@ -289,7 +293,8 @@ def test_rebuilt_invalid_limits_reach_wheel_once(env, args, consumer, monkeypatc
 
 @pytest.mark.parametrize("category_result", [RuntimeError("wheel failure"), None, 7])
 def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_result):
-    line = '{"error":{"id":"auth","category":"auth"}}'
+    line = json.dumps({"session_id": "01J00000000000000000000000", "position": 0, "sends": 1,
+                       "digests": {}, "error": {"id": "auth", "category": "auth", "message": "denied"}})
     monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
 
     def category(error):
@@ -312,7 +317,8 @@ def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_resul
     ("decision.request_parse", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "INVALID"),
 ])
 def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes, expected):
-    line = json.dumps({"position": 0, "sends": 1, "error": {"id": error_id, "category": "validation", "message": "controlled error"}})
+    line = json.dumps({"session_id": "01J00000000000000000000000", "position": 0, "sends": 1,
+                       "digests": {}, "error": {"id": error_id, "category": "validation", "message": "controlled error"}})
     monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
     callbacks = []
 
@@ -335,8 +341,10 @@ def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes
 
 
 def test_rebuilt_classifies_once_and_retains_callback_order(consumer, monkeypatch):
-    lines = ['{"position":0,"sends":1,"error":{"id":"auth","message":"denied","category":"auth"}}',
-             '{"position":1,"sends":1,"error":{"id":"quota","message":"exhausted","category":"quota"}}']
+    lines = [json.dumps({"session_id": "01J00000000000000000000000", "position": position, "sends": 1,
+                         "digests": {}, "error": {"id": error_id, "message": message, "category": category}})
+             for position, error_id, message, category in
+             [(0, "auth", "denied", "auth"), (1, "quota", "exhausted", "quota")]]
     classified, callbacks, cancellations = [], [], []
     native_category = sc_agent.category
 

@@ -13,7 +13,7 @@ mod support;
 mod tests {
     use sc_agent_http::testing::ScriptedTransport;
     use sc_agent_http::{HttpError, HttpResponse, LogContext, NetworkKind, Transport};
-    use sc_agent_types::ErrorId;
+    use sc_agent_types::{ErrorCategory, ErrorId};
     use sc_decision_schema::{
         Answer, Backend, DecisionError, DecisionRequest, ModelMetadataList, SystemOneResponse,
     };
@@ -37,6 +37,64 @@ mod tests {
             &noul(),
             &LogContext::NONE,
         )
+    }
+
+    fn decode_for(request_json: &str, body: &[u8]) -> Result<SystemOneResponse, DecisionError> {
+        backend().decode(
+            HttpResponse::new(200, vec![], body.to_vec()),
+            &request(request_json, false),
+            &LogContext::NONE,
+        )
+    }
+
+    #[test]
+    fn reply_answer_ids_must_equal_question_ids_and_error_is_redacted_retryable() {
+        let error = decode(200, br#"{"model":"m","answers":{"unrequested-answer-id":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#).unwrap_err();
+        assert!(matches!(
+            error,
+            DecisionError::ResponseInvalid { status: 200, .. }
+        ));
+        let detail = error.detail();
+        assert_eq!(detail.category, Some(ErrorCategory::ResponseInvalid));
+        assert_eq!(detail.status, Some(200));
+        assert!(detail.category.expect("category").retryable());
+        assert!(!format!("{error} {detail:?}").contains("unrequested-answer-id"));
+    }
+
+    #[test]
+    fn reply_answer_type_must_match_question_type() {
+        let error = decode_for(
+            r#"{"model":"m","state":"s","questions":{"q":{"type":"choice","criteria":{"a":"A"}}}}"#,
+            br#"{"model":"m","answers":{"q":{"type":"noul","noul":0.5}},"usage":{"input_tokens":1,"output_tokens":1}}"#,
+        ).unwrap_err();
+        assert!(matches!(
+            error,
+            DecisionError::ResponseInvalid { status: 200, .. }
+        ));
+        assert_eq!(error.detail().status, Some(200));
+    }
+
+    #[test]
+    fn reply_probabilities_and_confidence_must_be_finite_and_in_range() {
+        let noul_body = br#"{"model":"m","answers":{"q":{"type":"noul","noul":1.01}},"usage":{"input_tokens":1,"output_tokens":1}}"#;
+        assert!(matches!(
+            decode_for(
+                r#"{"model":"m","state":"s","questions":{"q":{"type":"noul"}}}"#,
+                noul_body
+            ),
+            Err(DecisionError::ResponseInvalid { status: 200, .. })
+        ));
+        for (confidence, probability) in [(0.5, -0.1), (1.1, 0.5)] {
+            let body = format!(
+                r#"{{"model":"m","answers":{{"q":{{"type":"choice","choice":"a","confidence":{confidence},"probabilities":{{"a":{probability}}}}}}},"usage":{{"input_tokens":1,"output_tokens":1}}}}"#
+            );
+            let req = r#"{"model":"m","state":"s","questions":{"q":{"type":"choice","criteria":{"a":"A"}}}}"#;
+            assert!(matches!(
+                decode_for(req, body.as_bytes()),
+                Err(DecisionError::ResponseInvalid { status: 200, .. })
+            ));
+        }
+        assert!(decode(200, br#"{"model":"m","answers":{"billing":{"type":"noul","noul":1.0}},"usage":{"input_tokens":1,"output_tokens":1}}"#).is_ok());
     }
 
     /// AC 2: the TypeSafe 200 example decodes and round-trips.

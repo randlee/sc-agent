@@ -10,7 +10,7 @@ COMMON = dict(model="jev", project="consumer", agent_role="judge", abort_on=froz
 CATEGORY_CASES = [
     ("auth", "AUTH.CREDENTIALS", False), ("quota", "DECIDR.RATE_LIMITED", False),
     ("busy", "DECIDR.OVERLOADED", True), ("network", "DECIDR.NETWORK", True),
-    ("response_invalid", "DECIDR.RESPONSE_INVALID", False), ("validation", "DECIDR.VALIDATION", False),
+    ("response_invalid", "DECIDR.RESPONSE_INVALID", True), ("validation", "DECIDR.VALIDATION", False),
     ("cancelled", "CANCELED", False), ("config", "DECIDR.CONFIG", False),
     ("log", "DECIDR.LOG", False), ("other", "DECIDR.ERROR", False),
 ]
@@ -22,8 +22,11 @@ def error_fields(error):
 
 
 def wire(position=0, *, sends=3, error=None):
-    row = {"position": position, "sends": sends}
-    row.update(error=error) if error is not None else row.update(response={"answers": {"q": True}})
+    row = {"session_id": "01J00000000000000000000000", "position": position, "sends": sends,
+           "digests": {"q": "0" * 64}}
+    row.update(error=error) if error is not None else row.update(response={
+        "model": "jev", "answers": {"q": {"type": "noul", "noul": 0.5}},
+        "usage": {"input_tokens": 1, "output_tokens": 1}})
     return json.dumps(row)
 
 
@@ -50,7 +53,7 @@ def test_each_shared_id(consumer, identifier, category, expected):
     detail = dict(id=identifier, category=category, message="failure")
     result = consumer.decode_result(wire(error=detail))
     assert result["error"].code == expected
-    assert result["error"].retryable is False
+    assert result["error"].retryable is (category == "response_invalid")
 
 
 def test_consumer_overrides_and_wheel_retryability(consumer, monkeypatch):
@@ -79,9 +82,9 @@ def test_metadata_rejects_non_integer_fields(consumer, value):
 def test_metadata_zero_and_unknown_sends(consumer):
     assert consumer.error_metadata(dict(status=0, attempts=0, retry_after_ms=0)) == dict(
         status=0, attempts=0, retry_after_ms=0)
-    result = consumer.decode_result('{"response": {"answers": {}}}')
+    result = consumer.decode_result(wire(sends="bad"))
     assert result["ok"] and result["attempts"] is None
-    result = consumer.decode_result('{"error": {"id":"x", "category":"busy", "message":"busy", "attempts":8}}')
+    result = consumer.decode_result(wire(sends="bad", error={"id": "x", "category": "busy", "message": "busy", "attempts": 8}))
     assert result["error"].attempts is None
     assert result["error"].code == "DECIDR.OVERLOADED"
 
@@ -151,11 +154,14 @@ def test_single_helper_forwards_context_and_preserves_wire(consumer, monkeypatch
 
     monkeypatch.setattr(sc_agent, "send", send)
     log = lambda _: None
-    result = consumer.call_result("request", **COMMON, config_dir="config", keyring_service="service",
+    result = consumer.call_result({"model": "jev"}, **COMMON, config_dir="config", keyring_service="service",
                                   keyring_account="account", timeout_secs=30, general_log=log,
                                   images={"image": b"data"}, long_context=True)
-    assert result == dict(ok=True, value={"answers": {"q": True}}, position=0, line=line, attempts=5)
-    assert observed == dict(request="request", model="jev", project="consumer", agent_role="judge",
+    assert result["ok"] and result["value"]["q"].noul == 0.5
+    assert result["usage"] == {"input_tokens": 1, "output_tokens": 1}
+    assert result["position"] == 0 and result["attempts"] == 5 and result["line"] == line
+    assert json.loads(observed["request"]) == {"model": "jev"}
+    assert {key: value for key, value in observed.items() if key != "request"} == dict(model="jev", project="consumer", agent_role="judge",
                             config_dir="config", keyring_service="service", keyring_account="account",
                             timeout_secs=30, general_log=log, images={"image": b"data"}, long_context=True,
                             cancel=observed["cancel"])
@@ -175,14 +181,14 @@ def test_batch_streams_immediately_once_and_returns_input_order(consumer, monkey
         return [first, second]
 
     monkeypatch.setattr(sc_agent, "send_batch", send_batch)
-    result = consumer.call_batch_results(["a", "b"], **COMMON, on_result=callbacks.append,
+    result = consumer.call_batch_results([{"x": "a"}, "b"], **COMMON, on_result=callbacks.append,
                                          config_dir="config", keyring_service="service", keyring_account="account",
                                          timeout_secs=30, workers=2)
     assert result == dict(ok=True, value=[callbacks[1], callbacks[0]])
     assert callbacks[0]["error"].attempts == 5
-    assert observed["requests"] == ["a", "b"]
+    assert observed["requests"] == ['{"x": "a"}', "b"]
     assert {key: value for key, value in observed.items() if key != "cancel"} == dict(
-        requests=["a", "b"], model="jev", project="consumer", agent_role="judge", config_dir="config",
+        requests=['{"x": "a"}', "b"], model="jev", project="consumer", agent_role="judge", config_dir="config",
         keyring_service="service", keyring_account="account", timeout_secs=30, workers=2, general_log=None)
 
 
@@ -276,18 +282,18 @@ def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, a
 @pytest.mark.parametrize("batch", [False, True])
 def test_each_wire_line_is_parsed_once(consumer, monkeypatch, batch):
     line = wire(error={"id": "decision.context_exceeded", "category": "validation", "message": "too large"})
-    loads, seen = json.loads, []
+    parse_result, seen = sc_agent.parse_result, []
 
-    def tracked(value, *args, **kwargs):
+    def tracked(value):
         if value == line:
             seen.append(value)
-        return loads(value, *args, **kwargs)
+        return parse_result(value)
 
     def send_batch(requests, *, on_result, **kwargs):
         on_result(line)
         return [line]
 
-    monkeypatch.setattr(consumer.json, "loads", tracked)
+    monkeypatch.setattr(sc_agent, "parse_result", tracked)
     monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
     monkeypatch.setattr(sc_agent, "send_batch", send_batch)
     result = (consumer.call_batch_results(["request"], **COMMON)["value"][0] if batch else

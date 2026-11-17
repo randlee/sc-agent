@@ -35,6 +35,10 @@ mod tests {
             expected: "SystemOneResponse",
             message: "expected value".to_owned(),
         },
+        DecisionError::ResponseInvalid {
+            status: 200,
+            reason: "answer ids do not match the request",
+        },
         DecisionError::DuplicateKey {
             key: "q".to_owned(),
         },
@@ -98,7 +102,7 @@ mod tests {
         assert!(!ids.contains(&"decision.digest"));
         ids.sort_unstable();
         ids.dedup();
-        assert_eq!(ids.len(), 15);
+        assert_eq!(ids.len(), 16);
 
         for error in &errors {
             assert_eq!(
@@ -118,7 +122,8 @@ mod tests {
                     DecisionError::ApiValidation { .. } => Some(422),
                     DecisionError::ApiStatus { status, .. }
                     | DecisionError::ContextExceeded { status }
-                    | DecisionError::ResponseParse { status, .. } => Some(*status),
+                    | DecisionError::ResponseParse { status, .. }
+                    | DecisionError::ResponseInvalid { status, .. } => Some(*status),
                     _ => None,
                 }
             );
@@ -137,9 +142,9 @@ mod tests {
                 | DecisionError::ApiBadRequest { .. }
                 | DecisionError::ApiValidation { .. }
                 | DecisionError::ContextExceeded { .. } => ErrorCategory::Validation,
-                DecisionError::ResponseParse { .. } | DecisionError::SchemaMismatch { .. } => {
-                    ErrorCategory::ResponseInvalid
-                }
+                DecisionError::ResponseParse { .. }
+                | DecisionError::ResponseInvalid { .. }
+                | DecisionError::SchemaMismatch { .. } => ErrorCategory::ResponseInvalid,
                 DecisionError::ApiStatus { .. } => ErrorCategory::Busy,
                 DecisionError::Http(_) => ErrorCategory::Network,
                 DecisionError::Cancelled { .. } => ErrorCategory::Cancelled,
@@ -297,6 +302,7 @@ mod tests {
                     | "decision.schema_mismatch"
                     | "decision.shutdown"
                     | "decision.response_parse"
+                    | "decision.response_invalid"
                     | "decision.api_status"
                     | "decision.cancelled"
             );

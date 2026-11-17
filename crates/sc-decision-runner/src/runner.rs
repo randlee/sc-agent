@@ -854,6 +854,7 @@ impl RunnerWork {
                 match self.shared.backend.decode(response, &core.request, &ctx) {
                     Err(
                         error @ (DecisionError::SchemaMismatch { .. }
+                        | DecisionError::ResponseInvalid { .. }
                         | DecisionError::ResponseParse {
                             status: 200..=299, ..
                         }),

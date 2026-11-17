@@ -18,8 +18,10 @@ class ConsumerFormatTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             variables = Path(directory) / "variables.json"
             output = Path(directory) / "consumer.py"
-            variables.write_text(json.dumps({"general_log": False, "sitr": True, "models": ["dec"],
-                                             "sc_decidr_version": "1.2.3", "sitr_version": "4.5.6"}))
+            variables.write_text(json.dumps({"general_log": False, "sitr": True, "batch_records": False,
+                                             "settings_module": "consumer_settings", "settings_file": ".sc/app/settings.yaml",
+                                             "settings_set_command": "app-settings set allow_remote_judge true|false",
+                                             "models": ["dec"], "sc_decidr_version": "1.2.3", "sitr_version": "4.5.6"}))
             subprocess.run(["sc-compose", "render", "--root", str(TEMPLATE.parent), "--file", str(TEMPLATE),
                             "--var-file", str(variables), "--strict", "--output", str(output)],
                            check=True, stdin=subprocess.DEVNULL, timeout=60)
@@ -45,7 +47,9 @@ class ConsumerFormatTest(unittest.TestCase):
                     variables = Path(directory) / "variables.json"
                     output = Path(directory) / "consumer.py"
                     variables.write_text(json.dumps({
-                        "general_log": general_log, "sitr": sitr, "models": ["dec"],
+                        "general_log": general_log, "sitr": sitr, "batch_records": False,
+                        "settings_module": "consumer_settings", "settings_file": ".sc/app/settings.yaml",
+                        "settings_set_command": "app-settings set allow_remote_judge true|false", "models": ["dec"],
                         "sc_decidr_version": "0.2.2", "sitr_version": "0.2.2",
                     }))
                     subprocess.run([

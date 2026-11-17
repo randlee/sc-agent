@@ -47,6 +47,14 @@ pub enum DecisionError {
         /// The serde_json message.
         message: String,
     },
+    /// A decoded reply does not match the request's answer ids, types or numeric bounds.
+    /// The provider body is never included.
+    ResponseInvalid {
+        /// The reply's HTTP status.
+        status: u16,
+        /// A fixed, sanitized explanation of the mismatch.
+        reason: &'static str,
+    },
     /// `OrderedMap::try_from_pairs` got a key twice.
     DuplicateKey {
         /// The duplicate key.
@@ -136,6 +144,7 @@ impl From<HttpError> for DecisionError {
 sc_agent_types::error_catalog! { DecisionError {
     DecisionError::RequestParse { .. } => ("decision.request_parse", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ResponseParse { .. } => ("decision.response_parse", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionError::ResponseInvalid { .. } => ("decision.response_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
     DecisionError::DuplicateKey { .. } => ("decision.duplicate_key", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::Encode { .. } => ("decision.encode", Some(sc_agent_types::ErrorCategory::Other)),
     DecisionError::ImageParts { .. } => ("decision.image_parts", Some(sc_agent_types::ErrorCategory::Validation)),
@@ -173,6 +182,9 @@ impl ErrorId for DecisionError {
                 expected,
                 message,
             } => format!("the HTTP {status} body is not a {expected}: {message}"),
+            Self::ResponseInvalid { status, reason } => {
+                format!("the HTTP {status} reply is invalid: {reason}")
+            }
             Self::DuplicateKey { key } => duplicate_message(key),
             Self::Encode { message } => message.clone(),
             Self::ImageParts { detail } => detail.clone(),
@@ -240,7 +252,8 @@ impl ErrorId for DecisionError {
             Self::ApiValidation { .. } => Some(422),
             Self::ApiStatus { status, .. }
             | Self::ContextExceeded { status }
-            | Self::ResponseParse { status, .. } => Some(*status),
+            | Self::ResponseParse { status, .. }
+            | Self::ResponseInvalid { status, .. } => Some(*status),
             _ => None,
         }
     }
@@ -279,7 +292,7 @@ impl ErrorId for DecisionError {
             ),
             Self::Shutdown { .. } => Some("start a new decision runner and send the request again"),
             Self::Http(error) => error.recovery(),
-            Self::ResponseParse { .. } => {
+            Self::ResponseParse { .. } | Self::ResponseInvalid { .. } => {
                 Some("check the response schema and selected model, then retry")
             }
             Self::ApiStatus { status: 402, .. } => {
