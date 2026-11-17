@@ -1,0 +1,13 @@
+{
+  "run_id": "20261116-0-integration",
+  "title": "Earlier integration reports (retained panels)",
+  "created_at": "",
+  "panels": [
+    "colima-anthropic.xhtml",
+    "colima-openai.xhtml",
+    "colima-typesafe.xhtml",
+    "macos-anthropic.xhtml",
+    "macos-openai.xhtml",
+    "macos-typesafe.xhtml"
+  ]
+}

@@ -4,6 +4,7 @@ import getpass
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,10 @@ def execute(args):
                      "--interpreter", python, "--out", wheels], cwd=ROOT, timeout=1800)
                 wheel, = wheels.glob("*.whl")
             run([python, "-m", "pip", "install", "--no-cache-dir", "--no-deps", wheel])
+        report_run_id = None
+        if args.pin_tag:
+            renderer = runpy.run_path(str(ROOT / "templates/integration-report/render.py"))
+            report_run_id = renderer["new_run_id"](ROOT / "site/reports")
         failed = False
         for provider in providers:
             junit = results / f"{args.platform}-{provider}.xml"
@@ -130,7 +135,7 @@ def execute(args):
                     failed = True
             if args.pin_tag:
                 run([sys.executable, ROOT / "templates/integration-report/render.py", junit,
-                     "--platform", args.platform, "--mode", "live", "--source-revision",
+                     "--run-id", report_run_id, "--platform", args.platform, "--mode", "live", "--source-revision",
                      args.pin_sha,
                      "--wheel-revision", f"{args.pin_tag}@{args.pin_sha}", "--output",
                      ROOT / f"site/reports/integration/{args.platform}-{provider}.xhtml"])

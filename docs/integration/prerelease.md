@@ -108,11 +108,11 @@ status=0
 "$scratch/venv/bin/python" scripts/integration.py --venv "$scratch/venv" \
   --env-file "$scratch/keys.env" --results "$scratch/results" --platform macos \
   --pin-tag "$pin_tag" --pin-sha "$pin_sha" >&2 || status=$?
-tar -cf - site/reports/integration
+tar -cf - site/reports
 exit "$status"
 REMOTE
 
-git add site/reports/integration/macos-*.xhtml
+git add site/reports
 git commit -m "Record clean-account prerelease integration results"
 git push
 ```
@@ -126,7 +126,7 @@ is presented as a passing case.
 
 For Colima, repeat the **same suite command** with the published Linux wheel or
 installed venv and a temporary `.env`, add `--platform colima --pin-tag TAG
---pin-sha SHA`, and commit/push `colima-*.xhtml`. Use a disposable container/volume
+--pin-sha SHA`, and commit/push `site/reports/`. Use a disposable container/volume
 and remove it and its temporary credentials after collecting the panels. One
 passing platform suffices; there is no automatic publication gate or CI live run.
 
@@ -145,3 +145,16 @@ The developer adding or changing a Cargo dependency updates both affected
 boundary records in the same change: the consumer's allowed dependencies and
 the dependency owner's allowed dependents (using dev entries for dev-only
 edges). Derive these entries from ADR-SAG-0004 and the actual Cargo graph.
+
+The shared renderer writes each run's XHTML panels and JSON under
+`site/reports/<run-id>/`, embeds those panels in `site/reports/<run-id>.html`, and
+updates `site/reports/index.html` newest first. Each provider in one invocation
+shares a run id. Existing XHTML can use the same publisher without rerendering:
+
+```bash
+python templates/integration-report/render.py --panel path/to/panel.xhtml \
+  --reports-dir site/reports --run-id YYYYMMDD-1-integration --title "Integration report"
+```
+
+Repeat `--panel` for multiple panels. Reusing the run id updates its page and
+retains one index entry. The site home page's Reports link is installed once.
