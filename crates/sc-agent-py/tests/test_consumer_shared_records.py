@@ -406,3 +406,21 @@ def test_redaction_happens_at_serialization_and_preserves_typed_records(tmp_path
     assert logged[0]["answers"]["q"] == {"type": "noul", "noul": 0.5}
     assert logged[0]["raw_response"]["secret"] == "[redacted]"
     assert "sk-canary" not in echoed[0] and "sk-canary" not in client.encode_result_line(line, redact=redact)
+
+
+@pytest.mark.parametrize("sends", [0, 1, 4])
+def test_native_send_count_controls_batch_retry_count(tmp_path, monkeypatch, sends):
+    client = _client(tmp_path, monkeypatch)
+    error = client.ClientError("DECIDR.NETWORK", "down", attempts=sends)
+    for raw, failure in ((None, error), ({"ok": False, "error": error, "attempts": sends}, None),
+                         ({"ok": True, "value": {}, "model_answered": "jev", "attempts": sends}, None)):
+        line = client._line(_job(client), _settings(client), raw, [], failure, False)
+        assert line["sends"] == sends and line["retry_count"] == max(sends - 1, 0)
+        assert line["ok"] is (failure is None and raw.get("ok") is True)
+
+
+def test_fixture_retry_count_uses_local_attempts_when_native_sends_unknown(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    raw = client._fixture_attempt(_job(client), {"*": {"q": {"noul": 0.5}}}, 1)
+    line = client._line(_job(client), _settings(client), raw, [{}, {}], None, False)
+    assert line["sends"] is None and line["retry_count"] == 1

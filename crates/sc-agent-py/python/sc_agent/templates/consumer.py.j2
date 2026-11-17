@@ -550,8 +550,20 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
           result_fields: Optional[Callable[[BatchJob, BatchSettings, Any], dict]] = None,
           error_message_limit: Optional[int] = None) -> dict:
     """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
-    if isinstance(raw, dict) and raw.get("ok") is True and "value" in raw:
-        raw = {"model": raw.get("model_answered"), "answers": raw["value"], "sends": raw.get("attempts")}
+    native_sends = None
+    if isinstance(raw, dict) and type(raw.get("ok")) is bool and "attempts" in raw:
+        native_sends = raw.get("attempts")
+        if raw["ok"] and "value" in raw:
+            raw = {"model": raw.get("model_answered"), "answers": raw["value"], "sends": native_sends}
+        elif not raw["ok"]:
+            error = error if error is not None else raw.get("error")
+            raw = None
+    if native_sends is None and error is not None:
+        native_sends = getattr(error, "attempts", None)
+    if native_sends is None and isinstance(raw, dict):
+        native_sends = raw.get("sends")
+    if type(native_sends) is not int or native_sends < 0:
+        native_sends = None
     fields = result_fields(job, settings, raw) if result_fields is not None else {}
     message = None if error is None else error.message
     if message is not None and error_message_limit is not None:
@@ -567,9 +579,9 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
         "dry_run": dry_run, "ok": raw is not None, "raw_response": raw,
         "answers": raw.get("answers") if isinstance(raw, dict) else None,
         "model_answered": raw.get("model") if isinstance(raw, dict) else None,
-        "sends": raw.get("sends") if isinstance(raw, dict) else None,
+        "sends": native_sends,
         "threshold": settings.threshold, "verdict": None, "min_confidence": None, "leaning": None,
-        "retry_count": max(len(attempts) - 1, 0), "attempts": attempts,
+        "retry_count": max((native_sends if native_sends is not None else len(attempts)) - 1, 0), "attempts": attempts,
         "error": None if error is None else {"code": error.code, "message": message,
                                                "recoverable": getattr(error, "recoverable", getattr(error, "retryable", False))},
     }
