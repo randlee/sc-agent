@@ -29,7 +29,8 @@ MODELS = {{ models | tojson }}
 LogSink = Callable[[dict], None]
 CategoryCodes = Mapping[str, str]
 AbortOn = frozenset[str]
-BatchItem = Union[str, tuple[str, Optional[dict[str, bytes]], bool]]
+Request = Union[str, dict]
+BatchItem = Union[Request, tuple[Request, Optional[dict[str, bytes]], bool]]
 
 __all__ = [
     "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
@@ -135,20 +136,16 @@ def exception_result(exc: Exception, *, category_codes=None) -> dict:
 def decode_result(line: str, *, category_codes=None) -> dict:
     """Decode one Rust wire result, retaining its position and observed sends."""
     try:
-        parsed = json.loads(line)
-        if not isinstance(parsed, dict):
-            raise _invalid("sc-decidr returned a non-object result")
-        if isinstance(parsed.get("error"), dict):
-            result = _failed(wheel_error(parsed["error"], category_codes=category_codes))
-        elif isinstance(parsed.get("response"), dict):
-            result = dict(ok=True, value=parsed["response"])
-        else:
-            raise _invalid("sc-decidr result has neither a response nor a typed error")
-        sends = parsed.get("sends")
+        parsed = _load_wheel().parse_result(line)
+        sends = parsed["sends"]
         attempts = sends if type(sends) is int and sends >= 0 else None
-        if not result["ok"]:
+        if parsed["error"] is not None:
+            result = exception_result(parsed["error"], category_codes=category_codes)
             result["error"].attempts = attempts
-        result.update(position=parsed.get("position"), line=line, attempts=attempts)
+        else:
+            result = dict(ok=True, value=parsed["answers"], usage=parsed["usage"])
+        result.update(position=parsed["position"], session_id=parsed["session_id"],
+                      digests=parsed["digests"], line=line, attempts=attempts)
         return result
     except (TypeError, ValueError) as exc:
         return _failed(_invalid(f"sc-decidr returned invalid JSON: {exc}"))
@@ -165,6 +162,10 @@ def _invoke(method, request, abort_on, kwargs, category_codes):
         return _failed(exc)
     kwargs["cancel"] = kwargs.get("cancel") if kwargs.get("cancel") is not None else wheel.CancelToken()
     try:
+        if method == "send":
+            request = _encode_request(request)
+        elif method == "send_batch":
+            request = [_encode_batch_item(item) for item in request]
         return dict(ok=True, value=getattr(wheel, method)(request, **kwargs))
     except KeyboardInterrupt:
         kwargs["cancel"].cancel()
@@ -177,8 +178,25 @@ def _invoke(method, request, abort_on, kwargs, category_codes):
         return _failed(exc)
 
 
+def _encode_request(request: Request) -> str:
+    if isinstance(request, str):
+        return request
+    if isinstance(request, dict):
+        return json.dumps(request)
+    raise ClientError("DECIDR.INVALID_REQUEST", "request must be a JSON string or object")
+
+
+def _encode_batch_item(item: BatchItem):
+    if isinstance(item, tuple):
+        if len(item) != 3:
+            raise ClientError("DECIDR.INVALID_REQUEST", "batch tuple must be (request, images, long_context)")
+        request, images, long_context = item
+        return (_encode_request(request), images, long_context)
+    return _encode_request(item)
+
+
 def call_result(
-    request: str, *, model: str, project: str, agent_role: str, abort_on: AbortOn,
+    request: Request, *, model: str, project: str, agent_role: str, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
     images: Optional[dict[str, bytes]] = None, long_context: bool = False,
     config_dir: Optional[str] = None, keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,

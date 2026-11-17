@@ -36,9 +36,10 @@ pub trait Backend: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// [`DecisionError::SchemaMismatch`] when the reply does not match the required schema
-    /// and must be sent again (REQ-SAG-0901); `ApiBadRequest`, `ApiValidation`, `ApiStatus`
-    /// or `ResponseParse` for a refused or unreadable reply.
+    /// [`DecisionError::SchemaMismatch`] or [`DecisionError::ResponseInvalid`] when the reply
+    /// does not match the required schema and must be sent again (REQ-SAG-0901);
+    /// `ApiBadRequest`, `ApiValidation`, `ApiStatus` or `ResponseParse` for a refused or
+    /// unreadable reply.
     fn decode(
         &self,
         response: HttpResponse,

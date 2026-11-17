@@ -42,7 +42,7 @@ def test_rendered_consumer_uses_only_public_apis(tmp_path, general_log, models, 
     render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
     tree = ast.parse((tmp_path / "consumer.py").read_text())
     public = {
-        "sc_agent": {"send", "send_batch", "category", "retryable", "SagError", "CancelToken"},
+        "sc_agent": {"send", "send_batch", "category", "retryable", "parse_result", "SagError", "CancelToken"},
         "sc_treesitter": {"run_query"},
     }
     aliases = {}
@@ -289,7 +289,8 @@ def test_rebuilt_invalid_limits_reach_wheel_once(env, args, consumer, monkeypatc
 
 @pytest.mark.parametrize("category_result", [RuntimeError("wheel failure"), None, 7])
 def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_result):
-    line = '{"error":{"id":"auth","category":"auth"}}'
+    line = json.dumps({"session_id": "01J00000000000000000000000", "position": 0, "sends": 1,
+                       "digests": {}, "error": {"id": "auth", "category": "auth", "message": "denied"}})
     monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
 
     def category(error):
@@ -312,7 +313,8 @@ def test_rebuilt_category_failure_is_typed(consumer, monkeypatch, category_resul
     ("decision.request_parse", {"context_exceeded": "CONTEXT", "validation": "INVALID"}, "INVALID"),
 ])
 def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes, expected):
-    line = json.dumps({"position": 0, "sends": 1, "error": {"id": error_id, "category": "validation", "message": "controlled error"}})
+    line = json.dumps({"session_id": "01J00000000000000000000000", "position": 0, "sends": 1,
+                       "digests": {}, "error": {"id": error_id, "category": "validation", "message": "controlled error"}})
     monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
     callbacks = []
 
@@ -335,8 +337,10 @@ def test_context_exceeded_mapping(consumer, monkeypatch, method, error_id, codes
 
 
 def test_rebuilt_classifies_once_and_retains_callback_order(consumer, monkeypatch):
-    lines = ['{"position":0,"sends":1,"error":{"id":"auth","message":"denied","category":"auth"}}',
-             '{"position":1,"sends":1,"error":{"id":"quota","message":"exhausted","category":"quota"}}']
+    lines = [json.dumps({"session_id": "01J00000000000000000000000", "position": position, "sends": 1,
+                         "digests": {}, "error": {"id": error_id, "message": message, "category": category}})
+             for position, error_id, message, category in
+             [(0, "auth", "denied", "auth"), (1, "quota", "exhausted", "quota")]]
     classified, callbacks, cancellations = [], [], []
     native_category = sc_agent.category
 

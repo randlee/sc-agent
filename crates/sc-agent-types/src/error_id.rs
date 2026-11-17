@@ -53,7 +53,7 @@ impl ErrorCategory {
     /// Whether a fresh call may be worth trying later.
     #[must_use]
     pub const fn retryable(self) -> bool {
-        matches!(self, Self::Busy | Self::Network)
+        matches!(self, Self::Busy | Self::Network | Self::ResponseInvalid)
     }
 }
 
