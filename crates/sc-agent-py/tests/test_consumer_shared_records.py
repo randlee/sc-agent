@@ -53,7 +53,9 @@ def test_fixture_lookup_and_shared_input_callbacks(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     job = _job(client, "anchor")
     fixture = {"item/candidate/r1": [{"q": {"noul": 0.25}}]}
-    assert client._fixture_attempt(job, fixture, 1) == {"model": "fixture", "answers": {"q": {"noul": 0.25}}}
+    fixture_result = client._fixture_attempt(job, fixture, 1)
+    assert fixture_result["model"] == "fixture"
+    assert fixture_result["answers"]["q"].noul == 0.25
     with pytest.raises(client.ClientError, match="answers fixture has no entry"):
         client._fixture_attempt(job, {}, 1)
 
@@ -131,11 +133,11 @@ def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path, mon
 def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     wheel_result = {"position": 0, "session_id": "s", "sends": 1, "digests": {},
-                    "error": None, "answers": {"model": "fixture", "answers": {}}, "usage": {}}
+                    "error": None, "answers": {}, "usage": {}}
     monkeypatch.setattr(client, "_load_wheel", lambda: SimpleNamespace(parse_result=lambda _: wheel_result))
-    result = client.decode_result("controlled wire")
+    result = client.decode_result(json.dumps({"response": {"model": "fixture"}}))
     assert type(result) is dict
-    assert result["ok"] is True and result["value"] == {"model": "fixture", "answers": {}}
+    assert result["ok"] is True and result["value"] == {} and result["model_answered"] == "fixture"
 
     tool_error = SimpleNamespace(code="SETTINGS.BAD", message="invalid setting", recoverable=True,
                                  action="repair settings", status=422, retry_after_ms=10,
@@ -305,3 +307,64 @@ def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_pat
     assert canceled["canceled"] and canceled["aborted_by"] == "user"
     assert canceled["error"]["code"] == "CANCELED"
     assert canceled["error"]["recoverable"] is True
+
+
+@pytest.mark.parametrize("answer,expected", [
+    ({"type": "noul", "noul": 0.5}, {"type": "noul", "noul": 0.5}),
+    ({"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8}},
+     {"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8}}),
+    ({"type": "score", "score": 2, "confidence": 0.8, "legend": {"2": "high"}, "probabilities": {"2": 0.8}},
+     {"type": "score", "score": 2, "confidence": 0.8, "legend": {"2": "high"}, "probabilities": {"2": 0.8}}),
+    ({"type": "box", "box": {"top": 0.1, "bottom": 0.9, "left": 0.2, "right": 0.8}, "confidence": 0.7},
+     {"type": "box", "box": {"top": 0.1, "bottom": 0.9, "left": 0.2, "right": 0.8}, "confidence": 0.7}),
+])
+def test_real_wheel_and_offline_fixture_share_typed_batch_records(tmp_path, monkeypatch, answer, expected):
+    client = _client(tmp_path, monkeypatch)
+    job = _job(client)
+    wire = json.dumps({"session_id": "session", "position": 0, "sends": 3, "digests": {},
+                       "response": {"model": "jev-real", "answers": {"q": answer},
+                                    "usage": {"input_tokens": 1, "output_tokens": 1}}})
+    live = client.decode_result(wire)
+    assert live["ok"] is True
+    fixture = client._fixture_attempt(job, {"*": {"q": answer}}, 1)
+    assert type(live["value"]["q"]) is type(fixture["answers"]["q"])
+    assert live["value"]["q"] == fixture["answers"]["q"]
+    for raw, model, sends in ((live, "jev-real", 3), (fixture, "fixture", None)):
+        record = client._line(job, _settings(client), raw, [], None, False)
+        decoded = json.loads(client.encode_result_line(record))
+        assert decoded["answers"]["q"] == expected
+        assert decoded["raw_response"]["answers"]["q"] == expected
+        assert decoded["model_answered"] == model and decoded["sends"] == sends
+
+
+def test_fixture_conversion_does_not_import_wheel(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setattr(client, "_load_wheel", lambda: pytest.fail("fixture loaded wheel"))
+    result = client._fixture_attempt(_job(client), {"*": {"q": {"noul": 0.5}}}, 1)
+    assert result["answers"]["q"].noul == 0.5
+    assert json.loads(client.encode_result_line(result))["answers"]["q"] == {"type": "noul", "noul": 0.5}
+
+
+def test_batch_error_retains_recovery_action(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    error = client.ClientError("DECIDR.NETWORK", "unavailable", action="Retry later")
+    line = client._line(_job(client), _settings(client), None, [], error, False)
+    assert json.loads(client.encode_result_line(line))["error"]["suggested_action"] == "Retry later"
+
+
+def test_batch_line_encodes_each_native_wheel_answer(tmp_path, monkeypatch):
+    import sc_agent
+
+    client = _client(tmp_path, monkeypatch)
+    answers = {
+        "n": sc_agent.NoulAnswer(0.5),
+        "c": sc_agent.ChoiceAnswer("yes", 0.8, {"yes": 0.8}),
+        "s": sc_agent.ScoreAnswer(2, 0.8, {"2": "high"}, {"2": 0.8}),
+        "b": sc_agent.BoxAnswer(0.1, 0.9, 0.2, 0.8, 0.7),
+    }
+    for key, answer in answers.items():
+        line = client._line(_job(client), _settings(client), {"model": "jev", "answers": {key: answer}},
+                            [], None, False)
+        decoded = json.loads(client.encode_result_line(line))
+        assert decoded["answers"][key]["type"] == {"n": "noul", "c": "choice", "s": "score", "b": "box"}[key]
+        assert decoded["raw_response"]["answers"][key] == decoded["answers"][key]

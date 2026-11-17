@@ -197,6 +197,61 @@ def exception_result(exc: Exception, *, category_codes=None) -> dict:
     return _failed(wheel_error(detail, category_codes=category_codes))
 
 
+class NoulAnswer(NamedTuple):
+    noul: float
+
+
+class ChoiceAnswer(NamedTuple):
+    choice: str
+    confidence: float
+    probabilities: Mapping[str, float]
+
+
+class ScoreAnswer(NamedTuple):
+    score: float
+    confidence: float
+    legend: Mapping[str, Any]
+    probabilities: Mapping[str, float]
+
+
+class BoxAnswer(NamedTuple):
+    top: float
+    bottom: float
+    left: float
+    right: float
+    confidence: Optional[float]
+
+
+def _typed_answer(answer):
+    """Normalize valid wheel and JSON fixture answers without requiring the wheel offline."""
+    if isinstance(answer, (NoulAnswer, ChoiceAnswer, ScoreAnswer, BoxAnswer)):
+        return answer
+    if isinstance(answer, dict):
+        try:
+            kind = answer.get("type") or next((key for key in ("noul", "choice", "score", "box") if key in answer), None)
+            if kind == "noul":
+                return NoulAnswer(answer["noul"])
+            if kind == "choice":
+                return ChoiceAnswer(answer["choice"], answer["confidence"], answer["probabilities"])
+            if kind == "score":
+                return ScoreAnswer(answer["score"], answer["confidence"], answer["legend"], answer["probabilities"])
+            if kind == "box":
+                box = answer["box"]
+                return BoxAnswer(box["top"], box["bottom"], box["left"], box["right"], answer.get("confidence"))
+        except (KeyError, TypeError):
+            pass  # Preserve malformed fixtures for the consumer's existing validation.
+        return answer
+    if hasattr(answer, "noul"):
+        return NoulAnswer(answer.noul)
+    if hasattr(answer, "choice"):
+        return ChoiceAnswer(answer.choice, answer.confidence, answer.probabilities)
+    if hasattr(answer, "score"):
+        return ScoreAnswer(answer.score, answer.confidence, answer.legend, answer.probabilities)
+    if hasattr(answer, "top"):
+        return BoxAnswer(answer.top, answer.bottom, answer.left, answer.right, answer.confidence)
+    return answer
+
+
 def decode_result(line: str, *, category_codes=None) -> dict:
     """Decode one Rust wire result, retaining its position and observed sends."""
     try:
@@ -207,7 +262,9 @@ def decode_result(line: str, *, category_codes=None) -> dict:
             result = exception_result(parsed["error"], category_codes=category_codes)
             result["error"].attempts = attempts
         else:
-            result = dict(ok=True, value=parsed["answers"], usage=parsed["usage"])
+            response = json.loads(line).get("response", {})
+            answers = {key: _typed_answer(answer) for key, answer in parsed["answers"].items()}
+            result = dict(ok=True, value=answers, usage=parsed["usage"], model_answered=response.get("model"))
         result.update(position=parsed["position"], session_id=parsed["session_id"],
                       digests=parsed["digests"], line=line, attempts=attempts)
         return result
@@ -440,7 +497,7 @@ def _fixture_attempt(job: BatchJob, fixture: dict, attempt: int, *, transient_co
         raise ClientError(code, f"fixture failure {code}", code in transient_codes)
     if not isinstance(entry, dict):
         raise ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object")
-    return {"model": "fixture", "answers": entry}
+    return {"model": "fixture", "answers": {key: _typed_answer(answer) for key, answer in entry.items()}}
 
 
 def batch_settings(args, prefix: str, *, check_threshold: Callable, request_cap: Callable):
@@ -465,6 +522,8 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
           result_fields: Optional[Callable[[BatchJob, BatchSettings, Any], dict]] = None,
           error_message_limit: Optional[int] = None, redact: Optional[Callable[[dict], dict]] = None) -> dict:
     """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
+    if isinstance(raw, dict) and raw.get("ok") is True and "value" in raw:
+        raw = {"model": raw.get("model_answered"), "answers": raw["value"], "sends": raw.get("attempts")}
     fields = result_fields(job, settings, raw) if result_fields is not None else {}
     message = None if error is None else error.message
     if message is not None and error_message_limit is not None:
@@ -486,6 +545,8 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
         "error": None if error is None else {"code": error.code, "message": message,
                                                "recoverable": getattr(error, "recoverable", getattr(error, "retryable", False))},
     }
+    if error is not None and getattr(error, "action", None) is not None:
+        line["error"]["suggested_action"] = error.action
     line.update(fields)
     return redact(line) if redact is not None else line
 
@@ -617,9 +678,37 @@ def write_stdout_line(text: str) -> None:
     buffer.flush()
 
 
+def _answer_json(answer):
+    """Convert wheel answer objects to the corresponding JSON wire shape."""
+    answer = _typed_answer(answer)
+    if isinstance(answer, NoulAnswer):
+        return {"type": "noul", "noul": answer.noul}
+    if isinstance(answer, ChoiceAnswer):
+        return {"type": "choice", "choice": answer.choice, "confidence": answer.confidence,
+                "probabilities": dict(answer.probabilities)}
+    if isinstance(answer, ScoreAnswer):
+        return {"type": "score", "score": answer.score, "confidence": answer.confidence,
+                "legend": dict(answer.legend), "probabilities": dict(answer.probabilities)}
+    if isinstance(answer, BoxAnswer):
+        return {"type": "box", "box": {"top": answer.top, "bottom": answer.bottom,
+                                       "left": answer.left, "right": answer.right},
+                "confidence": answer.confidence}
+    raise TypeError(f"Object of type {type(answer).__name__} is not JSON serializable")
+
+
+def _json_answers(value):
+    if isinstance(value, (NoulAnswer, ChoiceAnswer, ScoreAnswer, BoxAnswer)):
+        return _answer_json(value)
+    if isinstance(value, dict):
+        return {key: _json_answers(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_answers(item) for item in value]
+    return value
+
+
 def encode_result_line(line: dict) -> str:
     import json
-    return json.dumps(line, ensure_ascii=False) + "\n"
+    return json.dumps(_json_answers(line), ensure_ascii=False, default=_answer_json) + "\n"
 
 
 def _add_attempts(results: list) -> int:
