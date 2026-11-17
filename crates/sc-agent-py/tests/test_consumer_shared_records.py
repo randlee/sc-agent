@@ -147,8 +147,8 @@ def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
         "SETTINGS.BAD", "invalid setting", True, "repair settings")
     assert (converted.status, converted.retry_after_ms, converted.attempts, converted.data) == (
         422, 10, 2, {"field": "allow_remote_judge"})
-    assert "repository_root" not in __import__("inspect").signature(client.call_result).parameters
-    assert "repository_root" not in __import__("inspect").signature(client.call_batch_results).parameters
+    assert "repository_root" in __import__("inspect").signature(client.call_result).parameters
+    assert "repository_root" in __import__("inspect").signature(client.call_batch_results).parameters
 
 
 def test_non_boolean_truthy_consent_is_denied_and_settings_failures_are_typed(tmp_path, monkeypatch):
@@ -424,3 +424,47 @@ def test_fixture_retry_count_uses_local_attempts_when_native_sends_unknown(tmp_p
     raw = client._fixture_attempt(_job(client), {"*": {"q": {"noul": 0.5}}}, 1)
     line = client._line(_job(client), _settings(client), raw, [{}, {}], None, False)
     assert line["sends"] is None and line["retry_count"] == 1
+
+
+@pytest.mark.parametrize("batch", [False, True])
+@pytest.mark.parametrize("selected,cwd,change,should_send", [
+    (True, None, False, True),
+    (False, True, False, False),
+    (True, True, True, False),
+])
+def test_send_rechecks_selected_repository_consent(tmp_path, monkeypatch, batch, selected, cwd, change, should_send):
+    client = _client(tmp_path, monkeypatch)
+    selected_root = tmp_path / "selected"
+    cwd_root = tmp_path / "cwd"
+    selected_root.mkdir()
+    cwd_root.mkdir()
+    monkeypatch.chdir(cwd_root)
+    values = {selected_root: selected, cwd_root: cwd}
+    settings = install_test_settings_module(monkeypatch)
+    settings.find_repo_root = lambda path: SimpleNamespace(ok=True, value=path)
+    def consent(path):
+        value = values.get(path)
+        if value is None:
+            return SimpleNamespace(ok=False, error=SimpleNamespace(code="SETTINGS.REMOTE_JUDGE_UNSET"))
+        return SimpleNamespace(ok=True, value=value)
+    settings.remote_judge_consent = consent
+    sent = []
+    class CancelToken:
+        def cancel(self):
+            pass
+    wheel = SimpleNamespace(CancelToken=CancelToken, SagError=type("SagError", (Exception,), {}),
+                            send=lambda request, **kwargs: sent.append(request) or "wire",
+                            send_batch=lambda requests, **kwargs: sent.append(requests) or ["wire"])
+    monkeypatch.setattr(client, "_load_wheel", lambda: wheel)
+    monkeypatch.setattr(client, "decode_result", lambda line, **kwargs: {"ok": True, "value": {}, "position": 0})
+    if change:
+        client.remote_preflight(repository_root=str(selected_root))
+        values[selected_root] = False
+    call = client.call_batch_results if batch else client.call_result
+    result = call(["{}"] if batch else "{}", model="jev", project="p", agent_role="r",
+                  abort_on=frozenset(), repository_root=str(selected_root))
+    assert result["ok"] is should_send
+    assert bool(sent) is should_send
+    if not should_send:
+        assert result["error"].code == "POLICY.REMOTE_JUDGE_DISABLED"
+    assert ".sc/test/settings.yaml" in client.REPO_ROOT_HELP

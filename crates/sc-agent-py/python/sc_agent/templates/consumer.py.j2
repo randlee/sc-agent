@@ -28,6 +28,8 @@ SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 MODELS = {{ models | tojson }}
 REMOTE_JUDGE_SETTING = "{{ settings_file }}"
 REMOTE_JUDGE_SET = "{{ settings_set_command }}"
+REPO_ROOT_HELP = (f"any path inside the repository; the nearest {REMOTE_JUDGE_SETTING} at or above it holds "
+                  "allow_remote_judge (read for live Jev calls only; default .)")
 LogSink = Callable[[dict], None]
 CategoryCodes = Mapping[str, str]
 AbortOn = frozenset[str]
@@ -38,7 +40,7 @@ __all__ = [
     "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
     "DECIDR_CATEGORY_CODES", "new_cancel_token", "error_metadata", "wheel_error",
     "decode_result", "exception_result", "from_tool_error", "call_result", "call_batch_results", "remote_judge_consent",
-    "remote_preflight", "CANCELED_EXIT", "canceled_envelope",
+    "remote_preflight", "REPO_ROOT_HELP", "REMOTE_JUDGE_SETTING", "REMOTE_JUDGE_SET", "CANCELED_EXIT", "canceled_envelope",
 {% if sitr %}
     "extract",
 {% endif %}
@@ -274,11 +276,11 @@ def decode_result(line: str, *, category_codes=None) -> dict:
         return _failed(exc)
 
 
-def _invoke(method, request, abort_on, kwargs, category_codes, *, consent_what="The request text"):
+def _invoke(method, request, abort_on, kwargs, category_codes, *, repository_root=".", consent_what="The request text"):
     if frozenset(abort_on) not in _ALLOWED_ABORT_ON:
         raise ClientError("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}")
     try:
-        remote_preflight(what=consent_what)
+        remote_preflight(repository_root=repository_root, what=consent_what)
     except ClientError as exc:
         return _failed(exc)
     try:
@@ -329,7 +331,7 @@ def call_result(
     general_log: Optional[LogSink] = None,
 {% endif %}
     timeout_secs: Optional[float] = None,
-    consent_what: str = "The request text",
+    consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
     kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, images=images,
                   long_context=long_context, config_dir=config_dir, keyring_service=keyring_service,
@@ -339,7 +341,7 @@ def call_result(
 {% endif %}
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
-    sent = _invoke("send", request, abort_on, kwargs, category_codes, consent_what=consent_what)
+    sent = _invoke("send", request, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
     if not sent["ok"]:
         return sent
     result = decode_result(sent["value"], category_codes=category_codes)
@@ -357,7 +359,7 @@ def call_batch_results(
 {% endif %}
     timeout_secs: Optional[float] = None, workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
-    consent_what: str = "The request text",
+    consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
     completed, decoded = {}, {}
 
@@ -384,7 +386,7 @@ def call_batch_results(
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:
         kwargs["workers"] = workers
-    sent = _invoke("send_batch", requests, abort_on, kwargs, category_codes, consent_what=consent_what)
+    sent = _invoke("send_batch", requests, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
     if not sent["ok"]:
         return sent
     try:
