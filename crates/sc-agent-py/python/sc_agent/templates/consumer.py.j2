@@ -500,13 +500,15 @@ def _fixture_attempt(job: BatchJob, fixture: dict, attempt: int, *, transient_co
     if not isinstance(entry, dict):
         raise ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object")
     answers = {key: _typed_answer(answer) for key, answer in entry.items()}
+    if set(answers) != set(job.questions):
+        raise ClientError("DECIDR.RESPONSE_INVALID", "fixture answer IDs do not match question IDs")
     for key, answer in answers.items():
-        if not _valid_fixture_answer(answer):
+        if not _valid_fixture_answer(answer, job.questions[key]):
             raise ClientError("DECIDR.RESPONSE_INVALID", f"invalid fixture answer for {key}")
     return {"model": "fixture", "answers": answers}
 
 
-def _valid_fixture_answer(answer):
+def _valid_fixture_answer(answer, question):
     """Accept the wheel's JSON answer shapes; reject malformed fixtures before consumers read them."""
     import math
     def number(value):
@@ -515,18 +517,29 @@ def _valid_fixture_answer(answer):
         except OverflowError:
             return False
 
+    probability = lambda value: number(value) and 0 <= value <= 1
     probabilities = lambda value: isinstance(value, Mapping) and all(
-        isinstance(key, str) and number(probability) for key, probability in value.items())
+        isinstance(key, str) and probability(item) for key, item in value.items())
+    if not isinstance(question, Mapping):
+        return False
+    kind = question.get("type", "choice")
     if isinstance(answer, NoulAnswer):
-        return number(answer.noul)
+        return kind == "noul" and probability(answer.noul)
     if isinstance(answer, ChoiceAnswer):
-        return isinstance(answer.choice, str) and number(answer.confidence) and probabilities(answer.probabilities)
+        options = question.get("criteria")
+        if not (kind == "choice" and isinstance(answer.choice, str) and probability(answer.confidence)
+                and probabilities(answer.probabilities)):
+            return False
+        if isinstance(options, Mapping) and options and (
+                answer.choice not in options or set(answer.probabilities) != set(options)):
+            return False
+        return abs(sum(answer.probabilities.values()) - 1) <= 0.01 * max(len(answer.probabilities), 1)
     if isinstance(answer, ScoreAnswer):
-        return (number(answer.score) and number(answer.confidence) and isinstance(answer.legend, Mapping)
-                and probabilities(answer.probabilities))
+        return (kind == "score" and number(answer.score) and probability(answer.confidence)
+                and isinstance(answer.legend, Mapping) and probabilities(answer.probabilities))
     if isinstance(answer, BoxAnswer):
-        return all(number(value) for value in (answer.top, answer.bottom, answer.left, answer.right)) and (
-            answer.confidence is None or number(answer.confidence))
+        return kind == "box" and all(number(value) for value in (answer.top, answer.bottom, answer.left, answer.right)) and (
+            answer.confidence is None or probability(answer.confidence))
     return False
 
 

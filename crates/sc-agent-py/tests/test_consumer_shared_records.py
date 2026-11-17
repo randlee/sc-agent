@@ -311,8 +311,8 @@ def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_pat
 
 @pytest.mark.parametrize("answer,expected", [
     ({"type": "noul", "noul": 0.5}, {"type": "noul", "noul": 0.5}),
-    ({"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8}},
-     {"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8}}),
+    ({"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8, "no": 0.2}},
+     {"type": "choice", "choice": "yes", "confidence": 0.8, "probabilities": {"yes": 0.8, "no": 0.2}}),
     ({"type": "score", "score": 2, "confidence": 0.8, "legend": {"2": "high"}, "probabilities": {"2": 0.8}},
      {"type": "score", "score": 2, "confidence": 0.8, "legend": {"2": "high"}, "probabilities": {"2": 0.8}}),
     ({"type": "box", "box": {"top": 0.1, "bottom": 0.9, "left": 0.2, "right": 0.8}, "confidence": 0.7},
@@ -320,7 +320,10 @@ def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_pat
 ])
 def test_real_wheel_and_offline_fixture_share_typed_batch_records(tmp_path, monkeypatch, answer, expected):
     client = _client(tmp_path, monkeypatch)
-    job = _job(client)
+    question = {"type": answer["type"]}
+    if answer["type"] == "choice":
+        question["criteria"] = {"yes": "yes", "no": "no"}
+    job = _job(client)._replace(questions={"q": question})
     wire = json.dumps({"session_id": "session", "position": 0, "sends": 3, "digests": {},
                        "response": {"model": "jev-real", "answers": {"q": answer},
                                     "usage": {"input_tokens": 1, "output_tokens": 1}}})
@@ -468,3 +471,25 @@ def test_send_rechecks_selected_repository_consent(tmp_path, monkeypatch, batch,
     if not should_send:
         assert result["error"].code == "POLICY.REMOTE_JUDGE_DISABLED"
     assert ".sc/test/settings.yaml" in client.REPO_ROOT_HELP
+
+
+@pytest.mark.parametrize("questions,answers", [
+    ({"q": {"type": "noul"}}, {}),
+    ({"q": {"type": "noul"}}, {"other": {"noul": 0.5}}),
+    ({"q": {"type": "noul"}}, {"q": {"noul": 1.1}}),
+    ({"q": {"type": "noul"}}, {"q": {"noul": -0.1}}),
+    ({"q": {"type": "choice", "criteria": {"yes": "y", "no": "n"}}},
+     {"q": {"choice": "unknown", "confidence": 0.9, "probabilities": {"yes": 0.9, "no": 0.1}}}),
+    ({"q": {"type": "choice", "criteria": {"yes": "y", "no": "n"}}},
+     {"q": {"choice": "yes", "confidence": 1.1, "probabilities": {"yes": 0.9, "no": 0.1}}}),
+    ({"q": {"type": "choice", "criteria": {"yes": "y", "no": "n"}}},
+     {"q": {"choice": "yes", "confidence": 0.9, "probabilities": {"yes": 0.9}}}),
+    ({"q": {"type": "choice"}}, {"q": {"noul": 0.5}}),
+])
+def test_fixture_answers_match_questions_and_probability_contract(tmp_path, monkeypatch, questions, answers):
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setattr(client, "_load_wheel", lambda: pytest.fail("fixture loaded wheel"))
+    job = _job(client)._replace(questions=questions)
+    with pytest.raises(client.ClientError) as error:
+        client._fixture_attempt(job, {"*": answers}, 1)
+    assert error.value.code == "DECIDR.RESPONSE_INVALID"
