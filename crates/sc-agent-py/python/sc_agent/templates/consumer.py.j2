@@ -239,7 +239,7 @@ def _typed_answer(answer):
                 box = answer["box"]
                 return BoxAnswer(box["top"], box["bottom"], box["left"], box["right"], answer.get("confidence"))
         except (KeyError, TypeError):
-            pass  # Preserve malformed fixtures for the consumer's existing validation.
+            pass
         return answer
     if hasattr(answer, "noul"):
         return NoulAnswer(answer.noul)
@@ -497,7 +497,35 @@ def _fixture_attempt(job: BatchJob, fixture: dict, attempt: int, *, transient_co
         raise ClientError(code, f"fixture failure {code}", code in transient_codes)
     if not isinstance(entry, dict):
         raise ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object")
-    return {"model": "fixture", "answers": {key: _typed_answer(answer) for key, answer in entry.items()}}
+    answers = {key: _typed_answer(answer) for key, answer in entry.items()}
+    for key, answer in answers.items():
+        if not _valid_fixture_answer(answer):
+            raise ClientError("DECIDR.RESPONSE_INVALID", f"invalid fixture answer for {key}")
+    return {"model": "fixture", "answers": answers}
+
+
+def _valid_fixture_answer(answer):
+    """Accept the wheel's JSON answer shapes; reject malformed fixtures before consumers read them."""
+    import math
+    def number(value):
+        try:
+            return type(value) in (int, float) and math.isfinite(value)
+        except OverflowError:
+            return False
+
+    probabilities = lambda value: isinstance(value, Mapping) and all(
+        isinstance(key, str) and number(probability) for key, probability in value.items())
+    if isinstance(answer, NoulAnswer):
+        return number(answer.noul)
+    if isinstance(answer, ChoiceAnswer):
+        return isinstance(answer.choice, str) and number(answer.confidence) and probabilities(answer.probabilities)
+    if isinstance(answer, ScoreAnswer):
+        return (number(answer.score) and number(answer.confidence) and isinstance(answer.legend, Mapping)
+                and probabilities(answer.probabilities))
+    if isinstance(answer, BoxAnswer):
+        return all(number(value) for value in (answer.top, answer.bottom, answer.left, answer.right)) and (
+            answer.confidence is None or number(answer.confidence))
+    return False
 
 
 def batch_settings(args, prefix: str, *, check_threshold: Callable, request_cap: Callable):
@@ -520,7 +548,7 @@ def batch_settings(args, prefix: str, *, check_threshold: Callable, request_cap:
 
 def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dry_run: bool, *,
           result_fields: Optional[Callable[[BatchJob, BatchSettings, Any], dict]] = None,
-          error_message_limit: Optional[int] = None, redact: Optional[Callable[[dict], dict]] = None) -> dict:
+          error_message_limit: Optional[int] = None) -> dict:
     """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
     if isinstance(raw, dict) and raw.get("ok") is True and "value" in raw:
         raw = {"model": raw.get("model_answered"), "answers": raw["value"], "sends": raw.get("attempts")}
@@ -548,7 +576,7 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
     if error is not None and getattr(error, "action", None) is not None:
         line["error"]["suggested_action"] = error.action
     line.update(fields)
-    return redact(line) if redact is not None else line
+    return line
 
 
 def validate_request_lines(lines: list, settings: BatchSettings, question_sets,
@@ -628,20 +656,23 @@ async def stream_batch(source, settings: BatchSettings, *, make_jobs: Callable, 
                 yield _line(job, settings, None, [], error, settings.dry_run)
 
 
-def pump_batch(lines, *, log_result: Callable[[dict], Any], echo: bool = False) -> list:
+def pump_batch(lines, *, log_result: Callable[[dict], Any], echo: bool = False,
+               redact: Optional[Callable[[dict], dict]] = None) -> list:
     """Durably record each success and failure immediately as it arrives, then optionally echo its JSONL record."""
     import asyncio
     results = []
 
     async def drive():
         async for line in lines:
-            logged = log_result(line)
+            serializable = _json_answers(line)
+            safe_line = redact(serializable) if redact is not None else serializable
+            logged = log_result(safe_line)
             if isinstance(logged, ClientError):
                 raise logged
             if hasattr(logged, "ok") and not logged.ok:
                 raise from_tool_error(logged.error)
             if echo:
-                write_stdout_line(encode_result_line(line))
+                write_stdout_line(encode_result_line(safe_line))
             results.append(line)
 
     asyncio.run(drive())
@@ -697,6 +728,8 @@ def _answer_json(answer):
 
 
 def _json_answers(value):
+    if not isinstance(value, (dict, list, tuple, str, int, float, bool, type(None))):
+        value = _typed_answer(value)
     if isinstance(value, (NoulAnswer, ChoiceAnswer, ScoreAnswer, BoxAnswer)):
         return _answer_json(value)
     if isinstance(value, dict):
@@ -706,9 +739,11 @@ def _json_answers(value):
     return value
 
 
-def encode_result_line(line: dict) -> str:
+def encode_result_line(line: dict, *, redact: Optional[Callable[[dict], dict]] = None) -> str:
     import json
-    return json.dumps(_json_answers(line), ensure_ascii=False, default=_answer_json) + "\n"
+    serializable = _json_answers(line)
+    return json.dumps(redact(serializable) if redact is not None else serializable,
+                      ensure_ascii=False, default=_answer_json) + "\n"
 
 
 def _add_attempts(results: list) -> int:

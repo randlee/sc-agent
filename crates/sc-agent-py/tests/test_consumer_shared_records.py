@@ -368,3 +368,41 @@ def test_batch_line_encodes_each_native_wheel_answer(tmp_path, monkeypatch):
         decoded = json.loads(client.encode_result_line(line))
         assert decoded["answers"][key]["type"] == {"n": "noul", "c": "choice", "s": "score", "b": "box"}[key]
         assert decoded["raw_response"]["answers"][key] == decoded["answers"][key]
+
+
+@pytest.mark.parametrize("bad", [{"choice": "yes"}, {"noul": "bad"}, {"box": {"top": 1}},
+                                  {"type": "unknown"}, {"noul": True}])
+def test_malformed_fixture_answer_is_rejected_without_wheel(tmp_path, monkeypatch, bad):
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setattr(client, "_load_wheel", lambda: pytest.fail("fixture loaded wheel"))
+    with pytest.raises(client.ClientError) as error:
+        client._fixture_attempt(_job(client), {"*": {"q": bad}}, 1)
+    assert error.value.code == "DECIDR.RESPONSE_INVALID"
+
+
+def test_redaction_happens_at_serialization_and_preserves_typed_records(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    job = _job(client)
+    raw = client._fixture_attempt(job, {"*": {"q": {"noul": 0.5}}}, 1)
+    raw["secret"] = "sk-canary"
+    line = client._line(job, _settings(client), raw, [], None, False)
+    typed = line["answers"]["q"]
+
+    def redact(value):
+        if isinstance(value, dict):
+            return {key: redact(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return tuple(redact(item) for item in value)
+        return value.replace("sk-canary", "[redacted]") if isinstance(value, str) else value
+
+    logged, echoed = [], []
+    monkeypatch.setattr(client, "write_stdout_line", echoed.append)
+
+    async def source():
+        yield line
+
+    results = client.pump_batch(source(), log_result=logged.append, echo=True, redact=redact)
+    assert results[0]["answers"]["q"] is typed and typed.noul == 0.5
+    assert logged[0]["answers"]["q"] == {"type": "noul", "noul": 0.5}
+    assert logged[0]["raw_response"]["secret"] == "[redacted]"
+    assert "sk-canary" not in echoed[0] and "sk-canary" not in client.encode_result_line(line, redact=redact)
