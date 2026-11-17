@@ -33,8 +33,8 @@ def options(tmp_path, record_property):
 
 
 @pytest.mark.parametrize("operation", ["call", "call_batch"], ids=["noul-send", "noul-batch"])
-def test_real_noul_query(tmp_path, record_property, operation):
-    client = render_consumer(tmp_path, models=[MODEL])
+def test_real_noul_query(tmp_path, monkeypatch, record_property, operation):
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
     selected = []
 
     def log(record):
@@ -62,7 +62,7 @@ def test_real_noul_query(tmp_path, record_property, operation):
 def test_real_invalid_key_auth_cancel_redaction(tmp_path, monkeypatch, record_property):
     monkeypatch.chdir(tmp_path)  # A repository .env must not replace the invalid key.
     assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
-    client = render_consumer(tmp_path, models=[MODEL])
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
     source = ROOT / "crates/sc-agent-secrets/src/vars.rs"
     variables = dict(re.findall(r'pub const ([A-Z_]+): &str = "([^"]+)";', source.read_text()))
     key = "invalid-integration-key-0000000001"
