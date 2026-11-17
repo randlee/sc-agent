@@ -42,8 +42,8 @@ def test_readme_render_command_preserves_json_feature_types(tmp_path):
 @pytest.mark.parametrize("sitr", [False, True])
 @pytest.mark.parametrize("general_log", [False, True])
 @pytest.mark.parametrize("models", [["dec"], ["dec", "jev", "haiku", "luna"]])
-def test_rendered_consumer_uses_only_public_apis(tmp_path, general_log, models, sitr):
-    render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
+def test_rendered_consumer_uses_only_public_apis(tmp_path, monkeypatch, general_log, models, sitr):
+    render_consumer(tmp_path, monkeypatch=monkeypatch, general_log=general_log, models=models, sitr=sitr)
     tree = ast.parse((tmp_path / "consumer.py").read_text())
     public = {
         "sc_agent": {"send", "send_batch", "category", "retryable", "parse_result", "SagError", "CancelToken"},
@@ -90,7 +90,7 @@ def test_rendered_feature_combinations_run_loopback(env, args, tmp_path, monkeyp
     installed_version = importlib.metadata.version
     monkeypatch.setattr(importlib.metadata, "version", lambda name:
                         "999.0.0" if name in {"sc-decidr", "sitr"} else installed_version(name))
-    client = render_consumer(tmp_path, general_log=general_log, models=models, sitr=sitr)
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, general_log=general_log, models=models, sitr=sitr)
     for operation in (client.call_result, client.call_batch_results):
         assert ("general_log" in inspect.signature(operation).parameters) is general_log
         if not general_log:
@@ -213,9 +213,9 @@ def test_rendered_command_error_and_keyboard_interrupt_cancel(env, args, consume
 def test_optional_sitr_is_lazy_and_extraction_reaches_a_dry_run(tmp_path, monkeypatch):
     import sys
     monkeypatch.setitem(sys.modules, "sc_treesitter", None)
-    disabled = render_consumer(tmp_path, sitr=False)
+    disabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=False)
     assert not hasattr(disabled, "extract")
-    enabled = render_consumer(tmp_path, sitr=True)
+    enabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=True)
     assert callable(enabled.extract)  # Import itself does not need sitr.
     monkeypatch.delitem(sys.modules, "sc_treesitter")
     source = (ROOT / "crates/sc-treesitter/tests/fixtures/match.rs").read_text()

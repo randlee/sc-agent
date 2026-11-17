@@ -102,6 +102,6 @@ def outcome_call():
 
 
 @pytest.fixture
-def consumer(tmp_path):
+def consumer(tmp_path, monkeypatch):
     from consumer_support import render_consumer
-    return render_consumer(tmp_path)
+    return render_consumer(tmp_path, monkeypatch=monkeypatch)

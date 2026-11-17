@@ -14,7 +14,8 @@ try:
 except importlib.metadata.PackageNotFoundError:
     SITR_VERSION = ""
 
-def render_consumer(tmp_path, *, general_log=True, models=None, sitr=False, batch_records=False, source_template=False):
+def render_consumer(tmp_path, *, monkeypatch, general_log=True, models=None, sitr=False, batch_records=False,
+                    source_template=False):
     import sc_agent
     template = (pathlib.Path(__file__).resolve().parents[1] / "python/sc_agent/templates/consumer.py.j2"
                 if source_template else pathlib.Path(str(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")))
@@ -31,11 +32,11 @@ def render_consumer(tmp_path, *, general_log=True, models=None, sitr=False, batc
     spec = importlib.util.spec_from_file_location("rendered_consumer", output)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    install_test_settings_module()
+    install_test_settings_module(monkeypatch)
     return module
 
 
-def install_test_settings_module(*, allowed=True, missing=False):
+def install_test_settings_module(monkeypatch, *, allowed=True, missing=False):
     """Controlled settings result used by consumer tests; never reads a host repo or sends data."""
     module = types.ModuleType("sc_agent_test_settings")
     module.find_repo_root = lambda path: types.SimpleNamespace(ok=True, value=path)
@@ -46,6 +47,6 @@ def install_test_settings_module(*, allowed=True, missing=False):
             ok=False, error=types.SimpleNamespace(code="SETTINGS.REMOTE_JUDGE_UNSET", message="unset", action="set it"))
     else:
         module.remote_judge_consent = lambda path: types.SimpleNamespace(ok=True, value=False)
-    sys.modules[module.__name__] = module
+    monkeypatch.setitem(sys.modules, module.__name__, module)
     return module
 

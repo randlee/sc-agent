@@ -1,5 +1,6 @@
 """Controlled tests of consent and shared batch records; no provider or keychain access."""
 import hashlib
+import importlib
 import io
 import json
 import sys
@@ -10,8 +11,8 @@ import pytest
 from consumer_support import install_test_settings_module, render_consumer
 
 
-def _client(tmp_path):
-    return render_consumer(tmp_path, batch_records=True, source_template=True)
+def _client(tmp_path, monkeypatch):
+    return render_consumer(tmp_path, monkeypatch=monkeypatch, batch_records=True, source_template=True)
 
 
 def _job(client, anchor_id=None):
@@ -27,8 +28,8 @@ def _settings(client):
 
 @pytest.mark.parametrize("anchor_id,expected", [("anchor", "run/item/anchor/candidate/r1"),
                                                   (None, "run/item/candidate/r1")])
-def test_shared_record_format_and_run_id_are_stable(tmp_path, anchor_id, expected):
-    client = _client(tmp_path)
+def test_shared_record_format_and_run_id_are_stable(tmp_path, monkeypatch, anchor_id, expected):
+    client = _client(tmp_path, monkeypatch)
     job = _job(client, anchor_id)
     assert job.request_id == expected
     assert client.batch_run_id(job.request_id) == hashlib.sha256(expected.encode()).hexdigest()[:16]
@@ -48,8 +49,8 @@ def test_shared_record_format_and_run_id_are_stable(tmp_path, anchor_id, expecte
     assert clipped["error"]["message"] == "long"
 
 
-def test_fixture_lookup_and_shared_input_callbacks(tmp_path):
-    client = _client(tmp_path)
+def test_fixture_lookup_and_shared_input_callbacks(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     job = _job(client, "anchor")
     fixture = {"item/candidate/r1": [{"q": {"noul": 0.25}}]}
     assert client._fixture_attempt(job, fixture, 1) == {"model": "fixture", "answers": {"q": {"noul": 0.25}}}
@@ -74,8 +75,8 @@ def test_fixture_lookup_and_shared_input_callbacks(tmp_path):
     assert transient.value.code == "DECIDR.NETWORK" and transient.value.retryable is True
 
 
-def test_batch_stream_logs_success_and_failure_as_each_line_arrives(tmp_path):
-    client = _client(tmp_path)
+def test_batch_stream_logs_success_and_failure_as_each_line_arrives(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     ok = {"ok": True, "attempts": [{"attempt": 1}]}
     failed = {"ok": False, "attempts": [{"attempt": 1}], "error": {"code": "AUTH", "message": "denied"}}
     logged = []
@@ -93,8 +94,8 @@ def test_batch_stream_logs_success_and_failure_as_each_line_arrives(tmp_path):
     assert client.encode_result_line(failed).endswith("\n")
 
 
-def test_stream_batch_converts_worker_exception_to_logged_failure(tmp_path):
-    client = _client(tmp_path)
+def test_stream_batch_converts_worker_exception_to_logged_failure(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     job = _job(client)
     logged = []
 
@@ -119,8 +120,8 @@ def test_stream_batch_converts_worker_exception_to_logged_failure(tmp_path):
                                    "recoverable": False}
 
 
-def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path):
-    client = _client(tmp_path)
+def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     job = _job(client)
     make_jobs = lambda line, number, settings, questions: SimpleNamespace(ok=True, value=[job])
     with pytest.raises(client.ClientError, match="appears twice"):
@@ -128,7 +129,7 @@ def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path):
 
 
 def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
-    client = _client(tmp_path)
+    client = _client(tmp_path, monkeypatch)
     wheel_result = {"position": 0, "session_id": "s", "sends": 1, "digests": {},
                     "error": None, "answers": {"model": "fixture", "answers": {}}, "usage": {}}
     monkeypatch.setattr(client, "_load_wheel", lambda: SimpleNamespace(parse_result=lambda _: wheel_result))
@@ -149,8 +150,8 @@ def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
 
 
 def test_non_boolean_truthy_consent_is_denied_and_settings_failures_are_typed(tmp_path, monkeypatch):
-    client = _client(tmp_path)
-    settings = install_test_settings_module()
+    client = _client(tmp_path, monkeypatch)
+    settings = install_test_settings_module(monkeypatch)
     settings.remote_judge_consent = lambda path: SimpleNamespace(ok=True, value=1)
     with pytest.raises(client.ClientError) as denied:
         client.remote_judge_consent()
@@ -163,8 +164,42 @@ def test_non_boolean_truthy_consent_is_denied_and_settings_failures_are_typed(tm
     assert root_error.value.code == "SETTINGS.ROOT" and root_error.value.data["path"]
 
 
-def test_load_answers_fixture_error_branches(tmp_path):
-    client = _client(tmp_path)
+def test_settings_import_error_is_typed_and_preserves_cause(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    import_error = ImportError("controlled missing settings module")
+    import_module = importlib.import_module
+
+    def fail_settings_import(name, package=None):
+        if name == "sc_agent_test_settings":
+            raise import_error
+        return import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", fail_settings_import)
+    with pytest.raises(client.ClientError) as caught:
+        client.remote_judge_consent()
+    assert caught.value.code == "DEPENDENCY.SETTINGS"
+    assert "Install the consumer's settings module" in caught.value.action
+    assert caught.value.__cause__ is import_error
+
+    loaded = []
+    monkeypatch.setattr(client, "_load_wheel", lambda: loaded.append(True))
+    result = client.call_result("{}", model="jev", project="p", agent_role="r", abort_on=frozenset())
+    assert result["ok"] is False and result["error"].code == "DEPENDENCY.SETTINGS"
+    assert result["error"].__cause__ is import_error
+    assert loaded == []
+
+
+def test_settings_module_installation_is_scoped():
+    name = "sc_agent_test_settings"
+    before = sys.modules.get(name)
+    with pytest.MonkeyPatch.context() as scoped_patch:
+        module = install_test_settings_module(scoped_patch)
+        assert sys.modules[name] is module
+    assert sys.modules.get(name) is before
+
+
+def test_load_answers_fixture_error_branches(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     assert client.load_answers_fixture("", "item/candidate", lambda *_: None) is None
 
     failed = SimpleNamespace(ok=False, error=SimpleNamespace(code="INPUT.READ", message="unreadable"))
@@ -195,7 +230,7 @@ def test_write_stdout_line_uses_binary_and_text_streams(tmp_path, monkeypatch):
 
     binary = BinaryStdout()
     monkeypatch.setattr(sys, "stdout", binary)
-    client = _client(tmp_path)
+    client = _client(tmp_path, monkeypatch)
     client.write_stdout_line("é\n")
     assert binary.buffer.getvalue() == "é\n".encode("utf-8")
     assert binary.flushed == 1
@@ -206,14 +241,14 @@ def test_write_stdout_line_uses_binary_and_text_streams(tmp_path, monkeypatch):
     assert text.getvalue() == "plain\n"
 
 
-def test_batch_exports_are_absent_when_batch_records_are_disabled(tmp_path):
-    client = render_consumer(tmp_path, source_template=True)
+def test_batch_exports_are_absent_when_batch_records_are_disabled(tmp_path, monkeypatch):
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, source_template=True)
     for name in ("BatchJob", "batch_request_id", "_fixture_attempt", "stream_batch", "pump_batch"):
         assert not hasattr(client, name)
 
 
-def test_shared_batch_settings_delegates_consumer_question_rules(tmp_path):
-    client = _client(tmp_path)
+def test_shared_batch_settings_delegates_consumer_question_rules(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
     args = SimpleNamespace(repeat=2, max_workers=2, model="jev", timeout=3.0, dry_run=True,
                            gate="dev", threshold=0.75, max_request_bytes=900)
     settings = client.batch_settings(args, "run", check_threshold=lambda value: SimpleNamespace(ok=True, value=value),
@@ -227,8 +262,8 @@ def test_shared_batch_settings_delegates_consumer_question_rules(tmp_path):
 @pytest.mark.parametrize("allowed,missing,code", [(False, False, "POLICY.REMOTE_JUDGE_DISABLED"),
                                                    (False, True, "POLICY.REMOTE_JUDGE_DISABLED")])
 def test_both_send_paths_refuse_without_affirmative_consent(tmp_path, monkeypatch, allowed, missing, code):
-    client = _client(tmp_path)
-    install_test_settings_module(allowed=allowed, missing=missing)
+    client = _client(tmp_path, monkeypatch)
+    install_test_settings_module(monkeypatch, allowed=allowed, missing=missing)
     loaded = []
     monkeypatch.setattr(client, "_load_wheel", lambda: loaded.append(True))
 
@@ -243,8 +278,8 @@ def test_both_send_paths_refuse_without_affirmative_consent(tmp_path, monkeypatc
 
 
 def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_path, monkeypatch):
-    client = _client(tmp_path)
-    install_test_settings_module(allowed=True)
+    client = _client(tmp_path, monkeypatch)
+    install_test_settings_module(monkeypatch, allowed=True)
     sent = []
     class CancelToken:
         def cancel(self):
