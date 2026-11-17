@@ -26,7 +26,11 @@ def test_readme_render_command_preserves_json_feature_types(tmp_path):
     readme = (ROOT / "crates/sc-agent-py/README.md").read_text().split("## Generated consumer", 1)[1]
     match = re.search(r"```bash\n(.*?)\n```", readme, re.DOTALL)
     assert match, "README must document the consumer render command in a bash block"
-    subprocess.run(["bash", "-e", "-c", match.group(1)], cwd=tmp_path, check=True)
+    try:
+        subprocess.run(["bash", "-e", "-c", match.group(1)], cwd=tmp_path, check=True,
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired as exc:
+        raise AssertionError("README consumer render command timed out after 60 seconds") from exc
 
     generated = (tmp_path / "consumer.py").read_text()
     assert 'MODELS = ["jev"]' in generated
