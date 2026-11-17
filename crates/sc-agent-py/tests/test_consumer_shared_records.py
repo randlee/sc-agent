@@ -493,3 +493,19 @@ def test_fixture_answers_match_questions_and_probability_contract(tmp_path, monk
     with pytest.raises(client.ClientError) as error:
         client._fixture_attempt(job, {"*": answers}, 1)
     assert error.value.code == "DECIDR.RESPONSE_INVALID"
+
+
+def test_real_wheel_error_wire_keeps_action_and_send_count_in_batch_line(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    wire = json.dumps({
+        "session_id": "01J00000000000000000000000", "position": 0, "sends": 4, "digests": {},
+        "error": {"id": "http.network", "category": "network", "message": "network unavailable",
+                  "recovery": "Retry later"},
+    })
+    decoded = client.decode_result(wire)
+    assert decoded["ok"] is False
+    line = client._line(_job(client), _settings(client), decoded, [], None, False)
+    encoded = json.loads(client.encode_result_line(line))
+    assert encoded["error"]["suggested_action"] == "Retry later"
+    assert encoded["sends"] == 4
+    assert encoded["retry_count"] == 3
