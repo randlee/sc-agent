@@ -6,7 +6,8 @@ required_variables:
   - fragment_source
   - copy_json
   - copy_context
-  - body_html
+  - identity
+  - cases
 defaults: {}
 metadata:
   purpose: Section XHTML fragment template
@@ -42,7 +43,14 @@ metadata:
   <p class="meta">
     <span class="source-tag">{{ fragment_source }}</span>
   </p>
-{{ body_html | safe }}
+{% for item in identity %}
+  <p><strong>{{ item.label | e }}</strong>: {{ item.value | e }}</p>
+{% endfor %}
+  <table><thead><tr><th>Case</th><th>Provider</th><th>Model</th><th>Result</th><th>Observed</th><th>Detail</th></tr></thead><tbody>
+{% for case in cases %}
+    <tr>{% for key in ["case", "provider", "model", "status", "result", "detail"] %}<td>{{ case[key] | default('') | e }}</td>{% endfor %}</tr>
+{% endfor %}
+  </tbody></table>
   <script type="text/javascript">
     document.addEventListener("click", async function (event) {
       const button = event.target.closest("[data-copy-text]");
