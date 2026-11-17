@@ -1,6 +1,8 @@
 """Controlled tests of consent and shared batch records; no provider or keychain access."""
 import hashlib
+import io
 import json
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -66,6 +68,11 @@ def test_fixture_lookup_and_shared_input_callbacks(tmp_path):
                                          SimpleNamespace(ok=True, value=fixture))
     assert loaded is fixture
 
+    with pytest.raises(client.ClientError) as transient:
+        client._fixture_attempt(job, {"item/candidate/r1": {client.BATCH_FIXTURE_ERROR: "DECIDR.NETWORK"}},
+                                1, transient_codes=frozenset({"DECIDR.NETWORK"}))
+    assert transient.value.code == "DECIDR.NETWORK" and transient.value.retryable is True
+
 
 def test_batch_stream_logs_success_and_failure_as_each_line_arrives(tmp_path):
     client = _client(tmp_path)
@@ -84,6 +91,125 @@ def test_batch_stream_logs_success_and_failure_as_each_line_arrives(tmp_path):
     summary = client.streamed_result(result)
     assert summary.failed == [failed] and summary.attempts == 2
     assert client.encode_result_line(failed).endswith("\n")
+
+
+def test_stream_batch_converts_worker_exception_to_logged_failure(tmp_path):
+    client = _client(tmp_path)
+    job = _job(client)
+    logged = []
+
+    def make_jobs(line, number, settings, question_sets):
+        return SimpleNamespace(ok=True, value=[job])
+
+    def run_job(job, settings):
+        raise ValueError("controlled worker failure")
+
+    async def source():
+        yield {"item": "one"}
+
+    result = client.pump_batch(
+        client.stream_batch(source(), _settings(client), make_jobs=make_jobs, run_job=run_job, question_sets={}),
+        log_result=logged.append,
+    )
+    assert result == logged and len(logged) == 1
+    assert logged[0]["ok"] is False
+    assert logged[0]["request_id"] == job.request_id
+    assert logged[0]["error"] == {"code": "DECIDR.BATCH_JOB",
+                                   "message": "batch job failed: ValueError: controlled worker failure",
+                                   "recoverable": False}
+
+
+def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path):
+    client = _client(tmp_path)
+    job = _job(client)
+    make_jobs = lambda line, number, settings, questions: SimpleNamespace(ok=True, value=[job])
+    with pytest.raises(client.ClientError, match="appears twice"):
+        client.validate_request_lines([{}, {}], _settings(client), {}, make_jobs)
+
+
+def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
+    client = _client(tmp_path)
+    wheel_result = {"position": 0, "session_id": "s", "sends": 1, "digests": {},
+                    "error": None, "answers": {"model": "fixture", "answers": {}}, "usage": {}}
+    monkeypatch.setattr(client, "_load_wheel", lambda: SimpleNamespace(parse_result=lambda _: wheel_result))
+    result = client.decode_result("controlled wire")
+    assert type(result) is dict
+    assert result["ok"] is True and result["value"] == {"model": "fixture", "answers": {}}
+
+    tool_error = SimpleNamespace(code="SETTINGS.BAD", message="invalid setting", recoverable=True,
+                                 action="repair settings", status=422, retry_after_ms=10,
+                                 attempts=2, data={"field": "allow_remote_judge"})
+    converted = client.from_tool_error(tool_error)
+    assert (converted.code, converted.message, converted.retryable, converted.action) == (
+        "SETTINGS.BAD", "invalid setting", True, "repair settings")
+    assert (converted.status, converted.retry_after_ms, converted.attempts, converted.data) == (
+        422, 10, 2, {"field": "allow_remote_judge"})
+    assert "repository_root" not in __import__("inspect").signature(client.call_result).parameters
+    assert "repository_root" not in __import__("inspect").signature(client.call_batch_results).parameters
+
+
+def test_non_boolean_truthy_consent_is_denied_and_settings_failures_are_typed(tmp_path, monkeypatch):
+    client = _client(tmp_path)
+    settings = install_test_settings_module()
+    settings.remote_judge_consent = lambda path: SimpleNamespace(ok=True, value=1)
+    with pytest.raises(client.ClientError) as denied:
+        client.remote_judge_consent()
+    assert denied.value.code == "POLICY.REMOTE_JUDGE_DISABLED"
+
+    settings.find_repo_root = lambda path: SimpleNamespace(
+        ok=False, error=SimpleNamespace(code="SETTINGS.ROOT", message="no repository", data={"path": str(path)}))
+    with pytest.raises(client.ClientError) as root_error:
+        client.remote_judge_consent()
+    assert root_error.value.code == "SETTINGS.ROOT" and root_error.value.data["path"]
+
+
+def test_load_answers_fixture_error_branches(tmp_path):
+    client = _client(tmp_path)
+    assert client.load_answers_fixture("", "item/candidate", lambda *_: None) is None
+
+    failed = SimpleNamespace(ok=False, error=SimpleNamespace(code="INPUT.READ", message="unreadable"))
+    with pytest.raises(client.BatchInputError) as read_error:
+        client.load_answers_fixture("answers.json", "item/candidate", lambda *_: failed)
+    assert read_error.value.error.code == "INPUT.READ"
+
+    with pytest.raises(client.ClientError, match="must be an object"):
+        client.load_answers_fixture("answers.json", "item/candidate",
+                                    lambda *_: SimpleNamespace(ok=True, value=[]))
+
+    invalid = client.ClientError("INPUT.SCHEMA", "invalid answer envelope")
+    with pytest.raises(client.BatchInputError) as envelope_error:
+        client.load_answers_fixture("answers.json", "item/candidate",
+                                    lambda *_: SimpleNamespace(ok=True, value={}),
+                                    validate_envelope=lambda *_: invalid)
+    assert envelope_error.value.error.code == invalid.code
+
+
+def test_write_stdout_line_uses_binary_and_text_streams(tmp_path, monkeypatch):
+    class BinaryStdout:
+        def __init__(self):
+            self.buffer = io.BytesIO()
+            self.flushed = 0
+
+        def flush(self):
+            self.flushed += 1
+
+    binary = BinaryStdout()
+    monkeypatch.setattr(sys, "stdout", binary)
+    client = _client(tmp_path)
+    client.write_stdout_line("é\n")
+    assert binary.buffer.getvalue() == "é\n".encode("utf-8")
+    assert binary.flushed == 1
+
+    text = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", text)
+    client.write_stdout_line("plain\n")
+    assert text.getvalue() == "plain\n"
+
+
+def test_batch_exports_are_absent_when_batch_records_are_disabled(tmp_path):
+    client = render_consumer(tmp_path, source_template=True)
+    for name in ("BatchJob", "batch_request_id", "_fixture_attempt", "stream_batch", "pump_batch"):
+        assert not hasattr(client, name)
 
 
 def test_shared_batch_settings_delegates_consumer_question_rules(tmp_path):
