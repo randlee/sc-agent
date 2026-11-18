@@ -37,8 +37,7 @@ pub(crate) enum Command {
 /// `decidr send`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct SendArgs {
-    /// Optional override (typesafe, anthropic, openai, openrouter, nous, together). Absent: chosen by ranking among detected keys (REQ-SAG-0103).
-    #[arg(long, value_name = "PROVIDER", value_parser = non_empty_text)]
+    #[arg(long, value_name = "PROVIDER", value_parser = non_empty_text, help = provider_help())]
     pub(crate) provider: Option<String>,
     /// Short name (jev, haiku, luna, ...), a model id, or a configured local runner name.
     #[arg(long, value_name = "NAME", allow_hyphen_values = true, value_parser = non_empty_text)]
@@ -67,6 +66,17 @@ pub(crate) struct SendArgs {
     /// Request file, or - for stdin.
     #[arg(value_name = "FILE|-", default_value = "-", value_parser = non_empty_text)]
     pub(crate) input: String,
+}
+
+fn provider_help() -> String {
+    let providers = sc_agent_types::Provider::ALL
+        .iter()
+        .map(|provider| provider.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "Optional override ({providers}). Absent: chosen by ranking among detected keys (REQ-SAG-0103)."
+    )
 }
 
 impl SendArgs {
@@ -160,6 +170,35 @@ mod tests {
     fn cli_definition_is_consistent() {
         use clap::CommandFactory;
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn provider_help_lists_the_provider_catalog() {
+        use clap::CommandFactory;
+        let cli = Cli::command();
+        let help = cli
+            .find_subcommand("send")
+            .expect("send")
+            .get_arguments()
+            .find(|arg| arg.get_id() == "provider")
+            .expect("provider")
+            .get_help()
+            .expect("provider help")
+            .to_string();
+        let listed = help
+            .split_once('(')
+            .expect("provider list")
+            .1
+            .split_once(')')
+            .expect("provider list end")
+            .0;
+        assert_eq!(
+            listed.split(", ").collect::<Vec<_>>(),
+            sc_agent_types::Provider::ALL
+                .iter()
+                .map(|provider| provider.as_str())
+                .collect::<Vec<_>>()
+        );
     }
 
     /// AC: REQ-SAG-0004 (no --agent-name flag; project and agent role required).

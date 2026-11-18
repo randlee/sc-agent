@@ -41,6 +41,28 @@ def manifests() -> list[Path]:
     return paths
 
 
+def bump_version(current: str, version: str) -> None:
+    changed = []
+    pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
+    for path in manifests():
+        before = path.read_text()
+        after = pattern.sub(lambda match: match[1] + version + match[2], before)
+        if before != after:
+            path.write_text(after)
+            changed.append(str(path.relative_to(ROOT)))
+    changelog = ROOT / "CHANGELOG.md"
+    text = changelog.read_text()
+    text, count = re.subn(r"(?m)^## ", f"## {version} (unreleased)\n\n## ", text, count=1)
+    if count != 1:
+        raise ValueError("CHANGELOG.md must contain a release heading")
+    changelog.write_text(text)
+    subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
+    docli = tomllib.loads((ROOT / "release/publish-preflight.toml").read_text())["docli"]
+    subprocess.run(["bash", docli["generate_script"]], cwd=ROOT, check=True)
+    git("add", "--", *changed, "Cargo.lock", "CHANGELOG.md", *docli["drift_paths"], capture=False)
+    git("commit", "-m", f"release: prepare prerelease {version}", capture=False)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
@@ -65,17 +87,7 @@ def main() -> int:
         print(f"would select {tag}; workspace {current}; version bump {version != current}")
         return 0
     if version != current:
-        changed = []
-        pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
-        for path in manifests():
-            before = path.read_text()
-            after = pattern.sub(lambda match: match[1] + version + match[2], before)
-            if before != after:
-                path.write_text(after)
-                changed.append(str(path.relative_to(ROOT)))
-        subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
-        git("add", "--", *changed, "Cargo.lock", capture=False)
-        git("commit", "-m", f"release: prepare prerelease {version}", capture=False)
+        bump_version(current, version)
     # No force option: a racing publication or tag creation must fail closed.
     git("tag", "-a", tag, "-m", f"Prerelease {version}", capture=False)
     git("push", "origin", f"refs/tags/{tag}", capture=False)
