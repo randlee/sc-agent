@@ -52,7 +52,7 @@ The CLIs and the files each one reads are these, and no others:
 | `decidr` | `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
 | `sitr` | `~/.sc-agent/sitr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/sitr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `SITR_`, plus `SC_PROJECT` |
 
-Adding a CLI, or changing a file or prefix a CLI reads, requires a new version of this ADR that adds or changes its row, approved by the owner. A CLI that has no row here reads no sc-agent configuration.
+Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. A plan that adds a CLI, or changes a file or prefix a CLI reads, is not approved until it includes a new version of this ADR with that row.
 
 A setting is looked up in seven layers, and the first layer that sets it wins:
 
@@ -87,7 +87,7 @@ One file per CLI keeps each CLI's settings separate and lets a new CLI be added 
 
 **Negative:**
 
-- A setting can now come from seven places; a CLI must be able to report which layer supplied each value.
+- A setting can now come from seven places; `<cli> doctor` reports which layer supplied each value.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 ### Alternatives Considered

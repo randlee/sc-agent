@@ -50,11 +50,11 @@ The CLIs and the logs each one writes are these, and no others:
 | CLI | General log | Session logs |
 |---|---|---|
 | `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
-| `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
+| `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | none |
 
-The PyO3 bindings write the log of the CLI they bind: the `sc-decidr` wheel writes decidr's, and the `sitr` wheel writes sitr's.
+The logs are written by the Rust code. A PyO3 binding is not a CLI and has no row: a caller of the binding may inject its own general and session loggers (REQ-SAG-0008), and with none injected the binding writes the default logs of the CLI it binds, at the paths in that CLI's row.
 
-Adding a CLI, or changing a log a CLI writes, requires a new version of this ADR that adds or changes its row, approved by the owner. A CLI that has no row here writes no log under `<log_root>`.
+Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
 The session identity is fixed as follows.
 
