@@ -9,6 +9,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 import sys
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("prerelease_tag", ROOT / "scripts/prerelease_tag.py")
@@ -17,6 +18,44 @@ spec.loader.exec_module(tag)
 
 
 class ReleaseContract(unittest.TestCase):
+    def test_remote_tag_refresh_selects_next_version_before_heading_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = []\n[workspace.package]\nversion = "1.2.3"\n')
+            (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.3\n\n- Shipped note.\n')
+            (root / "release").mkdir()
+            (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\ntag_prefix = "prerelease/v"\n')
+            (root / "release/publish-preflight.toml").write_text(
+                '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n')
+            fetched = False
+
+            def git(*args, capture=True):
+                nonlocal fetched
+                if args == ("branch", "--show-current"):
+                    return "fix/release"
+                if args == ("status", "--porcelain"):
+                    return ""
+                if args == ("fetch", "origin", "--tags"):
+                    fetched = True
+                    return ""
+                if args == ("tag", "--list"):
+                    return "prerelease/v1.2.3" if fetched else ""
+                return ""
+
+            error = io.StringIO()
+            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=git) as calls, patch.object(tag.subprocess, "run", return_value=SimpleNamespace(stdout='[{"tagName":"prerelease/v1.2.3"}]')) as commands, contextlib.redirect_stderr(error), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(tag.main(), 0, error.getvalue())
+            self.assertTrue(fetched)
+            self.assertEqual(tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"], "1.2.4")
+            self.assertIn('## 1.2.4\n\n- Pending note.', (root / "CHANGELOG.md").read_text())
+            self.assertIn('## 1.2.3\n\n- Shipped note.', (root / "CHANGELOG.md").read_text())
+            self.assertEqual([call.args for call in calls.call_args_list][-2:], [
+                ("tag", "-a", "prerelease/v1.2.4", "-m", "Prerelease 1.2.4"),
+                ("push", "origin", "refs/tags/prerelease/v1.2.4")])
+            self.assertEqual([call.args[0] for call in commands.call_args_list], [
+                ["gh", "release", "list", "--limit", "1000", "--json", "tagName"],
+                ["cargo", "update", "--workspace"], ["bash", "scripts/generate-cli-docs.sh"]])
+
     def test_current_version_freezes_notes_without_updating_release_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -40,7 +79,7 @@ class ReleaseContract(unittest.TestCase):
             self.assertEqual([call.args for call in git.call_args_list], [
                 ("add", "--", "CHANGELOG.md"), ("commit", "-m", "release: prepare prerelease 1.2.3")])
 
-    def test_existing_current_version_refuses_before_changes_or_fetch(self):
+    def test_existing_selected_version_refuses_after_refresh_before_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "Cargo.toml").write_text('[workspace]\nmembers = []\n[workspace.package]\nversion = "1.2.3"\n')
@@ -57,12 +96,13 @@ class ReleaseContract(unittest.TestCase):
             commands.assert_not_called()
             git.assert_not_called()
             error = io.StringIO()
-            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", "", ""]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
+            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", "", "", ""]) as git, patch.object(tag.subprocess, "run", return_value=SimpleNamespace(stdout="[]")) as commands, contextlib.redirect_stderr(error):
                 self.assertEqual(tag.main(), 2)
             self.assertEqual(json.loads(error.getvalue())["error"]["id"], "prerelease.changelog_version_exists")
             self.assertEqual([call.args for call in git.call_args_list], [
-                ("branch", "--show-current"), ("status", "--porcelain"), ("tag", "--list")])
-            commands.assert_not_called()
+                ("branch", "--show-current"), ("status", "--porcelain"), ("fetch", "origin", "--tags"), ("tag", "--list")])
+            self.assertEqual(commands.call_count, 1)
+            self.assertEqual(commands.call_args.args[0][:3], ["gh", "release", "list"])
             self.assertEqual({path: path.read_bytes() for path in before}, before)
 
     def test_dry_run_describes_note_only_and_version_bump_paths(self):
@@ -151,11 +191,11 @@ class ReleaseContract(unittest.TestCase):
             (root / "release").mkdir()
             (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\n')
             error = io.StringIO()
-            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", "", "prerelease/v1.2.3"]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
+            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", ""]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
                 self.assertEqual(tag.main(), 2)
             self.assertEqual(json.loads(error.getvalue())["error"]["id"], "prerelease.changelog_empty")
             self.assertEqual([call.args for call in git.call_args_list], [
-                ("branch", "--show-current"), ("status", "--porcelain"), ("tag", "--list")])
+                ("branch", "--show-current"), ("status", "--porcelain")])
             commands.assert_not_called()
 
     def test_version_selection_never_reuses_stable_or_prerelease(self):
