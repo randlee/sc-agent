@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.7 (unreleased)
+
+- Preserve typed answers, native send counts and error wire details in shared batch results.
+- Validate fixture answers against their questions and redact serialized batch records.
+- Recheck remote-judging consent in the selected repository for each call.
+
+## 0.2.6 (unreleased)
+
+- Share Jev batch settings, validation, fixture handling, streaming and result records in the generated consumer.
+- Parse and validate typed NOUL, choice, score and box answers through the wheel.
+- Isolate consumer settings test modules and make the sitr closed-stdout test deterministic.
+
+## 0.2.5 (unreleased)
+
+- Report missing optional sitr dependencies from generated consumer extraction.
+- Identify the source wheel template in generated clients and retain generic shared error defaults.
+- Publish integration run pages and a report index.
+
 ## 0.2.4 (unreleased)
 
 - Generated consumers use one raisable ClientError for wheel and local errors, with the common error envelope and unchanged Rust messages and recovery text.
