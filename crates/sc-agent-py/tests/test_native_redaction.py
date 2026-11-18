@@ -32,7 +32,7 @@ def test_echoed_key_is_redacted_in_actual_python_decision_results(env, args, con
     if source == "env":
         monkeypatch.setenv(KEY_ENV, KEY)
     else:
-        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True, capture_output=True, timeout=30)
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], stdin=subprocess.DEVNULL, check=True, capture_output=True, timeout=30)
         (tmp_path / ".env").write_text(f"{KEY_ENV}={KEY}\n")
         monkeypatch.chdir(tmp_path)
     text = sc_agent.send(REQUEST, **args) if operation == "send" else sc_agent.send_batch([REQUEST], **args)[0]
@@ -99,7 +99,7 @@ def test_invalid_environment_key_auth_cancels_and_redacts(
     """The invalid-key unit path uses echo-key loopback; integration is separate."""
     key = "invalid-environment-key-b12-auth-0001"
     monkeypatch.chdir(tmp_path)  # No repository .env may override the explicit invalid key.
-    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
+    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], stdin=subprocess.DEVNULL, capture_output=True, timeout=30).returncode != 0
     request.getfixturevalue("env")
     config = request.getfixturevalue("config_dir")
     keyed_runner(config)

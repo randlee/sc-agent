@@ -1945,6 +1945,7 @@ name = "sitr"
 version = "0.2.7"
 dependencies = [
  "clap",
+ "sc-agent-testkit",
  "sc-observability",
  "sc-treesitter",
  "serde",

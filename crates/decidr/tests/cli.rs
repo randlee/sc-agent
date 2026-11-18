@@ -219,6 +219,7 @@ mod tests {
     fn decidr(home: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(DECIDR);
         command
+            .stdin(Stdio::null())
             .arg("--config-dir")
             .arg(home.join(".sc-agent"))
             .args(args)
@@ -476,11 +477,12 @@ mod tests {
             for _ in 0..3 {
                 recv_within(&sends, HANG_GUARD);
             }
-            let status = Command::new("kill")
-                .args([signal, &child.id().to_string()])
-                .status()
-                .expect("kill");
-            assert!(status.success());
+            let killed = run_bounded(Command::new("kill").args([signal, &child.id().to_string()]));
+            assert!(
+                killed.status.success(),
+                "{}",
+                String::from_utf8_lossy(&killed.stderr)
+            );
             let output = finish(child);
             assert_eq!(
                 output.status.code(),
@@ -519,8 +521,12 @@ mod tests {
         let runner = serve_each(|_| {});
         let home = home(runner.port());
         let fifo = home.path().join("input.jsonl");
-        let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
-        assert!(made.success());
+        let made = run_bounded(Command::new("mkfifo").arg(&fifo));
+        assert!(
+            made.status.success(),
+            "{}",
+            String::from_utf8_lossy(&made.stderr)
+        );
         let child = ChildGuard::spawn(
             decidr(
                 home.path(),
@@ -549,11 +555,12 @@ mod tests {
             });
         }
         let held = recv_within(&writer, HANG_GUARD).expect("decidr opened its input");
-        let status = Command::new("kill")
-            .args(["-TERM", &child.id().to_string()])
-            .status()
-            .expect("kill");
-        assert!(status.success());
+        let killed = run_bounded(Command::new("kill").args(["-TERM", &child.id().to_string()]));
+        assert!(
+            killed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&killed.stderr)
+        );
         let output = finish(child);
         drop(held);
         assert_eq!(
@@ -573,11 +580,12 @@ mod tests {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        let made = Command::new("mkfifo")
-            .arg(config.join("default.json"))
-            .status()
-            .expect("mkfifo");
-        assert!(made.success());
+        let made = run_bounded(Command::new("mkfifo").arg(config.join("default.json")));
+        assert!(
+            made.status.success(),
+            "{}",
+            String::from_utf8_lossy(&made.stderr)
+        );
         let output = run_bounded(&mut decidr(home.path(), &["models"]));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);

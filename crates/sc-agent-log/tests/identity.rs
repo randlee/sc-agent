@@ -187,18 +187,27 @@ fn repo_segment_cap() {
 
 /// `git <args>` in `dir`, with the test process's repository overrides removed.
 fn git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
-    let status = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(dir)
         .args(args)
         .env_remove("GIT_DIR")
         .env_remove("GIT_WORK_TREE")
         .env_remove("GIT_INDEX_FILE")
-        .status()?;
-    if status.success() {
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let output = sc_agent_testkit::ChildGuard::spawn(&mut command)
+        .wait_with_output(sc_agent_testkit::HANG_GUARD);
+    if output.status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::other(format!("git {args:?}: {status}")))
+        Err(std::io::Error::other(format!(
+            "git {args:?}: {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        )))
     }
 }
 
