@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.2.9
+
+- Version 0.2.8 was not fully released: only `sc-agent-types` and `sc-agent-config` 0.2.8 reached crates.io; no GitHub Release, PyPI, or package-manager release was published.
+- Version 0.2.9 is the first complete 0.2 release and contains everything listed under 0.2.8.
+- Fix Cargo publication of crates with a self dev-dependency by declaring that dependency by path, so `cargo publish` strips it.
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
