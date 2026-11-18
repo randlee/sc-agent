@@ -52,7 +52,7 @@ The CLIs and the logs each one writes are these, and no others:
 | `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
 | `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | none |
 
-The logs are written by the Rust code. A PyO3 binding is not a CLI and has no row: a caller of the binding may inject its own general and session loggers (REQ-SAG-0008), and with none injected the binding writes the default logs of the CLI it binds, at the paths in that CLI's row.
+The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app that uses a PyO3 binding obtains an sc-observability `Logger` from sc-observability, logs its own records to it, and injects that same `Logger` into the binding, so the app and the Rust code write through one logger and one queue in that process. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
