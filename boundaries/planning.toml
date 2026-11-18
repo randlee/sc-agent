@@ -1,4 +1,4 @@
-# Required by sc-lint 0.8.9 boundary inventory parsing when records exist;
-# this is analyzer input, not the authority for sprint progress (Beads is).
+# Required by sc-lint boundary inventory parsing when records exist;
+# B.15 is the remaining phase-B sprint; Beads is authoritative for progress.
 [planning]
-current_sprint = "B.13"
+current_sprint = "B.15"

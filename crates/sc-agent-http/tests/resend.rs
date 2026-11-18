@@ -472,7 +472,7 @@ mod cases {
         }
     }
 
-    // A5-06: connect, TLS and other transport failures are returned after one send.
+    // A5-06: connect, TLS and other transport failures are resent with holdoff.
     #[test]
     fn network_failures_are_resent_with_holdoff() {
         for kind in [NetworkKind::Connect, NetworkKind::Tls, NetworkKind::Other] {
