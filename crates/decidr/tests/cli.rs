@@ -412,16 +412,23 @@ mod tests {
 
     /// AC: REQ-SAG-0701 output. A closed stdout makes decidr cancel and report `decidr.write`.
     ///
-    /// Ordered: the runner answers only after the test has closed decidr's stdout (and seen
-    /// the send arrive), so the first write always meets a closed pipe.
+    /// Stdout's own socket has writes shut down before spawn, so inherited descriptors
+    /// cannot make it writable. The runner still answers only after the send arrives.
     #[test]
     fn a_closed_stdout_is_decide_write() {
+        use std::os::fd::OwnedFd;
+        use std::os::unix::net::UnixStream;
+
+        let (_reader, writer) = UnixStream::pair().expect("stdout socket pair");
+        writer
+            .shutdown(std::net::Shutdown::Write)
+            .expect("shut down stdout writes");
         let gate = Gate::new();
         let opener = gate.opener();
         let (runner, sends) = loopback(Mode::AnswerAfter(gate));
         let home = home(runner.port());
         let file = batch_file(home.path(), 3);
-        let mut child = ChildGuard::spawn(
+        let child = ChildGuard::spawn(
             decidr(
                 home.path(),
                 &[
@@ -436,10 +443,9 @@ mod tests {
                     file.to_str().expect("utf-8"),
                 ],
             )
-            .stdout(Stdio::piped())
+            .stdout(Stdio::from(OwnedFd::from(writer)))
             .stderr(Stdio::piped()),
         );
-        drop(child.take_stdout());
         recv_within(&sends, HANG_GUARD);
         opener.open();
         let output = finish(child);
