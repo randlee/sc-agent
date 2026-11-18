@@ -87,7 +87,7 @@ One file per CLI keeps each CLI's settings separate and lets a new CLI be added 
 
 **Negative:**
 
-- A setting can now come from seven places; each CLI needs a read-only command that reports which layer supplied each value; sitr has none yet.
+- A setting can now come from seven places; every CLI's `doctor` reports a `setting | value | source` table, with the shared rows from one shared routine; sitr gains a `doctor` command.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 ### Alternatives Considered

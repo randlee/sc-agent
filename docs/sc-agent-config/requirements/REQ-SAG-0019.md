@@ -31,7 +31,9 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - A file in the local folder MUST accept the same keys as the file of the same name in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 and 4 MUST be skipped.
 - Configuration files MUST be JSON.
-- Each CLI MUST have a read-only command (`decidr doctor` for decidr; sitr has none yet) that reports, for every setting, its value and the layer that supplied it, and the path of every file in the seven layers with whether it exists.
+- Each CLI MUST have a `<cli> doctor` command (`decidr doctor`, `sitr doctor`) that reports a table with one row per setting and the columns `setting`, `value` and `source`, where `source` is the flag, the environment variable name, the file path or `default`; and the path of every file in the seven layers with whether it exists.
+- The shared settings MUST be reported by one shared doctor routine that every CLI's doctor calls, so the shared rows are the same in every CLI.
+- `<cli> doctor` MUST NOT send a model request or write a file.
 - A failed load MUST name the file and the key path in its error.
 
 **MUST NOT statements:**
@@ -55,6 +57,8 @@ One file per CLI lets a CLI be added without changing another CLI's file. The sh
 - [ ] Outside a git work tree, a `.sc/sc-agent/decidr.json` in the current folder is not read.
 - [ ] A `~/.sc-agent/default.json` that sets `workers` has no effect.
 - [ ] A setting in `sitr.json` has no effect on decidr.
+- [ ] With `"project": "phase-a"` in `<worktree>/.sc/sc-agent/decidr.json`, `decidr doctor` reports the row `project | phase-a | <worktree>/.sc/sc-agent/decidr.json`.
+- [ ] With `"project": "phase-a"` only in the local `sc-agent.json`, `decidr doctor` and `sitr doctor` report the same `project` row.
 - [ ] A malformed local `decidr.json` fails the load with an error naming that file.
 
 ### Dependencies
