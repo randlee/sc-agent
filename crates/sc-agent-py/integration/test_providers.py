@@ -1,4 +1,4 @@
-"""Real providers only. Run with just integration, never as part of unit tests."""
+"""Live cases for just integration; offline contract tests control the wheel send boundary."""
 import json
 import os
 from pathlib import Path
@@ -32,29 +32,28 @@ def options(tmp_path, record_property):
     return dict(model=MODEL, project="integration", agent_role="pytest", config_dir=str(config))
 
 
-@pytest.mark.parametrize("operation", ["call", "call_batch"], ids=["noul-send", "noul-batch"])
-def test_real_noul_query(tmp_path, record_property, operation):
-    client = render_consumer(tmp_path, models=[MODEL])
+@pytest.mark.parametrize("operation", ["call_result", "call_batch_results"], ids=["noul-send", "noul-batch"])
+def test_real_noul_query(tmp_path, monkeypatch, record_property, operation):
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
     selected = []
 
     def log(record):
         if record.get("fields", {}).get("provider"):
             selected.append(record["fields"]["provider"])
 
-    result = getattr(client, operation)([REQUEST] * 2 if operation == "call_batch" else REQUEST,
+    result = getattr(client, operation)([REQUEST] * 2 if operation == "call_batch_results" else REQUEST,
                  **options(tmp_path, record_property), abort_on=frozenset(), category_codes={},
                  cancel=sc_agent.CancelToken(), general_log=log, timeout_secs=120)
-    rows = result if operation == "call_batch" else [result]
+    assert result["ok"], result.get("error")
+    rows = result["value"] if operation == "call_batch_results" else [result]
+    assert len(rows) == (2 if operation == "call_batch_results" else 1)
     answers = []
-    for text, code in rows:
-        line = json.loads(text)
-        error = line.get("error", {})
-        assert "response" in line, (error.get("id"), error.get("category"), error.get("status"))
-        assert code is None
-        answer = line["response"]["answers"]["q"]
-        assert answer["type"] == "noul"
-        assert isinstance(answer["noul"], (int, float)) and 0 <= answer["noul"] <= 1
-        answers.append(answer)
+    for row in rows:
+        assert row["ok"], row.get("error")
+        answer = row["value"]["q"]
+        assert isinstance(answer, client.NoulAnswer)
+        assert isinstance(answer.noul, (int, float)) and 0 <= answer.noul <= 1
+        answers.append({"type": "noul", "noul": answer.noul})
     assert selected and set(selected) == {PROVIDER}
     record_property("result", json.dumps(answers))
 
@@ -62,20 +61,27 @@ def test_real_noul_query(tmp_path, record_property, operation):
 def test_real_invalid_key_auth_cancel_redaction(tmp_path, monkeypatch, record_property):
     monkeypatch.chdir(tmp_path)  # A repository .env must not replace the invalid key.
     assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
-    client = render_consumer(tmp_path, models=[MODEL])
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
     source = ROOT / "crates/sc-agent-secrets/src/vars.rs"
     variables = dict(re.findall(r'pub const ([A-Z_]+): &str = "([^"]+)";', source.read_text()))
     key = "invalid-integration-key-0000000001"
     monkeypatch.setenv(variables[f"{PROVIDER.upper()}_API_KEY"], key)
     cancel = sc_agent.CancelToken()
     kwargs = options(tmp_path, record_property)
-    text, code = client.call(REQUEST, **kwargs, abort_on=frozenset({"auth"}),
-                            category_codes={"auth": "AUTH"}, cancel=cancel, timeout_secs=120)
-    error = json.loads(text)["error"]
-    assert error["category"] == "auth" and error["status"] == 401
-    assert code == "AUTH" and cancel.is_cancelled()
-    followup, _ = client.call(REQUEST, **kwargs, abort_on=frozenset({"auth"}), category_codes={}, cancel=cancel, timeout_secs=120)
-    assert json.loads(followup)["error"]["category"] == "cancelled"
-    assert key not in text + followup
+    result = client.call_result(REQUEST, **kwargs, abort_on=frozenset({"auth"}),
+                                category_codes={"auth": "AUTH"}, cancel=cancel, timeout_secs=120)
+    assert not result["ok"]
+    error = result["error"]
+    assert isinstance(error, client.ClientError)
+    wire_error = json.loads(result["line"])["error"]
+    assert wire_error["category"] == "auth" and wire_error["status"] == 401
+    assert error.data == wire_error and error.status == 401
+    assert error.code == "AUTH" and cancel.is_cancelled()
+    followup = client.call_result(REQUEST, **kwargs, abort_on=frozenset({"auth"}),
+                                 category_codes={}, cancel=cancel, timeout_secs=120)
+    assert not followup["ok"] and followup["error"].data["category"] == "cancelled"
+    assert followup["error"].code == "CANCELED"
+    output = json.dumps([error.to_json(), followup["error"].to_json(), result["line"], followup["line"]])
+    assert key not in output
     assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))
     record_property("result", "HTTP401/auth; token and follow-up cancelled; no key in results/logs")
