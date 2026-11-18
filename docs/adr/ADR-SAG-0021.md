@@ -45,6 +45,17 @@ Logs live under `<log_root>`, which defaults to `~/.sc-agent` and is set by `log
 - Each CLI's general log is `<log_root>/logs/<cli>/<cli>.log.jsonl`, for example `logs/decidr/decidr.log.jsonl`. Each CLI writes only its own general log.
 - Session logs are `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`. `sessions/` sits beside `logs/`, not under it, and holds nothing but session logs.
 
+The CLIs and the logs each one writes are these, and no others:
+
+| CLI | General log | Session logs |
+|---|---|---|
+| `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
+| `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
+
+The PyO3 bindings write the log of the CLI they bind: the `sc-decidr` wheel writes decidr's, and the `sitr` wheel writes sitr's.
+
+Adding a CLI, or changing a log a CLI writes, requires a new version of this ADR that adds or changes its row, approved by the owner. A CLI that has no row here writes no log under `<log_root>`.
+
 The session identity is fixed as follows.
 
 - `agent_role` is the named agent or app that makes the request, for example `plan-anchor`, `judge-jev`, `lai` or `sanity`. It is required. A generated consumer client hardcodes it to its product name; it is not a user setting.

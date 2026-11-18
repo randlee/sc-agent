@@ -45,6 +45,15 @@ Configuration has two kinds of scope and two locations.
 - The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform.
 - The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.
 
+The CLIs and the files each one reads are these, and no others:
+
+| CLI | Global files | Local files | Environment prefix |
+|---|---|---|---|
+| `decidr` | `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
+| `sitr` | `~/.sc-agent/sitr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/sitr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `SITR_`, plus `SC_PROJECT` |
+
+Adding a CLI, or changing a file or prefix a CLI reads, requires a new version of this ADR that adds or changes its row, approved by the owner. A CLI that has no row here reads no sc-agent configuration.
+
 A setting is looked up in seven layers, and the first layer that sets it wins:
 
 1. the CLI flag;
