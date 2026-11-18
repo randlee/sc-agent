@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.2.8 (unreleased)
+## Unreleased
+
+## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
 - Close test subprocess stdin explicitly and bound Rust CLI and repository-identity child processes with the shared child guard.

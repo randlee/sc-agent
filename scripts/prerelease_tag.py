@@ -22,18 +22,18 @@ class ReleaseNotesError(ValueError):
         self.code = code
 
 
-def release_notes(current: str, version: str) -> str:
+def release_notes(version: str) -> str:
     text = (ROOT / "CHANGELOG.md").read_text()
     headings = list(re.finditer(r"(?m)^## .+$", text))
-    if not headings or headings[0].group() != f"## {current} (unreleased)":
+    if not headings or headings[0].group() != "## Unreleased":
         raise ReleaseNotesError("prerelease.changelog_heading",
-                                f"CHANGELOG.md must start with a {current} (unreleased) release section")
+                                "CHANGELOG.md must start with an Unreleased section")
     heading = headings[0]
     section = text[heading.end():headings[1].start() if len(headings) > 1 else len(text)]
     if not any(line.strip() and not line.lstrip().startswith("#") for line in section.splitlines()):
         raise ReleaseNotesError("prerelease.changelog_empty",
-                                f"Add release notes to the {current} section before tagging {version}")
-    return text[:heading.start()] + f"## {version} (unreleased)" + text[heading.end():]
+                                f"Add notes to Unreleased before tagging {version}")
+    return text[:heading.start()] + f"## Unreleased\n\n## {version}" + text[heading.end():]
 
 
 def git(*args: str, capture: bool = True) -> str:
@@ -63,7 +63,7 @@ def manifests() -> list[Path]:
 
 
 def bump_version(current: str, version: str) -> None:
-    notes = release_notes(current, version)
+    notes = release_notes(version)
     changed = []
     pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
     for path in manifests():
@@ -94,7 +94,7 @@ def main() -> int:
         parser.error("commit or restore all work before creating a prerelease")
     current = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
     try:
-        release_notes(current, current)
+        release_notes(current)
     except ReleaseNotesError as exc:
         print(json.dumps({"ok": False, "error": {"id": exc.code, "message": str(exc)}}), file=sys.stderr)
         return 2
@@ -109,8 +109,7 @@ def main() -> int:
     if args.dry_run:
         print(f"would select {tag}; workspace {current}; version bump {version != current}")
         return 0
-    if version != current:
-        bump_version(current, version)
+    bump_version(current, version)
     # No force option: a racing publication or tag creation must fail closed.
     git("tag", "-a", tag, "-m", f"Prerelease {version}", capture=False)
     git("push", "origin", f"refs/tags/{tag}", capture=False)

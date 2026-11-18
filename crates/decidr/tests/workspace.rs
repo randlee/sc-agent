@@ -23,8 +23,9 @@ mod tests {
         .expect("changelog");
         let heading = text
             .lines()
-            .find_map(|line| line.strip_prefix("## "))
-            .expect("release heading");
+            .filter_map(|line| line.strip_prefix("## "))
+            .find(|heading| *heading != "Unreleased")
+            .expect("versioned release heading");
         assert_eq!(
             heading.split_whitespace().next(),
             Some(env!("CARGO_PKG_VERSION"))
