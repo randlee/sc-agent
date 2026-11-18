@@ -30,7 +30,7 @@ keyring = { version = "3.6", default-features = false, features = ["windows-nati
 keyring = { version = "3.6", default-features = false, features = ["sync-secret-service", "crypto-rust", "vendored"] }
 
 [dev-dependencies]
-sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
+sc-agent-secrets = { path = ".", features = ["test-keyring-guard"] }
 sc-agent-testkit = { workspace = true }
 sc-agent-types = { workspace = true, features = ["testing"] }
 tempfile = "3"

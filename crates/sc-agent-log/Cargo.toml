@@ -26,7 +26,7 @@ hostname = "0.4.2"
 sc-agent-testkit = { workspace = true }
 sc-agent-types = { workspace = true, features = ["testing"] }
 tempfile = "3"
-sc-agent-log = { workspace = true, features = ["testing"] }
+sc-agent-log = { path = ".", features = ["testing"] }
 
 [lints]
 workspace = true
