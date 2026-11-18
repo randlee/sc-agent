@@ -22,20 +22,23 @@ class ReleaseNotesError(ValueError):
         self.code = code
 
 
-def release_notes(version: str) -> str:
+def release_notes(version: str | None = None) -> str:
+    """Validate pending notes, freezing them only when a selected version is supplied."""
     text = (ROOT / "CHANGELOG.md").read_text()
     headings = list(re.finditer(r"(?m)^## .+$", text))
     if not headings or headings[0].group() != "## Unreleased":
         raise ReleaseNotesError("prerelease.changelog_heading",
                                 "CHANGELOG.md must start with an Unreleased section")
-    if any(heading.group().split()[1:2] == [version] for heading in headings[1:]):
+    if version is not None and any(heading.group().split()[1:2] == [version] for heading in headings[1:]):
         raise ReleaseNotesError("prerelease.changelog_version_exists",
                                 f"CHANGELOG.md already contains a {version} release section")
     heading = headings[0]
     section = text[heading.end():headings[1].start() if len(headings) > 1 else len(text)]
     if not any(line.strip() and not line.lstrip().startswith("#") for line in section.splitlines()):
         raise ReleaseNotesError("prerelease.changelog_empty",
-                                f"Add notes to Unreleased before tagging {version}")
+                                f"Add notes to Unreleased before tagging {version or 'a prerelease'}")
+    if version is None:
+        return text
     return text[:heading.start()] + f"## Unreleased\n\n## {version}" + text[heading.end():]
 
 
@@ -101,12 +104,12 @@ def main() -> int:
     if git("status", "--porcelain"):
         parser.error("commit or restore all work before creating a prerelease")
     current = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
-    tags = set(git("tag", "--list").splitlines())
     try:
-        release_notes(next_version(current, tags))
+        release_notes()
         if not args.dry_run:
             git("fetch", "origin", "--tags", capture=False)
-            tags.update(git("tag", "--list").splitlines())
+        tags = set(git("tag", "--list").splitlines())
+        if not args.dry_run:
             releases = subprocess.run(["gh", "release", "list", "--limit", "1000", "--json", "tagName"], cwd=ROOT, text=True, capture_output=True, check=True)
             tags.update(release["tagName"] for release in json.loads(releases.stdout))
         version = next_version(current, tags)
