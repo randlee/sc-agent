@@ -5,7 +5,7 @@
 ## 0.2.9
 
 - 0.2.8 was not fully released: only `sc-agent-types` and `sc-agent-config` 0.2.8 reached crates.io; no GitHub Release or other channel was published. 0.2.9 is the first complete 0.2 release and contains everything listed under 0.2.8.
-- Fix crates.io packaging of `sc-agent-secrets`, `sc-agent-http` and `sc-agent-log`, which failed because of a dev-dependency on the crate itself (removed).
+- Fix crates.io packaging of `sc-agent-secrets`, `sc-agent-http` and `sc-agent-log`: their dev-dependency on the crate itself is now declared by path, so `cargo publish` leaves it out of the published crate.
 
 ## 0.2.8
 
