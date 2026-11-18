@@ -12,8 +12,9 @@ pub trait EnvSource: Send + Sync {
 
 /// Reads variables from the process environment.
 ///
-/// A missing variable is `None`. A present empty string is `Some("")`, so the
-/// repo-root `.env` does not override it (the keyring is tried next).
+/// A missing variable is `None`; a present empty string is `Some("")`.
+/// Resolution checks repo-root `.env` first, then the process environment,
+/// then the keyring. A selected empty value is rejected without falling through.
 /// Non-Unicode values are treated as present and empty.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProcessEnv;

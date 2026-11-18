@@ -20,7 +20,8 @@ roots = ["main"]
 allowed_dependents = []
 allowed_dependencies = ["sc-treesitter"]
 allowed_dev_dependents = []
-allowed_dev_dependencies = []
+# CLI process tests reuse the shared bounded/reaping child guard.
+allowed_dev_dependencies = ["sc-agent-testkit"]
 forbidden_edges = []
 
 [references]

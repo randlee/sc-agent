@@ -22,22 +22,72 @@ mod tests {
 
     /// Every request example of openapi.json v0.2.0 and the TypeSafe guides that needs no
     /// image part (those are in `every_part_example_is_sent_as_multipart`).
-    const REQUESTS: [(&str, &str); 11] = [
-        ("request_noul", "response_noul"),
-        ("request_choice", "response_choice"),
-        ("request_score", "response_score"),
-        ("request_box", "response_box"),
-        ("request_noul_criteria", "response_noul"),
-        ("request_null_fields", "response_box_confidence_number"),
-        ("property_examples_request", "docs_quickstart_response_1"),
-        ("docs_p_models_request_1", "docs_noul_response_1"),
-        ("docs_p_images_request_1", "docs_noul_response_2"),
-        ("docs_p_images_request_3", "docs_noul_response_1"),
-        ("docs_p_images_request_4", "docs_choice_response_1"),
+    const REQUESTS: [&str; 11] = [
+        "request_noul",
+        "request_choice",
+        "request_score",
+        "request_box",
+        "request_noul_criteria",
+        "request_null_fields",
+        "property_examples_request",
+        "docs_p_models_request_1",
+        "docs_p_images_request_1",
+        "docs_p_images_request_3",
+        "docs_p_images_request_4",
     ];
 
     /// The request examples sent as multipart in `every_part_example_is_sent_as_multipart`.
     const PART_REQUESTS: [&str; 2] = ["request_assets_part", "docs_box_request_1"];
+
+    fn matching_response(request_text: &str) -> String {
+        let request: serde_json::Value = serde_json::from_str(request_text).expect("request JSON");
+        let questions = request["questions"].as_object().expect("questions");
+        let mut answers = serde_json::Map::new();
+        for (id, question) in questions {
+            let answer = match question["type"].as_str().expect("question type") {
+                "noul" => serde_json::json!({"type":"noul", "noul":0.5}),
+                "choice" => {
+                    let criteria = question["criteria"].as_object().expect("choice criteria");
+                    let choice = criteria.keys().next().expect("choice option");
+                    let probabilities = criteria
+                        .keys()
+                        .map(|key| {
+                            (
+                                key.clone(),
+                                serde_json::Value::from(if key == choice { 1.0 } else { 0.0 }),
+                            )
+                        })
+                        .collect::<serde_json::Map<_, _>>();
+                    serde_json::json!({"type":"choice", "choice":choice, "confidence":1.0, "probabilities":probabilities})
+                }
+                "score" => {
+                    let criteria = question["criteria"].as_array().expect("score criteria");
+                    let legend = criteria
+                        .iter()
+                        .enumerate()
+                        .map(|(i, value)| (i.to_string(), value.clone()))
+                        .collect::<serde_json::Map<_, _>>();
+                    let probabilities = criteria
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| {
+                            (
+                                i.to_string(),
+                                serde_json::Value::from(if i == 0 { 1.0 } else { 0.0 }),
+                            )
+                        })
+                        .collect::<serde_json::Map<_, _>>();
+                    serde_json::json!({"type":"score", "score":0.0, "confidence":1.0, "legend":legend, "probabilities":probabilities})
+                }
+                "box" => {
+                    serde_json::json!({"type":"box", "box":{"top":0.1,"bottom":0.9,"left":0.1,"right":0.9}, "confidence":0.9})
+                }
+                other => panic!("unsupported question type: {other}"),
+            };
+            answers.insert(id.clone(), answer);
+        }
+        serde_json::json!({"model":request["model"], "answers":answers, "usage":{"input_tokens":1,"output_tokens":1}}).to_string()
+    }
 
     #[test]
     fn jev_latest_uses_typesafe_with_keyring_override_and_other_provider_keys() {
@@ -103,7 +153,7 @@ mod tests {
         names.sort();
         let mut sent: Vec<String> = REQUESTS
             .iter()
-            .map(|(request, _)| (*request).to_owned())
+            .map(|request| (*request).to_owned())
             .chain(PART_REQUESTS.iter().map(|name| (*name).to_owned()))
             .collect();
         sent.sort();
@@ -114,9 +164,9 @@ mod tests {
     /// SystemOneBackend), reaches the transport unchanged, and returns the API's response.
     #[test]
     fn every_typesafe_request_example_returns_the_api_response() {
-        for (request_name, response_name) in REQUESTS {
+        for request_name in REQUESTS {
             let request_text = fixture(request_name);
-            let response_text = fixture(response_name);
+            let response_text = matching_response(&request_text);
             let transport = ScriptedTransport::responses(vec![json_response(200, &response_text)]);
             let log = MemoryLog::new().expect("log");
             let dir = empty_config_dir();
@@ -175,6 +225,7 @@ mod tests {
     fn every_part_example_is_sent_as_multipart() {
         for name in PART_REQUESTS {
             let request_text = fixture(name);
+            let response_text = matching_response(&request_text);
             let parts = part_names(&request_text);
             assert!(!parts.is_empty(), "{name} names a part");
             let images_dir = tempfile::tempdir().expect("dir");
@@ -188,8 +239,7 @@ mod tests {
                 .collect();
 
             // Single request: --image NAME=FILE and --long-context.
-            let transport =
-                ScriptedTransport::responses(vec![json_response(200, &fixture("response_noul"))]);
+            let transport = ScriptedTransport::responses(vec![json_response(200, &response_text)]);
             let log = MemoryLog::new().expect("log");
             let dir = empty_config_dir();
             let ctx = context(
@@ -238,8 +288,7 @@ mod tests {
                 "long_context": true,
             });
             let requests = read_batch(&mut line.to_string().as_bytes()).expect("batch");
-            let transport =
-                ScriptedTransport::responses(vec![json_response(200, &fixture("response_noul"))]);
+            let transport = ScriptedTransport::responses(vec![json_response(200, &response_text)]);
             let ctx = context(
                 dir.path(),
                 &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],

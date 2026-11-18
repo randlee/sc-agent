@@ -496,21 +496,20 @@ impl<T> BoundedQueue<T> {
 
     /// One producer is done; the last one closes the queue.
     pub(crate) fn producer_done(&self) {
-        let closes = {
+        {
             let mut state = self.lock();
             state.producers = state.producers.saturating_sub(1);
+            #[cfg(test)]
             let closes = state.producers == 0 && !state.closed;
             if state.producers == 0 {
                 state.closed = true;
             }
-            closes
-        };
-        #[cfg(test)]
-        if closes && let Some(seam) = lock(&self.on_close).as_ref() {
-            seam();
+            // The consumer cannot observe closure until the test observation is recorded.
+            #[cfg(test)]
+            if closes && let Some(seam) = lock(&self.on_close).as_ref() {
+                seam();
+            }
         }
-        #[cfg(not(test))]
-        let _ = closes;
         self.not_empty.notify_all();
         self.not_full.notify_all();
     }

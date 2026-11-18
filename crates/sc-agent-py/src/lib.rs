@@ -19,8 +19,9 @@ use binding_error::PyBindingError;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::Duration;
 
 use decidr::input::{BatchInput, build_batch, build_request_bytes};
@@ -35,6 +36,7 @@ use sc_agent_config::RunnerName;
 use sc_agent_log::{GeneralLogger, LogError, LogKind, SessionLogger, Slug};
 use sc_agent_types::{ErrorId, Provider};
 use sc_decision_schema::DecisionResult;
+use sc_decision_schema::{Answer, SystemOneResponse};
 use sc_observability::v2::{
     LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig, SinkRegistration,
 };
@@ -124,6 +126,253 @@ impl CancelToken {
     }
 }
 
+#[pyclass(module = "sc_agent", frozen)]
+pub struct NoulAnswer {
+    #[pyo3(get)]
+    noul: f64,
+}
+#[pymethods]
+impl NoulAnswer {
+    #[new]
+    fn new(noul: f64) -> Self {
+        Self { noul }
+    }
+}
+
+#[pyclass(module = "sc_agent", frozen)]
+pub struct ChoiceAnswer {
+    #[pyo3(get)]
+    choice: String,
+    #[pyo3(get)]
+    confidence: f64,
+    #[pyo3(get)]
+    probabilities: Py<PyAny>,
+}
+#[pymethods]
+impl ChoiceAnswer {
+    #[new]
+    fn new(
+        py: Python<'_>,
+        choice: String,
+        confidence: f64,
+        probabilities: Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let probabilities = py
+            .import("types")?
+            .getattr("MappingProxyType")?
+            .call1((probabilities,))?
+            .unbind();
+        Ok(Self {
+            choice,
+            confidence,
+            probabilities,
+        })
+    }
+}
+
+#[pyclass(module = "sc_agent", frozen)]
+pub struct ScoreAnswer {
+    #[pyo3(get)]
+    score: f64,
+    #[pyo3(get)]
+    confidence: f64,
+    #[pyo3(get)]
+    legend: Py<PyAny>,
+    #[pyo3(get)]
+    probabilities: Py<PyAny>,
+}
+#[pymethods]
+impl ScoreAnswer {
+    #[new]
+    fn new(
+        py: Python<'_>,
+        score: f64,
+        confidence: f64,
+        legend: Bound<'_, PyAny>,
+        probabilities: Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let mapping_proxy = py.import("types")?.getattr("MappingProxyType")?;
+        let legend = mapping_proxy.call1((legend,))?.unbind();
+        let probabilities = mapping_proxy.call1((probabilities,))?.unbind();
+        Ok(Self {
+            score,
+            confidence,
+            legend,
+            probabilities,
+        })
+    }
+}
+
+#[pyclass(module = "sc_agent", frozen)]
+pub struct BoxAnswer {
+    #[pyo3(get)]
+    top: f64,
+    #[pyo3(get)]
+    bottom: f64,
+    #[pyo3(get)]
+    left: f64,
+    #[pyo3(get)]
+    right: f64,
+    #[pyo3(get)]
+    confidence: Option<f64>,
+}
+#[pymethods]
+impl BoxAnswer {
+    #[new]
+    fn new(top: f64, bottom: f64, left: f64, right: f64, confidence: Option<f64>) -> Self {
+        Self {
+            top,
+            bottom,
+            left,
+            right,
+            confidence,
+        }
+    }
+}
+
+fn json_object(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<PyAny>> {
+    let encoded =
+        serde_json::to_string(value).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    Ok(py
+        .import("json")?
+        .call_method1("loads", (encoded,))?
+        .unbind())
+}
+
+#[pyfunction]
+fn parse_result(py: Python<'_>, line: &str) -> PyResult<Py<PyAny>> {
+    let parsed: Value = serde_json::from_str(line)
+        .map_err(|e| PyTypeError::new_err(format!("invalid result JSON: {e}")))?;
+    let row = parsed
+        .as_object()
+        .ok_or_else(|| PyTypeError::new_err("result must be an object"))?;
+    let result = PyDict::new(py);
+    for field in ["session_id", "position", "sends", "digests"] {
+        let value = row
+            .get(field)
+            .ok_or_else(|| PyTypeError::new_err(format!("result is missing {field}")))?;
+        result.set_item(field, json_object(py, value)?)?;
+    }
+    if let Some(response) = row.get("response") {
+        let encoded =
+            serde_json::to_vec(response).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let response = SystemOneResponse::from_json(200, &encoded).map_err(|e| {
+            PyTypeError::new_err(format!("invalid typed response: {}", e.message()))
+        })?;
+        let answers = PyDict::new(py);
+        for (id, answer) in response.answers.iter() {
+            let typed = match answer {
+                Answer::Noul { noul } => Py::new(py, NoulAnswer { noul: *noul })?.into_any(),
+                Answer::Choice {
+                    choice,
+                    confidence,
+                    probabilities,
+                } => {
+                    let probs = json_object(
+                        py,
+                        &serde_json::to_value(probabilities)
+                            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
+                    )?;
+                    let probs = py
+                        .import("types")?
+                        .getattr("MappingProxyType")?
+                        .call1((probs.bind(py),))?
+                        .unbind();
+                    Py::new(
+                        py,
+                        ChoiceAnswer {
+                            choice: choice.clone(),
+                            confidence: *confidence,
+                            probabilities: probs,
+                        },
+                    )?
+                    .into_any()
+                }
+                Answer::Score {
+                    score,
+                    confidence,
+                    legend,
+                    probabilities,
+                } => {
+                    let legend = json_object(
+                        py,
+                        &serde_json::to_value(legend)
+                            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
+                    )?;
+                    let probs = json_object(
+                        py,
+                        &serde_json::to_value(probabilities)
+                            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
+                    )?;
+                    let legend = py
+                        .import("types")?
+                        .getattr("MappingProxyType")?
+                        .call1((legend.bind(py),))?
+                        .unbind();
+                    let probs = py
+                        .import("types")?
+                        .getattr("MappingProxyType")?
+                        .call1((probs.bind(py),))?
+                        .unbind();
+                    Py::new(
+                        py,
+                        ScoreAnswer {
+                            score: *score,
+                            confidence: *confidence,
+                            legend,
+                            probabilities: probs,
+                        },
+                    )?
+                    .into_any()
+                }
+                Answer::Box {
+                    coordinates,
+                    confidence,
+                } => Py::new(
+                    py,
+                    BoxAnswer {
+                        top: coordinates.top,
+                        bottom: coordinates.bottom,
+                        left: coordinates.left,
+                        right: coordinates.right,
+                        confidence: *confidence,
+                    },
+                )?
+                .into_any(),
+                _ => return Err(PyTypeError::new_err("unsupported answer variant")),
+            };
+            answers.set_item(id, typed)?;
+        }
+        result.set_item("answers", answers)?;
+        result.set_item(
+            "usage",
+            json_object(
+                py,
+                &serde_json::to_value(response.usage)
+                    .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
+            )?,
+        )?;
+        result.set_item("error", py.None())?;
+    } else if let Some(error) = row.get("error") {
+        let encoded =
+            serde_json::to_string(error).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let detail: sc_agent_types::ErrorDetail = serde_json::from_str(&encoded)
+            .map_err(|e| PyTypeError::new_err(format!("invalid typed error: {e}")))?;
+        let module = py.import("sc_agent")?;
+        let exception = module
+            .getattr("SagError")?
+            .call1((detail.id, detail.message, encoded))?;
+        result.set_item("error", exception)?;
+        result.set_item("answers", py.None())?;
+        result.set_item("usage", py.None())?;
+    } else {
+        return Err(PyTypeError::new_err(
+            "result has neither response nor error",
+        ));
+    }
+    Ok(result.into_any().unbind())
+}
+
 /// A batch item: a JSON request string, or `(request, images, long_context)`.
 #[derive(FromPyObject)]
 enum BatchItem {
@@ -148,6 +397,24 @@ impl From<BatchItem> for BatchInput {
             },
         }
     }
+}
+
+// The exit hook runs while Python is still usable. Close admission before
+// releasing the GIL, then wait for every writer that might be attaching. The
+// read guard covers attachment, the callback and Python error formatting.
+static PYTHON_LOGS_OPEN: AtomicBool = AtomicBool::new(true);
+static PYTHON_LOG_WRITES: RwLock<()> = RwLock::new(());
+
+#[pyfunction]
+fn _shutdown_python_logs(py: Python<'_>) {
+    PYTHON_LOGS_OPEN.store(false, Ordering::Release);
+    py.detach(|| {
+        drop(
+            PYTHON_LOG_WRITES
+                .write()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+    });
 }
 
 /// Forwards each record to the caller-owned Python Logger or callable under the GIL.
@@ -188,6 +455,14 @@ impl PyLogSink {
 
 impl LogSink for PyLogSink {
     fn write(&self, event: &LogEvent) -> Result<(), LogSinkError> {
+        let _active = PYTHON_LOG_WRITES
+            .read()
+            .unwrap_or_else(PoisonError::into_inner);
+        if !PYTHON_LOGS_OPEN.load(Ordering::Acquire) {
+            return Err(Self::refused(
+                "the Python logging bridge is shut down".to_owned(),
+            ));
+        }
         Python::attach(|py| {
             if self.callable.bind(py).is_callable() {
                 let record = py
@@ -415,7 +690,10 @@ fn run_interruptible<T: Send>(
             let text =
                 decidr::output::to_json(&error.detail()).unwrap_or_else(|_| error.to_string());
             let message = std::ffi::CString::new(text).unwrap_or_default();
-            PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1)?;
+            if let Err(warning) = PyErr::warn(py, &py.get_type::<PyRuntimeWarning>(), &message, 1) {
+                // A warning filter must not replace the decision (or its error).
+                warning.write_unraisable(py, None);
+            }
         }
         if let Some(error) = raised {
             return Err(error);
@@ -773,6 +1051,10 @@ fn doctor(
 /// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
 #[pymodule(name = "_native")]
 fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.py().import("atexit")?.call_method1(
+        "register",
+        (wrap_pyfunction!(_shutdown_python_logs, module)?,),
+    )?;
     module.add_function(wrap_pyfunction!(send, module)?)?;
     module.add_function(wrap_pyfunction!(send_batch, module)?)?;
     module.add_function(wrap_pyfunction!(category, module)?)?;
@@ -780,13 +1062,20 @@ fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(_sag_error_fields, module)?)?;
     module.add_function(wrap_pyfunction!(models, module)?)?;
     module.add_function(wrap_pyfunction!(doctor, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_result, module)?)?;
     module.add_class::<CancelToken>()?;
+    module.add_class::<NoulAnswer>()?;
+    module.add_class::<ChoiceAnswer>()?;
+    module.add_class::<ScoreAnswer>()?;
+    module.add_class::<BoxAnswer>()?;
     module.py().run(
         cr#"
 class SagError(Exception):
     def __init__(self, id, message, detail_json):
         super().__init__(id, message, detail_json)
         self._fields = _sag_error_fields(detail_json)
+    def __str__(self):
+        return f"{self.id}: {self.message}"
     @property
     def id(self): return self.args[0]
     @property

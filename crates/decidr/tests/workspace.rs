@@ -12,6 +12,26 @@ mod tests {
             .to_path_buf()
     }
 
+    #[test]
+    fn changelog_heading_matches_workspace_version() {
+        let text = std::fs::read_to_string(
+            crates_dir()
+                .parent()
+                .expect("workspace")
+                .join("CHANGELOG.md"),
+        )
+        .expect("changelog");
+        let heading = text
+            .lines()
+            .filter_map(|line| line.strip_prefix("## "))
+            .find(|heading| *heading != "Unreleased")
+            .expect("versioned release heading");
+        assert_eq!(
+            heading.split_whitespace().next(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+    }
+
     fn files(dir: &Path, extension: &str, out: &mut Vec<PathBuf>) {
         for entry in std::fs::read_dir(dir).expect("dir").flatten() {
             let path = entry.path();

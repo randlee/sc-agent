@@ -130,6 +130,10 @@ mod tests {
                 send(&opts, request(NOUL), &CancelToken::new()).expect_err("no resolved key");
             assert_eq!(error.id(), "decidr.secrets");
             assert_eq!(
+                error.detail().category,
+                Some(sc_agent_types::ErrorCategory::Auth)
+            );
+            assert_eq!(
                 error.cause_detail().expect("credential error"),
                 failure.detail()
             );

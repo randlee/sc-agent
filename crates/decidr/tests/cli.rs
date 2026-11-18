@@ -219,6 +219,7 @@ mod tests {
     fn decidr(home: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(DECIDR);
         command
+            .stdin(Stdio::null())
             .arg("--config-dir")
             .arg(home.join(".sc-agent"))
             .args(args)
@@ -411,16 +412,23 @@ mod tests {
 
     /// AC: REQ-SAG-0701 output. A closed stdout makes decidr cancel and report `decidr.write`.
     ///
-    /// Ordered: the runner answers only after the test has closed decidr's stdout (and seen
-    /// the send arrive), so the first write always meets a closed pipe.
+    /// Stdout's own socket has writes shut down before spawn, so inherited descriptors
+    /// cannot make it writable. The runner still answers only after the send arrives.
     #[test]
     fn a_closed_stdout_is_decide_write() {
+        use std::os::fd::OwnedFd;
+        use std::os::unix::net::UnixStream;
+
+        let (_reader, writer) = UnixStream::pair().expect("stdout socket pair");
+        writer
+            .shutdown(std::net::Shutdown::Write)
+            .expect("shut down stdout writes");
         let gate = Gate::new();
         let opener = gate.opener();
         let (runner, sends) = loopback(Mode::AnswerAfter(gate));
         let home = home(runner.port());
         let file = batch_file(home.path(), 3);
-        let mut child = ChildGuard::spawn(
+        let child = ChildGuard::spawn(
             decidr(
                 home.path(),
                 &[
@@ -435,10 +443,9 @@ mod tests {
                     file.to_str().expect("utf-8"),
                 ],
             )
-            .stdout(Stdio::piped())
+            .stdout(Stdio::from(OwnedFd::from(writer)))
             .stderr(Stdio::piped()),
         );
-        drop(child.take_stdout());
         recv_within(&sends, HANG_GUARD);
         opener.open();
         let output = finish(child);
@@ -476,11 +483,12 @@ mod tests {
             for _ in 0..3 {
                 recv_within(&sends, HANG_GUARD);
             }
-            let status = Command::new("kill")
-                .args([signal, &child.id().to_string()])
-                .status()
-                .expect("kill");
-            assert!(status.success());
+            let killed = run_bounded(Command::new("kill").args([signal, &child.id().to_string()]));
+            assert!(
+                killed.status.success(),
+                "{}",
+                String::from_utf8_lossy(&killed.stderr)
+            );
             let output = finish(child);
             assert_eq!(
                 output.status.code(),
@@ -519,8 +527,12 @@ mod tests {
         let runner = serve_each(|_| {});
         let home = home(runner.port());
         let fifo = home.path().join("input.jsonl");
-        let made = Command::new("mkfifo").arg(&fifo).status().expect("mkfifo");
-        assert!(made.success());
+        let made = run_bounded(Command::new("mkfifo").arg(&fifo));
+        assert!(
+            made.status.success(),
+            "{}",
+            String::from_utf8_lossy(&made.stderr)
+        );
         let child = ChildGuard::spawn(
             decidr(
                 home.path(),
@@ -549,11 +561,12 @@ mod tests {
             });
         }
         let held = recv_within(&writer, HANG_GUARD).expect("decidr opened its input");
-        let status = Command::new("kill")
-            .args(["-TERM", &child.id().to_string()])
-            .status()
-            .expect("kill");
-        assert!(status.success());
+        let killed = run_bounded(Command::new("kill").args(["-TERM", &child.id().to_string()]));
+        assert!(
+            killed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&killed.stderr)
+        );
         let output = finish(child);
         drop(held);
         assert_eq!(
@@ -573,11 +586,12 @@ mod tests {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        let made = Command::new("mkfifo")
-            .arg(config.join("default.json"))
-            .status()
-            .expect("mkfifo");
-        assert!(made.success());
+        let made = run_bounded(Command::new("mkfifo").arg(config.join("default.json")));
+        assert!(
+            made.status.success(),
+            "{}",
+            String::from_utf8_lossy(&made.stderr)
+        );
         let output = run_bounded(&mut decidr(home.path(), &["models"]));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);

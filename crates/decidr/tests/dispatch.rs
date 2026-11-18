@@ -190,11 +190,14 @@ mod tests {
         let ok = send(&options, request(NOUL), &CancelToken::new()).expect("send");
         let text = String::from_utf8(result_line(&ok).expect("line")).expect("utf-8");
         assert!(text.contains("0.123456789"), "{text}");
+        let success: Value = serde_json::from_str(&text).expect("success JSON");
+        assert_eq!(success["sends"], 1);
 
         let failed = send(&options, request(NOUL), &CancelToken::new()).expect("send");
         let line: Value =
             serde_json::from_slice(&result_line(&failed).expect("line")).expect("json");
         assert_eq!(line["error"]["id"], "decision.http");
+        assert_eq!(line["sends"], 1);
         assert!(line["error"]["message"].as_str().is_some());
         assert_eq!(line["error"]["cause"]["id"], "http.network");
         assert!(
