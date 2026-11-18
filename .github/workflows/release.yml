@@ -204,7 +204,7 @@ jobs:
         run: |
           set -euo pipefail
           bin_args="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          cargo build --release --target ${{ matrix.target }} ${bin_args}
+          cargo build --release --locked --target ${{ matrix.target }} ${bin_args}
 
       - name: Package manifest-declared release archive
         shell: bash
