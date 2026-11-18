@@ -2,6 +2,10 @@
 
 ## 0.2.8 (unreleased)
 
+- Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
+- Close test subprocess stdin explicitly and bound Rust CLI and repository-identity child processes with the shared child guard.
+- Build release and dry-run wheels with the locked Cargo dependency set.
+
 ## 0.2.7 (unreleased)
 
 - Preserve typed answers, native send counts and error wire details in shared batch results.

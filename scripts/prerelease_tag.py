@@ -10,9 +10,30 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class ReleaseNotesError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def release_notes(current: str, version: str) -> str:
+    text = (ROOT / "CHANGELOG.md").read_text()
+    headings = list(re.finditer(r"(?m)^## .+$", text))
+    if not headings or headings[0].group() != f"## {current} (unreleased)":
+        raise ReleaseNotesError("prerelease.changelog_heading",
+                                f"CHANGELOG.md must start with a {current} (unreleased) release section")
+    heading = headings[0]
+    section = text[heading.end():headings[1].start() if len(headings) > 1 else len(text)]
+    if not any(line.strip() and not line.lstrip().startswith("#") for line in section.splitlines()):
+        raise ReleaseNotesError("prerelease.changelog_empty",
+                                f"Add release notes to the {current} section before tagging {version}")
+    return text[:heading.start()] + f"## {version} (unreleased)" + text[heading.end():]
 
 
 def git(*args: str, capture: bool = True) -> str:
@@ -42,6 +63,7 @@ def manifests() -> list[Path]:
 
 
 def bump_version(current: str, version: str) -> None:
+    notes = release_notes(current, version)
     changed = []
     pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
     for path in manifests():
@@ -51,11 +73,7 @@ def bump_version(current: str, version: str) -> None:
             path.write_text(after)
             changed.append(str(path.relative_to(ROOT)))
     changelog = ROOT / "CHANGELOG.md"
-    text = changelog.read_text()
-    text, count = re.subn(r"(?m)^## ", f"## {version} (unreleased)\n\n## ", text, count=1)
-    if count != 1:
-        raise ValueError("CHANGELOG.md must contain a release heading")
-    changelog.write_text(text)
+    changelog.write_text(notes)
     subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
     docli = tomllib.loads((ROOT / "release/publish-preflight.toml").read_text())["docli"]
     subprocess.run(["bash", docli["generate_script"]], cwd=ROOT, check=True)
@@ -74,13 +92,18 @@ def main() -> int:
         parser.error("refusing a protected or detached branch")
     if git("status", "--porcelain"):
         parser.error("commit or restore all work before creating a prerelease")
+    current = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    try:
+        release_notes(current, current)
+    except ReleaseNotesError as exc:
+        print(json.dumps({"ok": False, "error": {"id": exc.code, "message": str(exc)}}), file=sys.stderr)
+        return 2
     if not args.dry_run:
         git("fetch", "origin", "--tags", capture=False)
     tags = set(git("tag", "--list").splitlines())
     if not args.dry_run:
         releases = subprocess.run(["gh", "release", "list", "--limit", "1000", "--json", "tagName"], cwd=ROOT, text=True, capture_output=True, check=True)
         tags.update(release["tagName"] for release in json.loads(releases.stdout))
-    current = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
     version = next_version(current, tags)
     tag = policy["tag_prefix"] + version
     if args.dry_run:

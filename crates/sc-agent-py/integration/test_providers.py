@@ -60,7 +60,7 @@ def test_real_noul_query(tmp_path, monkeypatch, record_property, operation):
 
 def test_real_invalid_key_auth_cancel_redaction(tmp_path, monkeypatch, record_property):
     monkeypatch.chdir(tmp_path)  # A repository .env must not replace the invalid key.
-    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
+    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], stdin=subprocess.DEVNULL, capture_output=True, timeout=30).returncode != 0
     client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
     source = ROOT / "crates/sc-agent-secrets/src/vars.rs"
     variables = dict(re.findall(r'pub const ([A-Z_]+): &str = "([^"]+)";', source.read_text()))
