@@ -31,7 +31,7 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - A file in the local folder MUST accept the same keys as the file of the same name in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 and 4 MUST be skipped.
 - Configuration files MUST be JSON.
-- `<cli> doctor` MUST report, for every setting, its value and the layer that supplied it, and the path of every file in the seven layers with whether it exists.
+- Each CLI MUST have a read-only command (`decidr doctor` for decidr; sitr has none yet) that reports, for every setting, its value and the layer that supplied it, and the path of every file in the seven layers with whether it exists.
 - A failed load MUST name the file and the key path in its error.
 
 **MUST NOT statements:**
