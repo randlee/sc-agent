@@ -138,3 +138,21 @@ Name the project/phase variable after the decidr CLI, like other settings.
 **Why Rejected:**
 
 The project/phase applies to every CLI and to tools outside sc-agent.
+
+#### Alternative 4: A binding writes its own general log
+
+**Description:**
+
+With no logger injected, a PyO3 binding writes `<log_root>/logs/<wheel>/<wheel>.log.jsonl` instead of its CLI's general log.
+
+**Pros:**
+
+- Python callers' diagnostics are kept apart from the CLI's.
+
+**Cons:**
+
+- Each wheel adds a log owner that has no CLI and no row in the table.
+
+**Why Rejected:**
+
+Not requested. A binding is not a CLI; it writes its CLI's default logs.
