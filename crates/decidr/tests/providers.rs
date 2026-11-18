@@ -283,7 +283,7 @@ mod tests {
     /// transport goes through `LlmDecisionBackend` and the real `DecisionRunner`, which wraps
     /// it as `DecisionError::Http`; the result shows `decision.http` -> `http.network` with
     /// the transport's message. A provider 401 is decoded by the LLM backend:
-    /// `decision.backend` -> `decision_llm.llm` -> `llm.api_status` with the provider's text.
+    /// `decision.backend` -> `decision_llm.llm` -> `llm.api_status` with the missing key name.
     #[test]
     fn an_llm_failure_reaches_the_result_with_its_whole_chain() {
         let transport = ScriptedTransport::new(vec![
@@ -322,7 +322,12 @@ mod tests {
             ids,
             ["decision.backend", "decision_llm.llm", "llm.api_status"]
         );
-        assert!(levels[2].1.contains("invalid x-api-key"), "{levels:?}");
+        assert!(
+            levels[2].1.contains(sc_agent_secrets::ANTHROPIC_API_KEY),
+            "{levels:?}"
+        );
+        assert!(levels[2].1.contains("body withheld"), "{levels:?}");
+        assert!(!levels[2].1.contains("invalid x-api-key"), "{levels:?}");
     }
 
     /// REQ-SAG-0002 0.2.0 (attached-key redaction), end to end: a provider that echoes the
@@ -612,6 +617,10 @@ mod tests {
                 .expect("worker")
                 .expect("send");
             assert_eq!(transport.sends(), sends);
+            let line: serde_json::Value =
+                serde_json::from_slice(&decidr::output::result_line(&result).expect("result line"))
+                    .expect("JSON");
+            assert_eq!(line["sends"], sends);
             let error = result.outcome.expect_err("busy");
             assert_eq!(
                 error.detail().cause.expect("cause").id,

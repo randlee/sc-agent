@@ -68,6 +68,7 @@ def test_structured_http_status_on_batch_and_exception(env, args, status):
     """Controlled loopback statuses remain numeric in batch errors and SagError details."""
     _loopback, _log_root = env
     result = json.loads(sc_agent.send_batch([NOUL], **args)[0])
+    assert result["sends"] == 1
     assert find_status(result["error"]) == status
 
     with pytest.raises(sc_agent.SagError) as info:
@@ -76,16 +77,33 @@ def test_structured_http_status_on_batch_and_exception(env, args, status):
     assert find_status(detail) == status
 
 
+@pytest.mark.parametrize("status,body,expected_id,category", [
+    (400, "private MAX_TOKENS exceeded", "decision.context_exceeded", "validation"),
+    (400, "ordinary refusal", "decision.api_bad_request", "validation"),
+    (401, "max_tokens exceeded", "decision.api_status", "auth"),
+])
+def test_context_overflow_through_python_wheel(env, args, status, body, expected_id, category):
+    loopback, _ = env
+    loopback.response_body = {"detail": body}
+    result = json.loads(sc_agent.send(NOUL, **args))
+    error = result["error"]
+    assert error["id"] == expected_id
+    assert error["category"] == category
+    assert error["status"] == status
+    if expected_id == "decision.context_exceeded":
+        assert body not in json.dumps(result)
+
+
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
     """AC: ANC-006."""
     text = subprocess.run(
-        [decidr_bin, "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "--help"], stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     commands = re.findall(r"^\s{2}(\w+)\s", text.split("Commands:")[1].split("Options:")[0], re.M)
     commands = [name for name in commands if name != "help"]
     assert sorted(commands) == ["doctor", "models", "send"]
     batch = subprocess.run(
-        [decidr_bin, "send", "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "send", "--help"], stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     assert "--batch" in batch
     operations = {"send": "send", "models": "models", "doctor": "doctor", "send --batch": "send_batch"}
@@ -103,6 +121,7 @@ def test_send_and_send_batch_return_the_decided_response(env, args):
     line = json.loads(text)
     assert "error" not in line
     assert line["position"] == 0
+    assert line["sends"] == 1
     assert len(line["session_id"]) == 26
     assert line["response"]["answers"]["q"] == {"type": "noul", "noul": 0.123456789}
     assert '"noul":0.123456789' in text
@@ -124,6 +143,7 @@ def test_a_cancelled_token_stops_send_and_send_batch(env, args):
     assert token.is_cancelled()
     line = json.loads(sc_agent.send(NOUL, cancel=token, **args))
     assert line["error"]["id"] == "decision.cancelled"
+    assert line["sends"] == 0
     lines = sc_agent.send_batch([NOUL, NOUL], cancel=token, **args)
     assert [json.loads(item)["error"]["id"] for item in lines] == ["decision.cancelled"] * 2
     assert loopback.requests == []
@@ -167,7 +187,7 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, 
             "role",
             str(request),
         ],
-        capture_output=True,
+        stdin=subprocess.DEVNULL, capture_output=True,
         text=True,
         timeout=HANG_GUARD,
     )
@@ -397,9 +417,9 @@ def test_models_list_outcome(outcome_models_args, outcome_call, record_property)
 @pytest.mark.mode("ok")
 def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    text, code = outcome_call(consumer.call, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
-    assert code is None
-    line = json.loads(text)
+    result = outcome_call(consumer.call_result, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert result["ok"] is True
+    line = json.loads(result["line"])
     assert "error" not in line
     assert line["position"] == 0
     assert len(line["session_id"]) == 26
@@ -412,9 +432,10 @@ def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property
 @pytest.mark.mode("ok")
 def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    results = outcome_call(consumer.call_batch, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
-    assert all(code is None for _, code in results)
-    lines = [json.loads(line) for line, _ in results]
+    result = outcome_call(consumer.call_batch_results, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    assert result["ok"] is True
+    assert all(record["ok"] for record in result["value"])
+    lines = [json.loads(record["line"]) for record in result["value"]]
     assert sorted(line["position"] for line in lines) == [0, 1, 2]
     for line in lines:
         assert "error" not in line

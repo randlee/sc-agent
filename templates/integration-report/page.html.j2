@@ -1,0 +1,40 @@
+---
+required_variables:
+  - title
+  - back_href
+  - runs
+  - panels
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title | e }}</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 16px system-ui, sans-serif; line-height: 1.5; max-width: 72rem; margin: 2rem auto; padding: 0 1rem; }
+    iframe { width: 100%; height: 36rem; border: 1px solid #94a3b8; background: white; }
+    section { margin: 2rem 0; }
+  </style>
+</head>
+<body>
+  <nav><a href="{{ back_href | e }}">Back</a></nav>
+  <main>
+    <h1>{{ title | e }}</h1>
+{% if runs %}
+    <ol>
+{% for run in runs %}
+      <li><a href="{{ run.run_id | e }}.html">{{ run.run_id | e }} — {{ run.title | e }}</a>{% if run.created_at %} <time>{{ run.created_at | e }}</time>{% endif %}</li>
+{% endfor %}
+    </ol>
+{% endif %}
+{% for panel in panels %}
+    <section>
+      <h2><a href="{{ panel.href | e }}">{{ panel.name | e }}</a></h2>
+      <iframe title="{{ panel.name | e }}" srcdoc="{{ panel.content | e }}"></iframe>
+    </section>
+{% endfor %}
+  </main>
+</body>
+</html>

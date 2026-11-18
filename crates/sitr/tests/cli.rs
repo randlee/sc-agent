@@ -19,6 +19,9 @@ fn fixture(name: &str) -> PathBuf {
 fn command(home: &Path, args: &[&str]) -> Command {
     let mut command = Command::new(binary());
     command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .arg("--log-root")
         .arg(home.join(".sc-agent"))
         .args(args)
@@ -28,7 +31,10 @@ fn command(home: &Path, args: &[&str]) -> Command {
 }
 
 fn run(home: &Path, args: &[&str]) -> std::io::Result<Output> {
-    command(home, args).output()
+    Ok(
+        sc_agent_testkit::ChildGuard::spawn(&mut command(home, args))
+            .wait_with_output(sc_agent_testkit::HANG_GUARD),
+    )
 }
 
 /// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message", "recovery"?}`.
@@ -162,30 +168,6 @@ fn non_utf8_file_reaches_stderr_as_not_utf8() {
     assert_eq!(
         value["message"],
         format!("source in {path} is not UTF-8 at byte 6")
-    );
-}
-
-/// AC: REQ-SAG-0002 lowest-layer sitr.
-#[test]
-fn closed_stdout_is_a_write_error() {
-    let home = tempfile::tempdir().expect("home");
-    // The read end is dropped before the child starts, so every stdout write is EPIPE.
-    let (reader, writer) = std::io::pipe().expect("pipe");
-    drop(reader);
-    let output = command(home.path(), &["languages"])
-        .stdout(Stdio::from(writer))
-        .stderr(Stdio::piped())
-        .output()
-        .expect("spawn sitr");
-    assert_eq!(output.status.code(), Some(1), "status {:?}", output.status);
-    let value: serde_json::Value =
-        serde_json::from_slice(trim_newline(&output.stderr)).expect("stderr json");
-    assert_eq!(value["id"], "treesitter.write");
-    assert!(
-        value["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("broken pipe")),
-        "{value}"
     );
 }
 

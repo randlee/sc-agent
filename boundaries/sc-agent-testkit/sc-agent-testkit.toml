@@ -18,7 +18,7 @@ roots = ["Gate"]
 [dependencies]
 allowed_dependents = []
 allowed_dependencies = ["sc-agent-types"]
-allowed_dev_dependents = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
+allowed_dev_dependents = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sitr"]
 allowed_dev_dependencies = []
 forbidden_edges = []
 

@@ -321,6 +321,8 @@ pub struct DecisionResult {
     pub session_id: SessionId,
     /// The index of the request in the input; 0 for `decide` (REQ-SAG-0701).
     pub position: u64,
+    /// Provider requests started for this item, including retries; zero before any send.
+    pub sends: u32,
     /// The request's digests (`request.digests().clone()`); always one per question.
     pub digests: OrderedMap<String, QuestionDigest>,
     /// The decided response, or why there is none.
@@ -331,7 +333,8 @@ impl DecisionResult {
     /// The result of the request at `position` in session `session_id`.
     ///
     /// `digests` is the request's [`DecisionRequest::digests`] (cloned), so every result
-    /// carries one digest per question.
+    /// carries one digest per question. The send count defaults to zero; implementations
+    /// that start provider requests set it with [`Self::with_sends`].
     #[must_use]
     pub fn new(
         session_id: SessionId,
@@ -342,9 +345,17 @@ impl DecisionResult {
         Self {
             session_id,
             position,
+            sends: 0,
             digests,
             outcome,
         }
+    }
+
+    /// Sets the number of provider requests started for this item.
+    #[must_use]
+    pub const fn with_sends(mut self, sends: u32) -> Self {
+        self.sends = sends;
+        self
     }
 }
 

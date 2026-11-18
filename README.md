@@ -2,7 +2,7 @@
 
 sc-agent is one launch interface for the AI backends an agent workflow calls:
 
-- **AI SDK providers**: Anthropic, OpenAI, OpenRouter, Nous and Together, called through their APIs.
+- **AI SDK providers**: services in the [`Provider` registry](crates/sc-agent-types/src/provider.rs), called through their APIs.
 - **System-one decision models**: TypeSafe's Jev model and local runners that serve the same Jev API.
 - **Agents in a harness**: CLI agents such as Claude Code and Codex, and SDK agents (planned; see Status).
 
@@ -12,7 +12,7 @@ Every backend is launched the same way: one request form, one set of keys and co
 
 | Part | State |
 |---|---|
-| Decision models: Jev, local Jev-compatible runners, and Haiku and Luna answering in Jev's place | Done |
+| Decision models: Jev, local Jev-compatible runners, and supported LLMs answering in Jev's place | Done |
 | `decidr` CLI and the `sc_agent` Python module | Done |
 | `sitr` tree-sitter query tool and the `sc_treesitter` Python module | Done |
 | CLI agents (Claude Code, Codex) and SDK agents | Planned: they get their own crates on the same lower layers |
@@ -36,7 +36,7 @@ decidr doctor
 ```
 
 - `send`: one JSON request, or a JSONL batch with `--batch`.
-  - `--model` takes a short name (`jev`, `haiku`, `luna`, ...), a model id, or the name of a configured local runner.
+  - `--model` takes a [short name](crates/sc-agent-types/src/short_name.rs), a model id, or the name of a configured local runner.
   - `--provider` overrides the provider. Without it, the provider is chosen by ranking the keys that are found.
   - `--image NAME=FILE` and `--long-context` apply to a single request.
   - One result line is printed per request.

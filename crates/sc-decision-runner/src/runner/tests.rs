@@ -702,6 +702,7 @@ fn invalid_response_resend_uses_controlled_holdoff() {
             .find(|row| row.target == SessionLogger::TARGET)
             .expect("session row");
         assert_eq!(row.fields["sends"], 2);
+        assert_eq!(result.sends, 2);
         assert_eq!(row.fields["schema_resends"], 1);
     }
 }

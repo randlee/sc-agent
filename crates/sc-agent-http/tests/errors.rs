@@ -185,7 +185,8 @@ mod cases {
             HashSet::from([
                 "http.provider_busy",
                 "http.quota_exhausted",
-                "http.key_on_plain_http"
+                "http.key_on_plain_http",
+                "http.network"
             ])
         );
     }

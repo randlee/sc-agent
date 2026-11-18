@@ -47,6 +47,14 @@ pub enum DecisionError {
         /// The serde_json message.
         message: String,
     },
+    /// A decoded reply does not match the request's answer ids, types or numeric bounds.
+    /// The provider body is never included.
+    ResponseInvalid {
+        /// The reply's HTTP status.
+        status: u16,
+        /// A fixed, sanitized explanation of the mismatch.
+        reason: &'static str,
+    },
     /// `OrderedMap::try_from_pairs` got a key twice.
     DuplicateKey {
         /// The duplicate key.
@@ -87,11 +95,16 @@ pub enum DecisionError {
         /// The reply body, unchanged.
         body: Vec<u8>,
     },
+    /// The provider reports that the request exceeds its context window.
+    ContextExceeded {
+        /// The reply's HTTP status.
+        status: u16,
+    },
     /// The send failed in sc-agent-http (provider busy, quota exhausted, network, ...),
     /// wrapped unchanged.
     Http(HttpError),
     /// A backend crate above this one failed (e.g. an LLM provider error chain), carried whole.
-    /// Its recovery hint is the carried `detail().cause.recovery`; `recovery()` is `None` here.
+    /// `detail().recovery` forwards the carried cause hint; `recovery()` is `None` here.
     Backend {
         /// The backend's name.
         backend: &'static str,
@@ -131,6 +144,7 @@ impl From<HttpError> for DecisionError {
 sc_agent_types::error_catalog! { DecisionError {
     DecisionError::RequestParse { .. } => ("decision.request_parse", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ResponseParse { .. } => ("decision.response_parse", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
+    DecisionError::ResponseInvalid { .. } => ("decision.response_invalid", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
     DecisionError::DuplicateKey { .. } => ("decision.duplicate_key", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::Encode { .. } => ("decision.encode", Some(sc_agent_types::ErrorCategory::Other)),
     DecisionError::ImageParts { .. } => ("decision.image_parts", Some(sc_agent_types::ErrorCategory::Validation)),
@@ -138,6 +152,7 @@ sc_agent_types::error_catalog! { DecisionError {
     DecisionError::ApiBadRequest { .. } => ("decision.api_bad_request", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ApiValidation { .. } => ("decision.api_validation", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::ApiStatus { .. } => ("decision.api_status", Some(sc_agent_types::ErrorCategory::Other)),
+    DecisionError::ContextExceeded { .. } => ("decision.context_exceeded", Some(sc_agent_types::ErrorCategory::Validation)),
     DecisionError::Http(_) => ("decision.http", None),
     DecisionError::Backend { .. } => ("decision.backend", None),
     DecisionError::SchemaMismatch { .. } => ("decision.schema_mismatch", Some(sc_agent_types::ErrorCategory::ResponseInvalid)),
@@ -167,6 +182,9 @@ impl ErrorId for DecisionError {
                 expected,
                 message,
             } => format!("the HTTP {status} body is not a {expected}: {message}"),
+            Self::ResponseInvalid { status, reason } => {
+                format!("the HTTP {status} reply is invalid: {reason}")
+            }
             Self::DuplicateKey { key } => duplicate_message(key),
             Self::Encode { message } => message.clone(),
             Self::ImageParts { detail } => detail.clone(),
@@ -189,10 +207,19 @@ impl ErrorId for DecisionError {
                     .join("; ");
                 format!("the API refused the request (HTTP 422): {fields}")
             }
+            Self::ApiStatus {
+                status: status @ (401 | 403),
+                ..
+            } => format!("authentication failed (HTTP {status}); provider response body withheld"),
             Self::ApiStatus { status, body } => format!(
                 "the API answered HTTP {status}: {}",
                 String::from_utf8_lossy(body)
             ),
+            Self::ContextExceeded { status } => {
+                format!(
+                    "the API answered HTTP {status}: request exceeds the model's context window"
+                )
+            }
             Self::Http(error) => format!("the send failed ({})", error.id()),
             Self::Backend { backend, detail } => {
                 format!("the {backend} backend failed ({})", detail.id)
@@ -223,7 +250,10 @@ impl ErrorId for DecisionError {
         match self {
             Self::ApiBadRequest { .. } => Some(400),
             Self::ApiValidation { .. } => Some(422),
-            Self::ApiStatus { status, .. } | Self::ResponseParse { status, .. } => Some(*status),
+            Self::ApiStatus { status, .. }
+            | Self::ContextExceeded { status }
+            | Self::ResponseParse { status, .. }
+            | Self::ResponseInvalid { status, .. } => Some(*status),
             _ => None,
         }
     }
@@ -256,15 +286,29 @@ impl ErrorId for DecisionError {
             Self::ApiValidation { .. } => {
                 Some("fix each field named in `loc` as its `msg` says and send again")
             }
+            Self::ContextExceeded { .. } => Some("shorten the request and send again"),
             Self::SchemaMismatch { .. } => Some(
                 "the provider kept replying outside the schema; try another model or backend, or raise max_sends",
             ),
             Self::Shutdown { .. } => Some("start a new decision runner and send the request again"),
             Self::Http(error) => error.recovery(),
-            Self::ResponseParse { .. }
-            | Self::ApiStatus { .. }
-            | Self::Backend { .. }
-            | Self::Cancelled { .. } => None,
+            Self::ResponseParse { .. } | Self::ResponseInvalid { .. } => {
+                Some("check the response schema and selected model, then retry")
+            }
+            Self::ApiStatus { status: 402, .. } => {
+                Some("add provider credit or raise the account spending limit before trying again")
+            }
+            Self::ApiStatus { status: 429, .. } => {
+                Some("wait for the provider rate limit to clear before trying again")
+            }
+            Self::ApiStatus {
+                status: 401 | 403, ..
+            } => Some("check the API key for the selected provider"),
+            Self::ApiStatus { .. } => {
+                Some("check the provider status and the reported request details")
+            }
+            Self::Cancelled { .. } => Some("start a new call when ready"),
+            Self::Backend { .. } => None,
         }
     }
 }

@@ -2,7 +2,7 @@
 
 The `sc_agent` Python module: one function per `decidr` operation. It is a thin PyO3 layer over the `decidr` library (ADR-SAG-0004) and adds no wiring of its own. It is the top of the stack with `decidr`, and it has `publish = false`. Python users build it with maturin.
 
-Each function returns the same JSON text that the CLI prints.
+Each function returns the same JSON text that the CLI prints. Decision result objects contain `session_id`, `position`, `sends` (provider requests started for that item, including retries), and `digests`, plus either `response` or `error`. `sends` is zero before any request is sent.
 
 ## What it provides
 
@@ -16,6 +16,30 @@ Each function returns the same JSON text that the CLI prints.
 A failed decision is data in the returned line, not an exception. `KeyboardInterrupt` cancels the run, drains it and is re-raised. `general_log` and `session_log` accept a caller-owned `sc_observability.Logger` directly, or the existing `Callable[[dict], None]`. Python and Rust records reach the same injected Logger through its public `log(LogEvent)` API; the caller retains flush and shutdown. Each omitted logger uses its default file. No consumer adapter or record conversion is required.
 
 Keyring overrides apply only to the provider selected by the model. An ambiguous ranked model with an override raises `decidr.ambiguous_keyring_override`; no provider argument is required. Each supplied service/account must be 1–255 UTF-8 bytes. Omitted components independently use the provider credential-variable name and the current OS account. Lookup order is repository-root `.env`, process environment, then keyring; a present invalid higher-priority key never falls back. Invalid options raise `SagError("sc_agent_py.invalid_option", message, detail_json)` before network I/O.
+
+On macOS, Keychain may ask for access for each new Python interpreter binary.
+For a trusted interpreter, choose **Always Allow** to permit future reads by that
+interpreter; a different interpreter may prompt again. If access is not resolved
+within 15 seconds, the call raises `SagError` with id `decidr.secrets`, category
+`auth`, and cause id `secrets.keyring_timeout`; no provider request was sent.
+Keychain read errors likewise have cause id `secrets.keyring_read`. These are
+credential lookup failures, not provider authentication responses. Consumers
+should inspect the cause id before interpreting `auth` as a provider rejection:
+
+```python
+import json
+import sc_agent
+
+try:
+    sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
+except sc_agent.SagError as error:
+    if error.id == "decidr.secrets":
+        cause = json.loads(error.detail).get("cause") or {}
+        if cause.get("id") in {"secrets.keyring_timeout", "secrets.keyring_read"}:
+            print("Could not read the credential from the keychain")
+            raise
+    raise
+```
 
 `send` and `send_batch` accept optional `timeout_secs`: finite numeric seconds in
 10..=3600, including fractional seconds. It bounds each decision request’s connect,
@@ -84,16 +108,45 @@ The wheel ships `sc_agent/templates/consumer.py.j2`, derived from the working
 plan-anchor client at `fff69b2`. Render it with sc-compose >=1.8.0 and Python >=3.11:
 
 ```bash
+VARS=$(mktemp)
+trap 'rm -f "$VARS"' EXIT
+python - "$VARS" <<'PY'
+import json
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import sys
+
+try:
+    sitr_version = version("sitr")
+except PackageNotFoundError:
+    sitr_version = ""
+
+Path(sys.argv[1]).write_text(json.dumps({
+    "general_log": False,
+    "models": ["jev"],
+    "sitr": False,
+    "batch_records": False,
+    "settings_module": "plan_anchor_settings",
+    "settings_file": ".sc/plan-anchor/settings.yaml",
+    "settings_set_command": "python3 scripts/plan_anchor_settings.py set allow_remote_judge true|false",
+    "sc_decidr_version": version("sc-decidr"),
+    "sitr_version": sitr_version,
+}, indent=2) + "\n")
+PY
 TEMPLATE=$(python -c 'import importlib.resources, sc_agent; print(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")')
-SC_DECIDR_VERSION=$(python -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')
-SITR_VERSION=$(python -c 'import importlib.metadata as m; print(m.version("sitr") if any(d.metadata["Name"] == "sitr" for d in m.distributions()) else "")')
 sc-compose render --root "$(dirname "$TEMPLATE")" --file "$TEMPLATE" \
-  --var 'general_log=true' --var 'models=["jev","haiku","luna"]' --var 'sitr=false' \
-  --var "sc_decidr_version=$SC_DECIDR_VERSION" --var "sitr_version=$SITR_VERSION" \
+  --var-file "$VARS" \
   --strict --output consumer.py
 ```
 
-`models` records the selectors the consumer offers; each call passes its chosen
+The JSON vars file preserves booleans and the model list as typed values;
+`--var` values are strings and do not represent these options correctly.
+Set `settings_module`, `settings_file` and `settings_set_command` to the
+consumer's settings module and consent-setting instructions. The shared client
+reads that value before every single or batch send; there is no consent override
+argument. `batch_records` includes the optional shared batch-record helpers.
+
+`models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `general_log` includes or omits forwarding the caller's general
 logger. Session logging always uses the wheel default; the generated module does
 not accept or forward `session_log` (REQ-SAG-0018). Keyring service and account are
@@ -104,21 +157,82 @@ import sc_agent
 import consumer
 
 cancel = sc_agent.CancelToken()
-line, code = consumer.call(
+result = consumer.call_result(
     request_json, model="jev", project="my-project", agent_role="judge",
-    abort_on=frozenset({"auth", "quota"}), category_codes={"auth": "AUTH", "quota": "QUOTA"},
+    abort_on=frozenset({"auth", "quota"}),
     cancel=cancel, keyring_service=None, keyring_account=None, timeout_secs=120,
 )
 ```
 
-`abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. Both single
-and batch calls map stored categories through the caller's map, cancel on selected
-errors and on `KeyboardInterrupt`, and preserve the wheel's result lines. Batch
-callbacks run in finish order; returned tuples retain input order. Prompt authoring
-and result interpretation remain in the consumer; there is no additional retry loop.
+`abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. The generated
+module's transport surface is `call_result` and `call_batch_results`; the redundant
+`call`/`call_batch` APIs are removed. Both accept model/project/agent_role, optional
+cancel, config_dir, keyring_service/keyring_account and timeout_secs. Single calls
+also accept images/long_context; batches accept workers/on_result. general_log is
+available only when that feature is rendered. Neither forces a provider or redirects
+the session log. The wheel owns retries and cancellation.
+
+### One shared error
+
+`ClientError(code, message, retryable=False, action=None, *, status=None,
+retry_after_ms=None, attempts=None, data=None)` is a RuntimeError that consumers
+can raise or carry directly for both wheel and local validation/usage errors.
+Its public fields are those constructor names; `message` is read-only. There are
+no recoverable/retry_after/meta aliases and no message-replacement or context API.
+Put consumer-specific bookkeeping in `data`.
+
+`error.to_json()` renders the common consumer envelope:
+
+```json
+{"success": false, "data": null, "error": {"code": "INPUT.INVALID", "message": "missing field", "recoverable": false, "suggested_action": "Supply the field."}}
+```
+
+The envelope's existing `recoverable` name carries the error's `retryable` value.
+For wheel failures, message and action come unchanged from Rust's ErrorDetail
+`message` and `recovery`. The template keeps no wheel message/action tables and
+accepts no action override. Auth response bodies are withheld by Rust. Defaults use `DECIDR.*`, `AUTH.CREDENTIALS` and `CANCELED`.
+Override categories through `category_codes`, including `context_exceeded` for
+`decision.context_exceeded`; the redundant `DECIDR_ERROR_CODES` export is removed.
+
+A single result is `{"ok": true, "value": response, "position": n, "line": wire,
+"attempts": sends}` or `{"ok": false, "error": ClientError, ...}`. Result attempts
+come from Rust's sends (None if unknown), never an invented one. A successful batch
+is `{"ok": true, "value": [records in input order]}`; whole-call failures carry the
+same ClientError type. on_result receives each record immediately in finish order.
+Correlate with position, never arrival order. Completed callbacks are not repeated
+when returning the list. The record wrapper is not JSON-serializable when it holds
+an error: report that error with to_json().
+
+Rust writes each failed runner result once through the injected or default general
+logger as `runner.result.error`. Its fields are native id, category, provider, status,
+message, action, project and agent_role; the session id/position identify the request.
+Search across agents by native **id**, not a consumer's mapped code. The template
+does not log a rewritten copy.
+
+| Export | Contract |
+| --- | --- |
+| SC_DECIDR_VERSION, MODELS | Rendered version and offered model selectors. |
+| LogSink, CategoryCodes, AbortOn, BatchItem | Log callback, code map, abort set and batch-input aliases. |
+| ClientError | The single error type and envelope described above. |
+| DECIDR_CATEGORY_CODES | Shared category-to-code defaults. |
+| new_cancel_token() | Lazily creates a wheel token or raises ClientError if the wheel is missing. |
+| error_metadata(detail) | Optional integer status/retry_after_ms/attempts; rejects bool. |
+| wheel_error(detail, *, category_codes=None) | Converts a Rust detail into ClientError without rewriting its text. |
+| decode_result(line, *, category_codes=None) | Decodes a wire record, retaining position and sends. |
+| exception_result(exc, *, category_codes=None) | Retains ClientError identity or adapts SagError to that type. |
+| call_result, call_batch_results | The only single/batch transport helpers. |
+| extract | Only exported with sitr=true; separate tree-sitter extraction. |
 
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).
+
+With `batch_records=true`, `stream_batch` accepts an optional `abort(result)`
+predicate. For example, `abort=lambda row: (row.get("error") or {}).get("code", "").startswith(("AUTH.", "POLICY."))`
+stops submitting jobs when a yielded result carries one of those consumer codes.
+Already submitted jobs are drained and yielded in input order; all executor threads
+finish before the stream returns. The default is no abort. `window_factor` controls
+how many jobs may already be submitted; use `window_factor=1` to limit that window
+to `settings.max_workers`.
 
 Set `sitr=true` to include `extract(language, query, source, captures=None)`.
 It imports the separate, version-matched sitr wheel only when called and delegates

@@ -222,6 +222,10 @@ fn is_mismatch(error: &DecisionLlmError) -> bool {
 }
 
 impl Backend for LlmDecisionBackend {
+    fn provider(&self) -> Option<sc_agent_types::Provider> {
+        Some(self.llm.provider().into())
+    }
+
     /// `DecisionRequest` -> `LlmRequest` (built-in prompt, per-question JSON schema, every
     /// asset as an image part) -> `HttpRequest`.
     ///

@@ -110,6 +110,11 @@ impl ErrorId for LlmError {
             Self::Http { provider, source } => {
                 format!("the {provider} send failed ({})", source.id())
             }
+            Self::ApiStatus { provider, reply } if matches!(reply.status, 401 | 403) => format!(
+                "{provider} authentication failed (HTTP {}); check {}; provider response body withheld",
+                reply.status,
+                sc_agent_secrets::env_var((*provider).into())
+            ),
             Self::ApiStatus { provider, reply } => format!("{provider} answered {reply}"),
             Self::ReplyInvalid { provider, message } => {
                 format!("the {provider} reply is not its documented envelope: {message}")
@@ -158,6 +163,15 @@ impl ErrorId for LlmError {
         match self {
             Self::Http { source, .. } => source.recovery(),
             Self::Truncated { .. } => Some("raise max_tokens or ask for a shorter reply"),
+            Self::ApiStatus { reply, .. } if reply.status == 402 => {
+                Some("add provider credit or raise the account spending limit before trying again")
+            }
+            Self::ApiStatus { reply, .. } if reply.status == 429 => {
+                Some("wait for the provider rate limit to clear before trying again")
+            }
+            Self::ApiStatus { reply, .. } if matches!(reply.status, 401 | 403) => {
+                Some("check the provider API key named in the error message")
+            }
             Self::ApiStatus { .. } => Some(
                 "read the provider's message: fix the key, model or request it names, or check the provider's status",
             ),

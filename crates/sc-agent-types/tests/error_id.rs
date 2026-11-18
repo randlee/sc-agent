@@ -60,7 +60,7 @@ fn test_types_error_ids_display_and_detail() {
 }
 
 /// Every TypesError variant has a non-empty static recovery hint; the short-name and provider
-/// hints list exactly the spellings `FromStr` accepts.
+/// hints refer to the registries `FromStr` uses.
 #[test]
 fn test_every_types_error_has_a_recovery_hint() {
     for error in every_types_error() {
@@ -69,18 +69,16 @@ fn test_every_types_error_has_a_recovery_hint() {
             .unwrap_or_else(|| panic!("{} has no recovery", error.id()));
         assert!(!recovery.is_empty(), "{}", error.id());
     }
-    let listed = |names: Vec<&str>| format!("use one of: {}", names.join(", "));
-    let short_names = listed(ShortName::ALL.iter().map(|name| name.as_str()).collect());
-    let providers = listed(
-        Provider::ALL
-            .iter()
-            .map(|provider| provider.as_str())
-            .collect(),
-    );
     let error = "nope".parse::<ShortName>().expect_err("short name");
-    assert_eq!(error.recovery(), Some(short_names.as_str()));
+    assert_eq!(
+        error.recovery(),
+        Some("use a short name from the sc-agent-types ShortName registry")
+    );
     let error = "nope".parse::<Provider>().expect_err("provider");
-    assert_eq!(error.recovery(), Some(providers.as_str()));
+    assert_eq!(
+        error.recovery(),
+        Some("use a provider from the sc-agent-types Provider registry")
+    );
     assert!(
         "lower"
             .parse::<VarName>()

@@ -5,8 +5,8 @@ use sc_agent_http::{
 };
 use sc_agent_secrets::ApiKey;
 use sc_decision_schema::{
-    Backend, DecisionError, DecisionRequest, HttpBadRequestError, HttpValidationError,
-    ModelMetadataList, SystemOneResponse,
+    Answer, Backend, DecisionError, DecisionRequest, HttpBadRequestError, HttpValidationError,
+    ModelMetadataList, Question, SystemOneResponse,
 };
 
 use crate::base::BaseUrl;
@@ -162,6 +162,10 @@ impl SystemOneBackend {
 }
 
 impl Backend for SystemOneBackend {
+    fn provider(&self) -> Option<sc_agent_types::Provider> {
+        Some(sc_agent_types::Provider::TypeSafe)
+    }
+
     /// The `POST {base}/v1/systemone` request for `request`.
     ///
     /// JSON when `request.image_parts()` is empty, else multipart/form-data: part `request`
@@ -202,11 +206,16 @@ impl Backend for SystemOneBackend {
     /// The decided response of a final reply.
     ///
     /// 2xx: [`SystemOneResponse::from_json`], fields outside the TypeSafe schema kept in
-    /// `extra`, numbers unrounded. `request` and `ctx` are unused: this crate writes no log.
+    /// `extra`, numbers unrounded. The decoded reply is then checked against `request`;
+    /// `ctx` is unused because this crate writes no log.
     ///
     /// # Errors
     ///
     /// - 2xx whose body is not a `SystemOneResponse`: [`DecisionError::ResponseParse`];
+    /// - 2xx with answer ids/types or probabilities/confidence that do not match the request:
+    ///   retryable [`DecisionError::ResponseInvalid`] with only the status exposed;
+    /// - a 400, 413 or 422 context-window refusal: [`DecisionError::ContextExceeded`],
+    ///   with the response body withheld;
     /// - 400 with the documented body: [`DecisionError::ApiBadRequest`];
     /// - 422 with the documented body: [`DecisionError::ApiValidation`];
     /// - any other status (402 and 503 included), or a 400/422 of another shape (a string
@@ -215,17 +224,86 @@ impl Backend for SystemOneBackend {
     fn decode(
         &self,
         response: HttpResponse,
-        _request: &DecisionRequest,
+        request: &DecisionRequest,
         _ctx: &LogContext,
     ) -> Result<SystemOneResponse, DecisionError> {
         let status = response.status();
         if is_success(status) {
-            SystemOneResponse::from_json(status, response.body())
-                .map_err(|error| self.redact(error))
+            let decoded = SystemOneResponse::from_json(status, response.body())
+                .map_err(|error| self.redact(error))?;
+            validate_response(status, request, &decoded)?;
+            Ok(decoded)
         } else {
             Err(refusal(status, self.redacted(response.into_body())))
         }
     }
+}
+
+fn validate_response(
+    status: u16,
+    request: &DecisionRequest,
+    response: &SystemOneResponse,
+) -> Result<(), DecisionError> {
+    let invalid = |message: &'static str| DecisionError::ResponseInvalid {
+        status,
+        reason: message,
+    };
+    let questions = &request.body().questions;
+    if questions.len() != response.answers.len()
+        || questions
+            .iter()
+            .any(|(id, _)| response.answers.get(id).is_none())
+    {
+        return Err(invalid(
+            "the reply answer ids do not match the request question ids",
+        ));
+    }
+    for (id, question) in questions.iter() {
+        let Some(answer) = response.answers.get(id) else {
+            return Err(invalid(
+                "the reply answer ids do not match the request question ids",
+            ));
+        };
+        let type_matches = matches!(
+            (question, answer),
+            (Question::Noul { .. }, Answer::Noul { .. })
+                | (Question::Choice { .. }, Answer::Choice { .. })
+                | (Question::Score { .. }, Answer::Score { .. })
+                | (Question::Box { .. }, Answer::Box { .. })
+        );
+        if !type_matches {
+            return Err(invalid(
+                "a reply answer type does not match its question type",
+            ));
+        }
+        let valid_probability = |value: f64| value.is_finite() && (0.0..=1.0).contains(&value);
+        let valid = match answer {
+            Answer::Noul { noul } => valid_probability(*noul),
+            Answer::Choice {
+                confidence,
+                probabilities,
+                ..
+            }
+            | Answer::Score {
+                confidence,
+                probabilities,
+                ..
+            } => {
+                valid_probability(*confidence)
+                    && probabilities
+                        .iter()
+                        .all(|(_, value)| valid_probability(*value))
+            }
+            Answer::Box { confidence, .. } => confidence.is_none_or(valid_probability),
+            _ => false,
+        };
+        if !valid {
+            return Err(invalid(
+                "a reply probability or confidence is outside 0..=1 or not finite",
+            ));
+        }
+    }
+    Ok(())
 }
 
 const fn is_success(status: u16) -> bool {
@@ -262,6 +340,13 @@ fn redact_bytes(key: &ApiKey, body: Vec<u8>) -> Vec<u8> {
 
 /// The error for a non-2xx final reply of HTTP `status` with `body` (already redacted).
 fn refusal(status: u16, body: Vec<u8>) -> DecisionError {
+    // Only request-size and validation statuses can signal context overflow.
+    if matches!(status, 400 | 413 | 422) {
+        let text = String::from_utf8_lossy(&body).to_lowercase();
+        if text.contains("max_tokens") || (text.contains("token") && text.contains("exceed")) {
+            return DecisionError::ContextExceeded { status };
+        }
+    }
     match status {
         400 => match serde_json::from_slice::<HttpBadRequestError>(&body) {
             Ok(body) => DecisionError::ApiBadRequest { body },

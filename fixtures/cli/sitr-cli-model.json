@@ -1,6 +1,6 @@
 {
   "name": "sitr",
-  "version": "0.2.2",
+  "version": "0.2.8",
   "description": "Run predefined tree-sitter queries.",
   "long_description": "",
   "epilogue": "",

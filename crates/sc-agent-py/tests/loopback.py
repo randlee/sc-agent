@@ -29,6 +29,7 @@ class Loopback:
             raise ValueError(mode)
         self.mode = mode
         self.status = status
+        self.response_body = {"detail": "controlled status"}
         self.requests: list[dict] = []
         self.started = threading.Event()
         self.release = threading.Event()
@@ -107,7 +108,7 @@ class Loopback:
                     self.wfile.write(data)
                     return
                 if loopback.mode == "status":
-                    self._reply(loopback.status, {"detail": "controlled status"})
+                    self._reply(loopback.status, loopback.response_body)
                     return
                 self._reply(409, FIXED_ERROR)
 

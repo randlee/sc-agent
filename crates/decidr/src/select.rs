@@ -268,7 +268,7 @@ impl EnvSource for VarsEnv<'_> {
     }
 }
 
-/// Key lookup sources of one operation: environment, repo-root `.env`, keyring (REQ-SAG-0401).
+/// Key lookup sources of one operation: repo-root `.env`, environment, keyring (REQ-SAG-0401).
 struct Keys<'c> {
     env: VarsEnv<'c>,
     repo_root: Option<PathBuf>,

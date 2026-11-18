@@ -35,6 +35,10 @@ mod tests {
             expected: "SystemOneResponse",
             message: "expected value".to_owned(),
         },
+        DecisionError::ResponseInvalid {
+            status: 200,
+            reason: "answer ids do not match the request",
+        },
         DecisionError::DuplicateKey {
             key: "q".to_owned(),
         },
@@ -63,6 +67,7 @@ mod tests {
             status: 503,
             body: b"down".to_vec(),
         },
+        DecisionError::ContextExceeded { status: 400 },
         DecisionError::Http(network()),
         DecisionError::Backend {
             backend: "llm",
@@ -97,7 +102,7 @@ mod tests {
         assert!(!ids.contains(&"decision.digest"));
         ids.sort_unstable();
         ids.dedup();
-        assert_eq!(ids.len(), 14);
+        assert_eq!(ids.len(), 16);
 
         for error in &errors {
             assert_eq!(
@@ -116,7 +121,9 @@ mod tests {
                     DecisionError::ApiBadRequest { .. } => Some(400),
                     DecisionError::ApiValidation { .. } => Some(422),
                     DecisionError::ApiStatus { status, .. }
-                    | DecisionError::ResponseParse { status, .. } => Some(*status),
+                    | DecisionError::ContextExceeded { status }
+                    | DecisionError::ResponseParse { status, .. }
+                    | DecisionError::ResponseInvalid { status, .. } => Some(*status),
                     _ => None,
                 }
             );
@@ -133,10 +140,11 @@ mod tests {
                 | DecisionError::ImageParts { .. }
                 | DecisionError::Limits { .. }
                 | DecisionError::ApiBadRequest { .. }
-                | DecisionError::ApiValidation { .. } => ErrorCategory::Validation,
-                DecisionError::ResponseParse { .. } | DecisionError::SchemaMismatch { .. } => {
-                    ErrorCategory::ResponseInvalid
-                }
+                | DecisionError::ApiValidation { .. }
+                | DecisionError::ContextExceeded { .. } => ErrorCategory::Validation,
+                DecisionError::ResponseParse { .. }
+                | DecisionError::ResponseInvalid { .. }
+                | DecisionError::SchemaMismatch { .. } => ErrorCategory::ResponseInvalid,
                 DecisionError::ApiStatus { .. } => ErrorCategory::Busy,
                 DecisionError::Http(_) => ErrorCategory::Network,
                 DecisionError::Cancelled { .. } => ErrorCategory::Cancelled,
@@ -199,6 +207,7 @@ mod tests {
         let mut cause = llm_chain();
         cause.status = Some(401);
         cause.category = Some(ErrorCategory::Auth);
+        cause.recovery = Some("check the selected provider key".into());
         let error = DecisionError::Backend {
             backend: "llm",
             detail: Box::new(cause),
@@ -207,6 +216,10 @@ mod tests {
         assert_eq!(
             (detail.status, detail.category),
             (Some(401), Some(ErrorCategory::Auth))
+        );
+        assert_eq!(
+            detail.recovery.as_deref(),
+            Some("check the selected provider key")
         );
         let first = detail.cause.expect("first level");
         assert_eq!(
@@ -285,8 +298,13 @@ mod tests {
                     | "decision.limits"
                     | "decision.api_bad_request"
                     | "decision.api_validation"
+                    | "decision.context_exceeded"
                     | "decision.schema_mismatch"
                     | "decision.shutdown"
+                    | "decision.response_parse"
+                    | "decision.response_invalid"
+                    | "decision.api_status"
+                    | "decision.cancelled"
             );
             match error.recovery() {
                 Some(recovery) => {

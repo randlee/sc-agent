@@ -26,7 +26,7 @@ use std::time::Instant;
 
 use sc_agent_http::{Attempts, HttpClient, HttpRequest, Next, Pending, SendPermit, Start};
 use sc_agent_log::{GeneralLogger, Level, LogContext, SessionLogger};
-use sc_agent_types::{CancelToken, Clock, SessionId};
+use sc_agent_types::{CancelToken, Clock, ErrorId, SessionId};
 use sc_decision_schema::{
     Backend, Decision, DecisionError, DecisionRequest, DecisionResult, OrderedMap, QuestionDigest,
     SystemOneResponse,
@@ -334,7 +334,7 @@ impl Decision for DecisionRunner {
                 reason: "the runner ended without a result".to_owned(),
             });
             return finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
-                || decision_result(&identity, Err(cancelled(0))),
+                || decision_result(&identity, Err(cancelled(0)), 0),
                 Finished::into_result,
             );
         };
@@ -475,6 +475,7 @@ fn cancelled(sends: u32) -> DecisionError {
 fn decision_result(
     identity: &Identity,
     outcome: Result<SystemOneResponse, DecisionError>,
+    sends: u32,
 ) -> DecisionResult {
     DecisionResult::new(
         identity.session_id,
@@ -482,6 +483,7 @@ fn decision_result(
         identity.digests.clone(),
         outcome,
     )
+    .with_sends(sends)
 }
 
 /// Finishes the request of `identity` with `outcome`: wins its claim, writes its row,
@@ -497,10 +499,46 @@ fn finish(
     mode: Mode,
 ) -> Option<Finished> {
     let proof = identity.claim.win()?;
+    let tally = identity.progress.tally();
+    if let Err(error) = &outcome {
+        let detail = error.detail();
+        shared.event(
+            mode,
+            Level::Error,
+            "runner.result.error",
+            LogContext::request(identity.session_id, Some(identity.position)),
+            [
+                ("id", detail.id.into()),
+                (
+                    "category",
+                    detail.category.map(|category| category.as_str()).into(),
+                ),
+                (
+                    "provider",
+                    shared
+                        .backend
+                        .provider()
+                        .map(|provider| provider.as_str())
+                        .into(),
+                ),
+                ("status", detail.status.into()),
+                ("message", detail.message.into()),
+                (
+                    "action",
+                    detail.recovery.map(|action| action.to_string()).into(),
+                ),
+                ("project", shared.session.identity().project.as_str().into()),
+                (
+                    "agent_role",
+                    shared.session.identity().agent_role.as_str().into(),
+                ),
+            ],
+        );
+    }
     let row = Row {
         position: identity.position,
         model: &identity.model,
-        tally: identity.progress.tally(),
+        tally,
         digests: &identity.digests,
         outcome: &outcome,
     };
@@ -512,7 +550,10 @@ fn finish(
         &row,
         mode,
     );
-    Some(Finished::new(written, decision_result(identity, outcome)))
+    Some(Finished::new(
+        written,
+        decision_result(identity, outcome, tally.sends),
+    ))
 }
 
 /// Finishes `identity` as cancelled after the sends it made (non-blocking row write).
@@ -813,6 +854,7 @@ impl RunnerWork {
                 match self.shared.backend.decode(response, &core.request, &ctx) {
                     Err(
                         error @ (DecisionError::SchemaMismatch { .. }
+                        | DecisionError::ResponseInvalid { .. }
                         | DecisionError::ResponseParse {
                             status: 200..=299, ..
                         }),
@@ -1099,7 +1141,7 @@ impl Failed {
             reason: self.reason.clone(),
         });
         let result = finish(&self.shared, &identity, outcome, Mode::Blocking).map_or_else(
-            || decision_result(&identity, Err(cancelled(0))),
+            || decision_result(&identity, Err(cancelled(0)), 0),
             Finished::into_result,
         );
         Some(self.counts.yielded(result))

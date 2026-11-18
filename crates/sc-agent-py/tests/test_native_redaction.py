@@ -32,7 +32,7 @@ def test_echoed_key_is_redacted_in_actual_python_decision_results(env, args, con
     if source == "env":
         monkeypatch.setenv(KEY_ENV, KEY)
     else:
-        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True, capture_output=True, timeout=30)
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], stdin=subprocess.DEVNULL, check=True, capture_output=True, timeout=30)
         (tmp_path / ".env").write_text(f"{KEY_ENV}={KEY}\n")
         monkeypatch.chdir(tmp_path)
     text = sc_agent.send(REQUEST, **args) if operation == "send" else sc_agent.send_batch([REQUEST], **args)[0]
@@ -99,7 +99,7 @@ def test_invalid_environment_key_auth_cancels_and_redacts(
     """The invalid-key unit path uses echo-key loopback; integration is separate."""
     key = "invalid-environment-key-b12-auth-0001"
     monkeypatch.chdir(tmp_path)  # No repository .env may override the explicit invalid key.
-    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, timeout=30).returncode != 0
+    assert subprocess.run(["git", "rev-parse", "--show-toplevel"], stdin=subprocess.DEVNULL, capture_output=True, timeout=30).returncode != 0
     request.getfixturevalue("env")
     config = request.getfixturevalue("config_dir")
     keyed_runner(config)
@@ -109,14 +109,15 @@ def test_invalid_environment_key_auth_cancels_and_redacts(
     record_property("model", options["model"])
     record_property("mode", "loopback")
     cancel = sc_agent.CancelToken()
-    text, code = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+    result = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
                                category_codes={"auth": "AUTH"}, cancel=cancel)
+    text = result["line"]
     detail = json.loads(text)["error"]
     assert detail["status"] == 401 and detail["category"] == "auth"
-    assert code == "AUTH" and cancel.is_cancelled()
-    cancelled, _ = consumer.call(REQUEST, **options, abort_on=frozenset({"auth"}),
+    assert result["error"].code == "AUTH" and cancel.is_cancelled()
+    cancelled = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
                                  category_codes={}, cancel=cancel)
-    assert json.loads(cancelled)["error"]["category"] == "cancelled"
-    assert key not in text + cancelled
+    assert json.loads(cancelled["line"])["error"]["category"] == "cancelled"
+    assert key not in text + cancelled["line"]
     assert all(key not in path.read_text() for path in tmp_path.rglob("*.jsonl"))
     record_property("result", "HTTP 401; category auth; token and follow-up cancelled; key absent from results/logs")

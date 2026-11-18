@@ -531,7 +531,11 @@ mod tests {
             let detail = error.detail();
             assert_eq!(detail.id, error.id());
             assert_eq!(detail.message, error.message());
-            assert_eq!(detail.recovery.as_deref(), error.recovery());
+            let inherited = error.cause_detail().and_then(|cause| cause.recovery);
+            assert_eq!(
+                detail.recovery.as_deref(),
+                error.recovery().or(inherited.as_deref())
+            );
             assert_eq!(detail.cause, error.cause_detail().map(Box::new));
         }
         let [http, decision, status, parse, not_served, timeout] = &errors;
@@ -543,6 +547,14 @@ mod tests {
         }
         assert!(http.recovery().is_none());
         assert!(decision.recovery().is_none());
+        assert_eq!(
+            http.detail().recovery.as_deref(),
+            Some("check network access, DNS and TLS, then retry")
+        );
+        assert_eq!(
+            decision.detail().recovery.as_deref(),
+            Some("start a new call when ready")
+        );
     }
 
     /// AC 8, AC 9: a Laya runner at 127.0.0.1:8000 encodes POST {base}/v1/systemone and
