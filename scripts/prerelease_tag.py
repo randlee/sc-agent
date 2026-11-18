@@ -28,6 +28,9 @@ def release_notes(version: str) -> str:
     if not headings or headings[0].group() != "## Unreleased":
         raise ReleaseNotesError("prerelease.changelog_heading",
                                 "CHANGELOG.md must start with an Unreleased section")
+    if any(heading.group().split()[1:2] == [version] for heading in headings[1:]):
+        raise ReleaseNotesError("prerelease.changelog_version_exists",
+                                f"CHANGELOG.md already contains a {version} release section")
     heading = headings[0]
     section = text[heading.end():headings[1].start() if len(headings) > 1 else len(text)]
     if not any(line.strip() and not line.lstrip().startswith("#") for line in section.splitlines()):
@@ -65,19 +68,24 @@ def manifests() -> list[Path]:
 def bump_version(current: str, version: str) -> None:
     notes = release_notes(version)
     changed = []
-    pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
-    for path in manifests():
-        before = path.read_text()
-        after = pattern.sub(lambda match: match[1] + version + match[2], before)
-        if before != after:
-            path.write_text(after)
-            changed.append(str(path.relative_to(ROOT)))
+    if version != current:
+        pattern = re.compile(r'(\bversion\s*=\s*")' + re.escape(current) + r'(")')
+        for path in manifests():
+            before = path.read_text()
+            after = pattern.sub(lambda match: match[1] + version + match[2], before)
+            if before != after:
+                path.write_text(after)
+                changed.append(str(path.relative_to(ROOT)))
     changelog = ROOT / "CHANGELOG.md"
     changelog.write_text(notes)
-    subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
-    docli = tomllib.loads((ROOT / "release/publish-preflight.toml").read_text())["docli"]
-    subprocess.run(["bash", docli["generate_script"]], cwd=ROOT, check=True)
-    git("add", "--", *changed, "Cargo.lock", "CHANGELOG.md", *docli["drift_paths"], capture=False)
+    if version != current:
+        subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
+        docli = tomllib.loads((ROOT / "release/publish-preflight.toml").read_text())["docli"]
+        subprocess.run(["bash", docli["generate_script"]], cwd=ROOT, check=True)
+        changed.extend(["Cargo.lock", "CHANGELOG.md", *docli["drift_paths"]])
+    else:
+        changed.append("CHANGELOG.md")
+    git("add", "--", *changed, capture=False)
     git("commit", "-m", f"release: prepare prerelease {version}", capture=False)
 
 
@@ -93,21 +101,24 @@ def main() -> int:
     if git("status", "--porcelain"):
         parser.error("commit or restore all work before creating a prerelease")
     current = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    tags = set(git("tag", "--list").splitlines())
     try:
-        release_notes(current)
+        release_notes(next_version(current, tags))
+        if not args.dry_run:
+            git("fetch", "origin", "--tags", capture=False)
+            tags.update(git("tag", "--list").splitlines())
+            releases = subprocess.run(["gh", "release", "list", "--limit", "1000", "--json", "tagName"], cwd=ROOT, text=True, capture_output=True, check=True)
+            tags.update(release["tagName"] for release in json.loads(releases.stdout))
+        version = next_version(current, tags)
+        release_notes(version)
     except ReleaseNotesError as exc:
         print(json.dumps({"ok": False, "error": {"id": exc.code, "message": str(exc)}}), file=sys.stderr)
         return 2
-    if not args.dry_run:
-        git("fetch", "origin", "--tags", capture=False)
-    tags = set(git("tag", "--list").splitlines())
-    if not args.dry_run:
-        releases = subprocess.run(["gh", "release", "list", "--limit", "1000", "--json", "tagName"], cwd=ROOT, text=True, capture_output=True, check=True)
-        tags.update(release["tagName"] for release in json.loads(releases.stdout))
-    version = next_version(current, tags)
     tag = policy["tag_prefix"] + version
     if args.dry_run:
-        print(f"would select {tag}; workspace {current}; version bump {version != current}")
+        updates = ("update manifests/Cargo.lock and regenerate CLI docs" if version != current
+                   else "keep manifests/Cargo.lock and CLI docs unchanged")
+        print(f"would select {tag}; freeze Unreleased as {version}; {updates}; commit release notes and create/push tag")
         return 0
     bump_version(current, version)
     # No force option: a racing publication or tag creation must fail closed.

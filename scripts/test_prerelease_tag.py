@@ -17,6 +17,72 @@ spec.loader.exec_module(tag)
 
 
 class ReleaseContract(unittest.TestCase):
+    def test_current_version_freezes_notes_without_updating_release_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payloads = {"Cargo.toml": '[workspace]\nmembers = []\n[workspace.package]\nversion = "1.2.3"\n',
+                        "Cargo.lock": "unchanged lockfile\n", "fixtures/cli/model.json": "unchanged model\n",
+                        "site/cli/index.html": "unchanged docs\n",
+                        "release/publish-preflight.toml": '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n'}
+            for name, text in payloads.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+            changelog = root / "CHANGELOG.md"
+            history = '## 1.2.2\n\n- Shipped note.\n'
+            changelog.write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n' + history)
+            with patch.object(tag, "ROOT", root), patch.object(tag.subprocess, "run") as commands, patch.object(tag, "git") as git:
+                tag.bump_version("1.2.3", "1.2.3")
+            self.assertEqual(changelog.read_text(),
+                '# Changelog\n\n## Unreleased\n\n## 1.2.3\n\n- Pending note.\n\n' + history)
+            self.assertEqual({name: (root / name).read_text() for name in payloads}, payloads)
+            commands.assert_not_called()
+            self.assertEqual([call.args for call in git.call_args_list], [
+                ("add", "--", "CHANGELOG.md"), ("commit", "-m", "release: prepare prerelease 1.2.3")])
+
+    def test_existing_current_version_refuses_before_changes_or_fetch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = []\n[workspace.package]\nversion = "1.2.3"\n')
+            (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.3\n\n- Shipped note.\n')
+            (root / "release").mkdir()
+            (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\n')
+            (root / "release/publish-preflight.toml").write_text(
+                '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n')
+            before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+            with patch.object(tag, "ROOT", root), patch.object(tag.subprocess, "run") as commands, patch.object(tag, "git") as git:
+                with self.assertRaises(tag.ReleaseNotesError) as caught:
+                    tag.bump_version("1.2.3", "1.2.3")
+            self.assertEqual(caught.exception.code, "prerelease.changelog_version_exists")
+            commands.assert_not_called()
+            git.assert_not_called()
+            error = io.StringIO()
+            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", "", ""]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
+                self.assertEqual(tag.main(), 2)
+            self.assertEqual(json.loads(error.getvalue())["error"]["id"], "prerelease.changelog_version_exists")
+            self.assertEqual([call.args for call in git.call_args_list], [
+                ("branch", "--show-current"), ("status", "--porcelain"), ("tag", "--list")])
+            commands.assert_not_called()
+            self.assertEqual({path: path.read_bytes() for path in before}, before)
+
+    def test_dry_run_describes_note_only_and_version_bump_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Cargo.toml").write_text('[workspace.package]\nversion = "1.2.3"\n')
+            (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.2\n\n- Shipped note.\n')
+            (root / "release").mkdir()
+            (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\ntag_prefix = "prerelease/v"\n')
+            for tags, expected in [("", "keep manifests/Cargo.lock and CLI docs unchanged"),
+                                   ("prerelease/v1.2.3", "update manifests/Cargo.lock and regenerate CLI docs")]:
+                output = io.StringIO()
+                with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py", "--dry-run"]), patch.object(tag, "git", side_effect=["fix/release", "", tags]), patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stdout(output):
+                    self.assertEqual(tag.main(), 0)
+                self.assertIn(expected, output.getvalue())
+                self.assertIn("freeze Unreleased", output.getvalue())
+                self.assertIn("commit release notes", output.getvalue())
+                self.assertNotIn("version bump", output.getvalue())
+                commands.assert_not_called()
+
     def test_version_bump_regenerates_and_stages_release_documents(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -85,11 +151,11 @@ class ReleaseContract(unittest.TestCase):
             (root / "release").mkdir()
             (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\n')
             error = io.StringIO()
-            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", ""]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
+            with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py"]), patch.object(tag, "git", side_effect=["fix/release", "", "prerelease/v1.2.3"]) as git, patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stderr(error):
                 self.assertEqual(tag.main(), 2)
             self.assertEqual(json.loads(error.getvalue())["error"]["id"], "prerelease.changelog_empty")
             self.assertEqual([call.args for call in git.call_args_list], [
-                ("branch", "--show-current"), ("status", "--porcelain")])
+                ("branch", "--show-current"), ("status", "--porcelain"), ("tag", "--list")])
             commands.assert_not_called()
 
     def test_version_selection_never_reuses_stable_or_prerelease(self):
