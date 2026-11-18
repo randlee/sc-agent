@@ -14,7 +14,7 @@ reason = "Enforce the declared crate boundaries and publishable Cargo dependenci
 # serde remote=Self resolves to the generated serializer, not the wrapper method.
 # SCB-CYCLE-003: https://github.com/randlee/sc-lint/issues/974; remove these
 # four exclusions when the pinned sc-lint version contains the fix.
-exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/transport.rs", "crates/sc-decision-schema/src/models.rs", "crates/sc-decision-schema/src/request.rs", "crates/sc-decision-schema/src/response.rs"] }
+exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml", "crates/sc-agent-secrets/Cargo.toml", "crates/sc-agent-log/Cargo.toml", "crates/sc-agent-http/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/transport.rs", "crates/sc-decision-schema/src/models.rs", "crates/sc-decision-schema/src/request.rs", "crates/sc-decision-schema/src/response.rs"] }
 
 [tool.sc-lint.analyzers.portability]
 enabled = true

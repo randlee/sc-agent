@@ -29,7 +29,7 @@ ureq = "=3.5.1"
 [dev-dependencies]
 sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
 sc-agent-testkit = { workspace = true }
-sc-agent-http = { workspace = true, features = ["testing"] }
+sc-agent-http = { path = ".", features = ["testing"] }
 sc-agent-log = { workspace = true, features = ["testing"] }
 
 [lints]
