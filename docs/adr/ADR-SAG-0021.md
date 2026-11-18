@@ -52,7 +52,14 @@ The CLIs and the logs each one writes are these, and no others:
 | `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
 | `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | none |
 
-The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app that uses a PyO3 binding obtains an sc-observability `Logger` from sc-observability, logs its own records to it, and injects that same `Logger` into the binding, so the app and the Rust code write through one logger and one queue in that process. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
+The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app reaches sc-agent through its sc-compose generated client, and the client owns the general logger: it obtains one sc-observability `Logger` named after the client and injects that same `Logger` into every sc-decidr and sitr call, so the app, decidr and sitr write through one logger and one queue in that process. The apps and the general log each one's client writes are these:
+
+| App (client) | General log | Session logs |
+|---|---|---|
+| `plan-anchor` | `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl` | `<log_root>/sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
+| `judge-jev` | `<log_root>/logs/judge-jev/judge-jev.log.jsonl`, holding its decidr and sitr records | `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
+
+A plan that adds an app, or changes a log an app writes, is not approved until it includes a new version of this ADR with that row. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
