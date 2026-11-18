@@ -28,6 +28,8 @@ Definitions: The general logger writes the general log. The session logger write
 - The client's default general log MUST be `<log_root>/logs/<client>/<client>.log.jsonl`, such as `<log_root>/logs/judge-jev/judge-jev.log.jsonl`, and MUST hold the client's own records and the records of every sc-decidr and sitr call and error it made.
 - The generated client MUST let the app pass its own `sc_observability.Logger` in place of the default one, and MUST then inject that Logger into every sc-decidr and sitr call.
 - The generated client MUST NOT offer a mode in which an sc-decidr or sitr call gets no general logger.
+- The session logger MUST stay optionally injectable; with none injected, the generated client's sessions MUST be written to the default session log (REQ-SAG-0005).
+- With nothing configured, every log in the ADR-SAG-0021 tables MUST be enabled and written under `<log_root>`, and every sc-decidr and sitr call MUST be logged.
 
 - Injecting a Python Logger MUST forward records into that same Logger through its public `log(LogEvent)` API, without a consumer adapter or consumer record mapping. The caller MUST retain ownership of flush and shutdown. An injected Logger replaces only its corresponding default.
 
@@ -46,6 +48,7 @@ Applications built on sc-agent need to route logs into their own logging, and a 
 - [ ] A Python call to `sc-agent-py` with an injected general-log callable passes each general-log record to that callable and writes session rows through the default session logger.
 - [ ] In judge-jev, one sc-decidr call and one sitr call through the generated client write their records, and the record of a failed sitr call, into `<log_root>/logs/judge-jev/judge-jev.log.jsonl`, and no `decidr.log.jsonl`, `sitr.log.jsonl` or `sc-agent-py.log.jsonl` is written.
 - [ ] In plan-anchor, an sc-decidr call through the generated client writes its records into `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl`.
+- [ ] With nothing injected and nothing configured, a judge-jev run that makes sc-decidr and sitr calls writes `<log_root>/logs/judge-jev/judge-jev.log.jsonl` and `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl`, and writes no log outside `<log_root>`.
 - [ ] With the app's own Logger passed to the generated client, the sc-decidr and sitr records go to that Logger and no default general log file is written.
 
 ### Dependencies

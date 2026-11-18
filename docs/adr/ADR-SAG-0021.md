@@ -59,6 +59,8 @@ The logs are written by the Rust code through loggers that are injected (REQ-SAG
 | `plan-anchor` | `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl` | `<log_root>/sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
 | `judge-jev` | `<log_root>/logs/judge-jev/judge-jev.log.jsonl`, holding its decidr and sitr records | `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
 
+Every log in both tables is enabled by default and every sc-decidr and sitr call is logged, so with nothing configured all logs land under `<log_root>` (`~/.sc-agent/`) for a full audit. The session logger stays optionally injectable; no app injects one today.
+
 A plan that adds an app, or changes a log an app writes, is not approved until it includes a new version of this ADR with that row. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
