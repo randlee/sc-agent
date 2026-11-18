@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.2.8 (unreleased)
+
 ## 0.2.7 (unreleased)
 
 - Preserve typed answers, native send counts and error wire details in shared batch results.
