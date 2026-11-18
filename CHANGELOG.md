@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 0.2.8 was not fully released: only `sc-agent-types` and `sc-agent-config` 0.2.8 reached crates.io; no GitHub Release or other channel was published. 0.2.9 is the first complete 0.2 release and contains everything listed under 0.2.8.
+- Fix crates.io packaging of `sc-agent-secrets`, `sc-agent-http` and `sc-agent-log`, which failed because of a dev-dependency on the crate itself (removed).
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
