@@ -35,7 +35,7 @@ def test_integration_command_requires_typesafe_and_deletes_temporary_dotenv(tmp_
     empty = tmp_path / "keys.env"
     empty.write_text("")
     result = subprocess.run([sys.executable, str(root / "scripts/integration.py"), "--env-file", str(empty)],
-                            capture_output=True, text=True, timeout=30)
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "TypeSafe key is required" in result.stderr
     assert not empty.exists()
@@ -170,8 +170,8 @@ def test_pre_rendered_consumer_panel_cli(tmp_path):
     command = [sys.executable, str(renderer), "--panel", str(panel), "--reports-dir", str(reports),
                "--run-id", "20261117-1-integration", "--title", "Consumer result",
                "--created-at", "2026-11-17T01:00:00+00:00"]
-    subprocess.run(command, check=True, timeout=60)
-    subprocess.run(command, check=True, timeout=60)
+    subprocess.run(command, stdin=subprocess.DEVNULL, check=True, timeout=60)
+    subprocess.run(command, stdin=subprocess.DEVNULL, check=True, timeout=60)
     assert (reports / "index.html").read_text().count('href="20261117-1-integration.html"') == 1
     state = json.loads((reports / "20261117-1-integration/20261117-1-integration.json").read_text())
     assert state["panels"] == ["consumer.xhtml"]

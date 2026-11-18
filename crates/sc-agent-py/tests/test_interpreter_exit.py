@@ -91,7 +91,7 @@ def test_queued_python_logs_detach_before_interpreter_exit(env, args):
     ''')
     result = subprocess.run(
         [sys.executable, "-c", child, json.dumps(args), str(HANG_GUARD)],
-        capture_output=True, text=True, timeout=HANG_GUARD * 3,
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=HANG_GUARD * 3,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout) == {"queued": 64, "callbacks_after_shutdown": 0}

@@ -97,13 +97,13 @@ def test_context_overflow_through_python_wheel(env, args, status, body, expected
 def test_every_decidr_operation_has_its_python_function(decidr_bin):
     """AC: ANC-006."""
     text = subprocess.run(
-        [decidr_bin, "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "--help"], stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     commands = re.findall(r"^\s{2}(\w+)\s", text.split("Commands:")[1].split("Options:")[0], re.M)
     commands = [name for name in commands if name != "help"]
     assert sorted(commands) == ["doctor", "models", "send"]
     batch = subprocess.run(
-        [decidr_bin, "send", "--help"], check=True, capture_output=True, text=True, timeout=HANG_GUARD
+        [decidr_bin, "send", "--help"], stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=HANG_GUARD
     ).stdout
     assert "--batch" in batch
     operations = {"send": "send", "models": "models", "doctor": "doctor", "send --batch": "send_batch"}
@@ -187,7 +187,7 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, 
             "role",
             str(request),
         ],
-        capture_output=True,
+        stdin=subprocess.DEVNULL, capture_output=True,
         text=True,
         timeout=HANG_GUARD,
     )

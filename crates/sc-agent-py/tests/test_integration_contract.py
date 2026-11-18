@@ -18,7 +18,7 @@ LIVE_SUITE = Path(__file__).resolve().parents[1] / "integration/test_providers.p
 def test_live_suite_collects():
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q", str(LIVE_SUITE)],
-        env={**os.environ, "SC_AGENT_INTEGRATION_PROVIDER": "typesafe",
+        stdin=subprocess.DEVNULL, env={**os.environ, "SC_AGENT_INTEGRATION_PROVIDER": "typesafe",
              "SC_AGENT_TEST_TRAP_PLATFORM_KEYRING": "1"},
         capture_output=True, text=True, timeout=60,
     )

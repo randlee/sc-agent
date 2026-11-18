@@ -240,7 +240,7 @@ phase_wheel() {
   prepare_wheel_dir
   for manifest in crates/sc-agent-py/Cargo.toml crates/sc-treesitter-py/Cargo.toml; do
     bounded "$build_timeout" "maturin build $manifest" \
-      maturin build --release -m "$manifest" -o "$wheel_dir"
+      maturin build --release --locked -m "$manifest" -o "$wheel_dir"
   done
   shopt -s nullglob
   wheels=("$wheel_dir"/*.whl)

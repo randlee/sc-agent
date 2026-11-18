@@ -404,11 +404,11 @@ jobs:
           workspace_toml: ${{ needs.release-plan.outputs.workspace_toml }}
       - name: Build wheels (maturin)
         if: ${{ matrix.build_system == 'maturin' && matrix.target == '' && matrix.os != 'ubuntu-24.04-arm' }}
-        run: maturin build --release --manifest-path ${{ matrix.cargo_manifest }} --out dist
+        run: maturin build --release --locked --manifest-path ${{ matrix.cargo_manifest }} --out dist
       - name: Build ARM64 Linux wheel (maturin + Zig)
         if: ${{ matrix.build_system == 'maturin' && matrix.target == '' && matrix.os == 'ubuntu-24.04-arm' }}
         run: >-
-          maturin build --release --manifest-path ${{ matrix.cargo_manifest }} --out dist
+          maturin build --release --locked --manifest-path ${{ matrix.cargo_manifest }} --out dist
           --compatibility manylinux2014 --zig
       - name: Build declared wheel target (maturin)
         if: ${{ matrix.build_system == 'maturin' && matrix.target != '' }}

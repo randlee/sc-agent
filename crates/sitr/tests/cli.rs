@@ -3,7 +3,7 @@
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_sitr")
@@ -19,6 +19,9 @@ fn fixture(name: &str) -> PathBuf {
 fn command(home: &Path, args: &[&str]) -> Command {
     let mut command = Command::new(binary());
     command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .arg("--log-root")
         .arg(home.join(".sc-agent"))
         .args(args)
@@ -28,7 +31,10 @@ fn command(home: &Path, args: &[&str]) -> Command {
 }
 
 fn run(home: &Path, args: &[&str]) -> std::io::Result<Output> {
-    command(home, args).output()
+    Ok(
+        sc_agent_testkit::ChildGuard::spawn(&mut command(home, args))
+            .wait_with_output(sc_agent_testkit::HANG_GUARD),
+    )
 }
 
 /// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message", "recovery"?}`.

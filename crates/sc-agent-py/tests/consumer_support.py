@@ -28,7 +28,7 @@ def render_consumer(tmp_path, *, monkeypatch, general_log=True, models=None, sit
     output = tmp_path / "consumer.py"
     subprocess.run(["sc-compose", "render", "--root", str(template.parent), "--file", str(template),
                     "--var-file", str(variables), "--strict", "--output", str(output)],
-                   check=True, capture_output=True, text=True, timeout=60)
+                   stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=60)
     spec = importlib.util.spec_from_file_location("rendered_consumer", output)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
