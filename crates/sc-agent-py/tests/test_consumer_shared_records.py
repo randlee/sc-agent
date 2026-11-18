@@ -4,6 +4,7 @@ import importlib
 import io
 import json
 import sys
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -120,6 +121,78 @@ def test_stream_batch_converts_worker_exception_to_logged_failure(tmp_path, monk
     assert logged[0]["error"] == {"code": "DECIDR.BATCH_JOB",
                                    "message": "batch job failed: ValueError: controlled worker failure",
                                    "recoverable": False}
+
+
+@pytest.mark.parametrize("abort", [False, True])
+def test_stream_batch_optional_abort_stops_submitting_jobs(tmp_path, monkeypatch, abort):
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, batch_records=True)
+    job = _job(client)
+    called = []
+    parsed = []
+    failure = {"ok": False, "error": {"code": "AUTH.CREDENTIALS"}}
+
+    def make_jobs(line, number, settings, question_sets):
+        parsed.append(line)
+        return SimpleNamespace(ok=True, value=[job, job])
+
+    def run_job(job, settings):
+        called.append(job)
+        return failure
+
+    kwargs = {"abort": lambda result: (result.get("error") or {}).get("code") == "AUTH.CREDENTIALS"} if abort else {}
+    results = client.pump_batch(client.stream_batch(
+        ["first", "second"], _settings(client), make_jobs=make_jobs, run_job=run_job,
+        question_sets={}, window_factor=1, **kwargs), log_result=lambda _: None)
+    assert called == [job] * (1 if abort else 4)
+    assert results == [failure] * len(called)
+    assert parsed == (["first"] if abort else ["first", "second"])
+
+
+def test_stream_batch_abort_drains_in_flight_job_before_return(tmp_path, monkeypatch):
+    import asyncio
+
+    client = render_consumer(tmp_path, monkeypatch=monkeypatch, batch_records=True)
+    jobs = [_job(client, str(index)) for index in range(3)]
+    started, release, finished = threading.Event(), threading.Event(), threading.Event()
+    failure = {"ok": False, "error": {"code": "AUTH.CREDENTIALS"}}
+    success = {"ok": True}
+    called = []
+    threads = []
+
+    def run_job(job, settings):
+        called.append(job)
+        threads.append(threading.current_thread())
+        if job == jobs[0]:
+            assert started.wait(timeout=30), "second worker did not start"
+            return failure
+        assert job == jobs[1], "a job was submitted after abort"
+        started.set()
+        assert release.wait(timeout=30), "consumer did not release in-flight worker"
+        finished.set()
+        return success
+
+    async def consume():
+        results = []
+        try:
+            async for result in client.stream_batch(
+                ["input"], _settings(client)._replace(max_workers=2),
+                make_jobs=lambda *_: SimpleNamespace(ok=True, value=jobs), run_job=run_job,
+                question_sets={}, window_factor=1,
+                abort=lambda result: (result.get("error") or {}).get("code") == "AUTH.CREDENTIALS",
+            ):
+                if not results:
+                    assert result == failure
+                    assert started.is_set() and not finished.is_set()
+                    release.set()
+                results.append(result)
+        finally:
+            release.set()
+        assert finished.is_set(), "stream returned before worker completed"
+        return results
+
+    assert asyncio.run(consume()) == [failure, success]
+    assert sorted(job.anchor_id for job in called) == ["0", "1"]
+    assert all(not thread.is_alive() for thread in threads)
 
 
 def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path, monkeypatch):

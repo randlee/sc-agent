@@ -226,6 +226,14 @@ does not log a rewritten copy.
 For owner-attended prerelease checks and per-platform reports, see
 [the integration instructions](../../docs/integration/prerelease.md).
 
+With `batch_records=true`, `stream_batch` accepts an optional `abort(result)`
+predicate. For example, `abort=lambda row: (row.get("error") or {}).get("code", "").startswith(("AUTH.", "POLICY."))`
+stops submitting jobs when a yielded result carries one of those consumer codes.
+Already submitted jobs are drained and yielded in input order; all executor threads
+finish before the stream returns. The default is no abort. `window_factor` controls
+how many jobs may already be submitted; use `window_factor=1` to limit that window
+to `settings.max_workers`.
+
 Set `sitr=true` to include `extract(language, query, source, captures=None)`.
 It imports the separate, version-matched sitr wheel only when called and delegates
 to `sc_treesitter.run_query`. Extraction stays outside the decision path: use its

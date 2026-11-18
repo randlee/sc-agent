@@ -649,7 +649,7 @@ async def _aiter(source):
 
 
 async def stream_batch(source, settings: BatchSettings, *, make_jobs: Callable, run_job: Callable,
-                       question_sets, window_factor: int = 2):
+                       question_sets, window_factor: int = 2, abort: Optional[Callable[[dict], bool]] = None):
     """Run jobs in a bounded executor and yield completed results in input order."""
     import asyncio
     import concurrent.futures
@@ -657,6 +657,7 @@ async def stream_batch(source, settings: BatchSettings, *, make_jobs: Callable, 
     loop = asyncio.get_running_loop()
     pending = collections.deque()
     window = max(settings.max_workers, settings.max_workers * window_factor)
+    aborted = False
     with concurrent.futures.ThreadPoolExecutor(max_workers=settings.max_workers) as pool:
         number = 0
         async for line in _aiter(source):
@@ -669,11 +670,19 @@ async def stream_batch(source, settings: BatchSettings, *, make_jobs: Callable, 
                 while len(pending) >= window:
                     job, future = pending.popleft()
                     try:
-                        yield await future
+                        result = await future
                     except Exception as exc:
                         error = ClientError("DECIDR.BATCH_JOB",
                                             f"batch job failed: {type(exc).__name__}: {exc}")
-                        yield _line(job, settings, None, [], error, settings.dry_run)
+                        result = _line(job, settings, None, [], error, settings.dry_run)
+                    aborted = abort is not None and abort(result)
+                    yield result
+                    if aborted:
+                        break
+                if aborted:
+                    break
+            if aborted:
+                break
         while pending:
             job, future = pending.popleft()
             try:
