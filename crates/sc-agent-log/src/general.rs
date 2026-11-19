@@ -295,6 +295,10 @@ fn active_path(config: &LoggerConfig) -> PathBuf {
 /// sc-observability's LoggerBuilder registers its file sink without startup maintenance;
 /// building the logger schedules periodic maintenance. `JsonlFileSink::open` is its public
 /// synchronous startup pass. The policy and rotation/pruning work remain sc-observability's.
+/// In 1.5.0, `builder.rs:73-80,103-105,151-167` registers the sink and starts the
+/// runtime without a startup pass (`runtime.rs:534-547`, `maintenance.rs:96-114`);
+/// `maintenance.rs:592,604,830` schedules the later pass
+/// against a real clock. The unit test below exercises this pass before that worker exists.
 fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
     let active = active_path(config);
     JsonlFileSink::open(active.clone(), config.retained_log_policy)
