@@ -515,16 +515,9 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
         let advice = error.recovery().expect("actionable recovery");
         assert!(advice.contains("layer"), "{origin}: {advice}");
         assert_eq!(error.detail().recovery.as_deref(), Some(advice));
-        let AgentConfigError::Layer { cause, .. } = &error else {
-            panic!("expected a layered error")
-        };
-        assert_eq!(cause.id(), "config.invalid");
-        assert_eq!(error.detail().cause.as_deref(), Some(&cause.detail()));
         for ignored in ["default.json", "local.json", "SC_AGENT__"] {
             assert!(!advice.contains(ignored), "{origin}: {advice}");
         }
-        assert!(advice.contains("layer"), "{origin}: {advice}");
-        assert_eq!(error.detail().recovery.as_deref(), Some(advice));
         let AgentConfigError::Layer { cause, .. } = &error else {
             panic!("expected source context")
         };
