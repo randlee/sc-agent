@@ -131,6 +131,32 @@ fn at(source: &Source, cause: AgentConfigError) -> AgentConfigError {
         cause: Box::new(cause),
     }
 }
+// A validation pass may fail on a different layer's winning value. Attribute it
+// using the checked object's provenance, rather than the layer currently overlaid.
+fn decode_source<'a>(
+    error: &AgentConfigError,
+    sources: &'a BTreeMap<String, Source>,
+    fallback: &'a Source,
+) -> &'a Source {
+    let path = match error {
+        AgentConfigError::Invalid { path, .. }
+        | AgentConfigError::RunnerName { path, .. }
+        | AgentConfigError::KeyOnPlainHttp { path, .. } => path.as_str(),
+        AgentConfigError::Catalog(_) => "models",
+        _ => return fallback,
+    };
+    sources
+        .iter()
+        .filter(|(key, _)| {
+            path == key.as_str()
+                || path
+                    .strip_prefix(key.as_str())
+                    .is_some_and(|rest| rest.starts_with('.') || rest.starts_with('['))
+        })
+        .max_by_key(|(key, _)| key.len())
+        .map_or(fallback, |(_, source)| source)
+}
+
 fn check_keys(value: &Value, cli: CliName, shared: bool) -> Result<(), AgentConfigError> {
     let object = value
         .as_object()
@@ -374,8 +400,10 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
     // keep their required siblings while masked invalid values still fail.
     for (layer, source) in &layers {
         let mut checked = value.clone();
-        merge(&mut checked, layer, "", source, &mut BTreeMap::new());
-        decode(checked, options.cli).map_err(|e| at(source, e))?;
+        let mut checked_sources = sources.clone();
+        merge(&mut checked, layer, "", source, &mut checked_sources);
+        decode(checked, options.cli)
+            .map_err(|error| at(decode_source(&error, &checked_sources, source), error))?;
     }
     let mut config = decode(value, options.cli)?;
     if config.log_root.is_none() {
