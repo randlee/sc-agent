@@ -520,7 +520,7 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
     let global = options.home.join(".sc-agent");
     let mut paths = Vec::new();
     if let Some(worktree) = &options.worktree {
-        let local = worktree.join(".sc/sc-agent");
+        let local = worktree.join(".sc").join("sc-agent");
         paths.extend([local.join(options.cli.file_name()), local.join(SHARED_FILE)]);
     }
     paths.extend([
