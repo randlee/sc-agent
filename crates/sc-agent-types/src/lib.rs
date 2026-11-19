@@ -21,6 +21,7 @@ mod catalog;
 mod clock;
 mod error;
 mod error_id;
+mod log_root;
 mod model;
 mod provider;
 mod release_date;
@@ -38,6 +39,8 @@ pub use clock::{AdvanceHook, Clock, SystemClock, Waker};
 pub use error::TypesError;
 #[doc(inline)]
 pub use error_id::{ErrorCatalog, ErrorCategory, ErrorDetail, ErrorId};
+#[doc(inline)]
+pub use log_root::default_log_root;
 #[doc(inline)]
 pub use model::{MODELS, ModelDescriptor, ModelId};
 #[doc(inline)]

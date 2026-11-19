@@ -57,6 +57,8 @@ pub enum LogError {
         /// The host name read failure, if any.
         source: Option<std::io::Error>,
     },
+    /// The home directory is absent or empty.
+    HomeUnknown,
     /// The process's current working directory could not be read.
     WorkingDirUnknown {
         /// The current-directory read failure.
@@ -156,6 +158,7 @@ sc_agent_types::error_catalog! { LogError {
     LogError::GitUnavailable { .. } => ("log.git_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::GitOutput { .. } => ("log.git_output", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::HostUnknown { .. } => ("log.host_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::HomeUnknown => ("log.home_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::WorkingDirUnknown { .. } => ("log.working_dir_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::FolderUnknown { .. } => ("log.folder_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::InvalidName { .. } => ("log.invalid_name", Some(sc_agent_types::ErrorCategory::Log)),
@@ -190,6 +193,7 @@ impl ErrorId for LogError {
             }
             Self::HostUnknown { source: Some(_) } => "the host name could not be read".to_owned(),
             Self::HostUnknown { source: None } => "the host name is not UTF-8".to_owned(),
+            Self::HomeUnknown => "the home directory is unavailable".to_owned(),
             Self::WorkingDirUnknown { .. } => {
                 "the current working directory could not be read".to_owned()
             }
@@ -242,7 +246,8 @@ impl ErrorId for LogError {
                 source,
             )),
             Self::RowsLost { last, .. } => last.as_deref().cloned(),
-            Self::InvalidSlug { .. }
+            Self::HomeUnknown
+            | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }
@@ -274,7 +279,8 @@ impl Error for LogError {
             Self::RowsLost { last, .. } => {
                 last.as_deref().map(|last| last as &(dyn Error + 'static))
             }
-            Self::InvalidSlug { .. }
+            Self::HomeUnknown
+            | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }

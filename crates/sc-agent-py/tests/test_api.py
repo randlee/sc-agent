@@ -43,7 +43,7 @@ def test_python_module_exposes_its_module_documentation():
 
 
 def session_files(log_root: pathlib.Path) -> list[pathlib.Path]:
-    root = log_root / "logs"
+    root = log_root / "sessions"
     return sorted(root.rglob("sessions.jsonl")) if root.exists() else []
 
 
@@ -244,7 +244,7 @@ def test_only_a_general_log_callable_keeps_the_default_session_log(env, args):
     files = session_files(log_root)
     assert len(files) == 1
     assert files[0].parts[-3:] == ("role", "proj", "sessions.jsonl")
-    assert (log_root / "logs") in files[0].parents
+    assert (log_root / "sessions") in files[0].parents
     assert not (log_root / "logs" / "sc-agent-py.log.jsonl").exists()
 
 

@@ -5,7 +5,7 @@ General and session loggers for sc-agent, over `sc-observability` 1.5.0. It sits
 ## What it provides
 
 - `GeneralLogger`: the diagnostic log, `<log_root>/logs/<service>.log.jsonl`, one file per CLI. Retention is sc-observability's default policy.
-- `SessionLogger`: one JSONL row per call, appended to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl` and kept indefinitely. Every row starts with `session_id`, `repo`, `project` and `agent_role`.
+- `SessionLogger`: one JSONL row per call, appended to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` and kept indefinitely. Every row starts with `session_id`, `repo`, `project` and `agent_role`.
 - `Loggers::open`: opens both. Either can be an injected `Arc<Logger>`; what is not injected gets the default.
 - `SessionIdentity`, `Repo` (`Repo::detect`, `Repo::local`, `Repo::work_tree_root`), `Slug` and `LogContext` (the session id and batch position of a general event).
 - `LogError`. `flush()` reports every refused or lost row once as `LogError::RowsLost`; `close()` flushes, shuts down and returns the same report.

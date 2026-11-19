@@ -15,7 +15,7 @@ use tempfile::TempDir;
 fn general_file_per_cli() {
     let root = TempDir::new().expect("temp");
     for service in ["decidr", "sc-agent-py"] {
-        let log = GeneralLogger::open_default(root.path(), service).expect(service);
+        let log = GeneralLogger::open_default(Some(root.path()), service).expect(service);
         let row = payload(&[("cli", json!(service))]);
         log.write(
             Level::Info,
@@ -39,7 +39,7 @@ fn general_file_per_cli() {
 #[test]
 fn general_write_generic() {
     let root = TempDir::new().expect("temp");
-    let log = GeneralLogger::open_default(root.path(), "decidr").expect("logger");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
     let row = payload(&[
         ("status", json!(429)),
         ("retry_after_seconds", json!(1.25)),
@@ -117,4 +117,61 @@ fn context_on_general_events() {
         log.flush(),
         Err(LogError::RowsLost { count: 1, .. })
     ));
+}
+
+/// The shared and re-exported default root functions are identical.
+#[test]
+fn default_root_is_shared() {
+    let root = TempDir::new().expect("temp");
+    let expected = root.path().join(".sc-agent");
+    assert_eq!(sc_agent_types::default_log_root(root.path()), expected);
+    assert_eq!(sc_agent_log::default_log_root(root.path()), expected);
+}
+
+/// The child isolates home-directory changes from the parallel test process.
+#[test]
+fn default_root_child() {
+    let Some(mode) = std::env::var_os("SC_AGENT_TEST_HOME_MODE") else {
+        return;
+    };
+    if mode == "empty" {
+        assert!(matches!(
+            GeneralLogger::open_default(None, "decidr"),
+            Err(LogError::HomeUnknown)
+        ));
+    } else {
+        let logger = GeneralLogger::open_default(None, "decidr").expect("default logger");
+        logger
+            .write(
+                Level::Info,
+                "sc_agent_log",
+                "test.row",
+                LogContext::NONE,
+                payload(&[]),
+            )
+            .expect("write");
+        logger.close().expect("close");
+        let home = std::path::PathBuf::from(mode);
+        assert!(home.join(".sc-agent/logs/decidr.log.jsonl").is_file());
+    }
+}
+
+#[test]
+fn default_root_uses_child_home_and_refuses_empty() {
+    let root = TempDir::new().expect("temp");
+    let exe = std::env::current_exe().expect("test binary");
+    for (mode, home) in [
+        (root.path().as_os_str(), root.path().as_os_str()),
+        (std::ffi::OsStr::new("empty"), std::ffi::OsStr::new("")),
+    ] {
+        let status = std::process::Command::new(&exe)
+            .args(["--exact", "default_root_child"])
+            .env("SC_AGENT_TEST_HOME_MODE", mode)
+            .env("HOME", home)
+            .env("USERPROFILE", home)
+            .stdin(std::process::Stdio::null())
+            .status()
+            .expect("child");
+        assert!(status.success());
+    }
 }

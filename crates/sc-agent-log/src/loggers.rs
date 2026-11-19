@@ -45,7 +45,7 @@ impl Loggers {
         };
         let general = match general {
             Some(logger) => GeneralLogger::injected_in(logger, shared.clone()),
-            None => GeneralLogger::open_default(log_root, service)?,
+            None => GeneralLogger::open_default(Some(log_root), service)?,
         };
         let session = match session {
             Some(logger) => SessionLogger::injected_in(logger, shared, identity),

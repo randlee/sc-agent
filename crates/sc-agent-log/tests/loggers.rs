@@ -112,7 +112,7 @@ fn injected_general_only() {
         .len(),
         1
     );
-    // Session logs live under logs/ too: only the general log file must be absent.
+    // An injected general logger creates no default general file.
     let general_files = std::fs::read_dir(root.path().join("logs"))
         .map(|entries| {
             entries

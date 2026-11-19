@@ -73,7 +73,7 @@ fn rows_lost_reported_once() {
 #[test]
 fn healthy_writer_loses_nothing() {
     let root = TempDir::new().expect("temp");
-    let general = GeneralLogger::open_default(root.path(), "decidr").expect("general");
+    let general = GeneralLogger::open_default(Some(root.path()), "decidr").expect("general");
     general
         .write(
             Level::Info,
@@ -104,7 +104,7 @@ fn general_rotates_at_start() {
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
 
-    let log = GeneralLogger::open_default(root.path(), "decidr").expect("logger");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
     log.write(
         Level::Info,
         "sc_agent_log",
@@ -370,7 +370,7 @@ fn log_error_keeps_lower_layer_cause() {
 
     // sc-observability refuses a service name.
     let root = TempDir::new().expect("temp");
-    let error = GeneralLogger::open_default(root.path(), "not a name").expect_err("refused");
+    let error = GeneralLogger::open_default(Some(root.path()), "not a name").expect_err("refused");
     assert_eq!(error.id(), "log.invalid_name");
     let cause = error.detail().cause.expect("cause detail");
     let source = error
@@ -396,7 +396,7 @@ fn log_error_keeps_io_cause() {
     if !common::make_unwritable(&logs).expect("chmod") {
         return;
     }
-    let error = GeneralLogger::open_default(root.path(), "decidr").expect_err("cannot move");
+    let error = GeneralLogger::open_default(Some(root.path()), "decidr").expect_err("cannot move");
     common::make_writable(&logs).expect("chmod");
     assert_eq!(error.id(), "log.open_sink");
     assert!(

@@ -6,7 +6,7 @@
 //!   file `<log_root>/logs/<service>.log.jsonl`, one file per CLI, under sc-observability's own
 //!   retention policy (REQ-SAG-0003).
 //! - [`SessionLogger`], the session log: one JSONL row per call, appended to one
-//!   `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl` per directory by every run and
+//!   `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` per directory by every run and
 //!   process and kept indefinitely (REQ-SAG-0005). Every row's fields begin with `session_id`,
 //!   `repo`, `project` and `agent_role` (REQ-SAG-0004).
 //!
@@ -72,6 +72,7 @@ pub use loggers::Loggers;
 pub use name::MAX_SEGMENT_BYTES;
 #[doc(inline)]
 pub use repo::{GIT_DEADLINE, Repo};
+pub use sc_agent_types::default_log_root;
 pub use sc_observability::Level;
 pub use sc_observability::v2::Logger;
 #[doc(inline)]

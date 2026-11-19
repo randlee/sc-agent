@@ -75,7 +75,7 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
     assert!(output.stdout.is_empty());
     // Config fails before the CLI can open its logger. Also exercise the actual
     // general-log writer with the returned detail, as a caller logging it would.
-    let log = GeneralLogger::open_default(root.path(), "decidr").expect("general logger");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("general logger");
     let mut fields = Map::new();
     fields.insert("error".into(), detail.clone());
     log.write(
@@ -252,7 +252,7 @@ mod tests {
 
     fn rows(home: &Path) -> usize {
         let mut files = Vec::new();
-        find_rows(&home.join(".sc-agent").join("logs"), &mut files);
+        find_rows(&home.join(".sc-agent").join("sessions"), &mut files);
         files
             .iter()
             .map(|file| std::fs::read_to_string(file).expect("rows").lines().count())

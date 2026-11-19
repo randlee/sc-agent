@@ -29,7 +29,7 @@ const LOG: LogKind = LogKind::General;
 /// use sc_agent_types::SessionId;
 ///
 /// let root = tempfile::tempdir()?;
-/// let log = GeneralLogger::open_default(root.path(), "decidr")?;
+/// let log = GeneralLogger::open_default(Some(root.path()), "decidr")?;
 /// let mut fields = serde_json::Map::new();
 /// fields.insert("elapsed_ms".into(), 12.into());
 /// let ctx = LogContext::request(SessionId::new(), Some(0));
@@ -58,7 +58,23 @@ impl GeneralLogger {
     /// [`LogError::InvalidName`] when `service` is not a valid sc-observability service name,
     /// [`LogError::OpenSink`] when the startup retention pass fails (for example, a log
     /// directory that cannot be written), [`LogError::Start`] when the logger cannot start.
-    pub fn open_default(log_root: &Path, service: &'static str) -> Result<Self, LogError> {
+    pub fn open_default(log_root: Option<&Path>, service: &'static str) -> Result<Self, LogError> {
+        let default_root;
+        let log_root = match log_root {
+            Some(root) => root,
+            None => {
+                let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+                if std::env::var_os(home_var).is_some_and(|value| value.is_empty()) {
+                    return Err(LogError::HomeUnknown);
+                }
+                #[allow(deprecated)]
+                let home = std::env::home_dir()
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .ok_or(LogError::HomeUnknown)?;
+                default_root = sc_agent_types::default_log_root(&home);
+                &default_root
+            }
+        };
         let config = logger_config(service, log_root, true)?;
         prepare_log_file(&config)?;
         let logger = start_logger(config, LOG, None)?;

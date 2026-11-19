@@ -1,6 +1,6 @@
 //! [`SessionLogger`]: one JSONL row per call into the session log (REQ-SAG-0004, REQ-SAG-0005).
 //!
-//! The default file is `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per
+//! The default file is `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`: one file per
 //! directory, appended by every run and every process, kept indefinitely. It is written by a
 //! registered `JsonlFileSink` whose policy never renames or deletes it; the sink opens the file
 //! in append mode for each row, so concurrent loggers and processes append to the same file.
@@ -48,11 +48,11 @@ impl SessionIdentity {
         })
     }
 
-    /// `<log_root>/logs/<repo>/<agent_role>/<project>` (REQ-SAG-0003, REQ-SAG-0005): every log
-    /// lives under `<log_root>/logs/`, beside the general logs.
+    /// `<log_root>/sessions/<repo>/<agent_role>/<project>` (REQ-SAG-0003, REQ-SAG-0005): every log
+    /// lives under `<log_root>/sessions/`, separate from general logs.
     #[must_use]
     pub fn dir(&self, log_root: &Path) -> PathBuf {
-        let mut dir = log_root.join("logs");
+        let mut dir = log_root.join("sessions");
         dir.extend(self.repo.as_str().split('/'));
         dir.push(self.agent_role.as_str());
         dir.push(self.project.as_str());
@@ -78,7 +78,7 @@ impl SessionIdentity {
 /// log.flush()?;
 /// let file = root
 ///     .path()
-///     .join("logs")
+///     .join("sessions")
 ///     .join("github.com")
 ///     .join("randlee")
 ///     .join("sc-agent")
