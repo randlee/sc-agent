@@ -1,5 +1,4 @@
 {"sprint":"e-1"}
 {"sprint":"e-2"}
-{"sprint":"e-3"}
-{"sprint":"e-4","depends_on":["e-1","e-2","e-3"]}
+{"sprint":"e-4","depends_on":["e-1","e-2"]}
 {"sprint":"e-5","depends_on":["e-1"]}
