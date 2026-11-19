@@ -12,4 +12,4 @@
 {"id": "REQ-SAG-0008", "file": "docs/requirements/REQ-SAG-0008.md", "sha256": "510c1053d23f547ee7ff0639968144a3476b8cb72a77b7c00d7a38d708ca4c61", "runs": ["m1", "m2", "m3"], "lowest": 0.64, "commit": "a98901b"}
 {"id": "REQ-SAG-0005", "file": "docs/requirements/REQ-SAG-0005.md", "sha256": "66468861391602fb702b3c90df38957718dda6530fee69eb98c1f3742f904de7", "runs": ["w1", "w2", "w3"], "lowest": 0.63, "commit": "f633f8c"}
 {"id": "ADR-SAG-0020", "file": "docs/adr/ADR-SAG-0020.md", "sha256": "e91281afad8ff040945e0c15b3f70795735fbd5a9c5b78dcea5a38690de3e87e", "runs": ["x1", "x2", "x3"], "lowest": 0.94, "commit": "091a56c"}
-{"id": "ADR-SAG-0021", "file": "docs/adr/ADR-SAG-0021.md", "sha256": "a3e780022fa1f4d568c8582bb31bc9fb41afabe16ba7d8c461bcb4e607c79ae2", "runs": ["z1", "z2", "z3"], "lowest": 1.0, "commit": "9b386e3"}
+{"id": "ADR-SAG-0021", "file": "docs/adr/ADR-SAG-0021.md", "sha256": "53e989e7d1b856cad2ecbb499a893590adc5050863e3a80c162b6fcccc1a5aa2", "runs": ["q1", "q2", "q3"], "lowest": 1.0, "commit": "28ff7b4"}
