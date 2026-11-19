@@ -26,7 +26,6 @@ def _write_config(root: pathlib.Path, port: int, max_sends: int | None = None) -
     config = root / ".sc-agent"
     config.mkdir(parents=True, exist_ok=True)
     data = {
-        "log_root": str(log_root),
         "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": port, "model": MODEL}},
     }
     if max_sends is not None:
@@ -37,8 +36,8 @@ def _write_config(root: pathlib.Path, port: int, max_sends: int | None = None) -
 
 @pytest.fixture
 def env(tmp_path, monkeypatch, request):
-    """`(loopback, log_root)`; the config is `tmp_path/.sc-agent` (see `args`), the log root is
-    set in it. The mode comes from `@pytest.mark.mode`. No environment variable points at it."""
+    """`(loopback, log_root)`; the config is `tmp_path/.sc-agent` (see `args`), and
+    DECIDR_LOG_ROOT is the log root. The mode comes from `@pytest.mark.mode`."""
     marker = request.node.get_closest_marker("mode")
     callspec = getattr(request.node, "callspec", None)
     status = callspec.params.get("status") if callspec else None
@@ -56,6 +55,7 @@ def env(tmp_path, monkeypatch, request):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     log_root = _write_config(tmp_path, loopback.port, max_sends=1 if status is not None else None)
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(log_root))
     try:
         yield loopback, log_root
     finally:

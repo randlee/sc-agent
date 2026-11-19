@@ -7,7 +7,6 @@ use std::marker::PhantomData;
 use std::net::IpAddr;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroUsize};
 use std::ops::RangeInclusive;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use sc_agent_types::{Catalog, ModelId, ReleaseDate, ShortName, VarName};
@@ -60,7 +59,7 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 
 /// The validated values resolved from the CLI configuration layers.
 ///
-/// [`Default`] has no models, no `log_root`, 8 workers, 5 sends and no
+/// [`Default`] has no models, 8 workers, 5 sends and no
 /// runners. Unknown keys are rejected.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -74,9 +73,6 @@ pub struct AgentConfig {
     /// Extra catalog rows keyed by model id, at most [`MAX_MODELS`] (REQ-SAG-0102).
     #[serde(default, deserialize_with = "models_in_bounds")]
     pub models: BTreeMap<ModelId, ExtraModel>,
-    /// The log root, filled from the caller-supplied default by the layered loader.
-    #[serde(default, serialize_with = "display_path")]
-    pub log_root: Option<PathBuf>,
     /// Batch workers, 1..=[`MAX_WORKERS`] (REQ-SAG-0701, REQ-SAG-0013).
     #[serde(default = "default_workers", deserialize_with = "workers_in_bounds")]
     pub workers: NonZeroUsize,
@@ -97,7 +93,6 @@ impl Default for AgentConfig {
             project: None,
             cli: crate::CliName::Decidr,
             models: BTreeMap::new(),
-            log_root: None,
             workers: DEFAULT_WORKERS,
             max_sends: DEFAULT_MAX_SENDS,
             local_runners: BTreeMap::new(),
@@ -122,21 +117,6 @@ impl AgentConfig {
         self.project().ok_or(AgentConfigError::ProjectRequired {
             cli: self.cli.file_name(),
         })
-    }
-
-    /// Returns the resolved log root supplied by the layered loader.
-    ///
-    /// This is the `<log_root>` of the ADR-SAG-0002 session-log layout.
-    ///
-    /// # Errors
-    ///
-    /// [`AgentConfigError::HomeUnknown`] when `log_root` is absent and there
-    /// is no home directory.
-    pub fn log_root(&self) -> Result<PathBuf, AgentConfigError> {
-        match &self.log_root {
-            Some(root) => Ok(root.clone()),
-            None => Err(AgentConfigError::HomeUnknown),
-        }
     }
 
     /// Returns the built-in catalog plus every `models` entry.
@@ -400,13 +380,6 @@ impl<'de, K: Deserialize<'de> + Ord, V: Deserialize<'de>> Visitor<'de> for Bound
             map.insert(key, value);
         }
         Ok(map)
-    }
-}
-
-fn display_path<S: Serializer>(path: &Option<PathBuf>, serializer: S) -> Result<S::Ok, S::Error> {
-    match path {
-        Some(path) => serializer.collect_str(&path.display()),
-        None => serializer.serialize_none(),
     }
 }
 

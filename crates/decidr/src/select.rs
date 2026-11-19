@@ -232,7 +232,6 @@ pub fn load_context(context: &Context) -> Result<sc_agent_config::Loaded, Decidr
     Ok(sc_agent_config::load_layered(
         &sc_agent_config::LoadOptions {
             cli: context.cli,
-            default_log_root: sc_agent_log::default_log_root(&home),
             home,
             worktree,
             flags: context.flags.clone(),
@@ -400,16 +399,23 @@ fn choose_provider(
     })
 }
 
+/// The log root of `context`'s CLI: `<CLI>_LOG_ROOT` in its environment, else `~/.sc-agent`.
+fn log_root(context: &Context) -> Result<PathBuf, DecidrError> {
+    let variable = format!("{}LOG_ROOT", context.cli.env_prefix());
+    let environment = context.environment();
+    let root = environment.iter().find(|(name, _)| *name == *variable);
+    let home = context.home.clone().or_else(sc_agent_types::resolve_home);
+    sc_agent_types::cli_log_root(root.map(|(_, value)| value.as_os_str()), home)
+        .ok_or_else(|| sc_agent_config::AgentConfigError::HomeUnknown.into())
+}
+
 /// The general logger of `context`, or the default one for its service.
-pub(crate) fn general_for(
-    context: &Context,
-    config: &AgentConfig,
-) -> Result<GeneralLogger, DecidrError> {
+pub(crate) fn general_for(context: &Context) -> Result<GeneralLogger, DecidrError> {
     if let Some(general) = &context.opened_general {
         return Ok(general.clone());
     }
     Ok(GeneralLogger::open_with(
-        &config.log_root()?,
+        &log_root(context)?,
         context.cli.as_str(),
         context.general.clone(),
     )?)
@@ -426,7 +432,8 @@ pub(crate) fn general_for(
 ///
 /// `Config` (the configuration or its log root) or `Log` (the logger cannot open).
 pub fn general_logger(context: &Context) -> Result<GeneralLogger, DecidrError> {
-    general_for(context, &load_config(context)?)
+    load_config(context)?;
+    general_for(context)
 }
 
 /// The session logger of `options`: the injected one, else
@@ -438,15 +445,16 @@ pub fn general_logger(context: &Context) -> Result<GeneralLogger, DecidrError> {
 ///
 /// `Config` or `Log` (the repo, the identity or the logger).
 pub fn session_logger(options: &SendOptions) -> Result<SessionLogger, DecidrError> {
-    session_for(options, &load_config(&options.context)?)
+    load_config(&options.context)?;
+    session_for(options)
 }
 
-fn session_for(options: &SendOptions, config: &AgentConfig) -> Result<SessionLogger, DecidrError> {
+fn session_for(options: &SendOptions) -> Result<SessionLogger, DecidrError> {
     match &options.session {
         Some(session) => Ok(session.clone()),
         None => {
             let identity = session_identity(&options.project, &options.agent_role)?;
-            let root = config.log_root()?;
+            let root = log_root(&options.context)?;
             Ok(SessionLogger::open_with(
                 &root,
                 identity,
@@ -696,9 +704,9 @@ impl Prepared {
         let timeout = limits.timeout;
         let context = &options.context;
         let config = load_config(context)?;
-        let general = general_for(context, &config)?;
+        let general = general_for(context)?;
         let chosen = backend(options, &config, &general, timeout)?;
-        let session = session_for(options, &config)?;
+        let session = session_for(options)?;
         let local = match &chosen {
             Chosen::Local { runner, .. } => Some(runner),
             Chosen::Remote { .. } => None,
@@ -1094,7 +1102,7 @@ pub(crate) fn probe_setup(
     context: &Context,
 ) -> Result<(AgentConfig, GeneralLogger, bool), DecidrError> {
     let config = load_config(context)?;
-    let general = general_for(context, &config)?;
+    let general = general_for(context)?;
     Ok((config, general, context.opened_general.is_none()))
 }
 
@@ -1432,7 +1440,6 @@ mod select_tests {
             cli: sc_agent_config::CliName::Decidr,
             home: home.into(),
             worktree: Some(home.into()),
-            default_log_root: sc_agent_log::default_log_root(home),
             flags: Default::default(),
             flag_names: Default::default(),
             environment: Vec::new(),

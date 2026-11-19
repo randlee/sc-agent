@@ -18,8 +18,8 @@ mod tests {
     use serde_json::Value;
 
     use crate::common::{
-        ANTHROPIC_KEY, MapKeyring, NOUL, TYPESAFE_KEY, config_dir, context, environment,
-        json_response, ok_noul, options, records_text, request,
+        ANTHROPIC_KEY, MapKeyring, NOUL, TYPESAFE_KEY, config_dir, context, empty_config_dir,
+        environment, json_response, ok_noul, options, records_text, request,
     };
 
     fn find(dir: &Path, name: &str, found: &mut Vec<PathBuf>) {
@@ -39,11 +39,14 @@ mod tests {
     #[test]
     fn default_logs_are_written_under_the_log_root() {
         let root = tempfile::tempdir().expect("root");
-        let dir = config_dir(&serde_json::json!({ "log_root": root.path() }).to_string());
+        let dir = empty_config_dir();
         let transport = ScriptedTransport::responses(vec![ok_noul()]);
         let mut ctx = context(
             dir.path(),
-            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            &[
+                (sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY),
+                ("DECIDR_LOG_ROOT", root.path().to_str().expect("UTF-8 root")),
+            ],
             Arc::new(transport),
             &MemoryLog::new().expect("log"),
         );
@@ -92,12 +95,15 @@ mod tests {
     #[test]
     fn default_logs_are_written_when_a_batch_returns() {
         let root = tempfile::tempdir().expect("root");
-        let dir = config_dir(&serde_json::json!({ "log_root": root.path() }).to_string());
+        let dir = empty_config_dir();
         let transport = crate::common::Gate::new(ok_noul());
         let unused = MemoryLog::new().expect("log");
         let mut ctx = context(
             dir.path(),
-            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            &[
+                (sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY),
+                ("DECIDR_LOG_ROOT", root.path().to_str().expect("UTF-8 root")),
+            ],
             Arc::new(transport.clone()),
             &unused,
         );
@@ -172,19 +178,22 @@ mod tests {
         assert!(result.outcome.is_ok());
     }
 
-    /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `log_root` configured (a tempdir), the
+    /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `DECIDR_LOG_ROOT` set (a tempdir), the
     /// general log lands at `<log_root>/logs/decidr.log.jsonl` and the session log under
-    /// `<log_root>/sessions/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
-    /// (`<home>/.sc-agent`) comes from the shared `sc_agent_types::default_log_root` helper.
+    /// `<log_root>/sessions/<repo>/<agent_role>/<project>/`. Unset, the root is `<home>/.sc-agent`
+    /// from the shared `sc_agent_types::cli_log_root`.
     #[test]
     fn every_log_lands_under_log_root_logs() {
         let root = tempfile::tempdir().expect("root");
-        let dir = config_dir(&serde_json::json!({ "log_root": root.path() }).to_string());
+        let dir = empty_config_dir();
         let transport = ScriptedTransport::responses(vec![ok_noul()]);
         let unused = MemoryLog::new().expect("log");
         let mut ctx = context(
             dir.path(),
-            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            &[
+                (sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY),
+                ("DECIDR_LOG_ROOT", root.path().to_str().expect("UTF-8 root")),
+            ],
             Arc::new(transport),
             &unused,
         );
@@ -416,7 +425,7 @@ mod tests {
         let work = root.path().join("work");
         std::fs::create_dir(&work).expect("work");
         assert!(Repo::work_tree_root(&work).expect("lookup").is_none());
-        let home = config_dir(&serde_json::json!({"log_root":root.path()}).to_string());
+        let home = empty_config_dir();
         let memory = MemoryLog::new().expect("memory");
         let ctx = context(
             home.path(),

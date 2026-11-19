@@ -19,22 +19,17 @@ def snapshot(root):
 
 @pytest.mark.parametrize("source", ["file", "env"])
 def test_resolved_config_reports_source_without_writes_or_requests(env, tmp_path, monkeypatch, source):
-    runner = tmp_path / ".sc-agent/decidr.json"
-    data = json.loads(runner.read_text())
-    del data["log_root"]
-    runner.write_text(json.dumps(data))
-    expected = str(tmp_path / "configured")
     shared = tmp_path / ".sc-agent/sc-agent.json"
-    shared.write_text(json.dumps({"log_root": expected}))
+    shared.write_text(json.dumps({"project": "configured"}))
     origin = str(shared)
     if source == "env":
-        monkeypatch.setenv("DECIDR_LOG_ROOT", expected)
-        origin = "DECIDR_LOG_ROOT"
+        monkeypatch.setenv("SC_PROJECT", "configured")
+        origin = "SC_PROJECT"
     before = snapshot(tmp_path)
     result = sc_agent.resolved_config()
-    assert result["log_root"] == expected
-    assert result["project"] is None
-    assert result["sources"]["log_root"] == origin
+    assert "log_root" not in result
+    assert result["project"] == "configured"
+    assert result["sources"]["project"] == origin
     assert snapshot(tmp_path) == before
     assert env[0].requests == []
 
@@ -89,7 +84,7 @@ def test_generated_client_uses_one_logger_and_fixed_role(env, args, tmp_path, mo
     output.mkdir()
     client = render_consumer(output, monkeypatch=monkeypatch, client_name="plan-anchor", initialize_logger=False)
     logger = None
-    root = env[1]
+    root = tmp_path / ".sc-agent"
     service = "plan-anchor"
     if app_logger:
         root = tmp_path / "app"

@@ -8,6 +8,19 @@ pub fn default_log_root(home: &Path) -> PathBuf {
     home.join(".sc-agent")
 }
 
+/// The log root of a CLI: its `<CLI>_LOG_ROOT` test override when set and non-empty, else
+/// [`default_log_root`] under `home`; `None` when neither is known.
+#[must_use]
+pub fn cli_log_root(
+    override_root: Option<&std::ffi::OsStr>,
+    home: Option<PathBuf>,
+) -> Option<PathBuf> {
+    match override_root.filter(|root| !root.is_empty()) {
+        Some(root) => Some(PathBuf::from(root)),
+        None => home.map(|home| default_log_root(&home)),
+    }
+}
+
 /// Resolves the process home, rejecting an explicitly empty HOME (USERPROFILE on Windows).
 /// An unset variable may use the platform's standard home lookup.
 #[must_use]

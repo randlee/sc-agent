@@ -34,7 +34,9 @@ def render_consumer(tmp_path, *, monkeypatch, client_name="plan-anchor", models=
     spec.loader.exec_module(module)
     install_test_settings_module(monkeypatch)
     if initialize_logger:
-        module.client_logger(log_root=str(tmp_path / "client-logs"))
+        import sc_observability as obs
+        logger = obs.create_logger(obs.LoggerConfig(service=client_name, log_root=str(tmp_path / "client-logs")))
+        monkeypatch.setattr(module, "_CLIENT_LOGGER", logger.value)
     return module
 
 

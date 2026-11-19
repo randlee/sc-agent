@@ -10,7 +10,7 @@ Each function returns the same JSON text that the CLI prints. Decision result ob
 - `sc_agent.send_batch(requests, *, model, agent_role, project=None, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns result lines in input order and passes each to `on_result` as it finishes. Optional `workers` selects 1–64 workers for that batch.
 - `sc_agent.models(runner=None, ...)`: `decidr models`.
 - `sc_agent.doctor(...)`: `decidr doctor`; includes canonical settings/sources and files; a keyring that cannot be read fails it; logged to the general log like every call.
-- `sc_agent.resolved_config(*, project=None)`: returns `log_root`, optional `project`, and the `sources` mapping. It opens no logger and sends no provider request. Invalid layers raise `SagError` naming their file, variable or flag.
+- `sc_agent.resolved_config(*, project=None)`: returns optional `project` and the `sources` mapping. It opens no logger and sends no provider request. Invalid layers raise `SagError` naming their file, variable or flag.
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
 
@@ -149,8 +149,8 @@ argument. `batch_records` includes the optional shared batch-record helpers.
 
 `models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
 `model` unchanged. `client_name` fixes each session's `agent_role`; client functions do not accept an `agent_role` argument.
-The client obtains one sc-observability Logger, using `resolved_config()["log_root"]`,
-writing `<log_root>/logs/<client_name>.log.jsonl`, and injects it into every decidr
+The client opens one sc-observability Logger named `CLIENT_NAME` at `sc_agent.default_log_root()`
+(`~/.sc-agent`), writing `logs/<client_name>.log.jsonl`, and injects it into every decidr
 and sitr operation. Pass an app's Logger with `logger=` to use it instead.
 Session logging uses the wheel default unless `session_log=` is explicitly passed. Keyring service and account are
 runtime arguments, passed on every decision call without forcing a provider.

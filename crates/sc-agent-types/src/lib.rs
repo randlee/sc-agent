@@ -41,7 +41,7 @@ pub use error::TypesError;
 #[doc(inline)]
 pub use error_id::{ErrorCatalog, ErrorCategory, ErrorDetail, ErrorId};
 #[doc(inline)]
-pub use log_root::{default_log_root, resolve_home, resolve_home_with};
+pub use log_root::{cli_log_root, default_log_root, resolve_home, resolve_home_with};
 #[doc(inline)]
 pub use model::{MODELS, ModelDescriptor, ModelId};
 #[doc(inline)]

@@ -83,7 +83,7 @@ pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorRep
     let loaded = crate::load_context(&options.context)?;
     let config = &loaded.config;
     let context = &options.context;
-    let general = general_for(context, config)?;
+    let general = general_for(context)?;
     let owned = context.opened_general.is_none();
     let result = examine(&options.context, config, &general, cancel).map(|mut report| {
         report.settings = sc_agent_config::doctor_rows(&loaded);

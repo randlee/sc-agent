@@ -84,9 +84,6 @@ pub struct LoadOptions {
     pub home: PathBuf,
     /// Git worktree root; absent means skip local layers entirely.
     pub worktree: Option<PathBuf>,
-    /// Default supplied by the caller via `sc_agent_types::default_log_root`
-    /// (also re-exported as `sc_agent_log::default_log_root`).
-    pub default_log_root: PathBuf,
     /// Dotted key paths to flag values.
     pub flags: BTreeMap<String, Value>,
     /// Optional flag spelling, including `--`, per dotted path; absent paths
@@ -154,11 +151,6 @@ struct Setting {
 const SETTINGS: &[Setting] = &[
     Setting {
         path: "project",
-        shared: true,
-        env: EnvValue::String,
-    },
-    Setting {
-        path: "log_root",
         shared: true,
         env: EnvValue::String,
     },
@@ -411,9 +403,6 @@ fn merge(
     }
 }
 fn decode(mut value: Value, cli: CliName) -> Result<AgentConfig, AgentConfigError> {
-    if value.get("log_root").is_some_and(|v| !v.is_string()) {
-        return Err(invalid("log_root", "log_root must be a path string"));
-    }
     let project = value.as_object_mut().and_then(|obj| obj.remove("project"));
     let project = match project {
         None => None,
@@ -511,7 +500,8 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
         let key = if name == PROJECT_ENV {
             "project".to_owned()
         } else if let Some(suffix) = name.strip_prefix(options.cli.env_prefix()) {
-            if suffix == "PROJECT" {
+            // `<CLI>_LOG_ROOT` is the log root's test override, not a setting.
+            if suffix == "PROJECT" || suffix == "LOG_ROOT" {
                 continue;
             }
             suffix.to_ascii_lowercase().replace("__", ".")
@@ -554,22 +544,17 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
 
     let mut value = Value::Object(Map::new());
     let mut sources = BTreeMap::new();
-    sources.insert("log_root".into(), Source::Default);
     for (layer, source) in &layers {
         merge(&mut value, layer, "", source, &mut sources);
     }
     // Decode the winning object, then each layer re-applied over it, so a masked
     // invalid value still fails under its own source.
-    let mut config =
-        decode(value.clone(), options.cli).map_err(|error| attributed(error, &sources))?;
+    let config = decode(value.clone(), options.cli).map_err(|error| attributed(error, &sources))?;
     for (layer, source) in layers.iter().rev().skip(1) {
         let mut checked = value.clone();
         let mut checked_sources = sources.clone();
         merge(&mut checked, layer, "", source, &mut checked_sources);
         decode(checked, options.cli).map_err(|error| attributed(error, &checked_sources))?;
-    }
-    if config.log_root.is_none() {
-        config.log_root = Some(options.default_log_root.clone());
     }
     let mut loaded = Loaded {
         config,

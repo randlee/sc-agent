@@ -1,6 +1,5 @@
-//! `sitr` end-to-end tests (feature `cli`): each runs the built binary with
-//! `--log-root <tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
-//! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
+//! `sitr` end-to-end tests (feature `cli`): each runs the built binary with HOME and
+//! USERPROFILE set to a tempdir, so the general log lands in `<tempdir>/.sc-agent/logs/`.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -379,7 +378,7 @@ fn doctor_matches_shared_rows_lists_four_files_and_logs_like_every_call() -> std
     let report: serde_json::Value =
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
     let settings = report["settings"].as_array().expect("settings");
-    assert_eq!(settings.len(), 2);
+    assert_eq!(settings.len(), 1);
     assert_eq!(settings[0]["setting"], "project");
     assert_eq!(settings[0]["value"], "phase-a");
     let actual_shared_source = canonical_path_with_missing_tail(Path::new(
@@ -388,14 +387,6 @@ fn doctor_matches_shared_rows_lists_four_files_and_logs_like_every_call() -> std
     assert_eq!(
         actual_shared_source,
         canonical_path_with_missing_tail(&shared)?
-    );
-    assert_eq!(
-        settings[1],
-        serde_json::json!({
-            "setting": "log_root",
-            "value": home.path().join(".sc-agent").display().to_string(),
-            "source": "default",
-        })
     );
     let files = report["files"].as_array().expect("files");
     assert_eq!(files.len(), 4);
@@ -460,23 +451,8 @@ fn doctor_uses_shared_project_and_sitr_prefix_only() {
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
     assert_eq!(report["settings"][0]["value"], "phase-d");
     assert_eq!(report["settings"][0]["source"], "SC_PROJECT");
-    assert_eq!(report["settings"][1]["source"], "default");
 
     let sitr_root = home.path().join("sitr-root");
-    let output = run_with_env(
-        home.path(),
-        &["doctor"],
-        &[("SITR_LOG_ROOT", sitr_root.clone().into_os_string())],
-    )
-    .expect("spawn sitr doctor");
-    success(&output);
-    let report: serde_json::Value =
-        serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
-    assert_eq!(
-        report["settings"][1]["value"],
-        sitr_root.display().to_string()
-    );
-    assert_eq!(report["settings"][1]["source"], "SITR_LOG_ROOT");
     success(
         &run_with_env(
             home.path(),
@@ -578,7 +554,7 @@ fn doctor_resolves_all_four_config_files_in_layer_order() -> std::io::Result<()>
         (global.join("sc-agent.json"), "global-shared"),
     ];
     for (file, root) in &layers {
-        std::fs::write(file, serde_json::json!({"log_root": root}).to_string())
+        std::fs::write(file, serde_json::json!({"project": root}).to_string())
             .expect("write config layer");
     }
     for (index, (file, root)) in layers.iter().enumerate() {
@@ -586,10 +562,10 @@ fn doctor_resolves_all_four_config_files_in_layer_order() -> std::io::Result<()>
         success(&output);
         let report: serde_json::Value =
             serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
-        assert_eq!(report["settings"][1]["value"], *root);
+        assert_eq!(report["settings"][0]["value"], *root);
         let source = canonical_path_with_missing_tail(file)?;
         let actual_source = canonical_path_with_missing_tail(Path::new(
-            report["settings"][1]["source"]
+            report["settings"][0]["source"]
                 .as_str()
                 .expect("source path"),
         ))?;
@@ -599,37 +575,6 @@ fn doctor_resolves_all_four_config_files_in_layer_order() -> std::io::Result<()>
         }
     }
     Ok(())
-}
-
-#[test]
-fn shared_global_log_root_and_flag_override_choose_the_log_path() {
-    let home = temp_home().expect("temp home and git worktree");
-    let configured = home.path().join("configured");
-    let shared = home.path().join(".sc-agent").join("sc-agent.json");
-    std::fs::create_dir_all(shared.parent().expect("parent")).expect("create global config");
-    std::fs::write(
-        &shared,
-        serde_json::json!({"log_root": configured}).to_string(),
-    )
-    .expect("write global config");
-    success(&run(home.path(), &["languages"]).expect("spawn sitr"));
-    assert!(
-        home.path()
-            .join("configured")
-            .join("logs")
-            .join("sitr.log.jsonl")
-            .exists()
-    );
-
-    let flag_root = home.path().join("flag-root");
-    success(
-        &run(
-            home.path(),
-            &["--log-root", flag_root.to_str().expect("path"), "languages"],
-        )
-        .expect("spawn sitr"),
-    );
-    assert!(flag_root.join("logs").join("sitr.log.jsonl").exists());
 }
 
 #[test]

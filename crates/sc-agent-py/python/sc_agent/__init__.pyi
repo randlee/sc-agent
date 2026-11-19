@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 from sc_observability import Logger, AttachedLogger
 
@@ -93,3 +94,4 @@ def doctor(cancel: CancelToken | None = None,
            general_log: LogTarget | None = None) -> str: ...
 
 def resolved_config(*, project: str | None = None) -> dict[str, Any]: ...
+def default_log_root() -> Path: ...

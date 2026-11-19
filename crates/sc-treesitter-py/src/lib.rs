@@ -1,18 +1,20 @@
 //! Python entry points for tree-sitter with one general-log record per call.
 
-use std::path::PathBuf;
-
 use ::sc_treesitter::Capture;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use sc_agent_log::{GeneralLogger, Level, LogContext, LogError};
 use std::error::Error;
 
-/// Open the caller's logger or the default sitr log.
-fn logger(target: Option<Py<PyAny>>, root: Option<&std::path::Path>) -> Option<GeneralLogger> {
+/// Open the caller's logger or the default sitr log under sitr's log root.
+fn logger(target: Option<Py<PyAny>>) -> Option<GeneralLogger> {
     let result = match target {
         Some(target) => GeneralLogger::injected_python(target, "sitr"),
-        None => GeneralLogger::open_default(root, "sitr"),
+        None => {
+            let root = std::env::var_os("SITR_LOG_ROOT");
+            let root = sc_agent_log::cli_log_root(root.as_deref(), sc_agent_log::resolve_home());
+            GeneralLogger::open_default(root.as_deref(), "sitr")
+        }
     };
     result.inspect_err(notice).ok()
 }
@@ -71,42 +73,36 @@ fn record<T>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (*, general_log = None, log_root = None))]
-fn languages(
-    py: Python<'_>,
-    general_log: Option<Py<PyAny>>,
-    log_root: Option<PathBuf>,
-) -> PyResult<Vec<&'static str>> {
-    let log = logger(general_log, log_root.as_deref());
+#[pyo3(signature = (*, general_log = None))]
+fn languages(py: Python<'_>, general_log: Option<Py<PyAny>>) -> PyResult<Vec<&'static str>> {
+    let log = logger(general_log);
     let result = Ok(::sc_treesitter::python::languages());
     record(log, "sitr.languages", None, 0, &result, py);
     result
 }
 
 #[pyfunction]
-#[pyo3(signature = (language = None, *, general_log = None, log_root = None))]
+#[pyo3(signature = (language = None, *, general_log = None))]
 fn queries(
     py: Python<'_>,
     language: Option<&str>,
     general_log: Option<Py<PyAny>>,
-    log_root: Option<PathBuf>,
 ) -> PyResult<Vec<(&'static str, &'static str)>> {
-    let log = logger(general_log, log_root.as_deref());
+    let log = logger(general_log);
     let result = ::sc_treesitter::python::queries(language);
     record(log, "sitr.queries", language, 0, &result, py);
     result
 }
 
 #[pyfunction]
-#[pyo3(signature = (language, name, *, general_log = None, log_root = None))]
+#[pyo3(signature = (language, name, *, general_log = None))]
 fn query_source(
     py: Python<'_>,
     language: &str,
     name: &str,
     general_log: Option<Py<PyAny>>,
-    log_root: Option<PathBuf>,
 ) -> PyResult<&'static str> {
-    let log = logger(general_log, log_root.as_deref());
+    let log = logger(general_log);
     let result = ::sc_treesitter::python::query_source(language, name);
     record(
         log,
@@ -120,7 +116,7 @@ fn query_source(
 }
 
 #[pyfunction]
-#[pyo3(signature = (language, query, source, captures = None, *, general_log = None, log_root = None))]
+#[pyo3(signature = (language, query, source, captures = None, *, general_log = None))]
 fn run_query(
     py: Python<'_>,
     language: &str,
@@ -128,9 +124,8 @@ fn run_query(
     source: &Bound<'_, PyAny>,
     captures: Option<Vec<String>>,
     general_log: Option<Py<PyAny>>,
-    log_root: Option<PathBuf>,
 ) -> PyResult<Vec<Capture>> {
-    let log = logger(general_log, log_root.as_deref());
+    let log = logger(general_log);
     let result = ::sc_treesitter::python::run_query(language, query, source, captures);
     record(
         log,
