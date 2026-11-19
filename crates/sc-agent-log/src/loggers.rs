@@ -8,6 +8,16 @@ use sc_observability::v2::Logger;
 use crate::writer::{Ledger, last_resort};
 use crate::{GeneralLogger, LogError, SessionIdentity, SessionLogger};
 
+/// A caller-owned logger destination.
+#[non_exhaustive]
+pub enum Injected {
+    /// A native sc-observability logger.
+    Rust(Arc<Logger>),
+    /// A Python Logger, AttachedLogger, or callable.
+    #[cfg(feature = "python")]
+    Python(pyo3::Py<pyo3::PyAny>),
+}
+
 /// The general and session loggers of one process (REQ-SAG-0008).
 ///
 /// Inject either, both or neither; anything not injected is the default
@@ -37,18 +47,44 @@ impl Loggers {
         general: Option<Arc<Logger>>,
         session: Option<Arc<Logger>>,
     ) -> Result<Self, LogError> {
+        Self::open_with(
+            log_root,
+            service,
+            identity,
+            general.map(Injected::Rust),
+            session.map(Injected::Rust),
+        )
+    }
+
+    /// Opens default or caller-owned destinations independently.
+    ///
+    /// # Errors
+    /// Returns an error when a destination is invalid or cannot be opened.
+    pub fn open_with(
+        log_root: &Path,
+        service: &'static str,
+        identity: SessionIdentity,
+        general: Option<Injected>,
+        session: Option<Injected>,
+    ) -> Result<Self, LogError> {
         let shared = match (&general, &session) {
-            (Some(general), Some(session)) if Arc::ptr_eq(general, session) => {
+            (Some(Injected::Rust(general)), Some(Injected::Rust(session)))
+                if Arc::ptr_eq(general, session) =>
+            {
                 Some(Ledger::new(general))
             }
             _ => None,
         };
         let general = match general {
-            Some(logger) => GeneralLogger::injected_in(logger, shared.clone()),
+            Some(Injected::Rust(logger)) => GeneralLogger::injected_in(logger, shared.clone()),
+            #[cfg(feature = "python")]
+            Some(Injected::Python(target)) => GeneralLogger::injected_python(target, service)?,
             None => GeneralLogger::open_default(Some(log_root), service)?,
         };
         let session = match session {
-            Some(logger) => SessionLogger::injected_in(logger, shared, identity),
+            Some(Injected::Rust(logger)) => SessionLogger::injected_in(logger, shared, identity),
+            #[cfg(feature = "python")]
+            Some(Injected::Python(target)) => SessionLogger::injected_python(target, identity)?,
             None => SessionLogger::open_default(log_root, identity)?,
         };
         Ok(Self { general, session })

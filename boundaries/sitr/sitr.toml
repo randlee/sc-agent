@@ -18,7 +18,7 @@ roots = ["main"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-treesitter"]
+allowed_dependencies = ["sc-treesitter", "sc-agent-config", "sc-agent-log"]
 allowed_dev_dependents = []
 # CLI process tests reuse the shared bounded/reaping child guard.
 allowed_dev_dependencies = ["sc-agent-testkit"]

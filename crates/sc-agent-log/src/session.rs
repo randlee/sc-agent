@@ -144,6 +144,23 @@ impl SessionLogger {
         Self::injected_in(logger, None, identity)
     }
 
+    /// Injects a caller-owned Python logger or callable.
+    ///
+    /// # Errors
+    /// Returns an error if the target is invalid.
+    #[cfg(feature = "python")]
+    pub fn injected_python(
+        target: pyo3::Py<pyo3::PyAny>,
+        identity: SessionIdentity,
+    ) -> Result<Self, LogError> {
+        let target = crate::python::PythonTarget::classify(target)?;
+        Ok(Self {
+            writer: Arc::new(Writer::injected_python(target, Self::SERVICE, LOG)?),
+            identity: Arc::new(identity),
+            path: None,
+        })
+    }
+
     /// Injects a caller-owned logger and a controlled timestamp for deterministic boundary tests.
     /// Available only with the `testing` feature; it never transfers logger ownership.
     #[cfg(feature = "testing")]

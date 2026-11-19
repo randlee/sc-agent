@@ -31,6 +31,7 @@ loggers.close()?;
 
 ## Features
 
+- `python` (not default): `Injected`, `Loggers::open_with`, and direct injection of caller-owned Python `Logger`, `AttachedLogger`, or callable. The caller retains flush and shutdown.
 - `testing` (not default): `testing::MemoryLog`, an in-memory sink for consumers' tests. It adds no dependency.
 
 ## Depends on

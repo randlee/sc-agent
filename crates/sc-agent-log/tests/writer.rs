@@ -123,6 +123,48 @@ fn general_rotates_at_start() {
     assert_eq!(events(&active).expect("rows").len(), 1, "only the new row");
 }
 
+/// A file grown after opening is rotated on the next supported startup maintenance pass.
+#[test]
+fn general_rotates_after_growth_on_reopen() {
+    let root = TempDir::new().expect("temp");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
+    let active = root.path().join("logs/decidr.log.jsonl");
+    log.write(
+        Level::Info,
+        "sc_agent_log",
+        "test.initial",
+        LogContext::NONE,
+        Map::new(),
+    )
+    .expect("initial row");
+    log.flush().expect("flush initial row");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&active)
+        .expect("active");
+    file.set_len(OVERSIZED).expect("grow sparse file");
+    drop(file);
+    log.write(
+        Level::Info,
+        "sc_agent_log",
+        "test.row",
+        LogContext::NONE,
+        Map::new(),
+    )
+    .expect("row");
+    log.close().expect("close");
+    let grown = std::fs::metadata(&active).expect("active").len();
+    assert!(grown > OVERSIZED);
+    let reopened = GeneralLogger::open_default(Some(root.path()), "decidr").expect("reopen");
+    assert_eq!(
+        std::fs::metadata(root.path().join("logs/decidr.log.jsonl.1"))
+            .expect("rotated")
+            .len(),
+        grown
+    );
+    reopened.close().expect("close");
+}
+
 /// A8-04: an over-64 MiB session file is not renamed; the new row is appended to it.
 #[test]
 fn session_file_never_rotates() {

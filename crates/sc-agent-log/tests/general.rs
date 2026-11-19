@@ -134,36 +134,27 @@ fn default_root_child() {
     let Some(mode) = std::env::var_os("SC_AGENT_TEST_HOME_MODE") else {
         return;
     };
-    if mode == "empty" {
-        assert!(matches!(
-            GeneralLogger::open_default(None, "decidr"),
-            Err(LogError::HomeUnknown)
-        ));
-    } else {
-        let logger = GeneralLogger::open_default(None, "decidr").expect("default logger");
-        logger
-            .write(
-                Level::Info,
-                "sc_agent_log",
-                "test.row",
-                LogContext::NONE,
-                payload(&[]),
-            )
-            .expect("write");
-        logger.close().expect("close");
-        let home = std::path::PathBuf::from(mode);
-        assert!(home.join(".sc-agent/logs/decidr.log.jsonl").is_file());
-    }
+    let logger = GeneralLogger::open_default(None, "decidr").expect("default logger");
+    logger
+        .write(
+            Level::Info,
+            "sc_agent_log",
+            "test.row",
+            LogContext::NONE,
+            payload(&[]),
+        )
+        .expect("write");
+    logger.close().expect("close");
+    let home = std::path::PathBuf::from(mode);
+    assert!(home.join(".sc-agent/logs/decidr.log.jsonl").is_file());
 }
 
 #[test]
-fn default_root_uses_child_home_and_refuses_empty() {
+fn default_root_uses_child_home() {
     let root = TempDir::new().expect("temp");
     let exe = std::env::current_exe().expect("test binary");
-    for (mode, home) in [
-        (root.path().as_os_str(), root.path().as_os_str()),
-        (std::ffi::OsStr::new("empty"), std::ffi::OsStr::new("")),
-    ] {
+    {
+        let (mode, home) = (root.path().as_os_str(), root.path().as_os_str());
         let status = std::process::Command::new(&exe)
             .args(["--exact", "default_root_child"])
             .env("SC_AGENT_TEST_HOME_MODE", mode)

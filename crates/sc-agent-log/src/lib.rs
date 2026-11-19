@@ -53,6 +53,8 @@ mod general;
 mod kind;
 mod loggers;
 mod name;
+#[cfg(feature = "python")]
+mod python;
 mod repo;
 mod session;
 mod slug;
@@ -67,7 +69,7 @@ pub use general::GeneralLogger;
 #[doc(inline)]
 pub use kind::LogKind;
 #[doc(inline)]
-pub use loggers::Loggers;
+pub use loggers::{Injected, Loggers};
 #[doc(inline)]
 pub use name::MAX_SEGMENT_BYTES;
 #[doc(inline)]

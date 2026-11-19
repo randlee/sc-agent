@@ -412,6 +412,11 @@ fn ids() {
             log: LogKind::Session,
             source: EventError::Validation { context: context() },
         },
+        LogError::HomeUnknown,
+        LogError::InvalidTarget,
+        LogError::PythonRejected {
+            cause: Box::new(detail.clone()),
+        },
         LogError::Flush {
             log: LogKind::Session,
             source: FlushError::Drain { context: context() },
@@ -429,7 +434,7 @@ fn ids() {
     ];
     let ids: HashSet<_> = errors.iter().map(ErrorId::id).collect();
     sc_agent_testkit::assert_catalog_rows(&errors);
-    assert_eq!(ids.len(), 15);
+    assert_eq!(ids.len(), 18);
     for error in &errors {
         assert!(error.id().starts_with("log."), "{}", error.id());
         assert_eq!(

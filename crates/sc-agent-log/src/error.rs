@@ -104,6 +104,13 @@ pub enum LogError {
         /// sc-observability's failure.
         source: EventError,
     },
+    /// An injected Python target is not a supported logger or callable.
+    InvalidTarget,
+    /// An injected Python target refused a record.
+    PythonRejected {
+        /// The original Python error code and message.
+        cause: Box<ErrorDetail>,
+    },
     /// The flush barrier failed.
     Flush {
         /// Which logger.
@@ -166,6 +173,8 @@ sc_agent_types::error_catalog! { LogError {
     LogError::Start { .. } => ("log.start", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::ReservedField { .. } => ("log.reserved_field", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Validation)),
+    LogError::PythonRejected { .. } => ("log.python_rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowsLost { .. } => ("log.rows_lost", Some(sc_agent_types::ErrorCategory::Log)),
@@ -212,6 +221,10 @@ impl ErrorId for LogError {
                 format!("payload key {key:?} is reserved for the identity or context fields")
             }
             Self::Rejected { log, .. } => format!("the {log} logger refused the row"),
+            Self::InvalidTarget => {
+                "expected sc_observability.Logger, AttachedLogger, or a callable".to_owned()
+            }
+            Self::PythonRejected { .. } => "the injected Python target refused the row".to_owned(),
             Self::Flush { log, .. } => format!("the {log} logger could not flush"),
             Self::RowTooLarge { log, bytes, max } => {
                 format!(
@@ -233,7 +246,9 @@ impl ErrorId for LogError {
             | Self::WorkingDirUnknown { source } => {
                 Some(ErrorDetail::foreign(io_id(source), source))
             }
-            Self::InvalidName { cause, .. } => Some((**cause).clone()),
+            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
+                Some((**cause).clone())
+            }
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
             ),
@@ -246,7 +261,8 @@ impl ErrorId for LogError {
                 source,
             )),
             Self::RowsLost { last, .. } => last.as_deref().cloned(),
-            Self::HomeUnknown
+            Self::InvalidTarget
+            | Self::HomeUnknown
             | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
@@ -272,14 +288,17 @@ impl Error for LogError {
                 source: Some(source),
             } => Some(source),
             Self::WorkingDirUnknown { source } => Some(source),
-            Self::InvalidName { cause, .. } => Some(cause.as_ref()),
+            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
+                Some(cause.as_ref())
+            }
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),
             Self::Flush { source, .. } => Some(source),
             Self::RowsLost { last, .. } => {
                 last.as_deref().map(|last| last as &(dyn Error + 'static))
             }
-            Self::HomeUnknown
+            Self::InvalidTarget
+            | Self::HomeUnknown
             | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
