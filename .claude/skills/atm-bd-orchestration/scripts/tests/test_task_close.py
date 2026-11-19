@@ -1139,6 +1139,41 @@ def test_reopened_same_head_close_is_refused_but_new_commit_succeeds(world, role
     assert len([item for item in world.messages if item["type"] == "dev-sanity-task"]) == 2
 
 
+def test_rejection_resubmitted_at_the_same_commit_after_sanity_fail_dispatches_sanity_again(world):
+    world.beads[world.values["checked_bead"]]["metadata"]["role"] = "fix"
+    record_checked_commit(world)
+    (world.root / "scripts/example.py").write_text("pass\npass\n")
+    assert "ok" in world.run("fix", outcome="not_reproducible")
+    commit = world.head
+    assert "ok" in world.run("sanity", verdict="FAIL", undone=[{"number": 1, "reason": "rejection evidence does not show the path is gone"}])
+    checked = world.values["checked_bead"]
+    assert world.beads[checked]["status"] == "open"
+    dev_events = world.tasks[world.values["dev_task_id"]]
+    assert dev_events[-1]["event"] == "reopened"
+    reopened = dev_events[-1]["message_id"]
+    result = world.run("fix", outcome="not_reproducible", evidence="scripts/example.py:2")
+    assert "ok" in result, result
+    assert world.beads[checked]["status"] == "closed"
+    assert world.beads[checked]["close_reason"] == "not reproducible: scripts/example.py:2"
+    assert world.beads[checked]["metadata"]["commit"] == commit
+    assert world.beads[checked]["metadata"]["close_assignment_id"] == str(reopened)
+    sanity = world.values["sanity_bead"]
+    assert world.tasks[sanity][-1]["to_state"] == "assigned"
+    dispatches = [item for item in world.messages if item["type"] == "dev-sanity-task"]
+    assert len(dispatches) == 2 and dispatches[-1]["values"]["nr"] is True
+
+
+def test_fixed_reclose_at_the_prior_commit_after_sanity_fail_is_still_refused(world):
+    world.beads[world.values["checked_bead"]]["metadata"]["role"] = "fix"
+    assert "ok" in world.run("fix")
+    assert "ok" in world.run("sanity", verdict="FAIL", undone=[{"number": 1, "reason": "missing"}])
+    writes = list(world.writes)
+    result = world.run("fix", outcome="fixed")
+    assert result["err"]["code"] == "CLOSE.STALE_ASSIGNMENT"
+    assert world.head in result["err"]["message"] and "reopened under assignment" in result["err"]["message"]
+    assert world.writes == writes
+
+
 def test_reopened_prior_close_without_generation_stamp_is_still_refused(world):
     assert "ok" in world.run("dev")
     assert "ok" in world.run("sanity", verdict="FAIL", undone=[{"number": 1, "reason": "missing"}])
