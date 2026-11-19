@@ -68,6 +68,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-19T02:00:37+00:00",
+          "event": "excluded",
+          "item": "agt-e-5",
+          "reason": "e-5 changes only the sitr CLI, which builds its own default Logger with nothing injected; sitr wheel injection (general_log=) is e-4 deliverable 7, judged satisfied.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-e-5",
+          "reason": "e-5 changes only the sitr CLI, which builds its own default Logger with nothing injected; sitr wheel injection (general_log=) is e-4 deliverable 7, judged satisfied."
         }
       ]
     }

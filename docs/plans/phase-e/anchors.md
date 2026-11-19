@@ -22,6 +22,9 @@ Scope: touches crates/sc-agent-log, crates/sc-agent-py, crates/sc-treesitter-py 
 
 Deterministic check to pair with the development gate: git grep -n 'fn python_logger' crates returns nothing, and no LoggerBuilder call in crates/sc-agent-py, crates/sc-treesitter-py or crates/sc-agent-log is reached from a path that received an injected Python Logger
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-e-5`: e-5 changes only the sitr CLI, which builds its own default Logger with nothing injected; sitr wheel injection (general_log=) is e-4 deliverable 7, judged satisfied.
+
 Beads: anchor `agt-bllk`, plan questions `agt-bllk.1`, dev questions `agt-bllk.2`
 
 Fixtures:
