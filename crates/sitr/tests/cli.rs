@@ -12,11 +12,16 @@ fn binary() -> &'static str {
 
 fn temp_home() -> std::io::Result<tempfile::TempDir> {
     let home = tempfile::tempdir()?;
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .arg("init")
         .arg("-q")
         .current_dir(home.path())
-        .output()?;
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let output = sc_agent_testkit::ChildGuard::spawn(&mut command)
+        .wait_with_output(sc_agent_testkit::HANG_GUARD);
     if !output.status.success() {
         return Err(std::io::Error::other(format!(
             "git init failed: {}",
