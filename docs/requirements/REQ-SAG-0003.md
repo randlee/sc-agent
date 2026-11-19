@@ -1,7 +1,7 @@
 # Requirement: Log retention
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
@@ -22,10 +22,10 @@ Definitions: The general log is the application diagnostic log. A session log is
 - A session log MUST remain in `<log_root>/sessions/` whatever its age.
 - The built-in default of the `log_root` setting, layer 7 of REQ-SAG-0019, MUST be `~/.sc-agent`.
 - When a layer sets `log_root`, <log_root> MUST be the value of the first layer that sets it.
-- When no general logger is injected, each CLI MUST write its general log to `<log_root>/logs/<cli>/<cli>.log.jsonl`.
-- When no general logger is injected, decidr MUST write its general log to `<log_root>/logs/decidr/decidr.log.jsonl`.
-- When no general logger is injected, sitr MUST write its general log to `<log_root>/logs/sitr/sitr.log.jsonl`.
-- A generated client MUST write its general log to `<log_root>/logs/<client>/<client>.log.jsonl`, such as `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl` (REQ-SAG-0008).
+- When no general logger is injected, each CLI MUST write its general log to `<log_root>/logs/<cli>.log.jsonl`.
+- When no general logger is injected, decidr MUST write its general log to `<log_root>/logs/decidr.log.jsonl`.
+- When no general logger is injected, sitr MUST write its general log to `<log_root>/logs/sitr.log.jsonl`.
+- A generated client MUST write its general log to `<log_root>/logs/<client>.log.jsonl`, such as `<log_root>/logs/plan-anchor.log.jsonl` (REQ-SAG-0008).
 - Session logs MUST be written under `<log_root>/sessions/` (REQ-SAG-0005).
 - Each CLI MUST write its own general log file.
 - decidr MUST write its own general log file.
@@ -52,11 +52,11 @@ sc-observability already rotates and prunes the general log. Session logs are th
 - [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
 - [ ] A session log file under `<log_root>/sessions/` whose modification time is older than the sc-observability retention age is still present and unchanged after decidr runs a new session.
 - [ ] With no layer setting `log_root`, `decidr doctor` and `sitr doctor` each report `log_root` as `<home>/.sc-agent` with source `default`.
-- [ ] With `DECIDR_LOG_ROOT` set to a directory `<dir>`, a decidr run writes its general log to `<dir>/logs/decidr/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
-- [ ] With no general logger injected, a sitr run writes its general log to `<log_root>/logs/sitr/sitr.log.jsonl`.
-- [ ] After the plan-anchor generated client runs, its general log is `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl`.
-- [ ] With no log_root configured, decidr writes its general log to `<home>/.sc-agent/logs/decidr/decidr.log.jsonl` and its session logs under `<home>/.sc-agent/sessions/`.
-- [ ] After decidr and sitr each run, `<log_root>/logs/decidr/` and `<log_root>/logs/sitr/` each hold only that CLI's general log, and `<log_root>/logs/` holds no session log.
+- [ ] With `DECIDR_LOG_ROOT` set to a directory `<dir>`, a decidr run writes its general log to `<dir>/logs/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
+- [ ] With no general logger injected, a sitr run writes its general log to `<log_root>/logs/sitr.log.jsonl`.
+- [ ] After the plan-anchor generated client runs, its general log is `<log_root>/logs/plan-anchor.log.jsonl`.
+- [ ] With no log_root configured, decidr writes its general log to `<home>/.sc-agent/logs/decidr.log.jsonl` and its session logs under `<home>/.sc-agent/sessions/`.
+- [ ] After decidr and sitr each run, `<log_root>/logs/decidr.log.jsonl` holds only decidr's general log, `<log_root>/logs/sitr.log.jsonl` holds only sitr's, and `<log_root>/logs/` holds no session log.
 
 ### Dependencies
 

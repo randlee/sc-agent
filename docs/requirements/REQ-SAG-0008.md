@@ -1,7 +1,7 @@
 # Requirement: Logger injection into the Rust API and the wheels
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
@@ -42,8 +42,8 @@ Applications built on sc-agent route logs into their own logging, and a caller t
 
 **Acceptance Criteria:**
 
-- [ ] `Loggers::open` for the `decidr` service with no injected logger writes its general-log records to `<log_root>/logs/decidr/decidr.log.jsonl` and its session rows to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`.
-- [ ] `Loggers::open` for the `decidr` service with an injected session Logger sends each session row to that Logger and writes its general-log records to `<log_root>/logs/decidr/decidr.log.jsonl`.
+- [ ] `Loggers::open` for the `decidr` service with no injected logger writes its general-log records to `<log_root>/logs/decidr.log.jsonl` and its session rows to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`.
+- [ ] `Loggers::open` for the `decidr` service with an injected session Logger sends each session row to that Logger and writes its general-log records to `<log_root>/logs/decidr.log.jsonl`.
 - [ ] `Loggers::open` for the `decidr` service with an injected general Logger sends each general-log record to that Logger and writes its session rows to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`.
 - [ ] A Python call to the sc-decidr wheel with an injected session-log callable passes each session row to that callable and writes the general log through the default general logger.
 - [ ] A Python call to the sitr wheel with an injected general Logger writes its general-log records to that Logger.
