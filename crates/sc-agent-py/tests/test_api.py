@@ -212,6 +212,7 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
     assert "decidr.send" in [record["action"] for record in records]
     assert "http.send" in [record["action"] for record in records]
     assert len(rows) == 1 and rows[0]["action"] == "session.row"
+    assert sorted(rows[0]) == ["action", "correlation_id", "fields", "level", "message", "outcome", "request_id", "target", "trace"]
     assert list(rows[0]["fields"])[:4] == ["session_id", "repo", "project", "agent_role"]
     assert not (log_root / "logs" / "sc-agent-py.log.jsonl").exists()
     assert session_files(log_root) == []

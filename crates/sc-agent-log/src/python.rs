@@ -18,11 +18,7 @@ impl PythonTarget {
             if value.is_callable() {
                 return Ok(Self::Callable(target));
             }
-            let obs =
-                py.import("sc_observability")
-                    .map_err(|error| LogError::PythonUnavailable {
-                        cause: Box::new(exception(error)),
-                    })?;
+            let obs = py.import("sc_observability").map_err(classify_refused)?;
             if value
                 .is_instance(&obs.getattr("Logger").map_err(classify_refused)?)
                 .map_err(classify_refused)?
@@ -113,12 +109,12 @@ fn refused(error: PyErr) -> LogError {
     failure("python.exception", error.to_string())
 }
 
-fn exception(error: PyErr) -> ErrorDetail {
-    ErrorDetail::new("python.exception", error.to_string(), None)
-}
-
 fn classify_refused(error: PyErr) -> LogError {
-    LogError::PythonClassify {
-        cause: Box::new(exception(error)),
+    LogError::PythonUnavailable {
+        cause: Box::new(ErrorDetail::new(
+            "python.exception",
+            error.to_string(),
+            None,
+        )),
     }
 }

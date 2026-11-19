@@ -33,22 +33,19 @@ Project/phase uses only `SC_PROJECT`.
 Credential variable names are owned by `sc-agent-secrets`; this loader does
 not read their values.
 
-`LoadOptions` supplies `home`, optional `worktree`, `flags`, `environment`, and
-`default_log_root`. The caller supplies the latter from the shared default-log-root
+`LoadOptions` supplies `home`, optional `worktree`, `flags`, `flag_names`,
+`environment`, and `default_log_root`. `flag_names` optionally maps a dotted
+setting path to the caller's real flag spelling, including `--`, for doctor
+rows and errors; paths absent from it display as `--` plus the path with `_`
+replaced by `-`. The caller supplies the latter from the shared default-log-root
 function; the loader does not choose a separate default path. No process
 environment or home-directory discovery occurs in the layered loader.
 
-`load_layered_with_flag_names(&options, &names)` accepts a map from dotted
-setting paths to actual flag spellings, including `--`, for doctor rows and
-validation errors. For example, map `local_runners.laya.port` to `--runner-port`
-when that is the caller's real flag. `load_layered` keeps its existing spelling
-for callers that do not supply this map.
-
 The returned `Loaded` contains an `AgentConfig`, the winning `Source` of each
 setting and the inspected `LayerFile` paths with their `exists` values.
-`doctor_rows(&loaded)` builds deterministic, serializable `setting`, `value`,
-`source` rows, with shared settings first. Missing optional values display as
-`unset`. The two CLIs use the same routine for their shared rows.
+`doctor_rows(&loaded)` walks the serialized config and builds one `setting`,
+`value`, `source` row per leaf the CLI accepts, shared settings first. Missing
+optional values display as `unset`. The two CLIs use the same routine for their shared rows.
 
 `AgentConfig::project()` returns the resolved project/phase. A session caller
 uses `require_project()` before sending or writing; absence yields

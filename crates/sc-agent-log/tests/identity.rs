@@ -417,9 +417,6 @@ fn ids() {
         LogError::PythonUnavailable {
             cause: Box::new(detail.clone()),
         },
-        LogError::PythonClassify {
-            cause: Box::new(detail.clone()),
-        },
         LogError::PythonRejected {
             cause: Box::new(detail.clone()),
         },
@@ -444,7 +441,7 @@ fn ids() {
         LogError::InvalidTarget.base_category(),
         Some(sc_agent_types::ErrorCategory::Log)
     );
-    assert_eq!(ids.len(), 20);
+    assert_eq!(ids.len(), 19);
     for error in &errors {
         assert!(error.id().starts_with("log."), "{}", error.id());
         assert_eq!(

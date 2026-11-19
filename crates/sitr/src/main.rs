@@ -184,6 +184,7 @@ fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
         worktree,
         default_log_root: default_log_root(&home),
         flags,
+        flag_names: BTreeMap::new(),
         environment: std::env::vars_os().collect(),
     })
     .map_err(|error| Error::Config {

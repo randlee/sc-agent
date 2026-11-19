@@ -137,6 +137,27 @@ impl Writer {
         Self::new(logger, false, ledger, kind)
     }
 
+    /// The one injected-destination dispatch: a native logger keeps `ledger`, a Python target
+    /// is classified here.
+    #[cfg_attr(not(feature = "python"), allow(unused_variables))]
+    pub(crate) fn from_injected(
+        injected: crate::Injected,
+        ledger: Option<Arc<Ledger>>,
+        service: &'static str,
+        kind: LogKind,
+    ) -> Result<Self, LogError> {
+        match injected {
+            crate::Injected::Rust(logger) => Ok(Self::injected(logger, ledger, kind)),
+            #[cfg(feature = "python")]
+            crate::Injected::Python(target) => {
+                let target = pyo3::Python::attach(|py| {
+                    crate::python::PythonTarget::classify(target.clone_ref(py))
+                })?;
+                Self::injected_python(target, service, kind)
+            }
+        }
+    }
+
     fn new(logger: Arc<Logger>, owned: bool, ledger: Arc<Ledger>, kind: LogKind) -> Self {
         Self {
             service: logger.service_name().clone(),
