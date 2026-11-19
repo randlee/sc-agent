@@ -1,0 +1,120 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261119T020001Z-agt-e-2",
+  "gate": "plan",
+  "created_at": "2026-11-19T02:00:01+00:00",
+  "anchors_path": "docs/plans/phase-e/anchors.json",
+  "plan": "docs/plans/phase-e.jsonl",
+  "item": {
+    "id": "agt-e-2",
+    "title": "e-2: sc-agent-log: per-CLI general log folder, sessions/ tree, records delivered to an injected sc_observability.Logger; the phase's dependency lines",
+    "source": "/private/tmp/claude-501/-Users-randlee-github-sc-agent/14d644ff-101c-48fb-8090-95067f922283/scratchpad/gate/agt-e-2.md",
+    "chars": 7720,
+    "truncated": false,
+    "chars_before_reduction": 7720,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/anchor-phase-e/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a caller passes its own sc_observability.Logger into a wheel call (general_log= or session_log=), sc-agent MUST NOT build a second sc-observability Logger with LoggerBuilder for that log, as the python_logger function in crates/sc-agent-py does.",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-18",
+      "context": "phase-e/f/g planning session",
+      "anchor_version": 4,
+      "deterministic_check": "git grep -n 'fn python_logger' crates returns nothing, and no LoggerBuilder call in crates/sc-agent-py, crates/sc-treesitter-py or crates/sc-agent-log is reached from a path that received an injected Python Logger",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3181,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 7720,
+      "item_shortened": false,
+      "request_bytes": 11129
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "shortened": [],
+    "pass": true
+  }
+}
