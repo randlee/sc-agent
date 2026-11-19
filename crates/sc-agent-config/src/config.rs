@@ -473,9 +473,9 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
 /// Returns `~/.sc-agent`, the config directory and default log root (REQ-SAG-0003).
 ///
 /// The home directory joined with `.sc-agent` on every platform; the home
-/// directory comes from [`std::env::home_dir`]. Every log is written under
-/// `<log_root>/logs/`: general logs at `logs/<cli>.log.jsonl`, session logs at
-/// `logs/<repo>/<agent_role>/<project>/`.
+/// directory comes from [`std::env::home_dir`]. General logs are written to
+/// `<log_root>/logs/<cli>.log.jsonl`; session logs are written under
+/// `<log_root>/sessions/<repo>/<agent_role>/<project>/`.
 ///
 /// # Errors
 ///
