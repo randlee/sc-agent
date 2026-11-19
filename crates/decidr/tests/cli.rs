@@ -1,7 +1,7 @@
 //! The `decidr` binary as a process: help, slug refusal, interrupts, broken stdout and the
 //! fail-fast batch, against a loopback runner (no external network).
 //!
-//! Each child gets a cleared environment (only PATH) and `--config-dir <tempdir>/.sc-agent`,
+//! Each child gets a cleared environment (only PATH and, when set, LD_LIBRARY_PATH) and `--config-dir <tempdir>/.sc-agent`,
 //! whose default.json sets `log_root` to that same directory: no HOME or USERPROFILE is set,
 //! so no test reads or writes the real home. (The real-home default of `log_root` is
 //! sc-agent-config's `default_dir`, unit-tested there.) The process tests here are Unix-only
@@ -9,6 +9,44 @@
 //! never changed.
 
 mod common;
+
+/// Keep only the executable search path and the runtime loader path in an isolated child.
+fn isolate_environment(
+    command: &mut std::process::Command,
+    path: Option<std::ffi::OsString>,
+    loader_path: Option<std::ffi::OsString>,
+) {
+    command.env_clear().env("PATH", path.unwrap_or_default());
+    if let Some(loader_path) = loader_path {
+        command.env("LD_LIBRARY_PATH", loader_path);
+    }
+}
+
+#[test]
+fn isolated_child_environment_keeps_only_explicit_paths() {
+    let mut command = std::process::Command::new("unused");
+    command.env("HOME", "must-be-cleared");
+    isolate_environment(&mut command, Some("bin".into()), Some("lib".into()));
+    assert_eq!(
+        command.get_envs().collect::<Vec<_>>(),
+        vec![
+            (
+                std::ffi::OsStr::new("LD_LIBRARY_PATH"),
+                Some(std::ffi::OsStr::new("lib"))
+            ),
+            (
+                std::ffi::OsStr::new("PATH"),
+                Some(std::ffi::OsStr::new("bin"))
+            ),
+        ]
+    );
+    let mut no_loader = std::process::Command::new("unused");
+    isolate_environment(&mut no_loader, None, None);
+    assert_eq!(
+        no_loader.get_envs().collect::<Vec<_>>(),
+        vec![(std::ffi::OsStr::new("PATH"), Some(std::ffi::OsStr::new(""))),]
+    );
+}
 
 /// AC: ANC-006 (the subcommands the Python parity test lists).
 #[cfg(test)]
@@ -44,13 +82,17 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
         .to_string(),
     )
     .expect("config");
+    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_decidr"));
+    isolate_environment(
+        &mut command,
+        std::env::var_os("PATH"),
+        std::env::var_os("LD_LIBRARY_PATH"),
+    );
     let output = common::run_bounded(
-        std::process::Command::new(env!("CARGO_BIN_EXE_decidr"))
+        command
             .arg("--config-dir")
             .arg(&config)
             .arg("models")
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
             .current_dir(root.path()),
     );
@@ -218,13 +260,16 @@ mod tests {
 
     fn decidr(home: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(DECIDR);
+        super::isolate_environment(
+            &mut command,
+            std::env::var_os("PATH"),
+            std::env::var_os("LD_LIBRARY_PATH"),
+        );
         command
             .stdin(Stdio::null())
             .arg("--config-dir")
             .arg(home.join(".sc-agent"))
             .args(args)
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .current_dir(env!("CARGO_MANIFEST_DIR"));
         command
     }
