@@ -416,7 +416,7 @@ fn config_errors_follow_the_error_contract() {
         &["HOME", "USERPROFILE on Windows", "log_root", "config_dir"],
         &["1 MiB", "shrink", "config file"],
         &["rename the runner"],
-        &["fix the value", "SC_AGENT__", "default.json", "local.json"],
+        &["fix the value", "reported", "configuration path"],
         &["loopback", "key_env", "remove"],
     ];
     assert_eq!(expected.len(), others.len(), "one row per variant");

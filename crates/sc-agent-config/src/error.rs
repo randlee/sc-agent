@@ -162,9 +162,7 @@ impl ErrorId for AgentConfigError {
             }
             Self::Read { .. } => Some("make the named configuration file readable"),
             Self::Json { .. } => Some("fix the JSON in the named configuration file"),
-            Self::Invalid { .. } => Some(
-                "fix the value at the reported path in default.json/local.json or its SC_AGENT__ variable",
-            ),
+            Self::Invalid { .. } => Some("fix the value at the reported configuration path"),
             Self::KeyOnPlainHttp { .. } => Some("use a loopback host or remove key_env"),
             Self::RunnerName { .. } => Some("rename the runner"),
             // sc-config's own advice for its error code (files, JSON, overrides).

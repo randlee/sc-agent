@@ -565,6 +565,29 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
         assert_eq!(cause.id(), "config.invalid");
         assert!(cause.message().contains("workers"));
         assert_eq!(error.cause_detail(), Some(cause.detail()));
+        let detail = error.detail();
+        let mut current = Some(&detail);
+        let mut visited_cause = false;
+        while let Some(item) = current {
+            if item.id == "config.invalid" {
+                visited_cause = true;
+                assert!(
+                    item.recovery.is_some(),
+                    "{origin}: missing invalid-value recovery"
+                );
+            }
+            if let Some(recovery) = &item.recovery {
+                for ignored in ["default.json", "local.json", "SC_AGENT__"] {
+                    assert!(
+                        !recovery.contains(ignored),
+                        "{origin}: {}: {recovery}",
+                        item.id
+                    );
+                }
+            }
+            current = item.cause.as_deref();
+        }
+        assert!(visited_cause, "{origin}: missing invalid cause");
         if origin == "file" {
             fs::remove_file(file).unwrap();
         }
