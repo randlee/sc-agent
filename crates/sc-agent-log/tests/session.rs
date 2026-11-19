@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use common::{events, identity, keys, payload};
 use sc_agent_log::{Level, SessionLogger};
+use sc_agent_testkit::{HANG_GUARD, join_within};
 use sc_agent_types::SessionId;
 use serde_json::{Map, json};
 use tempfile::TempDir;
@@ -44,18 +45,25 @@ fn runs_append_one_file() {
         log.write(SessionId::new(), Map::new()).expect("row");
         log.flush().expect("flush");
     }
-    std::thread::scope(|scope| {
-        for _ in 0..3 {
-            scope.spawn(|| {
-                let log = SessionLogger::open_default(root.path(), identity().expect("identity"))
-                    .expect("logger");
-                for _ in 0..PER_LOGGER {
-                    log.write(SessionId::new(), Map::new()).expect("row");
-                }
-                log.flush().expect("flush");
-            });
-        }
-    });
+    let writers = (0..3)
+        .map(|writer| {
+            let root = root.path().to_path_buf();
+            std::thread::Builder::new()
+                .name(format!("session-writer-{writer}"))
+                .spawn(move || {
+                    let log = SessionLogger::open_default(&root, identity().expect("identity"))
+                        .expect("logger");
+                    for _ in 0..PER_LOGGER {
+                        log.write(SessionId::new(), Map::new()).expect("row");
+                    }
+                    log.flush().expect("flush");
+                })
+                .expect("spawn session writer")
+        })
+        .collect::<Vec<_>>();
+    for writer in writers {
+        join_within(writer, HANG_GUARD).expect("session writer");
+    }
     let dir = identity().expect("identity").dir(root.path());
     let names: Vec<_> = std::fs::read_dir(&dir)
         .expect("dir")
