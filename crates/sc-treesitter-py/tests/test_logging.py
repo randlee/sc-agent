@@ -43,11 +43,12 @@ def test_callable_and_failure_are_recorded(tmp_path):
 def test_default_logger_records_every_entry_point(tmp_path):
     sc_treesitter.languages(log_root=tmp_path)
     sc_treesitter.queries("python", log_root=tmp_path)
-    sc_treesitter.query_source("python", "branches", log_root=tmp_path)
+    source = sc_treesitter.query_source("python", "branches", log_root=tmp_path)
     sc_treesitter.run_query("python", QUERY, "x", log_root=tmp_path)
     rows = [json.loads(line) for line in (tmp_path / "logs/sitr.log.jsonl").read_text().splitlines()]
     assert [row["action"] for row in rows] == ["sitr.languages", "sitr.queries", "sitr.query_source", "sitr.run_query"]
     assert all(row["fields"]["outcome"] == "ok" for row in rows)
+    assert rows[2]["fields"]["query_size"] == len(source.encode("utf-8"))
 
 
 def test_default_home_in_child_process(tmp_path):

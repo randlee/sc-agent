@@ -101,7 +101,7 @@ fn query_source(
         log,
         "sitr.query_source",
         Some(language),
-        name.len(),
+        result.as_ref().map_or(0, |query| query.len()),
         &result,
         py,
     );
