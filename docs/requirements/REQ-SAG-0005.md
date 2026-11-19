@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is the session log root folder. JSONL is newline-delimited JSON, one row per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project.
+Definitions: `<log_root>` is the session log root folder. JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project.
 
 **MUST statements:**
 
