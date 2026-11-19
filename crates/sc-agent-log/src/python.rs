@@ -14,18 +14,23 @@ pub(crate) enum PythonTarget {
 impl PythonTarget {
     pub(crate) fn classify(target: Py<PyAny>) -> Result<Self, LogError> {
         Python::attach(|py| {
-            let obs = py.import("sc_observability").map_err(refused)?;
             let value = target.bind(py);
+            if value.is_callable() {
+                return Ok(Self::Callable(target));
+            }
+            let obs =
+                py.import("sc_observability")
+                    .map_err(|error| LogError::PythonUnavailable {
+                        cause: Box::new(exception(error)),
+                    })?;
             if value
-                .is_instance(&obs.getattr("Logger").map_err(refused)?)
-                .map_err(refused)?
+                .is_instance(&obs.getattr("Logger").map_err(classify_refused)?)
+                .map_err(classify_refused)?
                 || value
-                    .is_instance(&obs.getattr("AttachedLogger").map_err(refused)?)
-                    .map_err(refused)?
+                    .is_instance(&obs.getattr("AttachedLogger").map_err(classify_refused)?)
+                    .map_err(classify_refused)?
             {
                 Ok(Self::Logger(target))
-            } else if value.is_callable() {
-                Ok(Self::Callable(target))
             } else {
                 Err(LogError::InvalidTarget)
             }
@@ -104,4 +109,14 @@ fn failure(code: &str, message: impl Into<String>) -> LogError {
 }
 fn refused(error: PyErr) -> LogError {
     failure("python.exception", error.to_string())
+}
+
+fn exception(error: PyErr) -> ErrorDetail {
+    ErrorDetail::new("python.exception", error.to_string(), None)
+}
+
+fn classify_refused(error: PyErr) -> LogError {
+    LogError::PythonClassify {
+        cause: Box::new(exception(error)),
+    }
 }
