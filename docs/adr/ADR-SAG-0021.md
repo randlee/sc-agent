@@ -1,6 +1,6 @@
 # Decision: General logs and session logs live in separate trees, and the session identity is a fixed agent role plus a required project/phase
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-18  
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0021: General logs and session logs live in separate trees, and the session identity is a fixed agent role plus a required project/phase
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Related Documents
 
@@ -63,6 +63,8 @@ The logs are written by the Rust code through loggers that are injected (REQ-SAG
 Every log in both tables is enabled by default and every sc-decidr and sitr call is logged, so with nothing configured all logs land under `<log_root>` (`~/.sc-agent/`) for a full audit. The session logger stays optionally injectable; no app injects one today.
 
 A plan that adds an app, or changes a log an app writes, is not approved until it includes a new version of this ADR with that row. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
+
+The crates that carry this decision depend on each other as follows. The sitr wheel (`sc-treesitter-py`) depends on `sc-agent-log`, so it takes an injected Logger and has the same default general logger as the sc-decidr wheel. The `sitr` CLI depends on `sc-agent-config`, so it reads its configuration through the seven-layer lookup of ADR-SAG-0020. Both are existing crates.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
