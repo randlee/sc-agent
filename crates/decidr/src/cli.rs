@@ -196,7 +196,7 @@ mod tests {
 
     /// AC: REQ-SAG-0004 (no --agent-name flag; project and agent role required).
     #[test]
-    fn there_is_no_agent_name_flag_and_both_slugs_are_required() {
+    fn there_is_no_agent_name_flag_and_agent_role_is_required() {
         let base = ["decidr", "send", "--model", "jev", "--project", "p"];
         let error = parse(base.iter().chain(&["--agent-name", "x"])).expect_err("no flag");
         assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.usage");
