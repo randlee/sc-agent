@@ -54,8 +54,7 @@ sc-observability already rotates and prunes the general log. Session logs are th
 - [ ] With no layer setting `log_root`, `decidr doctor` and `sitr doctor` each report `log_root` as `<home>/.sc-agent` with source `default`.
 - [ ] With `DECIDR_LOG_ROOT` set to a directory `<dir>`, a decidr run writes its general log to `<dir>/logs/decidr/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
 - [ ] With `log_root` set in the global `sc-agent.json` and `DECIDR_LOG_ROOT` set to `<dir>`, `decidr doctor` reports `log_root` as `<dir>` with source `DECIDR_LOG_ROOT`.
-- [ ] With no general logger injected, a `decidr send` run from the command line appends its general log records to `<log_root>/logs/decidr/decidr.log.jsonl`.
-- [ ] With no general logger injected, a `sitr` run from the command line appends its general log records to `<log_root>/logs/sitr/sitr.log.jsonl`.
+- [ ] With no general logger injected, a sitr run writes its general log to `<log_root>/logs/sitr/sitr.log.jsonl`.
 - [ ] After the plan-anchor generated client runs, its general log is `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl`.
 - [ ] With no log_root configured, decidr writes its general log to `<home>/.sc-agent/logs/decidr/decidr.log.jsonl` and its session logs under `<home>/.sc-agent/sessions/`.
 - [ ] After decidr and sitr each run, `<log_root>/logs/decidr/` and `<log_root>/logs/sitr/` each hold only that CLI's general log, and `<log_root>/logs/` holds no session log.
