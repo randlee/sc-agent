@@ -436,26 +436,36 @@ fn decode(mut value: Value, cli: CliName) -> Result<AgentConfig, AgentConfigErro
     Ok(config)
 }
 
-// The provenance of an error path: its own source or that of its nearest recorded parent.
-fn source_for<'a>(
-    error: &AgentConfigError,
-    sources: &'a BTreeMap<String, Source>,
-    fallback: &'a Source,
-) -> &'a Source {
+// Names the error path's own source, else its nearest recorded parent's, else the one
+// source of all its recorded descendants; otherwise no layer.
+fn attributed(error: AgentConfigError, sources: &BTreeMap<String, Source>) -> AgentConfigError {
     let (AgentConfigError::Invalid { path, .. }
     | AgentConfigError::RunnerName { path, .. }
-    | AgentConfigError::KeyOnPlainHttp { path, .. }) = error
+    | AgentConfigError::KeyOnPlainHttp { path, .. }) = &error
     else {
-        return fallback;
+        return error;
     };
-    sources
+    let source = sources
         .iter()
         .filter(|(key, _)| {
             path.strip_prefix(key.as_str())
                 .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
         })
         .max_by_key(|(key, _)| key.len())
-        .map_or(fallback, |(_, source)| source)
+        .map(|(_, source)| source)
+        .or_else(|| {
+            let below = format!("{path}.");
+            let mut descendants = sources.iter().filter(|(key, _)| key.starts_with(&below));
+            let (_, first) = descendants.next()?;
+            descendants
+                .all(|(_, source)| source == first)
+                .then_some(first)
+        })
+        .cloned();
+    match source {
+        Some(source) => at(&source, error),
+        None => error,
+    }
 }
 
 /// Loads the seven layers, validating every supplied input even if a higher layer wins.
@@ -550,16 +560,13 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
     }
     // Decode the winning object, then each layer re-applied over it, so a masked
     // invalid value still fails under its own source.
-    let mut config = decode(value.clone(), options.cli).map_err(|error| {
-        let top = layers.last().map_or(&Source::Default, |(_, source)| source);
-        at(source_for(&error, &sources, top), error)
-    })?;
+    let mut config =
+        decode(value.clone(), options.cli).map_err(|error| attributed(error, &sources))?;
     for (layer, source) in layers.iter().rev().skip(1) {
         let mut checked = value.clone();
         let mut checked_sources = sources.clone();
         merge(&mut checked, layer, "", source, &mut checked_sources);
-        decode(checked, options.cli)
-            .map_err(|error| at(source_for(&error, &checked_sources, source), error))?;
+        decode(checked, options.cli).map_err(|error| attributed(error, &checked_sources))?;
     }
     if config.log_root.is_none() {
         config.log_root = Some(options.default_log_root.clone());
