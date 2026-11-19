@@ -220,24 +220,18 @@ pub fn load_context(context: &Context) -> Result<sc_agent_config::Loaded, Decidr
         return Ok(loaded.clone());
     }
     let environment = context.environment().into_owned();
-    let home = context
-        .home
-        .clone()
-        .or_else(|| {
-            environment
-                .iter()
-                .rev()
-                .find(|(key, value)| (key == "HOME" || key == "USERPROFILE") && !value.is_empty())
-                .map(|(_, value)| PathBuf::from(value))
-        })
-        .or_else(|| {
-            context
-                .environment
-                .is_none()
-                .then(std::env::home_dir)
-                .flatten()
-        })
-        .ok_or(sc_agent_config::AgentConfigError::HomeUnknown)?;
+    let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    let home = match &context.home {
+        Some(home) => home.clone(),
+        None => match environment.iter().rev().find(|(key, _)| key == home_var) {
+            Some((_, value)) if !value.is_empty() => PathBuf::from(value),
+            Some(_) => return Err(sc_agent_config::AgentConfigError::HomeUnknown.into()),
+            None if context.environment.is_none() => std::env::home_dir()
+                .filter(|home| !home.as_os_str().is_empty())
+                .ok_or(sc_agent_config::AgentConfigError::HomeUnknown)?,
+            None => return Err(sc_agent_config::AgentConfigError::HomeUnknown.into()),
+        },
+    };
     let worktree = match &context.repo_root {
         Some(root) => Some(root.clone()),
         None => Repo::work_tree_root(&working_dir()?)?,
@@ -1457,6 +1451,47 @@ mod select_tests {
             environment: Vec::new(),
         })
         .map(|loaded| loaded.config)
+    }
+
+    #[test]
+    fn layered_home_uses_the_platform_variable_independently_of_vector_order() {
+        let root = tempfile::tempdir().expect("root");
+        let unix_home = root.path().join("unix");
+        let windows_home = root.path().join("windows");
+        let expected = if cfg!(windows) {
+            &windows_home
+        } else {
+            &unix_home
+        };
+        let vars = vec![
+            (OsString::from("HOME"), unix_home.clone().into_os_string()),
+            (
+                OsString::from("USERPROFILE"),
+                windows_home.clone().into_os_string(),
+            ),
+        ];
+        for environment in [vars.clone(), vars.into_iter().rev().collect()] {
+            let mut context = Context::new(sc_agent_config::CliName::Decidr);
+            context.environment = Some(environment);
+            context.repo_root = Some(root.path().join("work"));
+            let loaded = load_context(&context).expect("layers");
+            assert_eq!(
+                loaded.config.log_root().expect("log root"),
+                sc_agent_log::default_log_root(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn explicitly_empty_home_never_falls_back_to_the_host_account() {
+        let mut context = Context::new(sc_agent_config::CliName::Decidr);
+        let name = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+        context.environment = Some(vec![(name.into(), "".into())]);
+        let error = load_context(&context).expect_err("empty home");
+        assert_eq!(
+            error.cause_detail().expect("cause").id,
+            "config.home_unknown"
+        );
     }
 
     /// QA-007: `--model` precedence is short name, then configured runner, then model id. A
