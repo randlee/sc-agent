@@ -137,14 +137,30 @@ fn decode_source<'a>(
     error: &AgentConfigError,
     sources: &'a BTreeMap<String, Source>,
     fallback: &'a Source,
+    precedence: &[&Source],
 ) -> &'a Source {
     let path = match error {
         AgentConfigError::Invalid { path, .. }
         | AgentConfigError::RunnerName { path, .. }
         | AgentConfigError::KeyOnPlainHttp { path, .. } => path.as_str(),
-        AgentConfigError::Catalog(_) => "models",
         _ => return fallback,
     };
+    // Missing fields and container limits are reported at the parent path. That
+    // parent may have no source entry because the merger records its leaf values.
+    if let Some((_, source)) = sources
+        .iter()
+        .filter(|(key, _)| {
+            key.strip_prefix(path)
+                .is_some_and(|rest| rest.starts_with('.') || rest.starts_with('['))
+        })
+        .max_by_key(|(_, source)| {
+            precedence
+                .iter()
+                .rposition(|candidate| *candidate == *source)
+        })
+    {
+        return source;
+    }
     sources
         .iter()
         .filter(|(key, _)| {
@@ -578,16 +594,30 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
     for (layer, source) in &layers {
         merge(&mut value, layer, "", source, &mut sources);
     }
+    let precedence: Vec<&Source> = layers.iter().map(|(_, source)| source).collect();
+    let default_source = Source::Default;
+    let fallback = layers.last().map_or(&default_source, |(_, source)| source);
+    // Diagnose the winning object first. Replacing a winning leaf while checking
+    // a lower layer must not hide that leaf's source on a parent-path error.
+    let mut config = decode(value.clone(), options.cli).map_err(|error| {
+        at(
+            decode_source(&error, &sources, fallback, &precedence),
+            error,
+        )
+    })?;
     // Validate lower values against the full object, so partial nested overrides
     // keep their required siblings while masked invalid values still fail.
     for (layer, source) in &layers {
         let mut checked = value.clone();
         let mut checked_sources = sources.clone();
         merge(&mut checked, layer, "", source, &mut checked_sources);
-        decode(checked, options.cli)
-            .map_err(|error| at(decode_source(&error, &checked_sources, source), error))?;
+        decode(checked, options.cli).map_err(|error| {
+            at(
+                decode_source(&error, &checked_sources, source, &precedence),
+                error,
+            )
+        })?;
     }
-    let mut config = decode(value, options.cli)?;
     if config.log_root.is_none() {
         config.log_root = Some(options.default_log_root.clone());
     }
