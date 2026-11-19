@@ -1,6 +1,17 @@
 //! Layered CLI configuration and shared doctor rows through [`load_layered`].
-//! All discovery inputs and the default log root are supplied in [`LoadOptions`].
-//! This crate reads layers but opens no log files and resolves no provider keys.
+//!
+//! For each setting the first value wins: CLI flag, environment variable, local
+//! `<cli>.json`, local `sc-agent.json`, global `<cli>.json`, global `sc-agent.json`,
+//! then the supplied default or a missing-setting error. Global files live under
+//! `<home>/.sc-agent/`; local files live under `<worktree>/.sc/sc-agent/` and are
+//! skipped when there is no worktree. [`LoadOptions`] supplies the discovery inputs,
+//! flags, environment and default log root. CLI settings use their CLI's environment
+//! prefix; the shared project/phase uses `SC_PROJECT`. [`doctor_rows`] reports each
+//! setting and its source. The loader validates values and does not write config files.
+//!
+//! [`AgentConfig`] holds the resolved settings, including log root, workers, send
+//! limit and local decision runners. Runner credentials are resolved separately by
+//! `sc_agent_secrets::resolve_var`. This crate opens no log files.
 #![forbid(unsafe_code)]
 
 mod config;
