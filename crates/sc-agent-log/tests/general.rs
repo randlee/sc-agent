@@ -5,6 +5,7 @@ mod common;
 use common::{events, keys, payload};
 use sc_agent_log::testing::MemoryLog;
 use sc_agent_log::{GeneralLogger, Level, LogContext, LogError};
+use sc_agent_testkit::{ChildGuard, HANG_GUARD};
 use sc_agent_types::SessionId;
 use serde_json::json;
 use tempfile::TempDir;
@@ -155,15 +156,17 @@ fn default_root_uses_child_home() {
     let exe = std::env::current_exe().expect("test binary");
     {
         let (mode, home) = (root.path().as_os_str(), root.path().as_os_str());
-        let status = std::process::Command::new(&exe)
+        let mut command = std::process::Command::new(&exe);
+        command
             .args(["--exact", "default_root_child"])
             .env("SC_AGENT_TEST_HOME_MODE", mode)
             .env("HOME", home)
             .env("USERPROFILE", home)
             .stdin(std::process::Stdio::null())
-            .status()
-            .expect("child");
-        assert!(status.success());
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        let output = ChildGuard::spawn(&mut command).wait_with_output(HANG_GUARD);
+        assert!(output.status.success(), "child failed: {output:?}");
     }
 }
 
