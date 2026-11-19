@@ -29,7 +29,7 @@ Definitions: The project/phase is the name of the project or phase a session bel
 
 - When no project layer sets `project`, a session write MUST NOT send a session.
 - When no project layer sets `project`, a session write MUST NOT write a session.
-- `project` MUST NOT have a built-in default.
+- When no project layer sets `project`, the built-in default layer, layer 7 of REQ-SAG-0019, MUST NOT give `project` a value.
 
 ### Rationale
 
@@ -43,6 +43,8 @@ Agents work by phase, so sessions are grouped by project/phase. A default would 
 - [ ] With `SC_PROJECT=phase-d` and `"project": "phase-c"` in the local `sc-agent.json`, sessions are filed under `phase-d`.
 - [ ] With `--project phase-e`, sessions are filed under `phase-e` whatever the environment and files set.
 - [ ] With no layer setting it, a decidr request fails with the typed error, nothing is sent, and no session row is written.
+- [ ] With no layer setting it, the typed error of a failed decidr request names `--project`, `SC_PROJECT`, `sc-agent.json` and `<cli>.json`.
+- [ ] With no layer setting it, a PyO3 call that would write a session fails with the same typed error.
 - [ ] `decidr --help` describes `--project` as the project/phase.
 
 ### Dependencies

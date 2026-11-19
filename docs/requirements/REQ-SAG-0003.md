@@ -53,6 +53,7 @@ sc-observability already rotates and prunes the general log. Session logs are th
 - [ ] A session log file under `<log_root>/sessions/` whose modification time is older than the sc-observability retention age is still present and unchanged after decidr runs a new session.
 - [ ] With no layer setting `log_root`, `decidr doctor` and `sitr doctor` each report `log_root` as `<home>/.sc-agent` with source `default`.
 - [ ] With `DECIDR_LOG_ROOT` set to a directory `<dir>`, a decidr run writes its general log to `<dir>/logs/decidr/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
+- [ ] With `log_root` set in the global `sc-agent.json` and `DECIDR_LOG_ROOT` set to `<dir>`, `decidr doctor` reports `log_root` as `<dir>` with source `DECIDR_LOG_ROOT`.
 - [ ] With no general logger injected, a sitr run writes its general log to `<log_root>/logs/sitr/sitr.log.jsonl`.
 - [ ] After the plan-anchor generated client runs, its general log is `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl`.
 - [ ] With no log_root configured, decidr writes its general log to `<home>/.sc-agent/logs/decidr/decidr.log.jsonl` and its session logs under `<home>/.sc-agent/sessions/`.

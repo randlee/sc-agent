@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sitr`; `<cli>` is its program name. The shared file is `sc-agent.json`. A CLI file is `<cli>.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. A typed error is an error detail (`ErrorDetail`, REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `runners.local.port`. The shared settings are the settings that apply to every CLI and that `sc-agent.json` holds. The shared doctor routine is the one routine that builds the rows of the shared settings for every CLI's doctor. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `setting`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it.
+Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sitr`; `<cli>` is its program name. The shared file is `sc-agent.json`. A CLI file is `<cli>.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. `default.json` and `local.json` are the files of the configuration layout before ADR-SAG-0020, such as `~/.sc-agent/default.json`. A typed error is an error detail (`ErrorDetail`, REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `runners.local.port`. The shared settings are the settings that apply to every CLI and that `sc-agent.json` holds. `<cli> doctor` is a CLI's doctor command, such as `decidr doctor` or `sitr doctor`. The shared doctor routine is the one routine that builds the rows of the shared settings for every CLI's doctor. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `setting`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it.
 
 **MUST statements:**
 
@@ -28,13 +28,13 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
   7. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
 - `sc-agent.json` MUST accept only settings that apply to every CLI.
-- `<cli>.json` MUST accept that CLI's settings.
+- `<cli>.json` MUST accept the settings of the CLI named `<cli>`.
 - `<cli>.json` MUST accept the shared settings.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 and 4 MUST be skipped.
 - Configuration files MUST be JSON.
-- Each CLI MUST have a `<cli> doctor` command (`decidr doctor`, `sitr doctor`).
+- Each CLI MUST have a `<cli> doctor` command.
 - `<cli> doctor` MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.
 - `<cli> doctor` MUST report the path of every file in the seven layers.
