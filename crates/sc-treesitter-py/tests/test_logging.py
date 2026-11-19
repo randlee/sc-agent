@@ -1,4 +1,5 @@
 """Wheel logging through real caller-owned loggers and temporary roots."""
+import inspect
 import json
 import os
 from pathlib import Path
@@ -108,3 +109,34 @@ def test_logger_open_failure_preserves_query_error(tmp_path, capfd):
         sc_treesitter.run_query("unknown", QUERY, "x", general_log=42, log_root=tmp_path)
     assert raised.value.args[0] == "treesitter.unknown_language"
     assert "log.invalid_target" in capfd.readouterr().err
+
+def test_query_and_source_text_are_absent_from_success_and_failure_logs(tmp_path):
+    marker = "sitr_private_query_source_marker_7c09"
+    source = f"{marker} = 1"
+    captures = sc_treesitter.run_query(
+        "python", f"(identifier) @{marker}", source, log_root=tmp_path,
+    )
+    assert captures[0].text == marker
+    with pytest.raises(sc_treesitter.TreesitterError) as raised:
+        sc_treesitter.run_query("python", f"({marker}) @id", source, log_root=tmp_path)
+    text = (tmp_path / "logs/sitr.log.jsonl").read_text()
+    rows = [json.loads(line) for line in text.splitlines()]
+    assert len(rows) == 2
+    assert [row["fields"]["outcome"] for row in rows] == ["ok", "error"]
+    assert rows[1]["fields"]["error_id"] == raised.value.args[0]
+    assert all(marker not in json.dumps(row) for row in rows)
+
+
+def test_public_callables_are_exactly_logged_wrappers_and_types():
+    wrappers = {"languages", "queries", "query_source", "run_query"}
+    public = {
+        name for name in dir(sc_treesitter)
+        if not name.startswith("_") and callable(getattr(sc_treesitter, name))
+    }
+    assert public == wrappers | {"Capture", "TreesitterError"}
+    for name in wrappers:
+        signature = inspect.signature(getattr(sc_treesitter, name))
+        for keyword in ("general_log", "log_root"):
+            parameter = signature.parameters[keyword]
+            assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, (name, keyword)
+            assert parameter.default is None, (name, keyword)
