@@ -754,6 +754,57 @@ def test_sanity_pass_closes_without_waiting_for_stack(world):
                         if argv[:4] == ["atm", "task", "close", world.values["sanity_task_id"]])
 
 
+def not_reproducible_sanity(world):
+    """A sanity check of a not_reproducible fix: the dev rejected the finding, so nothing was pushed and no PR exists."""
+    checked = world.beads[world.values["checked_bead"]]
+    for name in ("pr_number", "pr_url", "pr_base"):
+        checked["metadata"].pop(name, None)
+    world.beads[world.values["qa_bead"]]["metadata"].pop("pr_number", None)
+    world.values.pop("stack_bead", None)
+    world.values.update(outcome="not_reproducible", pr_number="", pr_url="")
+
+
+def test_accepted_not_reproducible_closes_sanity_and_qa_beads_without_qa(world):
+    not_reproducible_sanity(world)
+    result = world.run("sanity", verdict="PASS")
+    assert "ok" in result, result
+    commit = world.values["commit"]
+    sanity, qa = world.values["sanity_bead"], world.values["qa_bead"]
+    assert world.beads[sanity]["status"] == "closed"
+    assert world.beads[sanity]["close_reason"] == f"PASS at {commit}"
+    assert world.beads[qa]["status"] == "closed"
+    assert world.beads[qa]["close_reason"] == f"not reproducible: rejection accepted by sanity at {commit}; no QA"
+    assert world.tasks[world.values["sanity_task_id"]][-1]["close_outcome"] == "completed"
+    calls = [argv for argv, _kwargs in world.calls]
+    assert not any(argv[:3] == ["gh", "pr", "view"] for argv in calls)
+    assert not any(argv[:3] == ["atm", "task", "assign"] for argv in calls)
+    assert not any(message["type"] == "qa-task" for message in world.messages)
+    assert result["ok"]["assigned"] == []
+    assert result["ok"]["closed"] == [sanity, qa]
+
+
+def test_accepted_not_reproducible_replay_writes_nothing_more(world):
+    not_reproducible_sanity(world)
+    assert "ok" in world.run("sanity", verdict="PASS")
+    writes = len(world.writes)
+    assert "ok" in world.run("sanity", verdict="PASS")
+    assert len(world.writes) == writes
+
+
+def test_rejected_not_reproducible_fail_reopens_the_finding_and_leaves_qa_open(world):
+    not_reproducible_sanity(world)
+    qa = world.values["qa_bead"]
+    before = copy.deepcopy(world.beads[qa])
+    assert "ok" in world.run("sanity", verdict="FAIL", undone=[{"number": 1, "reason": "defect still reproduces"}])
+    checked = world.values["checked_bead"]
+    assert world.beads[checked]["status"] == "open"
+    assert world.beads[world.values["sanity_bead"]]["status"] == "open"
+    assert world.beads[qa] == before
+    assigns = [argv for argv, _ in world.writes if argv[:3] == ["atm", "task", "assign"]]
+    assert len(assigns) == 1 and assigns[0][assigns[0].index("--task-id") + 1] == checked
+    assert not any(argv[:3] == ["gh", "pr", "view"] for argv, _kwargs in world.calls)
+
+
 @pytest.mark.parametrize("configured_cap", [None, 2])
 def test_failure_cap_exceeds_limit_and_counts_distinct_assignments(world, configured_cap):
     config = world.root / hook.repo_config.RELATIVE_PATH
