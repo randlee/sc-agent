@@ -44,14 +44,18 @@ pub(crate) const LOG_TARGET: &str = "decidr";
 /// (REQ-SAG-0008).
 #[derive(Clone)]
 pub struct Context {
-    /// The general-log service: `"decidr"` or `"sc-agent-py"`.
-    pub service: &'static str,
-    /// The configuration directory; `None` is `sc_agent_config::default_dir()` (`~/.sc-agent`).
-    pub config_dir: Option<PathBuf>,
+    /// The CLI configuration scope and general-log service.
+    pub cli: sc_agent_config::CliName,
+    /// A configuration snapshot already loaded at the calling edge.
+    pub loaded: Option<sc_agent_config::Loaded>,
+    /// Explicit home for embedded callers and deterministic tests.
+    pub home: Option<PathBuf>,
+    /// Dotted configuration flags, applied after environment and file layers.
+    pub flags: std::collections::BTreeMap<String, Value>,
     /// The git work-tree top whose `.env` is read for keys (REQ-SAG-0401); `None` is
     /// `Repo::work_tree_root(cwd)`. Tests point it at a tempdir so no real `.env` is read.
     pub repo_root: Option<PathBuf>,
-    /// `SC_AGENT__` overrides and key lookup; `None` is `std::env::vars_os()`.
+    /// `DECIDR_` overrides and key lookup; `None` is `std::env::vars_os()`.
     pub environment: Option<Vec<(OsString, OsString)>>,
     /// The keyring read last for keys; `None` is the platform keyring.
     pub keyring: Option<Arc<dyn KeyringSource + Send + Sync>>,
@@ -59,8 +63,12 @@ pub struct Context {
     pub keyring_override: Option<KeyringLocation>,
     /// Every send; `None` is a `UreqTransport` with the operation's timeouts.
     pub transport: Option<Arc<dyn Transport>>,
-    /// The general log; `None` is `GeneralLogger::open_default(log_root, service)`.
-    pub general: Option<GeneralLogger>,
+    /// The caller-owned general destination; absent selects the default file.
+    pub general: Option<sc_agent_log::Injected>,
+    /// The caller-owned session destination; absent selects the default session file.
+    pub session: Option<sc_agent_log::Injected>,
+    /// An opened general writer shared by the process edge and its workers.
+    pub opened_general: Option<GeneralLogger>,
     /// The clock of every decision run and of every wait (admissions, holdoffs, provider
     /// pauses, sends, the local load wait, probe holdoffs); `None` is the real clock
     /// ([`Clock::system`]). A test seam: with `sc_agent_types::testing::ManualClock`, a
@@ -69,18 +77,22 @@ pub struct Context {
 }
 
 impl Context {
-    /// A context for `service` with every seam `None`.
+    /// A context for `cli` with no injected destinations or configuration snapshot.
     #[must_use]
-    pub fn new(service: &'static str) -> Self {
+    pub fn new(cli: sc_agent_config::CliName) -> Self {
         Self {
-            service,
-            config_dir: None,
+            cli,
+            loaded: None,
+            home: None,
+            flags: std::collections::BTreeMap::new(),
             repo_root: None,
             environment: None,
             keyring: None,
             keyring_override: None,
             transport: None,
             general: None,
+            session: None,
+            opened_general: None,
             clock: None,
         }
     }
@@ -103,8 +115,10 @@ impl fmt::Debug for Context {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Context")
-            .field("service", &self.service)
-            .field("config_dir", &self.config_dir)
+            .field("cli", &self.cli)
+            .field("loaded", &self.loaded)
+            .field("home", &self.home)
+            .field("flags", &self.flags)
             .field("repo_root", &self.repo_root)
             .field("environment", &self.environment.as_ref().map(Vec::len))
             .field("keyring", &self.keyring.is_some())
@@ -197,21 +211,55 @@ pub struct ModelsOptions {
     pub context: Context,
 }
 
-/// Loads the global configuration of `context` (REQ-SAG-0013 bounds included).
+/// Loads every applicable configuration layer without opening a logger.
 ///
 /// # Errors
-///
-/// [`DecidrError::Config`] with the `AgentConfigError` (key path in `config.invalid`).
-pub fn load_config(context: &Context) -> Result<AgentConfig, DecidrError> {
-    let dir = match &context.config_dir {
-        Some(dir) => dir.clone(),
-        None => sc_agent_config::default_dir()?,
+/// Returns the typed source-qualified configuration or worktree-discovery error.
+pub fn load_context(context: &Context) -> Result<sc_agent_config::Loaded, DecidrError> {
+    if let Some(loaded) = &context.loaded {
+        return Ok(loaded.clone());
+    }
+    let environment = context.environment().into_owned();
+    let home = context
+        .home
+        .clone()
+        .or_else(|| {
+            environment
+                .iter()
+                .rev()
+                .find(|(key, value)| (key == "HOME" || key == "USERPROFILE") && !value.is_empty())
+                .map(|(_, value)| PathBuf::from(value))
+        })
+        .or_else(|| {
+            context
+                .environment
+                .is_none()
+                .then(std::env::home_dir)
+                .flatten()
+        })
+        .ok_or(sc_agent_config::AgentConfigError::HomeUnknown)?;
+    let worktree = match &context.repo_root {
+        Some(root) => Some(root.clone()),
+        None => Repo::work_tree_root(&working_dir()?)?,
     };
-    // `load` takes the environment by value (A-4), so this is the one copy.
-    Ok(sc_agent_config::load(
-        dir,
-        context.environment().into_owned(),
+    Ok(sc_agent_config::load_layered(
+        &sc_agent_config::LoadOptions {
+            cli: context.cli,
+            default_log_root: sc_agent_log::default_log_root(&home),
+            home,
+            worktree,
+            flags: context.flags.clone(),
+            environment,
+        },
     )?)
+}
+
+/// The validated configuration of the context's layered snapshot.
+///
+/// # Errors
+/// Returns the typed layer or discovery error from [`load_context`].
+pub fn load_config(context: &Context) -> Result<AgentConfig, DecidrError> {
+    Ok(load_context(context)?.config)
 }
 
 /// The session identity of the working folder: `Repo::detect(cwd)`, `project`, `agent_role`.
@@ -364,20 +412,21 @@ fn choose_provider(
 
 /// The general logger of `context`, or the default one for its service.
 fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger, DecidrError> {
-    match &context.general {
-        Some(general) => Ok(general.clone()),
-        None => {
-            let root = config.log_root()?;
-            Ok(GeneralLogger::open_default(Some(&root), context.service)?)
-        }
+    if let Some(general) = &context.opened_general {
+        return Ok(general.clone());
     }
+    Ok(GeneralLogger::open_with(
+        &config.log_root()?,
+        context.cli.as_str(),
+        context.general.clone(),
+    )?)
 }
 
 /// The general logger an operation over `context` writes to: the injected one, else
 /// `<log_root>/logs/<service>.log.jsonl`.
 ///
 /// Callers that own the process (the `decidr` binary, sc-agent-py) open it here, put it in
-/// `context.general`, and close it after the operation, so every record is written (or with
+/// `context.opened_general`, and close it after the operation, so every record is written (or with
 /// the callable) before they return and a lost row is reported, not dropped.
 ///
 /// # Errors
@@ -405,7 +454,11 @@ fn session_for(options: &SendOptions, config: &AgentConfig) -> Result<SessionLog
         None => {
             let identity = session_identity(&options.project, &options.agent_role)?;
             let root = config.log_root()?;
-            Ok(SessionLogger::open_default(&root, identity)?)
+            Ok(SessionLogger::open_with(
+                &root,
+                identity,
+                options.context.session.clone(),
+            )?)
         }
     }
 }
@@ -670,11 +723,11 @@ impl Prepared {
         Ok(Self {
             runner,
             general,
-            owns_general: context.general.is_none(),
+            owns_general: context.opened_general.is_none(),
             chosen,
             probe: probe_transport(context),
             clock: context.clock(),
-            service: context.service,
+            service: context.cli.as_str(),
         })
     }
 
@@ -1029,17 +1082,30 @@ pub(crate) fn typesafe_backend(key: ResolvedKey) -> Result<SystemOneBackend, Dec
 }
 
 /// Key lookup for doctor: every provider in `Provider::PRIORITY` order with a key.
-pub(crate) fn detected_keys(
-    context: &Context,
-) -> Result<Vec<(Provider, ResolvedKey)>, DecidrError> {
+pub(crate) fn detected_keys(context: &Context) -> Result<crate::doctor::KeyChecks, DecidrError> {
     let keys = Keys::new(context)?;
-    let mut found = Vec::new();
+    let mut checks = crate::doctor::KeyChecks::default();
     for provider in Provider::PRIORITY {
-        if let Some(key) = keys.find(provider)? {
-            found.push((provider, key));
+        match keys.find(provider) {
+            Ok(Some(key)) => checks.found.push((provider, key)),
+            Ok(None) => (),
+            Err(DecidrError::Secrets(error))
+                if matches!(
+                    &*error,
+                    SecretsError::KeyringRead { .. }
+                        | SecretsError::KeyringTimeout
+                        | SecretsError::KeyringConstructionRefused
+                ) =>
+            {
+                checks.errors.push(crate::doctor::KeyringError {
+                    provider,
+                    error: error.detail(),
+                })
+            }
+            Err(error) => return Err(error),
         }
     }
-    Ok(found)
+    Ok(checks)
 }
 
 /// The config and general logger of a probe-class operation, and whether decidr opened the
@@ -1049,7 +1115,7 @@ pub(crate) fn probe_setup(
 ) -> Result<(AgentConfig, GeneralLogger, bool), DecidrError> {
     let config = load_config(context)?;
     let general = general_for(context, &config)?;
-    Ok((config, general, context.general.is_none()))
+    Ok((config, general, context.opened_general.is_none()))
 }
 
 /// `result`, unless a general logger decidr opened lost rows (then that error).
@@ -1076,7 +1142,7 @@ pub fn models(
     let (config, general, owned) = probe_setup(&options.context)?;
     let result = list_models(options, &config, &general, cancel);
     let mut fields = Map::new();
-    fields.insert("service".into(), options.context.service.into());
+    fields.insert("service".into(), options.context.cli.as_str().into());
     fields.insert(
         "runner".into(),
         options
@@ -1379,27 +1445,46 @@ mod select_tests {
         );
     }
 
+    fn test_config(
+        home: &std::path::Path,
+    ) -> Result<AgentConfig, sc_agent_config::AgentConfigError> {
+        sc_agent_config::load_layered(&sc_agent_config::LoadOptions {
+            cli: sc_agent_config::CliName::Decidr,
+            home: home.into(),
+            worktree: Some(home.into()),
+            default_log_root: sc_agent_log::default_log_root(home),
+            flags: Default::default(),
+            environment: Vec::new(),
+        })
+        .map(|loaded| loaded.config)
+    }
+
     /// QA-007: `--model` precedence is short name, then configured runner, then model id. A
     /// runner cannot be named like a short name (`haiku`): the config refuses it, so `haiku`
     /// always means the line. A runner named like a model id wins over the model id.
     #[test]
     fn a_runner_follows_the_documented_precedence() {
         let dir = tempfile::tempdir().expect("dir");
+        std::fs::create_dir_all(dir.path().join(".sc/sc-agent")).expect("local folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc/sc-agent/decidr.json"),
             r#"{"local_runners":{"haiku":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}"#,
         )
         .expect("write");
-        let error = sc_agent_config::load(dir.path().to_path_buf(), Vec::new())
-            .expect_err("a runner named like a short name");
-        assert_eq!(error.id(), "config.runner_name");
+        let error = test_config(dir.path()).expect_err("a runner named like a short name");
+        assert_eq!(error.id(), "config.layer");
+        assert_eq!(
+            error.cause_detail().expect("validation cause").id,
+            "config.runner_name"
+        );
 
+        std::fs::create_dir_all(dir.path().join(".sc/sc-agent")).expect("local folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc/sc-agent/decidr.json"),
             r#"{"local_runners":{"claude-haiku-5-5":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}"#,
         )
         .expect("write");
-        let config = sc_agent_config::load(dir.path().to_path_buf(), Vec::new()).expect("config");
+        let config = test_config(dir.path()).expect("config");
         assert!(matches!(
             ModelSelector::parse("claude-haiku-5-5", &config),
             Ok(ModelSelector::Runner(name)) if name.as_str() == "claude-haiku-5-5"
@@ -1416,11 +1501,7 @@ mod select_tests {
 
     #[test]
     fn a_model_selector_prefers_short_names_then_runners() {
-        let config: AgentConfig = sc_agent_config::load(
-            tempfile::tempdir().expect("dir").path().to_path_buf(),
-            Vec::new(),
-        )
-        .expect("default config");
+        let config = AgentConfig::default();
         assert_eq!(
             ModelSelector::parse("haiku", &config).expect("short"),
             ModelSelector::Short(ShortName::Haiku)
@@ -1449,16 +1530,17 @@ mod select_tests {
     #[test]
     fn a_local_runner_transport_uses_the_runner_request_timeout() {
         let dir = tempfile::tempdir().expect("dir");
+        std::fs::create_dir_all(dir.path().join(".sc/sc-agent")).expect("local folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc/sc-agent/decidr.json"),
             r#"{"local_runners":{
                 "laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"},
                 "slow":{"kind":"mapika","host":"127.0.0.1","port":9001,"model":"m",
                         "request_timeout_secs":900,"load_timeout_secs":1200}}}"#,
         )
         .expect("write");
-        let config = sc_agent_config::load(dir.path().to_path_buf(), Vec::new()).expect("config");
-        let context = Context::new("decidr");
+        let config = test_config(dir.path()).expect("config");
+        let context = Context::new(sc_agent_config::CliName::Decidr);
         let laya = local_runner(&config, "laya").expect("laya");
         assert_eq!(
             ureq_timeouts(decision_transport(&context, Some(laya), None)),
@@ -1475,7 +1557,7 @@ mod select_tests {
             ureq_timeouts(decision_transport(&context, None, None)),
             Some(Timeouts::default())
         );
-        let mut injected = Context::new("decidr");
+        let mut injected = Context::new(sc_agent_config::CliName::Decidr);
         injected.transport = Some(Arc::new(UreqTransport::new(Timeouts::probe())));
         assert_eq!(
             ureq_timeouts(decision_transport(&injected, Some(laya), None)),
@@ -1520,8 +1602,9 @@ mod select_tests {
     #[test]
     fn the_configured_load_timeout_reaches_the_load_wait() {
         let dir = tempfile::tempdir().expect("dir");
+        std::fs::create_dir_all(dir.path().join(".sc/sc-agent")).expect("local folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc/sc-agent/decidr.json"),
             r#"{"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":9100,"model":"jev-latest","load_timeout_secs":17}}}"#,
         )
         .expect("write");
@@ -1535,12 +1618,12 @@ mod select_tests {
             ),
         ]);
         let log = sc_agent_log::testing::MemoryLog::new().expect("log");
-        let mut context = Context::new("decidr");
-        context.config_dir = Some(dir.path().to_path_buf());
+        let mut context = Context::new(sc_agent_config::CliName::Decidr);
+        context.home = Some(dir.path().to_path_buf());
         context.repo_root = Some(dir.path().to_path_buf());
         context.environment = Some(Vec::new());
         context.transport = Some(Arc::new(transport));
-        context.general = Some(log.general());
+        context.opened_general = Some(log.general());
         let config = load_config(&context).expect("config");
         let identity =
             SessionIdentity::new(Repo::local("host", "folder").expect("repo"), "proj", "role")
@@ -1604,22 +1687,23 @@ mod tests {
         log: &MemoryLog,
     ) -> (tempfile::TempDir, SendOptions) {
         let dir = tempfile::tempdir().expect("config dir");
+        std::fs::create_dir_all(dir.path().join(".sc/sc-agent")).expect("local folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc/sc-agent/decidr.json"),
             if local {
                 r#"{"local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"jev-latest","request_timeout_secs":900,"load_timeout_secs":17}}}"#
             } else {
                 "{}"
             },
         ).expect("write config");
-        let mut context = Context::new("decidr");
-        context.config_dir = Some(dir.path().to_owned());
+        let mut context = Context::new(sc_agent_config::CliName::Decidr);
+        context.home = Some(dir.path().to_owned());
         context.repo_root = Some(dir.path().to_owned());
         context.environment = Some(vec![(
             OsString::from(sc_agent_secrets::TYPESAFE_API_KEY),
             OsString::from("timeout-test-key"),
         )]);
-        context.general = Some(log.general());
+        context.opened_general = Some(log.general());
         context.clock = Some(sc_agent_http::testing::ManualClock::new().clock());
         context.transport = Some(Arc::new(transport.clone()));
         let config = super::load_config(&context).expect("config");
@@ -1752,7 +1836,7 @@ mod tests {
             let log = MemoryLog::new().expect("log");
             let (dir, options) = options(false, &transport, &log);
             let config = format!(r#"{{"workers":{configured}}}"#);
-            std::fs::write(dir.path().join("default.json"), &config).expect("config");
+            std::fs::write(dir.path().join(".sc/sc-agent/decidr.json"), &config).expect("config");
             for limits in [
                 CallLimits {
                     timeout: Some(RequestTimeout::from_secs(10.0).expect("timeout")),
@@ -1791,7 +1875,8 @@ mod tests {
                 assert_eq!(record.fields["queue_capacity"], workers * 4);
             }
             assert_eq!(
-                std::fs::read_to_string(dir.path().join("default.json")).expect("config"),
+                std::fs::read_to_string(dir.path().join(".sc/sc-agent/decidr.json"))
+                    .expect("config"),
                 config
             );
         }
@@ -1811,7 +1896,11 @@ mod tests {
         .with_send_duration(clock.clone(), Duration::from_secs(10));
         let log = MemoryLog::new().expect("log");
         let (dir, mut options) = options(false, &transport, &log);
-        std::fs::write(dir.path().join("default.json"), r#"{"max_sends":1}"#).expect("config");
+        std::fs::write(
+            dir.path().join(".sc/sc-agent/decidr.json"),
+            r#"{"max_sends":1}"#,
+        )
+        .expect("config");
         options.context.clock = Some(clock.clock());
         let start = clock.now();
         let mut lines = Vec::new();

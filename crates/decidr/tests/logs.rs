@@ -47,7 +47,7 @@ mod tests {
             Arc::new(transport),
             &MemoryLog::new().expect("log"),
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let log = MemoryLog::new().expect("log");
         let mut options = options("jev", None, ctx, &log);
         options.session = None;
@@ -101,7 +101,7 @@ mod tests {
             Arc::new(transport.clone()),
             &unused,
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let mut options = options("jev", None, ctx, &unused);
         options.session = None;
         let cancel = CancelToken::new();
@@ -188,7 +188,7 @@ mod tests {
             Arc::new(transport),
             &unused,
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let mut options = options("jev", None, ctx, &unused);
         options.session = None;
         send(&options, request(NOUL), &CancelToken::new()).expect("send");
@@ -289,8 +289,12 @@ mod tests {
             ANTHROPIC_KEY.to_owned(),
         );
         Context {
-            service: "decidr",
-            config_dir: Some(dir.to_path_buf()),
+            cli: sc_agent_config::CliName::Decidr,
+            loaded: None,
+            flags: std::collections::BTreeMap::new(),
+            session: None,
+            general: None,
+            home: Some(dir.to_path_buf()),
             repo_root: Some(dir.to_path_buf()),
             environment: Some(environment(&[(
                 sc_agent_secrets::TYPESAFE_API_KEY,
@@ -299,7 +303,7 @@ mod tests {
             keyring: Some(Arc::new(MapKeyring(keyring))),
             keyring_override: None,
             transport: Some(Arc::new(transport)),
-            general: Some(log.general()),
+            opened_general: Some(log.general()),
             clock: None,
         }
     }

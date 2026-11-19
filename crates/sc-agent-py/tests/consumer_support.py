@@ -14,12 +14,12 @@ try:
 except importlib.metadata.PackageNotFoundError:
     SITR_VERSION = ""
 
-def render_consumer(tmp_path, *, monkeypatch, general_log=True, models=None, sitr=False, batch_records=False,
-                    source_template=False):
+def render_consumer(tmp_path, *, monkeypatch, client_name="plan-anchor", models=None, sitr=False, batch_records=False,
+                    source_template=False, initialize_logger=True):
     import sc_agent
     template = (pathlib.Path(__file__).resolve().parents[1] / "python/sc_agent/templates/consumer.py.j2"
                 if source_template else pathlib.Path(str(importlib.resources.files(sc_agent) / "templates/consumer.py.j2")))
-    values = {"general_log": general_log, "models": models or ["dec"], "sitr": sitr,
+    values = {"client_name": client_name, "models": models or ["dec"], "sitr": sitr,
               "batch_records": batch_records, "settings_module": "sc_agent_test_settings",
               "settings_file": ".sc/test/settings.yaml", "settings_set_command": "test-settings set allow_remote_judge true|false",
               "sc_decidr_version": SC_DECIDR_VERSION, "sitr_version": SITR_VERSION}
@@ -33,6 +33,8 @@ def render_consumer(tmp_path, *, monkeypatch, general_log=True, models=None, sit
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     install_test_settings_module(monkeypatch)
+    if initialize_logger:
+        module.client_logger(log_root=str(tmp_path / "client-logs"))
     return module
 
 

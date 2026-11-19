@@ -20,23 +20,23 @@ decidr doctor
 - `send`: one JSON request, or a JSONL batch with `--batch`. The input is a file, or `-` for stdin (the default). One result line is printed per request.
   Each result object contains `session_id`, `position`, `sends` (the number of provider requests started, including retries), and `digests`, plus either `response` or `error`. `sends` is zero when no request was sent.
   - `--model` takes a [short name](../sc-agent-types/src/short_name.rs), a model id, or the name of a configured local runner.
-  - `--project` and `--agent-role` are required slugs for the session rows (lowercase letters, digits, `.`, `_`, `-`).
+  - `--project` is an optional global project/phase override; absent, `SC_PROJECT` or a configuration file supplies it. A send without a project is refused before any request or session row. `--agent-role` is required. Both use path-safe lowercase slugs.
   - `--provider` overrides the provider. Without it, the provider is chosen by ranking the keys that are found.
   - `--image NAME=FILE` (repeatable) and `--long-context` apply to a single request, not to `--batch`.
   - `--timeout-secs SECONDS` sets the per-request timeout (finite values from 10 through 3600 seconds; fractional seconds are accepted).
   - `--workers COUNT` sets batch concurrency from 1 through 64 and requires `--batch`.
 - `models [--runner NAME]`: lists the models of TypeSafe, or of a configured local runner.
 - `doctor`: lists the keys found, in use order, and warns about provider models missing from the catalog.
-- `--config-dir PATH` (global): the configuration directory. The default is `~/.sc-agent`.
+- Configuration resolves flags, CLI environment variables (`DECIDR_`, plus `SC_PROJECT`), local `.sc/sc-agent/decidr.json` and `sc-agent.json`, then global `~/.sc-agent/decidr.json` and `sc-agent.json`. Outside a git worktree, local files are skipped. `doctor` reports settings, sources and file existence; unreadable keyrings appear as typed rows. It opens no file logger.
 
 Exit codes: 0 when the command ran and every result succeeded, 1 otherwise, 130 after an interrupt. Ctrl-C or SIGTERM cancels the run: every unfinished request ends as `decision.cancelled` and the logs are flushed. A third interrupt exits at once.
 
 ## What the library provides
 
 - `send`, `send_batch`, `models` and `doctor`, with `send_on` and `send_batch_on` over any `Decision`.
-- `SendOptions`, `ModelsOptions`, `DoctorOptions`, `ModelSelector` and `Context`. The context holds the seams (config directory, environment, keyring, transport, loggers, clock); every field `None` is the real default. `Context.keyring_override` optionally supplies a checked `KeyringLocation`; its service and account override the defaults only for the selected provider.
+- `SendOptions`, `ModelsOptions`, `DoctorOptions`, `ModelSelector` and `Context`. The context holds the seams (loaded layered config, CLI name, explicit home, environment, keyring, transport, injected destinations and clock); every field `None` is the real default. `Context.keyring_override` optionally supplies a checked `KeyringLocation`; its service and account override the defaults only for the selected provider.
 - `CallLimits`, `RequestTimeout` and `Workers` for checked per-call limits. `send_with` and `send_batch_with` accept `&CallLimits`; the existing `send` and `send_batch` use default limits. A timeout applies to the default decision transport and request deadline; worker count controls batch concurrency.
-- `load_config`, `general_logger`, `session_logger` and `session_identity`.
+- `load_context`, `load_config`, `general_logger`, `session_logger` and `session_identity`.
 - `DoctorReport`, `DetectedKey`, `MissingModel` and `Tie`.
 - Modules `input` (`build_request`, `build_batch`, `read_batch`, limits), `output` (`result_line`, `result_text`) and `signal`.
 - `DecidrError`. A failed decision is data in its `DecisionResult`, not an error.
@@ -53,7 +53,7 @@ use sc_agent_types::CancelToken;
 let json = br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
 let request = build_request(json, &[], false, None)?;
 
-let context = Context::new("my-tool");
+let context = Context::new(sc_agent_config::CliName::Decidr);
 let config = load_config(&context)?;
 let options = SendOptions {
     model: ModelSelector::parse("jev", &config)?,
@@ -86,3 +86,9 @@ Layer rule: a crate depends only on lower layers (ADR-SAG-0004), and `decidr` is
 - REQ-SAG-0004: session log identity.
 - REQ-SAG-0008: optional logger injection with default loggers.
 - ADR-SAG-0001 and ADR-SAG-0004: one backend trait; crate layering, with `decidr` as the composition root.
+
+General logs use `<log_root>/logs/decidr.log.jsonl`; sessions use
+`<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, kept indefinitely.
+The default log root is `<home>/.sc-agent`. `DECIDR_LOG_ROOT` overrides it;
+`DECIDR_WORKERS` and nested variables such as `DECIDR_LOCAL_RUNNERS__LAYA__PORT`
+override decidr settings. See [sc-agent-config](../sc-agent-config/README.md) for scope and precedence.

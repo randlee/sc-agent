@@ -2,7 +2,7 @@
 name: sc-decidr-consumer
 version: {{ sc_decidr_version }}
 format: python
-required_variables: [general_log, models, sitr, sc_decidr_version, sitr_version, batch_records, settings_module, settings_file, settings_set_command]
+required_variables: [client_name, models, sitr, sc_decidr_version, sitr_version, batch_records, settings_module, settings_file, settings_set_command]
 requires:
   cli:
     - name: sc-compose
@@ -19,10 +19,15 @@ when a caller makes a decision request.
 from __future__ import annotations
 
 import json
+import threading
 from typing import TYPE_CHECKING, Any, Callable, Mapping, NamedTuple, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from sc_agent import CancelToken
+
+CLIENT_NAME = {{ client_name | tojson }}
+_CLIENT_LOGGER = None
+_CLIENT_LOGGER_LOCK = threading.Lock()
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 MODELS = {{ models | tojson }}
@@ -37,7 +42,7 @@ Request = Union[str, dict]
 BatchItem = Union[Request, tuple[Request, Optional[dict[str, bytes]], bool]]
 
 __all__ = [
-    "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
+    "SC_DECIDR_VERSION", "CLIENT_NAME", "client_logger", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
     "DECIDR_CATEGORY_CODES", "new_cancel_token", "error_metadata", "wheel_error",
     "decode_result", "exception_result", "from_tool_error", "call_result", "call_batch_results", "remote_judge_consent",
     "remote_preflight", "REPO_ROOT_HELP", "REMOTE_JUDGE_SETTING", "REMOTE_JUDGE_SET", "CANCELED_EXIT", "canceled_envelope",
@@ -100,6 +105,25 @@ def _load_wheel():
     except ImportError as exc:
         raise ClientError("DEPENDENCY.SC_DECIDR", f"sc-decidr {{ sc_decidr_version }} is required for live calls: {exc}",
                           action="Install sc-decidr in the active Python environment.") from exc
+
+
+def client_logger(log_root=None, logger=None):
+    """One caller-owned Logger for this generated client's records and wheel calls."""
+    import sc_observability as obs
+    if logger is not None:
+        if not isinstance(logger, obs.Logger):
+            raise TypeError("logger must be a sc_observability.Logger")
+        return logger
+    global _CLIENT_LOGGER
+    with _CLIENT_LOGGER_LOCK:
+        if _CLIENT_LOGGER is None:
+            if log_root is None:
+                log_root = _load_wheel().resolved_config()["log_root"]
+            result = obs.create_logger(obs.LoggerConfig(service=CLIENT_NAME, log_root=log_root))
+            if isinstance(result, obs.Err):
+                raise from_tool_error(result.error)
+            _CLIENT_LOGGER = result.value
+        return _CLIENT_LOGGER
 
 
 def new_cancel_token():
@@ -323,22 +347,20 @@ def _encode_batch_item(item: BatchItem):
 
 
 def call_result(
-    request: Request, *, model: str, project: str, agent_role: str, abort_on: AbortOn,
+    request: Request, *, model: str, project: Optional[str] = None, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
     images: Optional[dict[str, bytes]] = None, long_context: bool = False,
-    config_dir: Optional[str] = None, keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-{% if general_log %}
-    general_log: Optional[LogSink] = None,
-{% endif %}
+    keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
+    logger=None, session_log=None,
     timeout_secs: Optional[float] = None,
     consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
-    kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, images=images,
-                  long_context=long_context, config_dir=config_dir, keyring_service=keyring_service,
+    kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel, images=images,
+                  long_context=long_context, keyring_service=keyring_service,
                   keyring_account=keyring_account)
-{% if general_log %}
-    kwargs["general_log"] = general_log
-{% endif %}
+    kwargs["general_log"] = client_logger(logger=logger)
+    if session_log is not None:
+        kwargs["session_log"] = session_log
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     sent = _invoke("send", request, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
@@ -351,12 +373,10 @@ def call_result(
 
 
 def call_batch_results(
-    requests: Sequence[BatchItem], *, model: str, project: str, agent_role: str, abort_on: AbortOn,
+    requests: Sequence[BatchItem], *, model: str, project: Optional[str] = None, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
-    config_dir: Optional[str] = None, keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-{% if general_log %}
-    general_log: Optional[LogSink] = None,
-{% endif %}
+    keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
+    logger=None, session_log=None,
     timeout_secs: Optional[float] = None, workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
     consent_what: str = "The request text", repository_root: str = ".",
@@ -377,11 +397,11 @@ def call_batch_results(
             on_result(result)
         return result
 
-    kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, on_result=record,
-                  config_dir=config_dir, keyring_service=keyring_service, keyring_account=keyring_account)
-{% if general_log %}
-    kwargs["general_log"] = general_log
-{% endif %}
+    kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel, on_result=record,
+                  keyring_service=keyring_service, keyring_account=keyring_account)
+    kwargs["general_log"] = client_logger(logger=logger)
+    if session_log is not None:
+        kwargs["session_log"] = session_log
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:
@@ -808,11 +828,11 @@ def streamed_result(results: list) -> StreamedResult:
 # Extraction is separate from every decision call.
 
 
-def extract(language: str, query: str, source: Union[str, bytes], captures=None):
+def extract(language: str, query: str, source: Union[str, bytes], captures=None, *, logger=None):
     try:
         import sc_treesitter
     except ImportError as exc:
         raise ClientError("DEPENDENCY.SITR", "sitr=={{ sitr_version }} is required for extraction",
                           action="Install sitr=={{ sitr_version }} in the active Python environment.") from exc
-    return sc_treesitter.run_query(language, query, source, captures=captures)
+    return sc_treesitter.run_query(language, query, source, captures=captures, general_log=client_logger(logger=logger))
 {% endif %}

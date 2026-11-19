@@ -1,10 +1,8 @@
 //! The `decidr` binary as a process: help, slug refusal, interrupts, broken stdout and the
 //! fail-fast batch, against a loopback runner (no external network).
 //!
-//! Each child gets a cleared environment (only PATH and, when set, LD_LIBRARY_PATH) and `--config-dir <tempdir>/.sc-agent`,
-//! whose default.json sets `log_root` to that same directory: no HOME or USERPROFILE is set,
-//! so no test reads or writes the real home. (The real-home default of `log_root` is
-//! sc-agent-config's `default_dir`, unit-tested there.) The process tests here are Unix-only
+//! Each child gets a cleared environment, an explicit temporary HOME/USERPROFILE and cwd.
+//! Its `.sc-agent/decidr.json` controls the runner and log root, so tests never read the real home. The process tests here are Unix-only
 //! because they use Unix signals, `kill` and `mkfifo`. The test process's own environment is
 //! never changed.
 
@@ -70,10 +68,10 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
     use serde_json::{Map, Value};
     let key = "sk-pasted-credential-not-a-variable";
     let root = tempfile::tempdir().expect("root");
-    let config = root.path().join("config");
+    let config = root.path().join(".sc-agent");
     std::fs::create_dir(&config).expect("config dir");
     std::fs::write(
-        config.join("default.json"),
+        config.join("decidr.json"),
         serde_json::json!({
             "log_root": root.path(),
             "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": 9100,
@@ -90,9 +88,9 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
     );
     let output = common::run_bounded(
         command
-            .arg("--config-dir")
-            .arg(&config)
             .arg("models")
+            .env("HOME", root.path())
+            .env("USERPROFILE", root.path())
             .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
             .current_dir(root.path()),
     );
@@ -101,9 +99,10 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
     let detail: Value =
         serde_json::from_str(stderr.lines().last().expect("error line")).expect("typed detail");
     assert_eq!(detail["id"], "decidr.config");
-    assert_eq!(detail["cause"]["id"], "config.invalid");
+    assert_eq!(detail["cause"]["id"], "config.layer");
+    assert_eq!(detail["cause"]["cause"]["id"], "config.invalid");
     assert!(
-        detail["cause"]["message"]
+        detail["cause"]["cause"]["message"]
             .as_str()
             .expect("message")
             .contains("local_runners.dec.key_env")
@@ -236,7 +235,7 @@ mod tests {
         }
     }
 
-    /// The `default.json` of these tests: runner `dec` on `port`, and `log_root` = `config`.
+    /// The `decidr.json` of these tests: runner `dec` on `port`, and `log_root` = `config`.
     fn config_json(config: &Path, port: u16) -> String {
         serde_json::json!({
             "log_root": config,
@@ -247,14 +246,14 @@ mod tests {
         .to_string()
     }
 
-    /// A tempdir whose `.sc-agent/default.json` (the child's `--config-dir`) names runner `dec`
+    /// A tempdir whose `.sc-agent/decidr.json` (the child's `--config-dir`) names runner `dec`
     /// on `port` and sets `log_root` to `.sc-agent` itself.
     fn home(port: u16) -> tempfile::TempDir {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        std::fs::write(config.join("default.json"), config_json(&config, port))
-            .expect("default.json");
+        std::fs::write(config.join("decidr.json"), config_json(&config, port))
+            .expect("decidr.json");
         home
     }
 
@@ -267,10 +266,11 @@ mod tests {
         );
         command
             .stdin(Stdio::null())
-            .arg("--config-dir")
-            .arg(home.join(".sc-agent"))
             .args(args)
-            .current_dir(env!("CARGO_MANIFEST_DIR"));
+            .env("HOME", home)
+            .env("USERPROFILE", home)
+            .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
+            .current_dir(home);
         command
     }
 
@@ -331,11 +331,135 @@ mod tests {
         ));
         assert_eq!(output.status.code(), Some(1));
         let detail = stderr_detail(&output);
-        assert_eq!(detail["id"], "decidr.log");
-        assert_eq!(detail["cause"]["id"], "log.invalid_slug");
+        assert_eq!(detail["id"], "decidr.config");
+        assert_eq!(detail["cause"]["id"], "config.layer");
+        assert_eq!(detail["cause"]["cause"]["id"], "config.invalid");
+        assert!(
+            detail["cause"]["message"]
+                .as_str()
+                .expect("message")
+                .contains("--project")
+        );
         assert!(output.stdout.is_empty());
         assert!(sends.try_recv().is_err(), "nothing was sent");
         assert_eq!(rows(home.path()), 0);
+    }
+
+    #[test]
+    fn layered_project_and_port_override_precede_send_and_sessions_are_retained() {
+        let (server, sends) = loopback(Mode::Answer);
+        let home = home(server.port());
+        let work = home.path().join("work");
+        std::fs::create_dir(&work).expect("work");
+        assert!(
+            run_bounded(Command::new("git").args(["init", "--quiet"]).arg(&work))
+                .status
+                .success()
+        );
+        assert!(
+            run_bounded(Command::new("git").arg("-C").arg(&work).args([
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/randlee/sc-agent.git"
+            ]))
+            .status
+            .success()
+        );
+        let config = home.path().join(".sc-agent/decidr.json");
+        // The file has a wrong port and no log_root: the environment supplies the real port,
+        // and the shared default-root function supplies <home>/.sc-agent.
+        std::fs::write(&config, serde_json::json!({"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":1,"model":"jev-latest"}}}).to_string()).expect("config");
+        let file = batch_file(home.path(), 1);
+        let request = [
+            "send",
+            "--model",
+            "dec",
+            "--agent-role",
+            "role",
+            file.to_str().expect("path"),
+        ];
+        let missing = run_bounded(decidr(home.path(), &request).current_dir(&work));
+        assert_eq!(missing.status.code(), Some(1));
+        let detail = stderr_detail(&missing);
+        assert_eq!(detail["id"], "decidr.config");
+        assert_eq!(detail["cause"]["id"], "config.project_required");
+        assert!(sends.try_recv().is_err());
+        assert_eq!(rows(home.path()), 0);
+        let old = home
+            .path()
+            .join(".sc-agent/sessions/local/m5/work/role/old/sessions.jsonl");
+        std::fs::create_dir_all(old.parent().expect("parent")).expect("old folder");
+        std::fs::write(&old, "retained session\n").expect("old bytes");
+        std::fs::File::open(&old)
+            .expect("old file")
+            .set_times(std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
+            .expect("old mtime");
+        let before = (
+            std::fs::read(&old).expect("bytes"),
+            std::fs::metadata(&old)
+                .expect("metadata")
+                .modified()
+                .expect("mtime"),
+        );
+        let sent = run_bounded(
+            decidr(home.path(), &request)
+                .args(["--project", "phase-flag"])
+                .current_dir(&work)
+                .env("SC_PROJECT", "phase-env")
+                .env("DECIDR_LOCAL_RUNNERS__DEC__PORT", server.port().to_string()),
+        );
+        assert!(
+            sent.status.success(),
+            "{}",
+            String::from_utf8_lossy(&sent.stderr)
+        );
+        recv_within(&sends, HANG_GUARD);
+        let session = home
+            .path()
+            .join(".sc-agent/sessions/github.com/randlee/sc-agent/role/phase-flag/sessions.jsonl");
+        let row: Value =
+            serde_json::from_str(&std::fs::read_to_string(session).expect("session")).expect("row");
+        assert_eq!(row["fields"]["project"], "phase-flag");
+        assert_eq!(row["fields"]["repo"], "github.com/randlee/sc-agent");
+        assert!(
+            home.path()
+                .join(".sc-agent/logs/decidr.log.jsonl")
+                .is_file()
+        );
+        assert_eq!(
+            before,
+            (
+                std::fs::read(&old).expect("bytes"),
+                std::fs::metadata(&old)
+                    .expect("metadata")
+                    .modified()
+                    .expect("mtime")
+            )
+        );
+        let override_root = home.path().join("override");
+        let sent = run_bounded(
+            decidr(home.path(), &request)
+                .current_dir(&work)
+                .env("SC_PROJECT", "phase-env")
+                .env("DECIDR_LOCAL_RUNNERS__DEC__PORT", server.port().to_string())
+                .env("DECIDR_LOG_ROOT", &override_root),
+        );
+        assert!(
+            sent.status.success(),
+            "{}",
+            String::from_utf8_lossy(&sent.stderr)
+        );
+        recv_within(&sends, HANG_GUARD);
+        assert!(override_root.join("logs/decidr.log.jsonl").is_file());
+        assert!(
+            override_root
+                .join("sessions/github.com/randlee/sc-agent/role/phase-env/sessions.jsonl")
+                .is_file()
+        );
+        let mut general_sessions = Vec::new();
+        find_rows(&override_root.join("logs"), &mut general_sessions);
+        assert!(general_sessions.is_empty());
     }
 
     #[test]
@@ -624,14 +748,14 @@ mod tests {
         assert_eq!(runner.stop(), 0, "nothing was sent");
     }
 
-    /// RSH-002: a `default.json` that is a FIFO is refused from its metadata
+    /// RSH-002: a `decidr.json` that is a FIFO is refused from its metadata
     /// (`config.not_a_file`), never opened, so decidr cannot block on it: it exits 1 at once.
     #[test]
     fn a_fifo_config_file_is_refused_without_blocking() {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        let made = run_bounded(Command::new("mkfifo").arg(config.join("default.json")));
+        let made = run_bounded(Command::new("mkfifo").arg(config.join("decidr.json")));
         assert!(
             made.status.success(),
             "{}",
@@ -643,4 +767,134 @@ mod tests {
         assert_eq!(detail["id"], "decidr.config");
         assert_eq!(detail["cause"]["id"], "config.not_a_file");
     }
+}
+
+/// Doctor's binary path prints the shared loader rows even when the guarded keyring refuses.
+#[test]
+fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
+    use serde_json::{Value, json};
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+    fn files(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, std::time::SystemTime)> {
+        let mut snapshot = BTreeMap::new();
+        for entry in std::fs::read_dir(root).expect("entries") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                snapshot.extend(files(&path));
+            } else {
+                snapshot.insert(
+                    path.clone(),
+                    (
+                        std::fs::read(&path).expect("bytes"),
+                        std::fs::metadata(path)
+                            .expect("metadata")
+                            .modified()
+                            .expect("mtime"),
+                    ),
+                );
+            }
+        }
+        snapshot
+    }
+    let root = tempfile::tempdir().expect("root");
+    let home = root.path().join("home");
+    let work = root.path().join("work");
+    std::fs::create_dir_all(home.join(".sc-agent")).expect("home");
+    std::fs::create_dir_all(work.join(".sc/sc-agent")).expect("work");
+    let git = common::run_bounded(
+        std::process::Command::new("git")
+            .args(["init", "--quiet"])
+            .arg(&work),
+    );
+    assert!(git.status.success());
+    let work = std::fs::canonicalize(work).expect("canonical worktree");
+    let global = home.join(".sc-agent/sc-agent.json");
+    let local = work.join(".sc/sc-agent/decidr.json");
+    std::fs::write(&global, json!({"project":"global"}).to_string()).expect("global");
+    std::fs::write(&local, json!({"project":"phase-a","workers":3}).to_string()).expect("local");
+    let command = || {
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_decidr"));
+        cmd.arg("doctor")
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("HOME", &home)
+            .env("USERPROFILE", &home)
+            .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
+            .current_dir(&work);
+        cmd
+    };
+    let before = files(root.path());
+    let output = common::run_bounded(&mut command());
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout).expect("doctor JSON");
+    let loaded = sc_agent_config::load_layered(&sc_agent_config::LoadOptions {
+        cli: sc_agent_config::CliName::Decidr,
+        home: home.clone(),
+        worktree: Some(work.clone()),
+        default_log_root: sc_agent_log::default_log_root(&home),
+        flags: BTreeMap::new(),
+        environment: Vec::new(),
+    })
+    .expect("canonical config");
+    assert_eq!(
+        report["settings"],
+        serde_json::to_value(sc_agent_config::doctor_rows(&loaded)).expect("canonical rows")
+    );
+    assert_eq!(
+        report["files"],
+        serde_json::to_value(&loaded.files).expect("canonical files")
+    );
+    assert_eq!(report["files"].as_array().expect("files").len(), 4);
+    assert_eq!(
+        report["keyring"].as_array().expect("keyring rows").len(),
+        sc_agent_types::Provider::ALL.len()
+    );
+    assert!(
+        report["keyring"]
+            .as_array()
+            .expect("rows")
+            .iter()
+            .all(|row| row["error"]["id"] == "secrets.keyring_construction_refused")
+    );
+    assert_eq!(files(root.path()), before, "doctor changed a file");
+    let outside = root.path().join("outside");
+    std::fs::create_dir(&outside).expect("outside");
+    let output = common::run_bounded(command().current_dir(&outside));
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).expect("outside JSON");
+    assert_eq!(report["files"].as_array().expect("files").len(), 2);
+    let output = common::run_bounded(
+        command()
+            .env("DECIDR_WORKERS", "3")
+            .env("SC_PROJECT", "phase-d")
+            .env("DECIDR_LOG_ROOT", root.path().join("other")),
+    );
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).expect("env JSON");
+    let rows = report["settings"].as_array().expect("rows");
+    for (name, value, source) in [
+        ("project", "phase-d", "SC_PROJECT"),
+        ("workers", "3", "DECIDR_WORKERS"),
+    ] {
+        assert!(
+            rows.iter().any(|row| row["setting"] == name
+                && row["value"] == value
+                && row["source"] == source)
+        );
+    }
+    assert!(
+        rows.iter()
+            .any(|row| row["setting"] == "log_root" && row["source"] == "DECIDR_LOG_ROOT")
+    );
+    let output = common::run_bounded(command().env("DECIDR_WORKERS", "0"));
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("DECIDR_WORKERS"));
+    std::fs::write(&local, "{").expect("malformed");
+    let output = common::run_bounded(&mut command());
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains(local.to_str().expect("path")));
 }

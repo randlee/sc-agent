@@ -1,5 +1,8 @@
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
+from sc_observability import Logger, AttachedLogger
+
+LogTarget = Logger | AttachedLogger | Callable[[dict[str, Any]], None]
 
 BatchItem = str | tuple[str, dict[str, bytes] | None, bool]
 
@@ -69,25 +72,24 @@ def parse_result(line: str) -> dict[str, Any]: ...
 
 def category(detail: str) -> str: ...
 def retryable(detail: str) -> bool: ...
-def send(request: str, *, model: str, project: str, agent_role: str,
+def send(request: str, *, model: str, agent_role: str, project: str | None = None,
          provider: str | None = None, images: dict[str, bytes] | None = None,
          long_context: bool = False, cancel: CancelToken | None = None,
-         general_log: Callable[[dict[str, Any]], None] | None = None,
-         session_log: Callable[[dict[str, Any]], None] | None = None,
-         config_dir: str | None = None, keyring_service: str | None = None,
+         general_log: LogTarget | None = None,
+         session_log: LogTarget | None = None,
+         keyring_service: str | None = None,
          keyring_account: str | None = None, timeout_secs: float | None = None) -> str: ...
-def send_batch(requests: Sequence[BatchItem], *, model: str, project: str,
-         agent_role: str, provider: str | None = None, cancel: CancelToken | None = None,
+def send_batch(requests: Sequence[BatchItem], *, model: str, agent_role: str, project: str | None = None, provider: str | None = None, cancel: CancelToken | None = None,
          on_result: Callable[[str], None] | None = None,
-         general_log: Callable[[dict[str, Any]], None] | None = None,
-         session_log: Callable[[dict[str, Any]], None] | None = None,
-         config_dir: str | None = None, keyring_service: str | None = None,
+         general_log: LogTarget | None = None,
+         session_log: LogTarget | None = None,
+         keyring_service: str | None = None,
          keyring_account: str | None = None, timeout_secs: float | None = None,
          workers: int | None = None) -> list[str]: ...
 
 def models(runner: str | None = None, cancel: CancelToken | None = None,
-           general_log: Callable[[dict[str, Any]], None] | None = None,
-           config_dir: str | None = None) -> str: ...
+           general_log: LogTarget | None = None) -> str: ...
 def doctor(cancel: CancelToken | None = None,
-           general_log: Callable[[dict[str, Any]], None] | None = None,
-           config_dir: str | None = None) -> str: ...
+           general_log: LogTarget | None = None) -> str: ...
+
+def resolved_config(*, project: str | None = None) -> dict[str, Any]: ...

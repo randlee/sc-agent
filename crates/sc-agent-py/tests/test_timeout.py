@@ -13,10 +13,9 @@ def test_invalid_timeout_is_typed_before_config_logs_or_network(env, args, opera
     loopback, log_root = env
     request = [NOUL] if operation is sc_agent.send_batch else NOUL
     # This would fail config loading if option validation did not run first.
-    config = tmp_path / "invalid-config"
-    config.mkdir()
-    (config / "default.json").write_text("not JSON")
-    options = {**args, "config_dir": str(config)}
+    config = tmp_path / ".sc-agent"
+    (config / "decidr.json").write_text("not JSON")
+    options = args
     with pytest.raises(sc_agent.SagError) as info:
         operation(request, **options, timeout_secs=seconds)
     ident, message, detail = info.value.args

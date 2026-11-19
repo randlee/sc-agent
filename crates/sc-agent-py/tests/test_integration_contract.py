@@ -48,7 +48,7 @@ def test_live_cases_use_rendered_consumer_contract(tmp_path, monkeypatch, provid
         assert kwargs["model"] == suite.MODEL
         observed.append("send")
         if general_log is not None:
-            general_log({"fields": {"provider": provider}})
+            general_log.log(__import__("sc_observability").LogEvent(level="info", target="controlled.contract", action="provider.selected", fields={"provider": provider}))
         if cancel.is_cancelled():
             return wire(error={"id": "decision.cancelled", "category": "cancelled", "message": "cancelled"})
         if os.environ.get(f"{provider.upper()}_API_KEY", "").startswith("invalid-integration-key-"):
@@ -59,7 +59,7 @@ def test_live_cases_use_rendered_consumer_contract(tmp_path, monkeypatch, provid
         assert requests == [suite.REQUEST] * 2
         assert kwargs["model"] == suite.MODEL
         observed.append("send_batch")
-        general_log({"fields": {"provider": provider}})
+        general_log.log(__import__("sc_observability").LogEvent(level="info", target="controlled.contract", action="provider.selected", fields={"provider": provider}))
         lines = [wire(position) for position in range(len(requests))]
         for line in reversed(lines):
             on_result(line)

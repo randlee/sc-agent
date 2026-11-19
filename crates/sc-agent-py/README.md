@@ -6,10 +6,11 @@ Each function returns the same JSON text that the CLI prints. Decision result ob
 
 ## What it provides
 
-- `sc_agent.send(request, *, model, project, agent_role, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log`, `config_dir`, `keyring_service`, `keyring_account` and `timeout_secs`.
-- `sc_agent.send_batch(requests, *, model, project, agent_role, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns result lines in input order and passes each to `on_result` as it finishes. Optional `workers` selects 1–64 workers for that batch.
+- `sc_agent.send(request, *, model, agent_role, project=None, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log`, `keyring_service`, `keyring_account` and `timeout_secs`.
+- `sc_agent.send_batch(requests, *, model, agent_role, project=None, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns result lines in input order and passes each to `on_result` as it finishes. Optional `workers` selects 1–64 workers for that batch.
 - `sc_agent.models(runner=None, ...)`: `decidr models`.
-- `sc_agent.doctor(...)`: `decidr doctor`.
+- `sc_agent.doctor(...)`: `decidr doctor`; includes canonical settings/sources, files and typed keyring status rows, without a file logger.
+- `sc_agent.resolved_config(*, project=None)`: returns `log_root`, optional `project`, and the `sources` mapping. It opens no logger and sends no provider request. Invalid layers raise `SagError` naming their file, variable or flag.
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
 
@@ -122,7 +123,7 @@ except PackageNotFoundError:
     sitr_version = ""
 
 Path(sys.argv[1]).write_text(json.dumps({
-    "general_log": False,
+    "client_name": "plan-anchor",
     "models": ["jev"],
     "sitr": False,
     "batch_records": False,
@@ -147,9 +148,11 @@ reads that value before every single or batch send; there is no consent override
 argument. `batch_records` includes the optional shared batch-record helpers.
 
 `models` records the selectors the consumer offers (see the [short-name registry](../sc-agent-types/src/short_name.rs)); each call passes its chosen
-`model` unchanged. `general_log` includes or omits forwarding the caller's general
-logger. Session logging always uses the wheel default; the generated module does
-not accept or forward `session_log` (REQ-SAG-0018). Keyring service and account are
+`model` unchanged. `client_name` fixes each session's `agent_role`; client functions do not accept an `agent_role` argument.
+The client obtains one sc-observability Logger, using `resolved_config()["log_root"]`,
+writing `<log_root>/logs/<client_name>.log.jsonl`, and injects it into every decidr
+and sitr operation. Pass an app's Logger with `logger=` to use it instead.
+Session logging uses the wheel default unless `session_log=` is explicitly passed. Keyring service and account are
 runtime arguments, passed on every decision call without forcing a provider.
 
 ```python
@@ -158,7 +161,7 @@ import consumer
 
 cancel = sc_agent.CancelToken()
 result = consumer.call_result(
-    request_json, model="jev", project="my-project", agent_role="judge",
+    request_json, model="jev", project="my-project",
     abort_on=frozenset({"auth", "quota"}),
     cancel=cancel, keyring_service=None, keyring_account=None, timeout_secs=120,
 )
@@ -166,11 +169,10 @@ result = consumer.call_result(
 
 `abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. The generated
 module's transport surface is `call_result` and `call_batch_results`; the redundant
-`call`/`call_batch` APIs are removed. Both accept model/project/agent_role, optional
-cancel, config_dir, keyring_service/keyring_account and timeout_secs. Single calls
-also accept images/long_context; batches accept workers/on_result. general_log is
-available only when that feature is rendered. Neither forces a provider or redirects
-the session log. The wheel owns retries and cancellation.
+`call`/`call_batch` APIs are removed. Both accept model, optional project, logger,
+session_log, cancel, keyring_service/keyring_account and timeout_secs. Single calls
+also accept images/long_context; batches accept workers/on_result. The wheel owns
+retries and cancellation.
 
 ### One shared error
 
@@ -240,3 +242,10 @@ to `sc_treesitter.run_query`. Extraction stays outside the decision path: use it
 captures when authoring a request, then call the same decision function. The
 header records both wheel versions when sitr is enabled. Mixed versions are
 unsupported and are not checked at import time.
+
+Configuration uses the same layered decidr inputs as the CLI: flags (`project=`),
+`SC_PROJECT` and `DECIDR_` environment variables, local git-worktree files at
+`.sc/sc-agent/{sc-agent,decidr}.json`, then global `~/.sc-agent/{sc-agent,decidr}.json`.
+A missing project is refused before any request or session row. The default general
+file is `<log_root>/logs/decidr.log.jsonl`; sessions are kept indefinitely under
+`<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`.

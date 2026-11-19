@@ -177,8 +177,12 @@ mod tests {
             inner: transport.clone(),
         });
         let context = crate::Context {
-            service: "decidr",
-            config_dir: Some(dir.path().to_path_buf()),
+            cli: sc_agent_config::CliName::Decidr,
+            loaded: None,
+            flags: std::collections::BTreeMap::new(),
+            session: None,
+            general: None,
+            home: Some(dir.path().to_path_buf()),
             repo_root: Some(dir.path().to_path_buf()),
             environment: Some(vec![(
                 sc_agent_secrets::TYPESAFE_API_KEY.into(),
@@ -187,7 +191,7 @@ mod tests {
             keyring: None,
             keyring_override: None,
             transport: Some(interrupting.clone()),
-            general: Some(log.general()),
+            opened_general: Some(log.general()),
             clock: None,
         };
         let identity =
@@ -267,11 +271,12 @@ mod tests {
     fn an_interrupt_after_the_logs_open_still_flushes_the_general_log() {
         let root = tempfile::tempdir().expect("root");
         let dir = tempfile::tempdir().expect("config");
+        std::fs::create_dir_all(dir.path().join(".sc-agent")).expect("config folder");
         std::fs::write(
-            dir.path().join("default.json"),
+            dir.path().join(".sc-agent/decidr.json"),
             serde_json::json!({ "log_root": root.path() }).to_string(),
         )
-        .expect("default.json");
+        .expect("decidr.json");
         let cancel = CancelToken::new();
         let watch = SignalWatch {
             state: Arc::new(State::default()),
@@ -282,8 +287,8 @@ mod tests {
             Action::Cancel,
             "no exit"
         );
-        let mut context = crate::Context::new("decidr");
-        context.config_dir = Some(dir.path().to_path_buf());
+        let mut context = crate::Context::new(sc_agent_config::CliName::Decidr);
+        context.home = Some(dir.path().to_path_buf());
         context.repo_root = Some(dir.path().to_path_buf());
         context.environment = Some(vec![(
             sc_agent_secrets::TYPESAFE_API_KEY.into(),

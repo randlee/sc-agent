@@ -22,28 +22,25 @@ if PROVIDER not in {"typesafe", "anthropic", "openai"}:
 MODEL = {"typesafe": "jev", "anthropic": "haiku", "openai": "luna"}[PROVIDER]
 
 
-def options(tmp_path, record_property):
-    config = tmp_path / "config"
+def options(tmp_path, record_property, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    config = tmp_path / ".sc-agent"
     config.mkdir()
-    (config / "default.json").write_text(json.dumps({"max_sends": 1, "log_root": str(tmp_path / "logs")}))
+    (config / "decidr.json").write_text(json.dumps({"max_sends": 1, "log_root": str(tmp_path / "logs")}))
     record_property("provider", PROVIDER)
     record_property("model", MODEL)
     record_property("mode", "live")
-    return dict(model=MODEL, project="integration", agent_role="pytest", config_dir=str(config))
+    return dict(model=MODEL, project="integration")
 
 
 @pytest.mark.parametrize("operation", ["call_result", "call_batch_results"], ids=["noul-send", "noul-batch"])
 def test_real_noul_query(tmp_path, monkeypatch, record_property, operation):
     client = render_consumer(tmp_path, monkeypatch=monkeypatch, models=[MODEL])
-    selected = []
-
-    def log(record):
-        if record.get("fields", {}).get("provider"):
-            selected.append(record["fields"]["provider"])
-
     result = getattr(client, operation)([REQUEST] * 2 if operation == "call_batch_results" else REQUEST,
-                 **options(tmp_path, record_property), abort_on=frozenset(), category_codes={},
-                 cancel=sc_agent.CancelToken(), general_log=log, timeout_secs=120)
+                 **options(tmp_path, record_property, monkeypatch), abort_on=frozenset(), category_codes={},
+                 cancel=sc_agent.CancelToken(), timeout_secs=120)
     assert result["ok"], result.get("error")
     rows = result["value"] if operation == "call_batch_results" else [result]
     assert len(rows) == (2 if operation == "call_batch_results" else 1)
@@ -54,6 +51,9 @@ def test_real_noul_query(tmp_path, monkeypatch, record_property, operation):
         assert isinstance(answer, client.NoulAnswer)
         assert isinstance(answer.noul, (int, float)) and 0 <= answer.noul <= 1
         answers.append({"type": "noul", "noul": answer.noul})
+    assert client.client_logger().flush().kind == "ok"
+    records = [json.loads(line) for line in (tmp_path / "client-logs/logs/plan-anchor.log.jsonl").read_text().splitlines()]
+    selected = [row["fields"]["provider"] for row in records if row.get("fields", {}).get("provider")]
     assert selected and set(selected) == {PROVIDER}
     record_property("result", json.dumps(answers))
 
@@ -67,7 +67,7 @@ def test_real_invalid_key_auth_cancel_redaction(tmp_path, monkeypatch, record_pr
     key = "invalid-integration-key-0000000001"
     monkeypatch.setenv(variables[f"{PROVIDER.upper()}_API_KEY"], key)
     cancel = sc_agent.CancelToken()
-    kwargs = options(tmp_path, record_property)
+    kwargs = options(tmp_path, record_property, monkeypatch)
     result = client.call_result(REQUEST, **kwargs, abort_on=frozenset({"auth"}),
                                 category_codes={"auth": "AUTH"}, cancel=cancel, timeout_secs=120)
     assert not result["ok"]

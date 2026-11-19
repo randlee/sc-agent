@@ -1,5 +1,19 @@
 # Getting started
 
+For decidr, put shared `project` and `log_root` settings in
+`~/.sc-agent/sc-agent.json`, and runner/model settings in `~/.sc-agent/decidr.json`.
+Git worktrees can override them at `.sc/sc-agent/{sc-agent,decidr}.json`.
+`DECIDR_` variables override files (nested keys use `__`); `SC_PROJECT` supplies
+project/phase. An explicit `--project` or Python `project=` wins. Run `decidr doctor`
+to see resolved values, sources and file existence without opening a file logger.
+Python callers can inspect the same result with `sc_agent.resolved_config(project=None)`.
+General logs go to `<log_root>/logs/decidr.log.jsonl`, sessions to
+`<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`.
+The [wheel guide](../crates/sc-agent-py/README.md) documents generated clients,
+which fix `agent_role` to `client_name` and share one injected app Logger.
+
+The release-kit setup below is for publishing a repository.
+
 Four steps take a repository from nothing to a published release:
 
 1. Read this guide.

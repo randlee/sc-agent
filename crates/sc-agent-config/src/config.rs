@@ -1,8 +1,7 @@
-//! Configuration types, bounds and [`load`].
+//! Configuration types and validation bounds.
 
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::fmt;
 use std::marker::PhantomData;
 use std::net::IpAddr;
@@ -12,7 +11,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use sc_agent_types::{Catalog, ModelId, ReleaseDate, ShortName, VarName};
-use sc_config::{AppName, ConfigError, Loader};
 #[cfg(test)]
 use serde::Serialize;
 use serde::de::{Error as _, MapAccess, Visitor};
@@ -20,9 +18,6 @@ use serde::{Deserialize, Deserializer};
 use serde_path_to_error::Segment;
 
 use crate::error::AgentConfigError;
-
-/// The sc-config application name; overrides use the prefix `SC_AGENT__`.
-pub const APP_NAME: &str = "sc-agent";
 
 /// Workers when `workers` is absent: 8 (REQ-SAG-0701).
 pub const DEFAULT_WORKERS: NonZeroUsize = NonZeroUsize::MIN.saturating_add(7);
@@ -82,7 +77,7 @@ pub struct AgentConfig {
     /// Extra catalog rows keyed by model id, at most [`MAX_MODELS`] (REQ-SAG-0102).
     #[serde(default, deserialize_with = "models_in_bounds")]
     pub models: BTreeMap<ModelId, ExtraModel>,
-    /// The log root; absent means [`default_dir`] (REQ-SAG-0003, REQ-SAG-0005).
+    /// The log root, filled from the caller-supplied default by the layered loader.
     #[serde(default)]
     pub log_root: Option<PathBuf>,
     /// Batch workers, 1..=[`MAX_WORKERS`] (REQ-SAG-0701, REQ-SAG-0013).
@@ -132,7 +127,7 @@ impl AgentConfig {
         })
     }
 
-    /// Returns `log_root`, else [`default_dir`] (REQ-SAG-0003).
+    /// Returns the resolved log root supplied by the layered loader.
     ///
     /// This is the `<log_root>` of the ADR-SAG-0002 session-log layout.
     ///
@@ -143,7 +138,7 @@ impl AgentConfig {
     pub fn log_root(&self) -> Result<PathBuf, AgentConfigError> {
         match &self.log_root {
             Some(root) => Ok(root.clone()),
-            None => default_dir(),
+            None => Err(AgentConfigError::HomeUnknown),
         }
     }
 
@@ -468,95 +463,6 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<NonZeroU32>, D::Error> {
     secs_in_bounds(deserializer, "load_timeout_secs", &RUNNER_LOAD_TIMEOUT_SECS)
-}
-
-/// Returns `~/.sc-agent`, the config directory and default log root (REQ-SAG-0003).
-///
-/// The home directory joined with `.sc-agent` on every platform; the home
-/// directory comes from [`std::env::home_dir`]. General logs are written to
-/// `<log_root>/logs/<cli>.log.jsonl`; session logs are written under
-/// `<log_root>/sessions/<repo>/<agent_role>/<project>/`.
-///
-/// # Errors
-///
-/// [`AgentConfigError::HomeUnknown`] when there is no (non-empty) home directory.
-pub fn default_dir() -> Result<PathBuf, AgentConfigError> {
-    std::env::home_dir()
-        .filter(|home| !home.as_os_str().is_empty())
-        .map(|home| home.join(".sc-agent"))
-        .ok_or(AgentConfigError::HomeUnknown)
-}
-
-/// Loads `<config_dir>/default.json`, optional `local.json` and `SC_AGENT__*` overrides.
-///
-/// `environment` is the only override source (decidr passes the process
-/// environment and [`default_dir`]; tests pass their own). Values are checked
-/// against their types and bounds with the key path of any failure.
-///
-/// With no `default.json` the result is [`AgentConfig::default`], unless an
-/// `SC_AGENT__` variable is set or a `local.json` exists: then the missing
-/// file is an error, so an override is never silently ignored (the
-/// `local.json` case is an accepted decision, bead agt-4p2.4 notes).
-///
-/// # Errors
-///
-/// - [`AgentConfigError::NotAFile`] when `default.json` or `local.json`
-///   exists but is not a regular file (a FIFO, a device, a directory),
-///   checked from its metadata before any read.
-/// - [`AgentConfigError::FileTooLarge`] when `default.json` or `local.json`
-///   is larger than [`MAX_CONFIG_FILE_BYTES`] (checked before reading).
-/// - [`AgentConfigError::Load`] when sc-config fails (unreadable file, bad
-///   JSON, an override it cannot apply, or a missing `default.json` with an
-///   override present).
-/// - [`AgentConfigError::Invalid`] when a value fails its type or bound,
-///   including unknown keys and more than [`MAX_MODELS`] models or
-///   [`MAX_LOCAL_RUNNERS`] runners; `path` names the key, such as `workers`
-///   or `local_runners.laya.host`.
-/// - [`AgentConfigError::RunnerName`] when a runner is named like a short name.
-/// - [`AgentConfigError::KeyOnPlainHttp`] when a runner with `key_env` has a
-///   host that is not loopback.
-pub fn load(
-    config_dir: PathBuf,
-    environment: Vec<(OsString, OsString)>,
-) -> Result<AgentConfig, AgentConfigError> {
-    let app = AppName::new(APP_NAME)?;
-    let prefix = app.env_prefix();
-    let has_override = environment
-        .iter()
-        .any(|(name, _)| name.as_encoded_bytes().starts_with(prefix.as_bytes()));
-    // An unreadable directory counts as "local.json may exist": the error is kept.
-    let has_local = config_dir.join("local.json").try_exists().unwrap_or(true);
-    for file in ["default.json", "local.json"] {
-        check_file(&config_dir.join(file))?;
-    }
-    let value = match Loader::new(app, config_dir, environment).load::<serde_json::Value>() {
-        Ok(value) => value,
-        Err(ConfigError::MissingDefault { .. }) if !has_override && !has_local => {
-            return Ok(AgentConfig::default());
-        }
-        Err(error) => return Err(error.into()),
-    };
-    let config: AgentConfig = serde_path_to_error::deserialize(value).map_err(invalid)?;
-    check_runners(&config)?;
-    Ok(config)
-}
-
-/// Refuses, from its metadata alone, a config file that is not a regular file (a FIFO or
-/// device, whose read can block forever) or is over [`MAX_CONFIG_FILE_BYTES`]; a missing or
-/// unreadable one is sc-config's to report.
-fn check_file(path: &std::path::Path) -> Result<(), AgentConfigError> {
-    match std::fs::metadata(path) {
-        Ok(metadata) if !metadata.is_file() => Err(AgentConfigError::NotAFile {
-            file: path.to_path_buf(),
-        }),
-        Ok(metadata) if metadata.len() > MAX_CONFIG_FILE_BYTES => {
-            Err(AgentConfigError::FileTooLarge {
-                file: path.to_path_buf(),
-                bytes: metadata.len(),
-            })
-        }
-        Ok(_) | Err(_) => Ok(()),
-    }
 }
 
 /// Maps a deserialization failure to `config.invalid`, or `config.runner_name` for a short-name runner key.

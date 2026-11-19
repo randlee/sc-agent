@@ -7,12 +7,12 @@
   "usage": "Usage: decidr [OPTIONS] <COMMAND>",
   "options": [
     {
-      "name": "config_dir",
-      "long": "--config-dir",
+      "name": "project",
+      "long": "--project",
       "short": null,
-      "help": "Configuration directory holding default.json (and local.json); default ~/.sc-agent. Logs go to the configured log_root, else ~/.sc-agent",
+      "help": "Optional project/phase for session rows; overrides SC_PROJECT and configuration files",
       "long_help": "",
-      "value_name": "PATH",
+      "value_name": "SLUG",
       "required": false,
       "default_value": null,
       "choices": [],
@@ -64,7 +64,7 @@
       "description": "Send one request (JSON) or a batch (JSONL, --batch) through the Decision trait",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: decidr send [OPTIONS] --model <NAME> --project <SLUG> --agent-role <SLUG> [FILE|-]",
+      "usage": "Usage: decidr send [OPTIONS] --model <NAME> --agent-role <SLUG> [FILE|-]",
       "options": [
         {
           "name": "agent_role",
@@ -131,19 +131,6 @@
           "help": "Short name (jev, haiku, luna, ...), a model id, or a configured local runner name",
           "long_help": "",
           "value_name": "NAME",
-          "required": true,
-          "default_value": null,
-          "choices": [],
-          "min_values": null,
-          "max_values": null
-        },
-        {
-          "name": "project",
-          "long": "--project",
-          "short": null,
-          "help": "Project slug for the session rows",
-          "long_help": "",
-          "value_name": "SLUG",
           "required": true,
           "default_value": null,
           "choices": [],

@@ -29,9 +29,6 @@ use sc_agent_log::{GeneralLogger, LogError, Slug};
 use sc_agent_types::{CancelToken, ErrorId, Provider};
 use sc_decision_schema::{DecisionRequest, DecisionResult};
 
-/// The general-log service of the binary.
-const SERVICE: &str = "decidr";
-
 fn main() -> ExitCode {
     let cancel = CancelToken::new();
     let watch = match decidr::signal::install(&cancel) {
@@ -66,13 +63,17 @@ fn run(
         Parsed::Print(text) => return Ok(print_stdout(text.as_bytes())),
         Parsed::Run(cli) => cli,
     };
-    let config_dir = cli.config_dir;
+    let mut context = Context::new(sc_agent_config::CliName::Decidr);
+    if let Some(project) = cli.project {
+        context.flags.insert("project".into(), project.into());
+    }
+    context.loaded = Some(decidr::load_context(&context)?);
     match cli.command {
-        Command::Send(args) => run_send(args, config_dir, cancel, watch, stdin, stdout),
+        Command::Send(args) => run_send(args, context, cancel, watch, stdin, stdout),
         Command::Models(args) => {
             // Configuration, keys and the logger open are exit-at-once; from here an
             // interrupt drains and flushes (RSH-002).
-            let (context, general) = context_with_general(config_dir.clone())?;
+            let (context, general) = context_with_general(context)?;
             watch.logs_opened();
             let options = ModelsOptions {
                 runner: args.runner,
@@ -85,7 +86,9 @@ fn run(
             Ok(ExitCode::SUCCESS)
         }
         Command::Doctor => {
-            let (context, general) = context_with_general(config_dir.clone())?;
+            let mut context = context;
+            let general = GeneralLogger::stderr(context.cli.as_str())?;
+            context.opened_general = Some(general.clone());
             watch.logs_opened();
             let options = DoctorOptions { context };
             let report = doctor(&options, cancel);
@@ -105,7 +108,7 @@ enum Input {
 
 fn run_send(
     args: SendArgs,
-    config_dir: Option<std::path::PathBuf>,
+    mut context: Context,
     cancel: &CancelToken,
     watch: &SignalWatch,
     stdin: &mut dyn Read,
@@ -118,9 +121,14 @@ fn run_send(
     }
     let limits = args.call_limits()?;
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
-    let project = Slug::new("project", &args.project)?;
     let agent_role = Slug::new("agent_role", &args.agent_role)?;
-    let config = load_config(&base_context(config_dir.clone()))?;
+    if let Some(workers) = args.workers {
+        context.flags.insert("workers".into(), workers.into());
+        context.loaded = None;
+    }
+    context.loaded = Some(decidr::load_context(&context)?);
+    let config = load_config(&context)?;
+    let project = Slug::new("project", config.require_project()?)?;
     let model = ModelSelector::parse(&args.model, &config)?;
     let provider = args
         .provider
@@ -148,7 +156,7 @@ fn run_send(
     };
     // Once the general log has opened, an interrupt cancels and the run drains, flushes and
     // closes the logs; the third interrupt exits at once (RSH-002, RSH-003).
-    let (context, general) = context_with_general(config_dir)?;
+    let (context, general) = context_with_general(context)?;
     watch.logs_opened();
     let mut options = SendOptions {
         model,
@@ -193,20 +201,10 @@ fn run_send(
     outcome.map(exit)
 }
 
-/// The binary's context: `--config-dir` (else `~/.sc-agent`) and every other seam default.
-fn base_context(config_dir: Option<std::path::PathBuf>) -> Context {
-    let mut context = Context::new(SERVICE);
-    context.config_dir = config_dir;
-    context
-}
-
-/// The binary's context with its general logger opened (and kept, to close it later).
-fn context_with_general(
-    config_dir: Option<std::path::PathBuf>,
-) -> Result<(Context, GeneralLogger), DecidrError> {
-    let mut context = base_context(config_dir);
+/// Open one process-owned general writer and share it with the operation.
+fn context_with_general(mut context: Context) -> Result<(Context, GeneralLogger), DecidrError> {
     let general = general_logger(&context)?;
-    context.general = Some(general.clone());
+    context.opened_general = Some(general.clone());
     Ok((context, general))
 }
 

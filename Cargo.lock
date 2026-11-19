@@ -1510,7 +1510,6 @@ dependencies = [
  "sc-agent-secrets",
  "sc-agent-testkit",
  "sc-agent-types",
- "sc-config",
  "serde",
  "serde_json",
  "serde_path_to_error",
@@ -1592,16 +1591,6 @@ dependencies = [
  "serde",
  "serde_json",
  "ulid",
-]
-
-[[package]]
-name = "sc-config"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd015a69da4884086fbbb845d1d7ce83a7713565f3be74d320542f04c261b2f8"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

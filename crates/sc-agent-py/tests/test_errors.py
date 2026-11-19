@@ -66,7 +66,7 @@ def test_stored_category_and_retryable_from_status_loopback(
     assert sc_agent.retryable(detail) is expected_retryable
 
     with pytest.raises(sc_agent.SagError) as caught:
-        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+        sc_agent.models(runner="dec")
     error = caught.value
     assert error.status == status
     restored = pickle.loads(pickle.dumps(error))

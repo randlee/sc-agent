@@ -6,7 +6,7 @@ import pytest
 import sc_agent
 
 
-COMMON = dict(model="jev", project="consumer", agent_role="judge", abort_on=frozenset({"auth"}))
+COMMON = dict(model="jev", project="consumer", abort_on=frozenset({"auth"}))
 CATEGORY_CASES = [
     ("auth", "AUTH.CREDENTIALS", False), ("quota", "DECIDR.RATE_LIMITED", False),
     ("busy", "DECIDR.OVERLOADED", True), ("network", "DECIDR.NETWORK", True),
@@ -153,16 +153,16 @@ def test_single_helper_forwards_context_and_preserves_wire(consumer, monkeypatch
         return line
 
     monkeypatch.setattr(sc_agent, "send", send)
-    log = lambda _: None
-    result = consumer.call_result({"model": "jev"}, **COMMON, config_dir="config", keyring_service="service",
-                                  keyring_account="account", timeout_secs=30, general_log=log,
+    log = consumer.client_logger()
+    result = consumer.call_result({"model": "jev"}, **COMMON, keyring_service="service",
+                                  keyring_account="account", timeout_secs=30, logger=log,
                                   images={"image": b"data"}, long_context=True)
     assert result["ok"] and result["value"]["q"].noul == 0.5
     assert result["usage"] == {"input_tokens": 1, "output_tokens": 1}
     assert result["position"] == 0 and result["attempts"] == 5 and result["line"] == line
     assert json.loads(observed["request"]) == {"model": "jev"}
-    assert {key: value for key, value in observed.items() if key != "request"} == dict(model="jev", project="consumer", agent_role="judge",
-                            config_dir="config", keyring_service="service", keyring_account="account",
+    assert {key: value for key, value in observed.items() if key != "request"} == dict(model="jev", project="consumer", agent_role=consumer.CLIENT_NAME,
+                            keyring_service="service", keyring_account="account",
                             timeout_secs=30, general_log=log, images={"image": b"data"}, long_context=True,
                             cancel=observed["cancel"])
     assert isinstance(observed["cancel"], sc_agent.CancelToken)
@@ -182,14 +182,14 @@ def test_batch_streams_immediately_once_and_returns_input_order(consumer, monkey
 
     monkeypatch.setattr(sc_agent, "send_batch", send_batch)
     result = consumer.call_batch_results([{"x": "a"}, "b"], **COMMON, on_result=callbacks.append,
-                                         config_dir="config", keyring_service="service", keyring_account="account",
+                                         keyring_service="service", keyring_account="account",
                                          timeout_secs=30, workers=2)
     assert result == dict(ok=True, value=[callbacks[1], callbacks[0]])
     assert callbacks[0]["error"].attempts == 5
     assert observed["requests"] == ['{"x": "a"}', "b"]
     assert {key: value for key, value in observed.items() if key != "cancel"} == dict(
-        requests=['{"x": "a"}', "b"], model="jev", project="consumer", agent_role="judge", config_dir="config",
-        keyring_service="service", keyring_account="account", timeout_secs=30, workers=2, general_log=None)
+        requests=['{"x": "a"}', "b"], model="jev", project="consumer", agent_role=consumer.CLIENT_NAME,
+        keyring_service="service", keyring_account="account", timeout_secs=30, workers=2, general_log=consumer.client_logger())
 
 
 @pytest.mark.parametrize("position", [None, True, "0", -1, 1])
@@ -246,19 +246,23 @@ def test_shared_error_is_raisable_and_renders_the_consumer_envelope(consumer):
 
 
 @pytest.mark.parametrize("status", [401, 402, 413, 422, 429, 503])
-def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, args, consumer, status):
+def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, args, consumer, status, tmp_path, monkeypatch):
     request = json.dumps({"model": "jev-latest", "state": "s", "questions": {"q": {"type": "noul"}}})
     if status == 413:
         env[0].response_body = {"detail": "context window exceeded"}
     if status == 401:
         env[0].response_body = {"detail": "PRIVATE PROVIDER AUTH BODY"}
     common_fields = []
-    for project, role in (("plan-anchor", "judge"), ("judge-jev", "quality")):
-        records = []
-        result = consumer.call_result(request, **dict(args, project=project, agent_role=role),
-                                      abort_on=frozenset(), general_log=records.append)
+    from consumer_support import render_consumer
+    for project in ("plan-anchor", "judge-jev"):
+        folder = tmp_path / project
+        folder.mkdir()
+        client = render_consumer(folder, monkeypatch=monkeypatch, client_name=project)
+        result = client.call_result(request, model=args["model"], project=project, abort_on=frozenset())
+        assert client.client_logger().flush().kind == "ok"
+        records = [json.loads(line) for line in (folder / "client-logs/logs" / f"{project}.log.jsonl").read_text().splitlines()]
         error = result["error"]
-        assert isinstance(error, consumer.ClientError)
+        assert isinstance(error, client.ClientError)
         native = json.loads(result["line"])["error"]
         assert error.message == native["message"] and error.action == native["recovery"]
         assert error.action
@@ -271,7 +275,7 @@ def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, a
         logged = [record for record in records if record["action"] == "runner.result.error"]
         assert len(logged) == 1
         fields = logged[0]["fields"]
-        assert fields["project"] == project and fields["agent_role"] == role
+        assert fields["project"] == project and fields["agent_role"] == project
         assert fields["id"] == native["id"] and fields["category"] == native["category"]
         assert fields["status"] == native.get("status") and fields["message"] == native["message"]
         assert fields["action"] == native["recovery"]
