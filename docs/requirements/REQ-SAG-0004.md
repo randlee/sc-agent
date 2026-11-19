@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. PyO3 bindings are the Python bindings of sc-agent. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
+Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. PyO3 bindings are the Python bindings of sc-agent. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`. An invalid `project` or `agent_role` is one that is not a slug.
 
 **MUST statements:**
 

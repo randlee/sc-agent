@@ -28,7 +28,8 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
   7. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
 - `sc-agent.json` MUST accept only settings that apply to every CLI.
-- `<cli>.json` MUST accept that CLI's settings and the shared settings.
+- `<cli>.json` MUST accept that CLI's settings.
+- `<cli>.json` MUST accept the shared settings.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 and 4 MUST be skipped.
@@ -39,7 +40,8 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - `<cli> doctor` MUST report the path of every file in the seven layers.
 - For each file in the seven layers, `<cli> doctor` MUST report whether it exists.
 - Every CLI's doctor MUST call one shared doctor routine to report the shared settings.
-- When a CLI fails to load a configuration file, its error MUST name the file and the key path.
+- When a CLI fails to load a configuration file, its error MUST name the file.
+- When a CLI fails to load a configuration file, its error MUST name the key path.
 
 **MUST NOT statements:**
 
