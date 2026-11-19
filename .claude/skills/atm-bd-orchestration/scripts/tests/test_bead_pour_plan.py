@@ -164,6 +164,9 @@ class PourPlanTests(unittest.TestCase):
                     self.assertEqual(step["metadata"]["pr_target"], "fix/x-previous")
                     self.assertEqual(step["metadata"]["branch"], "fix/x-1-qa1-f1")
                 self.assertEqual(steps[0]["metadata"]["requirements"], ["REQ-1"])
+                # Only the QA bead carries the sprint container's planned layer (t-x-1 is planned at layer 1).
+                self.assertEqual([step["metadata"].get("layer") for step in steps],
+                                 [None] if option == "A" else [None, None, 1])
                 assert_close_fields(self, steps, self.sprint, "qa1-f1-r1", "fix")
                 self.assertEqual(steps[0]["metadata"]["checked_title"], steps[0]["title"])  # the fix bead's own title
                 relations, _ = self.runner.relations(target, preview=False)

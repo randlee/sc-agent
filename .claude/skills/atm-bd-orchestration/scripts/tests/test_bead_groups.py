@@ -61,6 +61,10 @@ class FindingGroupTests(unittest.TestCase):
                 self.assertEqual(output.returncode, 0, output.stdout + output.stderr)
                 steps = tomllib.loads((root / "rendered.formula.toml").read_text())["steps"]
                 assert steps[2]["metadata"]["reviewers_round1"] == ["flaky-test-qa"]
+                self.assertEqual([step["id"] for step in steps], ["fix", "sanity", "qa"])
+                self.assertEqual(steps[2]["metadata"]["layer"], 4)  # the sprint container's planned layer, an integer
+                self.assertNotIn("layer", steps[0]["metadata"])
+                self.assertNotIn("layer", steps[1]["metadata"])
                 assert "code-worktrees/fix/d-1-qa1-f1" in target["compose"]["worktree"]
                 assert all(step["metadata"]["worktree"] == target["compose"]["worktree"] for step in steps)
                 metadata = steps[0]["metadata"]
@@ -69,8 +73,11 @@ class FindingGroupTests(unittest.TestCase):
                 else:
                     self.assertEqual(metadata["found_on_layer"], provenance)
 
+_UNSET = object()
+
+
 class FoundOnLayerGuardTests(unittest.TestCase):
-    def targets(self, layer):
+    def targets(self, layer, sprint_layer=1):
         loader = importlib.machinery.SourceFileLoader("bead_groups_layer_guard", str(SCRIPTS / "bead-groups"))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         assert spec is not None
@@ -84,6 +91,8 @@ class FoundOnLayerGuardTests(unittest.TestCase):
         stack = {"id": "t-phase-d.stack", "metadata": {"trunk": "integrate/phase-d", "stack_number": None, "layers": []}}
         container = {"status": "open", "title": "d-1: the work", "metadata": {"phase": "d", "sprint": "d-1", "stack": "stack", "difficulty": "normal",
                                                      "requirements": ["REQ-1"], "adrs": ["NONE"]}}
+        if sprint_layer is not _UNSET:
+            container["metadata"]["layer"] = sprint_layer
         runner.show = lambda bead: stack if bead == "t-phase-d.stack" else container
         runner.sidecar = lambda _: {"default_option": "C", "options": {"C": {}}, "ref": "{vars[finding_ref]}-r{vars[round]}"}
         row = {"ref": "qa1-f1", "severity": "blocking", "reviewer": "flaky-test-qa", "title": "issue", "remedy": "fix"}
@@ -114,6 +123,35 @@ class FoundOnLayerGuardTests(unittest.TestCase):
             groups, result, _ = self.targets(layer)
             self.assertNotIsInstance(result[0], groups.TargetError)
             self.assertEqual(result[0]["compose"]["has_found_on_layer"], expected)
+
+    def test_sprint_layer_is_the_qa_layer_compose_variable(self):
+        for sprint_layer in (1, 4):
+            groups, result, _ = self.targets(None, sprint_layer=sprint_layer)
+            self.assertNotIsInstance(result[0], groups.TargetError)
+            self.assertEqual((result[0]["compose"]["layer"], result[0]["compose"]["has_layer"]), (sprint_layer, True))
+
+    def test_missing_or_non_positive_sprint_layer_is_refused_before_compose(self):
+        for sprint_layer in (_UNSET, 0, -1):
+            with self.subTest(sprint_layer=sprint_layer):
+                with self.assertRaises(Exception) as caught:
+                    self.targets(None, sprint_layer=sprint_layer)
+                error = caught.exception
+                self.assertEqual(type(error).__name__, "TargetError")
+                self.assertEqual(error.code, "BEAD_GROUPS_SPRINT_LAYER_INVALID")
+                self.assertIn("sprint d-1 metadata.layer", str(error))
+                self.assertIn("not a positive integer", str(error))
+
+    def test_non_integer_sprint_layer_is_refused_by_the_row_type_check(self):
+        """A layer that is not an integer at all fails the sprint row's metadata type check first, naming the field and the sprint."""
+        for sprint_layer in (None, "", "1", 1.0, True):
+            with self.subTest(sprint_layer=sprint_layer):
+                with self.assertRaises(Exception) as caught:
+                    self.targets(None, sprint_layer=sprint_layer)
+                error = caught.exception
+                self.assertEqual(type(error).__name__, "TargetError")
+                self.assertEqual(error.code, "BEAD_GROUPS_TARGET_INVALID")
+                self.assertIn("metadata.layer", str(error))
+                self.assertIn("bd show d-1 --json", str(error))
 
 
 class PhaseEndFindingTests(unittest.TestCase):
@@ -254,6 +292,11 @@ class PhaseEndFindingTests(unittest.TestCase):
                          ("d", "t-phase-d", "stack", "hard"))
         self.assertEqual(compose["pr_target"], "integrate/phase-d")
         self.assertEqual(compose["branch"], "fix/t-phase-d-pe-f1")
+
+    def test_phase_epic_finding_qa_bead_has_no_planned_layer(self):
+        groups, result = self.targets(difficulty="hard")
+        self.assertNotIsInstance(result[0], groups.TargetError)
+        self.assertEqual((result[0]["compose"]["layer"], result[0]["compose"]["has_layer"]), ("", False))
 
     def test_phase_epic_finding_without_difficulty_is_refused(self):
         groups, result = self.targets()
@@ -527,7 +570,7 @@ class EmbeddedFindingRecoveryTests(unittest.TestCase):
                  "metadata": {"trunk": "integrate/phase-d", "stack_number": None, "layers": []}},
                 {"id": "t-d-1", "title": "d-1: sprint", "issue_type": "task", "labels": ["phase-d", "stage:sprint"],
                  "description": "## Deliverables\n1. Work", "acceptance_criteria": "done",
-                 "metadata": {"phase": "d", "sprint": "d-1", "stack": "phase-d", "requirements": ["NONE"],
+                 "metadata": {"phase": "d", "sprint": "d-1", "stack": "phase-d", "layer": 1, "requirements": ["NONE"],
                               "adrs": ["NONE"], "worktree": "/tmp/worktree", "branch": "sprint/d-1",
                               "pr_target": "integrate/phase-d", "difficulty": "normal"}},
                 {"id": "t-d-1.f1-r1-fix", "title": "fix", "status": "closed", "issue_type": "task",

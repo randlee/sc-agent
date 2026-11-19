@@ -244,6 +244,7 @@ class Compose(TypedDict, total=False):
     adrs: list[str]
     found_on_layer: int | str
     has_found_on_layer: bool
+    has_layer: bool
 
 
 PlanEntry = tuple[str, str, list[str]]
@@ -572,6 +573,13 @@ class Run:
         missing = [k for k, value in (("phase", phase), ("sprint", sprint_name), ("stack", stack_name), ("difficulty", difficulty_value)) if not value]
         if missing and not (phase_end and missing == ["difficulty"]):
             raise TargetError("BEAD_GROUPS_TARGET_INVALID", f"{sprint} lacks {', '.join(missing)}")
+        # The QA bead's layer is the plan's intent, the sprint container's metadata.layer, set at pour (not a stack position).
+        # A phase-end finding has no sprint container, so its QA bead carries no planned layer.
+        sprint_layer = meta.get("layer")
+        if not phase_end and (type(sprint_layer) is not int or sprint_layer < 1):
+            raise TargetError("BEAD_GROUPS_SPRINT_LAYER_INVALID",
+                              f"sprint {sprint} metadata.layer {sprint_layer!r} is not a positive integer; the finding group's QA bead "
+                              f"takes its layer from the sprint plan. Fix the plan's layer for {sprint} and re-import it; do not hand-edit poured beads")
         filed_by_json, filed_by_bead = self.show_typed(filed_by)
         qa_closed = filed_by_bead.get("status") == "closed"
         reason = filed_by_json.get("close_reason")
@@ -671,6 +679,8 @@ class Run:
                            **cut,
                            "found_on_layer": found_on_layer_value,
                            "has_found_on_layer": finding.get("found_on_layer") not in (None, ""),
+                           "layer": sprint_layer if type(sprint_layer) is int else "",
+                           "has_layer": not phase_end,
                            "priority": finding.get("priority", 1),
                            "edge_option": option, **self.close_compose(phase, f"{sprint_name}: fix {ref}: {finding['title']}", stack_id)}
                 compose["ref"] = fmt(sidecar["ref"], {"vars": compose | {"finding_ref": slug}})
