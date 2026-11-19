@@ -108,7 +108,12 @@ def _load_wheel():
 
 
 def client_logger(log_root=None, logger=None):
-    """One caller-owned Logger for this generated client's records and wheel calls."""
+    """Return a caller-supplied logger or this client's shared default logger.
+
+    The first successful default construction fixes its log root for this module;
+    later calls reuse it and ignore log_root. An explicit logger is returned directly
+    and does not replace the cached default.
+    """
     import sc_observability as obs
     if logger is not None:
         if not isinstance(logger, obs.Logger):
