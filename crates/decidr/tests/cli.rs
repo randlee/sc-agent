@@ -832,9 +832,12 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     std::fs::write(&local, json!({"project":"phase-a","workers":3}).to_string()).expect("local");
     let command = || {
         let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_decidr"));
+        isolate_environment(
+            &mut cmd,
+            std::env::var_os("PATH"),
+            std::env::var_os("LD_LIBRARY_PATH"),
+        );
         cmd.arg("doctor")
-            .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .env("HOME", &home)
             .env("USERPROFILE", &home)
             .env("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
