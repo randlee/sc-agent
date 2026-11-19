@@ -8,8 +8,8 @@
 {"id": "ADR-SAG-0017", "file": "docs/adr/ADR-SAG-0017.md", "sha256": "d36897ed6d917bc967b39b0891d93c2736c102fabdaa997631df15c0860d1bf5", "runs": ["f-r1", "f-r2", "f-r3"], "lowest": 1.0, "commit": "3afa4f9"}
 {"id": "ADR-SAG-0019", "file": "docs/adr/ADR-SAG-0019.md", "sha256": "56efd291d1a05320e427a11992a8a47a2e929acd8a679ca2f93bc674aba635b9", "runs": ["f-r1", "f-r2", "f-r3"], "lowest": 0.92, "commit": "3afa4f9"}
 {"id": "ADR-SAG-0021", "file": "docs/adr/ADR-SAG-0021.md", "sha256": "50bf7e79e53b4c752dca767f6fed6c14fff530823a341f65c17f0988f2fa6b2e", "runs": ["f-r1", "f-r2", "f-r3"], "lowest": 1.0, "commit": "3afa4f9"}
-{"id": "REQ-SAG-0005", "file": "docs/requirements/REQ-SAG-0005.md", "sha256": "778b8994224e7b77fa3f43246749240b10691491e3f6b436c732b6a0b247a3db", "runs": ["f-r1", "f-r2", "f-r3"], "lowest": 0.61, "commit": "3afa4f9"}
 {"id": "REQ-SAG-0020", "file": "docs/sc-agent-config/requirements/REQ-SAG-0020.md", "sha256": "dc4b02df8c1639b438198d6aa5ab548d4a55dbb5de95f10aa98911271e73a6f8", "runs": ["f-r1", "f-r2", "f-r3"], "lowest": 0.7, "commit": "3afa4f9"}
 {"id": "REQ-SAG-0401", "file": "docs/sc-agent-secrets/requirements/REQ-SAG-0401.md", "sha256": "52147f131ce585562fe483bf92d99509505886c42ae5dbd054a314089c76b833", "runs": ["g-r1", "g-r2", "g-r3"], "lowest": 0.66, "commit": "3afa4f9"}
 {"id": "REQ-SAG-0022", "file": "docs/requirements/REQ-SAG-0022.md", "sha256": "2179a0b14c21a890ec7766aa15f950d6c0ed93686660f3de0eb82b24c65561da", "runs": ["i-r1", "i-r2", "i-r3"], "lowest": 0.64, "commit": "3afa4f9"}
 {"id": "REQ-SAG-0008", "file": "docs/requirements/REQ-SAG-0008.md", "sha256": "510c1053d23f547ee7ff0639968144a3476b8cb72a77b7c00d7a38d708ca4c61", "runs": ["m1", "m2", "m3"], "lowest": 0.64, "commit": "a98901b"}
+{"id": "REQ-SAG-0005", "file": "docs/requirements/REQ-SAG-0005.md", "sha256": "66468861391602fb702b3c90df38957718dda6530fee69eb98c1f3742f904de7", "runs": ["w1", "w2", "w3"], "lowest": 0.63, "commit": "f633f8c"}
