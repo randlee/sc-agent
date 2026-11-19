@@ -369,12 +369,12 @@ mod tests {
         let config = home.path().join(".sc-agent/decidr.json");
         // The file has a wrong port and no log_root: the environment supplies the real port,
         // and the shared default-root function supplies <home>/.sc-agent.
-        std::fs::write(&config, serde_json::json!({"local_runners":{"dec":{"kind":"mapika","host":"127.0.0.1","port":1,"model":"jev-latest"}}}).to_string()).expect("config");
+        std::fs::write(&config, serde_json::json!({"local_runners":{"laya":{"kind":"mapika","host":"127.0.0.1","port":1,"model":"jev-latest"}}}).to_string()).expect("config");
         let file = batch_file(home.path(), 1);
         let request = [
             "send",
             "--model",
-            "dec",
+            "laya",
             "--agent-role",
             "role",
             file.to_str().expect("path"),
@@ -407,7 +407,10 @@ mod tests {
                 .args(["--project", "phase-flag"])
                 .current_dir(&work)
                 .env("SC_PROJECT", "phase-env")
-                .env("DECIDR_LOCAL_RUNNERS__DEC__PORT", server.port().to_string()),
+                .env(
+                    "DECIDR_LOCAL_RUNNERS__LAYA__PORT",
+                    server.port().to_string(),
+                ),
         );
         assert!(
             sent.status.success(),
@@ -442,7 +445,10 @@ mod tests {
             decidr(home.path(), &request)
                 .current_dir(&work)
                 .env("SC_PROJECT", "phase-env")
-                .env("DECIDR_LOCAL_RUNNERS__DEC__PORT", server.port().to_string())
+                .env(
+                    "DECIDR_LOCAL_RUNNERS__LAYA__PORT",
+                    server.port().to_string(),
+                )
                 .env("DECIDR_LOG_ROOT", &override_root),
         );
         assert!(
@@ -796,6 +802,13 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
         }
         snapshot
     }
+    let (request_sent, requests) = std::sync::mpsc::channel();
+    let server =
+        sc_agent_testkit::serve_each(move |mut stream| {
+            request_sent.send(()).expect("record unexpected request");
+            let _ = std::io::Write::write_all(&mut stream,
+            b"HTTP/1.1 500 Unexpected Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        });
     let root = tempfile::tempdir().expect("root");
     let home = root.path().join("home");
     let work = root.path().join("work");
@@ -813,6 +826,9 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     let global = home.join(".sc-agent/sc-agent.json");
     let local = work.join(".sc/sc-agent/decidr.json");
     std::fs::write(&global, json!({"project":"global"}).to_string()).expect("global");
+    std::fs::write(home.join(".sc-agent").join("decidr.json"), json!({
+        "local_runners":{"laya":{"kind":"mapika","host":"127.0.0.1","port":server.port(),"model":"jev-latest"}}
+    }).to_string()).expect("runner fixture");
     std::fs::write(&local, json!({"project":"phase-a","workers":3}).to_string()).expect("local");
     let command = || {
         let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_decidr"));
@@ -899,4 +915,12 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     let output = common::run_bounded(&mut command());
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains(local.to_str().expect("path")));
+    assert!(
+        requests.try_recv().is_err(),
+        "doctor sent a request to the configured runner"
+    );
+    assert!(
+        !root.path().join("other").exists(),
+        "doctor opened the configured log root"
+    );
 }
