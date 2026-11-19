@@ -1,7 +1,7 @@
 # Decision: General logs and session logs live in separate trees, and the session identity is a fixed agent role plus a required project/phase
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
@@ -43,22 +43,22 @@ Session logs must never mix with general logs, and every session must be filed u
 
 Logs live under `<log_root>`, which defaults to `~/.sc-agent` and is set by `log_root` in the shared configuration (ADR-SAG-0020).
 
-- Each CLI's general log is `<log_root>/logs/<cli>/<cli>.log.jsonl`, for example `logs/decidr/decidr.log.jsonl`. Each CLI writes only its own general log.
+- Each CLI's general log is `<log_root>/logs/<cli>.log.jsonl`, for example `logs/decidr.log.jsonl`. Each CLI writes only its own general log.
 - Session logs are `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`. `sessions/` sits beside `logs/`, not under it, and holds nothing but session logs.
 
 The CLIs and the logs each one writes are these, and no others:
 
 | CLI | General log | Session logs |
 |---|---|---|
-| `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
-| `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | none |
+| `decidr` | `<log_root>/logs/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
+| `sitr` | `<log_root>/logs/sitr.log.jsonl` | none |
 
 The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app reaches sc-agent through its sc-compose generated client, and the client owns the general logger (REQ-SAG-0022): it obtains one sc-observability `Logger` named after the client and injects that same `Logger` into every sc-decidr and sitr call, so the app, decidr and sitr write through one logger and one queue in that process. The apps and the general log each one's client writes are these:
 
 | App (client) | General log | Session logs |
 |---|---|---|
-| `plan-anchor` | `<log_root>/logs/plan-anchor/plan-anchor.log.jsonl` | `<log_root>/sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
-| `judge-jev` | `<log_root>/logs/judge-jev/judge-jev.log.jsonl`, holding its decidr and sitr records | `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
+| `plan-anchor` | `<log_root>/logs/plan-anchor.log.jsonl` | `<log_root>/sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
+| `judge-jev` | `<log_root>/logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
 
 Every log in both tables is enabled by default and every sc-decidr and sitr call is logged, so with nothing configured all logs land under `<log_root>` (`~/.sc-agent/`) for a full audit. The session logger stays optionally injectable; no app injects one today.
 
@@ -66,7 +66,7 @@ An app that judges many items, such as plan-anchor or judge-jev, judges every it
 
 A plan that adds an app, or changes a log an app writes, is not approved until it includes a new version of this ADR with that row. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
 
-The crates that carry this decision depend on each other as follows. The sitr wheel (`sc-treesitter-py`) depends on `sc-agent-log`, so it takes an injected Logger and has the same default general logger as the sc-decidr wheel. The `sitr` CLI depends on `sc-agent-config`, so it reads its configuration through the seven-layer lookup of ADR-SAG-0020. The `sitr` CLI also depends on `sc-agent-log`, so it opens its default general log through the same `sc-agent-log` call as the sitr wheel and the `logs/<cli>/` path rule lives in one crate. `sc-agent-log` has an optional `pyo3` dependency, off by default, that holds the one copy of the code both wheels use to call an injected `sc_observability.Logger`'s `log(LogEvent)`; the CLIs build `sc-agent-log` without it. All four are existing crates.
+The crates that carry this decision depend on each other as follows. The sitr wheel (`sc-treesitter-py`) depends on `sc-agent-log`, so it takes an injected Logger and has the same default general logger as the sc-decidr wheel. The `sitr` CLI depends on `sc-agent-config`, so it reads its configuration through the seven-layer lookup of ADR-SAG-0020. The `sitr` CLI also depends on `sc-agent-log`, so it opens its default general log through the same `sc-agent-log` call as the sitr wheel and the general-log path rule lives in one crate. `sc-agent-log` has an optional `pyo3` dependency, off by default, that holds the one copy of the code both wheels use to call an injected `sc_observability.Logger`'s `log(LogEvent)`; the CLIs build `sc-agent-log` without it. All four are existing crates.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
@@ -83,14 +83,14 @@ The session identity is fixed as follows.
 
 ### Rationale
 
-A separate `sessions/` tree lets the owner's tools, and the later SQLite load, read every session without skipping general logs. A per-CLI folder under `logs/` keeps each CLI's diagnostics apart as more CLIs are added. Hardcoding the agent role in the generated client stops an app from filing its sessions under another agent's name. Requiring the project/phase stops sessions of different phases from merging into one file. `SC_PROJECT` is not prefixed with a CLI name because the project/phase applies to every CLI and to tools outside sc-agent.
+A separate `sessions/` tree lets the owner's tools, and the later SQLite load, read every session without skipping general logs. One file per CLI under `logs/` keeps each CLI's diagnostics apart as more CLIs are added, and it is the path sc-observability 1.5.0 writes (`<log_root>/logs/<service>.log.jsonl`), so no sc-observability change is needed. Hardcoding the agent role in the generated client stops an app from filing its sessions under another agent's name. Requiring the project/phase stops sessions of different phases from merging into one file. `SC_PROJECT` is not prefixed with a CLI name because the project/phase applies to every CLI and to tools outside sc-agent.
 
 ### Consequences
 
 **Positive:**
 
 - `sessions/<repo>/<agent_role>/<project>/` selects one agent's work in one phase with a path glob.
-- Adding a CLI adds one folder under `logs/` and nothing under `sessions/`.
+- Adding a CLI adds one file under `logs/` and nothing under `sessions/`.
 
 **Negative:**
 
@@ -157,7 +157,7 @@ The project/phase applies to every CLI and to tools outside sc-agent.
 
 **Description:**
 
-With no logger injected, a PyO3 binding writes `<log_root>/logs/<wheel>/<wheel>.log.jsonl` instead of its CLI's general log.
+With no logger injected, a PyO3 binding writes `<log_root>/logs/<wheel>.log.jsonl` instead of its CLI's general log.
 
 **Pros:**
 
