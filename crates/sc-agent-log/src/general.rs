@@ -310,6 +310,29 @@ mod home_tests {
     use super::*;
 
     #[test]
+    fn startup_retention_runs_before_a_worker_exists() {
+        let root = tempfile::tempdir().expect("root");
+        let logs = root.path().join("logs");
+        std::fs::create_dir(&logs).expect("logs");
+        let active = logs.join("decidr.log.jsonl");
+        const OVERSIZED: u64 = 65 * 1024 * 1024;
+        let file = std::fs::File::create(&active).expect("active file");
+        file.set_len(OVERSIZED).expect("sparse file");
+        drop(file);
+
+        let config = logger_config("decidr", root.path(), true).expect("config");
+        prepare_log_file(&config).expect("startup retention");
+
+        assert_eq!(
+            std::fs::metadata(logs.join("decidr.log.jsonl.1"))
+                .expect("rotated file")
+                .len(),
+            OVERSIZED
+        );
+        assert!(!active.exists() || std::fs::metadata(active).expect("active").len() == 0);
+    }
+
+    #[test]
     fn stderr_logger_writes_and_closes_without_creating_files() {
         let root = tempfile::tempdir().expect("root");
         let log = GeneralLogger::stderr_in("decidr", root.path()).expect("stderr logger");
