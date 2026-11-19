@@ -15,7 +15,7 @@ fn options(root: &Path) -> LoadOptions {
         cli: CliName::Decidr,
         home: root.join("home"),
         worktree: Some(root.join("work")),
-        default_log_root: root.join("home/.sc-agent"),
+        default_log_root: root.join("home").join(".sc-agent"),
         flags: BTreeMap::new(),
         environment: Vec::new(),
     }
