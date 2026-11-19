@@ -322,6 +322,21 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
         "local_runners.laya.key_env".into(),
         json!({"local_runners":{"laya":insecure}}),
     ));
+    bad.push((
+        "local_runners.jev".into(),
+        json!({"local_runners":{"jev":runner.clone()}}),
+    ));
+    for key in ["models", "local_runners"] {
+        let entry = if key == "models" {
+            json!({"line":"haiku","released":"2001-01-01"})
+        } else {
+            runner.clone()
+        };
+        let entries: serde_json::Map<String, Value> = (0..65)
+            .map(|i| (format!("entry-{i}"), entry.clone()))
+            .collect();
+        bad.push((key.into(), Value::Object(entries)));
+    }
     for (key, value) in bad {
         let object = if key.starts_with("local_runners.") {
             value.clone()
@@ -460,4 +475,16 @@ fn injected_default_root_accepts_non_unicode_paths_without_serialization() {
         load_layered(&o).unwrap().config.log_root().unwrap(),
         o.default_log_root
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn non_utf8_default_log_root_remains_a_path_and_never_panics() {
+    use std::os::unix::ffi::OsStringExt;
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    o.default_log_root = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![255]));
+    let loaded = load_layered(&o).unwrap();
+    assert_eq!(loaded.config.log_root().unwrap(), o.default_log_root);
+    assert_eq!(row(&loaded, "log_root").source, "default");
 }
