@@ -135,6 +135,24 @@ fn nested_merge_preserves_unmodified_values_and_their_sources() {
 }
 
 #[test]
+fn numeric_looking_model_id_from_environment_stays_a_string() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    write(
+        &o.home.join(".sc-agent/decidr.json"),
+        &json!({"local_runners":{"fixture":{
+            "kind":"generic", "host":"localhost", "port":8123, "model":"original"
+        }}}),
+    );
+    env(&mut o, "DECIDR_LOCAL_RUNNERS__FIXTURE__MODEL", "123");
+
+    let loaded = load_layered(&o).unwrap();
+
+    assert_eq!(loaded.config.local_runners["fixture"].model.as_str(), "123");
+    assert_eq!(row(&loaded, "local_runners.fixture.model").value, "123");
+}
+
+#[test]
 fn shared_precedence_is_local_before_global_and_cli_before_shared() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());

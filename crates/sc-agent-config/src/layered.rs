@@ -157,23 +157,208 @@ fn decode_source<'a>(
         .map_or(fallback, |(_, source)| source)
 }
 
-fn check_keys(value: &Value, cli: CliName, shared: bool) -> Result<(), AgentConfigError> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| invalid("$", "configuration must be a JSON object"))?;
-    for key in object.keys() {
-        if !matches!(key.as_str(), "project" | "log_root")
-            && (shared
-                || cli == CliName::Sitr
-                || !matches!(
-                    key.as_str(),
-                    "models" | "workers" | "max_sends" | "local_runners"
-                ))
-        {
-            return Err(invalid(key, "setting is not accepted in this scope"));
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EnvValue {
+    String,
+    Json,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DoctorValue {
+    None,
+    Project,
+    LogRoot,
+    Workers,
+    MaxSends,
+    EmptyModels,
+    ModelLine,
+    ModelReleased,
+    EmptyRunners,
+    RunnerKind,
+    RunnerHost,
+    RunnerPort,
+    RunnerModel,
+    RunnerKeyEnv,
+    RunnerRequestTimeout,
+    RunnerLoadTimeout,
+}
+
+#[derive(Clone, Copy)]
+struct Setting {
+    path: &'static str,
+    shared: bool,
+    env: EnvValue,
+    doctor: DoctorValue,
+}
+
+// This is the loader's schema for accepted paths, environment value types and
+// doctor rows. `*` matches one dynamic model or runner name.
+const SETTINGS: &[Setting] = &[
+    Setting {
+        path: "project",
+        shared: true,
+        env: EnvValue::String,
+        doctor: DoctorValue::Project,
+    },
+    Setting {
+        path: "log_root",
+        shared: true,
+        env: EnvValue::String,
+        doctor: DoctorValue::LogRoot,
+    },
+    Setting {
+        path: "workers",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::Workers,
+    },
+    Setting {
+        path: "max_sends",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::MaxSends,
+    },
+    Setting {
+        path: "models",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::EmptyModels,
+    },
+    Setting {
+        path: "models.*",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::None,
+    },
+    Setting {
+        path: "models.*.line",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::ModelLine,
+    },
+    Setting {
+        path: "models.*.released",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::ModelReleased,
+    },
+    Setting {
+        path: "local_runners",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::EmptyRunners,
+    },
+    Setting {
+        path: "local_runners.*",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::None,
+    },
+    Setting {
+        path: "local_runners.*.kind",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::RunnerKind,
+    },
+    Setting {
+        path: "local_runners.*.host",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::RunnerHost,
+    },
+    Setting {
+        path: "local_runners.*.port",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::RunnerPort,
+    },
+    Setting {
+        path: "local_runners.*.model",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::RunnerModel,
+    },
+    Setting {
+        path: "local_runners.*.key_env",
+        shared: false,
+        env: EnvValue::String,
+        doctor: DoctorValue::RunnerKeyEnv,
+    },
+    Setting {
+        path: "local_runners.*.request_timeout_secs",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::RunnerRequestTimeout,
+    },
+    Setting {
+        path: "local_runners.*.load_timeout_secs",
+        shared: false,
+        env: EnvValue::Json,
+        doctor: DoctorValue::RunnerLoadTimeout,
+    },
+];
+
+fn path_matches(pattern: &str, path: &[&str], allow_prefix: bool) -> bool {
+    let parts: Vec<_> = pattern.split('.').collect();
+    (allow_prefix && path.len() <= parts.len() || path.len() == parts.len())
+        && path
+            .iter()
+            .zip(parts)
+            .all(|(actual, expected)| expected == "*" || actual == &expected)
+}
+
+fn check_path(path: &[&str], cli: CliName, shared: bool) -> Result<(), AgentConfigError> {
+    if SETTINGS.iter().any(|setting| {
+        let scope_ok = if shared {
+            setting.shared
+        } else {
+            cli == CliName::Decidr || setting.shared
+        };
+        scope_ok && path_matches(setting.path, path, true)
+    }) {
+        Ok(())
+    } else {
+        Err(invalid(
+            path.last().copied().unwrap_or("$"),
+            "setting is not accepted in this scope",
+        ))
+    }
+}
+
+fn check_object(
+    value: &Value,
+    path: &mut Vec<String>,
+    cli: CliName,
+    shared: bool,
+) -> Result<(), AgentConfigError> {
+    let object = value.as_object().ok_or_else(|| {
+        invalid(
+            path.last().map_or("$", String::as_str),
+            "configuration must be a JSON object",
+        )
+    })?;
+    for (key, child) in object {
+        path.push(key.clone());
+        let parts: Vec<_> = path.iter().map(String::as_str).collect();
+        check_path(&parts, cli, shared)?;
+        if child.is_object() {
+            check_object(child, path, cli, shared)?;
         }
+        path.pop();
     }
     Ok(())
+}
+
+fn check_keys(value: &Value, cli: CliName, shared: bool) -> Result<(), AgentConfigError> {
+    check_object(value, &mut Vec::new(), cli, shared)
+}
+
+fn env_value_kind(path: &str) -> EnvValue {
+    let parts: Vec<_> = path.split('.').collect();
+    SETTINGS
+        .iter()
+        .find(|setting| path_matches(setting.path, &parts, false))
+        .map_or(EnvValue::Json, |setting| setting.env)
 }
 fn file_value(path: &Path) -> Result<Option<Value>, AgentConfigError> {
     let metadata = match std::fs::metadata(path) {
@@ -364,14 +549,11 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
         let text = raw
             .to_str()
             .ok_or_else(|| at(&source, invalid(&key, "value is not UTF-8")))?;
-        let leaf = key.rsplit('.').next().unwrap_or(&key);
-        let value = if matches!(
-            leaf,
-            "project" | "log_root" | "kind" | "host" | "model" | "key_env" | "line" | "released"
-        ) {
-            Value::String(text.into())
-        } else {
-            serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.into()))
+        let value = match env_value_kind(&key) {
+            EnvValue::String => Value::String(text.into()),
+            EnvValue::Json => {
+                serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.into()))
+            }
         };
         let mut object = Value::Object(Map::new());
         put(&mut object, &key.split('.').collect::<Vec<_>>(), value).map_err(|e| at(&source, e))?;
@@ -424,74 +606,182 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
 #[must_use]
 pub fn doctor_rows(loaded: &Loaded) -> Vec<DoctorRow> {
     let c = &loaded.config;
-    let mut values = vec![
-        ("project".into(), c.project().unwrap_or("unset").to_owned()),
-        (
-            "log_root".into(),
-            c.log_root
-                .as_ref()
-                .map_or_else(|| "unset".into(), |p| p.display().to_string()),
-        ),
-    ];
+    let mut rows = Vec::new();
+    let mut push = |setting: String, value: String| {
+        let source = loaded
+            .sources
+            .get(&setting)
+            .unwrap_or(&Source::Default)
+            .to_string();
+        rows.push(DoctorRow {
+            setting,
+            value,
+            source,
+        });
+    };
+    for spec in SETTINGS {
+        match spec.doctor {
+            DoctorValue::Project => push("project".into(), c.project().unwrap_or("unset").into()),
+            DoctorValue::LogRoot => push(
+                "log_root".into(),
+                c.log_root
+                    .as_ref()
+                    .map_or_else(|| "unset".into(), |p| p.display().to_string()),
+            ),
+            DoctorValue::Workers if c.cli == CliName::Decidr => {
+                push("workers".into(), c.workers.to_string())
+            }
+            DoctorValue::MaxSends if c.cli == CliName::Decidr => {
+                push("max_sends".into(), c.max_sends.to_string())
+            }
+            DoctorValue::EmptyModels if c.cli == CliName::Decidr && c.models.is_empty() => {
+                push("models".into(), "{}".into())
+            }
+            DoctorValue::EmptyRunners if c.cli == CliName::Decidr && c.local_runners.is_empty() => {
+                push("local_runners".into(), "{}".into())
+            }
+            _ => {}
+        }
+    }
     if c.cli == CliName::Decidr {
-        values.extend([
-            ("workers".into(), c.workers.to_string()),
-            ("max_sends".into(), c.max_sends.to_string()),
-        ]);
-        if c.models.is_empty() {
-            values.push(("models".into(), "{}".into()));
-        }
         for (id, model) in &c.models {
-            values.extend([
-                (format!("models.{id}.line"), model.line.as_str().into()),
-                (format!("models.{id}.released"), model.released.to_string()),
-            ]);
+            for spec in SETTINGS.iter().filter(|s| s.path.starts_with("models.*.")) {
+                match spec.doctor {
+                    DoctorValue::ModelLine => {
+                        push(format!("models.{id}.line"), model.line.as_str().into())
+                    }
+                    DoctorValue::ModelReleased => {
+                        push(format!("models.{id}.released"), model.released.to_string())
+                    }
+                    _ => {}
+                }
+            }
         }
-        if c.local_runners.is_empty() {
-            values.push(("local_runners".into(), "{}".into()));
-        }
-        for (name, r) in &c.local_runners {
-            let prefix = format!("local_runners.{name}");
-            let kind = match r.kind {
-                RunnerKind::Laya => "laya",
-                RunnerKind::Strands => "strands",
-                RunnerKind::Mapika => "mapika",
-                RunnerKind::Generic => "generic",
-            };
-            for (key, value) in [
-                ("kind", kind.into()),
-                ("host", r.host.as_str().into()),
-                ("port", r.port.to_string()),
-                ("model", r.model.to_string()),
-                (
-                    "key_env",
-                    r.key_env
-                        .as_ref()
-                        .map_or_else(|| "unset".into(), ToString::to_string),
-                ),
-                (
-                    "request_timeout_secs",
-                    r.request_timeout().as_secs().to_string(),
-                ),
-                ("load_timeout_secs", r.load_timeout().as_secs().to_string()),
-            ] {
-                values.push((format!("{prefix}.{key}"), value));
+        for (name, runner) in &c.local_runners {
+            for spec in SETTINGS
+                .iter()
+                .filter(|s| s.path.starts_with("local_runners.*."))
+            {
+                let prefix = format!("local_runners.{name}");
+                match spec.doctor {
+                    DoctorValue::RunnerKind => {
+                        let kind = match runner.kind {
+                            RunnerKind::Laya => "laya",
+                            RunnerKind::Strands => "strands",
+                            RunnerKind::Mapika => "mapika",
+                            RunnerKind::Generic => "generic",
+                        };
+                        push(format!("{prefix}.kind"), kind.into());
+                    }
+                    DoctorValue::RunnerHost => {
+                        push(format!("{prefix}.host"), runner.host.as_str().into())
+                    }
+                    DoctorValue::RunnerPort => {
+                        push(format!("{prefix}.port"), runner.port.to_string())
+                    }
+                    DoctorValue::RunnerModel => {
+                        push(format!("{prefix}.model"), runner.model.to_string())
+                    }
+                    DoctorValue::RunnerKeyEnv => push(
+                        format!("{prefix}.key_env"),
+                        runner
+                            .key_env
+                            .as_ref()
+                            .map_or_else(|| "unset".into(), ToString::to_string),
+                    ),
+                    DoctorValue::RunnerRequestTimeout => push(
+                        format!("{prefix}.request_timeout_secs"),
+                        runner.request_timeout().as_secs().to_string(),
+                    ),
+                    DoctorValue::RunnerLoadTimeout => push(
+                        format!("{prefix}.load_timeout_secs"),
+                        runner.load_timeout().as_secs().to_string(),
+                    ),
+                    _ => {}
+                }
             }
         }
     }
-    values
-        .into_iter()
-        .map(|(setting, value)| {
-            let source = loaded
-                .sources
-                .get(&setting)
-                .unwrap_or(&Source::Default)
-                .to_string();
-            DoctorRow {
-                setting,
-                value,
-                source,
+    rows
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    fn collect_leaf_paths(value: &Value, prefix: &mut Vec<String>, out: &mut Vec<String>) {
+        if let Some(object) = value.as_object() {
+            for (key, child) in object {
+                prefix.push(key.clone());
+                collect_leaf_paths(child, prefix, out);
+                prefix.pop();
             }
-        })
-        .collect()
+        } else {
+            out.push(prefix.join("."));
+        }
+    }
+
+    #[test]
+    fn schema_covers_every_serialized_config_field_and_doctor_row() {
+        let config = decode(
+            serde_json::json!({
+                "models": {"123": {"line": "haiku", "released": "2026-01-01"}},
+                "local_runners": {"fixture": {
+                    "kind": "generic", "host": "localhost", "port": 8123,
+                    "model": "123", "key_env": "TOKEN", "request_timeout_secs": 30,
+                    "load_timeout_secs": 60
+                }}
+            }),
+            CliName::Decidr,
+        )
+        .unwrap();
+        let serialized = serde_json::to_value(config).unwrap();
+        let actual_roots: std::collections::BTreeSet<_> = serialized
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let schema_roots: std::collections::BTreeSet<_> = SETTINGS
+            .iter()
+            .filter_map(|setting| setting.path.split('.').next())
+            .filter(|root| *root != "project")
+            .collect();
+        assert_eq!(actual_roots, schema_roots);
+        assert!(SETTINGS.iter().any(|setting| setting.path == "project"));
+        for root in &actual_roots {
+            assert!(
+                SETTINGS.iter().any(|setting| {
+                    setting.path.split('.').next() == Some(root)
+                        && setting.doctor != DoctorValue::None
+                }),
+                "missing doctor row definition for AgentConfig field {root}"
+            );
+        }
+
+        let mut actual_paths = Vec::new();
+        collect_leaf_paths(&serialized, &mut Vec::new(), &mut actual_paths);
+        for path in actual_paths {
+            let parts: Vec<_> = path.split('.').collect();
+            assert!(
+                SETTINGS
+                    .iter()
+                    .any(|setting| path_matches(setting.path, &parts, false)),
+                "missing schema path {path}"
+            );
+        }
+        for setting in SETTINGS
+            .iter()
+            .filter(|setting| setting.path.contains("*."))
+        {
+            if setting.path.contains(".*.") {
+                assert_ne!(
+                    setting.doctor,
+                    DoctorValue::None,
+                    "missing doctor row for {}",
+                    setting.path
+                );
+            }
+        }
+    }
 }
