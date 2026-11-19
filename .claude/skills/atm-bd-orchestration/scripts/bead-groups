@@ -51,8 +51,9 @@ reported as a missing bead.
 No poured bead gets an assignee: each carries `difficulty`, and the lead
 picks the agent at dispatch. Variables come from the target beads, the
 phase file `.atm-bd/phase-<p>.toml` (plan file, root) and the relations file.
-For a finding, the branch is `fix/<sprint>-<normalized finding ref>`, the
-worktree is beneath the configured `worktree_base`, and `pr_target` is the
+For a finding, the branch is `fix/<sprint>-<normalized finding ref>`, with
+`-r<round>` appended after round 1 so a later round is a new layer and a re-pour
+never reuses a branch already in the stack ledger; the worktree is beneath the configured `worktree_base`, and `pr_target` is the
 stack ledger's last layer branch, or its trunk when no layers exist.
 Requests and receipts are written to <repo>/.atm-bd/pour/.
 
@@ -603,6 +604,8 @@ class Run:
         stack_meta = bead_schema.StackMetadata.model_validate(bead_metadata(stack))
         # This pour needs only the branch; no Git head lookup is needed for the trunk fallback.
         pr_target, _ = select_stack_top(stack_json, stack_meta.trunk, lambda _: "unused")
+        # A recorded layer is never moved (Stack Discipline): a later round's fix is a new layer.
+        layer_branches = {layer.branch for layer in stack_meta.layers}
         out: list[Target | TargetError] = []
         for finding in findings:
             ref = finding["ref"]
@@ -632,7 +635,7 @@ class Run:
                     raise TargetError("BEAD_GROUPS_FOUND_ON_LAYER_NOT_INTEGER",
                                       f"finding {ref}: found_on_layer {layer!r} is not an integer; pass the integer stack layer, "
                                       "or omit found_on_layer and put free text in the finding description")
-                branch = f"fix/{sprint_name}-{slug}"
+                branch = f"fix/{sprint_name}-{slug}" if round_ == 1 else f"fix/{sprint_name}-{slug}-r{round_}"
                 # Layer records carry no difficulty, so the cut takes it from the finding or the sprint and the fix group carries all four keys together.
                 if not isinstance(finding_difficulty, str) or not finding_difficulty:
                     raise TargetError("BEAD_GROUPS_FINDINGS_INVALID", f"finding {ref} needs difficulty")
@@ -676,7 +679,7 @@ class Run:
                 existing_metadata: Metadata = bead_metadata(existing) if existing is not None else {}
                 existing_cut: dict[str, str] = {key: value for key in cut
                                                 if isinstance((value := existing_metadata.get(key)), str)}
-                if all(existing_cut.get(key) for key in cut):
+                if all(existing_cut.get(key) for key in cut) and existing_cut["branch"] not in layer_branches:
                     compose.update(branch=existing_cut["branch"], worktree=existing_cut["worktree"],
                                    pr_target=existing_cut["pr_target"])
                 ref_value = compose_string(compose, "ref")
