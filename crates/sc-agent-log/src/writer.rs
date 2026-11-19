@@ -21,10 +21,9 @@ use sc_observability::v2::{
     LogEvent, Logger, LoggerBuilder, LoggerConfig, ShutdownError, SinkRegistration,
 };
 use sc_observability::{
-    ActionName, Level, OBSERVATION_ENVELOPE_VERSION, ProcessIdentity, SchemaVersion, ServiceName,
-    TargetCategory, Timestamp,
+    ActionName, Level, ProcessIdentity, ServiceName, TargetCategory, Timestamp,
 };
-use sc_observability_types::CorrelationId;
+use sc_observability_types::{CorrelationId, constants::OBSERVATION_SCHEMA_VERSION};
 use serde_json::{Map, Value};
 
 use crate::{LogError, LogKind};
@@ -95,15 +94,20 @@ impl Ledger {
     }
 }
 
+/// Exactly one destination receives each event.
+enum Destination {
+    Native(Arc<Logger>),
+    #[cfg(feature = "python")]
+    Python(crate::python::PythonTarget),
+}
+
 /// Owns or borrows one running logger.
 ///
 /// Dropping an owned writer flushes and shuts the logger down (best effort, with a last-resort
 /// stderr line for unreported losses); [`Writer::close`] does the same and returns the outcome.
 /// An injected logger is never flushed-on-drop or shut down here (REQ-SAG-0008).
 pub(crate) struct Writer {
-    logger: Option<Arc<Logger>>,
-    #[cfg(feature = "python")]
-    python: Option<crate::python::PythonTarget>,
+    destination: Destination,
     owned: bool,
     /// Set by `close`, so Drop has nothing left to do.
     closed: bool,
@@ -136,9 +140,7 @@ impl Writer {
     fn new(logger: Arc<Logger>, owned: bool, ledger: Arc<Ledger>, kind: LogKind) -> Self {
         Self {
             service: logger.service_name().clone(),
-            logger: Some(logger),
-            #[cfg(feature = "python")]
-            python: None,
+            destination: Destination::Native(logger),
             owned,
             closed: false,
             ledger,
@@ -157,8 +159,7 @@ impl Writer {
         let service = ServiceName::new(service)
             .map_err(|error| LogError::invalid_name("service", service, &error))?;
         Ok(Self {
-            logger: None,
-            python: Some(target),
+            destination: Destination::Python(target),
             owned: false,
             closed: false,
             service,
@@ -218,9 +219,7 @@ impl Writer {
             })
             .transpose()?;
         Ok(LogEvent {
-            version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).map_err(|error| {
-                LogError::invalid_name("version", OBSERVATION_ENVELOPE_VERSION, &error)
-            })?,
+            version: OBSERVATION_SCHEMA_VERSION.clone(),
             timestamp: self.timestamp(),
             level,
             service: self.service.clone(),
@@ -249,22 +248,13 @@ impl Writer {
                 max: MAX_ROW_BYTES,
             });
         }
-        #[cfg(feature = "python")]
-        if let Some(python) = &self.python {
-            return python.admit(&event);
-        }
-        let Some(logger) = &self.logger else {
-            return Err(LogError::PythonRejected {
-                cause: Box::new(ErrorDetail::new(
-                    "log.missing_target",
-                    "missing logger destination",
-                    None,
-                )),
-            });
-        };
-        let admitted = match mode {
-            Mode::Blocking => logger.log(event),
-            Mode::NonBlocking => logger.try_log(event),
+        let admitted = match &self.destination {
+            #[cfg(feature = "python")]
+            Destination::Python(target) => return target.admit(&event),
+            Destination::Native(logger) => match mode {
+                Mode::Blocking => logger.log(event),
+                Mode::NonBlocking => logger.try_log(event),
+            },
         };
         admitted.map_err(|source| LogError::Rejected {
             log: self.kind,
@@ -285,10 +275,18 @@ impl Writer {
         error
     }
 
+    fn native_logger(&self) -> Option<&Logger> {
+        match &self.destination {
+            Destination::Native(logger) => Some(logger),
+            #[cfg(feature = "python")]
+            Destination::Python(_) => None,
+        }
+    }
+
     /// Flush barrier; then [`LogError::RowsLost`] if any row since the last report was
     /// refused or not written. Each lost row is reported once across all writers on the logger.
     pub(crate) fn flush(&self) -> Result<(), LogError> {
-        let health = if let Some(logger) = &self.logger {
+        let health = if let Some(logger) = self.native_logger() {
             logger.flush().map_err(|source| LogError::Flush {
                 log: self.kind,
                 source,
@@ -335,7 +333,7 @@ impl Writer {
     pub(crate) fn close(mut self) -> Result<(), LogError> {
         let flushed = self.flush();
         if self.owned
-            && let Some(logger) = &self.logger
+            && let Some(logger) = self.native_logger()
             && let Err(error) = logger.shutdown()
         {
             last_resort(self.kind, None, Some(&error));
@@ -363,7 +361,7 @@ impl Drop for Writer {
         }
         // Best effort: no caller is left to return to, so anything unreported goes to stderr.
         let flushed = self.flush();
-        if let Some(logger) = &self.logger {
+        if let Some(logger) = self.native_logger() {
             let shutdown = logger.shutdown();
             last_resort(self.kind, flushed.err().as_ref(), shutdown.err().as_ref());
         }
@@ -465,6 +463,29 @@ pub(crate) fn start_logger(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn event_preserves_the_session_identifier_and_schema() {
+        let memory = crate::testing::MemoryLog::new().expect("memory");
+        let writer = Writer::injected(memory.logger(), None, LogKind::Session);
+        let id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+            .parse::<SessionId>()
+            .expect("ULID");
+        let event = writer
+            .event(
+                Level::Info,
+                "sc_agent.session",
+                "session.result",
+                Some(id),
+                Map::new(),
+            )
+            .expect("event");
+        assert_eq!(event.version.as_str(), "v1");
+        assert_eq!(
+            event.correlation_id.expect("correlation").as_str(),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+        );
+    }
 
     /// The exact boundary is driven by a fixed event, including timestamp and envelope.
     #[test]
