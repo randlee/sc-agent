@@ -1,5 +1,6 @@
 """sanity-split renders one assignment per numbered deliverable of a pinned, pushed commit."""
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -17,6 +18,7 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
+from jev_receipts import CLIENT, env as jev_env, receipted
 from rendering import render
 from subprocess_helpers import (
     HANG_GUARD_SECONDS,
@@ -269,7 +271,8 @@ class SanitySplit(unittest.TestCase):
         bead_file = self.root / "bead.json"
         bead_file.write_text(json.dumps(bead_json if bead_json is not None else bead()))
         argv = [str(SCRIPT), "--task", "agt-x-1-sanity", "--bead", "agt-x-1", "--worktree", str(worktree or self.repo.wt),
-                "--branch", branch, "--commit", commit or self.repo.sha, "--base", base, "--lint-command", lint,
+                "--branch", branch, "--commit", commit or self.repo.sha, "--base", base,
+                *(["--lint-command", lint] if lint is not None else []),
                 "--scratch", str(self.scratch), "--bead-json", str(bead_file), *extra]
         driver = self.root / "driver.py"
         driver.write_text(DRIVER)
@@ -863,6 +866,119 @@ class SanitySplit(unittest.TestCase):
         self.assertEqual(manifest["changed_files"], [])
         self.assertEqual(len(manifest["assignments"]), 2)
         self.assertFalse(self.scratch.exists())
+
+    def earlier_run(self, lint):
+        """A finished normal split at the current head, its manifest saved where a re-check names it."""
+        out = self.run_split(lint=lint)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        manifest = json.loads(out.stdout)
+        self.wait_lint(manifest["lint"]["exit_file"])
+        path = self.root / f"earlier-{manifest['run_id']}.json"
+        path.write_text(out.stdout)
+        return manifest, path
+
+    def rebase_onto_new_top(self):
+        """The layer after a clean rebase: a new pushed head with one more change."""
+        self.repo.commit("crates/types/src/backoff.rs", "pub fn backoff() {}\n", "rebased")
+        return self.repo.push_head()
+
+    def test_recheck_starts_no_lint_and_carries_the_earlier_passed_lint(self):
+        earlier, earlier_path = self.earlier_run("echo ran >> ../lint-count")
+        count_file = self.root / "lint-count"
+        self.assertEqual(count_file.read_text(), "ran\n")
+        new_sha = self.rebase_onto_new_top()
+        supervisors_before = len(self.supervisors)
+
+        out = self.run_split(None, None, new_sha, "sprint/x", "develop", "--recheck-of", str(earlier_path), lint=None)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        manifest = json.loads(out.stdout)
+        self.assertEqual(len(self.supervisors), supervisors_before, "a re-check started a lint supervisor")
+        self.assertEqual(count_file.read_text(), "ran\n", "lint ran again")
+        self.assertIs(manifest["recheck"], True)
+        self.assertEqual(manifest["reviewers"], ["sanity-jev", "sanity-selected"])
+        self.assertEqual(manifest["operational_reviewer"], "sanity-selected")
+        self.assertEqual(manifest["sha"], new_sha)
+        self.assertNotEqual(manifest["sha"], earlier["sha"])
+        # changed_files exactly as a normal split computes them at the new head
+        self.assertEqual(manifest["changed_files"], ["crates/types/src/backoff.rs", "crates/types/src/retry.rs"])
+        self.assertEqual(manifest["assignments"][0]["assignment"]["changed_files"], manifest["changed_files"])
+        self.assertEqual(manifest["assignments"][0]["assignment"]["commit"], new_sha)
+        self.assertEqual(manifest["lint"], {
+            "carried": True, "command": "echo ran >> ../lint-count", "log": earlier["lint"]["log"],
+            "exit_file": earlier["lint"]["exit_file"], "exit_code": 0, "commit": earlier["sha"],
+            "run_id": earlier["run_id"], "sanity_bead": "agt-x-1-sanity", "manifest": str(earlier_path)})
+
+        # A re-check of a re-check carries the run that actually linted.
+        second_path = self.root / "recheck-1.json"
+        second_path.write_text(out.stdout)
+        again = self.run_split(None, None, new_sha, "sprint/x", "develop", "--recheck-of", str(second_path), lint=None)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(json.loads(again.stdout)["lint"], manifest["lint"])
+        self.assertEqual(len(self.supervisors), supervisors_before)
+
+        # The real merge takes the Jev reviewer alone with the carried lint.
+        results = [receipted(result(1, new_sha)), receipted(result(2, new_sha))]
+        digest = hashlib.sha256(json.dumps(results, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        jev_vars = self.root / "jev-vars.json"
+        jev_vars.write_text(json.dumps({"run_id": manifest["run_id"], "reviewer": "sanity-jev",
+                                        "reviewer_results": results, "reviewer_results_sha256": digest}))
+        manifest_file = self.root / "recheck-manifest.json"
+        manifest_file.write_text(out.stdout)
+        merged = run_command([str(MERGE), str(manifest_file), "agt-x-1-sanity", "agt-x-1", "x",
+                              "--reviewer", "sanity-selected", "--started-at", "1700000000", "--completed-at", "1700000001",
+                              "--jev-vars", str(jev_vars), "--client", str(CLIENT)],
+                             check=False, capture_output=True, text=True, env=jev_env(), timeout=HANG_GUARD_SECONDS)
+        self.assertEqual(merged.returncode, 0, merged.stderr)
+        selected = json.loads(merged.stdout)
+        self.assertEqual((selected["verdict"], selected["recheck"], selected["commit"]), ("PASS", True, new_sha))
+        self.assertEqual(selected["lint_carried_from"]["commit"], earlier["sha"])
+
+    def test_recheck_is_refused_when_the_earlier_lint_did_not_pass(self):
+        _, failed_path = self.earlier_run(FAKE_LINT)          # the fake lint exits 1
+        new_sha = self.rebase_onto_new_top()
+        supervisors_before = len(self.supervisors)
+        out = self.run_split(None, None, new_sha, "sprint/x", "develop", "--recheck-of", str(failed_path), lint=None)
+        self.assertEqual((out.returncode, out.stdout), (6, ""))
+        self.assertIn("SANITY.RECHECK_LINT_NOT_PASSED", out.stderr)
+        self.assertIn("exited '1', not 0", out.stderr)
+
+        earlier = json.loads(failed_path.read_text())
+        cases = {
+            "lint exit file absent": {**earlier, "lint": {**earlier["lint"], "exit_file": str(self.root / "absent.exit")}},
+            "split-only manifest": {**earlier, "lint": None},
+            "carried lint that failed": {**earlier, "lint": {"carried": True, "command": "x", "log": "l", "exit_file": "e",
+                                                             "exit_code": 1, "commit": earlier["sha"], "run_id": None,
+                                                             "sanity_bead": "agt-x-1-sanity", "manifest": "m"}},
+        }
+        for name, value in cases.items():
+            with self.subTest(name):
+                path = self.root / "case.json"
+                path.write_text(json.dumps(value))
+                refused = self.run_split(None, None, new_sha, "sprint/x", "develop", "--recheck-of", str(path), lint=None)
+                self.assertEqual((refused.returncode, refused.stdout), (6, ""))
+                self.assertIn("SANITY.RECHECK_LINT_NOT_PASSED", refused.stderr)
+        self.assertEqual(len(self.supervisors), supervisors_before)
+
+    def test_recheck_is_refused_for_another_dev_bead(self):
+        earlier, earlier_path = self.earlier_run("true")
+        other = self.root / "other-bead.json"
+        other.write_text(json.dumps({**earlier, "dev_bead": "agt-x-2"}))
+        out = self.run_split(None, None, self.rebase_onto_new_top(), "sprint/x", "develop", "--recheck-of", str(other), lint=None)
+        self.assertEqual((out.returncode, out.stdout), (7, ""))
+        self.assertIn("SANITY.RECHECK_BEAD_MISMATCH", out.stderr)
+        self.assertIn("'agt-x-2', not agt-x-1", out.stderr)
+
+    def test_recheck_excludes_a_lint_command_and_split_only(self):
+        _, earlier_path = self.earlier_run("true")
+        both = self.run_split(None, None, None, "sprint/x", "develop", "--recheck-of", str(earlier_path), lint="true")
+        self.assertEqual(both.returncode, 1)
+        self.assertIn("not allowed with argument", both.stderr)
+        neither = self.run_split(None, None, None, "sprint/x", "develop", lint=None)
+        self.assertEqual(neither.returncode, 1)
+        split_only = self.run_split(None, None, None, "sprint/x", "develop", "--recheck-of", str(earlier_path),
+                                    "--split-only", lint=None)
+        self.assertEqual(split_only.returncode, 1)
+        self.assertIn("cannot be combined with --split-only", split_only.stderr)
 
     def test_usage(self):
         out = run_command([str(SCRIPT), "--task", "t"], check=False, capture_output=True, text=True, timeout=HANG_GUARD_SECONDS)

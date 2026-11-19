@@ -11,7 +11,13 @@ Usage:
     --reviewer sanity-llm|sanity-jev --started-at <epoch> --completed-at <epoch> < results.json
     --reviewer sanity-selected --started-at <epoch> --completed-at <epoch> --llm-vars <file>
     --jev-vars <file> --selection <file>
+    --reviewer sanity-selected --started-at <epoch> --completed-at <epoch> --jev-vars <file>   (re-check)
 
+A re-check manifest (`sanity-split --recheck-of`: `recheck: true`, lint carried from the
+earlier run) has the roster sanity-jev, sanity-selected. Its selected merge takes every
+deliverable's Jev reply, needs only `--jev-vars` (`--llm-vars` and `--selection` are
+refused), uses the carried lint exit code without reading a lint file, and its output adds
+`recheck: true` and `lint_carried_from` (the earlier run's commit, exit code, log, run_id).
 `manifest.json` is what `sanity-split` printed. stdin is a JSON array holding
 the unchanged reply of every child of one reviewer (LLM or JEV), one per
 deliverable: the parsed envelope, or the fenced JSON reply text as a string. Run once per reviewer against the same manifest/lint. New manifests
@@ -109,18 +115,38 @@ class AssignmentText(TypedDict):
     text: str | None
 
 
+class CarriedLint(TypedDict):
+    carried: bool
+    command: str
+    log: str
+    exit_file: str
+    exit_code: int
+    commit: str
+    run_id: str | None
+    sanity_bead: str
+    manifest: str
+
+
 class LintDescriptor(TypedDict):
     exit_file: str | None
     log: str | None
     command: JsonValue
     has_command: bool
+    carried: CarriedLint | None
 
 
 def parse_lint_descriptor(lint: JsonObject) -> LintDescriptor:
     exit_file, log = lint.get("exit_file"), lint.get("log")
+    carried: CarriedLint | None = None
+    if "carried" in lint:
+        fields = {key: lint.get(key) for key in CarriedLint.__required_keys__}
+        if not matches_typeddict(fields, CarriedLint) or fields["carried"] is not True or fields["exit_code"] != 0:
+            raise Reject("manifest carried lint must be sanity-split's passed record "
+                         "{carried: true, command, log, exit_file, exit_code: 0, commit, run_id, sanity_bead, manifest}")
+        carried = fields
     return {"exit_file": exit_file if isinstance(exit_file, str) else None,
             "log": log if isinstance(log, str) else None,
-            "command": lint.get("command"), "has_command": "command" in lint}
+            "command": lint.get("command"), "has_command": "command" in lint, "carried": carried}
 
 
 def lint_command(lint: LintDescriptor) -> JsonValue:
@@ -144,6 +170,7 @@ class Manifest(TypedDict):
     reviewers: list[str] | None
     assignments: list[AssignmentText]
     checked_bead_data: JsonValue
+    recheck: bool
 
 
 def load_manifest(path: str | Path) -> Manifest:
@@ -167,6 +194,12 @@ def load_manifest(path: str | Path) -> Manifest:
     if run_id is not None and not isinstance(run_id, str):
         raise Reject("manifest run_id must be a string or null")
     assert isinstance(lint, dict)
+    descriptor = parse_lint_descriptor(lint)
+    recheck = manifest.get("recheck", False)
+    if recheck is not False and recheck is not True:
+        raise Reject("manifest recheck must be a boolean")
+    if recheck != (descriptor["carried"] is not None):
+        raise Reject("a re-check manifest carries its lint and only a re-check manifest does")
     worktree = manifest.get("worktree_path")
     reviewers = manifest.get("reviewers", [])
     assignments = manifest.get("assignments", [])
@@ -176,14 +209,14 @@ def load_manifest(path: str | Path) -> Manifest:
             parsed = parse_assignment_text(assignment)
             if parsed is not None:
                 parsed_assignments.append(parsed)
-    return {"sha": sha, "base": str(manifest.get("base_sha") or ""), "branch": branch, "deliverables_total": total, "lint": parse_lint_descriptor(lint),
+    return {"sha": sha, "base": str(manifest.get("base_sha") or ""), "branch": branch, "deliverables_total": total, "lint": descriptor,
             "worktree_path": worktree if isinstance(worktree, str) else None,
             "invalid_worktree": None if isinstance(worktree, str) else worktree,
             "run_id": run_id, "has_run_id": "run_id" in manifest,
             "operational_reviewer": manifest.get("operational_reviewer"),
             "has_operational_reviewer": "operational_reviewer" in manifest,
             "reviewers": [reviewer for reviewer in reviewers if isinstance(reviewer, str)] if isinstance(reviewers, list) else None,
-            "assignments": parsed_assignments, "checked_bead_data": manifest.get("checked_bead_data")}
+            "assignments": parsed_assignments, "checked_bead_data": manifest.get("checked_bead_data"), "recheck": recheck}
 
 
 def read_results() -> list[JsonValue]:
@@ -641,6 +674,20 @@ def selected_results(args: MergeArguments, manifest: Manifest, sanity_bead: str,
     return selected, selection, sources
 
 
+def recheck_results(args: MergeArguments, manifest: Manifest) -> tuple[list[JsonValue], dict[int, str]]:
+    """A re-check's selected result: every deliverable's Jev reply, each one screened as in a normal selection."""
+    assert args.jev_vars is not None
+    jev = load_reviewer_vars(args.jev_vars, "sanity-jev", manifest)["results"]
+    args.fallback_errors = [reply["error"] for reply in jev
+                            if isinstance(reply, dict) and reply.get("success") is False and isinstance(reply.get("error"), dict)]
+    client = load_client(Path(args.client) if args.client else CLIENT)
+    seen: set[str] = set()
+    for row in jev:
+        if (reason := jev_reply_problem(row, client, seen)):
+            raise Reject(f"sanity-jev reply: {reason}")
+    return jev, {number: "sanity-jev" for number in range(1, manifest["deliverables_total"] + 1)}
+
+
 def unique_errors(items: list[JsonValue]) -> list[JsonValue]:
     """Keep first-seen error envelopes once when selected and original replies overlap."""
     seen: set[str] = set()
@@ -683,6 +730,8 @@ def lint_result(manifest: JsonObject) -> tuple[int, list[JsonObject], str]:
 
 
 def lint_result_from_descriptor(lint: LintDescriptor, worktree_value: JsonValue) -> tuple[int, list[JsonObject], str]:
+    if lint["carried"] is not None:                 # a re-check: the earlier run's passed lint, never rerun
+        return lint["carried"]["exit_code"], [], ""
     exit_name, log_name = lint["exit_file"], lint["log"]
     if exit_name is None or log_name is None:
         raise Reject("manifest lint exit_file and log must be strings")
@@ -833,7 +882,13 @@ def main(argv: list[str]) -> int:
                 print("--completed-at must not be more than five seconds in the future", file=sys.stderr)
                 return 1
         selected_mode = args.reviewer == "sanity-selected"
-        if selected_mode:
+        if selected_mode and manifest["recheck"]:
+            if args.llm_vars or args.selection:
+                raise Reject("a re-check selects the Jev reply only: pass --jev-vars, not --llm-vars or --selection")
+            if not args.jev_vars:
+                raise Reject("a re-check sanity-selected requires --jev-vars")
+            results, selection_sources = recheck_results(args, manifest)
+        elif selected_mode:
             if not all((args.llm_vars, args.jev_vars, args.selection)):
                 raise Reject("sanity-selected requires --llm-vars, --jev-vars, and --selection")
             results, selection, selection_sources = selected_results(args, manifest, sanity_bead, dev_bead)
@@ -896,7 +951,7 @@ def main(argv: list[str]) -> int:
                 "depends_on": [dependency["raw"] for dependency in finding["depends_on"]],
                 "deliverable_text": assignment_text(manifest["assignments"], number),
             })
-            if selection is not None:
+            if number in selection_sources:
                 finding_records[-1]["reviewer"] = "sc-" + selection_sources[number]
     for index, finding in enumerate(lint_findings, 1):
         finding_records.append({
@@ -908,6 +963,13 @@ def main(argv: list[str]) -> int:
     count = len(finding_records)
     lint = manifest["lint"]
     lint_md = f"`{lint_command(lint)}` exit {lint_exit}"
+    recheck: JsonObject = {}
+    if lint["carried"] is not None:
+        carried = lint["carried"]
+        lint_md += f" (carried from {carried['sanity_bead']} at {carried['commit']}; log {carried['log']})"
+        recheck = {"recheck": True, "lint_carried_from": {
+            "sanity_bead": carried["sanity_bead"], "run_id": carried["run_id"], "commit": carried["commit"],
+            "exit_code": carried["exit_code"], "log": carried["log"], "manifest": carried["manifest"]}}
     if lint_findings:
         lint_md += "\n" + "\n".join(fmt(f) for f in lint_findings)
     json.dump({
@@ -917,7 +979,7 @@ def main(argv: list[str]) -> int:
         "branch": manifest["branch"], "commit": manifest["sha"], "base": manifest["base"],
         "verdict": "PASS" if all(not findings for findings in report_findings.values()) and lint_exit == 0 else "FAIL",
         "findings_count": count, "findings": finding_records, "selection": selection,
-        "findings_md": "\n".join(blocks), "lint_md": lint_md,
+        "findings_md": "\n".join(blocks), "lint_md": lint_md, **recheck,
     }, sys.stdout, indent=2)
     print()
     return 0

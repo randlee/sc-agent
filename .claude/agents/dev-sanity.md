@@ -88,6 +88,13 @@ as --final-verdict, or CANNOT_RUN if selection cannot run. The scripts derive
 elapsed fields, API_FAILURE rows, exact fallback envelopes and receipts.
 The merge carries checked bead data, so history needs no new bead lookup.
 
+A re-check sanity bead (`<sanity bead>-r<N>`, a clean rebase of a passed layer)
+runs Jev only and never reruns lint: run sanity-split with `--recheck-of
+<earlier run's manifest>` instead of --lint-command. It refuses (exit 6/7) when
+that run's lint did not pass or it checked another dev bead; send that refusal
+to the lead. Dispatch only sc-sanity-jev children, merge sanity-jev, then
+sanity-selected with --jev-vars alone, and append only the Jev history row.
+
 ## Daemon-mode verification override
 
 For daemon-mode assignments, sanity only inspects deliverables and developer
