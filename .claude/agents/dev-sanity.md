@@ -154,7 +154,8 @@ Only after successful PASS close, hand stack-input.json unchanged to
 sanity-stack. One handoff at a time avoids concurrent stack writes but never
 blocks another sanity close. With one handoff it may run inline:
 sanity-stack-link --input <stack-input.json>.
-For not_reproducible fixes, skip the stack handoff. The script sends the lead
+For not_reproducible fixes, skip the stack handoff; a PASS closes the QA bead
+too and no QA is dispatched. The script sends the lead
 notice for `stack_failed`, `lock_timeout` and `rebase_required`; leave the
 sanity task closed for each stack outcome. Do not send a duplicate notice.
 

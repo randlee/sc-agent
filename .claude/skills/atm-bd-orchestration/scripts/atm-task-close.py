@@ -938,6 +938,16 @@ class Hook:
             self.close_task(bead, "dev-sanity-complete.md.j2", outcome=REFUSED)
             return
         self.render("dev-sanity-complete.md.j2")
+        if verdict == "PASS" and values["outcome"] == "not_reproducible":
+            # The dev rejected the finding and sanity accepted the rejection: nothing to QA (owner ruling 2026-11-19).
+            passed = f"PASS at {values['commit']}"
+            if (self.bead(bead).get("status") == "closed" and self.bead(bead).get("close_reason") != passed
+                    and not is_terminal(self.task_history[bead])):
+                self.update(bead, status="open")
+            self.close_bead(bead, passed)
+            self.close_bead(values["qa_bead"], f"not reproducible: rejection accepted by sanity at {values['commit']}; no QA")
+            self.close_task(bead, "dev-sanity-complete.md.j2")
+            return
         if verdict == "PASS":
             checked = self.bead(values["checked_bead"])
             current_pr = self.current_pr_for_qa(checked)
