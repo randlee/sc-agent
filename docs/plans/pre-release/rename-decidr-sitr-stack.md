@@ -91,18 +91,18 @@ rg -n 'path = \"\.\./decide\"|\"-p decide\"|CARGO_BIN_EXE_decide' crates .github
 
 ## W3 — `sitr` CLI
 
-**Scope:** `sc-treesitter` only.
+**Scope:** the `sitr` CLI crate, using the `sc-treesitter` library.
 
-- `[[bin]] name = "sitr"`.
+- `crates/sitr`: `[[bin]] name = "sitr"`.
 - clap / `SERVICE` / `sitr.log.jsonl` / `sitr.command`.
-- `tests/cli.rs`: `CARGO_BIN_EXE_sitr`, hints `sitr languages`.
-- CI assertion: bin `sitr` + `required-features = ["cli"]`.
+- `crates/sitr/tests/cli.rs`: `CARGO_BIN_EXE_sitr`, hints `sitr languages`.
+- CI assertion: package `sitr` builds the `sitr` binary; `sc-treesitter` has no CLI feature or binary target.
 
 **Gates:**
 
 ```bash
-cargo test -p sc-treesitter --features cli,grammar-python,grammar-rust
-cargo run -p sc-treesitter --features cli --bin sitr -- languages
+cargo test -p sitr --features grammar-python,grammar-rust
+cargo run -p sitr -- languages
 ```
 
 ---
@@ -113,7 +113,7 @@ cargo run -p sc-treesitter --features cli --bin sitr -- languages
 
 - `git mv docs/decide` → `docs/decidr` (if present).
 - `docs/requirements/**`, `docs/adr/**`: product name `decide` → `decidr` where it means the CLI/library (not `Decision::decide`).
-- `crates/*/README.md` install lines: `cargo install decidr`, `cargo install sc-treesitter --features cli` → binary `sitr`.
+- `crates/*/README.md` install lines: `cargo install decidr`, `cargo install sitr` → binary `sitr`.
 
 **Gates:** `rg -l '\bdecide\b' docs/requirements docs/adr docs/decidr | wc -l` triaged to zero **product** hits (manual allowlist file in QA report).
 
