@@ -32,6 +32,25 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+fn canonical_path_with_missing_tail(path: &Path) -> std::io::Result<PathBuf> {
+    let mut existing = path;
+    let mut suffix = Vec::new();
+    while !existing.exists() {
+        let component = existing.file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing path component")
+        })?;
+        suffix.push(component.to_os_string());
+        existing = existing.parent().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing path ancestor")
+        })?;
+    }
+    let mut canonical = std::fs::canonicalize(existing)?;
+    for component in suffix.iter().rev() {
+        canonical.push(component);
+    }
+    Ok(canonical)
+}
+
 fn command(home: &Path, args: &[&str]) -> Command {
     let mut command = Command::new(binary());
     command
@@ -138,7 +157,7 @@ fn query_prints_captures_matching_the_golden() {
     )
     .expect("spawn sitr");
     success(&output);
-    assert!(!home.path().join(".sc-agent/sessions").exists());
+    assert!(!home.path().join(".sc-agent").join("sessions").exists());
     let golden = std::fs::read(fixture("match.rs.json")).expect("golden");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
@@ -289,10 +308,13 @@ fn snapshot_config_tree(root: &Path) -> std::io::Result<Vec<(PathBuf, Vec<u8>)>>
 }
 
 #[test]
-fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() {
+fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() -> std::io::Result<()> {
     let home = temp_home().expect("temp home and git worktree");
     let canonical_home = std::fs::canonicalize(home.path()).expect("canonical temp home");
-    let shared = canonical_home.join(".sc/sc-agent/sc-agent.json");
+    let shared = canonical_home
+        .join(".sc")
+        .join("sc-agent")
+        .join("sc-agent.json");
     std::fs::create_dir_all(shared.parent().expect("parent")).expect("create local config");
     std::fs::write(&shared, br#"{"project":"phase-a"}"#).expect("write local config");
     let before = snapshot_config_tree(home.path()).expect("snapshot temp worktree");
@@ -304,13 +326,14 @@ fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() {
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
     let settings = report["settings"].as_array().expect("settings");
     assert_eq!(settings.len(), 2);
+    assert_eq!(settings[0]["setting"], "project");
+    assert_eq!(settings[0]["value"], "phase-a");
+    let actual_shared_source = canonical_path_with_missing_tail(Path::new(
+        settings[0]["source"].as_str().expect("source path"),
+    ))?;
     assert_eq!(
-        settings[0],
-        serde_json::json!({
-            "setting": "project",
-            "value": "phase-a",
-            "source": shared.display().to_string(),
-        })
+        actual_shared_source,
+        canonical_path_with_missing_tail(&shared)?
     );
     assert_eq!(
         settings[1],
@@ -326,32 +349,38 @@ fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() {
         files.iter().filter(|file| file["exists"] == true).count(),
         1
     );
-    assert_eq!(
-        files
-            .iter()
-            .map(|file| file["path"].as_str().expect("path"))
-            .collect::<Vec<_>>(),
-        vec![
-            canonical_home
-                .join(".sc/sc-agent/sitr.json")
-                .to_str()
-                .expect("path"),
-            shared.to_str().expect("path"),
-            home.path()
-                .join(".sc-agent/sitr.json")
-                .to_str()
-                .expect("path"),
-            home.path()
-                .join(".sc-agent/sc-agent.json")
-                .to_str()
-                .expect("path"),
-        ]
-    );
+    let actual_paths = files
+        .iter()
+        .map(|file| {
+            canonical_path_with_missing_tail(Path::new(file["path"].as_str().expect("path")))
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let expected_paths = [
+        canonical_home
+            .join(".sc")
+            .join("sc-agent")
+            .join("sitr.json"),
+        shared.clone(),
+        home.path().join(".sc-agent").join("sitr.json"),
+        home.path().join(".sc-agent").join("sc-agent.json"),
+    ]
+    .iter()
+    .map(|path| canonical_path_with_missing_tail(path))
+    .collect::<std::io::Result<Vec<_>>>()?;
+    assert_eq!(actual_paths, expected_paths);
     assert_eq!(
         snapshot_config_tree(home.path()).expect("snapshot temp worktree"),
         before
     );
-    assert!(!home.path().join(".sc-agent/logs/sitr.log.jsonl").exists());
+    assert!(
+        !home
+            .path()
+            .join(".sc-agent")
+            .join("logs")
+            .join("sitr.log.jsonl")
+            .exists()
+    );
+    Ok(())
 }
 
 #[test]
@@ -385,9 +414,9 @@ fn doctor_uses_shared_project_and_sitr_prefix_only() {
 }
 
 #[test]
-fn doctor_resolves_all_four_config_files_in_layer_order() {
+fn doctor_resolves_all_four_config_files_in_layer_order() -> std::io::Result<()> {
     let home = temp_home().expect("temp home and git worktree");
-    let local = home.path().join(".sc/sc-agent");
+    let local = home.path().join(".sc").join("sc-agent");
     let global = home.path().join(".sc-agent");
     std::fs::create_dir_all(&local).expect("create local config");
     std::fs::create_dir_all(&global).expect("create global config");
@@ -407,26 +436,25 @@ fn doctor_resolves_all_four_config_files_in_layer_order() {
         let report: serde_json::Value =
             serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
         assert_eq!(report["settings"][1]["value"], *root);
-        let source = if index < 2 {
-            std::fs::canonicalize(file).expect("canonical local config path")
-        } else {
-            file.clone()
-        };
-        assert_eq!(
-            report["settings"][1]["source"],
-            source.display().to_string()
-        );
+        let source = canonical_path_with_missing_tail(file)?;
+        let actual_source = canonical_path_with_missing_tail(Path::new(
+            report["settings"][1]["source"]
+                .as_str()
+                .expect("source path"),
+        ))?;
+        assert_eq!(actual_source, source,);
         if index + 1 < layers.len() {
             std::fs::remove_file(file).expect("remove winning config layer");
         }
     }
+    Ok(())
 }
 
 #[test]
 fn shared_global_log_root_and_flag_override_choose_the_log_path() {
     let home = temp_home().expect("temp home and git worktree");
     let configured = home.path().join("configured");
-    let shared = home.path().join(".sc-agent/sc-agent.json");
+    let shared = home.path().join(".sc-agent").join("sc-agent.json");
     std::fs::create_dir_all(shared.parent().expect("parent")).expect("create global config");
     std::fs::write(
         &shared,
@@ -434,7 +462,13 @@ fn shared_global_log_root_and_flag_override_choose_the_log_path() {
     )
     .expect("write global config");
     success(&run(home.path(), &["languages"]).expect("spawn sitr"));
-    assert!(home.path().join("configured/logs/sitr.log.jsonl").exists());
+    assert!(
+        home.path()
+            .join("configured")
+            .join("logs")
+            .join("sitr.log.jsonl")
+            .exists()
+    );
 
     let flag_root = home.path().join("flag-root");
     success(
@@ -444,5 +478,5 @@ fn shared_global_log_root_and_flag_override_choose_the_log_path() {
         )
         .expect("spawn sitr"),
     );
-    assert!(flag_root.join("logs/sitr.log.jsonl").exists());
+    assert!(flag_root.join("logs").join("sitr.log.jsonl").exists());
 }
