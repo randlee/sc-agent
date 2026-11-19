@@ -115,3 +115,11 @@ def test_generated_client_uses_one_logger_and_fixed_role(env, args, tmp_path, mo
             operation(REQUEST, model="dec", agent_role="other", abort_on=frozenset())
     assert used.log(obs.LogEvent(level="info", target="app", action="still.open", fields={})).kind == "ok"
     assert used.shutdown().kind == "ok"
+
+
+@pytest.mark.parametrize("batch", [False, True])
+def test_missing_agent_role_is_refused_before_logs_or_requests(env, args, batch):
+    operation = sc_agent.send_batch if batch else sc_agent.send
+    with pytest.raises(TypeError, match="agent_role"):
+        operation([REQUEST] if batch else REQUEST, **{k:v for k,v in args.items() if k != "agent_role"})
+    assert env[0].requests == [] and not env[1].exists()

@@ -807,7 +807,9 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
             .arg(&work),
     );
     assert!(git.status.success());
-    let work = std::fs::canonicalize(work).expect("canonical worktree");
+    let work = sc_agent_log::Repo::work_tree_root(&work)
+        .expect("worktree lookup")
+        .expect("git worktree");
     let global = home.join(".sc-agent/sc-agent.json");
     let local = work.join(".sc/sc-agent/decidr.json");
     std::fs::write(&global, json!({"project":"global"}).to_string()).expect("global");
