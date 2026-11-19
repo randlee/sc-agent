@@ -370,7 +370,7 @@ fn context() -> Box<ErrorContext> {
     ))
 }
 
-/// A8-16: 15 distinct log.* ids (14 + log.row_too_large, RSH-003); Display is "<id>: <message>" only.
+/// Every log.* catalog id is distinct; Display is "<id>: <message>" only.
 #[test]
 fn ids() {
     let detail = ErrorDetail::new("x.y", "lower", None);
@@ -454,6 +454,9 @@ fn ids() {
         assert_eq!(error.recovery(), None);
         assert_eq!(error.detail().id, error.id());
     }
-    let flush = &errors[11];
-    assert_eq!(flush.cause_detail().expect("flush cause").id, "TEST_CODE");
+    let rejected = &errors[11];
+    assert_eq!(
+        rejected.cause_detail().expect("rejected cause").id,
+        "TEST_CODE"
+    );
 }
