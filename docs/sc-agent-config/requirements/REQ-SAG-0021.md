@@ -45,6 +45,7 @@ Agents work by phase, so sessions are grouped by project/phase. A default would 
 - [ ] With no layer setting it, a decidr request fails with the typed error, nothing is sent, and no session row is written.
 - [ ] With no layer setting it, the typed error of a failed decidr request names `--project`, `SC_PROJECT`, `sc-agent.json` and `<cli>.json`.
 - [ ] With no layer setting it, a PyO3 call that would write a session fails with the same typed error.
+- [ ] With `SC_PROJECT=phase-d`, a PyO3 call given the `project` argument `phase-f` files its session under `phase-f`.
 - [ ] `decidr --help` describes `--project` as the project/phase.
 
 ### Dependencies
