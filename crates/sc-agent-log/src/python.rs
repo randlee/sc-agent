@@ -47,6 +47,8 @@ impl PythonTarget {
                 sc_observability::Level::Warn => "warn",
                 sc_observability::Level::Error => "error",
             };
+            // sc-observability is pinned to 1.5.0. When upgrading it, re-check
+            // this mapping against every LogEvent field on both Rust and Python sides.
             let payload = serde_json::json!({"level":level, "target":event.target, "action":event.action,
                 "message":event.message, "request_id":event.request_id, "correlation_id":event.correlation_id,
                 "outcome":event.outcome, "trace":event.trace, "fields":event.fields});
