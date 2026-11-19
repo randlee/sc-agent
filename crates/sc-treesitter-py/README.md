@@ -53,6 +53,11 @@ None of its own. It builds `sc-treesitter` with the `python` feature and the def
 
 - `sc-treesitter` (with feature `python`) and `sc-agent-log` (with feature `python`).
 
+Logging failures (opening, record admission or closing) emit `sitr logging failed:`
+and the original `log.*` diagnostic to stderr. They leave the query result unchanged,
+including its `TreesitterError` when the query fails. An unusable log root or injected
+target therefore does not prevent parsing; it also does not create a fallback logger.
+
 ## Requirements and decisions
 
 - REQ-SAG-0303: PyO3 and CLI query surfaces.
