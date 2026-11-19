@@ -353,11 +353,18 @@ mod home_tests {
     #[test]
     fn empty_or_unset_home_refuses_open_without_real_home() {
         let root = tempfile::tempdir().expect("temp");
+        let lookup_called = std::cell::Cell::new(false);
         let result = GeneralLogger::open_default_with_home(None, "decidr", || {
             resolve_home(Some(std::ffi::OsStr::new("")), || {
-                panic!("empty home must not call the platform lookup")
+                lookup_called.set(true);
+                Some(root.path().to_owned())
             })
         });
+        assert!(!root.path().join(".sc-agent").exists());
+        assert!(
+            !lookup_called.get(),
+            "empty home must not invoke the lookup"
+        );
         assert!(matches!(result, Err(LogError::HomeUnknown)));
         let result =
             GeneralLogger::open_default_with_home(None, "decidr", || resolve_home(None, || None));
