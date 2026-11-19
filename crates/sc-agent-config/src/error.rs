@@ -152,9 +152,9 @@ impl ErrorId for AgentConfigError {
             Self::ProjectRequired { .. } => {
                 Some("set the project/phase through one of the named setting places")
             }
-            Self::Layer { .. } => {
-                Some("fix the value at the reported path in the layer named in the error")
-            }
+            Self::Layer { .. } => Some(
+                "inspect cause_detail/source for the failing key path, then fix its value in the named layer",
+            ),
             Self::Read { .. } => Some("make the named configuration file readable"),
             Self::Json { .. } => Some("fix the JSON in the named configuration file"),
             Self::Invalid { .. } => Some("fix the value at the reported configuration path"),
