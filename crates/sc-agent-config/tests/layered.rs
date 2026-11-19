@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use sc_agent_config::{
     AgentConfigError, CliName, DoctorRow, LoadOptions, Source, doctor_rows, load_layered,
+    load_layered_with_flag_names,
 };
 use sc_agent_types::{ErrorCategory, ErrorId, MAX_SEGMENT_BYTES};
 use serde_json::{Value, json};
@@ -836,4 +837,34 @@ fn model_count_limit_uses_the_source_of_the_parent_descendants() {
         .collect();
     write(&local, &json!({"models":models}));
     failure_source(&o, &local.display().to_string(), "models");
+}
+
+#[test]
+fn supplied_flag_spelling_reaches_doctor_and_validation_error() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    write(
+        &global_cli_file(&o),
+        &json!({"local_runners":{"laya":{
+            "kind":"laya", "host":"127.0.0.1", "port":8000, "model":"local/model"
+        }}}),
+    );
+    let path = "local_runners.laya.port";
+    let names = BTreeMap::from([(path.to_owned(), "--runner-port".to_owned())]);
+    o.flags.insert(path.into(), json!(9000));
+    let loaded = load_layered_with_flag_names(&o, &names).unwrap();
+    assert_eq!(row(&loaded, path).source, "--runner-port");
+    assert_eq!(row(&loaded, path).value, "9000");
+    assert_eq!(
+        row(&load_layered(&o).unwrap(), path).source,
+        "--local-runners.laya.port"
+    );
+    o.flags.insert(path.into(), json!(0));
+    let error = load_layered_with_flag_names(&o, &names).unwrap_err();
+    let AgentConfigError::Layer { source, cause } = error else {
+        panic!("expected flag layer")
+    };
+    assert_eq!(source, "--runner-port");
+    assert_eq!(cause.id(), "config.invalid");
+    assert!(cause.message().contains(path));
 }

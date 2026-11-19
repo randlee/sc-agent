@@ -17,6 +17,7 @@ pub const SHARED_FILE: &str = "sc-agent.json";
 pub const PROJECT_ENV: &str = "SC_PROJECT";
 
 /// The closed CLI scope table of ADR-SAG-0020.
+/// Adding a CLI requires updating that table and releasing sc-agent-config.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CliName {
     /// The decision CLI.
@@ -517,6 +518,22 @@ fn decode(mut value: Value, cli: CliName) -> Result<AgentConfig, AgentConfigErro
 /// Returns typed file, JSON, scope or bounds errors, preserving the originating
 /// file/variable/flag and the underlying validation error. No file is written.
 pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
+    load_layered_with_flag_names(options, &BTreeMap::new())
+}
+
+/// Loads the same layers with caller-supplied display names for flag provenance.
+///
+/// `flag_names` maps dotted setting paths to the actual CLI flag spelling,
+/// including `--`. Names are used in both doctor rows and load errors. Paths
+/// absent from the map keep the [`load_layered`] spelling (`--` plus the path
+/// with underscores replaced by hyphens).
+///
+/// # Errors
+/// Returns the same errors as [`load_layered`], with the supplied flag names.
+pub fn load_layered_with_flag_names(
+    options: &LoadOptions,
+    flag_names: &BTreeMap<String, String>,
+) -> Result<Loaded, AgentConfigError> {
     let global = options.home.join(".sc-agent");
     let mut paths = Vec::new();
     if let Some(worktree) = &options.worktree {
@@ -577,7 +594,12 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
         layers.push((object, source));
     }
     for (key, value) in &options.flags {
-        let source = Source::Flag(format!("--{}", key.replace('_', "-")));
+        let source = Source::Flag(
+            flag_names
+                .get(key)
+                .cloned()
+                .unwrap_or_else(|| format!("--{}", key.replace('_', "-"))),
+        );
         let mut object = Value::Object(Map::new());
         put(
             &mut object,

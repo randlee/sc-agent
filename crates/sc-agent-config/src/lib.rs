@@ -10,7 +10,7 @@ mod layered;
 #[doc(inline)]
 pub use layered::{
     CliName, DoctorRow, LayerFile, LoadOptions, Loaded, PROJECT_ENV, SHARED_FILE, Source,
-    doctor_rows, load_layered,
+    doctor_rows, load_layered, load_layered_with_flag_names,
 };
 
 #[doc(inline)]
