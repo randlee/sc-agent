@@ -32,7 +32,7 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - `<cli>.json` MUST accept the shared settings.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
-- When the CLI does not run inside a git work tree, layers 3 and 4 MUST be skipped.
+- When the CLI does not run inside a git work tree, the CLI MUST skip layers 3 and 4, the files of the local folder.
 - Configuration files MUST be JSON.
 - Each CLI MUST have a `<cli> doctor` command.
 - `<cli> doctor` MUST report the settings table.
@@ -66,10 +66,14 @@ One shared doctor routine makes the shared rows the same in every CLI. One file 
 - [ ] A flag value beats the same setting in the environment and in every file.
 - [ ] Outside a git work tree, a `.sc/sc-agent/decidr.json` in the current folder is not read.
 - [ ] A `~/.sc-agent/default.json` that sets `workers` has no effect.
+- [ ] A `~/.sc-agent/local.json` that sets `workers` has no effect.
 - [ ] A setting in `sitr.json` has no effect on decidr.
 - [ ] With `"project": "phase-a"` in `<worktree>/.sc/sc-agent/decidr.json`, `decidr doctor` reports the row `project | phase-a | <worktree>/.sc/sc-agent/decidr.json`.
 - [ ] With `"project": "phase-a"` only in the local `sc-agent.json`, `decidr doctor` and `sitr doctor` report the same `project` row.
 - [ ] A malformed local `decidr.json` fails the load with an error naming that file.
+- [ ] A local `decidr.json` written in TOML fails the load with an error naming that file.
+- [ ] A `decidr doctor` run sends no request to the TypeSafe (Jev) decision API.
+- [ ] A `decidr doctor` run and a `sitr doctor` run each create no file and change no file.
 
 ### Dependencies
 
