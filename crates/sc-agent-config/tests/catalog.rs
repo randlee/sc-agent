@@ -4,6 +4,22 @@ use sc_agent_types::TypesError;
 #[test]
 fn every_configuration_error_matches_its_own_catalog() {
     let samples = [
+        AgentConfigError::ProjectRequired { cli: "decidr.json" },
+        AgentConfigError::Layer {
+            source: "a.json".into(),
+            cause: Box::new(AgentConfigError::Invalid {
+                path: "workers".into(),
+                message: "bad".into(),
+            }),
+        },
+        AgentConfigError::Read {
+            file: "f".into(),
+            cause: std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+        },
+        AgentConfigError::Json {
+            file: "f".into(),
+            cause: serde_json::from_str::<serde_json::Value>("{").unwrap_err(),
+        },
         AgentConfigError::Load(sc_config::ConfigError::MissingDefault {
             path: "missing".into(),
         }),

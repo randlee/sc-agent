@@ -13,6 +13,32 @@ use sc_agent_types::{ErrorDetail, ErrorId, TypesError};
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum AgentConfigError {
+    /// No layer sets the required project/phase.
+    ProjectRequired {
+        /// The CLI file that can set the value.
+        cli: &'static str,
+    },
+    /// A layered input failed validation; its original error is retained.
+    Layer {
+        /// The flag, environment variable or file supplying this input.
+        source: String,
+        /// The unchanged validation failure.
+        cause: Box<AgentConfigError>,
+    },
+    /// Reading a layer failed.
+    Read {
+        /// The layer file.
+        file: PathBuf,
+        /// The original I/O failure.
+        cause: std::io::Error,
+    },
+    /// A layer is not valid JSON.
+    Json {
+        /// The layer file.
+        file: PathBuf,
+        /// The original parser failure.
+        cause: serde_json::Error,
+    },
     /// sc-config failed: a file is unreadable or not JSON, or an override cannot be applied.
     Load(sc_config::ConfigError),
     /// A `models` entry conflicts with the catalog (a model on two lines).
@@ -56,6 +82,10 @@ pub enum AgentConfigError {
 }
 
 sc_agent_types::error_catalog! { AgentConfigError {
+    AgentConfigError::ProjectRequired { .. } => ("config.project_required", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::Layer { .. } => ("config.layer", None),
+    AgentConfigError::Read { .. } => ("config.read", Some(sc_agent_types::ErrorCategory::Config)),
+    AgentConfigError::Json { .. } => ("config.json", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Load(_) => ("config.load", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Catalog(_) => ("config.catalog", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::HomeUnknown => ("config.home_unknown", Some(sc_agent_types::ErrorCategory::Config)),
@@ -76,6 +106,12 @@ impl ErrorId for AgentConfigError {
 
     fn message(&self) -> String {
         match self {
+            Self::ProjectRequired { cli } => format!(
+                "project/phase is required: set --project, SC_PROJECT, or project in sc-agent.json or {cli}"
+            ),
+            Self::Layer { source, cause } => format!("{source}: {cause}"),
+            Self::Read { file, cause } => format!("{} at $: {cause}", file.display()),
+            Self::Json { file, cause } => format!("{} at $: {cause}", file.display()),
             Self::Load(_) => "the sc-agent configuration could not be loaded".to_owned(),
             Self::Catalog(_) => "a configured model conflicts with the model catalog".to_owned(),
             Self::HomeUnknown => {
@@ -101,6 +137,10 @@ impl ErrorId for AgentConfigError {
 
     fn cause_detail(&self) -> Option<ErrorDetail> {
         match self {
+            Self::Layer { cause, .. } => Some(cause.detail()),
+            Self::Read { cause, .. } => Some(ErrorDetail::foreign("std.io", cause)),
+            Self::Json { cause, .. } => Some(ErrorDetail::foreign("serde_json", cause)),
+            Self::ProjectRequired { .. } => None,
             Self::Load(inner) => Some(ErrorDetail::foreign(inner.code(), inner)),
             Self::Catalog(inner) => Some(inner.detail()),
             Self::HomeUnknown
@@ -114,6 +154,12 @@ impl ErrorId for AgentConfigError {
 
     fn recovery(&self) -> Option<&'static str> {
         match self {
+            Self::ProjectRequired { .. } => {
+                Some("set the project/phase through one of the named setting places")
+            }
+            Self::Layer { cause, .. } => cause.recovery(),
+            Self::Read { .. } => Some("make the named configuration file readable"),
+            Self::Json { .. } => Some("fix the JSON in the named configuration file"),
             Self::Invalid { .. } => Some(
                 "fix the value at the reported path in default.json/local.json or its SC_AGENT__ variable",
             ),
@@ -146,6 +192,10 @@ impl fmt::Display for AgentConfigError {
 impl std::error::Error for AgentConfigError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Layer { cause, .. } => Some(cause.as_ref()),
+            Self::Read { cause, .. } => Some(cause),
+            Self::Json { cause, .. } => Some(cause),
+            Self::ProjectRequired { .. } => None,
             Self::Load(inner) => Some(inner),
             Self::Catalog(inner) => Some(inner),
             Self::HomeUnknown

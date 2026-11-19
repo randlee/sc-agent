@@ -1,3 +1,7 @@
+//! Layered CLI configuration and shared doctor rows through [`load_layered`].
+//! All discovery inputs and the default log root are supplied in [`LoadOptions`].
+//! The legacy API below remains for callers until the integration sprint migrates them.
+//!
 //! Global sc-agent configuration, loaded with sc-config from `~/.sc-agent/`.
 //!
 //! [`load`] reads `<config_dir>/default.json`, merges an optional
@@ -16,6 +20,13 @@
 
 mod config;
 mod error;
+mod layered;
+
+#[doc(inline)]
+pub use layered::{
+    CliName, DoctorRow, LayerFile, LoadOptions, Loaded, PROJECT_ENV, SHARED_FILE, Source,
+    doctor_rows, load_layered,
+};
 
 #[doc(inline)]
 pub use config::{
