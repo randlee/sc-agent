@@ -163,6 +163,32 @@ fn numeric_looking_model_id_from_environment_stays_a_string() {
 }
 
 #[test]
+fn environment_segments_named_like_fields_are_matched_by_position() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    write(
+        &global_cli_file(&o),
+        &json!({
+            "models": {"line": {"line":"sonnet", "released":"2026-01-01"}},
+            "local_runners": {"model": {"kind":"generic", "host":"localhost", "port":8123, "model":"original"}}
+        }),
+    );
+    env(&mut o, "DECIDR_MODELS__LINE__LINE", "haiku");
+    env(&mut o, "DECIDR_LOCAL_RUNNERS__MODEL__MODEL", "123");
+    let loaded = load_layered(&o).unwrap();
+    assert_eq!(row(&loaded, "models.line.line").value, "haiku");
+    assert_eq!(
+        row(&loaded, "models.line.line").source,
+        "DECIDR_MODELS__LINE__LINE"
+    );
+    assert_eq!(loaded.config.local_runners["model"].model.as_str(), "123");
+    assert_eq!(
+        row(&loaded, "local_runners.model.model").source,
+        "DECIDR_LOCAL_RUNNERS__MODEL__MODEL"
+    );
+}
+
+#[test]
 fn shared_precedence_is_local_before_global_and_cli_before_shared() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
