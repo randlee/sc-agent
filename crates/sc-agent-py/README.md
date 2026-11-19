@@ -6,7 +6,7 @@ Each function returns the same JSON text that the CLI prints. Decision result ob
 
 ## What it provides
 
-- `sc_agent.send(request, *, model, agent_role, project=None, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log`, `keyring_service`, `keyring_account` and `timeout_secs`.
+- `sc_agent.send(request, *, model, agent_role, project=None, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `keyring_service`, `keyring_account` and `timeout_secs`.
 - `sc_agent.send_batch(requests, *, model, agent_role, project=None, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns result lines in input order and passes each to `on_result` as it finishes. Optional `workers` selects 1–64 workers for that batch.
 - `sc_agent.models(runner=None, ...)`: `decidr models`.
 - `sc_agent.doctor(...)`: `decidr doctor`; includes canonical settings/sources and files; a keyring that cannot be read fails it; logged to the general log like every call.
@@ -14,7 +14,7 @@ Each function returns the same JSON text that the CLI prints. Decision result ob
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
 
-A failed decision is data in the returned line, not an exception. `KeyboardInterrupt` cancels the run, drains it and is re-raised. `general_log` and `session_log` accept a caller-owned `sc_observability.Logger` directly, or the existing `Callable[[dict], None]`. Python and Rust records reach the same injected Logger through its public `log(LogEvent)` API; the caller retains flush and shutdown. Each omitted logger uses its default file. No consumer adapter or record conversion is required.
+A failed decision is data in the returned line, not an exception. `KeyboardInterrupt` cancels the run, drains it and is re-raised. `general_log` accepts a caller-owned `sc_observability.Logger` directly, or the existing `Callable[[dict], None]`. Python and Rust records reach the same injected Logger through its public `log(LogEvent)` API; the caller retains flush and shutdown. Without it the general log uses its default file. The session log is always the default session file. No consumer adapter or record conversion is required.
 
 Keyring overrides apply only to the provider selected by the model. An ambiguous ranked model with an override raises `decidr.ambiguous_keyring_override`; no provider argument is required. Each supplied service/account must be 1–255 UTF-8 bytes. Omitted components independently use the provider credential-variable name and the current OS account. Lookup order is repository-root `.env`, process environment, then keyring; a present invalid higher-priority key never falls back. Invalid options raise `SagError("sc_agent_py.invalid_option", message, detail_json)` before network I/O.
 
@@ -152,7 +152,7 @@ argument. `batch_records` includes the optional shared batch-record helpers.
 The client opens one sc-observability Logger named `CLIENT_NAME` at `sc_agent.default_log_root()`
 (`~/.sc-agent`), writing `logs/<client_name>.log.jsonl`, and injects it into every decidr
 and sitr operation. Pass an app's Logger with `logger=` to use it instead.
-Session logging uses the wheel default unless `session_log=` is explicitly passed. Keyring service and account are
+The session log is always the wheel default. Keyring service and account are
 runtime arguments, passed on every decision call without forcing a provider.
 
 ```python
@@ -170,7 +170,7 @@ result = consumer.call_result(
 `abort_on` is required: empty, `{"auth"}`, or `{"auth", "quota"}`. The generated
 module's transport surface is `call_result` and `call_batch_results`; the redundant
 `call`/`call_batch` APIs are removed. Both accept model, optional project, logger,
-session_log, cancel, keyring_service/keyring_account and timeout_secs. Single calls
+cancel, keyring_service/keyring_account and timeout_secs. Single calls
 also accept images/long_context; batches accept workers/on_result. The wheel owns
 retries and cancellation.
 

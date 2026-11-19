@@ -301,7 +301,6 @@ mod tests {
             cli: sc_agent_config::CliName::Decidr,
             loaded: None,
             flags: std::collections::BTreeMap::new(),
-            session: None,
             general: None,
             home: Some(dir.to_path_buf()),
             repo_root: Some(dir.to_path_buf()),

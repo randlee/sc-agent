@@ -53,11 +53,12 @@ impl Loggers {
             service,
             identity,
             general.map(Injected::Rust),
-            session.map(Injected::Rust),
+            session,
         )
     }
 
-    /// Opens default or caller-owned destinations independently.
+    /// Opens default or caller-owned destinations independently; a Python target is accepted for
+    /// the general log only.
     ///
     /// # Errors
     /// Returns an error when a destination is invalid or cannot be opened.
@@ -66,12 +67,10 @@ impl Loggers {
         service: &'static str,
         identity: SessionIdentity,
         general: Option<Injected>,
-        session: Option<Injected>,
+        session: Option<Arc<Logger>>,
     ) -> Result<Self, LogError> {
         let shared = match (&general, &session) {
-            (Some(Injected::Rust(general)), Some(Injected::Rust(session)))
-                if Arc::ptr_eq(general, session) =>
-            {
+            (Some(Injected::Rust(general)), Some(session)) if Arc::ptr_eq(general, session) => {
                 Some(Ledger::new(general))
             }
             _ => None,

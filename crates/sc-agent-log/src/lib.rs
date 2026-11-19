@@ -51,8 +51,8 @@
 //! With the `python` feature, an injected Python callable receives one dictionary per event.
 //! Its exact keys are `level`, `target`, and `action` (strings); `message`, `request_id`,
 //! `correlation_id`, and `outcome` (strings or `None`); `trace` (a JSON-compatible dictionary
-//! or `None`); and `fields` (a dictionary of JSON-compatible values). A session event's
-//! `correlation_id` is its session ID. The caller owns the callable and any logger lifecycle.
+//! or `None`); and `fields` (a dictionary of JSON-compatible values). Only the general log accepts a Python
+//! target. The caller owns the callable and any logger lifecycle.
 
 #![forbid(unsafe_code)]
 
