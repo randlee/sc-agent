@@ -221,16 +221,19 @@ pub fn load_context(context: &Context) -> Result<sc_agent_config::Loaded, Decidr
     }
     let environment = context.environment().into_owned();
     let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    let injected_home = environment
+        .iter()
+        .rev()
+        .find(|(key, _)| key == home_var)
+        .map(|(_, value)| value.as_os_str());
     let home = match &context.home {
         Some(home) => home.clone(),
-        None => match environment.iter().rev().find(|(key, _)| key == home_var) {
-            Some((_, value)) if !value.is_empty() => PathBuf::from(value),
-            Some(_) => return Err(sc_agent_config::AgentConfigError::HomeUnknown.into()),
-            None if context.environment.is_none() => std::env::home_dir()
-                .filter(|home| !home.as_os_str().is_empty())
-                .ok_or(sc_agent_config::AgentConfigError::HomeUnknown)?,
-            None => return Err(sc_agent_config::AgentConfigError::HomeUnknown.into()),
-        },
+        None => sc_agent_types::resolve_home_with(injected_home, || match injected_home {
+            Some(home) => Some(PathBuf::from(home)),
+            None if context.environment.is_none() => std::env::home_dir(),
+            None => None,
+        })
+        .ok_or(sc_agent_config::AgentConfigError::HomeUnknown)?,
     };
     let worktree = match &context.repo_root {
         Some(root) => Some(root.clone()),
