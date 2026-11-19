@@ -174,7 +174,7 @@ fn memory_log_records() {
         .expect("general");
     session
         .write(session_id, payload(&[("decision", json!("yes"))]))
-        .expect("session.row");
+        .expect("session");
     general
         .write(
             Level::Error,
