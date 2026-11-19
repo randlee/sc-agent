@@ -10,9 +10,24 @@ fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_sitr")
 }
 
+const GIT_ENV: [&str; 5] = [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_CEILING_DIRECTORIES",
+];
+
+fn isolate_git(command: &mut Command) {
+    for name in GIT_ENV {
+        command.env_remove(name);
+    }
+}
+
 fn temp_home() -> std::io::Result<tempfile::TempDir> {
     let home = tempfile::tempdir()?;
     let mut command = Command::new("git");
+    isolate_git(&mut command);
     command
         .arg("init")
         .arg("-q")
@@ -27,6 +42,11 @@ fn temp_home() -> std::io::Result<tempfile::TempDir> {
             "git init failed: {}",
             String::from_utf8_lossy(&output.stderr)
         )));
+    }
+    if !home.path().join(".git").exists() {
+        return Err(std::io::Error::other(
+            "git init did not create a repository",
+        ));
     }
     Ok(home)
 }
@@ -72,6 +92,7 @@ fn command(home: &Path, args: &[&str]) -> Command {
         .env_remove("DECIDR_LOG_ROOT")
         .env_remove("DECIDR_WORKERS")
         .env_remove("SC_AGENT__WORKERS");
+    isolate_git(&mut command);
     command
 }
 
@@ -615,4 +636,34 @@ fn shared_global_log_root_and_flag_override_choose_the_log_path() {
         .expect("spawn sitr"),
     );
     assert!(flag_root.join("logs").join("sitr.log.jsonl").exists());
+}
+
+#[test]
+fn git_commands_are_isolated_from_hook_environment() {
+    let root = tempfile::tempdir().unwrap();
+    let mut git = Command::new("git");
+    for name in GIT_ENV {
+        git.env(name, root.path().join("not-a-repository"));
+    }
+    isolate_git(&mut git);
+    git.args(["init", "-q"])
+        .current_dir(root.path())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let output = sc_agent_testkit::ChildGuard::spawn(&mut git)
+        .wait_with_output(sc_agent_testkit::HANG_GUARD);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(root.path().join(".git").is_dir());
+    let cli = command(root.path(), &["--help"]);
+    for name in GIT_ENV {
+        assert!(
+            cli.get_envs()
+                .any(|(key, value)| key == name && value.is_none())
+        );
+    }
 }
