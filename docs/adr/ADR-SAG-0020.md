@@ -1,6 +1,6 @@
 # Decision: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.1.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-18  
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0020: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Related Documents
 
