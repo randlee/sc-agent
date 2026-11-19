@@ -252,7 +252,7 @@ fn check_path(path: &[&str], cli: CliName, shared: bool) -> Result<(), AgentConf
         Ok(())
     } else {
         Err(invalid(
-            path.last().copied().unwrap_or("$"),
+            &path.join("."),
             "setting is not accepted in this scope",
         ))
     }
@@ -500,14 +500,18 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
         let key = if name == PROJECT_ENV {
             "project".to_owned()
         } else if let Some(suffix) = name.strip_prefix(options.cli.env_prefix()) {
-            // `<CLI>_LOG_ROOT` is the log root's test override, not a setting.
-            if suffix == "PROJECT" || suffix == "LOG_ROOT" {
-                continue;
-            }
             suffix.to_ascii_lowercase().replace("__", ".")
         } else {
             continue;
         };
+        // A `<CLI>_` variable names one of this CLI's own settings or is ignored.
+        let parts: Vec<_> = key.split('.').collect();
+        if name != PROJECT_ENV
+            && (check_path(&parts, options.cli, false).is_err()
+                || check_path(&parts, options.cli, true).is_ok())
+        {
+            continue;
+        }
         let source = Source::Env(name.into());
         let text = raw
             .to_str()
@@ -519,7 +523,7 @@ pub fn load_layered(options: &LoadOptions) -> Result<Loaded, AgentConfigError> {
             }
         };
         let mut object = Value::Object(Map::new());
-        put(&mut object, &key.split('.').collect::<Vec<_>>(), value).map_err(|e| at(&source, e))?;
+        put(&mut object, &parts, value).map_err(|e| at(&source, e))?;
         check_keys(&object, options.cli, false).map_err(|e| at(&source, e))?;
         layers.push((object, source));
     }
