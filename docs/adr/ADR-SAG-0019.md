@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.0  
+**Version:** 0.7.1  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-16  
+**Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -72,7 +72,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | Model and provider | `model=` takes any selector string. `provider=None` ranks the detected keys (REQ-SAG-0103). | Pass the selector unchanged. Never set `provider`. |
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. | Pass its keyring overrides, if any. |
    | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
-   | General log | The generated client obtains one `sc_observability.Logger` named after the client, writing `<log_root>/logs/<client>/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022); the sitr wheel accepts it too. | Log its own records to the client's Logger, or pass its own Logger to the client. |
+   | General log | The generated client obtains one `sc_observability.Logger` named after the client, writing `<log_root>/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022); the sitr wheel accepts it too. | Log its own records to the client's Logger, or pass its own Logger to the client. |
    | Errors | Typed fields with a stored `category`, `category()`, `retryable()` and `SagError` (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns input order (decision 8). | Nothing. |
