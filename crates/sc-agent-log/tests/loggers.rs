@@ -52,6 +52,18 @@ fn defaults_write_both() {
         .len(),
         1
     );
+    assert!(
+        !root
+            .path()
+            .join("logs/github.com/randlee/sc-agent/rust-developer/phase-b")
+            .join(SessionLogger::FILE)
+            .exists(),
+        "sessions must not be written under logs/"
+    );
+    assert!(
+        !root.path().join("sessions/decidr.log.jsonl").exists(),
+        "general logs must not be written under sessions/"
+    );
 }
 
 /// A8-12: an injected session logger gets the rows; the general log is the default file.
