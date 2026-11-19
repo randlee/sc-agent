@@ -388,7 +388,10 @@ class Hook:
                         raise CloseError("CLOSE.HISTORY_MALFORMED", f"{self.task} event {event_id}: malformed close commit in {detail!r}",
                                          f"Inspect `atm task events {self.task} --all --json` and reconcile the bead's close history before retrying.")
                     prior_commits.add(sha)
-            if record.get("status") != "closed" and self.values["commit"] in prior_commits:
+            # The guard forces a rework commit for a reopened `fixed` close. A rejection (not_reproducible) has no new
+            # commit, so after a sanity FAIL it is re-submitted at the same commit with new evidence.
+            if (record.get("status") != "closed" and self.values["commit"] in prior_commits
+                    and self.values["outcome"] != "not_reproducible"):
                 raise CloseError("CLOSE.STALE_ASSIGNMENT", f"{self.task}: prior close commit {self.values['commit']} was reopened under assignment {self.assignment_id}",
                                  f"Push a rework commit with `git push origin {self.values['branch']}` and re-close; inspect `atm task events {self.task} --json`.")
             if is_terminal(events):
