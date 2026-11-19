@@ -72,6 +72,7 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 #[non_exhaustive]
 pub struct AgentConfig {
     #[serde(skip)]
+    // Validated by sc_agent_types::is_valid_slug before storage by load_layered.
     pub(crate) project: Option<String>,
     #[serde(skip)]
     pub(crate) cli: crate::CliName,
@@ -110,7 +111,9 @@ impl Default for AgentConfig {
 }
 
 impl AgentConfig {
-    /// The resolved project/phase, with no built-in default.
+    /// The resolved path-safe project/phase slug, with no built-in default.
+    ///
+    /// Validation uses the same sc-agent-types rule as the session logger.
     #[must_use]
     pub fn project(&self) -> Option<&str> {
         self.project.as_deref()

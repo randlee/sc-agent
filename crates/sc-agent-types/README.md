@@ -9,6 +9,7 @@ The crate does no I/O, reads no files and needs no runtime. Its only dependencie
 - **Model catalog:** `Catalog`, `ModelId`, `ShortName`, `ReleaseDate`, `ModelDescriptor` and the built-in `MODELS`. `ModelChoice` is how a caller picks a model: `Latest(ShortName)` or `Version(ModelId)`.
 - **Providers:** `Provider`, with a fixed priority ranking (`Provider::PRIORITY`, `Provider::ranking`). Providers are separate from model ids.
 - **Identifiers:** `SessionId` (a ULID) and `VarName` (a checked environment-variable name).
+- **Session names:** `is_valid_slug`, `is_path_safe` and `MAX_SEGMENT_BYTES`, the shared project/role and repository-segment rules used by configuration and logging.
 - **Cancellation:** `CancelToken`, cooperative cancel with deadline waits and wake hooks (`on_cancel`, `CancelHook`, `Wait`).
 - **Time:** `Clock` (`Clock::system()`, `now`, `wait_until`) and `SystemClock`. It is the one source of time and of timed waits.
 - **Errors:** the `ErrorId` trait and `ErrorDetail` (id, message, optional recovery, HTTP status and cause), the one error convention of the workspace, and the crate's own `TypesError`.

@@ -26,6 +26,7 @@ mod model;
 mod provider;
 mod release_date;
 mod session_id;
+mod session_name;
 mod short_name;
 mod var_name;
 
@@ -49,6 +50,8 @@ pub use provider::Provider;
 pub use release_date::ReleaseDate;
 #[doc(inline)]
 pub use session_id::SessionId;
+#[doc(inline)]
+pub use session_name::{MAX_SEGMENT_BYTES, is_path_safe, is_valid_slug};
 #[doc(inline)]
 pub use short_name::ShortName;
 #[doc(inline)]
