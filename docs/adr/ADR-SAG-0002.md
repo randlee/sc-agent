@@ -1,9 +1,9 @@
 # Decision: Session logs are JSONL first, then SQLite with server sync
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-10  
+**Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -24,6 +24,10 @@
 - REQ-SAG-0202
 - NFR-SAG-0001
 
+**Architecture Decisions:**
+
+- ADR-SAG-0021
+
 ### Context
 
 The owner builds tools that read session logs to tune consumer code, analysing 10,000 to 20,000 or more decisions at a time. One task produced 40,000 sessions, each a single Jev query with its own ULID and question digest.
@@ -34,7 +38,7 @@ Session logs must be separable by repository, type of work and project, kept ind
 
 ### Decision
 
-For the MVP, session logs are JSONL under `<log_root>/logs/<repo>/<agent_role>/<project>/`. Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.
+For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.
 
 **Key Principles:**
 
