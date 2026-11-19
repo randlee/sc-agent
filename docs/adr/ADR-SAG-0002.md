@@ -24,7 +24,7 @@
 - REQ-SAG-0202
 - NFR-SAG-0001
 
-**Decisions:**
+**Architecture Decisions:**
 
 - ADR-SAG-0021
 

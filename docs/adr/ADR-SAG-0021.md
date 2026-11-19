@@ -22,7 +22,7 @@
 - REQ-SAG-0005
 - REQ-SAG-0021
 
-**Decisions:**
+**Architecture Decisions:**
 
 - ADR-SAG-0002
 - ADR-SAG-0019

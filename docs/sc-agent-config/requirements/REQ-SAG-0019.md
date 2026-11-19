@@ -33,7 +33,6 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - Configuration files MUST be JSON.
 - Each CLI MUST have a `<cli> doctor` command (`decidr doctor`, `sitr doctor`) that reports a table with one row per setting and the columns `setting`, `value` and `source`, where `source` is the flag, the environment variable name, the file path or `default`; and the path of every file in the seven layers with whether it exists.
 - The shared settings MUST be reported by one shared doctor routine that every CLI's doctor calls, so the shared rows are the same in every CLI.
-- `<cli> doctor` MUST NOT send a model request or write a file.
 - A failed load MUST name the file and the key path in its error.
 
 **MUST NOT statements:**
@@ -41,6 +40,7 @@ Definitions: A CLI is an sc-agent command-line program, such as `decidr` or `sit
 - A CLI MUST NOT read `default.json` or `local.json`.
 - A CLI MUST NOT read another CLI's `<cli>.json`.
 - A CLI MUST NOT write to any configuration file while it loads configuration.
+- `<cli> doctor` MUST NOT send a model request or write a file.
 
 ### Rationale
 

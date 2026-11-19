@@ -21,7 +21,8 @@ Definitions: The general log is the application diagnostic log. A session log is
 - The general log MUST use the rotation and retention built into sc-observability.
 - Session logs MUST be kept indefinitely.
 - <log_root> MUST default to `~/.sc-agent`, the user's home directory joined with `.sc-agent` on every platform, and MUST be settable as `log_root` through the layers of REQ-SAG-0019.
-- A CLI's general log MUST be written at `<log_root>/logs/<cli>/<cli>.log.jsonl`, such as `<log_root>/logs/decidr/decidr.log.jsonl`.
+- With no general logger injected, a CLI's general log MUST be written at `<log_root>/logs/<cli>/<cli>.log.jsonl`, such as `<log_root>/logs/decidr/decidr.log.jsonl`.
+- A generated client's general log MUST be written at `<log_root>/logs/<client>/<client>.log.jsonl` (REQ-SAG-0008).
 - Session logs MUST be written under `<log_root>/sessions/` (REQ-SAG-0005).
 - Each CLI MUST write its own general log file.
 
@@ -50,4 +51,5 @@ sc-observability already rotates and prunes the general log. Session logs are th
 
 - ADR-SAG-0002
 - ADR-SAG-0021
+- REQ-SAG-0008
 - REQ-SAG-0019

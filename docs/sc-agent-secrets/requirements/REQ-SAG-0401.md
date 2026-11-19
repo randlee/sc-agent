@@ -1,9 +1,9 @@
 # Requirement: Credential variable names live in the secrets crate
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-18  
 **Owner:** Rand Lee  
 
 ---
@@ -24,9 +24,11 @@
 
 - Callers MUST be able to override keyring service and account independently per provider. An omitted service MUST default to that provider's credential-variable name; an omitted account MUST default to the current OS account.
 - Each provided keyring component MUST contain 1–255 UTF-8 bytes, validated before network I/O. Errors MUST name the option and bound without retaining its supplied value.
-- Overrides for one provider MUST NOT affect another provider.
-
 - Python calls supplying either keyring override MUST name `provider`; otherwise they MUST return `sc_agent_py.invalid_option` before network I/O. Calls without overrides MUST retain automatic provider selection.
+
+**MUST NOT statements:**
+
+- Overrides for one provider MUST NOT affect another provider.
 
 ### Rationale
 

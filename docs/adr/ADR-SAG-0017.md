@@ -6,7 +6,6 @@
 **Last Updated:** 2026-11-14  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-11  
-**Revision:** 0.3.0 (2026-11-14, owner-approved): record fourteen published crates including **decidr** under owner decision `agt-ln6` (OPEN-B-007, ruling 2026-11-14T11:48:19Z); the PyPI rename is recorded in owner commit [a6fca64](https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e).  
 
 ---
 
@@ -22,6 +21,10 @@
 - REQ-SAG-0131
 - REQ-SAG-0132
 - REQ-SAG-0803
+
+**External References:**
+
+- [owner commit a6fca64](https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e) the PyPI rename; version 0.3.0 (2026-11-14, owner-approved) records fourteen published crates including decidr under owner decision `agt-ln6` (OPEN-B-007, ruling 2026-11-14T11:48:19Z).
 
 ### Context
 
