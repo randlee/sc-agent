@@ -21,6 +21,7 @@
 - REQ-SAG-0004
 - REQ-SAG-0005
 - REQ-SAG-0021
+- REQ-SAG-0022
 
 **Architecture Decisions:**
 
@@ -52,7 +53,7 @@ The CLIs and the logs each one writes are these, and no others:
 | `decidr` | `<log_root>/logs/decidr/decidr.log.jsonl` | `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |
 | `sitr` | `<log_root>/logs/sitr/sitr.log.jsonl` | none |
 
-The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app reaches sc-agent through its sc-compose generated client, and the client owns the general logger: it obtains one sc-observability `Logger` named after the client and injects that same `Logger` into every sc-decidr and sitr call, so the app, decidr and sitr write through one logger and one queue in that process. The apps and the general log each one's client writes are these:
+The logs are written by the Rust code through loggers that are injected (REQ-SAG-0008). An app reaches sc-agent through its sc-compose generated client, and the client owns the general logger (REQ-SAG-0022): it obtains one sc-observability `Logger` named after the client and injects that same `Logger` into every sc-decidr and sitr call, so the app, decidr and sitr write through one logger and one queue in that process. The apps and the general log each one's client writes are these:
 
 | App (client) | General log | Session logs |
 |---|---|---|

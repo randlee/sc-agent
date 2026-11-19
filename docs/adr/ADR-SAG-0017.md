@@ -30,6 +30,8 @@
 
 Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter CLI, and Python wheels. Release must use one manifest-driven kit across five consumer channels.
 
+The problem is that every channel must release from the same tag, and per-channel workflow literals for crate lists or binary names would let the channels list different crates or binaries.
+
 ### Decision
 
 Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (`sc-decidr` and `sitr` wheels), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.
@@ -53,3 +55,15 @@ Phase A first release surfaces are **crates.io** (the crates listed in `release/
 **Negative:**
 
 - Workspace `Cargo.toml` must list members literally for kit validation.
+
+### Alternatives Considered
+
+#### Alternative 1: Per-channel workflow literals
+
+**Description:**
+
+Each channel's workflow writes its own crate list and binary names as literals.
+
+**Why Rejected:**
+
+The Key Principles of this record forbid ad-hoc per-channel workflow literals for crate lists or binary names, and REQ-SAG-0132 requires consumer extensions to use the kit seam, not forked workflows.

@@ -72,7 +72,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | Model and provider | `model=` takes any selector string. `provider=None` ranks the detected keys (REQ-SAG-0103). | Pass the selector unchanged. Never set `provider`. |
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. | Pass its keyring overrides, if any. |
    | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
-   | General log | The generated client obtains one `sc_observability.Logger` named after the client, writing `<log_root>/logs/<client>/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0008); the sitr wheel accepts it too. | Log its own records to the client's Logger, or pass its own Logger to the client. |
+   | General log | The generated client obtains one `sc_observability.Logger` named after the client, writing `<log_root>/logs/<client>/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022); the sitr wheel accepts it too. | Log its own records to the client's Logger, or pass its own Logger to the client. |
    | Errors | Typed fields with a stored `category`, `category()`, `retryable()` and `SagError` (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns input order (decision 8). | Nothing. |
@@ -80,7 +80,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
    - The template covers the decision call, model pass-through, API keys, logging wiring, cancellation, `abort_on` and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
-   - Its feature variables are `models` and `sitr` (`true` or `false`). Session logging and the injected general logger are not optional (REQ-SAG-0008).
+   - Its feature variables are `models` and `sitr` (`true` or `false`). Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of either wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
    - The generated header records the sc-decidr version, and the sitr version when `sitr` is on, as troubleshooting information. Nothing checks it at runtime.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.

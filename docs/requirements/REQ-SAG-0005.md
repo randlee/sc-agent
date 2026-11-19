@@ -14,13 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is the session log root folder. JSONL is newline-delimited JSON, one row per line.
+Definitions: `<log_root>` is the session log root folder. JSONL is newline-delimited JSON, one row per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project.
 
 **MUST statements:**
 
-- Session logs MUST be written as JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/`.
-- All sessions of one repo, agent role and project MUST be appended to the one file `sessions.jsonl` in that directory.
-- Every CLI MUST write its session logs into this one tree.
+- Session logs MUST be written as JSONL.
+- Session logs MUST be written in the session directory.
+- Every session MUST be appended to the file `sessions.jsonl` in its session directory.
+- `decidr` MUST write its session logs in the session directory.
 
 ### Rationale
 
