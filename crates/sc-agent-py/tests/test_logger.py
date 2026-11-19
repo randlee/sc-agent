@@ -67,6 +67,8 @@ def test_same_caller_owned_logger_receives_python_and_sc_agent_records(env, args
             assert not sessions
             files = list(default_root.rglob("sessions.jsonl"))
             assert len(files) == 1
+            assert files[0].is_relative_to(default_root / "sessions")
+            assert not list((default_root / "logs").rglob("sessions.jsonl"))
             assert len(files[0].read_text().splitlines()) == expected
     finally:
         ok(logger.shutdown())
