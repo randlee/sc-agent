@@ -40,6 +40,10 @@ def without(envelope, key):
     return {k: v for k, v in envelope.items() if k != key}
 
 
+def without_receipt(envelope):
+    return {**envelope, "data": without(envelope["data"], "jev")}
+
+
 def test_selected_fallback_errors_are_not_counted_twice():
     error = {"code": "SANITY.LLM_API_FAILURE", "message": "unavailable"}
     assert MERGE_MODULE.unique_errors([error, error]) == [error]
@@ -307,7 +311,84 @@ class SanityMerge(unittest.TestCase):
         self.assertEqual(vars_["reviewer"], "sanity-selected")
         self.assertIsInstance(vars_["selection"], list)
         self.assertEqual(vars_["selection"], json.loads((self.dir / "selection.json").read_text()))
+        self.assertNotIn("recheck", vars_)
+        self.assertNotIn("lint_carried_from", vars_)
         self.render_complete(vars_, "# Dev Sanity Check FAIL")
+
+    CARRIED = {"carried": True, "command": "just lint", "log": "/scratch/agt-d-4-sanity-lint.log",
+               "exit_file": "/scratch/agt-d-4-sanity-lint.exit", "exit_code": 0, "commit": "e" * 40,
+               "run_id": "earlier-run", "sanity_bead": TASK, "manifest": "/scratch/earlier.json"}
+
+    def recheck_args(self, jev_results, **lint):
+        """A re-check manifest (as `sanity-split --recheck-of` prints it) and its Jev vars; no lint file exists."""
+        self.write_manifest(run_id="recheck-run", recheck=True, reviewers=["sanity-jev", "sanity-selected"],
+                            operational_reviewer="sanity-selected", lint={**self.CARRIED, **lint})
+        jev_path = self.dir / "jev.json"
+        jev_path.write_text(json.dumps(reviewer_vars("recheck-run", "sanity-jev", jev_results)[0]))
+        return (str(self.manifest), TASK, DEV, SPRINT, "--reviewer", "sanity-selected", "--started-at", "1700000000",
+                "--completed-at", "1700000001", "--jev-vars", str(jev_path))
+
+    def test_recheck_selects_the_jev_reply_alone_with_the_carried_lint(self):
+        self.assertFalse(self.exit.exists())
+        for findings, verdict in (((), "PASS"), ((FINDING,), "FAIL")):
+            with self.subTest(verdict):
+                out = self.merge([], *self.recheck_args([self.result(1), self.result(2, findings)]))
+                self.assertEqual(out.returncode, 0, out.stderr)
+                report = json.loads(out.stdout)
+                self.assertEqual((report["verdict"], report["reviewer"], report["commit"]), (verdict, "sanity-selected", self.sha))
+                self.assertIs(report["recheck"], True)
+                self.assertEqual(report["lint_carried_from"], {
+                    "sanity_bead": TASK, "run_id": "earlier-run", "commit": "e" * 40, "exit_code": 0,
+                    "log": "/scratch/agt-d-4-sanity-lint.log", "manifest": "/scratch/earlier.json"})
+                self.assertEqual(report["lint_md"], f"`just lint` exit 0 (carried from {TASK} at {'e' * 40}; "
+                                                    "log /scratch/agt-d-4-sanity-lint.log)")
+                self.assertIsNone(report["selection"])
+                self.assertEqual(report["findings_count"], len(findings))
+                if findings:
+                    self.assertEqual((report["findings"][0]["reviewer"], report["findings"][0]["deliverable"]),
+                                     ("sc-sanity-jev", 2))
+                self.render_complete(report, f"# Dev Sanity Check {verdict}")
+        self.assertFalse(self.exit.exists())
+
+    def test_recheck_jev_family_merge_carries_the_lint_and_llm_is_off_the_roster(self):
+        args = self.recheck_args([])
+        jev = self.merge([self.result(1), self.result(2)], *args[:4], "--reviewer", "sanity-jev", *args[6:10])
+        self.assertEqual(jev.returncode, 0, jev.stderr)
+        self.assertEqual((json.loads(jev.stdout)["verdict"], json.loads(jev.stdout)["recheck"]), ("PASS", True))
+        llm = self.merge([self.result(1), self.result(2)], *args[:4], "--reviewer", "sanity-llm", *args[6:10])
+        self.assertEqual((llm.returncode, llm.stdout), (1, ""))
+
+    def test_recheck_refuses_llm_inputs_and_unproven_lint(self):
+        args = self.recheck_args([self.result(1), self.result(2)])
+        llm_vars = self.dir / "llm.json"
+        llm_vars.write_text(json.dumps(reviewer_vars("recheck-run", "sanity-llm", [self.result(1), self.result(2)])[0]))
+        for name, extra, message in (
+                ("llm vars", ("--llm-vars", str(llm_vars)), "selects the Jev reply only"),
+                ("selection", ("--selection", str(self.dir / "selection.json")), "selects the Jev reply only")):
+            with self.subTest(name):
+                out = self.merge([], *args, *extra)
+                self.assertEqual(out.returncode, 1, out.stderr)
+                self.assertIn(message, out.stderr)
+        no_jev = self.merge([], *args[:-2])
+        self.assertEqual(no_jev.returncode, 1)
+        self.assertIn("requires --jev-vars", no_jev.stderr)
+        unreceipted = self.merge([], *self.recheck_args([without_receipt(self.result(1)), self.result(2)]))
+        self.assertEqual(unreceipted.returncode, 1)
+        self.assertIn("no valid Jev receipt", unreceipted.stderr)
+        failed = self.merge([], *self.recheck_args([self.result(1), self.result(2)], exit_code=1))
+        self.assertEqual(failed.returncode, 1)
+        self.assertIn("carried lint must be sanity-split's passed record", failed.stderr)
+        self.write_manifest(run_id="recheck-run", recheck=True, reviewers=["sanity-jev", "sanity-selected"],
+                            operational_reviewer="sanity-selected")
+        uncarried = self.merge([], *args)
+        self.assertEqual(uncarried.returncode, 1)
+        self.assertIn("a re-check manifest carries its lint", uncarried.stderr)
+
+    def test_recheck_with_a_jev_cannot_run_is_cannot_run(self):
+        out = self.merge([], *self.recheck_args([self.result(1), self.failure(code="SANITY.TARGET_UNREADABLE")]))
+        self.assertEqual(out.returncode, 3, out.stderr)
+        report = json.loads(out.stdout)
+        self.assertEqual((report["verdict"], report["error"]["code"]), ("CANNOT_RUN", "SANITY.TARGET_UNREADABLE"))
 
     def test_rerun_context_is_validated_as_typed_repo_relative_paths(self):
         selected_args = self.selected_merge_args()
