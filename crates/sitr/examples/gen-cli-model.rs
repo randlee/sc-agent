@@ -44,7 +44,7 @@ mod tests {
             .iter()
             .map(|command| command.name())
             .collect();
-        assert_eq!(names, ["languages", "queries", "query"]);
+        assert_eq!(names, ["doctor", "languages", "queries", "query"]);
         assert!(
             model
                 .options()
@@ -56,6 +56,12 @@ mod tests {
                 .subcommands()
                 .iter()
                 .any(|command| command.name() == "query")
+        );
+        assert!(
+            model
+                .subcommands()
+                .iter()
+                .any(|command| command.name() == "doctor")
         );
     }
 }

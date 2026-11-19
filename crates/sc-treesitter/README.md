@@ -40,7 +40,7 @@ sitr query python branches path/to/file.py
 sitr query rust match-arms src/lib.rs --captures arm
 ```
 
-`sitr` prints JSON and a newline on stdout and exits 0. On failure it prints one stderr line `{"id": "treesitter.<variant>", "message": ...}`, prints nothing on stdout and exits 1. Each run writes one `sitr.command` event to `~/.sc-agent/logs/sitr.log.jsonl`, or to `<PATH>/logs/sitr.log.jsonl` with `--log-root PATH`.
+`sitr` prints JSON and a newline on stdout and exits 0. On failure it prints one stderr line `{"id": "treesitter.<variant>", "message": ...}`, prints nothing on stdout and exits 1. Each run writes one `sitr.command` event through `sc-agent-log` to `<log_root>/logs/sitr.log.jsonl`; the default `log_root` is `~/.sc-agent`, and configuration or `--log-root PATH` can override it. `sitr doctor` reports the resolved settings and config files without writing a log or requiring a project/phase.
 
 ## Features
 

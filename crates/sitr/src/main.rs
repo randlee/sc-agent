@@ -8,24 +8,19 @@
 
 mod cli;
 
+use std::collections::BTreeMap;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
-use sc_observability::v2::{Logger, LoggerConfig};
-use sc_observability::{
-    ActionName, Level, LogEvent, OBSERVATION_ENVELOPE_VERSION, OutcomeLabel, ProcessIdentity,
-    SchemaVersion, ServiceName, TargetCategory, Timestamp,
-};
+use sc_agent_config::{CliName, LoadOptions, Loaded, doctor_rows, load_layered};
+use sc_agent_log::{GeneralLogger, Level, LogContext, default_log_root};
 use sc_treesitter::{
     Error, LanguageId, queries, query_source, read_source, run_query, to_json_bytes,
 };
 
 use crate::cli::{Command, Parsed};
-
-/// Service name, and so the log file name `sitr.log.jsonl`.
-const SERVICE: &str = "sitr";
 
 /// What the `sitr.command` event records about one run.
 #[derive(Debug, Default)]
@@ -41,28 +36,49 @@ fn main() -> ExitCode {
     let started = Instant::now();
     let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
     let parsed = cli::parse(args.clone());
-    let flag = match &parsed {
-        Ok(Parsed::Run(cli)) => cli.log_root.clone(),
-        Ok(Parsed::Print(_)) | Err(_) => cli::log_root_arg(&args),
-    };
-    let logger = match general_log(flag) {
-        Ok(logger) => logger,
-        Err(error) => return emit(&error),
-    };
-    let mut fields = CommandFields {
-        subcommand: match &parsed {
-            Ok(Parsed::Run(cli)) => cli.command.name(),
-            Ok(Parsed::Print(_)) => "help",
-            Err(_) => "usage",
-        },
-        ..CommandFields::default()
-    };
-    let result = parsed
-        .and_then(|parsed| run(parsed, &mut fields))
-        .and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
-    record(&logger, &fields, started, result.as_ref().err());
-    // A log failure never changes the result.
-    let _shutdown = logger.shutdown();
+    match parsed {
+        Ok(Parsed::Print(text)) => write_result(Ok(text.into_bytes())),
+        Ok(Parsed::Run(cli)) => {
+            let loaded = match load_config(cli.log_root.as_deref()) {
+                Ok(loaded) => loaded,
+                Err(error) => return emit(&error),
+            };
+            if matches!(&cli.command, Command::Doctor) {
+                let result = doctor_report(&loaded);
+                return write_result(result);
+            }
+            let logger = match general_log(loaded.config.log_root.as_deref()) {
+                Ok(logger) => logger,
+                Err(error) => return emit(&error),
+            };
+            let mut fields = CommandFields {
+                subcommand: cli.command.name(),
+                ..CommandFields::default()
+            };
+            let result = run(cli.command, &mut fields)
+                .and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
+            record(&logger, &fields, started, result.as_ref().err());
+            let _closed = logger.close();
+            finish(result, &mut io::stderr().lock())
+        }
+        Err(error) => {
+            if let Ok(loaded) = load_config(cli::log_root_arg(&args).as_deref())
+                && let Ok(logger) = general_log(loaded.config.log_root.as_deref())
+            {
+                let fields = CommandFields {
+                    subcommand: "usage",
+                    ..CommandFields::default()
+                };
+                record(&logger, &fields, started, Some(&error));
+                let _closed = logger.close();
+            }
+            emit(&error)
+        }
+    }
+}
+
+fn write_result(result: Result<Vec<u8>, Error>) -> ExitCode {
+    let result = result.and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
     finish(result, &mut io::stderr().lock())
 }
 
@@ -83,12 +99,12 @@ fn finish(result: Result<(), Error>, stderr: &mut impl Write) -> ExitCode {
     }
 }
 
-fn run(parsed: Parsed, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
-    let cli = match parsed {
-        Parsed::Print(text) => return Ok(text.into_bytes()),
-        Parsed::Run(cli) => cli,
-    };
-    match cli.command {
+fn run(command: Command, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
+    match command {
+        Command::Doctor => Err(Error::Usage {
+            kind: "Internal".to_owned(),
+            detail: "doctor must run without opening a logger".to_owned(),
+        }),
         Command::Languages => {
             let ids: Vec<LanguageId> = sc_treesitter::languages().collect();
             json_line(&ids)
@@ -148,97 +164,119 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// sc-observability logger, service `sitr`, log root `log_root` (`--log-root`), else
-/// `home_dir()/.sc-agent`.
-///
-/// # Errors
-///
-/// [`Error::Log`] when no log root is given and the home directory is unknown, or the logger
-/// cannot start.
-fn general_log(log_root: Option<PathBuf>) -> Result<Logger, Error> {
-    let root = match log_root {
-        Some(root) => root,
-        None => std::env::home_dir()
-            .filter(|home| !home.as_os_str().is_empty())
-            .map(default_log_root)
-            .ok_or_else(|| Error::Log {
-                detail: "the home directory is unknown".to_owned(),
-            })?,
-    };
-    let service = ServiceName::new(SERVICE).map_err(|error| Error::Log {
+/// Loads all sitr settings from the shared seven-layer resolver.
+fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
+    let home = std::env::home_dir()
+        .filter(|home| !home.as_os_str().is_empty())
+        .ok_or_else(|| Error::Usage {
+            kind: "Configuration".to_owned(),
+            detail: "home directory is unknown".to_owned(),
+        })?;
+    let cwd = std::env::current_dir().map_err(|error| Error::Usage {
+        kind: "Configuration".to_owned(),
+        detail: format!("cannot determine current directory: {error}"),
+    })?;
+    let worktree = sc_agent_log::Repo::work_tree_root(&cwd).map_err(|error| Error::Usage {
+        kind: "Configuration".to_owned(),
         detail: error.to_string(),
     })?;
-    let config = LoggerConfig::default_for(service, root);
-    Logger::new(config).map_err(|error| Error::Log {
-        detail: format!("{}: {}", error.code(), error.diagnostic().message),
+    let flags = log_root_flag.map_or_else(BTreeMap::new, |path| {
+        BTreeMap::from([("log_root".to_owned(), path.display().to_string().into())])
+    });
+    load_layered(&LoadOptions {
+        cli: CliName::Sitr,
+        home: home.clone(),
+        worktree,
+        default_log_root: default_log_root(&home),
+        flags,
+        environment: std::env::vars_os().collect(),
+    })
+    .map_err(|error| Error::Usage {
+        kind: "Configuration".to_owned(),
+        detail: error.to_string(),
     })
 }
 
-fn default_log_root(home: PathBuf) -> PathBuf {
-    home.join(".sc-agent")
+/// The shared sc-agent-log default for service `sitr`.
+fn general_log(log_root: Option<&Path>) -> Result<GeneralLogger, Error> {
+    GeneralLogger::open_default(log_root, "sitr").map_err(|error| Error::Log {
+        detail: error.to_string(),
+    })
+}
+
+fn doctor_report(loaded: &Loaded) -> Result<Vec<u8>, Error> {
+    #[derive(serde::Serialize)]
+    struct Report<'a> {
+        settings: Vec<sc_agent_config::DoctorRow>,
+        files: &'a [sc_agent_config::LayerFile],
+    }
+    json_line(&Report {
+        settings: doctor_rows(loaded),
+        files: &loaded.files,
+    })
 }
 
 /// Records the one `sitr.command` event; a failure here is dropped (it never changes the result).
-fn record(logger: &Logger, command: &CommandFields, started: Instant, error: Option<&Error>) {
-    if let Some(event) = command_event(logger, command, started, error) {
-        let _logged = logger.log(event);
-    }
-}
-
-fn command_event(
-    logger: &Logger,
+fn record(
+    logger: &GeneralLogger,
     command: &CommandFields,
     started: Instant,
     error: Option<&Error>,
-) -> Option<LogEvent> {
-    let optional = |value: Option<serde_json::Value>| value.unwrap_or(serde_json::Value::Null);
-    let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+) {
     let mut fields = serde_json::Map::new();
     fields.insert("subcommand".to_owned(), command.subcommand.into());
     fields.insert(
         "language".to_owned(),
-        optional(command.language.clone().map(Into::into)),
+        command
+            .language
+            .clone()
+            .map_or(serde_json::Value::Null, Into::into),
     );
     fields.insert(
         "query".to_owned(),
-        optional(command.query.clone().map(Into::into)),
+        command
+            .query
+            .clone()
+            .map_or(serde_json::Value::Null, Into::into),
     );
     fields.insert(
         "file".to_owned(),
-        optional(
-            command
-                .file
-                .as_ref()
-                .map(|file| file.display().to_string().into()),
-        ),
+        command
+            .file
+            .as_ref()
+            .map_or(serde_json::Value::Null, |file| {
+                file.display().to_string().into()
+            }),
     );
-    fields.insert("bytes".to_owned(), optional(command.bytes.map(Into::into)));
-    fields.insert("duration_ms".to_owned(), duration_ms.into());
+    fields.insert(
+        "bytes".to_owned(),
+        command.bytes.map_or(serde_json::Value::Null, Into::into),
+    );
+    fields.insert(
+        "duration_ms".to_owned(),
+        u64::try_from(started.elapsed().as_millis())
+            .unwrap_or(u64::MAX)
+            .into(),
+    );
     fields.insert(
         "error_id".to_owned(),
         error.map_or(serde_json::Value::Null, |error| error.id().into()),
     );
-    Some(LogEvent {
-        version: SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).ok()?,
-        timestamp: Timestamp::now_utc(),
-        level: if error.is_some() {
+    fields.insert(
+        "outcome".to_owned(),
+        if error.is_some() { "error" } else { "ok" }.into(),
+    );
+    let _logged = logger.write(
+        if error.is_some() {
             Level::Error
         } else {
             Level::Info
         },
-        service: logger.service_name().clone(),
-        target: TargetCategory::new(SERVICE).ok()?,
-        action: ActionName::new("sitr.command").ok()?,
-        message: error.map(Error::message),
-        identity: ProcessIdentity::default(),
-        trace: None,
-        request_id: None,
-        correlation_id: None,
-        outcome: Some(OutcomeLabel::new(if error.is_some() { "error" } else { "ok" }).ok()?),
-        diagnostic: None,
-        state_transition: None,
+        "sitr",
+        "sitr.command",
+        LogContext::NONE,
         fields,
-    })
+    );
 }
 
 #[cfg(test)]
