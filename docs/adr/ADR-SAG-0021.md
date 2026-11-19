@@ -66,7 +66,7 @@ An app that judges many items, such as plan-anchor or judge-jev, judges every it
 
 A plan that adds an app, or changes a log an app writes, is not approved until it includes a new version of this ADR with that row. A PyO3 binding is not a CLI and has no row: with no logger injected, the binding uses the default logger of the CLI it binds, at the paths in that CLI's row.
 
-The crates that carry this decision depend on each other as follows. The sitr wheel (`sc-treesitter-py`) depends on `sc-agent-log`, so it takes an injected Logger and has the same default general logger as the sc-decidr wheel. The `sitr` CLI depends on `sc-agent-config`, so it reads its configuration through the seven-layer lookup of ADR-SAG-0020. Both are existing crates.
+The crates that carry this decision depend on each other as follows. The sitr wheel (`sc-treesitter-py`) depends on `sc-agent-log`, so it takes an injected Logger and has the same default general logger as the sc-decidr wheel. The `sitr` CLI depends on `sc-agent-config`, so it reads its configuration through the seven-layer lookup of ADR-SAG-0020. The `sitr` CLI also depends on `sc-agent-log`, so it opens its default general log through the same `sc-agent-log` call as the sitr wheel and the `logs/<cli>/` path rule lives in one crate. `sc-agent-log` has an optional `pyo3` dependency, off by default, that holds the one copy of the code both wheels use to call an injected `sc_observability.Logger`'s `log(LogEvent)`; the CLIs build `sc-agent-log` without it. All four are existing crates.
 
 Every CLI has a row, and every cell is filled; a CLI that writes no log of a kind says `none`. A plan that adds a CLI, or changes a log a CLI writes, is not approved until it includes a new version of this ADR with that row.
 
