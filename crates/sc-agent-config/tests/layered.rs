@@ -548,6 +548,11 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
         let AgentConfigError::Layer { cause, .. } = &error else {
             panic!("expected source context")
         };
+        assert_eq!(
+            error.message(),
+            format!("configuration input from {expected_source} failed")
+        );
+        assert!(!error.message().contains(&cause.message()));
         assert_eq!(cause.id(), "config.invalid");
         assert!(cause.message().contains("workers"));
         assert_eq!(error.cause_detail(), Some(cause.detail()));
