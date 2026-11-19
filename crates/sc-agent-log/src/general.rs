@@ -60,11 +60,7 @@ impl GeneralLogger {
     /// directory that cannot be written), [`LogError::Start`] when the logger cannot start.
     pub fn open_default(log_root: Option<&Path>, service: &'static str) -> Result<Self, LogError> {
         Self::open_default_with_home(log_root, service, || {
-            let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-            resolve_home(std::env::var_os(home_var).as_deref(), || {
-                #[allow(deprecated)]
-                std::env::home_dir()
-            })
+            sc_agent_types::resolve_home().ok_or(LogError::HomeUnknown)
         })
     }
 
@@ -309,19 +305,6 @@ fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
         })
 }
 
-/// Resolve home with an injected platform lookup; never fall back on an explicitly empty value.
-fn resolve_home(
-    home: Option<&std::ffi::OsStr>,
-    lookup: impl FnOnce() -> Option<PathBuf>,
-) -> Result<PathBuf, LogError> {
-    if home.is_some_and(std::ffi::OsStr::is_empty) {
-        return Err(LogError::HomeUnknown);
-    }
-    lookup()
-        .filter(|path| !path.as_os_str().is_empty())
-        .ok_or(LogError::HomeUnknown)
-}
-
 #[cfg(test)]
 mod home_tests {
     use super::*;
@@ -356,10 +339,11 @@ mod home_tests {
         let root = tempfile::tempdir().expect("temp");
         let lookup_called = std::cell::Cell::new(false);
         let result = GeneralLogger::open_default_with_home(None, "decidr", || {
-            resolve_home(Some(std::ffi::OsStr::new("")), || {
+            sc_agent_types::resolve_home_with(Some(std::ffi::OsStr::new("")), || {
                 lookup_called.set(true);
                 Some(root.path().to_owned())
             })
+            .ok_or(LogError::HomeUnknown)
         });
         assert!(!root.path().join(".sc-agent").exists());
         assert!(
@@ -367,8 +351,9 @@ mod home_tests {
             "empty home must not invoke the lookup"
         );
         assert!(matches!(result, Err(LogError::HomeUnknown)));
-        let result =
-            GeneralLogger::open_default_with_home(None, "decidr", || resolve_home(None, || None));
+        let result = GeneralLogger::open_default_with_home(None, "decidr", || {
+            sc_agent_types::resolve_home_with(None, || None).ok_or(LogError::HomeUnknown)
+        });
         assert!(matches!(result, Err(LogError::HomeUnknown)));
         assert_eq!(
             std::fs::read_dir(root.path()).expect("read temp").count(),
