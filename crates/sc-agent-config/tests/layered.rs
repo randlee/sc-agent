@@ -2,7 +2,7 @@
 #![cfg(test)]
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use sc_agent_config::{
     AgentConfigError, CliName, DoctorRow, LoadOptions, Source, doctor_rows, load_layered,
@@ -20,6 +20,10 @@ fn options(root: &Path) -> LoadOptions {
         environment: Vec::new(),
     }
 }
+fn global_cli_file(options: &LoadOptions) -> PathBuf {
+    options.home.join(".sc-agent").join(options.cli.file_name())
+}
+
 fn write(path: &Path, value: &Value) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, value.to_string()).unwrap();
@@ -39,16 +43,20 @@ fn every_project_layer_wins_in_order_and_missing_is_typed() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
     let paths = [
-        o.home.join(".sc-agent/sc-agent.json"),
-        o.home.join(".sc-agent/decidr.json"),
+        o.home.join(".sc-agent").join("sc-agent.json"),
+        global_cli_file(&o),
         o.worktree
             .as_ref()
             .unwrap()
-            .join(".sc/sc-agent/sc-agent.json"),
+            .join(".sc")
+            .join("sc-agent")
+            .join("sc-agent.json"),
         o.worktree
             .as_ref()
             .unwrap()
-            .join(".sc/sc-agent/decidr.json"),
+            .join(".sc")
+            .join("sc-agent")
+            .join(o.cli.file_name()),
     ];
     for (i, path) in paths.iter().enumerate() {
         write(path, &json!({"project":format!("file-{i}")}));
@@ -96,12 +104,14 @@ fn every_project_layer_wins_in_order_and_missing_is_typed() {
 fn nested_merge_preserves_unmodified_values_and_their_sources() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    let global = o.home.join(".sc-agent/decidr.json");
+    let global = global_cli_file(&o);
     let local = o
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent/decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(
         &global,
         &json!({"workers":4,"local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":8000,"model":"local/model"}}}),
@@ -139,7 +149,7 @@ fn numeric_looking_model_id_from_environment_stays_a_string() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
     write(
-        &o.home.join(".sc-agent/decidr.json"),
+        &global_cli_file(&o),
         &json!({"local_runners":{"fixture":{
             "kind":"generic", "host":"localhost", "port":8123, "model":"original"
         }}}),
@@ -156,15 +166,14 @@ fn numeric_looking_model_id_from_environment_stays_a_string() {
 fn shared_precedence_is_local_before_global_and_cli_before_shared() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
-    write(
-        &o.home.join(".sc-agent/decidr.json"),
-        &json!({"project":"global-cli"}),
-    );
+    write(&global_cli_file(&o), &json!({"project":"global-cli"}));
     write(
         &o.worktree
             .as_ref()
             .unwrap()
-            .join(".sc/sc-agent/sc-agent.json"),
+            .join(".sc")
+            .join("sc-agent")
+            .join("sc-agent.json"),
         &json!({"project":"local-shared"}),
     );
     assert_eq!(
@@ -175,7 +184,9 @@ fn shared_precedence_is_local_before_global_and_cli_before_shared() {
         &o.worktree
             .as_ref()
             .unwrap()
-            .join(".sc/sc-agent/decidr.json"),
+            .join(".sc")
+            .join("sc-agent")
+            .join(o.cli.file_name()),
         &json!({"project":"local-cli"}),
     );
     assert_eq!(
@@ -200,7 +211,7 @@ fn foreign_and_legacy_inputs_and_credentials_are_ignored() {
     }
     assert_eq!(load_layered(&o).unwrap(), clean);
     assert_eq!(doctor_rows(&load_layered(&o).unwrap()), doctor_rows(&clean));
-    fs::remove_file(o.home.join(".sc-agent/sitr.json")).unwrap();
+    fs::remove_file(o.home.join(".sc-agent").join(CliName::Sitr.file_name())).unwrap();
     o.cli = CliName::Sitr;
     o.environment.clear();
     let clean = load_layered(&o).unwrap();
@@ -221,7 +232,9 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent/sc-agent.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join("sc-agent.json");
     write(&file, &json!({"project":"phase-a"}));
     let expected = vec![
         DoctorRow {
@@ -253,7 +266,13 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
         serde_json::to_value(row(&loaded, "project")).unwrap()["value"],
         "phase-a"
     );
-    let cli_file = o.worktree.as_ref().unwrap().join(".sc/sc-agent/sitr.json");
+    let cli_file = o
+        .worktree
+        .as_ref()
+        .unwrap()
+        .join(".sc")
+        .join("sc-agent")
+        .join(CliName::Sitr.file_name());
     write(&cli_file, &json!({"project":"sitr-phase"}));
     assert_eq!(
         row(&load_layered(&o).unwrap(), "project").source,
@@ -269,7 +288,9 @@ fn outside_git_skips_local_files_and_loading_writes_nothing() {
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent/decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(&file, &json!({"workers":0}));
     o.worktree = None;
     let before = fs::read(&file).unwrap();
@@ -284,7 +305,7 @@ fn outside_git_skips_local_files_and_loading_writes_nothing() {
 fn scope_json_and_file_errors_name_the_source_and_keep_causes() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
-    let file = o.home.join(".sc-agent/sc-agent.json");
+    let file = o.home.join(".sc-agent").join("sc-agent.json");
     write(&file, &json!({"workers":2}));
     let error = load_layered(&o).unwrap_err();
     assert!(error.message().contains("workers"));
@@ -367,9 +388,11 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
                 o.worktree
                     .as_ref()
                     .unwrap()
-                    .join(".sc/sc-agent/decidr.json")
+                    .join(".sc")
+                    .join("sc-agent")
+                    .join(o.cli.file_name())
             } else {
-                o.home.join(".sc-agent/decidr.json")
+                global_cli_file(&o)
             };
             write(&file, &object);
             let error = load_layered(&o).unwrap_err();
@@ -406,10 +429,10 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
 fn invalid_lower_layer_is_not_hidden_by_a_flag() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    write(&o.home.join(".sc-agent/decidr.json"), &json!({"workers":0}));
+    write(&global_cli_file(&o), &json!({"workers":0}));
     o.flags.insert("workers".into(), json!(2));
     assert!(load_layered(&o).is_err());
-    fs::remove_file(o.home.join(".sc-agent/decidr.json")).unwrap();
+    fs::remove_file(global_cli_file(&o)).unwrap();
     env(&mut o, "DECIDR_WORKERS", "0");
     assert!(
         load_layered(&o)
@@ -512,7 +535,7 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
     let root = tempfile::tempdir().unwrap();
     for origin in ["file", "environment", "flag"] {
         let mut o = options(root.path());
-        let file = o.home.join(".sc-agent").join("decidr.json");
+        let file = global_cli_file(&o);
         let expected_source = match origin {
             "file" => {
                 write(&file, &json!({"workers":0}));
@@ -566,7 +589,7 @@ fn project_path_safety_is_enforced_at_each_configuration_layer() {
     for name in unsafe_names {
         for origin in ["file", "environment", "flag"] {
             let mut o = options(root.path());
-            let file = o.home.join(".sc-agent").join("decidr.json");
+            let file = global_cli_file(&o);
             let expected_source = match origin {
                 "file" => {
                     write(&file, &json!({"project":name}));
@@ -604,7 +627,7 @@ fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
     ] {
         for origin in ["file", "environment", "flag"] {
             let mut o = options(root.path());
-            let file = o.home.join(".sc-agent").join("decidr.json");
+            let file = global_cli_file(&o);
             match origin {
                 "file" => write(&file, &json!({"project":name})),
                 "environment" => env(&mut o, "SC_PROJECT", &name),
@@ -627,7 +650,7 @@ fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
 fn validation_names_the_winning_key_source_despite_unrelated_lower_files() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    let file = o.home.join(".sc-agent").join("decidr.json");
+    let file = global_cli_file(&o);
     write(&file, &json!({"workers": 2}));
     o.flags.insert("project".into(), json!("Phase B"));
     let AgentConfigError::Layer { source, cause } = load_layered(&o).unwrap_err() else {
@@ -673,7 +696,7 @@ fn nested_port_failures_name_flag_env_and_file_over_unrelated_lower_values() {
     for source in ["flag", "env", "file"] {
         let root = tempfile::tempdir().unwrap();
         let mut o = options(root.path());
-        let global = o.home.join(".sc-agent").join("decidr.json");
+        let global = global_cli_file(&o);
         write(
             &global,
             &json!({"workers": 2, "local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}),
@@ -682,8 +705,9 @@ fn nested_port_failures_name_flag_env_and_file_over_unrelated_lower_values() {
             .worktree
             .as_ref()
             .unwrap()
-            .join(".sc/sc-agent")
-            .join("decidr.json");
+            .join(".sc")
+            .join("sc-agent")
+            .join(o.cli.file_name());
         let origin = match source {
             "flag" => {
                 o.flags.insert("local_runners.laya.port".into(), json!(0));
@@ -706,13 +730,14 @@ fn nested_port_failures_name_flag_env_and_file_over_unrelated_lower_values() {
 fn parent_runner_errors_name_the_highest_precedence_descendant() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    let global = o.home.join(".sc-agent").join("decidr.json");
+    let global = global_cli_file(&o);
     let local = o
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent")
-        .join("decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(
         &global,
         &json!({"workers":2,"local_runners":{"laya":{"port":1}}}),
@@ -732,13 +757,14 @@ fn parent_runner_errors_name_the_highest_precedence_descendant() {
 fn short_name_runner_key_and_split_plain_http_key_keep_their_sources() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
-    let global = o.home.join(".sc-agent").join("decidr.json");
+    let global = global_cli_file(&o);
     let local = o
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent")
-        .join("decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(&global, &json!({"workers":2}));
     write(
         &local,
@@ -764,13 +790,14 @@ fn short_name_runner_key_and_split_plain_http_key_keep_their_sources() {
 fn model_entry_and_parent_count_errors_keep_their_sources() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
-    let global = o.home.join(".sc-agent").join("decidr.json");
+    let global = global_cli_file(&o);
     let local = o
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent")
-        .join("decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(&global, &json!({"workers":2}));
     write(
         &local,
@@ -793,7 +820,7 @@ fn model_entry_and_parent_count_errors_keep_their_sources() {
 fn exact_child_provenance_wins_over_its_recorded_parent() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    let global = o.home.join(".sc-agent").join("decidr.json");
+    let global = global_cli_file(&o);
     write(&global, &json!({"local_runners":{}}));
     o.flags.insert(
         "local_runners.laya".into(),
@@ -806,13 +833,14 @@ fn exact_child_provenance_wins_over_its_recorded_parent() {
 fn model_count_limit_uses_the_source_of_the_parent_descendants() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
-    let global = o.home.join(".sc-agent").join("decidr.json");
+    let global = global_cli_file(&o);
     let local = o
         .worktree
         .as_ref()
         .unwrap()
-        .join(".sc/sc-agent")
-        .join("decidr.json");
+        .join(".sc")
+        .join("sc-agent")
+        .join(o.cli.file_name());
     write(&global, &json!({"workers":2}));
     let models: serde_json::Map<String, Value> = (0..=sc_agent_config::MAX_MODELS)
         .map(|i| {
