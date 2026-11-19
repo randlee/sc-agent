@@ -81,6 +81,25 @@ impl GeneralLogger {
         })
     }
 
+    /// Opens an injected destination, or the default general file when absent.
+    ///
+    /// # Errors
+    /// Returns an error when the default cannot open or the Python target is invalid.
+    pub fn open_with(
+        log_root: &Path,
+        service: &'static str,
+        injected: Option<crate::Injected>,
+    ) -> Result<Self, LogError> {
+        match injected {
+            Some(crate::Injected::Rust(logger)) => Ok(Self::injected(logger)),
+            #[cfg(feature = "python")]
+            Some(crate::Injected::Python(target)) => {
+                pyo3::Python::attach(|py| Self::injected_python(target.clone_ref(py), service))
+            }
+            None => Self::open_default(Some(log_root), service),
+        }
+    }
+
     /// A general logger writing to the injected `logger`; it is never flushed-on-drop or shut
     /// down here.
     #[must_use]

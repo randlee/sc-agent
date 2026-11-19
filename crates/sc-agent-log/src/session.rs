@@ -144,6 +144,25 @@ impl SessionLogger {
         Self::injected_in(logger, None, identity)
     }
 
+    /// Opens an injected destination, or the default session file when absent.
+    ///
+    /// # Errors
+    /// Returns an error when the default cannot open or the Python target is invalid.
+    pub fn open_with(
+        log_root: &Path,
+        identity: SessionIdentity,
+        injected: Option<crate::Injected>,
+    ) -> Result<Self, LogError> {
+        match injected {
+            Some(crate::Injected::Rust(logger)) => Ok(Self::injected(logger, identity)),
+            #[cfg(feature = "python")]
+            Some(crate::Injected::Python(target)) => {
+                pyo3::Python::attach(|py| Self::injected_python(target.clone_ref(py), identity))
+            }
+            None => Self::open_default(log_root, identity),
+        }
+    }
+
     /// Injects a caller-owned Python logger or callable.
     ///
     /// # Errors

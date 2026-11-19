@@ -174,7 +174,7 @@ fn memory_log_records() {
         .expect("general");
     session
         .write(session_id, payload(&[("decision", json!("yes"))]))
-        .expect("session");
+        .expect("session.row");
     general
         .write(
             Level::Error,
@@ -211,4 +211,73 @@ fn memory_log_records() {
         .map(|sink| sink.name.as_str().to_owned())
         .collect();
     assert_eq!(sinks, ["memory"]);
+}
+
+#[test]
+fn general_open_with_selects_injection_or_default_without_a_session() {
+    let root = tempfile::tempdir().expect("root");
+    let memory = MemoryLog::new().expect("memory");
+    let injected = sc_agent_log::Injected::Rust(memory.logger());
+    let log = sc_agent_log::GeneralLogger::open_with(root.path(), "decidr", Some(injected.clone()))
+        .expect("injected");
+    log.write(
+        Level::Info,
+        "test",
+        "injected.general",
+        LogContext::NONE,
+        serde_json::Map::new(),
+    )
+    .expect("write");
+    log.close().expect("close");
+    assert_eq!(
+        memory.records().expect("records")[0].action,
+        "injected.general"
+    );
+    assert!(!root.path().join("logs").exists());
+    let default =
+        sc_agent_log::GeneralLogger::open_with(root.path(), "decidr", None).expect("default");
+    default
+        .write(
+            Level::Info,
+            "test",
+            "default.general",
+            LogContext::NONE,
+            serde_json::Map::new(),
+        )
+        .expect("write");
+    default.close().expect("close");
+    assert!(
+        std::fs::read_to_string(root.path().join("logs/decidr.log.jsonl"))
+            .expect("rows")
+            .contains("default.general")
+    );
+    assert!(!root.path().join("sessions").exists());
+}
+
+#[test]
+fn session_open_with_selects_injection_or_default_without_a_general_log() {
+    let root = tempfile::tempdir().expect("root");
+    let memory = MemoryLog::new().expect("memory");
+    let id = identity().expect("identity");
+    let injected = sc_agent_log::Injected::Rust(memory.logger());
+    let log = sc_agent_log::SessionLogger::open_with(root.path(), id.clone(), Some(injected))
+        .expect("injected");
+    log.write(SessionId::new(), serde_json::Map::new())
+        .expect("write");
+    log.close().expect("close");
+    assert_eq!(memory.records().expect("records")[0].action, "session.row");
+    assert!(!root.path().join("sessions").exists());
+    let default =
+        sc_agent_log::SessionLogger::open_with(root.path(), id.clone(), None).expect("default");
+    let path = default.path().expect("path").to_owned();
+    default
+        .write(SessionId::new(), serde_json::Map::new())
+        .expect("write");
+    default.close().expect("close");
+    assert!(path.starts_with(id.dir(root.path())));
+    assert_eq!(
+        std::fs::read_to_string(path).expect("rows").lines().count(),
+        1
+    );
+    assert!(!root.path().join("logs").exists());
 }

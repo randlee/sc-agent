@@ -9,13 +9,14 @@ use crate::writer::{Ledger, last_resort};
 use crate::{GeneralLogger, LogError, SessionIdentity, SessionLogger};
 
 /// A caller-owned logger destination.
+#[derive(Clone)]
 #[non_exhaustive]
 pub enum Injected {
     /// A native sc-observability logger.
     Rust(Arc<Logger>),
     /// A Python Logger, AttachedLogger, or callable.
     #[cfg(feature = "python")]
-    Python(pyo3::Py<pyo3::PyAny>),
+    Python(Arc<pyo3::Py<pyo3::PyAny>>),
 }
 
 /// The general and session loggers of one process (REQ-SAG-0008).
@@ -78,13 +79,17 @@ impl Loggers {
         let general = match general {
             Some(Injected::Rust(logger)) => GeneralLogger::injected_in(logger, shared.clone()),
             #[cfg(feature = "python")]
-            Some(Injected::Python(target)) => GeneralLogger::injected_python(target, service)?,
+            Some(Injected::Python(target)) => {
+                GeneralLogger::open_with(log_root, service, Some(Injected::Python(target)))?
+            }
             None => GeneralLogger::open_default(Some(log_root), service)?,
         };
         let session = match session {
             Some(Injected::Rust(logger)) => SessionLogger::injected_in(logger, shared, identity),
             #[cfg(feature = "python")]
-            Some(Injected::Python(target)) => SessionLogger::injected_python(target, identity)?,
+            Some(Injected::Python(target)) => {
+                SessionLogger::open_with(log_root, identity, Some(Injected::Python(target)))?
+            }
             None => SessionLogger::open_default(log_root, identity)?,
         };
         Ok(Self { general, session })
