@@ -1,6 +1,6 @@
 ---
 name: finding-group
-version: 6.2.0
+version: 6.3.0
 description: Beads formula for the fix, sanity and QA tasks of one blocking finding, attached under its sprint container. bead-groups supplies every variable.
 format: toml
 required_variables:
@@ -34,6 +34,8 @@ required_variables:
 defaults:
   found_on_layer: ""
   has_found_on_layer: false
+  layer: ""
+  has_layer: false
 ---
 {#
 sc-compose beads formula (sc-compose/beads/v1, ADR-0021): the fix group of one
@@ -70,6 +72,11 @@ container and the repository configuration):
   finding_ref, round, severity, reviewer, remedy, finding_title, filed_by
   found_at_commit, requirements, adrs
   found_on_layer  optional provenance copied from the checked bead
+  layer, has_layer
+                 the QA bead's planned layer: the sprint container's
+                 metadata.layer (a positive integer, the plan's intent, not a
+                 stack position); has_layer is false only for a phase-end
+                 finding, which has no sprint container
   phase, sprint, stack, difficulty, priority
   stack_bead, checked_title, phase_feature, lint_command, policy_path,
   max_sanity_rounds
@@ -169,7 +176,8 @@ phase = "{{{ phase }}}"
 sprint = "{{{ sprint }}}"
 stack = "{{{ stack }}}"
 round = {{{ round }}}
-difficulty = "{{{ difficulty }}}"
+{% if has_layer %}layer = {{{ layer | tojson }}}
+{% endif %}difficulty = "{{{ difficulty }}}"
 branch = "{{{ branch }}}"
 worktree = "{{{ worktree }}}"
 pr_target = "{{{ pr_target }}}"
