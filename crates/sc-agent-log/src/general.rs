@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use sc_observability::Level;
 use sc_observability::constants::{DEFAULT_LOG_DIR_NAME, DEFAULT_LOG_FILE_SUFFIX};
-use sc_observability::v2::{JsonlFileSink, Logger, LoggerConfig};
+use sc_observability::v2::{ConsoleSink, JsonlFileSink, Logger, LoggerConfig, SinkRegistration};
 use serde_json::{Map, Value};
 
 use crate::writer::{Ledger, Mode, Writer, logger_config, start_logger};
@@ -92,9 +92,9 @@ impl GeneralLogger {
     }
 
     fn stderr_in(service: &'static str, root: &Path) -> Result<Self, LogError> {
-        let mut config = logger_config(service, root, false)?;
-        config.enable_console_sink = true;
-        let logger = start_logger(config, LOG, None)?;
+        let config = logger_config(service, root, false)?;
+        let console = SinkRegistration::typed(Arc::new(ConsoleSink::stderr()));
+        let logger = start_logger(config, LOG, Some(console))?;
         Ok(Self {
             writer: Arc::new(Writer::owned(logger, LOG)),
         })
