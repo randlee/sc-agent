@@ -83,7 +83,7 @@ pub enum AgentConfigError {
 
 sc_agent_types::error_catalog! { AgentConfigError {
     AgentConfigError::ProjectRequired { .. } => ("config.project_required", Some(sc_agent_types::ErrorCategory::Config)),
-    AgentConfigError::Layer { .. } => ("config.layer", None),
+    AgentConfigError::Layer { .. } => ("config.layer", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Read { .. } => ("config.read", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Json { .. } => ("config.json", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Load(_) => ("config.load", Some(sc_agent_types::ErrorCategory::Config)),

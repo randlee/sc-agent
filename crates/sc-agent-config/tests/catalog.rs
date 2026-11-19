@@ -1,5 +1,5 @@
 use sc_agent_config::AgentConfigError;
-use sc_agent_types::TypesError;
+use sc_agent_types::{ErrorCategory, ErrorId, TypesError};
 
 #[test]
 fn every_configuration_error_matches_its_own_catalog() {
@@ -44,4 +44,20 @@ fn every_configuration_error_matches_its_own_catalog() {
         },
     ];
     sc_agent_testkit::assert_catalog_rows(&samples);
+    // REQ-SAG-0017 assigns every config.* id to Config, independently of
+    // whether the stored category happened to match its own catalog row.
+    for error in &samples {
+        assert_eq!(
+            error.base_category(),
+            Some(ErrorCategory::Config),
+            "{}",
+            error.id()
+        );
+        assert_eq!(
+            error.detail().category,
+            Some(ErrorCategory::Config),
+            "{}",
+            error.id()
+        );
+    }
 }
