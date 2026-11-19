@@ -46,7 +46,8 @@ fn real_logger_attached_logger_callable_and_failures() {
     assert_eq!(rows.lines().count(), 2);
     assert!(!root.path().join("logs/decidr.log.jsonl").exists());
     let both = Loggers::open_with(root.path(), "decidr", identity(), None, Some(Injected::Python(std::sync::Arc::new(target(&module, "callback"))))).unwrap();
-    both.session.write(SessionId::new(), Map::new()).unwrap();
+    let session_id = SessionId::new();
+    both.session.write(session_id, Map::new()).unwrap();
     both.general.write(Level::Info, "test", "test.row", LogContext::NONE, Map::new()).unwrap();
     both.close().unwrap();
     assert!(root.path().join("logs/decidr.log.jsonl").is_file());
@@ -54,7 +55,16 @@ fn real_logger_attached_logger_callable_and_failures() {
         let records = module.getattr(py, "records").unwrap();
         assert_eq!(records.bind(py).len().unwrap(), 1);
         let row = records.bind(py).get_item(0).unwrap();
-        assert!(row.cast::<PyDict>().unwrap().contains("fields").unwrap());
+        let row = row.cast::<PyDict>().unwrap();
+        let mut keys: Vec<String> = row.keys().iter().map(|key| key.extract().unwrap()).collect();
+        keys.sort();
+        assert_eq!(keys, ["action", "correlation_id", "fields", "level", "message", "outcome", "request_id", "target", "trace"]);
+        assert_eq!(row.get_item("correlation_id").unwrap().unwrap().extract::<String>().unwrap(), session_id.to_string());
+        for key in ["message", "outcome", "request_id", "trace"] {
+            assert!(row.get_item(key).unwrap().unwrap().is_none(), "{key}");
+        }
+        assert_eq!(row.get_item("level").unwrap().unwrap().extract::<String>().unwrap(), "info");
+        assert!(row.get_item("fields").unwrap().unwrap().cast::<PyDict>().is_ok());
     });
     let bad = Python::attach(|py| py.None());
     let error = GeneralLogger::injected_python(bad, "decidr").unwrap_err();

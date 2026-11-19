@@ -29,6 +29,17 @@ loggers.close()?;
 
 `log_root` is a `&Path`. It normally comes from `AgentConfig::log_root()`; this crate does not decide it.
 
+## Python callable records
+
+An injected Python callable receives one dictionary per event. Its keys are:
+
+- `level`, `target`, `action`: strings; level is `trace`, `debug`, `info`, `warn`, or `error`.
+- `message`, `request_id`, `correlation_id`, `outcome`: strings or `None`. For a session event, `correlation_id` is the session ID.
+- `trace`: a JSON-compatible dictionary or `None`.
+- `fields`: a dictionary containing JSON-compatible values.
+
+The keys are always present; fields without a value are `None`. The callable is caller-owned.
+
 ## Workspace test linking
 
 The Linux all-features workspace test unifies the `python` feature into binaries

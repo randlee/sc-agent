@@ -136,6 +136,7 @@ impl GeneralLogger {
     }
 
     /// Injects a caller-owned Python logger or callable.
+    /// Callable records use the [documented dictionary shape](crate#python-callable-records).
     ///
     /// # Errors
     /// Returns an error if the target or service is invalid.
