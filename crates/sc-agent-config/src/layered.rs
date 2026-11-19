@@ -84,7 +84,8 @@ pub struct LoadOptions {
     pub home: PathBuf,
     /// Git worktree root; absent means skip local layers entirely.
     pub worktree: Option<PathBuf>,
-    /// Default supplied by the caller's shared default-log-root function.
+    /// Default supplied by the caller via `sc_agent_types::default_log_root`
+    /// (also re-exported as `sc_agent_log::default_log_root`).
     pub default_log_root: PathBuf,
     /// Dotted key paths to flag values.
     pub flags: BTreeMap<String, Value>,
