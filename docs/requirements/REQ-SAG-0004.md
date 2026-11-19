@@ -14,14 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. PyO3 bindings are the Python bindings of sc-agent. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
+Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. PyO3 bindings are the Python bindings of sc-agent. A CLI (command-line interface) is an sc-agent command-line program, such as decidr or sitr. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`. An invalid `project` or `agent_role` is one that is not a slug. To resolve a setting is to choose its value from the layers that can set it. A required field is one without which a session write is rejected with an error. To return an error is to end the call with an error instead of a result. Normalizing the `origin` URL to `<host>/<owner>/<repo>` drops its scheme, user name, password and port, then one trailing `/` and one trailing `.git`.
 
 **MUST statements:**
 
-- Every session log row MUST carry `session_id`.
-- Every session log row MUST carry `repo`.
-- Every session log row MUST carry `project`.
-- Every session log row MUST carry `agent_role`.
+- Every session log row MUST include the `session_id` field.
+- Every session log row MUST include the `repo` field.
+- Every session log row MUST include the `project` field.
+- Every session log row MUST include the `agent_role` field.
 - `repo` MUST be the repository's git `origin` URL normalized to `<host>/<owner>/<repo>`.
 - `repo` MUST have no scheme.
 - `repo` MUST have no `.git` suffix.
