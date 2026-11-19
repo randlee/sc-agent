@@ -401,7 +401,10 @@ fn choose_provider(
 }
 
 /// The general logger of `context`, or the default one for its service.
-fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger, DecidrError> {
+pub(crate) fn general_for(
+    context: &Context,
+    config: &AgentConfig,
+) -> Result<GeneralLogger, DecidrError> {
     if let Some(general) = &context.opened_general {
         return Ok(general.clone());
     }
@@ -1072,30 +1075,17 @@ pub(crate) fn typesafe_backend(key: ResolvedKey) -> Result<SystemOneBackend, Dec
 }
 
 /// Key lookup for doctor: every provider in `Provider::PRIORITY` order with a key.
-pub(crate) fn detected_keys(context: &Context) -> Result<crate::doctor::KeyChecks, DecidrError> {
+pub(crate) fn detected_keys(
+    context: &Context,
+) -> Result<Vec<(Provider, ResolvedKey)>, DecidrError> {
     let keys = Keys::new(context)?;
-    let mut checks = crate::doctor::KeyChecks::default();
+    let mut found = Vec::new();
     for provider in Provider::PRIORITY {
-        match keys.find(provider) {
-            Ok(Some(key)) => checks.found.push((provider, key)),
-            Ok(None) => (),
-            Err(DecidrError::Secrets(error))
-                if matches!(
-                    &*error,
-                    SecretsError::KeyringRead { .. }
-                        | SecretsError::KeyringTimeout
-                        | SecretsError::KeyringConstructionRefused
-                ) =>
-            {
-                checks.errors.push(crate::doctor::KeyringError {
-                    provider,
-                    error: error.detail(),
-                })
-            }
-            Err(error) => return Err(error),
+        if let Some(key) = keys.find(provider)? {
+            found.push((provider, key));
         }
     }
-    Ok(checks)
+    Ok(found)
 }
 
 /// The config and general logger of a probe-class operation, and whether decidr opened the

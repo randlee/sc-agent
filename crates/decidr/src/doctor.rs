@@ -4,13 +4,14 @@
 use sc_agent_config::AgentConfig;
 use sc_agent_log::{GeneralLogger, Level, LogContext};
 use sc_agent_secrets::{KeySource, ResolvedKey};
-use sc_agent_types::{CancelToken, ErrorDetail, ErrorId, MODELS, ModelId, Provider};
+use sc_agent_types::{CancelToken, ErrorId, MODELS, ModelId, Provider};
 use sc_llm_provider::{LlmClient, LlmProvider, catalog_model_id};
 use serde_json::{Map, Value};
 
 use crate::DecidrError;
 use crate::select::{
-    Context, LOG_TARGET, detected_keys, flushed_result, probe, probe_client, typesafe_backend,
+    Context, LOG_TARGET, detected_keys, flushed_result, general_for, probe, probe_client,
+    typesafe_backend,
 };
 
 /// One detected provider key: the provider and where its key was found, never the value.
@@ -48,28 +49,11 @@ pub struct Tie {
     pub builtin: ModelId,
 }
 
-/// A keyring lookup that could not be performed; configuration diagnosis still succeeds.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct KeyringError {
-    /// Provider whose credential could not be checked.
-    pub provider: Provider,
-    /// The unchanged typed keyring failure.
-    pub error: ErrorDetail,
-}
-
-#[derive(Default)]
-pub(crate) struct KeyChecks {
-    pub(crate) found: Vec<(Provider, ResolvedKey)>,
-    pub(crate) errors: Vec<KeyringError>,
-}
-
 /// What `decidr doctor` prints.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DoctorReport {
     /// Every detected provider key, in `Provider::PRIORITY` order.
     pub keys: Vec<DetectedKey>,
-    /// Unreadable keyrings, reported independently of configuration rows.
-    pub keyring: Vec<KeyringError>,
     /// Provider models missing from the catalog; empty when none is.
     pub missing: Vec<MissingModel>,
     /// Config models tying a built-in; empty when none does.
@@ -99,17 +83,7 @@ pub fn doctor(options: &DoctorOptions, cancel: &CancelToken) -> Result<DoctorRep
     let loaded = crate::load_context(&options.context)?;
     let config = &loaded.config;
     let context = &options.context;
-    let general = if let Some(opened) = &context.opened_general {
-        opened.clone()
-    } else if context.general.is_some() {
-        GeneralLogger::open_with(
-            &config.log_root()?,
-            context.cli.as_str(),
-            context.general.clone(),
-        )?
-    } else {
-        GeneralLogger::stderr(context.cli.as_str())?
-    };
+    let general = general_for(context, config)?;
     let owned = context.opened_general.is_none();
     let result = examine(&options.context, config, &general, cancel).map(|mut report| {
         report.settings = sc_agent_config::doctor_rows(&loaded);
@@ -151,8 +125,7 @@ fn examine(
     cancel: &CancelToken,
 ) -> Result<DoctorReport, DecidrError> {
     let catalog = config.catalog().map_err(DecidrError::from)?;
-    let checks = detected_keys(context)?;
-    let found = checks.found;
+    let found = detected_keys(context)?;
     let http = probe_client(context, config, general);
     let clock = context.clock();
     let mut missing = Vec::new();
@@ -175,7 +148,6 @@ fn examine(
             })
             .collect(),
         missing,
-        keyring: checks.errors,
         ties: ties(config),
         settings: Vec::new(),
         files: Vec::new(),

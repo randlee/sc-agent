@@ -164,7 +164,10 @@ impl SessionLogger {
     ) -> Result<Self, LogError> {
         match injected {
             Some(injected) => Ok(Self {
+                #[cfg(feature = "python")]
                 writer: Arc::new(Writer::from_injected(injected, ledger, Self::SERVICE, LOG)?),
+                #[cfg(not(feature = "python"))]
+                writer: Arc::new(Writer::from_injected(injected, ledger, LOG)?),
                 identity: Arc::new(identity),
                 path: None,
             }),

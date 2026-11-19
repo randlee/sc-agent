@@ -43,10 +43,6 @@ fn main() -> ExitCode {
                 Ok(loaded) => loaded,
                 Err(error) => return emit(&error),
             };
-            if matches!(&cli.command, Command::Doctor) {
-                let result = doctor_report(&loaded);
-                return write_result(result);
-            }
             let logger = match general_log(loaded.config.log_root.as_deref()) {
                 Ok(logger) => logger,
                 Err(error) => return emit(&error),
@@ -55,7 +51,7 @@ fn main() -> ExitCode {
                 subcommand: cli.command.name(),
                 ..CommandFields::default()
             };
-            let result = run(cli.command, &mut fields)
+            let result = run(cli.command, &loaded, &mut fields)
                 .and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
             record(&logger, &fields, started, result.as_ref().err());
             let _closed = logger.close();
@@ -99,12 +95,9 @@ fn finish(result: Result<(), Error>, stderr: &mut impl Write) -> ExitCode {
     }
 }
 
-fn run(command: Command, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
+fn run(command: Command, loaded: &Loaded, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
     match command {
-        Command::Doctor => Err(Error::Usage {
-            kind: "Internal".to_owned(),
-            detail: "doctor must run without opening a logger".to_owned(),
-        }),
+        Command::Doctor => doctor_report(loaded),
         Command::Languages => {
             let ids: Vec<LanguageId> = sc_treesitter::languages().collect();
             json_line(&ids)

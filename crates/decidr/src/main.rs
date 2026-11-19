@@ -86,9 +86,7 @@ fn run(
             Ok(ExitCode::SUCCESS)
         }
         Command::Doctor => {
-            let mut context = context;
-            let general = GeneralLogger::stderr(context.cli.as_str())?;
-            context.opened_general = Some(general.clone());
+            let (context, general) = context_with_general(context)?;
             watch.logs_opened();
             let options = DoctorOptions { context };
             let report = doctor(&options, cancel);

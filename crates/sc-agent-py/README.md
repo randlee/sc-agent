@@ -9,7 +9,7 @@ Each function returns the same JSON text that the CLI prints. Decision result ob
 - `sc_agent.send(request, *, model, agent_role, project=None, ...)`: `decidr send`. Optional keywords are `provider`, `images` (a dict of part name to PNG or JPEG bytes), `long_context`, `cancel`, `general_log`, `session_log`, `keyring_service`, `keyring_account` and `timeout_secs`.
 - `sc_agent.send_batch(requests, *, model, agent_role, project=None, ...)`: `decidr send --batch`. Each item is a JSON string, or a tuple `(request, images, long_context)`. It returns result lines in input order and passes each to `on_result` as it finishes. Optional `workers` selects 1–64 workers for that batch.
 - `sc_agent.models(runner=None, ...)`: `decidr models`.
-- `sc_agent.doctor(...)`: `decidr doctor`; includes canonical settings/sources, files and typed keyring status rows, without a file logger.
+- `sc_agent.doctor(...)`: `decidr doctor`; includes canonical settings/sources and files; a keyring that cannot be read fails it; logged to the general log like every call.
 - `sc_agent.resolved_config(*, project=None)`: returns `log_root`, optional `project`, and the `sources` mapping. It opens no logger and sends no provider request. Invalid layers raise `SagError` naming their file, variable or flag.
 - `sc_agent.CancelToken`: `cancel()` and `is_cancelled()`.
 - `sc_agent.SagError`: every error raises it. `args` is `(id, message, detail)`, where `detail` is the JSON error chain.
