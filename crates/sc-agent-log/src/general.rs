@@ -81,6 +81,44 @@ impl GeneralLogger {
         })
     }
 
+    /// Opens diagnostics on stderr without opening or maintaining any log file.
+    ///
+    /// Uses sc-observability's standard console sink and default level.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid service name or a logger that cannot start.
+    pub fn stderr(service: &'static str) -> Result<Self, LogError> {
+        Self::stderr_in(service, Path::new("."))
+    }
+
+    fn stderr_in(service: &'static str, root: &Path) -> Result<Self, LogError> {
+        let mut config = logger_config(service, root, false)?;
+        config.enable_console_sink = true;
+        let logger = start_logger(config, LOG, None)?;
+        Ok(Self {
+            writer: Arc::new(Writer::owned(logger, LOG)),
+        })
+    }
+
+    /// Opens an injected destination, or the default general file when absent.
+    ///
+    /// # Errors
+    /// Returns an error when the default cannot open or the Python target is invalid.
+    pub fn open_with(
+        log_root: &Path,
+        service: &'static str,
+        injected: Option<crate::Injected>,
+    ) -> Result<Self, LogError> {
+        match injected {
+            Some(crate::Injected::Rust(logger)) => Ok(Self::injected(logger)),
+            #[cfg(feature = "python")]
+            Some(crate::Injected::Python(target)) => {
+                pyo3::Python::attach(|py| Self::injected_python(target.clone_ref(py), service))
+            }
+            None => Self::open_default(Some(log_root), service),
+        }
+    }
+
     /// A general logger writing to the injected `logger`; it is never flushed-on-drop or shut
     /// down here.
     #[must_use]
@@ -273,6 +311,31 @@ fn reject_empty_home(home: Option<&std::ffi::OsStr>) -> Result<(), LogError> {
 #[cfg(test)]
 mod home_tests {
     use super::*;
+
+    #[test]
+    fn stderr_logger_writes_and_closes_without_creating_files() {
+        let root = tempfile::tempdir().expect("root");
+        let log = GeneralLogger::stderr_in("decidr", root.path()).expect("stderr logger");
+        log.write(
+            Level::Info,
+            "decidr",
+            "doctor.checked",
+            LogContext::NONE,
+            Map::new(),
+        )
+        .expect("record");
+        log.close().expect("close");
+        assert_eq!(
+            std::fs::read_dir(root.path())
+                .expect("root entries")
+                .count(),
+            0
+        );
+        assert!(matches!(
+            GeneralLogger::stderr(""),
+            Err(LogError::InvalidName { .. })
+        ));
+    }
 
     #[test]
     fn empty_home_is_rejected_without_platform_lookup() {
