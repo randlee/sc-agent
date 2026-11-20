@@ -310,7 +310,7 @@ mod tests {
     /// nothing is sent and no row is written.
     #[test]
     fn an_invalid_slug_is_refused_before_anything_is_sent() {
-        let (runner, sends) = loopback(Mode::Answer);
+        let runner = serve_each(|_| {});
         let home = home(runner.port());
         let file = batch_file(home.path(), 1);
         let output = run_bounded(&mut decidr(
@@ -338,13 +338,13 @@ mod tests {
                 .contains("--project")
         );
         assert!(output.stdout.is_empty());
-        assert!(sends.try_recv().is_err(), "nothing was sent");
+        assert_eq!(runner.stop(), 0, "nothing was sent");
         assert_eq!(rows(home.path()), 0);
     }
 
     #[test]
     fn layered_project_and_port_override_precede_send_and_sessions_are_retained() {
-        let (server, sends) = loopback(Mode::Answer);
+        let server = serve_each(|_| {});
         let home = home(server.port());
         let work = home.path().join("work");
         std::fs::create_dir(&work).expect("work");
@@ -381,7 +381,8 @@ mod tests {
         let detail = stderr_detail(&missing);
         assert_eq!(detail["id"], "decidr.config");
         assert_eq!(detail["cause"]["id"], "config.project_required");
-        assert!(sends.try_recv().is_err());
+        assert_eq!(server.stop(), 0, "nothing was sent");
+        let (server, sends) = loopback(Mode::Answer);
         assert_eq!(rows(home.path()), 0);
         let old = home
             .path()
