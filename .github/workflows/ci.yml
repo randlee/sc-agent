@@ -150,6 +150,27 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Check standalone decidr does not link Python
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cargo build --locked -p decidr
+          linked_libs="$(ldd target/debug/decidr)"
+          if [[ "$linked_libs" == *libpython* ]]; then
+            echo "Standalone decidr unexpectedly links libpython"
+            exit 1
+          fi
+
+      # All-features workspace builds unify sc-agent-log's Python feature into decidr.
+      # The standalone decidr build does not enable that feature or need libpython.
+      - name: Expose Python shared library to workspace tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python_libdir="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+          test -n "$python_libdir"
+          echo "LD_LIBRARY_PATH=${python_libdir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> "$GITHUB_ENV"
+
       - name: Run workspace tests
         run: cargo test --locked --workspace --all-features
 

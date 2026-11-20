@@ -29,6 +29,13 @@ loggers.close()?;
 
 `log_root` is a `&Path`. It normally comes from `AgentConfig::log_root()`; this crate does not decide it.
 
+## Workspace test linking
+
+The Linux all-features workspace test unifies the `python` feature into binaries
+such as `decidr`, so CI adds setup-python's `LIBDIR` to `LD_LIBRARY_PATH` for
+that test job. A standalone `cargo build -p decidr` does not enable that feature
+and does not require Python at runtime.
+
 ## Features
 
 - `python` (not default): `Injected`, `Loggers::open_with`, and direct injection of caller-owned Python `Logger`, `AttachedLogger`, or callable. The caller retains flush and shutdown.
