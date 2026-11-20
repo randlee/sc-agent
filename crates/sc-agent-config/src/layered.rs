@@ -751,6 +751,77 @@ mod schema_tests {
         }
     }
 
+    fn assert_string_leaf_kinds(value: &Value, path: &mut Vec<String>) {
+        if let Some(object) = value.as_object() {
+            for (key, child) in object {
+                path.push(key.clone());
+                assert_string_leaf_kinds(child, path);
+                path.pop();
+            }
+        } else if value.is_string() {
+            let path = path.join(".");
+            assert_eq!(
+                env_value_kind(&path),
+                EnvValue::String,
+                "string leaf {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn populated_config_emits_each_declared_doctor_row_and_string_kind() {
+        let config = decode(
+            serde_json::json!({
+                "project": "phase-a", "log_root": "/controlled",
+                "models": {"123": {"line": "haiku", "released": "2026-01-01"}},
+                "local_runners": {"fixture": {
+                    "kind": "generic", "host": "localhost", "port": 8123,
+                    "model": "123", "key_env": "TOKEN", "request_timeout_secs": 30,
+                    "load_timeout_secs": 60
+                }}
+            }),
+            CliName::Decidr,
+        )
+        .unwrap();
+        let serialized = serde_json::to_value(&config).unwrap();
+        assert_string_leaf_kinds(&serialized, &mut Vec::new());
+        assert_eq!(env_value_kind("project"), EnvValue::String);
+        let loaded = Loaded {
+            config,
+            sources: BTreeMap::new(),
+            files: Vec::new(),
+        };
+        let empty = Loaded {
+            config: AgentConfig::default(),
+            sources: BTreeMap::new(),
+            files: Vec::new(),
+        };
+        let populated_rows = doctor_rows(&loaded);
+        let empty_rows = doctor_rows(&empty);
+        for setting in SETTINGS
+            .iter()
+            .filter(|setting| setting.doctor != DoctorValue::None)
+        {
+            let path = setting
+                .path
+                .replace("models.*.", "models.123.")
+                .replace("local_runners.*.", "local_runners.fixture.");
+            let rows = if matches!(
+                setting.doctor,
+                DoctorValue::EmptyModels | DoctorValue::EmptyRunners
+            ) {
+                &empty_rows
+            } else {
+                &populated_rows
+            };
+            assert!(
+                rows.iter().any(|row| row.setting == path),
+                "missing doctor row for {}",
+                setting.path
+            );
+        }
+    }
+
     #[test]
     fn schema_covers_every_serialized_config_field_and_doctor_row() {
         let config = decode(
