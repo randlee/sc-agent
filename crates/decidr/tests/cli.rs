@@ -799,10 +799,8 @@ fn layered_doctor_fails_on_keyring_error_and_logs_the_call() {
         }
         snapshot
     }
-    let (request_sent, requests) = std::sync::mpsc::channel();
     let server =
         sc_agent_testkit::serve_each(move |mut stream| {
-            request_sent.send(()).expect("record unexpected request");
             let _ = std::io::Write::write_all(&mut stream,
             b"HTTP/1.1 500 Unexpected Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         });
@@ -883,8 +881,9 @@ fn layered_doctor_fails_on_keyring_error_and_logs_the_call() {
             .message
             .contains(local.to_str().expect("full config path"))
     );
-    assert!(
-        requests.try_recv().is_err(),
+    assert_eq!(
+        server.stop(),
+        0,
         "doctor sent a request to the configured runner"
     );
 }

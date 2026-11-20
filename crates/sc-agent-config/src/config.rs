@@ -143,8 +143,28 @@ pub struct ExtraModel {
     pub released: ReleaseDate,
 }
 
-/// Why [`RunnerName::try_from`] refuses a built-in short name; [`load`] maps it to `config.runner_name`.
-const RUNNER_NAME_IS_SHORT_NAME: &str = "runner name must not be a built-in short name";
+/// Invalid runner name or host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunnerValidationError {
+    /// Runner names cannot be empty.
+    EmptyName,
+    /// Runner names cannot shadow built-in short names.
+    BuiltInShortName,
+    /// Hosts must be hostnames or IP addresses.
+    InvalidHost,
+}
+
+impl fmt::Display for RunnerValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::EmptyName => "runner name must not be empty",
+            Self::BuiltInShortName => "runner name must not be a built-in short name",
+            Self::InvalidHost => "host must be a hostname or IP address",
+        })
+    }
+}
+
+impl std::error::Error for RunnerValidationError {}
 
 /// A local runner's name: the `local_runners` key (REQ-SAG-0801).
 ///
@@ -165,17 +185,17 @@ impl RunnerName {
 }
 
 impl TryFrom<String> for RunnerName {
-    type Error = &'static str;
+    type Error = RunnerValidationError;
 
     fn try_from(text: String) -> Result<Self, Self::Error> {
         if text.is_empty() {
-            return Err("runner name must not be empty");
+            return Err(RunnerValidationError::EmptyName);
         }
         if ShortName::ALL
             .iter()
             .any(|short| short.as_str().eq_ignore_ascii_case(&text))
         {
-            return Err(RUNNER_NAME_IS_SHORT_NAME);
+            return Err(RunnerValidationError::BuiltInShortName);
         }
         Ok(Self(text))
     }
@@ -299,13 +319,13 @@ impl RunnerHost {
 }
 
 impl TryFrom<String> for RunnerHost {
-    type Error = &'static str;
+    type Error = RunnerValidationError;
 
     fn try_from(text: String) -> Result<Self, Self::Error> {
         if text.parse::<IpAddr>().is_ok() || is_hostname(&text) {
             Ok(Self(text))
         } else {
-            Err("host must be a hostname or IP address")
+            Err(RunnerValidationError::InvalidHost)
         }
     }
 }
@@ -455,18 +475,25 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
 
 /// Maps a deserialization failure to `config.invalid`, or `config.runner_name` for a short-name runner key.
 pub(crate) fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigError {
-    let path = error.path().to_string();
+    let path = error
+        .path()
+        .iter()
+        .fold(String::new(), |path, segment| match segment {
+            Segment::Map { key } => crate::layers::join_path(&path, key),
+            Segment::Enum { variant } => crate::layers::join_path(&path, variant),
+            Segment::Seq { index } => format!("{path}[{index}]"),
+            Segment::Unknown => crate::layers::join_path(&path, "?"),
+        });
     let message = error.inner().to_string();
-    if message == RUNNER_NAME_IS_SHORT_NAME {
-        let segments: Vec<&Segment> = error.path().iter().collect();
-        if let [Segment::Map { key: field }, Segment::Map { key: name }] = segments.as_slice()
-            && field == "local_runners"
-        {
-            return AgentConfigError::RunnerName {
-                name: name.clone(),
-                path,
-            };
-        }
+    let segments: Vec<&Segment> = error.path().iter().collect();
+    if let [Segment::Map { key: field }, Segment::Map { key: name }] = segments.as_slice()
+        && field == "local_runners"
+        && RunnerName::try_from(name.clone()) == Err(RunnerValidationError::BuiltInShortName)
+    {
+        return AgentConfigError::RunnerName {
+            name: name.clone(),
+            path,
+        };
     }
     AgentConfigError::Invalid { path, message }
 }
@@ -476,10 +503,35 @@ pub(crate) fn check_runners(config: &AgentConfig) -> Result<(), AgentConfigError
     for (name, runner) in &config.local_runners {
         if runner.key_env.is_some() && !runner.host.is_loopback() {
             return Err(AgentConfigError::KeyOnPlainHttp {
-                path: format!("local_runners.{name}.key_env"),
+                path: crate::layers::join_path(
+                    &crate::layers::join_path("local_runners", name.as_str()),
+                    "key_env",
+                ),
                 host: runner.host.as_str().to_owned(),
             });
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod runner_validation_tests {
+    use super::*;
+
+    #[test]
+    fn runner_errors_are_typed() {
+        assert_eq!(
+            RunnerName::try_from(String::new()),
+            Err(RunnerValidationError::EmptyName)
+        );
+        let short = ShortName::ALL[0].as_str().to_owned();
+        assert_eq!(
+            RunnerName::try_from(short),
+            Err(RunnerValidationError::BuiltInShortName)
+        );
+        assert_eq!(
+            RunnerHost::try_from("http://example.com".to_owned()),
+            Err(RunnerValidationError::InvalidHost)
+        );
+    }
 }

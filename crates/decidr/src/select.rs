@@ -14,8 +14,8 @@ use std::time::Instant;
 
 use sc_agent_config::{AgentConfig, LocalRunner, RunnerName};
 use sc_agent_http::{
-    Attempts, HttpClient, HttpError, HttpRequest, HttpResponse, LogContext, Next, Pending,
-    ResendPolicy, Start, Timeouts, Transport, UreqTransport,
+    Attempts, HttpClient, HttpRequest, HttpResponse, LogContext, Next, Pending, ResendPolicy,
+    Start, Timeouts, Transport, UreqTransport,
 };
 use sc_agent_log::{GeneralLogger, Level, LogError, Repo, SessionIdentity, SessionLogger, Slug};
 use sc_agent_secrets::{
@@ -1007,12 +1007,7 @@ fn send_probe(
                     wait(clock, cancel, at, 0)?;
                     continue;
                 }
-                Err(reason) => {
-                    return Err(DecidrError::from(HttpError::invalid_request(format!(
-                        "the send was refused before it started ({})",
-                        reason.as_str()
-                    ))));
-                }
+                Err(reason) => return Err(DecidrError::StartRefused { reason }),
             },
             Some(held) => match http.may_resend(request, held, now) {
                 Ok(Start::Go(permit)) => permit,
