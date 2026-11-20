@@ -36,7 +36,7 @@ PY
 if [[ -f $manifest ]]; then
     cargo metadata --manifest-path "$manifest" --no-deps --format-version 1 | python3 -c '
 import json, sys
-allowed = {"ureq", "serde", "serde_json", "keyring", "dotenvy", "ulid", "sc-observability", "clap", "pyo3", "tree-sitter", "thiserror", "sc-config", "ctrlc"}
+allowed = {"ureq", "serde", "serde_json", "keyring", "dotenvy", "ulid", "sc-observability", "clap", "pyo3", "tree-sitter", "thiserror", "sc-config", "ctrlc", "sc-sha"}
 data = json.load(sys.stdin)
 local = {p["name"] for p in data["packages"] if p["id"] in data["workspace_members"]}
 bad = sorted({d["name"] for p in data["packages"] if p["id"] in data["workspace_members"] for d in p["dependencies"] if d["name"] not in allowed | local and not d["name"].startswith("tree-sitter-")})
