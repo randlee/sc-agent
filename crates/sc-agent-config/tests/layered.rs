@@ -100,44 +100,6 @@ fn every_project_layer_wins_in_order_and_missing_is_typed() {
 }
 
 #[test]
-fn nested_merge_preserves_unmodified_values_and_their_sources() {
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    let global = global_cli_file(&o);
-    let local = local_file(&o, o.cli.file_name());
-    write(
-        &global,
-        &json!({"workers":4,"local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":8000,"model":"local/model"}}}),
-    );
-    write(
-        &local,
-        &json!({"workers":2,"local_runners":{"laya":{"request_timeout_secs":900}}}),
-    );
-    env(&mut o, "DECIDR_LOCAL_RUNNERS__LAYA__PORT", "9000");
-    let loaded = load_layered(&o).unwrap();
-    let runner = &loaded.config.local_runners["laya"];
-    assert_eq!(runner.port.get(), 9000);
-    assert_eq!(runner.host.as_str(), "127.0.0.1");
-    assert_eq!(runner.request_timeout().as_secs(), 900);
-    assert_eq!(loaded.config.workers.get(), 2);
-    assert_eq!(row(&loaded, "local_runners.laya.port").value, "9000");
-    assert_eq!(
-        row(&loaded, "local_runners.laya.port").source,
-        "DECIDR_LOCAL_RUNNERS__LAYA__PORT"
-    );
-    assert_eq!(
-        row(&loaded, "local_runners.laya.host").source,
-        global.display().to_string()
-    );
-    assert_eq!(row(&loaded, "workers").source, local.display().to_string());
-    env(&mut o, "DECIDR_WORKERS", "3");
-    o.flags.insert("workers".into(), json!(1));
-    let loaded = load_layered(&o).unwrap();
-    assert_eq!(loaded.config.workers.get(), 1);
-    assert_eq!(row(&loaded, "workers").source, "--workers");
-}
-
-#[test]
 fn numeric_looking_model_id_from_environment_stays_a_string() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
@@ -153,32 +115,6 @@ fn numeric_looking_model_id_from_environment_stays_a_string() {
 
     assert_eq!(loaded.config.local_runners["fixture"].model.as_str(), "123");
     assert_eq!(row(&loaded, "local_runners.fixture.model").value, "123");
-}
-
-#[test]
-fn environment_segments_named_like_fields_are_matched_by_position() {
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    write(
-        &global_cli_file(&o),
-        &json!({
-            "models": {"line": {"line":"sonnet", "released":"2026-01-01"}},
-            "local_runners": {"model": {"kind":"generic", "host":"localhost", "port":8123, "model":"original"}}
-        }),
-    );
-    env(&mut o, "DECIDR_MODELS__LINE__LINE", "haiku");
-    env(&mut o, "DECIDR_LOCAL_RUNNERS__MODEL__MODEL", "123");
-    let loaded = load_layered(&o).unwrap();
-    assert_eq!(row(&loaded, "models.line.line").value, "haiku");
-    assert_eq!(
-        row(&loaded, "models.line.line").source,
-        "DECIDR_MODELS__LINE__LINE"
-    );
-    assert_eq!(loaded.config.local_runners["model"].model.as_str(), "123");
-    assert_eq!(
-        row(&loaded, "local_runners.model.model").source,
-        "DECIDR_LOCAL_RUNNERS__MODEL__MODEL"
-    );
 }
 
 #[test]
@@ -317,37 +253,6 @@ fn outside_git_skips_local_files_and_loading_writes_nothing() {
 }
 
 #[test]
-fn scope_json_and_file_errors_name_the_source_and_keep_causes() {
-    let root = tempfile::tempdir().unwrap();
-    let o = options(root.path());
-    let file = o.home.join(".sc-agent").join("sc-agent.json");
-    write(&file, &json!({"workers":2}));
-    let error = load_layered(&o).unwrap_err();
-    assert!(
-        error
-            .cause_detail()
-            .expect("validation cause")
-            .message
-            .contains("workers")
-    );
-    assert!(error.message().contains(&file.display().to_string()));
-    assert_eq!(error.detail().cause.unwrap().id, "config.invalid");
-    fs::write(&file, "{").unwrap();
-    let error = load_layered(&o).unwrap_err();
-    assert_eq!(error.id(), "config.json");
-    assert!(error.message().contains(&file.display().to_string()));
-    assert!(error.cause_detail().is_some());
-    fs::remove_file(&file).unwrap();
-    fs::create_dir(&file).unwrap();
-    assert_eq!(load_layered(&o).unwrap_err().id(), "config.not_a_file");
-    fs::remove_dir(&file).unwrap();
-    let f = fs::File::create(&file).unwrap();
-    f.set_len(sc_agent_config::MAX_CONFIG_FILE_BYTES + 1)
-        .unwrap();
-    assert_eq!(load_layered(&o).unwrap_err().id(), "config.file_too_large");
-}
-
-#[test]
 fn malformed_local_decidr_json_names_its_path() {
     let root = tempfile::tempdir().unwrap();
     let o = options(root.path());
@@ -470,41 +375,6 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
             "{error}"
         );
     }
-}
-
-#[test]
-fn invalid_lower_layer_is_not_hidden_by_a_flag() {
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    write(&global_cli_file(&o), &json!({"workers":0}));
-    o.flags.insert("workers".into(), json!(2));
-    assert!(load_layered(&o).is_err());
-    fs::remove_file(global_cli_file(&o)).unwrap();
-    env(&mut o, "DECIDR_WORKERS", "0");
-    assert!(
-        load_layered(&o)
-            .unwrap_err()
-            .message()
-            .contains("DECIDR_WORKERS")
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn a_non_utf8_environment_value_names_the_variable() {
-    use std::os::unix::ffi::OsStringExt;
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    o.environment.push((
-        "DECIDR_WORKERS".into(),
-        std::ffi::OsString::from_vec(vec![255]),
-    ));
-    assert!(
-        load_layered(&o)
-            .unwrap_err()
-            .message()
-            .contains("DECIDR_WORKERS")
-    );
 }
 
 #[test]

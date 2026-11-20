@@ -17,12 +17,14 @@
 mod config;
 mod error;
 mod layered;
+pub mod layers;
 
 #[doc(inline)]
 pub use layered::{
-    CliName, DoctorRow, LayerFile, LoadOptions, Loaded, PROJECT_ENV, SHARED_FILE, Source,
-    doctor_rows, load_layered,
+    CliName, DoctorRow, LoadOptions, Loaded, PROJECT_ENV, SHARED_FILE, doctor_rows, load_layered,
 };
+#[doc(inline)]
+pub use layers::{LayerFile, Source};
 
 #[doc(inline)]
 pub use config::{

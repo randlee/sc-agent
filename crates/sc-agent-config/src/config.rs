@@ -39,11 +39,8 @@ pub const MAX_MODELS: usize = 64;
 /// Most `local_runners` entries a config may hold: 64 (REQ-SAG-0013).
 pub const MAX_LOCAL_RUNNERS: usize = 64;
 
-/// Largest configuration layer read: 1 MiB.
-///
-/// sc-config 0.2.0 reads each file whole (`std::fs::read`, no limit), so
-/// [`load`] checks the size first. A real config is a few kilobytes.
-pub const MAX_CONFIG_FILE_BYTES: u64 = 1024 * 1024;
+/// Largest configuration layer read: 1 MiB ([`crate::layers::MAX_FILE_BYTES`]).
+pub const MAX_CONFIG_FILE_BYTES: u64 = crate::layers::MAX_FILE_BYTES;
 
 /// A local runner's request timeout when `request_timeout_secs` is absent (REQ-SAG-0015).
 pub const DEFAULT_RUNNER_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
