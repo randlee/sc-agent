@@ -1,6 +1,6 @@
 # Requirement: Error detail JSON written by 0.1.0 still reads in later releases
 
-**Status:** Withdrawn  
+**Status:** Deprecated  
 **Version:** 0.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
@@ -10,9 +10,9 @@
 
 ## NFR-SAG-0002: Error detail JSON written by 0.1.0 still reads in later releases
 
-**Status:** Withdrawn  
+**Status:** Deprecated  
 
-Withdrawn 2026-11-20 by the owner, Rand Lee: "We are still using python, schema isn't locked yet. I haven't mentioned locking schema yet. I have tools to do this that aren't on this repo. No hand built checks." No compatibility rule or check replaces it.
+Deprecated 2026-11-20 by the owner, Rand Lee: "We are still using python, schema isn't locked yet. I haven't mentioned locking schema yet. I have tools to do this that aren't on this repo. No hand built checks." No compatibility rule or check replaces it.
 
 ### Requirement Statement
 
