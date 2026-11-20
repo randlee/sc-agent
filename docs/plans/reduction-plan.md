@@ -32,9 +32,12 @@ Nothing not in these three is built.
   | typesafe | `https://api.typesafe.ai/v1` | `TYPESAFE_API_KEY` | SystemOne | jev → `jev-1.14.0`, decider → (current id) |
   | anthropic | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | Messages | haiku → `claude-haiku-5-5` |
   | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` | chat/completions | luna → `gpt-6-luna` |
+  | openrouter | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | chat/completions | the Claude and GPT short names, with OpenRouter's ids |
+  | together | `https://api.together.ai/v1` | `TOGETHER_API_KEY` | chat/completions | the Claude and GPT short names, with Together's ids |
+  | nous | `https://inference-api.nousresearch.com/v1` | `NOUS_API_KEY` | chat/completions | none named; ids passed through |
   | local | host:port from config | none | SystemOne | laya |
 
-  `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. No ranking, no release dates, no config catalog. OpenRouter and Nous are dropped: no named model needs them (add a table row if one ever does).
+  `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. With a reseller provider (openrouter, together, nous) and a name in no table, the text is sent as the model id unchanged. No ranking, no release dates, no config catalog. All six providers the current code supports are kept (owner, 2026-11-19); the reseller model ids are taken from the current code's tables.
 - **Retry.** Busy (429/502/529) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
 - **Keys.** Environment variable, then repo-root `.env` (via `dotenvy`, never written to the process environment), then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key is a plain `String` that is never put into an error, a log record or a Debug output (a contract test checks the key text appears nowhere).
 - **Config.** Only: `project` (`--project`, `SC_PROJECT`, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`), the Laya runner's `host`/`port`/`model`, and `workers`. Looked up in that order with the source recorded for `decidr doctor`.
