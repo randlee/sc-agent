@@ -859,6 +859,7 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
         worktree: Some(work.clone()),
         default_log_root: sc_agent_log::default_log_root(&home),
         flags: BTreeMap::new(),
+        flag_names: BTreeMap::new(),
         environment: Vec::new(),
     })
     .expect("canonical config");

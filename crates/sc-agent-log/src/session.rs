@@ -153,12 +153,21 @@ impl SessionLogger {
         identity: SessionIdentity,
         injected: Option<crate::Injected>,
     ) -> Result<Self, LogError> {
+        Self::open_in(log_root, identity, injected, None)
+    }
+
+    pub(crate) fn open_in(
+        log_root: &Path,
+        identity: SessionIdentity,
+        injected: Option<crate::Injected>,
+        ledger: Option<Arc<Ledger>>,
+    ) -> Result<Self, LogError> {
         match injected {
-            Some(crate::Injected::Rust(logger)) => Ok(Self::injected(logger, identity)),
-            #[cfg(feature = "python")]
-            Some(crate::Injected::Python(target)) => {
-                pyo3::Python::attach(|py| Self::injected_python(target.clone_ref(py), identity))
-            }
+            Some(injected) => Ok(Self {
+                writer: Arc::new(Writer::from_injected(injected, ledger, Self::SERVICE, LOG)?),
+                identity: Arc::new(identity),
+                path: None,
+            }),
             None => Self::open_default(log_root, identity),
         }
     }

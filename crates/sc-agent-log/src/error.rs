@@ -106,13 +106,9 @@ pub enum LogError {
     },
     /// An injected Python target is not a supported logger or callable.
     InvalidTarget,
-    /// The sc-observability Python package could not be imported for a non-callable target.
+    /// The sc-observability Python package, or its logger types, could not be loaded for a
+    /// non-callable target.
     PythonUnavailable {
-        /// The original Python exception.
-        cause: Box<ErrorDetail>,
-    },
-    /// Inspecting a non-callable Python target's supported logger types failed.
-    PythonClassify {
         /// The original Python exception.
         cause: Box<ErrorDetail>,
     },
@@ -185,7 +181,6 @@ sc_agent_types::error_catalog! { LogError {
     LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::PythonUnavailable { .. } => ("log.python_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
-    LogError::PythonClassify { .. } => ("log.python_classify", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::PythonRejected { .. } => ("log.python_rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
@@ -237,7 +232,6 @@ impl ErrorId for LogError {
                 "expected sc_observability.Logger, AttachedLogger, or a callable".to_owned()
             }
             Self::PythonUnavailable { .. } => "could not import sc_observability for an injected logger; install sc-observability or pass a callable".to_owned(),
-            Self::PythonClassify { .. } => "could not classify the injected Python logger".to_owned(),
             Self::PythonRejected { .. } => "the injected Python target refused the row".to_owned(),
             Self::Flush { log, .. } => format!("the {log} logger could not flush"),
             Self::RowTooLarge { log, bytes, max } => {
@@ -262,8 +256,7 @@ impl ErrorId for LogError {
             }
             Self::InvalidName { cause, .. }
             | Self::PythonRejected { cause }
-            | Self::PythonUnavailable { cause }
-            | Self::PythonClassify { cause } => Some((**cause).clone()),
+            | Self::PythonUnavailable { cause } => Some((**cause).clone()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
             ),
@@ -305,8 +298,7 @@ impl Error for LogError {
             Self::WorkingDirUnknown { source } => Some(source),
             Self::InvalidName { cause, .. }
             | Self::PythonRejected { cause }
-            | Self::PythonUnavailable { cause }
-            | Self::PythonClassify { cause } => Some(cause.as_ref()),
+            | Self::PythonUnavailable { cause } => Some(cause.as_ref()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),
             Self::Flush { source, .. } => Some(source),

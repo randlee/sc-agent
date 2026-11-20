@@ -76,23 +76,10 @@ impl Loggers {
             }
             _ => None,
         };
-        let general = match general {
-            Some(Injected::Rust(logger)) => GeneralLogger::injected_in(logger, shared.clone()),
-            #[cfg(feature = "python")]
-            Some(Injected::Python(target)) => {
-                GeneralLogger::open_with(log_root, service, Some(Injected::Python(target)))?
-            }
-            None => GeneralLogger::open_default(Some(log_root), service)?,
-        };
-        let session = match session {
-            Some(Injected::Rust(logger)) => SessionLogger::injected_in(logger, shared, identity),
-            #[cfg(feature = "python")]
-            Some(Injected::Python(target)) => {
-                SessionLogger::open_with(log_root, identity, Some(Injected::Python(target)))?
-            }
-            None => SessionLogger::open_default(log_root, identity)?,
-        };
-        Ok(Self { general, session })
+        Ok(Self {
+            general: GeneralLogger::open_in(log_root, service, general, shared.clone())?,
+            session: SessionLogger::open_in(log_root, identity, session, shared)?,
+        })
     }
 
     /// Closes both loggers ([`GeneralLogger::close`], [`SessionLogger::close`]).

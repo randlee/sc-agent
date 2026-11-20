@@ -11,10 +11,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use sc_agent_types::{Catalog, ModelId, ReleaseDate, ShortName, VarName};
-#[cfg(test)]
-use serde::Serialize;
 use serde::de::{Error as _, MapAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_path_to_error::Segment;
 
 use crate::error::AgentConfigError;
@@ -64,12 +62,11 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 ///
 /// [`Default`] has no models, no `log_root`, 8 workers, 5 sends and no
 /// runners. Unknown keys are rejected.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct AgentConfig {
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     // Validated by sc_agent_types::is_valid_slug before storage by load_layered.
     pub(crate) project: Option<String>,
     #[serde(skip)]
@@ -78,7 +75,7 @@ pub struct AgentConfig {
     #[serde(default, deserialize_with = "models_in_bounds")]
     pub models: BTreeMap<ModelId, ExtraModel>,
     /// The log root, filled from the caller-supplied default by the layered loader.
-    #[serde(default)]
+    #[serde(default, serialize_with = "display_path")]
     pub log_root: Option<PathBuf>,
     /// Batch workers, 1..=[`MAX_WORKERS`] (REQ-SAG-0701, REQ-SAG-0013).
     #[serde(default = "default_workers", deserialize_with = "workers_in_bounds")]
@@ -159,8 +156,7 @@ impl AgentConfig {
 }
 
 /// One extra catalog row: the model's line and release date.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct ExtraModel {
@@ -179,8 +175,7 @@ const RUNNER_NAME_IS_SHORT_NAME: &str = "runner name must not be a built-in shor
 /// `decidr` can tell a runner from a model line by name. A short name is
 /// refused while the config is deserialized; [`load`] reports it as
 /// [`AgentConfigError::RunnerName`] with the key path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(try_from = "String")]
 pub struct RunnerName(String);
 
@@ -229,8 +224,7 @@ impl fmt::Display for RunnerName {
 }
 
 /// One local decision runner (REQ-SAG-0801); its name is the map key.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct LocalRunner {
@@ -249,10 +243,18 @@ pub struct LocalRunner {
     #[serde(default)]
     pub key_env: Option<VarName>,
     /// Request timeout in seconds, within [`RUNNER_REQUEST_TIMEOUT_SECS`] (REQ-SAG-0015).
-    #[serde(default, deserialize_with = "request_timeout_in_bounds")]
+    #[serde(
+        default,
+        deserialize_with = "request_timeout_in_bounds",
+        serialize_with = "secs_or::<300, _>"
+    )]
     pub request_timeout_secs: Option<NonZeroU32>,
     /// Model-load timeout in seconds, within [`RUNNER_LOAD_TIMEOUT_SECS`] (REQ-SAG-0015).
-    #[serde(default, deserialize_with = "load_timeout_in_bounds")]
+    #[serde(
+        default,
+        deserialize_with = "load_timeout_in_bounds",
+        serialize_with = "secs_or::<600, _>"
+    )]
     pub load_timeout_secs: Option<NonZeroU32>,
 }
 
@@ -280,8 +282,7 @@ fn secs(value: NonZeroU32) -> Duration {
 ///
 /// sc-decision-local maps each to its own daemon kind; a new daemon adds a
 /// variant here and there, so both crates match exhaustively.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RunnerKind {
     /// A Strands daemon.
@@ -299,8 +300,7 @@ pub enum RunnerKind {
 /// A hostname is 1..=253 characters of dot-separated labels, each 1..=63
 /// characters of `[A-Za-z0-9-]` with no leading or trailing `-`. Paths, `@`,
 /// `:` ports, whitespace and empty text are rejected.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(Serialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(try_from = "String")]
 pub struct RunnerHost(String);
 
@@ -402,6 +402,24 @@ impl<'de, K: Deserialize<'de> + Ord, V: Deserialize<'de>> Visitor<'de> for Bound
         Ok(map)
     }
 }
+
+fn display_path<S: Serializer>(path: &Option<PathBuf>, serializer: S) -> Result<S::Ok, S::Error> {
+    match path {
+        Some(path) => serializer.collect_str(&path.display()),
+        None => serializer.serialize_none(),
+    }
+}
+
+// Doctor shows an unset timeout as its effective default (DEFAULT_RUNNER_*_TIMEOUT).
+fn secs_or<const DEFAULT: u32, S: Serializer>(
+    secs: &Option<NonZeroU32>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_u32(secs.map_or(DEFAULT, NonZeroU32::get))
+}
+
+const _: () = assert!(DEFAULT_RUNNER_REQUEST_TIMEOUT.as_secs() == 300);
+const _: () = assert!(DEFAULT_RUNNER_LOAD_TIMEOUT.as_secs() == 600);
 
 const fn default_workers() -> NonZeroUsize {
     DEFAULT_WORKERS
