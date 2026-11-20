@@ -397,6 +397,12 @@ fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() -> std::io::
 #[test]
 fn doctor_uses_shared_project_and_sitr_prefix_only() {
     let home = temp_home().expect("temp home and git worktree");
+    let baseline = run_with_env(
+        home.path(),
+        &["doctor"],
+        &[("SC_PROJECT", OsString::from("phase-d"))],
+    )
+    .expect("spawn sitr doctor without decidr env");
     let output = run_with_env(
         home.path(),
         &["doctor"],
@@ -411,6 +417,8 @@ fn doctor_uses_shared_project_and_sitr_prefix_only() {
     )
     .expect("spawn sitr doctor");
     success(&output);
+    assert_eq!(output.stdout, baseline.stdout);
+    assert_eq!(output.stderr, baseline.stderr);
     let report: serde_json::Value =
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
     assert_eq!(report["settings"][0]["value"], "phase-d");
@@ -432,6 +440,91 @@ fn doctor_uses_shared_project_and_sitr_prefix_only() {
         sitr_root.display().to_string()
     );
     assert_eq!(report["settings"][1]["source"], "SITR_LOG_ROOT");
+    success(
+        &run_with_env(
+            home.path(),
+            &["languages"],
+            &[("SITR_LOG_ROOT", sitr_root.clone().into_os_string())],
+        )
+        .expect("spawn sitr with SITR_LOG_ROOT"),
+    );
+    assert!(sitr_root.join("logs").join("sitr.log.jsonl").is_file());
+}
+
+#[test]
+fn decidr_environment_does_not_change_sitr_config_or_log_destination() {
+    let home = temp_home().expect("temp home and git worktree");
+    let baseline = run(home.path(), &["doctor"]).expect("spawn sitr doctor");
+    success(&baseline);
+
+    let other_root = home.path().join("other-root");
+    let report = run_with_env(
+        home.path(),
+        &["doctor"],
+        &[
+            ("DECIDR_WORKERS", OsString::from("3")),
+            ("DECIDR_LOG_ROOT", other_root.clone().into_os_string()),
+        ],
+    )
+    .expect("spawn sitr doctor with decidr environment");
+    success(&report);
+    assert_eq!(report.stdout, baseline.stdout);
+    assert_eq!(report.stderr, baseline.stderr);
+
+    success(
+        &run_with_env(
+            home.path(),
+            &["languages"],
+            &[("DECIDR_LOG_ROOT", other_root.clone().into_os_string())],
+        )
+        .expect("spawn sitr with DECIDR_LOG_ROOT"),
+    );
+    assert!(home.path().join(".sc-agent/logs/sitr.log.jsonl").is_file());
+    assert!(!other_root.exists());
+}
+
+#[test]
+fn decidr_config_files_do_not_change_sitr_doctor_rows_or_files() {
+    let home = temp_home().expect("temp home and git worktree");
+    let baseline = run(home.path(), &["doctor"]).expect("spawn sitr doctor");
+    success(&baseline);
+
+    let local = home.path().join(".sc/sc-agent");
+    let global = home.path().join(".sc-agent");
+    std::fs::create_dir_all(&local).expect("create local config dir");
+    std::fs::create_dir_all(&global).expect("create global config dir");
+    std::fs::write(
+        local.join("decidr.json"),
+        br#"{"project":"ignored-local","log_root":"local-root"}"#,
+    )
+    .expect("write local decidr config");
+    std::fs::write(
+        global.join("decidr.json"),
+        br#"{"project":"ignored-global","log_root":"global-root"}"#,
+    )
+    .expect("write global decidr config");
+
+    let report = run(home.path(), &["doctor"]).expect("spawn sitr doctor with decidr files");
+    success(&report);
+    assert_eq!(report.stdout, baseline.stdout);
+    assert_eq!(report.stderr, baseline.stderr);
+}
+
+#[test]
+fn one_default_run_creates_only_the_general_log_and_no_sessions() {
+    let home = temp_home().expect("temp home and git worktree");
+    success(&run(home.path(), &["languages"]).expect("spawn sitr"));
+
+    let logs = home.path().join(".sc-agent").join("logs");
+    let mut names = std::fs::read_dir(&logs)
+        .expect("logs directory")
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<Vec<_>, _>>()
+        .expect("read log entries");
+    names.sort();
+    assert_eq!(names, vec![OsString::from("sitr.log.jsonl")]);
+    assert!(logs.join("sitr.log.jsonl").is_file());
+    assert!(!home.path().join(".sc-agent").join("sessions").exists());
 }
 
 #[test]
