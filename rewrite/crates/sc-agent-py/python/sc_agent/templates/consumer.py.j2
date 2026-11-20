@@ -1,0 +1,39 @@
+---
+name: sc-decidr-consumer
+version: {{ sc_decidr_version }}
+format: python
+required_variables: [client_name, sc_decidr_version]
+requires:
+  cli:
+    - name: sc-compose
+      minimum_version: "1.8.0"
+---
+"""Shared decidr and sitr calls for {{ client_name }}."""
+import sc_agent
+
+CLIENT_NAME = {{ client_name | tojson }}
+_opened = sc_agent.logger(CLIENT_NAME)
+
+
+def send(request, model, project=None, provider=None):
+    if not _opened["ok"]:
+        return _opened
+    return sc_agent.send(request, model, CLIENT_NAME, provider=provider, project=project,
+                         general_log=_opened["value"])
+
+
+def send_batch(requests, model, project=None, provider=None, workers=2):
+    if not _opened["ok"]:
+        return _opened
+    return sc_agent.send_batch(requests, model, CLIENT_NAME, provider=provider, project=project,
+                               workers=workers, general_log=_opened["value"])
+
+
+def extract(language, query, source):
+    if not _opened["ok"]:
+        return _opened
+    try:
+        import sc_treesitter
+    except ImportError:
+        return {"ok": False, "error": {"id": "missing_sitr", "message": "sitr is not installed", "action": "Install sitr"}}
+    return sc_treesitter.run_query(language, query, source, general_log=_opened["value"])

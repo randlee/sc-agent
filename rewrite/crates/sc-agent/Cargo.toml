@@ -1,0 +1,15 @@
+[package]
+name = "sc-agent"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = "1"
+ureq = { version = "2.12", features = ["json"] }
+dotenvy = "0.15"
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service"] }
+sc-observability = "1.5"
+ulid = "1"
+sc-config = { git = "https://github.com/randlee/sc-runtime", branch = "feature/sc-config-layers" }
+sc-sha = "1.9"
+serde = { version = "1", features = ["derive"] }

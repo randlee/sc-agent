@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["crates/sc-agent", "crates/decidr", "crates/sc-agent-py", "crates/sc-treesitter", "crates/sc-treesitter-py", "crates/sitr"]
