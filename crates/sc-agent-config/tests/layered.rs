@@ -488,3 +488,44 @@ fn non_utf8_default_log_root_remains_a_path_and_never_panics() {
     assert_eq!(loaded.config.log_root().unwrap(), o.default_log_root);
     assert_eq!(row(&loaded, "log_root").source, "default");
 }
+
+#[test]
+fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
+    let root = tempfile::tempdir().unwrap();
+    for origin in ["file", "environment", "flag"] {
+        let mut o = options(root.path());
+        let file = o.home.join(".sc-agent/decidr.json");
+        let expected_source = match origin {
+            "file" => {
+                write(&file, &json!({"workers":0}));
+                file.display().to_string()
+            }
+            "environment" => {
+                env(&mut o, "DECIDR_WORKERS", "0");
+                "DECIDR_WORKERS".into()
+            }
+            "flag" => {
+                o.flags.insert("workers".into(), json!(0));
+                "--workers".into()
+            }
+            _ => unreachable!(),
+        };
+        let error = load_layered(&o).unwrap_err();
+        assert!(error.message().contains(&expected_source));
+        let advice = error.recovery().expect("actionable recovery");
+        assert!(advice.contains("layer"), "{origin}: {advice}");
+        assert_eq!(error.detail().recovery.as_deref(), Some(advice));
+        for ignored in ["default.json", "local.json", "SC_AGENT__"] {
+            assert!(!advice.contains(ignored), "{origin}: {advice}");
+        }
+        let AgentConfigError::Layer { cause, .. } = &error else {
+            panic!("expected source context")
+        };
+        assert_eq!(cause.id(), "config.invalid");
+        assert!(cause.message().contains("workers"));
+        assert_eq!(error.cause_detail(), Some(cause.detail()));
+        if origin == "file" {
+            fs::remove_file(file).unwrap();
+        }
+    }
+}

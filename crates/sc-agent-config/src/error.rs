@@ -45,14 +45,14 @@ pub enum AgentConfigError {
     Catalog(TypesError),
     /// There is no home directory, so `~/.sc-agent` cannot be located.
     HomeUnknown,
-    /// `default.json` or `local.json` is larger than `MAX_CONFIG_FILE_BYTES` (1 MiB).
+    /// A configuration file is larger than `MAX_CONFIG_FILE_BYTES` (1 MiB).
     FileTooLarge {
         /// The file.
         file: PathBuf,
         /// Its size in bytes.
         bytes: u64,
     },
-    /// `default.json` or `local.json` exists but is not a regular file (a FIFO, a device, a
+    /// A configuration path exists but is not a regular file (a FIFO, a device or a
     /// directory): it is refused before any read, which could block forever.
     NotAFile {
         /// The path.
@@ -157,7 +157,9 @@ impl ErrorId for AgentConfigError {
             Self::ProjectRequired { .. } => {
                 Some("set the project/phase through one of the named setting places")
             }
-            Self::Layer { cause, .. } => cause.recovery(),
+            Self::Layer { .. } => {
+                Some("fix the value at the reported path in the layer named in the error")
+            }
             Self::Read { .. } => Some("make the named configuration file readable"),
             Self::Json { .. } => Some("fix the JSON in the named configuration file"),
             Self::Invalid { .. } => Some(
