@@ -173,7 +173,7 @@ sc_agent_types::error_catalog! { LogError {
     LogError::Start { .. } => ("log.start", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::ReservedField { .. } => ("log.reserved_field", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
-    LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Validation)),
+    LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::PythonRejected { .. } => ("log.python_rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
