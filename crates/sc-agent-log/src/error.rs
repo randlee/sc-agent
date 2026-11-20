@@ -71,7 +71,7 @@ pub enum LogError {
     },
     /// sc-observability refused a service, target, action or id name.
     InvalidName {
-        /// Which name: `"service"`, `"target"`, `"action"`, `"correlation_id"`, `"version"` or `"sink"`.
+        /// Which name: `"service"`, `"target"`, `"action"`, `"correlation_id"` or `"sink"`.
         what: &'static str,
         /// The refused name.
         value: String,
