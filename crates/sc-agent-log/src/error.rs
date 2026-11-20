@@ -106,6 +106,16 @@ pub enum LogError {
     },
     /// An injected Python target is not a supported logger or callable.
     InvalidTarget,
+    /// The sc-observability Python package could not be imported for a non-callable target.
+    PythonUnavailable {
+        /// The original Python exception.
+        cause: Box<ErrorDetail>,
+    },
+    /// Inspecting a non-callable Python target's supported logger types failed.
+    PythonClassify {
+        /// The original Python exception.
+        cause: Box<ErrorDetail>,
+    },
     /// An injected Python target refused a record.
     PythonRejected {
         /// The original Python error code and message.
@@ -174,6 +184,8 @@ sc_agent_types::error_catalog! { LogError {
     LogError::ReservedField { .. } => ("log.reserved_field", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::PythonUnavailable { .. } => ("log.python_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::PythonClassify { .. } => ("log.python_classify", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::PythonRejected { .. } => ("log.python_rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
@@ -224,6 +236,8 @@ impl ErrorId for LogError {
             Self::InvalidTarget => {
                 "expected sc_observability.Logger, AttachedLogger, or a callable".to_owned()
             }
+            Self::PythonUnavailable { .. } => "could not import sc_observability for an injected logger; install sc-observability or pass a callable".to_owned(),
+            Self::PythonClassify { .. } => "could not classify the injected Python logger".to_owned(),
             Self::PythonRejected { .. } => "the injected Python target refused the row".to_owned(),
             Self::Flush { log, .. } => format!("the {log} logger could not flush"),
             Self::RowTooLarge { log, bytes, max } => {
@@ -246,9 +260,10 @@ impl ErrorId for LogError {
             | Self::WorkingDirUnknown { source } => {
                 Some(ErrorDetail::foreign(io_id(source), source))
             }
-            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
-                Some((**cause).clone())
-            }
+            Self::InvalidName { cause, .. }
+            | Self::PythonRejected { cause }
+            | Self::PythonUnavailable { cause }
+            | Self::PythonClassify { cause } => Some((**cause).clone()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
             ),
@@ -288,9 +303,10 @@ impl Error for LogError {
                 source: Some(source),
             } => Some(source),
             Self::WorkingDirUnknown { source } => Some(source),
-            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
-                Some(cause.as_ref())
-            }
+            Self::InvalidName { cause, .. }
+            | Self::PythonRejected { cause }
+            | Self::PythonUnavailable { cause }
+            | Self::PythonClassify { cause } => Some(cause.as_ref()),
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),
             Self::Flush { source, .. } => Some(source),
