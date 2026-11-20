@@ -3,3 +3,4 @@
 {"sprint":"e-4","depends_on":["e-1","e-2"]}
 {"sprint":"e-5","depends_on":["e-1","e-2"]}
 {"sprint":"e-6","depends_on":["e-2"]}
+{"sprint":"e-7","depends_on":["e-2","e-4","e-5","e-6"]}
