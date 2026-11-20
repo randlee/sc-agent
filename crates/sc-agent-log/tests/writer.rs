@@ -26,7 +26,7 @@ use sc_observability::v2::{
     EventError, LogEvent, LogSink, LogSinkError, Logger, LoggerBuilder, LoggerConfig,
     SinkRegistration,
 };
-use sc_observability::{ServiceName, SinkHealth, SinkHealthState, SinkName};
+use sc_observability::{MaintenanceCadence, ServiceName, SinkHealth, SinkHealthState, SinkName};
 use serde_json::{Map, json};
 use tempfile::TempDir;
 
@@ -104,18 +104,23 @@ fn general_rotates_at_start() {
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
 
-    // Public builder registration creates no worker and does not run startup maintenance.
-    // This negative assertion cannot race the background maintenance cadence.
+    // Hold periodic maintenance off while exercising the complete build and shutdown path.
     let mut config = LoggerConfig::default_for(
         ServiceName::new("decidr").expect("service"),
         root.path().to_owned(),
     );
     config.enable_console_sink = false;
     config.enable_file_sink = true;
-    let builder = LoggerBuilder::new(config).expect("public builder");
+    config.retained_log_policy.maintenance_cadence =
+        MaintenanceCadence::new(Duration::from_secs(86_400));
+    let logger = LoggerBuilder::new(config)
+        .expect("public builder")
+        .build()
+        .expect("build");
+    logger.flush().expect("flush barrier");
+    logger.shutdown().expect("shutdown barrier");
     assert_eq!(std::fs::metadata(&active).expect("active").len(), OVERSIZED);
     assert!(!logs.join("decidr.log.jsonl.1").exists());
-    drop(builder);
 
     let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
     log.write(
