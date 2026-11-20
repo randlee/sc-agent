@@ -535,7 +535,7 @@ pub fn load_layered_with_flag_names(
     options: &LoadOptions,
     flag_names: &BTreeMap<String, String>,
 ) -> Result<Loaded, AgentConfigError> {
-    let global = options.home.join(".sc-agent");
+    let global = sc_agent_types::default_log_root(&options.home);
     let mut paths = Vec::new();
     if let Some(worktree) = &options.worktree {
         let local = worktree.join(".sc").join("sc-agent");

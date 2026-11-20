@@ -175,7 +175,7 @@ mod tests {
     /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `log_root` configured (a tempdir), the
     /// general log lands at `<log_root>/logs/decidr.log.jsonl` and the session log under
     /// `<log_root>/sessions/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
-    /// (`<home>/.sc-agent`) is sc-agent-config's `default_dir`, tested there.
+    /// (`<home>/.sc-agent`) comes from the shared `sc_agent_types::default_log_root` helper.
     #[test]
     fn every_log_lands_under_log_root_logs() {
         let root = tempfile::tempdir().expect("root");

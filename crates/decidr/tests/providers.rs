@@ -98,6 +98,12 @@ mod tests {
             body_json(&transport.requests()[0])["model"],
             "claude-haiku-6-0"
         );
+        let earlier = r#"{"models":{"claude-haiku-0-1":{"line":"haiku","released":"2001-01-01"}}}"#;
+        let (_, transport) = haiku_send(&keys, None, Some(earlier));
+        assert_eq!(
+            body_json(&transport.requests()[0])["model"],
+            "claude-haiku-5-5"
+        );
         let (_, transport) = haiku_send(&keys, None, None);
         assert_eq!(
             body_json(&transport.requests()[0])["model"],
