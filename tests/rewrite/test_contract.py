@@ -41,7 +41,7 @@ class Contract(unittest.TestCase):
 
     def setUp(self):
         self.home = tempfile.TemporaryDirectory()
-        config = Path(self.home.name) / "repo" / "config"
+        config = Path(self.home.name) / "fixture" / "config"
         config.mkdir(parents=True)
         (config / "default.json").write_text("{}")
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
