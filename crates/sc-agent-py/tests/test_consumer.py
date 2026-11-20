@@ -209,12 +209,14 @@ def test_rendered_command_error_and_keyboard_interrupt_cancel(env, args, consume
 
 def test_optional_sitr_is_lazy_and_extraction_reaches_a_dry_run(tmp_path, monkeypatch):
     import sys
+    import sc_treesitter
+
     monkeypatch.setitem(sys.modules, "sc_treesitter", None)
     disabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=False)
     assert not hasattr(disabled, "extract")
     enabled = render_consumer(tmp_path, monkeypatch=monkeypatch, sitr=True)
     assert callable(enabled.extract)  # Import itself does not need sitr.
-    monkeypatch.delitem(sys.modules, "sc_treesitter")
+    monkeypatch.setitem(sys.modules, "sc_treesitter", sc_treesitter)
     source = (ROOT / "crates/sc-treesitter/tests/fixtures/match.rs").read_text()
     captures = enabled.extract("rust", "(match_expression) @match", source)
     assert captures
