@@ -251,7 +251,9 @@ pub fn load_context(context: &Context) -> Result<sc_agent_config::Loaded, Decidr
 /// The validated configuration of the context's layered snapshot.
 ///
 /// # Errors
-/// Returns the typed layer or discovery error from [`load_context`].
+/// Returns the typed layer or discovery error from [`load_context`]. A layer's
+/// message names its origin; inspect the error source chain or typed cause_detail
+/// for the failing configuration key and validation message.
 pub fn load_config(context: &Context) -> Result<AgentConfig, DecidrError> {
     Ok(load_context(context)?.config)
 }

@@ -335,7 +335,13 @@ fn scope_json_and_file_errors_name_the_source_and_keep_causes() {
     let file = o.home.join(".sc-agent").join("sc-agent.json");
     write(&file, &json!({"workers":2}));
     let error = load_layered(&o).unwrap_err();
-    assert!(error.message().contains("workers"));
+    assert!(
+        error
+            .cause_detail()
+            .expect("validation cause")
+            .message
+            .contains("workers")
+    );
     assert!(error.message().contains(&file.display().to_string()));
     assert_eq!(error.detail().cause.unwrap().id, "config.invalid");
     fs::write(&file, "{").unwrap();
@@ -439,7 +445,14 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
                 error.message().contains(&file.display().to_string()),
                 "{error}"
             );
-            assert!(error.message().contains(&key), "{error}");
+            assert!(
+                error
+                    .cause_detail()
+                    .expect("validation cause")
+                    .message
+                    .contains(&key),
+                "{error}"
+            );
             fs::remove_file(&file).unwrap();
         }
         let mut o = options(root.path());
@@ -460,7 +473,14 @@ fn every_bound_is_checked_in_global_local_and_environment_layers() {
         env(&mut o, &name, &env_value);
         let error = load_layered(&o).unwrap_err();
         assert!(error.message().contains(&name), "{error}");
-        assert!(error.message().contains(&key), "{error}");
+        assert!(
+            error
+                .cause_detail()
+                .expect("validation cause")
+                .message
+                .contains(&key),
+            "{error}"
+        );
     }
 }
 
@@ -515,7 +535,13 @@ fn collection_limits_and_unknown_keys_apply_to_layered_inputs() {
         let name = format!("DECIDR_{}", key.to_ascii_uppercase());
         env(&mut o, &name, &Value::Object(entries).to_string());
         let error = load_layered(&o).unwrap_err();
-        assert!(error.message().contains(key));
+        assert!(
+            error
+                .cause_detail()
+                .expect("validation cause")
+                .message
+                .contains(key)
+        );
         assert!(error.message().contains(&name));
     }
     let root = tempfile::tempdir().unwrap();
@@ -540,7 +566,13 @@ fn null_log_root_is_not_allowed_to_fall_back_to_process_home() {
     o.flags.insert("log_root".into(), Value::Null);
     let error = load_layered(&o).unwrap_err();
     assert!(error.message().contains("--log-root"));
-    assert!(error.message().contains("log_root"));
+    assert!(
+        error
+            .cause_detail()
+            .expect("validation cause")
+            .message
+            .contains("log_root")
+    );
 }
 
 #[cfg(unix)]
@@ -594,6 +626,7 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
         assert!(error.message().contains(&expected_source));
         let advice = error.recovery().expect("actionable recovery");
         assert!(advice.contains("layer"), "{origin}: {advice}");
+        assert!(advice.contains("cause_detail/source"), "{origin}: {advice}");
         assert_eq!(error.detail().recovery.as_deref(), Some(advice));
         for ignored in ["default.json", "local.json", "SC_AGENT__"] {
             assert!(!advice.contains(ignored), "{origin}: {advice}");
@@ -674,7 +707,14 @@ fn project_path_safety_is_enforced_at_each_configuration_layer() {
             };
             let error =
                 load_layered(&o).expect_err(&format!("{origin} accepted unsafe project {name:?}"));
-            assert!(error.message().contains("project"), "{error}");
+            assert!(
+                error
+                    .cause_detail()
+                    .expect("validation cause")
+                    .message
+                    .contains("project"),
+                "{error}"
+            );
             assert!(error.message().contains(&expected_source), "{error}");
             if origin == "file" {
                 fs::remove_file(file).unwrap();
