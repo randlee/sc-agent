@@ -5,12 +5,18 @@ import pytest
 import sc_treesitter
 
 
+@pytest.fixture(autouse=True)
+def sitr_log_root(tmp_path, monkeypatch):
+    """The default sitr logger writes under tmp_path (SITR_LOG_ROOT), never the real home."""
+    monkeypatch.setenv("SITR_LOG_ROOT", str(tmp_path))
+
+
 def test_caller_written_query_returns_capture_objects(tmp_path):
     """AC: REQ-SAG-0303 PyO3."""
     captures = sc_treesitter.run_query(
         "python",
         "(function_definition name: (identifier) @name)",
-        b"def hello():\n    pass\n", log_root=tmp_path,
+        b"def hello():\n    pass\n",
     )
     assert len(captures) == 1
     capture = captures[0]
@@ -21,21 +27,21 @@ def test_caller_written_query_returns_capture_objects(tmp_path):
     assert (capture.start_byte, capture.end_byte) == (4, 9)
 
     rust = sc_treesitter.run_query(
-        "rust", "(function_item name: (identifier) @name)", "fn hello() {}\n", log_root=tmp_path
+        "rust", "(function_item name: (identifier) @name)", "fn hello() {}\n"
     )
     assert [c.text for c in rust] == ["hello"]
 
 
 def test_listings(tmp_path):
-    assert sc_treesitter.languages(log_root=tmp_path) == ["python", "rust"]
-    assert sc_treesitter.queries("python", log_root=tmp_path) == [("python", "branches")]
-    assert "case_pattern" in sc_treesitter.query_source("python", "branches", log_root=tmp_path)
+    assert sc_treesitter.languages() == ["python", "rust"]
+    assert sc_treesitter.queries("python") == [("python", "branches")]
+    assert "case_pattern" in sc_treesitter.query_source("python", "branches")
 
 
 def test_non_utf8_bytes_raise_not_utf8(tmp_path):
     """AC: REQ-SAG-0002 lowest-layer PyO3."""
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("python", "(identifier) @id", b"ab = 1\n\xff\n", log_root=tmp_path)
+        sc_treesitter.run_query("python", "(identifier) @id", b"ab = 1\n\xff\n")
     error_id, message = raised.value.args
     assert error_id == "treesitter.not_utf8"
     assert message == "source is not UTF-8 at byte 7"
@@ -43,8 +49,8 @@ def test_non_utf8_bytes_raise_not_utf8(tmp_path):
 
 def test_other_errors_keep_their_ids(tmp_path):
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("cobol", "(x) @x", b"x", log_root=tmp_path)
+        sc_treesitter.run_query("cobol", "(x) @x", b"x")
     assert raised.value.args[0] == "treesitter.unknown_language"
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("python", "(identifier) @id", 42, log_root=tmp_path)
+        sc_treesitter.run_query("python", "(identifier) @id", 42)
     assert raised.value.args[0] == "treesitter.python"

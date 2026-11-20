@@ -89,6 +89,6 @@ Layer rule: a crate depends only on lower layers (ADR-SAG-0004), and `decidr` is
 
 General logs use `<log_root>/logs/decidr.log.jsonl`; sessions use
 `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, kept indefinitely.
-The default log root is `<home>/.sc-agent`. `DECIDR_LOG_ROOT` overrides it;
+The log root is `<home>/.sc-agent`; it is not a setting. `DECIDR_LOG_ROOT` overrides it in tests;
 `DECIDR_WORKERS` and nested variables such as `DECIDR_LOCAL_RUNNERS__LAYA__PORT`
 override decidr settings. See [sc-agent-config](../sc-agent-config/README.md) for scope and precedence.

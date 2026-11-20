@@ -13,12 +13,18 @@ import sc_treesitter
 QUERY = "(identifier) @id"
 
 
+@pytest.fixture(autouse=True)
+def sitr_log_root(tmp_path, monkeypatch):
+    """The default sitr logger writes under tmp_path (SITR_LOG_ROOT), never the real home."""
+    monkeypatch.setenv("SITR_LOG_ROOT", str(tmp_path))
+
+
 def test_injected_logger_and_attached_logger(tmp_path):
     root = tmp_path / "owned"
     logger = obs.create_logger(obs.LoggerConfig(service="consumer", log_root=str(root))).value
     attached = obs.AttachedLogger(logger._native)
     for target in (logger, attached):
-        sc_treesitter.run_query("python", QUERY, b"x = 1", general_log=target, log_root=tmp_path)
+        sc_treesitter.run_query("python", QUERY, b"x = 1", general_log=target)
     assert logger.flush().kind == "ok"
     rows = [json.loads(line) for line in (root / "logs/consumer.log.jsonl").read_text().splitlines()]
     assert [row["action"] for row in rows] == ["sitr.run_query", "sitr.run_query"]
@@ -31,9 +37,9 @@ def test_injected_logger_and_attached_logger(tmp_path):
 
 def test_callable_and_failure_are_recorded(tmp_path):
     records = []
-    sc_treesitter.run_query("python", QUERY, "x", general_log=records.append, log_root=tmp_path)
+    sc_treesitter.run_query("python", QUERY, "x", general_log=records.append)
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("unknown", QUERY, "x", general_log=records.append, log_root=tmp_path)
+        sc_treesitter.run_query("unknown", QUERY, "x", general_log=records.append)
     assert len(records) == 2
     assert records[0]["fields"]["outcome"] == "ok"
     assert records[1]["fields"]["outcome"] == "error"
@@ -42,10 +48,10 @@ def test_callable_and_failure_are_recorded(tmp_path):
 
 
 def test_default_logger_records_every_entry_point(tmp_path):
-    sc_treesitter.languages(log_root=tmp_path)
-    sc_treesitter.queries("python", log_root=tmp_path)
-    source = sc_treesitter.query_source("python", "branches", log_root=tmp_path)
-    sc_treesitter.run_query("python", QUERY, "x", log_root=tmp_path)
+    sc_treesitter.languages()
+    sc_treesitter.queries("python")
+    source = sc_treesitter.query_source("python", "branches")
+    sc_treesitter.run_query("python", QUERY, "x")
     rows = [json.loads(line) for line in (tmp_path / "logs/sitr.log.jsonl").read_text().splitlines()]
     assert [row["action"] for row in rows] == ["sitr.languages", "sitr.queries", "sitr.query_source", "sitr.run_query"]
     assert all(row["fields"]["outcome"] == "ok" for row in rows)
@@ -54,6 +60,7 @@ def test_default_logger_records_every_entry_point(tmp_path):
 
 def test_default_home_in_child_process(tmp_path):
     env = os.environ.copy()
+    env.pop("SITR_LOG_ROOT")
     env["HOME"] = str(tmp_path)
     env["USERPROFILE"] = str(tmp_path)
     script = 'import sc_treesitter; sc_treesitter.run_query("python", "(identifier) @id", "x")'
@@ -72,17 +79,17 @@ def test_default_home_in_child_process(tmp_path):
     (sc_treesitter.run_query, ("python", QUERY, "x")),
 ])
 @pytest.mark.parametrize("failure", ["invalid_target", "blocked_root", "raising_target"])
-def test_logging_failures_preserve_results_and_report_ids(tmp_path, capfd, entrypoint, args, failure):
+def test_logging_failures_preserve_results_and_report_ids(tmp_path, capfd, monkeypatch, entrypoint, args, failure):
     records = []
     expected = entrypoint(*args, general_log=records.append)
-    kwargs = {"log_root": tmp_path}
+    kwargs = {}
     if failure == "invalid_target":
         kwargs["general_log"] = 42
         error_id = "log.invalid_target"
     elif failure == "blocked_root":
         blocked = tmp_path / "file"
         blocked.write_text("unchanged")
-        kwargs["log_root"] = blocked
+        monkeypatch.setenv("SITR_LOG_ROOT", str(blocked))
         error_id = "log.open_sink"
     else:
         def raising(record):
@@ -106,7 +113,7 @@ def test_logging_failures_preserve_results_and_report_ids(tmp_path, capfd, entry
 
 def test_logger_open_failure_preserves_query_error(tmp_path, capfd):
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("unknown", QUERY, "x", general_log=42, log_root=tmp_path)
+        sc_treesitter.run_query("unknown", QUERY, "x", general_log=42)
     assert raised.value.args[0] == "treesitter.unknown_language"
     assert "log.invalid_target" in capfd.readouterr().err
 
@@ -114,11 +121,11 @@ def test_query_and_source_text_are_absent_from_success_and_failure_logs(tmp_path
     marker = "sitr_private_query_source_marker_7c09"
     source = f"{marker} = 1"
     captures = sc_treesitter.run_query(
-        "python", f"(identifier) @{marker}", source, log_root=tmp_path,
+        "python", f"(identifier) @{marker}", source
     )
     assert captures[0].text == marker
     with pytest.raises(sc_treesitter.TreesitterError) as raised:
-        sc_treesitter.run_query("python", f"({marker}) @id", source, log_root=tmp_path)
+        sc_treesitter.run_query("python", f"({marker}) @id", source)
     text = (tmp_path / "logs/sitr.log.jsonl").read_text()
     rows = [json.loads(line) for line in text.splitlines()]
     assert len(rows) == 2
@@ -136,7 +143,7 @@ def test_public_callables_are_exactly_logged_wrappers_and_types():
     assert public == wrappers | {"Capture", "TreesitterError"}
     for name in wrappers:
         signature = inspect.signature(getattr(sc_treesitter, name))
-        for keyword in ("general_log", "log_root"):
+        for keyword in ("general_log",):
             parameter = signature.parameters[keyword]
             assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, (name, keyword)
             assert parameter.default is None, (name, keyword)

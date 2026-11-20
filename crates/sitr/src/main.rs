@@ -2,20 +2,20 @@
 //!
 //! Output: JSON plus a newline on stdout, exit 0. Failure: one stderr line
 //! `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Each run records
-//! one `sitr.command` event in its own general log, `~/.sc-agent/logs/sitr.log.jsonl`, or
-//! `<PATH>/logs/sitr.log.jsonl` with `--log-root <PATH>`.
+//! one `sitr.command` event in its own general log, `~/.sc-agent/logs/sitr.log.jsonl`
+//! (`$SITR_LOG_ROOT/logs/sitr.log.jsonl` when that test override is set).
 #![forbid(unsafe_code)]
 
 mod cli;
 
 use std::collections::BTreeMap;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
 use sc_agent_config::{CliName, LoadOptions, Loaded, doctor_rows, load_layered};
-use sc_agent_log::{GeneralLogger, Level, LogContext, default_log_root};
+use sc_agent_log::{GeneralLogger, Level, LogContext};
 use sc_treesitter::{
     Error, LanguageId, queries, query_source, read_source, run_query, to_json_bytes,
 };
@@ -39,11 +39,11 @@ fn main() -> ExitCode {
     match parsed {
         Ok(Parsed::Print(text)) => write_result(Ok(text.into_bytes())),
         Ok(Parsed::Run(cli)) => {
-            let loaded = match load_config(cli.log_root.as_deref()) {
+            let loaded = match load_config() {
                 Ok(loaded) => loaded,
                 Err(error) => return emit(&error),
             };
-            let logger = match general_log(loaded.config.log_root.as_deref()) {
+            let logger = match general_log() {
                 Ok(logger) => logger,
                 Err(error) => return emit(&error),
             };
@@ -58,9 +58,7 @@ fn main() -> ExitCode {
             finish(result, &mut io::stderr().lock())
         }
         Err(error) => {
-            if let Ok(loaded) = load_config(cli::log_root_arg(&args).as_deref())
-                && let Ok(logger) = general_log(loaded.config.log_root.as_deref())
-            {
+            if let Ok(logger) = general_log() {
                 let fields = CommandFields {
                     subcommand: "usage",
                     ..CommandFields::default()
@@ -158,7 +156,7 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
 }
 
 /// Loads all sitr settings from the shared seven-layer resolver.
-fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
+fn load_config() -> Result<Loaded, Error> {
     let home = sc_agent_log::resolve_home().ok_or_else(|| Error::Config {
         detail: "home directory is unknown".to_owned(),
     })?;
@@ -168,15 +166,11 @@ fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
     let worktree = sc_agent_log::Repo::work_tree_root(&cwd).map_err(|error| Error::Config {
         detail: error.to_string(),
     })?;
-    let flags = log_root_flag.map_or_else(BTreeMap::new, |path| {
-        BTreeMap::from([("log_root".to_owned(), path.display().to_string().into())])
-    });
     load_layered(&LoadOptions {
         cli: CliName::Sitr,
-        home: home.clone(),
+        home,
         worktree,
-        default_log_root: default_log_root(&home),
-        flags,
+        flags: BTreeMap::new(),
         flag_names: BTreeMap::new(),
         environment: std::env::vars_os().collect(),
     })
@@ -185,9 +179,11 @@ fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
     })
 }
 
-/// The shared sc-agent-log default for service `sitr`.
-fn general_log(log_root: Option<&Path>) -> Result<GeneralLogger, Error> {
-    GeneralLogger::open_default(log_root, "sitr").map_err(|error| Error::Log {
+/// sitr's general log under its log root (`SITR_LOG_ROOT`, else `~/.sc-agent`).
+fn general_log() -> Result<GeneralLogger, Error> {
+    let root = std::env::var_os("SITR_LOG_ROOT");
+    let root = sc_agent_log::cli_log_root(root.as_deref(), sc_agent_log::resolve_home());
+    GeneralLogger::open_default(root.as_deref(), "sitr").map_err(|error| Error::Log {
         detail: error.to_string(),
     })
 }

@@ -12,11 +12,11 @@ The underlying `sc-treesitter` library remains independent of sc-agent crates.
 - `sc_treesitter.query_source(language, name)`: the text of a predefined query.
 - `sc_treesitter.Capture` and `sc_treesitter.TreesitterError`. `TreesitterError.args` is `(id, message)`, where the id is a stable `treesitter.*` id.
 
-Every function accepts keyword-only `general_log=` and `log_root=`. Pass a caller-owned
+Every function accepts keyword-only `general_log=`. Pass a caller-owned
 `sc_observability.Logger`, `AttachedLogger`, or callable as `general_log` to receive one
 record per call, including failed calls. The caller owns the logger's flush and shutdown.
-Without an injected logger, `log_root` selects `<log_root>/logs/sitr.log.jsonl`; when omitted,
-sc-agent-log uses `<home>/.sc-agent/logs/sitr.log.jsonl`. The wheel does not read a config file.
+Without an injected logger, records go to `<home>/.sc-agent/logs/sitr.log.jsonl`
+(`$SITR_LOG_ROOT/logs/sitr.log.jsonl` when that test override is set). The wheel does not read a config file.
 Records include the operation, language, query size, outcome and error id, without query or
 source text. The GIL is released while tree-sitter parses and queries.
 

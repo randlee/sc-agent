@@ -27,7 +27,7 @@ loggers.session.flush()?;
 loggers.close()?;
 ```
 
-`log_root` is a `&Path`. It normally comes from `AgentConfig::log_root()`; this crate does not decide it.
+`log_root` is a `&Path`. Callers take it from `cli_log_root` (re-exported from sc-agent-types): `<CLI>_LOG_ROOT`, else `~/.sc-agent`.
 
 ## Python callable records
 

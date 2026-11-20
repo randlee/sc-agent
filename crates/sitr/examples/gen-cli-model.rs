@@ -47,12 +47,6 @@ mod tests {
         assert_eq!(names, ["doctor", "languages", "queries", "query"]);
         assert!(
             model
-                .options()
-                .iter()
-                .any(|option| option.long() == Some("--log-root"))
-        );
-        assert!(
-            model
                 .subcommands()
                 .iter()
                 .any(|command| command.name() == "query")

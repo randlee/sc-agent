@@ -857,15 +857,6 @@ fn resolved_config(py: Python<'_>, project: Option<&str>) -> PyResult<Py<PyAny>>
     let context = context(None, project).map_err(|error| sag_error(&error))?;
     let loaded = decidr::load_context(&context).map_err(|error| sag_error(&error))?;
     let result = PyDict::new(py);
-    result.set_item(
-        "log_root",
-        loaded
-            .config
-            .log_root()
-            .map_err(|error| sag_error(&error.into()))?
-            .to_string_lossy()
-            .as_ref(),
-    )?;
     result.set_item("project", loaded.config.project())?;
     let sources = PyDict::new(py);
     for (key, source) in loaded.sources {
@@ -873,6 +864,13 @@ fn resolved_config(py: Python<'_>, project: Option<&str>) -> PyResult<Py<PyAny>>
     }
     result.set_item("sources", sources)?;
     Ok(result.into_any().unbind())
+}
+
+/// The default log root, `~/.sc-agent`, where a generated client opens its logger.
+#[pyfunction]
+fn default_log_root() -> PyResult<std::path::PathBuf> {
+    sc_agent_types::cli_log_root(None, sc_agent_types::resolve_home())
+        .ok_or_else(|| sag_error(&sc_agent_config::AgentConfigError::HomeUnknown.into()))
 }
 
 /// The `sc_agent` module: `send`, `send_batch`, `models`, `doctor`, `CancelToken`, `SagError`.
@@ -886,6 +884,7 @@ fn sc_agent(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(models, module)?)?;
     module.add_function(wrap_pyfunction!(doctor, module)?)?;
     module.add_function(wrap_pyfunction!(resolved_config, module)?)?;
+    module.add_function(wrap_pyfunction!(default_log_root, module)?)?;
     module.add_function(wrap_pyfunction!(parse_result, module)?)?;
     module.add_class::<CancelToken>()?;
     module.add_class::<NoulAnswer>()?;

@@ -83,7 +83,7 @@ pub use loggers::{Injected, Loggers};
 pub use name::MAX_SEGMENT_BYTES;
 #[doc(inline)]
 pub use repo::{GIT_DEADLINE, Repo};
-pub use sc_agent_types::{default_log_root, resolve_home};
+pub use sc_agent_types::{cli_log_root, default_log_root, resolve_home};
 pub use sc_observability::Level;
 pub use sc_observability::v2::Logger;
 #[doc(inline)]

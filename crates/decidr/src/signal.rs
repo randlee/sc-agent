@@ -271,12 +271,6 @@ mod tests {
     fn an_interrupt_after_the_logs_open_still_flushes_the_general_log() {
         let root = tempfile::tempdir().expect("root");
         let dir = tempfile::tempdir().expect("config");
-        std::fs::create_dir_all(dir.path().join(".sc-agent")).expect("config folder");
-        std::fs::write(
-            dir.path().join(".sc-agent/decidr.json"),
-            serde_json::json!({ "log_root": root.path() }).to_string(),
-        )
-        .expect("decidr.json");
         let cancel = CancelToken::new();
         let watch = SignalWatch {
             state: Arc::new(State::default()),
@@ -290,10 +284,13 @@ mod tests {
         let mut context = crate::Context::new(sc_agent_config::CliName::Decidr);
         context.home = Some(dir.path().to_path_buf());
         context.repo_root = Some(dir.path().to_path_buf());
-        context.environment = Some(vec![(
-            sc_agent_secrets::TYPESAFE_API_KEY.into(),
-            "ts-signal-test".into(),
-        )]);
+        context.environment = Some(vec![
+            (
+                sc_agent_secrets::TYPESAFE_API_KEY.into(),
+                "ts-signal-test".into(),
+            ),
+            ("DECIDR_LOG_ROOT".into(), root.path().into()),
+        ]);
         let transport = sc_agent_http::testing::ScriptedTransport::new(Vec::new());
         context.transport = Some(Arc::new(transport.clone()));
         let options = crate::ModelsOptions {

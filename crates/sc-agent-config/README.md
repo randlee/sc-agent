@@ -21,7 +21,7 @@ per key; scalar and array values replace the lower value. Supplied values are
 validated even when a higher layer overrides them. Non-regular files and files
 larger than `MAX_CONFIG_FILE_BYTES` are refused before reading.
 
-Both scopes accept `project` and `log_root`. Only decidr's CLI file accepts
+Both scopes accept `project`. Only decidr's CLI file accepts
 `models`, `workers`, `max_sends` and `local_runners`; shared files cannot contain
 those settings. The loader ignores other CLIs' files and environment prefixes.
 
@@ -33,13 +33,13 @@ Project/phase uses only `SC_PROJECT`.
 Credential variable names are owned by `sc-agent-secrets`; this loader does
 not read their values.
 
-`LoadOptions` supplies `home`, optional `worktree`, `flags`, `flag_names`,
-`environment`, and `default_log_root`. `flag_names` optionally maps a dotted
-setting path to the caller's real flag spelling, including `--`, for doctor
-rows and errors; paths absent from it display as `--` plus the path with `_`
-replaced by `-`. The caller supplies the latter from the shared default-log-root
-function; the loader does not choose a separate default path. No process
-environment or home-directory discovery occurs in the layered loader.
+`LoadOptions` supplies `home`, optional `worktree`, `flags`, `flag_names` and
+`environment`. `flag_names` optionally maps a dotted setting path to the
+caller's real flag spelling, including `--`, for doctor rows and errors; paths
+absent from it display as `--` plus the path with `_` replaced by `-`. The log
+root is not a setting: `<CLI>_LOG_ROOT` is skipped, and callers use
+`sc_agent_types::cli_log_root`. No process environment or home-directory
+discovery occurs in the layered loader.
 
 The returned `Loaded` contains an `AgentConfig`, the winning `Source` of each
 setting and the inspected `LayerFile` paths with their `exists` values.

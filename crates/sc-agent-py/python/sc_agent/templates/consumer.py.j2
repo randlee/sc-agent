@@ -107,12 +107,12 @@ def _load_wheel():
                           action="Install sc-decidr in the active Python environment.") from exc
 
 
-def client_logger(log_root=None, logger=None):
-    """Return a caller-supplied logger or this client's shared default logger.
+def client_logger(logger=None):
+    """Return a caller-supplied logger or this client's one default logger.
 
-    The first successful default construction fixes its log root for this module;
-    later calls reuse it and ignore log_root. An explicit logger is returned directly
-    and does not replace the cached default.
+    The default is opened once, named CLIENT_NAME, at the default log root
+    (<log_root>/logs/<CLIENT_NAME>.log.jsonl). An explicit logger is returned
+    directly and does not replace it.
     """
     import sc_observability as obs
     if logger is not None:
@@ -122,8 +122,7 @@ def client_logger(log_root=None, logger=None):
     global _CLIENT_LOGGER
     with _CLIENT_LOGGER_LOCK:
         if _CLIENT_LOGGER is None:
-            if log_root is None:
-                log_root = _load_wheel().resolved_config()["log_root"]
+            log_root = str(_load_wheel().default_log_root())
             result = obs.create_logger(obs.LoggerConfig(service=CLIENT_NAME, log_root=log_root))
             if isinstance(result, obs.Err):
                 raise from_tool_error(result.error)

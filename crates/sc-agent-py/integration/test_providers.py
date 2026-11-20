@@ -28,7 +28,7 @@ def options(tmp_path, record_property, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config = tmp_path / ".sc-agent"
     config.mkdir()
-    (config / "decidr.json").write_text(json.dumps({"max_sends": 1, "log_root": str(tmp_path / "logs")}))
+    (config / "decidr.json").write_text(json.dumps({"max_sends": 1}))
     record_property("provider", PROVIDER)
     record_property("model", MODEL)
     record_property("mode", "live")

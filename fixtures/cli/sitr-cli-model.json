@@ -4,28 +4,14 @@
   "description": "Run predefined tree-sitter queries.",
   "long_description": "",
   "epilogue": "",
-  "usage": "Usage: sitr [OPTIONS] <COMMAND>",
-  "options": [
-    {
-      "name": "log_root",
-      "long": "--log-root",
-      "short": null,
-      "help": "Override the resolved log root; the general log is written to `<PATH>/logs/sitr.log.jsonl`",
-      "long_help": "",
-      "value_name": "PATH",
-      "required": false,
-      "default_value": null,
-      "choices": [],
-      "min_values": null,
-      "max_values": null
-    }
-  ],
+  "usage": "Usage: sitr <COMMAND>",
+  "options": [],
   "arguments": [],
   "subcommands": [
     {
       "name": "doctor",
       "version": null,
-      "description": "Report resolved settings and configuration files without writing anything",
+      "description": "Report resolved settings and configuration files",
       "long_description": "",
       "epilogue": "",
       "usage": "Usage: sitr doctor",

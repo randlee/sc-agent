@@ -15,7 +15,6 @@ fn options(root: &Path) -> LoadOptions {
         cli: CliName::Decidr,
         home: root.join("home"),
         worktree: Some(root.join("work")),
-        default_log_root: root.join("home").join(".sc-agent"),
         flags: BTreeMap::new(),
         flag_names: BTreeMap::new(),
         environment: Vec::new(),
@@ -229,9 +228,7 @@ fn foreign_and_legacy_inputs_and_credentials_are_ignored() {
     env(&mut o, "DECIDR_LOG_ROOT", "elsewhere");
     assert_eq!(load_layered(&o).unwrap(), clean);
     env(&mut o, "SITR_LOG_ROOT", "sitr-root");
-    let loaded = load_layered(&o).unwrap();
-    assert_eq!(row(&loaded, "log_root").value, "sitr-root");
-    assert_eq!(row(&loaded, "log_root").source, "SITR_LOG_ROOT");
+    assert_eq!(load_layered(&o).unwrap(), clean);
 }
 
 #[test]
@@ -240,32 +237,20 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
     let mut o = options(root.path());
     let file = local_file(&o, "sc-agent.json");
     write(&file, &json!({"project":"phase-a"}));
-    let expected = vec![
-        DoctorRow {
-            setting: "project".into(),
-            value: "phase-a".into(),
-            source: root
-                .path()
-                .join("work")
-                .join(".sc")
-                .join("sc-agent")
-                .join("sc-agent.json")
-                .display()
-                .to_string(),
-        },
-        DoctorRow {
-            setting: "log_root".into(),
-            value: root
-                .path()
-                .join("home")
-                .join(".sc-agent")
-                .display()
-                .to_string(),
-            source: "default".into(),
-        },
-    ];
+    let expected = vec![DoctorRow {
+        setting: "project".into(),
+        value: "phase-a".into(),
+        source: root
+            .path()
+            .join("work")
+            .join(".sc")
+            .join("sc-agent")
+            .join("sc-agent.json")
+            .display()
+            .to_string(),
+    }];
     let decidr = load_layered(&o).unwrap();
-    assert_eq!(&doctor_rows(&decidr)[..2], expected);
+    assert_eq!(&doctor_rows(&decidr)[..1], expected);
     o.cli = CliName::Sitr;
     let sitr = load_layered(&o).unwrap();
     assert_eq!(doctor_rows(&sitr), expected);
@@ -294,13 +279,7 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
             ]
         );
     }
-    o.default_log_root = root.path().join("injected-default");
     let loaded = load_layered(&o).unwrap();
-    assert_eq!(loaded.config.log_root().unwrap(), o.default_log_root);
-    assert_eq!(
-        row(&loaded, "log_root").value,
-        o.default_log_root.display().to_string()
-    );
     assert_eq!(
         serde_json::to_value(row(&loaded, "project")).unwrap()["value"],
         "phase-a"
@@ -557,48 +536,6 @@ fn collection_limits_and_unknown_keys_apply_to_layered_inputs() {
     o.cli = CliName::Sitr;
     o.flags.insert("workers".into(), json!(2));
     assert!(load_layered(&o).is_err());
-}
-
-#[test]
-fn null_log_root_is_not_allowed_to_fall_back_to_process_home() {
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    o.flags.insert("log_root".into(), Value::Null);
-    let error = load_layered(&o).unwrap_err();
-    assert!(error.message().contains("--log-root"));
-    assert!(
-        error
-            .cause_detail()
-            .expect("validation cause")
-            .message
-            .contains("log_root")
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn injected_default_root_accepts_non_unicode_paths_without_serialization() {
-    use std::os::unix::ffi::OsStringExt;
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    o.default_log_root
-        .push(std::ffi::OsString::from_vec(vec![255]));
-    assert_eq!(
-        load_layered(&o).unwrap().config.log_root().unwrap(),
-        o.default_log_root
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn non_utf8_default_log_root_remains_a_path_and_never_panics() {
-    use std::os::unix::ffi::OsStringExt;
-    let root = tempfile::tempdir().unwrap();
-    let mut o = options(root.path());
-    o.default_log_root = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![255]));
-    let loaded = load_layered(&o).unwrap();
-    assert_eq!(loaded.config.log_root().unwrap(), o.default_log_root);
-    assert_eq!(row(&loaded, "log_root").source, "default");
 }
 
 #[test]

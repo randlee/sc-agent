@@ -73,7 +73,6 @@ fn rejected_key_env_is_absent_from_error_detail_stderr_and_log_lines() {
     std::fs::write(
         config.join("decidr.json"),
         serde_json::json!({
-            "log_root": root.path(),
             "local_runners": {"dec": {"kind": "mapika", "host": "127.0.0.1", "port": 9100,
                 "model": "jev-latest", "key_env": key}}
         })
@@ -235,10 +234,9 @@ mod tests {
         }
     }
 
-    /// The `decidr.json` of these tests: runner `dec` on `port`, and `log_root` = `config`.
-    fn config_json(config: &Path, port: u16) -> String {
+    /// The `decidr.json` of these tests: runner `dec` on `port`.
+    fn config_json(port: u16) -> String {
         serde_json::json!({
-            "log_root": config,
             "local_runners": {
                 "dec": { "kind": "mapika", "host": "127.0.0.1", "port": port, "model": "jev-latest" }
             }
@@ -247,13 +245,12 @@ mod tests {
     }
 
     /// A tempdir whose `.sc-agent/decidr.json` (the child's `--config-dir`) names runner `dec`
-    /// on `port` and sets `log_root` to `.sc-agent` itself.
+    /// on `port`; the default log root is `.sc-agent` itself.
     fn home(port: u16) -> tempfile::TempDir {
         let home = tempfile::tempdir().expect("home");
         let config = home.path().join(".sc-agent");
         std::fs::create_dir_all(&config).expect("config dir");
-        std::fs::write(config.join("decidr.json"), config_json(&config, port))
-            .expect("decidr.json");
+        std::fs::write(config.join("decidr.json"), config_json(port)).expect("decidr.json");
         home
     }
 

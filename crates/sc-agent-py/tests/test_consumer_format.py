@@ -35,7 +35,7 @@ class ConsumerFormatTest(unittest.TestCase):
             self.assertIn("sitr==4.5.6", caught.exception.action)
             self.assertIsInstance(caught.exception.__cause__, ImportError)
             captures = [object()]
-            logger = namespace["client_logger"](log_root=directory)
+            logger = namespace["_CLIENT_LOGGER"] = object()
             wheel = types.SimpleNamespace(run_query=mock.Mock(return_value=captures))
             with mock.patch.dict(sys.modules, {"sc_treesitter": wheel}):
                 self.assertIs(namespace["extract"]("python", "query", "source", captures=["c"]), captures)
