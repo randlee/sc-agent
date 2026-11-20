@@ -12,7 +12,8 @@
 //!
 //! Both take generic rows (`serde_json::Map`); callers build the payload. Either can be an
 //! injected `Arc<Logger>`; what is not injected gets the default ([`Loggers`], REQ-SAG-0008).
-//! `<log_root>` is `AgentConfig::log_root()` (default `~/.sc-agent`), not decided here.
+//! Callers can supply `<log_root>` explicitly. When omitted, [`GeneralLogger::open_default`]
+//! resolves the process home and uses [`default_log_root`] from `sc-agent-types` (`~/.sc-agent`).
 //!
 //! A row a caller cannot act on is still counted: `flush()` reports every refused or lost row
 //! once as [`LogError::RowsLost`], and `close()` flushes, shuts the logger down and returns the
@@ -82,7 +83,7 @@ pub use loggers::{Injected, Loggers};
 pub use name::MAX_SEGMENT_BYTES;
 #[doc(inline)]
 pub use repo::{GIT_DEADLINE, Repo};
-pub use sc_agent_types::default_log_root;
+pub use sc_agent_types::{default_log_root, resolve_home};
 pub use sc_observability::Level;
 pub use sc_observability::v2::Logger;
 #[doc(inline)]

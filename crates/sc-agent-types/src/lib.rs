@@ -10,7 +10,7 @@
 //! - the one source of time and of timed waits ([`Clock`], [`SystemClock`]);
 //! - the one error convention of the workspace ([`ErrorId`], [`ErrorDetail`]).
 //!
-//! It does no I/O, reads no files and depends on no runtime: only `serde` and `ulid`.
+//! Apart from process home lookup, it does no I/O, reads no files and depends on no runtime: only `serde` and `ulid`.
 //!
 //! Feature `testing` (not default) adds [`testing`]: a manual clock and cancel trace points
 //! for consumers' tests.
@@ -41,7 +41,7 @@ pub use error::TypesError;
 #[doc(inline)]
 pub use error_id::{ErrorCatalog, ErrorCategory, ErrorDetail, ErrorId};
 #[doc(inline)]
-pub use log_root::default_log_root;
+pub use log_root::{default_log_root, resolve_home, resolve_home_with};
 #[doc(inline)]
 pub use model::{MODELS, ModelDescriptor, ModelId};
 #[doc(inline)]

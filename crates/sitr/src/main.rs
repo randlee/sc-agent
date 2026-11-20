@@ -166,11 +166,9 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
 
 /// Loads all sitr settings from the shared seven-layer resolver.
 fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
-    let home = std::env::home_dir()
-        .filter(|home| !home.as_os_str().is_empty())
-        .ok_or_else(|| Error::Config {
-            detail: "home directory is unknown".to_owned(),
-        })?;
+    let home = sc_agent_log::resolve_home().ok_or_else(|| Error::Config {
+        detail: "home directory is unknown".to_owned(),
+    })?;
     let cwd = std::env::current_dir().map_err(|error| Error::Config {
         detail: format!("cannot determine current directory: {error}"),
     })?;
