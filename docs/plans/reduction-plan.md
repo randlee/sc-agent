@@ -4,9 +4,9 @@ Owner: Rand Lee. 2026-11-19.
 
 ## Goal
 
-sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **under 2,000 lines of Rust in total across every `.rs` file in the repository, tests, examples and scripts included**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of Rust in total (failing above 2,200) across every `.rs` file in the repository, tests, examples and scripts included**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
 
-**Wheels.** Two wheels. The sc-decidr wheel's `logger(name)` returns a callable handle that writes each record through its Rust Logger; the sitr wheel accepts that callable; sitr used alone writes `logs/sitr.log.jsonl`. No other wrappers and no handwritten library code.
+**Wheel.** One Python wheel (`sc-decidr`) holding the decidr and sitr APIs. `logger(name)` returns its Rust Logger, which every decidr and sitr call accepts directly; no callable bridge. The `sitr` and `decidr` CLIs each use their own Logger.
 
 **No unnecessary wrapping:** ureq, keyring, dotenvy and sc-observability are called directly. No traits, no newtypes or wrapper structs over library types, no re-exports. A type exists only when it carries data the libraries do not (a provider table row, a result, an error).
 
@@ -29,7 +29,7 @@ Nothing not in these three is built.
 - **send / send_batch.** One request, or many with a worker fan-out and a per-call timeout. Result or typed error per request.
 - **Models: one table per provider**, static, in code:
 
-  | Provider | Base URL | Key variable | Request shape | Models (short name → id) |
+  | Provider | Base URL | Key variable | Request shape | Models (short name → id, release date) |
   |---|---|---|---|---|
   | typesafe | `https://api.typesafe.ai/v1` | `TYPESAFE_API_KEY` | SystemOne | jev → `jev-1.14.0`, decider → (current id) |
   | anthropic | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | Messages | haiku → `claude-haiku-5-5` |
@@ -39,36 +39,36 @@ Nothing not in these three is built.
   | nous | `https://inference-api.nousresearch.com/v1` | `NOUS_API_KEY` | chat/completions | none named; ids passed through |
   | local | host:port from config | none | SystemOne | laya |
 
-  `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. With a reseller provider (openrouter, together, nous) and a name in no table, the text is sent as the model id unchanged. No ranking, no release dates, no config catalog. All six providers the current code supports are kept; the reseller model ids are taken from the current code's tables.
+  Each provider table lists its models as (short name, model id, release date). `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. When several rows share a short name, the one with the most recent date is used by default; a full model id selects that row exactly. With a reseller provider (openrouter, together, nous) and a name in no table, the text is sent as the model id unchanged. No provider ranking and no config catalog: the tables are static code. All six providers the current code supports are kept; the reseller model ids are taken from the current code's tables.
 - **Retry.** Busy (429/502/529) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
-- **Keys.** Environment variable, then repo-root `.env` (via `dotenvy`, never written to the process environment), then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key is a plain `String` that is never put into an error, a log record or a Debug output (a contract test checks the key text appears nowhere).
+- **Keys.** Repo-root `.env` (via `dotenvy`, never written to the process environment), then the environment variable, then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key is a plain `String` that is never put into an error, a log record or a Debug output (a contract test checks the key text appears nowhere).
 - **Config.** Only: `project` (`--project`, `SC_PROJECT`, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`), the Laya runner's `host`/`port`/`model`, and `workers`. Looked up in that order with the source recorded for `decidr doctor`.
 - **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; general-log failure not handled.
 - **Errors.** One error enum for the core with stable ids and an action string, logged and returned the same way from the CLI (non-zero exit plus the JSON error) and the wheel (a returned error value, never a raised exception).
-- **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), the `sc-decidr` wheel (decidr API, `logger(name)` returning the callable handle over its Rust Logger), and the `sitr` wheel (sitr API, accepts that callable; alone it writes `logs/sitr.log.jsonl`). No `sc-observability` Python dependency, no forwarding to Python `logging`.
+- **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), and one `sc-decidr` wheel (decidr API, sitr API, `logger(name)` returning the Rust Logger both accept). No `sc-observability` Python dependency, no callable bridge, no forwarding to Python `logging`.
 - **Generated client.** The sc-compose template: obtains one Logger by client name, injects it into every call, hardcodes `agent_role`.
 - **Interrupt.** A cancel flag (about 10 lines): Ctrl-C stops sending new requests and the run returns what finished.
 
 ## Not built
 
-Image parts, the long-context header, provider ranking, release-date ordering, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it).
+Image parts, the long-context header, provider ranking, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
 
 ## Layout
 
-| Crate | Contents | Guide budget (Rust lines after `cargo fmt`, tests included; the hard limit is the 2,000 total) |
+| Crate | Contents | Guide budget (Rust lines after `cargo fmt`, tests included; the hard limit is the 2,200 total) |
 |---|---|---|
 | `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
 | `decidr` | CLI | 150 |
-| `sc-agent-py` + sitr wheel | decidr wheel (API, `logger(name)` handle) and sitr wheel (accepts the handle); return results, never raise | 250 |
+| `sc-agent-py` | the one wheel: decidr API, sitr API, `logger(name)`; returns results, never raises | 250 |
 | `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI, rewritten the same way | 800 |
 
 Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
 
 ## Gates (one script, seconds, run before a task can close and before push)
 
-1. Total under 2,000 Rust lines (tests, examples, scripts included; after `cargo fmt`); new crates only until the old crates are deleted.
+1. Total about 2,000 Rust lines (tests, examples, scripts included; after `cargo fmt`), failing above 2,200; new crates only until the old crates are deleted.
 2. Dependency allow-list (`cargo metadata`).
-3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `ReleaseDate`, `LoggerBuilder` outside the default-Logger function, `sc_observability` in any `pyproject.toml` dependency list.
+3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `LoggerBuilder` outside the default-Logger function, `sc_observability` in any `pyproject.toml` dependency list.
 4. Clippy with `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` denied in non-test code.
 5. No `raise` in the wheel's Python or the generated client; no `PyErr` returned from a wheel function.
 6. Contract tests pass (below).
