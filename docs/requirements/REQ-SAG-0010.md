@@ -18,13 +18,9 @@
 
 - sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.
 
-**Notes:**
-
-- This requirement is met by a timed wait that cancellation can end, such as a wait on a channel or condition variable. It does not require a clock abstraction or an injected time source.
-
 ### Rationale
 
-A sleeping thread cannot react to cancellation or new work; waits are made on events or deadlines that cancellation can end.
+A sleeping thread cannot react to cancellation or new work; waits are made on events or deadlines that cancellation can end. This requirement is met by a timed wait that cancellation can end, such as a wait on a channel or condition variable. It does not require a clock abstraction or an injected time source.
 
 Owner ruling (2026-11-20), Rand Lee: "No sleep (is async requirement)."
 

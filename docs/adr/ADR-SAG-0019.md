@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.3  
+**Version:** 0.7.4  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -173,9 +173,9 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    Integration tests send real queries through the rendered consumer. One suite runs once per provider (TypeSafe, Anthropic, OpenAI); each run's environment holds only that provider's key, so the consumer's automatic selection resolves to it. A provider with no key is reported as not run; any other error fails. The developer runs the suite on a locally built wheel and fixes every failure before the prerelease is cut. The same suite then runs on the installed prerelease wheels on a clean install, and each run renders one XHTML panel (provider x platform) recording the prerelease tag and commit; the panels are committed and pushed. One passing platform is sufficient. REQ-SAG-0133 is superseded by this decision.
 
-10. **Category assignments are part of the contract.**
+10. **Category assignments are not locked.**
 
-    Moving an id to a different category, or changing the status refinement, is a breaking change. Adding an id with a category is not.
+    Rand Lee (2026-11-20): "schema isn't locked yet ... No hand built checks."
 
 11. **sitr is an optional, separate section of the consumer template.**
 
