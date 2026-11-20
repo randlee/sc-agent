@@ -1,17 +1,17 @@
-# Decision: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
+# Decision: sc-treesitter-py and sitr are separate crates over sc-treesitter
 
-**Status:** Approved  
-**Version:** 0.1.0  
-**Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
-**Owner:** Rand Lee  
-**Decision Date:** 2026-11-09  
+**Status:** Approved
+**Version:** 0.2.0
+**Created:** 2026-11-09
+**Last Updated:** 2026-11-19
+**Owner:** Rand Lee
+**Decision Date:** 2026-11-19
 
 ---
 
-## ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
+## ADR-SAG-0005: sc-treesitter-py and sitr are separate crates over sc-treesitter
 
-**Status:** Approved  
+**Status:** Approved
 
 ### Related Documents
 
@@ -26,35 +26,35 @@
 
 ### Context
 
-sc-treesitter is a stand-alone library with two query surfaces: PyO3 bindings for Python and the `sitr` CLI.
+sc-treesitter is a stand-alone library used by two query surfaces: the PyO3 bindings and the `sitr` CLI. Since 2026-11-12, the repository has built the CLI as its own `crates/sitr` crate.
 
 **Problem Statement:**
 
-The Python bindings and the CLI need PyO3, clap and sc-observability, but a Rust caller of the library needs none of them.
+The Python bindings need PyO3, and the CLI needs its own command-line and logging dependencies. A Rust caller of the library needs none of those dependencies or CLI targets.
 
 ### Decision
 
-`sc-treesitter-py` is a separate PyO3 crate over `sc-treesitter`. `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
+`sc-treesitter-py` is a separate PyO3 crate over `sc-treesitter`. `sc-treesitter` has a `python` feature that enables its PyO3 types. The `sitr` CLI is built from its own crate, `crates/sitr`, and depends on `sc-treesitter` for query functionality. `sc-treesitter` has no `sitr` binary target or `cli` feature. Its default features carry no PyO3, clap or sc-observability.
 
 **Key Principles:**
 
 - A default build of `sc-treesitter` pulls in no PyO3, clap or sc-observability.
-- `sitr` builds only when the `cli` feature is on.
+- `sitr` is built from the separate `sitr` crate.
 - The Python extension module is built from `sc-treesitter-py`, not from `sc-treesitter`.
 
 ### Rationale
 
-Feature gates keep the library's default dependency set small while the PyO3 types stay next to the code they wrap; a separate PyO3 crate keeps the extension-module build out of the library.
+The separate CLI crate keeps the library free of the CLI's clap and sc-observability dependencies and binary target. The separate PyO3 crate keeps the extension-module build out of the library.
 
 ### Consequences
 
 **Positive:**
 
-- A Rust caller of `sc-treesitter` compiles no Python or CLI dependencies.
+- A default Rust build of `sc-treesitter` compiles no Python or CLI dependencies.
 
 **Negative:**
 
-- Two crates and two features to version and test.
+- Separate crates and a Python feature to version and test.
 
 ### Alternatives Considered
 
@@ -76,20 +76,20 @@ Build the extension module and `sitr` from `sc-treesitter` with all dependencies
 
 Default features must carry no clap or sc-observability.
 
-#### Alternative 2: Separate sitr crate
+#### Alternative 2: Put sitr in sc-treesitter behind a cli feature
 
 **Description:**
 
-Put the `sitr` binary in its own crate.
+Put the `sitr` binary in `sc-treesitter` and gate it behind `required-features = ["cli"]`.
 
 **Pros:**
 
-- The library manifest has no binary target.
+- One fewer crate to version.
 
 **Cons:**
 
-- One more crate for a single small binary.
+- The library manifest contains a CLI binary target and carries its CLI feature and dependency wiring.
 
 **Why Rejected:**
 
-A `cli` feature with `required-features` gives the same isolation without another crate.
+Keeping `sitr` in `crates/sitr` keeps the library free of the CLI's clap and sc-observability dependencies and binary target.

@@ -80,7 +80,7 @@ The crates are layered: each one depends only on the layers below it (ADR-SAG-00
 | Decision backends | `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider` and `sc-decision-llm` |
 | Runner | `sc-decision-runner` (worker threads, holdoff, cancellation, session rows) |
 | Top | `decidr` (library, composition root and CLI) and `sc-agent-py` (the PyO3 `sc_agent` module) |
-| Stands alone | `sc-treesitter` (`sitr` and `sc_treesitter`) |
+| Tree-sitter | `sc-treesitter` library (`sc_treesitter`); `sitr` CLI (`sitr`) |
 | Test support only | `sc-agent-testkit` |
 
 There is no async runtime: the workspace is synchronous and uses no tokio.
