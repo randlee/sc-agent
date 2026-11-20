@@ -1,7 +1,7 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -53,6 +53,7 @@ Definitions:
 - `retry_after_ms` MUST be the parsed Retry-After rounded up to whole milliseconds.
 - A `retry_after_ms` too large for a `u64` MUST be `u64::MAX`.
 - The sc-decidr wheel MUST return a failed request as an error value carrying the typed fields, and MUST NOT raise an exception for it.
+- An exception raised in Python while a wheel call runs, including one raised by a caller's `on_result` callback, MUST be caught and returned as an error value.
 
 **MUST NOT statements:**
 
@@ -67,6 +68,8 @@ Consumers decide whether to retry or back off, and how to fix authentication, fr
 The 0.1.0 error-JSON compatibility rule is withdrawn (2026-11-20), Rand Lee: "We are still using python, schema isn't locked yet. I haven't mentioned locking schema yet. I have tools to do this that aren't on this repo. No hand built checks."
 
 Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is prohibited on the repo.
+
+Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (return error) so app doesn't crash."
 
 ### Success Criteria
 
