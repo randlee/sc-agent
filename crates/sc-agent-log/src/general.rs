@@ -59,17 +59,26 @@ impl GeneralLogger {
     /// [`LogError::OpenSink`] when the startup retention pass fails (for example, a log
     /// directory that cannot be written), [`LogError::Start`] when the logger cannot start.
     pub fn open_default(log_root: Option<&Path>, service: &'static str) -> Result<Self, LogError> {
+        Self::open_default_with_home(log_root, service, || {
+            let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+            resolve_home(std::env::var_os(home_var).as_deref(), || {
+                #[allow(deprecated)]
+                std::env::home_dir()
+            })
+        })
+    }
+
+    /// Opens using a supplied home lookup when no explicit root was given.
+    fn open_default_with_home(
+        log_root: Option<&Path>,
+        service: &'static str,
+        home: impl FnOnce() -> Result<PathBuf, LogError>,
+    ) -> Result<Self, LogError> {
         let default_root;
         let log_root = match log_root {
             Some(root) => root,
             None => {
-                let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-                reject_empty_home(std::env::var_os(home_var).as_deref())?;
-                #[allow(deprecated)]
-                let home = std::env::home_dir()
-                    .filter(|path| !path.as_os_str().is_empty())
-                    .ok_or(LogError::HomeUnknown)?;
-                default_root = sc_agent_types::default_log_root(&home);
+                default_root = sc_agent_types::default_log_root(&home()?);
                 &default_root
             }
         };
@@ -299,13 +308,17 @@ fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
         })
 }
 
-/// Reject an explicitly empty home before the platform home lookup can fall back.
-fn reject_empty_home(home: Option<&std::ffi::OsStr>) -> Result<(), LogError> {
+/// Resolve home with an injected platform lookup; never fall back on an explicitly empty value.
+fn resolve_home(
+    home: Option<&std::ffi::OsStr>,
+    lookup: impl FnOnce() -> Option<PathBuf>,
+) -> Result<PathBuf, LogError> {
     if home.is_some_and(std::ffi::OsStr::is_empty) {
-        Err(LogError::HomeUnknown)
-    } else {
-        Ok(())
+        return Err(LogError::HomeUnknown);
     }
+    lookup()
+        .filter(|path| !path.as_os_str().is_empty())
+        .ok_or(LogError::HomeUnknown)
 }
 
 #[cfg(test)]
@@ -338,12 +351,27 @@ mod home_tests {
     }
 
     #[test]
-    fn empty_home_is_rejected_without_platform_lookup() {
-        assert!(matches!(
-            reject_empty_home(Some(std::ffi::OsStr::new(""))),
-            Err(LogError::HomeUnknown)
-        ));
-        assert!(reject_empty_home(None).is_ok());
-        assert!(reject_empty_home(Some(std::ffi::OsStr::new("/controlled"))).is_ok());
+    fn empty_or_unset_home_refuses_open_without_real_home() {
+        let root = tempfile::tempdir().expect("temp");
+        let lookup_called = std::cell::Cell::new(false);
+        let result = GeneralLogger::open_default_with_home(None, "decidr", || {
+            resolve_home(Some(std::ffi::OsStr::new("")), || {
+                lookup_called.set(true);
+                Some(root.path().to_owned())
+            })
+        });
+        assert!(!root.path().join(".sc-agent").exists());
+        assert!(
+            !lookup_called.get(),
+            "empty home must not invoke the lookup"
+        );
+        assert!(matches!(result, Err(LogError::HomeUnknown)));
+        let result =
+            GeneralLogger::open_default_with_home(None, "decidr", || resolve_home(None, || None));
+        assert!(matches!(result, Err(LogError::HomeUnknown)));
+        assert_eq!(
+            std::fs::read_dir(root.path()).expect("read temp").count(),
+            0
+        );
     }
 }
