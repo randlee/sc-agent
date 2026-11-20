@@ -17,6 +17,7 @@ serde_json = "1"
 serde_path_to_error = "0.1"
 
 [dev-dependencies]
+sc-agent-secrets = { workspace = true }
 sc-agent-testkit = { workspace = true }
 tempfile = "3"
 

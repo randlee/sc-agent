@@ -71,6 +71,10 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct AgentConfig {
+    #[serde(skip)]
+    pub(crate) project: Option<String>,
+    #[serde(skip)]
+    pub(crate) cli: crate::CliName,
     /// Extra catalog rows keyed by model id, at most [`MAX_MODELS`] (REQ-SAG-0102).
     #[serde(default, deserialize_with = "models_in_bounds")]
     pub models: BTreeMap<ModelId, ExtraModel>,
@@ -94,6 +98,8 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
+            project: None,
+            cli: crate::CliName::Decidr,
             models: BTreeMap::new(),
             log_root: None,
             workers: DEFAULT_WORKERS,
@@ -104,6 +110,22 @@ impl Default for AgentConfig {
 }
 
 impl AgentConfig {
+    /// The resolved project/phase, with no built-in default.
+    #[must_use]
+    pub fn project(&self) -> Option<&str> {
+        self.project.as_deref()
+    }
+
+    /// Requires a project/phase before a session is sent or written.
+    ///
+    /// # Errors
+    /// Returns [`AgentConfigError::ProjectRequired`] naming every setting place.
+    pub fn require_project(&self) -> Result<&str, AgentConfigError> {
+        self.project().ok_or(AgentConfigError::ProjectRequired {
+            cli: self.cli.file_name(),
+        })
+    }
+
     /// Returns `log_root`, else [`default_dir`] (REQ-SAG-0003).
     ///
     /// This is the `<log_root>` of the ADR-SAG-0002 session-log layout.
@@ -527,7 +549,7 @@ fn check_file(path: &std::path::Path) -> Result<(), AgentConfigError> {
 }
 
 /// Maps a deserialization failure to `config.invalid`, or `config.runner_name` for a short-name runner key.
-fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigError {
+pub(crate) fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigError {
     let path = error.path().to_string();
     let message = error.inner().to_string();
     if message == RUNNER_NAME_IS_SHORT_NAME {
@@ -545,7 +567,7 @@ fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigE
 }
 
 /// The runner check serde cannot express: no key over plain http off the machine.
-fn check_runners(config: &AgentConfig) -> Result<(), AgentConfigError> {
+pub(crate) fn check_runners(config: &AgentConfig) -> Result<(), AgentConfigError> {
     for (name, runner) in &config.local_runners {
         if runner.key_env.is_some() && !runner.host.is_loopback() {
             return Err(AgentConfigError::KeyOnPlainHttp {

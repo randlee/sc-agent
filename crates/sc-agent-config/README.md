@@ -1,57 +1,57 @@
 # sc-agent-config
 
-The global sc-agent configuration, loaded with sc-config from `~/.sc-agent/`. It sits in the config, secrets and logging layer, above `sc-agent-types`. It reads files and applies overrides. It logs nothing and resolves no keys.
+Shared configuration loading and doctor rows for `decidr` and `sitr`. The crate
+reads JSON files, validates settings and records their sources. It writes no
+files, logs nothing, resolves no credentials and needs no async runtime.
 
-`load` reads `<config_dir>/default.json`, merges an optional `local.json`, then applies `SC_AGENT__*` environment overrides such as `SC_AGENT__MAX_SENDS=2` or `SC_AGENT__LOCAL_RUNNERS__LAYA__PORT=9000`. Every value is checked at load.
+`load_layered(&LoadOptions)` resolves each key from these layers, highest first:
 
-## What it provides
+1. Explicit flags (dotted setting paths).
+2. The selected CLI's environment prefix, plus `SC_PROJECT`.
+3. `<worktree>/.sc/sc-agent/<cli>.json`.
+4. `<worktree>/.sc/sc-agent/sc-agent.json`.
+5. `<home>/.sc-agent/<cli>.json`.
+6. `<home>/.sc-agent/sc-agent.json`.
+7. Built-in values, or a typed missing-setting error when required by the caller.
 
-- `load(config_dir, environment)` and `default_dir()`.
-- `AgentConfig`: `models`, `log_root`, `workers`, `max_sends` and `local_runners`. Its methods are `log_root()` (default `~/.sc-agent`) and `catalog()` (the built-in catalog plus the configured models).
-- `ExtraModel`, `LocalRunner`, `RunnerKind` (`strands`, `laya`, `mapika`, `generic`), `RunnerName` and `RunnerHost`.
-- Constants for the defaults and bounds, such as `DEFAULT_WORKERS`, `DEFAULT_MAX_SENDS`, `MAX_WORKERS`, `MAX_MAX_SENDS`, `RUNNER_REQUEST_TIMEOUT_SECS` and `RUNNER_LOAD_TIMEOUT_SECS`.
-- `AgentConfigError`. A bad value is `AgentConfigError::Invalid` with its key path, such as `local_runners.laya.host`.
+`CliName` selects `decidr.json` / `DECIDR_` or `sitr.json` / `SITR_`.
+With `worktree: None`, local files are neither inspected nor read. Objects merge
+per key; scalar and array values replace the lower value. Supplied values are
+validated even when a higher layer overrides them. Non-regular files and files
+larger than `MAX_CONFIG_FILE_BYTES` are refused before reading.
 
-## Usage
+Both scopes accept `project` and `log_root`. Only decidr's CLI file accepts
+`models`, `workers`, `max_sends` and `local_runners`; shared files cannot contain
+those settings. The loader ignores other CLIs' files and environment prefixes.
 
-```json
-{ "workers": 8, "max_sends": 5,
-  "models": { "claude-haiku-5-6": { "line": "haiku", "released": "2026-12-01" } },
-  "local_runners": { "laya": { "kind": "laya", "host": "127.0.0.1", "port": 8000,
-                               "model": "convaiinnovations/laya" } } }
-```
+Nested environment names join upper-case key parts with `__`, for example
+`DECIDR_LOCAL_RUNNERS__LAYA__PORT=9000`. Project/phase uses only `SC_PROJECT`.
+Credential variable names are owned by `sc-agent-secrets`; this loader does
+not read their values.
 
-```rust,ignore
-let dir = sc_agent_config::default_dir()?;
-let environment: Vec<_> = std::env::vars_os().collect();
-let config = sc_agent_config::load(dir, environment)?;
+`LoadOptions` supplies `home`, optional `worktree`, `flags`, `environment`, and
+`default_log_root`. The caller supplies the latter from the shared default-log-root
+function; the loader does not choose a separate default path. No process
+environment or home-directory discovery occurs in the layered loader.
 
-let workers = config.workers;
-let log_root = config.log_root()?;
-let catalog = config.catalog()?;
-```
+The returned `Loaded` contains an `AgentConfig`, the winning `Source` of each
+setting and the inspected `LayerFile` paths with their `exists` values.
+`doctor_rows(&loaded)` builds deterministic, serializable `setting`, `value`,
+`source` rows, with shared settings first. Missing optional values display as
+`unset`. The two CLIs use the same routine for their shared rows.
 
-| Key | Default | Bound |
-|---|---|---|
-| `models` | none | at most `MAX_MODELS`; an id must not sit on two lines |
-| `log_root` | `~/.sc-agent` | |
-| `workers` | 8 | 1..=64 |
-| `max_sends` | 5 | 1..=10 |
-| `local_runners.<name>` | none | name is not a short name; `port` is not 0; `key_env` only on a loopback host; `request_timeout_secs` 10..=3600 (default 300); `load_timeout_secs` 10..=7200 (default 600) |
+`AgentConfig::project()` returns the resolved project/phase. A session caller
+uses `require_project()` before sending or writing; absence yields
+`config.project_required`, category `config`, naming every setting place.
+Project names are nonempty lowercase slugs using letters, digits, `.`, `_`, `-`.
+Layer errors preserve the validation error and add its file, variable or flag.
 
-A runner's `key_env` names the variable that holds its key. `sc_agent_secrets::resolve_var` resolves it. Credential variable names live only in `sc-agent-secrets`.
+Existing model, worker, send-count, runner, host, port and timeout checks are
+shared with the legacy loader. Workers are bounded by `MAX_WORKERS`, sends by
+`MAX_MAX_SENDS`, and model/runner maps by `MAX_MODELS` / `MAX_LOCAL_RUNNERS`.
+Runner request and load timeouts use `RUNNER_REQUEST_TIMEOUT_SECS` and
+`RUNNER_LOAD_TIMEOUT_SECS`; a runner key is accepted only on a loopback host.
 
-## Depends on
-
-- `sc-agent-types`.
-
-Layer rule: a crate depends only on lower layers (ADR-SAG-0004). The crate has no runtime.
-
-## Requirements and decisions
-
-- REQ-SAG-0013: config bounds.
-- REQ-SAG-0801: local decision runners come from configuration.
-- REQ-SAG-0015: local runner timeouts.
-- REQ-SAG-0102: model catalog, built-in models plus global configuration.
-- REQ-SAG-0003 and REQ-SAG-0005: the log root that sessions and logs are written under.
-- ADR-SAG-0004: crate layering.
+The legacy `load`, `default_dir` and `APP_NAME` remain available for callers
+that have not yet adopted the layered API. Their behavior is unchanged; the
+integration sprint removes them when it migrates those callers.
