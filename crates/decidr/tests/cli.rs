@@ -811,7 +811,8 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
         });
     let root = tempfile::tempdir().expect("root");
     let home = root.path().join("home");
-    let work = root.path().join("work");
+    // Exercise JSON escaping on Unix as well as Windows.
+    let work = root.path().join(r"work\escaped");
     std::fs::create_dir_all(home.join(".sc-agent")).expect("home");
     std::fs::create_dir_all(work.join(".sc/sc-agent")).expect("work");
     let git = common::run_bounded(
@@ -824,7 +825,7 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
         .expect("worktree lookup")
         .expect("git worktree");
     let global = home.join(".sc-agent/sc-agent.json");
-    let local = work.join(".sc/sc-agent/decidr.json");
+    let local = work.join(".sc").join("sc-agent").join("decidr.json");
     std::fs::write(&global, json!({"project":"global"}).to_string()).expect("global");
     std::fs::write(home.join(".sc-agent").join("decidr.json"), json!({
         "local_runners":{"laya":{"kind":"mapika","host":"127.0.0.1","port":server.port(),"model":"jev-latest"}}
@@ -917,7 +918,18 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     std::fs::write(&local, "{").expect("malformed");
     let output = common::run_bounded(&mut command());
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains(local.to_str().expect("path")));
+    let stderr = String::from_utf8(output.stderr).expect("stderr UTF8");
+    let detail: sc_agent_types::ErrorDetail =
+        serde_json::from_str(stderr.lines().last().expect("typed error line"))
+            .expect("typed error JSON");
+    assert_eq!(detail.id, "decidr.config");
+    let cause = detail.cause.as_deref().expect("configuration cause");
+    assert_eq!(cause.id, "config.json");
+    assert!(
+        cause
+            .message
+            .contains(local.to_str().expect("full config path"))
+    );
     assert!(
         requests.try_recv().is_err(),
         "doctor sent a request to the configured runner"
