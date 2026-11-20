@@ -51,7 +51,7 @@ Different callers in one process need different parallelism and different patien
 **Acceptance Criteria:**
 
 - [ ] A Rust test shows the runner built for a call with `workers` 2 has 2 workers.
-- [ ] A Python `send_batch(workers=2)` call reads `workers == 2` from the `runner.stream.start` event passed to its `general_log` callable.
+- [ ] A Python `send_batch(workers=2)` call finds `workers == 2` in the `runner.stream.start` record written through its injected general Logger.
 - [ ] `workers` of 0, 65 or -1 raises `SagError` `decidr.invalid_workers`, and the loopback runner receives no request.
 - [ ] `decidr send --workers 2` without `--batch` exits with `decidr.invalid_workers`.
 - [ ] `decidr send --timeout-secs 10` and `--batch --workers 2` reach the effective timeout and worker count, as shown by Rust tests.

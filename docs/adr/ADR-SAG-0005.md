@@ -1,17 +1,17 @@
-# Decision: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
+# Decision: sitr's Python API is built into the sc-decidr wheel; sitr lives in sc-treesitter behind a cli feature
 
-**Status:** Approved  
-**Version:** 0.1.0  
+**Status:** Proposed  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-19  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
 ---
 
-## ADR-SAG-0005: sc-treesitter-py is a separate PyO3 crate; sitr lives in sc-treesitter behind a cli feature
+## ADR-SAG-0005: sitr's Python API is built into the sc-decidr wheel; sitr lives in sc-treesitter behind a cli feature
 
-**Status:** Approved  
+**Status:** Proposed  
 
 ### Related Documents
 
@@ -34,17 +34,17 @@ The Python bindings and the CLI need PyO3, clap and sc-observability, but a Rust
 
 ### Decision
 
-`sc-treesitter-py` is a separate PyO3 crate over `sc-treesitter`. `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
+`sc-agent-py`, the crate that builds the sc-decidr wheel, depends on `sc-treesitter` with its `python` feature and exposes the sitr Python API as `sc_agent.sitr`; there is no separate sitr wheel and no `sc-treesitter-py` crate (ADR-SAG-0021). `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
 
 **Key Principles:**
 
 - A default build of `sc-treesitter` pulls in no PyO3, clap or sc-observability.
 - `sitr` builds only when the `cli` feature is on.
-- The Python extension module is built from `sc-treesitter-py`, not from `sc-treesitter`.
+- The one Python extension module is built from `sc-agent-py`, not from `sc-treesitter`.
 
 ### Rationale
 
-Feature gates keep the library's default dependency set small while the PyO3 types stay next to the code they wrap; a separate PyO3 crate keeps the extension-module build out of the library.
+Feature gates keep the library's default dependency set small while the PyO3 types stay next to the code they wrap; building the sitr API into the sc-decidr wheel gives a Python process one copy of sc-observability and one Logger for decidr and sitr calls (ADR-SAG-0021).
 
 ### Consequences
 
@@ -54,7 +54,7 @@ Feature gates keep the library's default dependency set small while the PyO3 typ
 
 **Negative:**
 
-- Two crates and two features to version and test.
+- Installing the wheel always installs both the decidr and sitr APIs.
 
 ### Alternatives Considered
 
