@@ -212,7 +212,14 @@ fn foreign_and_legacy_inputs_and_credentials_are_ignored() {
         write(&o.home.join(".sc-agent").join(file), &json!({"workers":0}));
     }
     let clean = load_layered(&o).unwrap();
-    for (name, value) in [("SC_AGENT__WORKERS", "0"), ("SITR_LOG_ROOT", "elsewhere")] {
+    for (name, value) in [
+        ("SC_AGENT__WORKERS", "0"),
+        ("SITR_LOG_ROOT", "elsewhere"),
+        ("DECIDR_LOG_ROOT", "elsewhere"),
+        ("DECIDR_PROJECT", "not-sc-project"),
+        ("DECIDR_NOT_A_SETTING", "{"),
+        ("DECIDR_LOCAL_RUNNERS__DEC__NOPE", "1"),
+    ] {
         env(&mut o, name, value);
     }
     for name in sc_agent_secrets::ALL_VARS {
@@ -228,6 +235,8 @@ fn foreign_and_legacy_inputs_and_credentials_are_ignored() {
     env(&mut o, "DECIDR_LOG_ROOT", "elsewhere");
     assert_eq!(load_layered(&o).unwrap(), clean);
     env(&mut o, "SITR_LOG_ROOT", "sitr-root");
+    env(&mut o, "SITR_PROJECT", "not-sc-project");
+    env(&mut o, "SITR_WORKERS", "0");
     assert_eq!(load_layered(&o).unwrap(), clean);
 }
 
@@ -533,6 +542,16 @@ fn collection_limits_and_unknown_keys_apply_to_layered_inputs() {
             .contains("--unknown")
     );
     o.flags.clear();
+    write(
+        &global_cli_file(&o),
+        &json!({"local_runners":{"dec":{"nope":1}}}),
+    );
+    let error = load_layered(&o).unwrap_err();
+    assert_eq!(
+        error.cause_detail().expect("cause").message,
+        "invalid value at local_runners.dec.nope: setting is not accepted in this scope"
+    );
+    fs::remove_file(global_cli_file(&o)).unwrap();
     o.cli = CliName::Sitr;
     o.flags.insert("workers".into(), json!(2));
     assert!(load_layered(&o).is_err());

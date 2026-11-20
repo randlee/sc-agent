@@ -1,22 +1,37 @@
 //! Python entry points for tree-sitter with one general-log record per call.
 
-use ::sc_treesitter::Capture;
+use ::sc_treesitter::{Capture, python::TreesitterError};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use sc_agent_log::{GeneralLogger, Level, LogContext, LogError};
 use std::error::Error;
+use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 
-/// Open the caller's logger or the default sitr log under sitr's log root.
+/// The default sitr logger, opened once per log root and kept for the process.
+static DEFAULT: Mutex<Option<(Option<PathBuf>, GeneralLogger)>> = Mutex::new(None);
+
+/// The caller's logger, or the default sitr log under sitr's log root.
 fn logger(target: Option<Py<PyAny>>) -> Option<GeneralLogger> {
     let result = match target {
         Some(target) => GeneralLogger::injected_python(target, "sitr"),
-        None => {
-            let root = std::env::var_os("SITR_LOG_ROOT");
-            let root = sc_agent_log::cli_log_root(root.as_deref(), sc_agent_log::resolve_home());
-            GeneralLogger::open_default(root.as_deref(), "sitr")
-        }
+        None => default_logger(),
     };
     result.inspect_err(notice).ok()
+}
+
+fn default_logger() -> Result<GeneralLogger, LogError> {
+    let root = std::env::var_os("SITR_LOG_ROOT");
+    let root = sc_agent_log::cli_log_root(root.as_deref(), sc_agent_log::resolve_home());
+    let mut cached = DEFAULT.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some((opened, log)) = cached.as_ref()
+        && *opened == root
+    {
+        return Ok(log.clone());
+    }
+    let log = GeneralLogger::open_default(root.as_deref(), "sitr")?;
+    *cached = Some((root, log.clone()));
+    Ok(log)
 }
 
 fn notice(error: &LogError) {
@@ -38,16 +53,20 @@ fn record<T>(
     py: Python<'_>,
 ) {
     let Some(log) = log else { return };
-    let error_id = result.as_ref().err().and_then(|error| {
-        error
-            .value(py)
-            .getattr("args")
-            .ok()?
-            .get_item(0)
-            .ok()?
-            .extract::<String>()
-            .ok()
-    });
+    let error_id = result
+        .as_ref()
+        .err()
+        .filter(|error| error.is_instance_of::<TreesitterError>(py))
+        .and_then(|error| {
+            error
+                .value(py)
+                .getattr("args")
+                .ok()?
+                .get_item(0)
+                .ok()?
+                .extract::<String>()
+                .ok()
+        });
     let fields = [
         ("language".to_owned(), language.map(str::to_owned).into()),
         ("query_size".to_owned(), query_size.into()),
@@ -67,6 +86,7 @@ fn record<T>(
     if let Err(error) = log.write(level, "sitr", action, LogContext::NONE, fields) {
         notice(&error);
     }
+    // The default logger stays open in `DEFAULT`, so this flushes; it never shuts it down.
     if let Err(error) = log.close() {
         notice(&error);
     }
@@ -145,11 +165,6 @@ fn sc_treesitter(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(query_source, module)?)?;
     module.add_function(wrap_pyfunction!(run_query, module)?)?;
     module.add_class::<Capture>()?;
-    module.add(
-        "TreesitterError",
-        module
-            .py()
-            .get_type::<::sc_treesitter::python::TreesitterError>(),
-    )?;
+    module.add("TreesitterError", module.py().get_type::<TreesitterError>())?;
     Ok(())
 }

@@ -67,6 +67,11 @@ fn run(
     if let Some(project) = cli.project {
         context.flags.insert("project".into(), project.into());
     }
+    if let Command::Send(args) = &cli.command
+        && let Some(workers) = args.workers.filter(|_| args.batch)
+    {
+        context.flags.insert("workers".into(), workers.into());
+    }
     context.loaded = Some(decidr::load_context(&context)?);
     match cli.command {
         Command::Send(args) => run_send(args, context, cancel, watch, stdin, stdout),
@@ -106,7 +111,7 @@ enum Input {
 
 fn run_send(
     args: SendArgs,
-    mut context: Context,
+    context: Context,
     cancel: &CancelToken,
     watch: &SignalWatch,
     stdin: &mut dyn Read,
@@ -120,11 +125,6 @@ fn run_send(
     let limits = args.call_limits()?;
     // Slugs first: an invalid one sends and logs nothing (REQ-SAG-0004).
     let agent_role = Slug::new("agent_role", &args.agent_role)?;
-    if let Some(workers) = args.workers {
-        context.flags.insert("workers".into(), workers.into());
-        context.loaded = None;
-    }
-    context.loaded = Some(decidr::load_context(&context)?);
     let config = load_config(&context)?;
     let project = Slug::new("project", config.require_project()?)?;
     let model = ModelSelector::parse(&args.model, &config)?;

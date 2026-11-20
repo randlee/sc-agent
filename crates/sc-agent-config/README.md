@@ -36,10 +36,11 @@ not read their values.
 `LoadOptions` supplies `home`, optional `worktree`, `flags`, `flag_names` and
 `environment`. `flag_names` optionally maps a dotted setting path to the
 caller's real flag spelling, including `--`, for doctor rows and errors; paths
-absent from it display as `--` plus the path with `_` replaced by `-`. The log
-root is not a setting: `<CLI>_LOG_ROOT` is skipped, and callers use
-`sc_agent_types::cli_log_root`. No process environment or home-directory
-discovery occurs in the layered loader.
+absent from it display as `--` plus the path with `_` replaced by `-`. A
+`<CLI>_` variable that does not name one of that CLI's own settings, such as
+`DECIDR_PROJECT` or `SITR_LOG_ROOT`, is ignored. The log root is not a setting;
+callers use `sc_agent_types::cli_log_root`. No process environment or
+home-directory discovery occurs in the layered loader.
 
 The returned `Loaded` contains an `AgentConfig`, the winning `Source` of each
 setting and the inspected `LayerFile` paths with their `exists` values.
