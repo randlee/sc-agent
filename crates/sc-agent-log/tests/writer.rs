@@ -104,6 +104,19 @@ fn general_rotates_at_start() {
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
 
+    // Public builder registration creates no worker and does not run startup maintenance.
+    // This negative assertion cannot race the background maintenance cadence.
+    let mut config = LoggerConfig::default_for(
+        ServiceName::new("decidr").expect("service"),
+        root.path().to_owned(),
+    );
+    config.enable_console_sink = false;
+    config.enable_file_sink = true;
+    let builder = LoggerBuilder::new(config).expect("public builder");
+    assert_eq!(std::fs::metadata(&active).expect("active").len(), OVERSIZED);
+    assert!(!logs.join("decidr.log.jsonl.1").exists());
+    drop(builder);
+
     let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
     log.write(
         Level::Info,
@@ -123,7 +136,7 @@ fn general_rotates_at_start() {
     assert_eq!(events(&active).expect("rows").len(), 1, "only the new row");
 }
 
-/// A file grown after opening is rotated on the next supported startup maintenance pass.
+/// A file grown between logger lifetimes is rotated on the next startup pass.
 #[test]
 fn general_rotates_after_growth_on_reopen() {
     let root = TempDir::new().expect("temp");
@@ -138,23 +151,15 @@ fn general_rotates_after_growth_on_reopen() {
     )
     .expect("initial row");
     log.flush().expect("flush initial row");
+    log.close().expect("close before external growth");
     let file = std::fs::OpenOptions::new()
         .write(true)
         .open(&active)
         .expect("active");
     file.set_len(OVERSIZED).expect("grow sparse file");
     drop(file);
-    log.write(
-        Level::Info,
-        "sc_agent_log",
-        "test.row",
-        LogContext::NONE,
-        Map::new(),
-    )
-    .expect("row");
-    log.close().expect("close");
     let grown = std::fs::metadata(&active).expect("active").len();
-    assert!(grown > OVERSIZED);
+    assert_eq!(grown, OVERSIZED);
     let reopened = GeneralLogger::open_default(Some(root.path()), "decidr").expect("reopen");
     assert_eq!(
         std::fs::metadata(root.path().join("logs/decidr.log.jsonl.1"))
