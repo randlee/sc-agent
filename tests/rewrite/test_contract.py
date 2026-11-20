@@ -142,22 +142,22 @@ class Contract(unittest.TestCase):
                     self.assertEqual(self.server.requests[0][2]["model"], "custom-model")
                 self.assertNotIn("test-secret-never-log", json.dumps(result))
 
-    def test_key_priority_env_dotenv_then_keyring_double(self):
+    def test_key_priority_dotenv_env_then_keyring_double(self):
         root = Path(self.home.name) / "repo"
         root.mkdir()
         (root / ".env").write_text("TYPESAFE_API_KEY=dotenv-secret\n")
         os.environ["SC_AGENT_TEST_REPO_ROOT"] = str(root)
         os.environ["SC_AGENT_TEST_KEYRING_VALUE"] = "keyring-secret"
-        for expected in ("test-secret-never-log", "dotenv-secret", "keyring-secret"):
+        for expected in ("dotenv-secret", "test-secret-never-log", "keyring-secret"):
             self.server.requests.clear()
             result = self.send()
             self.assertTrue(result["ok"], result)
             self.assertEqual(self.server.requests[0][1].get("Authorization"), f"Bearer {expected}")
             self.assertNotIn(expected, json.dumps(result))
-            if expected == "test-secret-never-log":
-                os.environ.pop("TYPESAFE_API_KEY")
-            elif expected == "dotenv-secret":
+            if expected == "dotenv-secret":
                 (root / ".env").unlink()
+            elif expected == "test-secret-never-log":
+                os.environ.pop("TYPESAFE_API_KEY")
 
     def test_cli_commands(self):
         target = Path(__file__).resolve().parents[2] / "rewrite" / "target" / "debug"
