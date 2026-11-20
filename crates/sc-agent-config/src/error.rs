@@ -106,7 +106,7 @@ impl ErrorId for AgentConfigError {
             Self::ProjectRequired { cli } => format!(
                 "project/phase is required: set --project, SC_PROJECT, or project in sc-agent.json or {cli}"
             ),
-            Self::Layer { source, cause } => format!("{source}: {cause}"),
+            Self::Layer { source, .. } => format!("configuration input from {source} failed"),
             Self::Read { file, cause } => format!("{} at $: {cause}", file.display()),
             Self::Json { file, cause } => format!("{} at $: {cause}", file.display()),
             Self::Catalog(_) => "a configured model conflicts with the model catalog".to_owned(),
