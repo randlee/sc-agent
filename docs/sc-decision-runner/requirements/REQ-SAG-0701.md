@@ -34,8 +34,8 @@ Owner ruling (2026-11-20), Rand Lee: "I do not require results in request order.
 
 **Acceptance Criteria:**
 
-- [ ] A batch of 40 requests against a test transport that answers each after a delay finishes in about one eighth of the serial time with the default of 8 workers.
-- [ ] With workers set to 1, the same batch runs one request at a time.
+- [ ] With the default of 8 workers, a batch of 40 requests sent to a test server that holds every reply until 8 requests are in flight completes, and the server never sees more than 8 requests in flight.
+- [ ] With workers set to 1, the test server never sees more than one request in flight from the same batch.
 - [ ] A batch in which one request fails returns that error tagged with its session ULID and returns every other result.
 - [ ] Cancelling a running batch returns cancelled results for every unfinished request.
 
