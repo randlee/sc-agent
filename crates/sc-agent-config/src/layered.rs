@@ -265,18 +265,14 @@ fn decode(mut value: Value, cli: CliName) -> Result<AgentConfig, AgentConfigErro
     let project = value.as_object_mut().and_then(|obj| obj.remove("project"));
     let project = match project {
         None => None,
-        Some(Value::String(s))
-            if !s.is_empty()
-                && s.bytes().all(|b| {
-                    b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
-                }) =>
-        {
-            Some(s)
-        }
+        Some(Value::String(s)) if sc_agent_types::is_valid_slug(&s) => Some(s),
         Some(_) => {
             return Err(invalid(
                 "project",
-                "project/phase must be a nonempty lowercase slug using a-z, 0-9, '.', '_' or '-'",
+                format!(
+                    "project/phase must be a path-safe lowercase slug using a-z, 0-9, '.', '_' or '-', at most {} bytes, not '.', '..', a trailing dot or a Windows device name",
+                    sc_agent_types::MAX_SEGMENT_BYTES
+                ),
             ));
         }
     };

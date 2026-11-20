@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::LogError;
-use crate::name::is_path_safe;
+use sc_agent_types::is_valid_slug;
 
 /// Lowercase text of only `a-z`, `0-9`, `.`, `_` and `-`, non-empty (REQ-SAG-0004).
 ///
@@ -24,10 +24,7 @@ impl Slug {
     /// `a-z 0-9 . _ -` or is not a path-safe name (empty, too long, `.`, `..`, trailing `.`,
     /// a Windows device name).
     pub fn new(field: &'static str, text: &str) -> Result<Self, LogError> {
-        let allowed = text
-            .bytes()
-            .all(|byte| matches!(byte, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-'));
-        if !allowed || !is_path_safe(text) {
+        if !is_valid_slug(text) {
             return Err(LogError::InvalidSlug {
                 field,
                 value: text.to_owned(),

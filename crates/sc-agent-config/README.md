@@ -43,7 +43,9 @@ setting and the inspected `LayerFile` paths with their `exists` values.
 `AgentConfig::project()` returns the resolved project/phase. A session caller
 uses `require_project()` before sending or writing; absence yields
 `config.project_required`, category `config`, naming every setting place.
-Project names are nonempty lowercase slugs using letters, digits, `.`, `_`, `-`.
+Project names use the same `sc_agent_types::is_valid_slug` rule as the logger:
+lowercase slugs using letters, digits, `.`, `_`, `-` that are safe directory
+names on every supported platform, bounded by `MAX_SEGMENT_BYTES`.
 Layer errors preserve the validation error and add its file, variable or flag.
 
 Existing model, worker, send-count, runner, host, port and timeout checks are

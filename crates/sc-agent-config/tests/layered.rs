@@ -7,7 +7,7 @@ use std::path::Path;
 use sc_agent_config::{
     AgentConfigError, CliName, DoctorRow, LoadOptions, Source, doctor_rows, load_layered,
 };
-use sc_agent_types::{ErrorCategory, ErrorId};
+use sc_agent_types::{ErrorCategory, ErrorId, MAX_SEGMENT_BYTES};
 use serde_json::{Value, json};
 
 fn options(root: &Path) -> LoadOptions {
@@ -526,6 +526,81 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
         assert_eq!(error.cause_detail(), Some(cause.detail()));
         if origin == "file" {
             fs::remove_file(file).unwrap();
+        }
+    }
+}
+
+#[test]
+fn project_path_safety_is_enforced_at_each_configuration_layer() {
+    let root = tempfile::tempdir().unwrap();
+    let mut unsafe_names = vec![
+        ".".to_owned(),
+        "..".to_owned(),
+        "phase.".to_owned(),
+        "con".to_owned(),
+        "nul".to_owned(),
+        "aux".to_owned(),
+        "com1".to_owned(),
+        "lpt9".to_owned(),
+        "con.txt".to_owned(),
+    ];
+    unsafe_names.push("a".repeat(MAX_SEGMENT_BYTES + 1));
+    for name in unsafe_names {
+        for origin in ["file", "environment", "flag"] {
+            let mut o = options(root.path());
+            let file = o.home.join(".sc-agent/decidr.json");
+            let expected_source = match origin {
+                "file" => {
+                    write(&file, &json!({"project":name}));
+                    file.display().to_string()
+                }
+                "environment" => {
+                    env(&mut o, "SC_PROJECT", &name);
+                    "SC_PROJECT".into()
+                }
+                "flag" => {
+                    o.flags.insert("project".into(), json!(name));
+                    "--project".into()
+                }
+                _ => unreachable!(),
+            };
+            let error =
+                load_layered(&o).expect_err(&format!("{origin} accepted unsafe project {name:?}"));
+            assert!(error.message().contains("project"), "{error}");
+            assert!(error.message().contains(&expected_source), "{error}");
+            if origin == "file" {
+                fs::remove_file(file).unwrap();
+            }
+        }
+    }
+}
+
+#[test]
+fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
+    let root = tempfile::tempdir().unwrap();
+    for name in [
+        "a.b_c-1".to_owned(),
+        "console".to_owned(),
+        "com10".to_owned(),
+        "a".repeat(MAX_SEGMENT_BYTES),
+    ] {
+        for origin in ["file", "environment", "flag"] {
+            let mut o = options(root.path());
+            let file = o.home.join(".sc-agent/decidr.json");
+            match origin {
+                "file" => write(&file, &json!({"project":name})),
+                "environment" => env(&mut o, "SC_PROJECT", &name),
+                "flag" => {
+                    o.flags.insert("project".into(), json!(name));
+                }
+                _ => unreachable!(),
+            }
+            let loaded = load_layered(&o).unwrap();
+            assert_eq!(loaded.config.project(), Some(name.as_str()));
+            assert_eq!(loaded.config.require_project().unwrap(), name);
+            if origin == "file" {
+                fs::remove_file(file).unwrap();
+            }
         }
     }
 }
