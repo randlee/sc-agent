@@ -1,7 +1,7 @@
 # Requirement: Credential variable names live in the secrets crate
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -38,8 +38,11 @@ Credential handling stays in one crate, so redaction and key lookup cannot disag
 
 Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic." The keyring account defaults to the current user account unless something else is passed in.
 
+Owner ruling (2026-11-20), Rand Lee: "Isn't ENV > .env > keyring (or win/linux equivalent) standard order?" A variable already set in the environment wins over `.env`, which is also dotenvy's default.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A workspace search finds credential variable names as string literals only in `sc-agent-secrets`.
+- [ ] With a valid key in the environment, a different valid key in the repository-root `.env` and another in the keyring, the environment key is used; with none in the environment, the `.env` key is used; with neither, the keyring key is used.
