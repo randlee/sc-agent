@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use sc_agent_config::{
-    AgentConfigError, CliName, DoctorRow, LoadOptions, Source, doctor_rows, load_layered,
-    load_layered_with_flag_names,
+    AgentConfigError, CliName, DoctorRow, LayerFile, LoadOptions, Source, doctor_rows,
+    load_layered, load_layered_with_flag_names,
 };
 use sc_agent_types::{ErrorCategory, ErrorId, MAX_SEGMENT_BYTES};
 use serde_json::{Value, json};
@@ -244,11 +244,23 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
         DoctorRow {
             setting: "project".into(),
             value: "phase-a".into(),
-            source: file.display().to_string(),
+            source: root
+                .path()
+                .join("work")
+                .join(".sc")
+                .join("sc-agent")
+                .join("sc-agent.json")
+                .display()
+                .to_string(),
         },
         DoctorRow {
             setting: "log_root".into(),
-            value: o.default_log_root.display().to_string(),
+            value: root
+                .path()
+                .join("home")
+                .join(".sc-agent")
+                .display()
+                .to_string(),
             source: "default".into(),
         },
     ];
@@ -257,8 +269,31 @@ fn canonical_shared_doctor_rows_are_identical_and_default_is_injected() {
     o.cli = CliName::Sitr;
     let sitr = load_layered(&o).unwrap();
     assert_eq!(doctor_rows(&sitr), expected);
-    assert_eq!(sitr.files.len(), 4);
-    assert_eq!(sitr.files.iter().filter(|f| f.exists).count(), 1);
+    let local = root.path().join("work").join(".sc").join("sc-agent");
+    let global = root.path().join("home").join(".sc-agent");
+    for (loaded, cli_name) in [(&decidr, "decidr.json"), (&sitr, "sitr.json")] {
+        assert_eq!(
+            loaded.files,
+            vec![
+                LayerFile {
+                    path: local.join(cli_name),
+                    exists: false
+                },
+                LayerFile {
+                    path: local.join("sc-agent.json"),
+                    exists: true
+                },
+                LayerFile {
+                    path: global.join(cli_name),
+                    exists: false
+                },
+                LayerFile {
+                    path: global.join("sc-agent.json"),
+                    exists: false
+                },
+            ]
+        );
+    }
     o.default_log_root = root.path().join("injected-default");
     let loaded = load_layered(&o).unwrap();
     assert_eq!(loaded.config.log_root().unwrap(), o.default_log_root);
@@ -316,6 +351,23 @@ fn scope_json_and_file_errors_name_the_source_and_keep_causes() {
     f.set_len(sc_agent_config::MAX_CONFIG_FILE_BYTES + 1)
         .unwrap();
     assert_eq!(load_layered(&o).unwrap_err().id(), "config.file_too_large");
+}
+
+#[test]
+fn malformed_local_decidr_json_names_its_path() {
+    let root = tempfile::tempdir().unwrap();
+    let o = options(root.path());
+    let file = root
+        .path()
+        .join("work")
+        .join(".sc")
+        .join("sc-agent")
+        .join("decidr.json");
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "{").unwrap();
+    let error = load_layered(&o).unwrap_err();
+    assert_eq!(error.id(), "config.json");
+    assert!(error.message().contains(&file.display().to_string()));
 }
 
 #[test]
