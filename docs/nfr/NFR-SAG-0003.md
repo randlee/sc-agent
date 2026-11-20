@@ -19,7 +19,7 @@ Definitions:
 - `floors.toml` is the file at the repository root that writes down the workspace's floor values for sc-compose templates to read.
 - The Python floor is `[python].floor` in `floors.toml`.
 - The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel's stable-ABI tag.
-- The Python binding crates are `crates/sc-agent-py` and `crates/sc-treesitter` (its optional pyo3).
+- The Python binding crates are `crates/sc-agent-py`, `crates/sc-treesitter-py` and `crates/sc-treesitter` (its optional pyo3).
 
 **MUST statements:**
 
