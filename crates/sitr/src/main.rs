@@ -168,16 +168,13 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
 fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
     let home = std::env::home_dir()
         .filter(|home| !home.as_os_str().is_empty())
-        .ok_or_else(|| Error::Usage {
-            kind: "Configuration".to_owned(),
+        .ok_or_else(|| Error::Config {
             detail: "home directory is unknown".to_owned(),
         })?;
-    let cwd = std::env::current_dir().map_err(|error| Error::Usage {
-        kind: "Configuration".to_owned(),
+    let cwd = std::env::current_dir().map_err(|error| Error::Config {
         detail: format!("cannot determine current directory: {error}"),
     })?;
-    let worktree = sc_agent_log::Repo::work_tree_root(&cwd).map_err(|error| Error::Usage {
-        kind: "Configuration".to_owned(),
+    let worktree = sc_agent_log::Repo::work_tree_root(&cwd).map_err(|error| Error::Config {
         detail: error.to_string(),
     })?;
     let flags = log_root_flag.map_or_else(BTreeMap::new, |path| {
@@ -191,8 +188,7 @@ fn load_config(log_root_flag: Option<&Path>) -> Result<Loaded, Error> {
         flags,
         environment: std::env::vars_os().collect(),
     })
-    .map_err(|error| Error::Usage {
-        kind: "Configuration".to_owned(),
+    .map_err(|error| Error::Config {
         detail: error.to_string(),
     })
 }

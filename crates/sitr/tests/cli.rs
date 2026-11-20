@@ -210,6 +210,23 @@ fn unknown_language_and_missing_positional_fail_with_ids() {
     assert_eq!(missing["id"], "treesitter.file_not_found");
 }
 
+#[test]
+fn malformed_sitr_config_reports_config_error_and_recovery() {
+    let home = temp_home().expect("temp home and git worktree");
+    let config = home.path().join(".sc").join("sc-agent").join("sitr.json");
+    std::fs::create_dir_all(config.parent().expect("config parent")).expect("create config dir");
+    std::fs::write(&config, b"{").expect("write malformed config");
+
+    let value =
+        error_json(&run(home.path(), &["doctor"]).expect("spawn sitr")).expect("failure contract");
+    assert_eq!(value["id"], "treesitter.config");
+    assert!(value["message"].as_str().unwrap().contains("sitr.json"));
+    assert_eq!(
+        value["recovery"],
+        "fix or remove the file named in the message, then run sitr doctor"
+    );
+}
+
 /// AC: REQ-SAG-0002 lowest-layer sitr.
 #[cfg(feature = "grammar-python")]
 #[test]

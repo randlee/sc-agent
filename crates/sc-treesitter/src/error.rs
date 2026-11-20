@@ -163,6 +163,11 @@ pub enum Error {
         /// clap's rendered text.
         detail: String,
     },
+    /// The `sitr` configuration could not be loaded.
+    Config {
+        /// The lower configuration error's `Display`.
+        detail: String,
+    },
     /// A PyO3 argument conversion failure (bindings only).
     Python {
         /// The `PyErr` `Display`.
@@ -206,6 +211,7 @@ impl Error {
             Self::LimitExceeded { .. } => "treesitter.limit_exceeded",
             Self::Encode { .. } => "treesitter.encode",
             Self::Usage { .. } => "treesitter.usage",
+            Self::Config { .. } => "treesitter.config",
             Self::Python { .. } => "treesitter.python",
             Self::Write { .. } => "treesitter.write",
             Self::Log { .. } => "treesitter.log",
@@ -282,6 +288,7 @@ impl Error {
             Self::Usage { kind, detail } => {
                 format!("invalid arguments ({kind}): {}", one_line(detail))
             }
+            Self::Config { detail } => format!("configuration error: {}", one_line(detail)),
             Self::Python { detail } => format!("invalid Python argument: {detail}"),
             Self::Write { kind, detail } => format!("cannot write output: {kind}: {detail}"),
             Self::Log { detail } => format!("the general log could not start: {detail}"),
@@ -313,6 +320,9 @@ impl Error {
             Self::SyntaxError { .. } => Some("fix the syntax error inside the matched span"),
             Self::LimitExceeded { .. } => Some("narrow the query or query a smaller source"),
             Self::Usage { .. } => Some("run `sitr --help`"),
+            Self::Config { .. } => {
+                Some("fix or remove the file named in the message, then run sitr doctor")
+            }
             Self::Python { .. } => Some("pass the source as `bytes` or `str`"),
             Self::GrammarLoad { .. }
             | Self::FileRead { .. }
@@ -431,6 +441,7 @@ mod tests {
                 kind: text(),
                 detail: text(),
             },
+            Error::Config { detail: text() },
             Error::Python { detail: text() },
             Error::Write {
                 kind: ErrorKind::BrokenPipe,
@@ -443,11 +454,11 @@ mod tests {
     /// AC: REQ-SAG-0002 errors.
     #[cfg(any(feature = "grammar-python", feature = "grammar-rust"))]
     #[test]
-    fn all_19_ids_are_distinct_well_formed_and_serialized() {
+    fn all_20_ids_are_distinct_well_formed_and_serialized() {
         let errors = one_of_each();
-        assert_eq!(errors.len(), 19);
+        assert_eq!(errors.len(), 20);
         let ids: std::collections::BTreeSet<&str> = errors.iter().map(Error::id).collect();
-        assert_eq!(ids.len(), 19, "ids must be distinct");
+        assert_eq!(ids.len(), 20, "ids must be distinct");
         for error in &errors {
             let id = error.id();
             let rest = id.strip_prefix("treesitter.").expect("prefix");
@@ -503,6 +514,18 @@ mod tests {
                 "id": "treesitter.write",
                 "message": "cannot write output: broken pipe: Broken pipe (os error 32)"
             })
+        );
+    }
+
+    #[test]
+    fn configuration_error_has_actionable_recovery() {
+        let error = Error::Config {
+            detail: "invalid JSON in /work/.sc/sc-agent/sitr.json".to_owned(),
+        };
+        assert_eq!(error.id(), "treesitter.config");
+        assert_eq!(
+            error.recovery(),
+            Some("fix or remove the file named in the message, then run sitr doctor")
         );
     }
 
