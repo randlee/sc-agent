@@ -166,3 +166,67 @@ fn default_root_uses_child_home() {
         assert!(status.success());
     }
 }
+
+/// A doctor-style JSON response stays separate from the stderr diagnostic stream.
+#[test]
+fn stderr_diagnostics_keep_doctor_json_clean() {
+    const CHILD: &str = "SC_AGENT_LOG_STDERR_CHILD";
+    const ACTION: &str = "doctor.stderr.canary";
+    if std::env::var_os(CHILD).is_some() {
+        let log = GeneralLogger::stderr("decidr").expect("stderr logger");
+        log.write(
+            Level::Info,
+            "decidr",
+            ACTION,
+            LogContext::NONE,
+            serde_json::Map::new(),
+        )
+        .expect("write");
+        log.close().expect("close barrier");
+        println!("\nDOCTOR_JSON={{\"settings\":[],\"files\":[]}}");
+        return;
+    }
+    let root = tempfile::tempdir().expect("root");
+    let mut command = std::process::Command::new(std::env::current_exe().expect("test binary"));
+    command
+        .args([
+            "stderr_diagnostics_keep_doctor_json_clean",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CHILD, "1")
+        .env("HOME", root.path())
+        .env("USERPROFILE", root.path())
+        .current_dir(root.path())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let output = sc_agent_testkit::ChildGuard::spawn(&mut command)
+        .wait_with_output(sc_agent_testkit::HANG_GUARD);
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("stdout");
+    let stderr = String::from_utf8(output.stderr).expect("stderr");
+    assert!(
+        !stdout.contains(ACTION),
+        "diagnostic polluted stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains(ACTION),
+        "diagnostic missing from stderr: {stderr}"
+    );
+    let json = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("DOCTOR_JSON="))
+        .expect("JSON response");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(json).expect("clean JSON"),
+        serde_json::json!({"settings":[],"files":[]})
+    );
+    assert_eq!(
+        std::fs::read_dir(root.path())
+            .expect("root entries")
+            .count(),
+        0
+    );
+}
