@@ -74,13 +74,55 @@ Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-sha, s
 
 ## Gates (one script, seconds, run before a task can close and before push)
 
-1. Total about 2,000 Rust lines (tests, examples, scripts included; after `cargo fmt`), failing above 2,200; new crates only until the old crates are deleted.
+1. Size: the "Size trip" rule below, applied at each sprint's QA review.
 2. Dependency allow-list (`cargo metadata`).
 3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `LoggerBuilder` outside the default-Logger function, `sc_observability` in any `pyproject.toml` dependency list.
 4. Clippy with `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` denied in non-test code.
 5. No `raise` in the wheel's Python or the generated client; no `PyErr` returned from a wheel function.
 6. Contract tests pass (below).
 The gate script and the budgets live in a path only the owner changes.
+
+## Size trip
+
+```
+SIZE TRIP
+
+Trigger. At a sprint's QA review, total Rust source is over 2,500 lines, or tests are larger than source. Checked once per sprint, not per commit.
+
+Effect. The sprint stops. The dev changes nothing in response to the trip: no compressing code, no deleting tests, no moving code elsewhere.
+
+Report. An agent that did not write the code produces one report with two parts.
+
+  Part 1, actual against expected: one row per file with the section 7 estimate, the actual line count and the difference, plus totals.
+
+  Part 2, what was written that the design does not specify: one row per function, type, constant, test or file not named in the design's copy list, public surface or behavior table. Columns:
+    Item | Where (file:lines) | Lines | What it does | Dev's reason | What removing it costs | Keep or remove
+  - "Dev's reason" is the dev's own words, quoted.
+  - "What removing it costs" names the behavior row or test that would fail, or says "nothing".
+  - "Keep or remove" is left blank. Rand fills it in, per item.
+
+The Part 2 list is produced mechanically first: a script lists every item in the source and subtracts the names in the design. The reviewer fills in the columns and does not choose which items appear.
+
+That same list is produced at every sprint's QA review, trip or not. If it is empty, nothing is reported. If the trip fires, the list is already there.
+
+After Rand's marks. Removed items are deleted with their tests. Kept items are added to the design by name, and that file's estimate is updated, so the next review treats them as specified.
+```
+
+## Sprint QA reviews
+
+Each sprint of `docs/decider-design.md` section 10 that writes or changes Rust ends with one QA review. Every one applies "Size trip".
+
+| QA review | Sprint | Applies |
+|---|---|---|
+| QA review S1 | 1: One request to Jev from the CLI | Size trip |
+| QA review S2 | 2: Batch, cancel, digest, config, tables, models, doctor | Size trip |
+| QA review S3 | 3: Haiku/Luna path | Size trip |
+| QA review S4 | 4: sitr library and CLI | Size trip |
+| QA review S5 | 5: The wheel and the client template | Size trip |
+| QA review S6 | 6: plan-anchor on the wheel | Size trip |
+| QA review S7 | 7: judge-jev on the wheel | Size trip |
+
+Dev beads carry what to build and copy only; neither the rule nor its numbers appear in any dev bead.
 
 ## Contract tests (black box, at the product boundary)
 

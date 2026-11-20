@@ -152,7 +152,7 @@ sc_agent.sitr.languages() / queries(language=None) / query_source(language, name
 
 ## 7. Files and sizes
 
-Non-blank, non-comment lines. "Copied" is counted from the named pass-2 items; "new" is my estimate.
+Non-blank, non-comment lines. "Copied" is counted from the named pass-2 items; "new" is my estimate. Every per-file number here is an estimate only, used for Part 1 of the "Size trip" report; no check fails on a per-file count.
 
 | Crate | File | Lines | Basis |
 |---|---|---|---|
@@ -207,13 +207,39 @@ Each is a script that passes or fails. No reviewer judgement is involved in any 
 | Gate | Fails when |
 |---|---|
 | Files | A crate has a file not in section 7 |
-| Size | A file is over its line count |
+| Size trip | The "Size trip" rule below fires at the sprint's QA review |
 | Surface | The public items differ from section 6 |
 | Dependencies | `Cargo.toml` names a crate not in section 7 |
 | Constructs | Source defines a trait, or uses `unwrap`, `expect` or `panic!` outside tests |
 | Panics | Every public Rust function and every wheel function catches a panic (`catch_unwind`) and returns it as an error with `Category::Panic`; a test forces a panic through each entry point and gets the error back |
 | Behavior | A row of section 4 has no test named for it, or the test fails |
 | Drop-in | Either consumer's own test suite fails against the wheel |
+
+### Size trip
+
+```
+SIZE TRIP
+
+Trigger. At a sprint's QA review, total Rust source is over 2,500 lines, or tests are larger than source. Checked once per sprint, not per commit.
+
+Effect. The sprint stops. The dev changes nothing in response to the trip: no compressing code, no deleting tests, no moving code elsewhere.
+
+Report. An agent that did not write the code produces one report with two parts.
+
+  Part 1, actual against expected: one row per file with the section 7 estimate, the actual line count and the difference, plus totals.
+
+  Part 2, what was written that the design does not specify: one row per function, type, constant, test or file not named in the design's copy list, public surface or behavior table. Columns:
+    Item | Where (file:lines) | Lines | What it does | Dev's reason | What removing it costs | Keep or remove
+  - "Dev's reason" is the dev's own words, quoted.
+  - "What removing it costs" names the behavior row or test that would fail, or says "nothing".
+  - "Keep or remove" is left blank. Rand fills it in, per item.
+
+The Part 2 list is produced mechanically first: a script lists every item in the source and subtracts the names in the design. The reviewer fills in the columns and does not choose which items appear.
+
+That same list is produced at every sprint's QA review, trip or not. If it is empty, nothing is reported. If the trip fires, the list is already there.
+
+After Rand's marks. Removed items are deleted with their tests. Kept items are added to the design by name, and that file's estimate is updated, so the next review treats them as specified.
+```
 
 Review rule: a finding must cite a section of this design. A finding that asks for something not in the design is closed as invalid. QA runs once per sprint, not once per fix.
 
