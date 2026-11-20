@@ -75,7 +75,6 @@ pub fn context(
         cli: sc_agent_config::CliName::Decidr,
         loaded: None,
         flags: std::collections::BTreeMap::new(),
-        session: None,
         general: None,
         home: Some(dir.to_path_buf()),
         // No real `.env` is read (QA-011): the repo root is the tempdir config dir.

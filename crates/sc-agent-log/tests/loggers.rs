@@ -259,9 +259,9 @@ fn session_open_with_selects_injection_or_default_without_a_general_log() {
     let root = tempfile::tempdir().expect("root");
     let memory = MemoryLog::new().expect("memory");
     let id = identity().expect("identity");
-    let injected = sc_agent_log::Injected::Rust(memory.logger());
-    let log = sc_agent_log::SessionLogger::open_with(root.path(), id.clone(), Some(injected))
-        .expect("injected");
+    let log =
+        sc_agent_log::SessionLogger::open_with(root.path(), id.clone(), Some(memory.logger()))
+            .expect("injected");
     log.write(SessionId::new(), serde_json::Map::new())
         .expect("write");
     log.close().expect("close");

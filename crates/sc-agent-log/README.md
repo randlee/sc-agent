@@ -49,7 +49,7 @@ and does not require Python at runtime.
 
 ## Features
 
-- `python` (not default): `Injected`, `Loggers::open_with`, and direct injection of caller-owned Python `Logger`, `AttachedLogger`, or callable. The caller retains flush and shutdown.
+- `python` (not default): `Injected` and direct injection of a caller-owned Python `Logger`, `AttachedLogger`, or callable into the general log; the session log takes only a Rust `Logger`. The caller retains flush and shutdown.
   `Injected::Python` exposes `pyo3::Py<PyAny>`, so the pinned PyO3 version (0.29.2) is part of this feature's Rust API compatibility contract. Consumers passing Python objects must use a compatible PyO3 version; changing it can break their builds.
 - `testing` (not default): `testing::MemoryLog`, an in-memory sink for consumers' tests. It adds no dependency.
 

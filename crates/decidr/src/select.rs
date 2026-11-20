@@ -65,8 +65,6 @@ pub struct Context {
     pub transport: Option<Arc<dyn Transport>>,
     /// The caller-owned general destination; absent selects the default file.
     pub general: Option<sc_agent_log::Injected>,
-    /// The caller-owned session destination; absent selects the default session file.
-    pub session: Option<sc_agent_log::Injected>,
     /// An opened general writer shared by the process edge and its workers.
     pub opened_general: Option<GeneralLogger>,
     /// The clock of every decision run and of every wait (admissions, holdoffs, provider
@@ -91,7 +89,6 @@ impl Context {
             keyring_override: None,
             transport: None,
             general: None,
-            session: None,
             opened_general: None,
             clock: None,
         }
@@ -455,11 +452,7 @@ fn session_for(options: &SendOptions) -> Result<SessionLogger, DecidrError> {
         None => {
             let identity = session_identity(&options.project, &options.agent_role)?;
             let root = log_root(&options.context)?;
-            Ok(SessionLogger::open_with(
-                &root,
-                identity,
-                options.context.session.clone(),
-            )?)
+            Ok(SessionLogger::open_default(&root, identity)?)
         }
     }
 }

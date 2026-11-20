@@ -8,8 +8,9 @@
 //! The decidr call runs on a scoped worker thread; the Python thread waits on its result
 //! channel with a 100 ms timed wait outside the GIL and calls `check_signals` between waits,
 //! so `KeyboardInterrupt` cancels the run, drains it and is re-raised (REQ-SAG-0011).
-//! `general_log` and `session_log` take a caller-owned `sc_observability.Logger` or
-//! `Callable[[dict], None]` (REQ-SAG-0008). Configuration uses the shared decidr layers.
+//! `general_log` takes a caller-owned `sc_observability.Logger` or `Callable[[dict], None]`
+//! (REQ-SAG-0008); the session log is always the default file. Configuration uses the shared
+//! decidr layers.
 
 mod binding_error;
 mod keyring_options;
@@ -539,7 +540,6 @@ fn send_options(
     agent_role: &str,
     provider: ProviderOption<'_>,
     general_log: Option<Py<PyAny>>,
-    session_log: Option<Py<PyAny>>,
 ) -> Result<SendOptions, DecidrError> {
     let agent_role = Slug::new("agent_role", agent_role)?;
     let mut context = context(general_log, project)?;
@@ -547,7 +547,6 @@ fn send_options(
     let project = Slug::new("project", config.require_project()?)?;
     let model = ModelSelector::parse(model, &config)?;
     let provider = provider.parse()?;
-    context.session = session_log.map(|target| Injected::Python(Arc::new(target)));
     open_general(&mut context)?;
     let mut options = SendOptions {
         model,
@@ -622,7 +621,7 @@ fn invalid_option(option: &str, bound: &str) -> PyErr {
 /// `images` maps part names to PNG or JPEG bytes. Raises `SagError` for a command error; a
 /// failed decision is data in the returned line.
 #[pyfunction]
-#[pyo3(signature = (request, *, model, project = None, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, session_log = None, keyring_service = None, keyring_account = None, timeout_secs = None))]
+#[pyo3(signature = (request, *, model, project = None, agent_role, provider = None, images = None, long_context = false, cancel = None, general_log = None, keyring_service = None, keyring_account = None, timeout_secs = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -638,7 +637,6 @@ fn send(
     long_context: bool,
     cancel: Option<&CancelToken>,
     general_log: Option<Py<PyAny>>,
-    session_log: Option<Py<PyAny>>,
     keyring_service: Option<&str>,
     keyring_account: Option<&str>,
     timeout_secs: Option<f64>,
@@ -653,15 +651,8 @@ fn send(
     let images = images.unwrap_or_default().into_iter().collect();
     let request = build_request_bytes(request.as_bytes(), images, long_context, None)
         .map_err(|error| sag_error(&error))?;
-    let mut options = send_options(
-        model,
-        project,
-        agent_role,
-        provider,
-        general_log,
-        session_log,
-    )
-    .map_err(|error| sag_error(&error))?;
+    let mut options = send_options(model, project, agent_role, provider, general_log)
+        .map_err(|error| sag_error(&error))?;
     options.context.keyring_override = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();
@@ -712,7 +703,7 @@ fn send(
 /// `decidr send --batch`: always `Decision::decide_stream`; returns the result lines in
 /// input order and passes each to `on_result` as it arrives.
 #[pyfunction]
-#[pyo3(signature = (requests, *, model, project = None, agent_role, provider = None, cancel = None, on_result = None, general_log = None, session_log = None, keyring_service = None, keyring_account = None, timeout_secs = None, workers = None))]
+#[pyo3(signature = (requests, *, model, project = None, agent_role, provider = None, cancel = None, on_result = None, general_log = None, keyring_service = None, keyring_account = None, timeout_secs = None, workers = None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "one keyword argument per decidr send flag (ANC-006)"
@@ -727,7 +718,6 @@ fn send_batch(
     cancel: Option<&CancelToken>,
     on_result: Option<Py<PyAny>>,
     general_log: Option<Py<PyAny>>,
-    session_log: Option<Py<PyAny>>,
     keyring_service: Option<&str>,
     keyring_account: Option<&str>,
     timeout_secs: Option<f64>,
@@ -745,15 +735,8 @@ fn send_batch(
     let provider = ProviderOption::Text(provider);
     let requests = build_batch(requests.into_iter().map(BatchInput::from).collect())
         .map_err(|error| sag_error(&error))?;
-    let mut options = send_options(
-        model,
-        project,
-        agent_role,
-        provider,
-        general_log,
-        session_log,
-    )
-    .map_err(|error| sag_error(&error))?;
+    let mut options = send_options(model, project, agent_role, provider, general_log)
+        .map_err(|error| sag_error(&error))?;
     options.context.keyring_override = keyring;
     let cancel = token(cancel);
     let worker_cancel = cancel.clone();

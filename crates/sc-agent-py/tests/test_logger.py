@@ -18,17 +18,12 @@ def ok(result):
 
 @pytest.mark.mode("ok")
 @pytest.mark.parametrize("operation", ["send", "send_batch"])
-@pytest.mark.parametrize("injection", ["general", "session", "both"])
-def test_same_caller_owned_logger_receives_python_and_sc_agent_records(env, args, tmp_path, operation, injection):
+def test_same_caller_owned_logger_receives_python_and_sc_agent_records(env, args, tmp_path, operation):
     _, default_root = env
     caller_root = tmp_path / "caller"
     logger = ok(obs.create_logger(obs.LoggerConfig(service="consumer", log_root=str(caller_root))))
     ok(logger.log(obs.LogEvent(level="info", target="consumer", action="before", fields={"owner": "python"})))
-    injected = {}
-    if injection in ("general", "both"):
-        injected["general_log"] = logger
-    if injection in ("session", "both"):
-        injected["session_log"] = logger
+    injected = {"general_log": logger}
     seen = []
     original_log = logger.log
     def observe(event):
@@ -49,27 +44,15 @@ def test_same_caller_owned_logger_receives_python_and_sc_agent_records(env, args
         actions = [event.action for event in events]
         assert {"before", "after"}.issubset(actions)
         assert all(event.service == "consumer" for event in events)
-        if injection in ("general", "both"):
-            assert "decidr.send" in actions
-            assert "http.send" in actions
-            assert not (default_root / "logs/decidr.log.jsonl").exists()
-        else:
-            assert (default_root / "logs/decidr.log.jsonl").exists()
-            assert "decidr.send" not in actions
-        sessions = [event for event in events if event.target == "sc_agent.session"]
-        expected = 1 if operation == "send" else 2
-        if injection in ("session", "both"):
-            assert len(sessions) == expected
-            assert sorted(event.fields["position"].value for event in sessions) == list(range(expected))
-            assert {event.fields["session_id"].value for event in sessions} == {json.loads(line)["session_id"] for line in lines}
-            assert not list(default_root.rglob("sessions.jsonl"))
-        else:
-            assert not sessions
-            files = list(default_root.rglob("sessions.jsonl"))
-            assert len(files) == 1
-            assert files[0].is_relative_to(default_root / "sessions")
-            assert not list((default_root / "logs").rglob("sessions.jsonl"))
-            assert len(files[0].read_text().splitlines()) == expected
+        assert "decidr.send" in actions
+        assert "http.send" in actions
+        assert not (default_root / "logs/decidr.log.jsonl").exists()
+        assert not [event for event in events if event.target == "sc_agent.session"]
+        files = list(default_root.rglob("sessions.jsonl"))
+        assert len(files) == 1
+        assert files[0].is_relative_to(default_root / "sessions")
+        assert not list((default_root / "logs").rglob("sessions.jsonl"))
+        assert len(files[0].read_text().splitlines()) == (1 if operation == "send" else 2)
     finally:
         ok(logger.shutdown())
     assert isinstance(logger.log(obs.LogEvent(level="info", target="consumer", action="closed")), obs.Err)
@@ -80,7 +63,7 @@ def test_closed_caller_logger_reports_lost_rows_and_preserves_decision(env, args
     logger = ok(obs.create_logger(obs.LoggerConfig(service="consumer", log_root=str(tmp_path / "caller"))))
     ok(logger.shutdown())
     with pytest.warns(RuntimeWarning) as warnings:
-        result = sc_agent.send(NOUL, **args, general_log=logger, session_log=logger)
+        result = sc_agent.send(NOUL, **args, general_log=logger)
     assert "response" in json.loads(result)
     messages = "\n".join(str(warning.message) for warning in warnings)
     assert "log.rows_lost" in messages

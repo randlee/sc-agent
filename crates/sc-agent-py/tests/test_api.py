@@ -207,33 +207,16 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
     """AC: REQ-SAG-0008 Python."""
     _loopback, log_root = env
     records: list[dict] = []
-    rows: list[dict] = []
-    sc_agent.send(NOUL, general_log=records.append, session_log=rows.append, **args)
+    sc_agent.send(NOUL, general_log=records.append, **args)
     assert "decidr.send" in [record["action"] for record in records]
     assert "http.send" in [record["action"] for record in records]
-    assert len(rows) == 1 and rows[0]["action"] == "session.row"
-    assert sorted(rows[0]) == ["action", "correlation_id", "fields", "level", "message", "outcome", "request_id", "target", "trace"]
-    assert list(rows[0]["fields"])[:4] == ["session_id", "repo", "project", "agent_role"]
     assert not (log_root / "logs" / "sc-agent-py.log.jsonl").exists()
-    assert session_files(log_root) == []
     models: list[dict] = []
     listed = json.loads(
         sc_agent.models(runner="dec", general_log=models.append)
     )
     assert listed["models"][0]["name"] == "jev-latest"
     assert "decidr.models" in [record["action"] for record in models]
-
-
-def test_only_a_session_log_callable_keeps_the_default_general_log(env, args):
-    """AC: REQ-SAG-0008 AC4."""
-    _loopback, log_root = env
-    rows: list[dict] = []
-    sc_agent.send(NOUL, session_log=rows.append, **args)
-    assert len(rows) == 1
-    general = log_root / "logs" / "decidr.log.jsonl"
-    assert general.exists()
-    assert "decidr.send" in general.read_text()
-    assert session_files(log_root) == []
 
 
 def test_only_a_general_log_callable_keeps_the_default_session_log(env, args):
@@ -289,7 +272,7 @@ def test_keyboard_interrupt_cancels_drains_and_reraises(env, args):
 
 
 def test_a_raising_log_callable_never_changes_the_result(env, args):
-    """AC: REQ-SAG-0008 (QA-003). A general_log or session_log callable that raises makes its
+    """AC: REQ-SAG-0008 (QA-003). A general_log callable that raises makes its
     writes refused writes: the send returns its normal result, and the lost rows are reported
     (as a RuntimeWarning naming log.rows_lost) instead of being dropped silently."""
 
@@ -300,13 +283,9 @@ def test_a_raising_log_callable_never_changes_the_result(env, args):
         line = json.loads(sc_agent.send(NOUL, general_log=refuse, **args))
     assert line["error"]["id"] == "decision.api_status"  # the loopback's fixed error, as always
 
-    with pytest.warns(RuntimeWarning, match="log.rows_lost"):
-        line = json.loads(sc_agent.send(NOUL, session_log=refuse, **args))
-    assert line["error"]["id"] == "decision.api_status"
-
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # a callable that accepts every record warns nothing
-        sc_agent.send(NOUL, general_log=lambda _record: None, session_log=lambda _record: None, **args)
+        sc_agent.send(NOUL, general_log=lambda _record: None, **args)
 
 
 def test_an_on_result_exception_cancels_drains_and_reraises(env, args):

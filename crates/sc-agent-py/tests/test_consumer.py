@@ -124,7 +124,7 @@ def test_rendered_feature_combinations_run_loopback(env, args, tmp_path, monkeyp
     assert result["ok"] and "response" in json.loads(result["line"])
     assert passed[0]["model"] == "dec"
     assert passed[0]["general_log"] is client.client_logger()
-    assert "provider" not in passed[0] and "session_log" not in passed[0]
+    assert "provider" not in passed[0]
     assert passed[0]["keyring_service"] == "consumer-entry"
     assert passed[0]["keyring_account"] == "consumer-account"
     assert passed[0]["cancel"] is cancel
@@ -249,7 +249,7 @@ def test_rebuilt_default_keyring_and_forbidden_arguments(consumer, monkeypatch, 
     assert len(passed) == 1
     assert passed[0]["keyring_service"] is None
     assert passed[0]["keyring_account"] is None
-    assert "session_log" not in passed[0] and "provider" not in passed[0]
+    assert "provider" not in passed[0]
 
 
 @pytest.mark.parametrize("method,payload", [("call_result", REQUEST), ("call_batch_results", [REQUEST])])

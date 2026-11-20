@@ -77,13 +77,11 @@ def send(request: str, *, model: str, agent_role: str, project: str | None = Non
          provider: str | None = None, images: dict[str, bytes] | None = None,
          long_context: bool = False, cancel: CancelToken | None = None,
          general_log: LogTarget | None = None,
-         session_log: LogTarget | None = None,
          keyring_service: str | None = None,
          keyring_account: str | None = None, timeout_secs: float | None = None) -> str: ...
 def send_batch(requests: Sequence[BatchItem], *, model: str, agent_role: str, project: str | None = None, provider: str | None = None, cancel: CancelToken | None = None,
          on_result: Callable[[str], None] | None = None,
          general_log: LogTarget | None = None,
-         session_log: LogTarget | None = None,
          keyring_service: str | None = None,
          keyring_account: str | None = None, timeout_secs: float | None = None,
          workers: int | None = None) -> list[str]: ...

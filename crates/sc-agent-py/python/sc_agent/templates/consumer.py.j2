@@ -355,7 +355,7 @@ def call_result(
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
     images: Optional[dict[str, bytes]] = None, long_context: bool = False,
     keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-    logger=None, session_log=None,
+    logger=None,
     timeout_secs: Optional[float] = None,
     consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
@@ -363,8 +363,6 @@ def call_result(
                   long_context=long_context, keyring_service=keyring_service,
                   keyring_account=keyring_account)
     kwargs["general_log"] = client_logger(logger=logger)
-    if session_log is not None:
-        kwargs["session_log"] = session_log
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     sent = _invoke("send", request, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
@@ -380,7 +378,7 @@ def call_batch_results(
     requests: Sequence[BatchItem], *, model: str, project: Optional[str] = None, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
     keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-    logger=None, session_log=None,
+    logger=None,
     timeout_secs: Optional[float] = None, workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
     consent_what: str = "The request text", repository_root: str = ".",
@@ -404,8 +402,6 @@ def call_batch_results(
     kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel, on_result=record,
                   keyring_service=keyring_service, keyring_account=keyring_account)
     kwargs["general_log"] = client_logger(logger=logger)
-    if session_log is not None:
-        kwargs["session_log"] = session_log
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:

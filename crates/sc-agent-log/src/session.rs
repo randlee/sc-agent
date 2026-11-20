@@ -144,14 +144,14 @@ impl SessionLogger {
         Self::injected_in(logger, None, identity)
     }
 
-    /// Opens an injected destination, or the default session file when absent.
+    /// Opens the injected logger, or the default session file when absent.
     ///
     /// # Errors
-    /// Returns an error when the default cannot open or the Python target is invalid.
+    /// Returns an error when the default cannot open.
     pub fn open_with(
         log_root: &Path,
         identity: SessionIdentity,
-        injected: Option<crate::Injected>,
+        injected: Option<Arc<Logger>>,
     ) -> Result<Self, LogError> {
         Self::open_in(log_root, identity, injected, None)
     }
@@ -159,38 +159,13 @@ impl SessionLogger {
     pub(crate) fn open_in(
         log_root: &Path,
         identity: SessionIdentity,
-        injected: Option<crate::Injected>,
+        injected: Option<Arc<Logger>>,
         ledger: Option<Arc<Ledger>>,
     ) -> Result<Self, LogError> {
         match injected {
-            Some(injected) => Ok(Self {
-                #[cfg(feature = "python")]
-                writer: Arc::new(Writer::from_injected(injected, ledger, Self::SERVICE, LOG)?),
-                #[cfg(not(feature = "python"))]
-                writer: Arc::new(Writer::from_injected(injected, ledger, LOG)?),
-                identity: Arc::new(identity),
-                path: None,
-            }),
+            Some(logger) => Ok(Self::injected_in(logger, ledger, identity)),
             None => Self::open_default(log_root, identity),
         }
-    }
-
-    /// Injects a caller-owned Python logger or callable.
-    /// Callable records use the [documented dictionary shape](crate#python-callable-records).
-    ///
-    /// # Errors
-    /// Returns an error if the target is invalid.
-    #[cfg(feature = "python")]
-    pub fn injected_python(
-        target: pyo3::Py<pyo3::PyAny>,
-        identity: SessionIdentity,
-    ) -> Result<Self, LogError> {
-        let target = crate::python::PythonTarget::classify(target)?;
-        Ok(Self {
-            writer: Arc::new(Writer::injected_python(target, Self::SERVICE, LOG)?),
-            identity: Arc::new(identity),
-            path: None,
-        })
     }
 
     /// Injects a caller-owned logger and a controlled timestamp for deterministic boundary tests.
