@@ -50,18 +50,6 @@ impl PythonTarget {
                 .map_err(refused)?;
             match self {
                 Self::Callable(target) => {
-                    let fields = record
-                        .cast::<PyDict>()
-                        .map_err(|error| refused(error.into()))?;
-                    for key in [
-                        "message",
-                        "request_id",
-                        "correlation_id",
-                        "outcome",
-                        "trace",
-                    ] {
-                        fields.del_item(key).map_err(refused)?;
-                    }
                     target.call1(py, (record,)).map_err(refused)?;
                     Ok(())
                 }
