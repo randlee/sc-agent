@@ -14,7 +14,8 @@ files, logs nothing, resolves no credentials and needs no async runtime.
 6. `<home>/.sc-agent/sc-agent.json`.
 7. Built-in values, or a typed missing-setting error when required by the caller.
 
-`CliName` selects `decidr.json` / `DECIDR_` or `sitr.json` / `SITR_`.
+`CliName` selects `decidr.json` / `DECIDR_` or `sitr.json` / `SITR_`. Adding
+a CLI requires updating ADR-SAG-0020's scope table and a sc-agent-config crate release.
 With `worktree: None`, local files are neither inspected nor read. Objects merge
 per key; scalar and array values replace the lower value. Supplied values are
 validated even when a higher layer overrides them. Non-regular files and files
@@ -25,7 +26,10 @@ Both scopes accept `project` and `log_root`. Only decidr's CLI file accepts
 those settings. The loader ignores other CLIs' files and environment prefixes.
 
 Nested environment names join upper-case key parts with `__`, for example
-`DECIDR_LOCAL_RUNNERS__LAYA__PORT=9000`. Project/phase uses only `SC_PROJECT`.
+`DECIDR_LOCAL_RUNNERS__LAYA__PORT=9000`. Environment key parts resolve to
+lowercase setting names: runner names must be lowercase to use environment
+overrides; a mixed-case runner name in JSON cannot be addressed through them.
+Project/phase uses only `SC_PROJECT`.
 Credential variable names are owned by `sc-agent-secrets`; this loader does
 not read their values.
 
@@ -33,6 +37,12 @@ not read their values.
 `default_log_root`. The caller supplies the latter from the shared default-log-root
 function; the loader does not choose a separate default path. No process
 environment or home-directory discovery occurs in the layered loader.
+
+`load_layered_with_flag_names(&options, &names)` accepts a map from dotted
+setting paths to actual flag spellings, including `--`, for doctor rows and
+validation errors. For example, map `local_runners.laya.port` to `--runner-port`
+when that is the caller's real flag. `load_layered` keeps its existing spelling
+for callers that do not supply this map.
 
 The returned `Loaded` contains an `AgentConfig`, the winning `Source` of each
 setting and the inspected `LayerFile` paths with their `exists` values.
