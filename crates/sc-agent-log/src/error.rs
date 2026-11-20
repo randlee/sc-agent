@@ -57,6 +57,8 @@ pub enum LogError {
         /// The host name read failure, if any.
         source: Option<std::io::Error>,
     },
+    /// The home directory is absent or empty.
+    HomeUnknown,
     /// The process's current working directory could not be read.
     WorkingDirUnknown {
         /// The current-directory read failure.
@@ -101,6 +103,13 @@ pub enum LogError {
         log: LogKind,
         /// sc-observability's failure.
         source: EventError,
+    },
+    /// An injected Python target is not a supported logger or callable.
+    InvalidTarget,
+    /// An injected Python target refused a record.
+    PythonRejected {
+        /// The original Python error code and message.
+        cause: Box<ErrorDetail>,
     },
     /// The flush barrier failed.
     Flush {
@@ -156,6 +165,7 @@ sc_agent_types::error_catalog! { LogError {
     LogError::GitUnavailable { .. } => ("log.git_unavailable", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::GitOutput { .. } => ("log.git_output", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::HostUnknown { .. } => ("log.host_unknown", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::HomeUnknown => ("log.home_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::WorkingDirUnknown { .. } => ("log.working_dir_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::FolderUnknown { .. } => ("log.folder_unknown", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::InvalidName { .. } => ("log.invalid_name", Some(sc_agent_types::ErrorCategory::Log)),
@@ -163,6 +173,8 @@ sc_agent_types::error_catalog! { LogError {
     LogError::Start { .. } => ("log.start", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::ReservedField { .. } => ("log.reserved_field", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Rejected { .. } => ("log.rejected", Some(sc_agent_types::ErrorCategory::Log)),
+    LogError::InvalidTarget => ("log.invalid_target", Some(sc_agent_types::ErrorCategory::Validation)),
+    LogError::PythonRejected { .. } => ("log.python_rejected", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::Flush { .. } => ("log.flush", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowTooLarge { .. } => ("log.row_too_large", Some(sc_agent_types::ErrorCategory::Log)),
     LogError::RowsLost { .. } => ("log.rows_lost", Some(sc_agent_types::ErrorCategory::Log)),
@@ -190,6 +202,7 @@ impl ErrorId for LogError {
             }
             Self::HostUnknown { source: Some(_) } => "the host name could not be read".to_owned(),
             Self::HostUnknown { source: None } => "the host name is not UTF-8".to_owned(),
+            Self::HomeUnknown => "the home directory is unavailable".to_owned(),
             Self::WorkingDirUnknown { .. } => {
                 "the current working directory could not be read".to_owned()
             }
@@ -208,6 +221,10 @@ impl ErrorId for LogError {
                 format!("payload key {key:?} is reserved for the identity or context fields")
             }
             Self::Rejected { log, .. } => format!("the {log} logger refused the row"),
+            Self::InvalidTarget => {
+                "expected sc_observability.Logger, AttachedLogger, or a callable".to_owned()
+            }
+            Self::PythonRejected { .. } => "the injected Python target refused the row".to_owned(),
             Self::Flush { log, .. } => format!("the {log} logger could not flush"),
             Self::RowTooLarge { log, bytes, max } => {
                 format!(
@@ -229,7 +246,9 @@ impl ErrorId for LogError {
             | Self::WorkingDirUnknown { source } => {
                 Some(ErrorDetail::foreign(io_id(source), source))
             }
-            Self::InvalidName { cause, .. } => Some((**cause).clone()),
+            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
+                Some((**cause).clone())
+            }
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(
                 ErrorDetail::foreign(source.diagnostic().code.as_str(), source),
             ),
@@ -242,7 +261,9 @@ impl ErrorId for LogError {
                 source,
             )),
             Self::RowsLost { last, .. } => last.as_deref().cloned(),
-            Self::InvalidSlug { .. }
+            Self::InvalidTarget
+            | Self::HomeUnknown
+            | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }
@@ -267,14 +288,18 @@ impl Error for LogError {
                 source: Some(source),
             } => Some(source),
             Self::WorkingDirUnknown { source } => Some(source),
-            Self::InvalidName { cause, .. } => Some(cause.as_ref()),
+            Self::InvalidName { cause, .. } | Self::PythonRejected { cause } => {
+                Some(cause.as_ref())
+            }
             Self::OpenSink { source, .. } | Self::Start { source, .. } => Some(source),
             Self::Rejected { source, .. } => Some(source),
             Self::Flush { source, .. } => Some(source),
             Self::RowsLost { last, .. } => {
                 last.as_deref().map(|last| last as &(dyn Error + 'static))
             }
-            Self::InvalidSlug { .. }
+            Self::InvalidTarget
+            | Self::HomeUnknown
+            | Self::InvalidSlug { .. }
             | Self::InvalidRepo { .. }
             | Self::GitOutput { .. }
             | Self::HostUnknown { source: None }

@@ -17,7 +17,7 @@ roots = ["load"]
 
 [dependencies]
 allowed_dev_dependencies = ["sc-agent-testkit", "sc-agent-secrets"]
-allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-local", "sc-decision-runner"]
+allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-local", "sc-decision-runner", "sitr"]
 allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 

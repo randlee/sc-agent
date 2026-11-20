@@ -35,7 +35,7 @@ mod tests {
 
     /// AC: REQ-SAG-0003, ADR-SAG-0002. With no injected loggers, a send writes
     /// `<log_root>/logs/decidr.log.jsonl` and its session row under
-    /// `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, identity fields first.
+    /// `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, identity fields first.
     #[test]
     fn default_logs_are_written_under_the_log_root() {
         let root = tempfile::tempdir().expect("root");
@@ -66,7 +66,9 @@ mod tests {
         let expected = repo
             .as_str()
             .split('/')
-            .fold(root.path().join("logs"), |path, segment| path.join(segment))
+            .fold(root.path().join("sessions"), |path, segment| {
+                path.join(segment)
+            })
             .join("role")
             .join("proj")
             .join("sessions.jsonl");
@@ -172,7 +174,7 @@ mod tests {
 
     /// REQ-SAG-0003 0.2.0, REQ-SAG-0005 0.2.0: with `log_root` configured (a tempdir), the
     /// general log lands at `<log_root>/logs/decidr.log.jsonl` and the session log under
-    /// `<log_root>/logs/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
+    /// `<log_root>/sessions/<repo>/<agent_role>/<project>/`. The unconfigured default of `log_root`
     /// (`<home>/.sc-agent`) is sc-agent-config's `default_dir`, tested there.
     #[test]
     fn every_log_lands_under_log_root_logs() {
@@ -200,8 +202,8 @@ mod tests {
         find(root.path(), "sessions.jsonl", &mut rows);
         assert_eq!(rows.len(), 1);
         assert!(
-            rows[0].starts_with(&logs),
-            "session log under logs/: {}",
+            rows[0].starts_with(root.path().join("sessions")),
+            "session log under sessions/: {}",
             rows[0].display()
         );
     }

@@ -19,7 +19,7 @@ roots = ["sc_treesitter"]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-treesitter"]
+allowed_dependencies = ["sc-treesitter", "sc-agent-log"]
 allowed_dev_dependents = []
 allowed_dev_dependencies = []
 forbidden_edges = []

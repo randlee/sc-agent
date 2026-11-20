@@ -73,7 +73,7 @@ fn rows_lost_reported_once() {
 #[test]
 fn healthy_writer_loses_nothing() {
     let root = TempDir::new().expect("temp");
-    let general = GeneralLogger::open_default(root.path(), "decidr").expect("general");
+    let general = GeneralLogger::open_default(Some(root.path()), "decidr").expect("general");
     general
         .write(
             Level::Info,
@@ -104,7 +104,7 @@ fn general_rotates_at_start() {
     file.set_len(OVERSIZED).expect("sparse");
     drop(file);
 
-    let log = GeneralLogger::open_default(root.path(), "decidr").expect("logger");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
     log.write(
         Level::Info,
         "sc_agent_log",
@@ -121,6 +121,48 @@ fn general_rotates_at_start() {
         OVERSIZED
     );
     assert_eq!(events(&active).expect("rows").len(), 1, "only the new row");
+}
+
+/// A file grown after opening is rotated on the next supported startup maintenance pass.
+#[test]
+fn general_rotates_after_growth_on_reopen() {
+    let root = TempDir::new().expect("temp");
+    let log = GeneralLogger::open_default(Some(root.path()), "decidr").expect("logger");
+    let active = root.path().join("logs/decidr.log.jsonl");
+    log.write(
+        Level::Info,
+        "sc_agent_log",
+        "test.initial",
+        LogContext::NONE,
+        Map::new(),
+    )
+    .expect("initial row");
+    log.flush().expect("flush initial row");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&active)
+        .expect("active");
+    file.set_len(OVERSIZED).expect("grow sparse file");
+    drop(file);
+    log.write(
+        Level::Info,
+        "sc_agent_log",
+        "test.row",
+        LogContext::NONE,
+        Map::new(),
+    )
+    .expect("row");
+    log.close().expect("close");
+    let grown = std::fs::metadata(&active).expect("active").len();
+    assert!(grown > OVERSIZED);
+    let reopened = GeneralLogger::open_default(Some(root.path()), "decidr").expect("reopen");
+    assert_eq!(
+        std::fs::metadata(root.path().join("logs/decidr.log.jsonl.1"))
+            .expect("rotated")
+            .len(),
+        grown
+    );
+    reopened.close().expect("close");
 }
 
 /// A8-04: an over-64 MiB session file is not renamed; the new row is appended to it.
@@ -370,7 +412,7 @@ fn log_error_keeps_lower_layer_cause() {
 
     // sc-observability refuses a service name.
     let root = TempDir::new().expect("temp");
-    let error = GeneralLogger::open_default(root.path(), "not a name").expect_err("refused");
+    let error = GeneralLogger::open_default(Some(root.path()), "not a name").expect_err("refused");
     assert_eq!(error.id(), "log.invalid_name");
     let cause = error.detail().cause.expect("cause detail");
     let source = error
@@ -396,7 +438,7 @@ fn log_error_keeps_io_cause() {
     if !common::make_unwritable(&logs).expect("chmod") {
         return;
     }
-    let error = GeneralLogger::open_default(root.path(), "decidr").expect_err("cannot move");
+    let error = GeneralLogger::open_default(Some(root.path()), "decidr").expect_err("cannot move");
     common::make_writable(&logs).expect("chmod");
     assert_eq!(error.id(), "log.open_sink");
     assert!(

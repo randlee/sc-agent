@@ -29,7 +29,7 @@ const LOG: LogKind = LogKind::General;
 /// use sc_agent_types::SessionId;
 ///
 /// let root = tempfile::tempdir()?;
-/// let log = GeneralLogger::open_default(root.path(), "decidr")?;
+/// let log = GeneralLogger::open_default(Some(root.path()), "decidr")?;
 /// let mut fields = serde_json::Map::new();
 /// fields.insert("elapsed_ms".into(), 12.into());
 /// let ctx = LogContext::request(SessionId::new(), Some(0));
@@ -58,7 +58,21 @@ impl GeneralLogger {
     /// [`LogError::InvalidName`] when `service` is not a valid sc-observability service name,
     /// [`LogError::OpenSink`] when the startup retention pass fails (for example, a log
     /// directory that cannot be written), [`LogError::Start`] when the logger cannot start.
-    pub fn open_default(log_root: &Path, service: &'static str) -> Result<Self, LogError> {
+    pub fn open_default(log_root: Option<&Path>, service: &'static str) -> Result<Self, LogError> {
+        let default_root;
+        let log_root = match log_root {
+            Some(root) => root,
+            None => {
+                let home_var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+                reject_empty_home(std::env::var_os(home_var).as_deref())?;
+                #[allow(deprecated)]
+                let home = std::env::home_dir()
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .ok_or(LogError::HomeUnknown)?;
+                default_root = sc_agent_types::default_log_root(&home);
+                &default_root
+            }
+        };
         let config = logger_config(service, log_root, true)?;
         prepare_log_file(&config)?;
         let logger = start_logger(config, LOG, None)?;
@@ -72,6 +86,21 @@ impl GeneralLogger {
     #[must_use]
     pub fn injected(logger: Arc<Logger>) -> Self {
         Self::injected_in(logger, None)
+    }
+
+    /// Injects a caller-owned Python logger or callable.
+    ///
+    /// # Errors
+    /// Returns an error if the target or service is invalid.
+    #[cfg(feature = "python")]
+    pub fn injected_python(
+        target: pyo3::Py<pyo3::PyAny>,
+        service: &'static str,
+    ) -> Result<Self, LogError> {
+        let target = crate::python::PythonTarget::classify(target)?;
+        Ok(Self {
+            writer: Arc::new(Writer::injected_python(target, service, LOG)?),
+        })
     }
 
     /// A general logger on `logger` sharing `ledger`, the lost-row accounting of other writers
@@ -230,4 +259,28 @@ fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
             path: active,
             source,
         })
+}
+
+/// Reject an explicitly empty home before the platform home lookup can fall back.
+fn reject_empty_home(home: Option<&std::ffi::OsStr>) -> Result<(), LogError> {
+    if home.is_some_and(std::ffi::OsStr::is_empty) {
+        Err(LogError::HomeUnknown)
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod home_tests {
+    use super::*;
+
+    #[test]
+    fn empty_home_is_rejected_without_platform_lookup() {
+        assert!(matches!(
+            reject_empty_home(Some(std::ffi::OsStr::new(""))),
+            Err(LogError::HomeUnknown)
+        ));
+        assert!(reject_empty_home(None).is_ok());
+        assert!(reject_empty_home(Some(std::ffi::OsStr::new("/controlled"))).is_ok());
+    }
 }

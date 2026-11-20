@@ -1,0 +1,76 @@
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyModule};
+use sc_agent_log::{GeneralLogger, Level, LogContext, LogError, Loggers, Injected, Repo, SessionIdentity};
+use sc_agent_types::{ErrorId, SessionId};
+use serde_json::Map;
+use std::ffi::CString;
+
+fn module(root: &std::path::Path) -> Py<PyModule> {
+    Python::attach(|py| {
+        let source = CString::new(format!(r#"
+import sc_observability as obs
+root = {root:?}
+logger = obs.create_logger(obs.LoggerConfig(service='injected', log_root=root)).value
+attached = obs.AttachedLogger(logger._native)
+records = []
+def callback(record): records.append(record)
+def fail(record): raise ValueError('controlled failure')
+"#, root = root.to_string_lossy())).unwrap();
+        PyModule::from_code(py, &source, c"injected.py", c"injected").unwrap().unbind()
+    })
+}
+fn target(module: &Py<PyModule>, name: &str) -> Py<PyAny> {
+    Python::attach(|py| module.getattr(py, name).unwrap())
+}
+fn write(logger: &GeneralLogger) -> Result<(), LogError> {
+    logger.write(Level::Info, "test", "test.row", LogContext::NONE, Map::new())
+}
+fn identity() -> SessionIdentity {
+    SessionIdentity::new(Repo::from_origin_url("https://github.com/randlee/sc-agent.git").unwrap(), "phase-b", "rust-developer").unwrap()
+}
+#[test]
+fn real_logger_attached_logger_callable_and_failures() {
+    let root = tempfile::tempdir().unwrap();
+    let python_root = root.path().join("python");
+    let module = module(&python_root);
+    for name in ["logger", "attached"] {
+        let log = GeneralLogger::injected_python(target(&module, name), "decidr").unwrap();
+        write(&log).unwrap();
+        log.close().unwrap();
+    }
+    Python::attach(|py| {
+        let logger = module.getattr(py, "logger").unwrap();
+        assert_eq!(logger.call_method0(py, "flush").unwrap().getattr(py, "kind").unwrap().extract::<String>(py).unwrap(), "ok");
+    });
+    let rows = std::fs::read_to_string(python_root.join("logs/injected.log.jsonl")).unwrap();
+    assert_eq!(rows.lines().count(), 2);
+    assert!(!root.path().join("logs/decidr.log.jsonl").exists());
+    let both = Loggers::open_with(root.path(), "decidr", identity(), None, Some(Injected::Python(target(&module, "callback")))).unwrap();
+    both.session.write(SessionId::new(), Map::new()).unwrap();
+    both.general.write(Level::Info, "test", "test.row", LogContext::NONE, Map::new()).unwrap();
+    both.close().unwrap();
+    assert!(root.path().join("logs/decidr.log.jsonl").is_file());
+    Python::attach(|py| {
+        let records = module.getattr(py, "records").unwrap();
+        assert_eq!(records.bind(py).len().unwrap(), 1);
+        let row = records.bind(py).get_item(0).unwrap();
+        assert!(row.cast::<PyDict>().unwrap().contains("fields").unwrap());
+    });
+    let bad = Python::attach(|py| py.None());
+    let error = GeneralLogger::injected_python(bad, "decidr").unwrap_err();
+    assert_eq!(error.id(), "log.invalid_target");
+    assert!(error.message().contains("AttachedLogger"));
+    let raising = GeneralLogger::injected_python(target(&module, "fail"), "decidr").unwrap();
+    assert!(write(&raising).is_err());
+    assert!(matches!(raising.flush(), Err(LogError::RowsLost {count: 1, ..})));
+    Python::attach(|py| { module.getattr(py, "logger").unwrap().call_method0(py, "shutdown").unwrap(); });
+    let stopped = GeneralLogger::injected_python(target(&module, "logger"), "decidr").unwrap();
+    let error = write(&stopped).unwrap_err();
+    let cause = error.cause_detail().unwrap();
+    assert!(!cause.id.is_empty() && !cause.message.is_empty());
+    let LogError::RowsLost {count, last: Some(last), ..} = stopped.flush().unwrap_err() else { panic!("expected refusal") };
+    assert_eq!(count, 1);
+    assert_eq!(last.id, cause.id);
+    assert_eq!(last.message, cause.message);
+    stopped.flush().unwrap();
+}

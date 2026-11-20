@@ -368,7 +368,7 @@ fn general_for(context: &Context, config: &AgentConfig) -> Result<GeneralLogger,
         Some(general) => Ok(general.clone()),
         None => {
             let root = config.log_root()?;
-            Ok(GeneralLogger::open_default(&root, context.service)?)
+            Ok(GeneralLogger::open_default(Some(&root), context.service)?)
         }
     }
 }

@@ -101,7 +101,9 @@ impl Ledger {
 /// stderr line for unreported losses); [`Writer::close`] does the same and returns the outcome.
 /// An injected logger is never flushed-on-drop or shut down here (REQ-SAG-0008).
 pub(crate) struct Writer {
-    logger: Arc<Logger>,
+    logger: Option<Arc<Logger>>,
+    #[cfg(feature = "python")]
+    python: Option<crate::python::PythonTarget>,
     owned: bool,
     /// Set by `close`, so Drop has nothing left to do.
     closed: bool,
@@ -134,7 +136,9 @@ impl Writer {
     fn new(logger: Arc<Logger>, owned: bool, ledger: Arc<Ledger>, kind: LogKind) -> Self {
         Self {
             service: logger.service_name().clone(),
-            logger,
+            logger: Some(logger),
+            #[cfg(feature = "python")]
+            python: None,
             owned,
             closed: false,
             ledger,
@@ -142,6 +146,29 @@ impl Writer {
             #[cfg(feature = "testing")]
             timestamp: None,
         }
+    }
+
+    #[cfg(feature = "python")]
+    pub(crate) fn injected_python(
+        target: crate::python::PythonTarget,
+        service: &'static str,
+        kind: LogKind,
+    ) -> Result<Self, LogError> {
+        let service = ServiceName::new(service)
+            .map_err(|error| LogError::invalid_name("service", service, &error))?;
+        Ok(Self {
+            logger: None,
+            python: Some(target),
+            owned: false,
+            closed: false,
+            service,
+            ledger: Arc::new(Ledger {
+                accounting: Mutex::new(Accounting::default()),
+            }),
+            kind,
+            #[cfg(feature = "testing")]
+            timestamp: None,
+        })
     }
 
     #[cfg(feature = "testing")]
@@ -222,9 +249,22 @@ impl Writer {
                 max: MAX_ROW_BYTES,
             });
         }
+        #[cfg(feature = "python")]
+        if let Some(python) = &self.python {
+            return python.admit(&event);
+        }
+        let Some(logger) = &self.logger else {
+            return Err(LogError::PythonRejected {
+                cause: Box::new(ErrorDetail::new(
+                    "log.missing_target",
+                    "missing logger destination",
+                    None,
+                )),
+            });
+        };
         let admitted = match mode {
-            Mode::Blocking => self.logger.log(event),
-            Mode::NonBlocking => self.logger.try_log(event),
+            Mode::Blocking => logger.log(event),
+            Mode::NonBlocking => logger.try_log(event),
         };
         admitted.map_err(|source| LogError::Rejected {
             log: self.kind,
@@ -234,7 +274,10 @@ impl Writer {
 
     /// Counts one refused row and keeps it as the latest failure.
     fn count(&self, error: LogError) -> LogError {
-        let detail = error.detail();
+        let detail = match &error {
+            LogError::PythonRejected { cause } => (**cause).clone(),
+            _ => error.detail(),
+        };
         let mut accounting = self.ledger.lock();
         accounting.refused = accounting.refused.saturating_add(1);
         accounting.last = Some(detail);
@@ -245,13 +288,18 @@ impl Writer {
     /// Flush barrier; then [`LogError::RowsLost`] if any row since the last report was
     /// refused or not written. Each lost row is reported once across all writers on the logger.
     pub(crate) fn flush(&self) -> Result<(), LogError> {
-        self.logger.flush().map_err(|source| LogError::Flush {
-            log: self.kind,
-            source,
-        })?;
-        // Read health before the lock: no call leaves the crate while it is held.
-        let health = self.logger.health();
-        let total = health.dropped_events_total;
+        let health = if let Some(logger) = &self.logger {
+            logger.flush().map_err(|source| LogError::Flush {
+                log: self.kind,
+                source,
+            })?;
+            Some(logger.health())
+        } else {
+            None
+        };
+        let total = health
+            .as_ref()
+            .map_or(0, |health| health.dropped_events_total);
         let mut accounting = self.ledger.lock();
         let newly_lost = total.saturating_sub(accounting.writer_lost_seen);
         accounting.writer_lost_seen = accounting.writer_lost_seen.max(total);
@@ -264,7 +312,7 @@ impl Writer {
         }
         // A writer loss is observed at this flush, after any refusal admitted before it.
         let writer_last = (newly_lost > 0)
-            .then(|| health.last_error.or(health.last_writer_error))
+            .then(|| health.and_then(|health| health.last_error.or(health.last_writer_error)))
             .flatten()
             .map(|summary| {
                 let id = summary
@@ -287,7 +335,8 @@ impl Writer {
     pub(crate) fn close(mut self) -> Result<(), LogError> {
         let flushed = self.flush();
         if self.owned
-            && let Err(error) = self.logger.shutdown()
+            && let Some(logger) = &self.logger
+            && let Err(error) = logger.shutdown()
         {
             last_resort(self.kind, None, Some(&error));
         }
@@ -314,8 +363,10 @@ impl Drop for Writer {
         }
         // Best effort: no caller is left to return to, so anything unreported goes to stderr.
         let flushed = self.flush();
-        let shutdown = self.logger.shutdown();
-        last_resort(self.kind, flushed.err().as_ref(), shutdown.err().as_ref());
+        if let Some(logger) = &self.logger {
+            let shutdown = logger.shutdown();
+            last_resort(self.kind, flushed.err().as_ref(), shutdown.err().as_ref());
+        }
     }
 }
 

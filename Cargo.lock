@@ -1535,6 +1535,7 @@ name = "sc-agent-log"
 version = "0.2.8"
 dependencies = [
  "hostname",
+ "pyo3",
  "sc-agent-log",
  "sc-agent-testkit",
  "sc-agent-types",
@@ -1761,6 +1762,7 @@ version = "0.2.8"
 dependencies = [
  "pyo3",
  "pyo3-build-config",
+ "sc-agent-log",
  "sc-treesitter",
 ]
 
@@ -1946,6 +1948,8 @@ name = "sitr"
 version = "0.2.8"
 dependencies = [
  "clap",
+ "sc-agent-config",
+ "sc-agent-log",
  "sc-agent-testkit",
  "sc-observability",
  "sc-treesitter",

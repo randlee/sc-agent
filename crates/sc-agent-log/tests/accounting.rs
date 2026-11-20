@@ -65,7 +65,7 @@ fn close_returns_lost_rows() {
     assert_eq!((*log, *count), (LogKind::Session, 1));
     assert!(last.is_some());
 
-    let healthy = GeneralLogger::open_default(root.path(), "decidr").expect("general");
+    let healthy = GeneralLogger::open_default(Some(root.path()), "decidr").expect("general");
     healthy
         .write(Level::Info, "t", "a", LogContext::NONE, Map::new())
         .expect("row");
