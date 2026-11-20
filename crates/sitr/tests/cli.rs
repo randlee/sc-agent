@@ -2,6 +2,7 @@
 //! `--log-root <tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
@@ -70,10 +71,20 @@ fn command(home: &Path, args: &[&str]) -> Command {
 }
 
 fn run(home: &Path, args: &[&str]) -> std::io::Result<Output> {
-    Ok(
-        sc_agent_testkit::ChildGuard::spawn(&mut command(home, args))
-            .wait_with_output(sc_agent_testkit::HANG_GUARD),
-    )
+    run_with_env(home, args, &[])
+}
+
+fn run_with_env(
+    home: &Path,
+    args: &[&str],
+    env_overrides: &[(&str, OsString)],
+) -> std::io::Result<Output> {
+    let mut command = command(home, args);
+    for (key, value) in env_overrides {
+        command.env(key, value);
+    }
+    Ok(sc_agent_testkit::ChildGuard::spawn(&mut command)
+        .wait_with_output(sc_agent_testkit::HANG_GUARD))
 }
 
 /// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message", "recovery"?}`.
@@ -386,12 +397,19 @@ fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() -> std::io::
 #[test]
 fn doctor_uses_shared_project_and_sitr_prefix_only() {
     let home = temp_home().expect("temp home and git worktree");
-    let output = command(home.path(), &["doctor"])
-        .env("SC_PROJECT", "phase-d")
-        .env("DECIDR_WORKERS", "3")
-        .env("DECIDR_LOG_ROOT", home.path().join("other"))
-        .output()
-        .expect("spawn sitr doctor");
+    let output = run_with_env(
+        home.path(),
+        &["doctor"],
+        &[
+            ("SC_PROJECT", OsString::from("phase-d")),
+            ("DECIDR_WORKERS", OsString::from("3")),
+            (
+                "DECIDR_LOG_ROOT",
+                home.path().join("other").into_os_string(),
+            ),
+        ],
+    )
+    .expect("spawn sitr doctor");
     success(&output);
     let report: serde_json::Value =
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
@@ -399,16 +417,19 @@ fn doctor_uses_shared_project_and_sitr_prefix_only() {
     assert_eq!(report["settings"][0]["source"], "SC_PROJECT");
     assert_eq!(report["settings"][1]["source"], "default");
 
-    let output = command(home.path(), &["doctor"])
-        .env("SITR_LOG_ROOT", home.path().join("sitr-root"))
-        .output()
-        .expect("spawn sitr doctor");
+    let sitr_root = home.path().join("sitr-root");
+    let output = run_with_env(
+        home.path(),
+        &["doctor"],
+        &[("SITR_LOG_ROOT", sitr_root.clone().into_os_string())],
+    )
+    .expect("spawn sitr doctor");
     success(&output);
     let report: serde_json::Value =
         serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
     assert_eq!(
         report["settings"][1]["value"],
-        home.path().join("sitr-root").display().to_string()
+        sitr_root.display().to_string()
     );
     assert_eq!(report["settings"][1]["source"], "SITR_LOG_ROOT");
 }
