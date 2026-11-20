@@ -56,16 +56,17 @@ One wheel means one copy of sc-observability and one Logger in a Python process.
 |---|---|---|---|
 | Send | POST `https://api.typesafe.ai/v1/systemone`, bearer key, JSON body, 30 s default timeout | Same | ureq |
 | Reply limits | Over 1 MiB, not JSON, or not an object is an invalid response | Same | serde_json |
+| Request limit | 24,000 bytes default, 64,000 ceiling, because the Python logger refused events over 64 KiB | The Rust sc-observability logger accepts events up to 1 MiB, so the request limit is 1 MiB; a larger request returns `SizeExceeded` without sending | none |
 | Status to error | 401 auth; 422 validation with the first 300 characters; 429 and 529 busy; 500 and up transient; a 4xx mentioning `max_tokens` or token-exceed is context-exceeded; anything else is a plain HTTP error. Bodies are withheld except the 422 text | Same, as `Category` plus `status` | none |
 | Retry | Up to 3 sends. Retried: busy, 5xx, network, invalid response. Wait Retry-After (seconds, capped at 30) else 1 s, then 2 s | Same. `max_sends` default 3; the batch path passes 2, as the Python does | std |
-| Not retried | 401, 422, context-exceeded | Same | none |
+| Not retried | 401, 422, context-exceeded | Same. Context-exceeded and request-size-exceeded are returned at once as errors; nothing halves or shortens a request, in Rust or in the client | none |
 | Answer check | Every question answered, no unknown ids; choice is one of the options, confidence and probabilities in range and summing to 1 within rounding; noul in 0..1 | Same, producing typed answers (item 3) | serde |
 | Key | Environment, then OS credential store; must be printable ASCII with no whitespace | Environment, then `.env`, then OS keyring (service = variable name, account = OS user) | dotenvy, keyring |
 | Never show the key | Redaction pass over output | Key type whose debug and display print nothing; no reply body or header reaches a message | none |
 | Batch | Thread pool of `max_workers` (default and cap 4), results yielded in request order, one retry per job, whole batch stops sending on an auth error | `send_batch` with scoped threads, same order, same stop rule | std |
 | Result record | Per job: every attempt with its error, retry count, raw response, model that answered | `Outcome` carries the same (section 6) | none |
 | Dry run and answer fixtures | In the script | Stay in the client template; Rust knows nothing about them | none |
-| Item shortening on context-exceeded | In the script | Stays in the consumer; Rust only reports the category | none |
+| Item shortening on context-exceeded | In the script | Not built. Rust returns `ContextExceeded`; a request over the size limit returns `SizeExceeded` | none |
 
 One deliberate difference: the Python honours Retry-After on the first retry only. The Rust honours it on every retry. Say so if you want the Python's rule exactly.
 
@@ -126,7 +127,7 @@ pub struct Outcome  { pub session_id: Ulid, pub position: usize, pub model: Stri
                       pub attempts: Vec<Attempt>, pub result: Result<Response, Error> }
 pub struct Attempt  { pub ok: bool, pub error: Option<Error> }
 pub struct Error    { pub category: Category, pub message: String, pub status: Option<u16>, pub retry_after_secs: Option<f64> }
-pub enum   Category { Busy, Auth, Network, ResponseInvalid, Validation, ContextExceeded, Http, Canceled }
+pub enum   Category { Busy, Auth, Network, ResponseInvalid, Validation, ContextExceeded, SizeExceeded, Http, Canceled, Panic }
 
 // sitr (library)
 pub fn run_query(language: &str, query: &str, source: &[u8], captures: Option<&[String]>) -> Result<Vec<Capture>, Error>;
@@ -195,6 +196,8 @@ Changes a consumer makes, and no others:
 
 Error codes the consumers print (`JEV.RATE_LIMITED`, `JEV.OVERLOADED`, `AUTH.CREDENTIALS` and the rest) are mapped in the client from `Category` and `status`.
 
+Every client function returns a result value (`Result[T, E]`: ok with the value, or err with the typed error). The client raises nothing; `ClientError` and `BatchInputError` are error values, not exceptions.
+
 One thing a user will notice: the working Python read the keychain entry `plan-anchor` / `typesafe-api-key`. The Rust reads `TYPESAFE_API_KEY` / the OS user, per your ruling. A key stored under the old name is not found.
 
 ## 9. Gates
@@ -208,6 +211,7 @@ Each is a script that passes or fails. No reviewer judgement is involved in any 
 | Surface | The public items differ from section 6 |
 | Dependencies | `Cargo.toml` names a crate not in section 7 |
 | Constructs | Source defines a trait, or uses `unwrap`, `expect` or `panic!` outside tests |
+| Panics | Every public Rust function and every wheel function catches a panic (`catch_unwind`) and returns it as an error with `Category::Panic`; a test forces a panic through each entry point and gets the error back |
 | Behavior | A row of section 4 has no test named for it, or the test fails |
 | Drop-in | Either consumer's own test suite fails against the wheel |
 
