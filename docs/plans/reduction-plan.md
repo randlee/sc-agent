@@ -49,9 +49,17 @@ Nothing not in these three is built.
 - **Generated client.** The sc-compose template: obtains one Logger by client name, injects it into every call, hardcodes `agent_role`.
 - **Interrupt.** A cancel flag (about 10 lines): Ctrl-C stops sending new requests and the run returns what finished.
 
+- **Also included.**
+  - Cache key: the per-question sha256, with a public function to compute it.
+  - Each session row carries the request text.
+  - A distinct typed answer per question type.
+  - Layered config through the `sc-config` crate, called directly (no loader of our own).
+  - Cancel (Ctrl-C stops new requests; finished results are returned).
+  - `decidr doctor`.
+
 ## Not built
 
-Image parts, the long-context header, provider ranking, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
+Image parts, the long-context header, provider ranking, the user model catalog, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
 
 ## Layout
 
