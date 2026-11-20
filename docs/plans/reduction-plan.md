@@ -59,7 +59,7 @@ Image parts, the long-context header, provider ranking, release-date ordering, t
 |---|---|---|
 | `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
 | `decidr` | CLI | 150 |
-| `sc-agent-py` | the one wheel: decidr API, `sc_agent.sitr`, `logger(name)`; returns results, never raises | 250 |
+| `sc-agent-py` + sitr wheel | decidr wheel (API, `logger(name)` handle) and sitr wheel (accepts the handle); return results, never raise | 250 |
 | `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI, rewritten the same way | 800 |
 
 Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
