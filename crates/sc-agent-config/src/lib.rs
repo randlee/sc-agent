@@ -31,7 +31,7 @@ pub use config::{
     AgentConfig, DEFAULT_MAX_SENDS, DEFAULT_RUNNER_LOAD_TIMEOUT, DEFAULT_RUNNER_REQUEST_TIMEOUT,
     DEFAULT_WORKERS, ExtraModel, LocalRunner, MAX_CONFIG_FILE_BYTES, MAX_LOCAL_RUNNERS,
     MAX_MAX_SENDS, MAX_MODELS, MAX_WORKERS, RUNNER_LOAD_TIMEOUT_SECS, RUNNER_REQUEST_TIMEOUT_SECS,
-    RunnerHost, RunnerKind, RunnerName,
+    RunnerHost, RunnerKind, RunnerName, RunnerValidationError,
 };
 #[doc(inline)]
 pub use error::AgentConfigError;

@@ -63,6 +63,11 @@ pub enum DecidrError {
     Decision(Box<sc_decision_schema::DecisionError>),
     /// A models or doctor send failed.
     Http(Box<sc_agent_http::HttpError>),
+    /// A send was refused before its first attempt.
+    StartRefused {
+        /// The admission limit that refused the send.
+        reason: sc_agent_http::BusyReason,
+    },
     /// An LLM client could not be built or a provider model list could not be read.
     Llm(Box<sc_llm_provider::LlmError>),
     /// `flush_session_log` failed after the results were printed.
@@ -242,6 +247,7 @@ sc_agent_types::error_catalog! { DecidrError {
     DecidrError::Local(_) => ("decidr.local", None),
     DecidrError::Decision(_) => ("decidr.decision", None),
     DecidrError::Http(_) => ("decidr.http", None),
+    DecidrError::StartRefused { .. } => ("decidr.start_refused", Some(sc_agent_types::ErrorCategory::Other)),
     DecidrError::Llm(_) => ("decidr.llm", None),
     DecidrError::Runner(_) => ("decidr.runner", None),
     DecidrError::NoProviderKey { .. } => ("decidr.no_provider_key", Some(sc_agent_types::ErrorCategory::Auth)),
@@ -294,6 +300,9 @@ impl ErrorId for DecidrError {
             }
             Self::Decision(error) => format!("the decision backend failed ({})", error.id()),
             Self::Http(error) => format!("the send failed ({})", error.id()),
+            Self::StartRefused { reason } => {
+                format!("the send was refused before it started ({reason})")
+            }
             Self::Llm(error) => format!("the LLM provider failed ({})", error.id()),
             Self::Runner(error) => format!("the session log failed ({})", error.id()),
             Self::AmbiguousKeyringOverride { candidates } => format!(
@@ -391,6 +400,7 @@ impl ErrorId for DecidrError {
             Self::Encode { source } => foreign("serde_json", source),
             Self::Signal { source } => foreign("ctrlc", source),
             Self::InvalidRequestTimeout { .. }
+            | Self::StartRefused { .. }
             | Self::InvalidWorkers { .. }
             | Self::AmbiguousKeyringOverride { .. }
             | Self::NoProviderKey { .. }
@@ -418,6 +428,7 @@ impl ErrorId for DecidrError {
             Self::Local(error) => error.recovery(),
             Self::Decision(error) | Self::RequestInvalid { source: error, .. } => error.recovery(),
             Self::Http(error) => error.recovery(),
+            Self::StartRefused { .. } => Some("Retry with a fresh request and send budget."),
             Self::Llm(error) => error.recovery(),
             Self::Runner(error) => error.recovery(),
             Self::AmbiguousKeyringOverride { .. } => {
@@ -477,6 +488,7 @@ impl Error for DecidrError {
             Self::Encode { source } => Some(source),
             Self::Signal { source } => Some(source),
             Self::InvalidRequestTimeout { .. }
+            | Self::StartRefused { .. }
             | Self::InvalidWorkers { .. }
             | Self::AmbiguousKeyringOverride { .. }
             | Self::NoProviderKey { .. }
@@ -493,6 +505,23 @@ impl Error for DecidrError {
 mod tests {
     use super::*;
     use sc_agent_types::ShortName;
+
+    #[test]
+    fn start_refusal_preserves_reason_and_recovery() {
+        let error = DecidrError::StartRefused {
+            reason: sc_agent_http::BusyReason::Budget,
+        };
+        assert!(matches!(
+            error,
+            DecidrError::StartRefused {
+                reason: sc_agent_http::BusyReason::Budget
+            }
+        ));
+        let detail = error.detail();
+        assert_eq!(detail.id, "decidr.start_refused");
+        assert!(detail.message.contains("budget"));
+        assert!(detail.recovery.is_some());
+    }
 
     #[test]
     fn every_decidr_error_matches_its_own_catalog() {
@@ -564,6 +593,9 @@ mod tests {
     fn samples() -> Vec<DecidrError> {
         let io = || std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
         vec![
+            DecidrError::StartRefused {
+                reason: sc_agent_http::BusyReason::Sends,
+            },
             DecidrError::NoProviderKey {
                 model: ModelSelector::Short(ShortName::Jev),
                 tried: vec![Provider::TypeSafe],
