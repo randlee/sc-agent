@@ -512,7 +512,7 @@ fn layered_invalid_recovery_does_not_recommend_ignored_legacy_inputs() {
     let root = tempfile::tempdir().unwrap();
     for origin in ["file", "environment", "flag"] {
         let mut o = options(root.path());
-        let file = o.home.join(".sc-agent/decidr.json");
+        let file = o.home.join(".sc-agent").join("decidr.json");
         let expected_source = match origin {
             "file" => {
                 write(&file, &json!({"workers":0}));
@@ -566,7 +566,7 @@ fn project_path_safety_is_enforced_at_each_configuration_layer() {
     for name in unsafe_names {
         for origin in ["file", "environment", "flag"] {
             let mut o = options(root.path());
-            let file = o.home.join(".sc-agent/decidr.json");
+            let file = o.home.join(".sc-agent").join("decidr.json");
             let expected_source = match origin {
                 "file" => {
                     write(&file, &json!({"project":name}));
@@ -604,7 +604,7 @@ fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
     ] {
         for origin in ["file", "environment", "flag"] {
             let mut o = options(root.path());
-            let file = o.home.join(".sc-agent/decidr.json");
+            let file = o.home.join(".sc-agent").join("decidr.json");
             match origin {
                 "file" => write(&file, &json!({"project":name})),
                 "environment" => env(&mut o, "SC_PROJECT", &name),
@@ -627,7 +627,7 @@ fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
 fn validation_names_the_winning_key_source_despite_unrelated_lower_files() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());
-    let file = o.home.join(".sc-agent/decidr.json");
+    let file = o.home.join(".sc-agent").join("decidr.json");
     write(&file, &json!({"workers": 2}));
     o.flags.insert("project".into(), json!("Phase B"));
     let AgentConfigError::Layer { source, cause } = load_layered(&o).unwrap_err() else {
@@ -651,4 +651,177 @@ fn validation_names_the_winning_key_source_despite_unrelated_lower_files() {
     };
     assert_eq!(source, file.display().to_string());
     assert!(matches!(*cause, AgentConfigError::Invalid { ref path, .. } if path == "workers"));
+}
+
+fn failure_source(o: &LoadOptions, expected_source: &str, expected_path: &str) {
+    let AgentConfigError::Layer { source, cause } = load_layered(o).expect_err("invalid layer")
+    else {
+        panic!("source-qualified failure");
+    };
+    assert_eq!(source, expected_source);
+    let path = match *cause {
+        AgentConfigError::Invalid { path, .. }
+        | AgentConfigError::RunnerName { path, .. }
+        | AgentConfigError::KeyOnPlainHttp { path, .. } => path,
+        other => panic!("unexpected cause: {other:?}"),
+    };
+    assert_eq!(path, expected_path);
+}
+
+#[test]
+fn nested_port_failures_name_flag_env_and_file_over_unrelated_lower_values() {
+    for source in ["flag", "env", "file"] {
+        let root = tempfile::tempdir().unwrap();
+        let mut o = options(root.path());
+        let global = o.home.join(".sc-agent").join("decidr.json");
+        write(
+            &global,
+            &json!({"workers": 2, "local_runners":{"laya":{"kind":"laya","host":"127.0.0.1","port":9000,"model":"m"}}}),
+        );
+        let local = o
+            .worktree
+            .as_ref()
+            .unwrap()
+            .join(".sc/sc-agent")
+            .join("decidr.json");
+        let origin = match source {
+            "flag" => {
+                o.flags.insert("local_runners.laya.port".into(), json!(0));
+                "--local-runners.laya.port".into()
+            }
+            "env" => {
+                env(&mut o, "DECIDR_LOCAL_RUNNERS__LAYA__PORT", "0");
+                "DECIDR_LOCAL_RUNNERS__LAYA__PORT".into()
+            }
+            _ => {
+                write(&local, &json!({"local_runners":{"laya":{"port":0}}}));
+                local.display().to_string()
+            }
+        };
+        failure_source(&o, &origin, "local_runners.laya.port");
+    }
+}
+
+#[test]
+fn parent_runner_errors_name_the_highest_precedence_descendant() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    let global = o.home.join(".sc-agent").join("decidr.json");
+    let local = o
+        .worktree
+        .as_ref()
+        .unwrap()
+        .join(".sc/sc-agent")
+        .join("decidr.json");
+    write(
+        &global,
+        &json!({"workers":2,"local_runners":{"laya":{"port":1}}}),
+    );
+    write(
+        &local,
+        &json!({"local_runners":{"laya":{"host":"localhost"}}}),
+    );
+    failure_source(&o, &local.display().to_string(), "local_runners.laya");
+    env(&mut o, "DECIDR_LOCAL_RUNNERS__LAYA__PORT", "2");
+    failure_source(&o, "DECIDR_LOCAL_RUNNERS__LAYA__PORT", "local_runners.laya");
+    o.flags.insert("local_runners.laya.port".into(), json!(3));
+    failure_source(&o, "--local-runners.laya.port", "local_runners.laya");
+}
+
+#[test]
+fn short_name_runner_key_and_split_plain_http_key_keep_their_sources() {
+    let root = tempfile::tempdir().unwrap();
+    let o = options(root.path());
+    let global = o.home.join(".sc-agent").join("decidr.json");
+    let local = o
+        .worktree
+        .as_ref()
+        .unwrap()
+        .join(".sc/sc-agent")
+        .join("decidr.json");
+    write(&global, &json!({"workers":2}));
+    write(
+        &local,
+        &json!({"local_runners":{"haiku":{"kind":"laya","host":"localhost","port":1,"model":"m"}}}),
+    );
+    failure_source(&o, &local.display().to_string(), "local_runners.haiku");
+    write(
+        &global,
+        &json!({"workers":2,"local_runners":{"laya":{"kind":"laya","host":"remote.example","port":1,"model":"m"}}}),
+    );
+    write(
+        &local,
+        &json!({"local_runners":{"laya":{"key_env":sc_agent_secrets::LAYA_API_KEY}}}),
+    );
+    failure_source(
+        &o,
+        &local.display().to_string(),
+        "local_runners.laya.key_env",
+    );
+}
+
+#[test]
+fn model_entry_and_parent_count_errors_keep_their_sources() {
+    let root = tempfile::tempdir().unwrap();
+    let o = options(root.path());
+    let global = o.home.join(".sc-agent").join("decidr.json");
+    let local = o
+        .worktree
+        .as_ref()
+        .unwrap()
+        .join(".sc/sc-agent")
+        .join("decidr.json");
+    write(&global, &json!({"workers":2}));
+    write(
+        &local,
+        &json!({"models":{"custom":{"line":"haiku","released":"not-a-date"}}}),
+    );
+    failure_source(&o, &local.display().to_string(), "models.custom.released");
+    let models: serde_json::Map<String, Value> = (0..=sc_agent_config::MAX_MODELS)
+        .map(|i| {
+            (
+                format!("custom-{i}"),
+                json!({"line":"haiku","released":"2026-01-01"}),
+            )
+        })
+        .collect();
+    write(&local, &json!({"models":models}));
+    failure_source(&o, &local.display().to_string(), "models");
+}
+
+#[test]
+fn exact_child_provenance_wins_over_its_recorded_parent() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    let global = o.home.join(".sc-agent").join("decidr.json");
+    write(&global, &json!({"local_runners":{}}));
+    o.flags.insert(
+        "local_runners.laya".into(),
+        json!({"kind":"laya","host":"localhost","port":0,"model":"m"}),
+    );
+    failure_source(&o, "--local-runners.laya", "local_runners.laya.port");
+}
+
+#[test]
+fn model_count_limit_uses_the_source_of_the_parent_descendants() {
+    let root = tempfile::tempdir().unwrap();
+    let o = options(root.path());
+    let global = o.home.join(".sc-agent").join("decidr.json");
+    let local = o
+        .worktree
+        .as_ref()
+        .unwrap()
+        .join(".sc/sc-agent")
+        .join("decidr.json");
+    write(&global, &json!({"workers":2}));
+    let models: serde_json::Map<String, Value> = (0..=sc_agent_config::MAX_MODELS)
+        .map(|i| {
+            (
+                format!("custom-{i}"),
+                json!({"line":"haiku","released":"2026-01-01"}),
+            )
+        })
+        .collect();
+    write(&local, &json!({"models":models}));
+    failure_source(&o, &local.display().to_string(), "models");
 }
