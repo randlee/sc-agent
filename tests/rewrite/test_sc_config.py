@@ -12,21 +12,23 @@ class Configuration(unittest.TestCase):
         binary = Path(__file__).resolve().parents[2] / 'rewrite/target/debug/decidr'
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            config = root / 'config'
-            config.mkdir()
-            default = config / 'default.json'
-            local = config / 'local.json'
-            default.write_text(json.dumps({'project': 'default'}))
-            local.write_text(json.dumps({'project': 'local'}))
-            env = {'PATH': os.defpath, 'HOME': temp, 'DECIDR__PROJECT': 'environment',
-                   'SC_AGENT_TEST_REPO_ROOT': temp}
+            local = root / 'repo' / '.sc'
+            global_dir = root / 'home' / '.sc-agent'
+            local.mkdir(parents=True)
+            global_dir.mkdir(parents=True)
+            files = [local / 'decidr.json', local / 'sc-agent.json', global_dir / 'decidr.json', global_dir / 'sc-agent.json']
+            values = ['local-decidr', 'local-shared', 'global-decidr', 'global-shared']
+            for path, value in zip(files, values):
+                path.write_text(json.dumps({'project': value}))
+            env = {'PATH': os.defpath, 'HOME': str(root / 'home'), 'SC_PROJECT': 'environment',
+                   'SC_AGENT_TEST_REPO_ROOT': str(root / 'repo')}
             def doctor(*args):
                 done = subprocess.run([str(binary), 'doctor', *args], cwd=root, env=env, text=True, capture_output=True, timeout=10)
                 self.assertEqual(done.returncode, 0, done.stderr)
                 return json.loads(done.stdout)['value']['project']['value']
             self.assertEqual(doctor('--project', 'flag'), 'flag')
             self.assertEqual(doctor(), 'environment')
-            del env['DECIDR__PROJECT']
-            self.assertEqual(doctor(), 'local')
-            local.unlink()
-            self.assertEqual(doctor(), 'default')
+            del env['SC_PROJECT']
+            for path, value in zip(files, values):
+                self.assertEqual(doctor(), value)
+                path.unlink()

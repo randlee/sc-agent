@@ -41,9 +41,6 @@ class Contract(unittest.TestCase):
 
     def setUp(self):
         self.home = tempfile.TemporaryDirectory()
-        config = Path(self.home.name) / "fixture" / "config"
-        config.mkdir(parents=True)
-        (config / "default.json").write_text("{}")
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
         self.server.requests = []
@@ -55,8 +52,7 @@ class Contract(unittest.TestCase):
         self.env = patch.dict(os.environ, {
             "PATH": path,
             "HOME": self.home.name, "USERPROFILE": self.home.name,
-            "DECIDR__PROJECT": "contract", "TYPESAFE_API_KEY": "test-secret-never-log",
-            "SC_AGENT_TEST_REPO_ROOT": str(config.parent),
+            "SC_PROJECT": "contract", "TYPESAFE_API_KEY": "test-secret-never-log",
             "SC_AGENT_TEST_BASE_URL": f"http://127.0.0.1:{self.server.server_port}",
         }, clear=True)
         self.env.start()
@@ -110,11 +106,11 @@ class Contract(unittest.TestCase):
         self.assertEqual(len(self.server.requests), 2)
 
     def test_missing_project_reports_sources_and_sends_nothing(self):
-        os.environ.pop("DECIDR__PROJECT", None)
+        os.environ.pop("SC_PROJECT", None)
         result = self.send()
         self.assertFalse(result["ok"], result)
         text = json.dumps(result)
-        for source in ("--project", "DECIDR__PROJECT", "default.json", "local.json"):
+        for source in ("--project", "SC_PROJECT", "decidr.json", "sc-agent.json"):
             self.assertIn(source, text)
         self.assertEqual(self.server.requests, [])
 
@@ -150,8 +146,6 @@ class Contract(unittest.TestCase):
         root = Path(self.home.name) / "repo"
         root.mkdir()
         (root / ".env").write_text("TYPESAFE_API_KEY=dotenv-secret\n")
-        (root / "config").mkdir()
-        (root / "config" / "default.json").write_text("{}")
         os.environ["SC_AGENT_TEST_REPO_ROOT"] = str(root)
         os.environ["SC_AGENT_TEST_KEYRING_VALUE"] = "keyring-secret"
         for expected in ("test-secret-never-log", "dotenv-secret", "keyring-secret"):
