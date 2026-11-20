@@ -258,7 +258,7 @@ def test_settings_import_error_is_typed_and_preserves_cause(tmp_path, monkeypatc
 
     loaded = []
     monkeypatch.setattr(client, "_load_wheel", lambda: loaded.append(True))
-    result = client.call_result("{}", model="jev", project="p", agent_role="r", abort_on=frozenset())
+    result = client.call_result("{}", model="jev", project="p", abort_on=frozenset())
     assert result["ok"] is False and result["error"].code == "DEPENDENCY.SETTINGS"
     assert result["error"].__cause__ is import_error
     assert loaded == []
@@ -342,8 +342,8 @@ def test_both_send_paths_refuse_without_affirmative_consent(tmp_path, monkeypatc
     loaded = []
     monkeypatch.setattr(client, "_load_wheel", lambda: loaded.append(True))
 
-    single = client.call_result("{}", model="jev", project="p", agent_role="r", abort_on=frozenset())
-    batch = client.call_batch_results(["{}"], model="jev", project="p", agent_role="r", abort_on=frozenset())
+    single = client.call_result("{}", model="jev", project="p", abort_on=frozenset())
+    batch = client.call_batch_results(["{}"], model="jev", project="p", abort_on=frozenset())
     direct = client._invoke("send", "{}", frozenset(), {}, None)
     assert not single["ok"] and single["error"].code == code
     assert not batch["ok"] and batch["error"].code == code
@@ -370,8 +370,8 @@ def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_pat
     monkeypatch.setattr(client, "_load_wheel", lambda: wheel)
     monkeypatch.setattr(client, "decode_result", lambda line, **kwargs:
                         {"ok": True, "value": {}, "position": 0, "error": None, "attempts": 1})
-    result = client.call_result("{}", model="jev", project="p", agent_role="r", abort_on=frozenset())
-    batch = client.call_batch_results(["{}"], model="jev", project="p", agent_role="r", abort_on=frozenset())
+    result = client.call_result("{}", model="jev", project="p", abort_on=frozenset())
+    batch = client.call_batch_results(["{}"], model="jev", project="p", abort_on=frozenset())
     assert result["ok"] and batch["ok"]
     assert [entry[0] for entry in sent] == ["send", "send_batch"]
 
@@ -537,7 +537,7 @@ def test_send_rechecks_selected_repository_consent(tmp_path, monkeypatch, batch,
         client.remote_preflight(repository_root=str(selected_root))
         values[selected_root] = False
     call = client.call_batch_results if batch else client.call_result
-    result = call(["{}"] if batch else "{}", model="jev", project="p", agent_role="r",
+    result = call(["{}"] if batch else "{}", model="jev", project="p",
                   abort_on=frozenset(), repository_root=str(selected_root))
     assert result["ok"] is should_send
     assert bool(sent) is should_send

@@ -72,7 +72,7 @@ def test_structured_http_status_on_batch_and_exception(env, args, status):
     assert find_status(result["error"]) == status
 
     with pytest.raises(sc_agent.SagError) as info:
-        sc_agent.models(runner="dec", config_dir=args["config_dir"])
+        sc_agent.models(runner="dec")
     _ident, detail = error_of(info)
     assert find_status(detail) == status
 
@@ -155,8 +155,10 @@ def test_an_invalid_project_is_refused(env, args):
     with pytest.raises(sc_agent.SagError) as info:
         sc_agent.send(NOUL, **{**args, "project": "Phase B"})
     ident, detail = error_of(info)
-    assert ident == "decidr.log"
-    assert detail["cause"]["id"] == "log.invalid_slug"
+    assert ident == "decidr.config"
+    assert detail["cause"]["id"] == "config.layer"
+    assert detail["cause"]["cause"]["id"] == "config.invalid"
+    assert "--project" in detail["cause"]["message"]
     assert loopback.requests == []
     assert session_files(log_root) == []
 
@@ -176,8 +178,6 @@ def test_cli_and_python_rows_carry_the_same_identity(env, decidr_bin, tmp_path, 
     child = subprocess.run(
         [
             decidr_bin,
-            "--config-dir",
-            str(config_dir),
             "send",
             "--model",
             "dec",
@@ -217,7 +217,7 @@ def test_injected_loggers_receive_the_records_and_write_no_file(env, args):
     assert session_files(log_root) == []
     models: list[dict] = []
     listed = json.loads(
-        sc_agent.models(runner="dec", general_log=models.append, config_dir=args["config_dir"])
+        sc_agent.models(runner="dec", general_log=models.append)
     )
     assert listed["models"][0]["name"] == "jev-latest"
     assert "decidr.models" in [record["action"] for record in models]
@@ -229,7 +229,7 @@ def test_only_a_session_log_callable_keeps_the_default_general_log(env, args):
     rows: list[dict] = []
     sc_agent.send(NOUL, session_log=rows.append, **args)
     assert len(rows) == 1
-    general = log_root / "logs" / "sc-agent-py.log.jsonl"
+    general = log_root / "logs" / "decidr.log.jsonl"
     assert general.exists()
     assert "decidr.send" in general.read_text()
     assert session_files(log_root) == []
@@ -391,7 +391,6 @@ def test_real_platform_keyring_is_trapped_in_python_tests(env, args, monkeypatch
             project="proj",
             agent_role="role",
             provider="typesafe",
-            config_dir=args["config_dir"],
             keyring_service="test-keyring-trap",
         )
     ident, detail = error_of(info)
@@ -417,7 +416,7 @@ def test_models_list_outcome(outcome_models_args, outcome_call, record_property)
 @pytest.mark.mode("ok")
 def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    result = outcome_call(consumer.call_result, NOUL, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    result = outcome_call(consumer.call_result, NOUL, **{k: v for k, v in outcome_args.items() if k != "agent_role"}, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
     assert result["ok"] is True
     line = json.loads(result["line"])
     assert "error" not in line
@@ -432,7 +431,7 @@ def test_noul_send_outcome(outcome_args, outcome_call, consumer, record_property
 @pytest.mark.mode("ok")
 def test_noul_send_batch_outcome(outcome_args, outcome_call, consumer, record_property):
     """The rendered consumer returns a valid noul response over loopback."""
-    result = outcome_call(consumer.call_batch_results, [NOUL] * 3, **outcome_args, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
+    result = outcome_call(consumer.call_batch_results, [NOUL] * 3, **{k: v for k, v in outcome_args.items() if k != "agent_role"}, abort_on=frozenset(), category_codes={}, cancel=sc_agent.CancelToken())
     assert result["ok"] is True
     assert all(record["ok"] for record in result["value"])
     lines = [json.loads(record["line"]) for record in result["value"]]

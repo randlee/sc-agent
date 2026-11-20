@@ -558,7 +558,7 @@ mod tests {
     }
 
     /// AC: REQ-SAG-0601. A request answered 529 (no Retry-After) every time is sent 5 times
-    /// and ends `http.provider_busy` (reason `sends`, 5 attempts); `SC_AGENT__MAX_SENDS=2` in
+    /// and ends `http.provider_busy` (reason `sends`, 5 attempts); `DECIDR_MAX_SENDS=2` in
     /// the context environment sends it twice. The run's clock is a ManualClock stepped by the
     /// test (one worker): once send n is made and the held job is parked on the clock, the
     /// clock moves past the n-th backoff (2^(n-1) s plus the 250 ms jitter ceiling). No real
@@ -588,7 +588,7 @@ mod tests {
             (
                 vec![
                     (sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY),
-                    ("SC_AGENT__MAX_SENDS", "2"),
+                    ("DECIDR_MAX_SENDS", "2"),
                 ],
                 2,
             ),
@@ -601,7 +601,7 @@ mod tests {
             };
             let clock = sc_agent_http::testing::ManualClock::new();
             let log = MemoryLog::new().expect("log");
-            // An override needs a default.json (A-4: an override is never silently ignored).
+            // An explicit CLI configuration supplies the baseline worker count.
             let dir = config_dir(r#"{"workers":1}"#);
             let mut ctx = context(dir.path(), &vars, Arc::new(signalled), &log);
             ctx.clock = Some(clock.clock());
@@ -669,7 +669,7 @@ mod tests {
             Arc::new(transport),
             &log,
         );
-        ctx.general = Some(general);
+        ctx.opened_general = Some(general);
         let reading = clock.clone();
         ctx.clock = Some(reading.clock());
         let options = options("jev", None, ctx, &log);
@@ -873,6 +873,9 @@ mod tests {
             let error = load_config(&ctx).expect_err(json);
             assert_eq!(error.id(), "decidr.config");
             let detail = error.cause_detail().expect("cause");
+            assert_eq!(detail.id, "config.layer", "{json}");
+            assert!(detail.message.contains("decidr.json"));
+            let detail = detail.cause.expect("validation cause");
             assert_eq!(detail.id, cause, "{json}");
             assert!(detail.message.contains(path), "{json}: {}", detail.message);
             // send loads the same config first: nothing is sent.

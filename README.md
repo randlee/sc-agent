@@ -42,7 +42,7 @@ decidr doctor
   - One result line is printed per request.
 - `models`: lists the models of TypeSafe or of a configured local runner.
 - `doctor`: lists the keys found, in the order they are used, and reports catalog mismatches.
-- `--config-dir PATH` (global): the configuration directory. The default is `~/.sc-agent`.
+- `--project SLUG` (global): optional project/phase override; otherwise resolved from `SC_PROJECT` and configuration files. `--agent-role` remains required on sends.
 
 Ctrl-C or SIGTERM cancels the run. Every unfinished request ends as `decision.cancelled`, the session log is flushed, and `decidr` exits 130. A third interrupt exits at once.
 
@@ -57,15 +57,15 @@ sc_agent.models()
 sc_agent.doctor()
 ```
 
-Every `decidr` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `config_dir=`, and the `general_log=` and `session_log=` callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
+Every `decidr` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `general_log=` and `session_log=` for caller-owned sc-observability Loggers or callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
 
 ## Configuration, keys and logs
 
-- **Configuration:** read from `~/.sc-agent/default.json`, then `local.json`, then `SC_AGENT__*` overrides. All values are checked when the configuration loads.
+- **Configuration:** shared layered JSON: global `~/.sc-agent/sc-agent.json` and `decidr.json`, local `<worktree>/.sc/sc-agent/sc-agent.json` and `decidr.json`, then `DECIDR_` environment settings and flags. `--project` / `project=None` resolve project/phase through flags, `SC_PROJECT` and files. Doctor prints values, winning sources and file existence without writing a file.
 - **Keys:** read from the environment, from the repository-root `.env`, or from the OS keyring. An attached key is redacted from all error text.
-- **Logs:** everything goes under `<log_root>/logs/` (default `~/.sc-agent/logs/`):
-  - each CLI writes its own general log, rotated by sc-observability;
-  - session logs go to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.
+- **Logs:** `log_root` defaults to `~/.sc-agent`:
+  - each CLI writes `<log_root>/logs/<cli>.log.jsonl`, rotated by sc-observability;
+  - session logs go to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.
 
 ## Workspace
 

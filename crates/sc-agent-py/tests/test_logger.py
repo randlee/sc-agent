@@ -52,9 +52,9 @@ def test_same_caller_owned_logger_receives_python_and_sc_agent_records(env, args
         if injection in ("general", "both"):
             assert "decidr.send" in actions
             assert "http.send" in actions
-            assert not (default_root / "logs/sc-agent-py.log.jsonl").exists()
+            assert not (default_root / "logs/decidr.log.jsonl").exists()
         else:
-            assert (default_root / "logs/sc-agent-py.log.jsonl").exists()
+            assert (default_root / "logs/decidr.log.jsonl").exists()
             assert "decidr.send" not in actions
         sessions = [event for event in events if event.target == "sc_agent.session"]
         expected = 1 if operation == "send" else 2

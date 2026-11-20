@@ -31,7 +31,7 @@ def _write_config(root: pathlib.Path, port: int, max_sends: int | None = None) -
     }
     if max_sends is not None:
         data["max_sends"] = max_sends
-    (config / "default.json").write_text(json.dumps(data))
+    (config / "decidr.json").write_text(json.dumps(data))
     return log_root
 
 
@@ -47,11 +47,14 @@ def env(tmp_path, monkeypatch, request):
         status,
     )
     for name in list(os.environ):
-        if name.startswith("SC_AGENT__") or name.endswith("_API_KEY"):
+        if name.startswith(("SC_AGENT__", "DECIDR_", "SITR_")) or name == "SC_PROJECT" or name.endswith("_API_KEY"):
             monkeypatch.delenv(name)
     # The extension and child CLI inherit this trap. Any real OS keyring
     # backend construction during Python tests fails before contacting it.
     monkeypatch.setenv("SC_AGENT_TEST_TRAP_PLATFORM_KEYRING", "1")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
     log_root = _write_config(tmp_path, loopback.port, max_sends=1 if status is not None else None)
     try:
         yield loopback, log_root
@@ -83,7 +86,7 @@ def config_dir(tmp_path) -> pathlib.Path:
 @pytest.fixture
 def args(env, config_dir) -> dict:
     """Keyword arguments of one send to runner `dec` with the test's `config_dir`."""
-    return dict(model="dec", project="proj", agent_role="role", config_dir=str(config_dir))
+    return dict(model="dec", project="proj", agent_role="role")
 
 
 @pytest.fixture
@@ -93,7 +96,7 @@ def outcome_args(args):
 
 @pytest.fixture
 def outcome_models_args(args):
-    return dict(runner="dec", config_dir=args["config_dir"])
+    return dict(runner="dec")
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ KEY_ENV = "NATIVE_REDACTION_TEST_KEY"
 
 
 def keyed_runner(config_dir):
-    path = config_dir / "default.json"
+    path = config_dir / "decidr.json"
     config = json.loads(path.read_text())
     config["local_runners"]["dec"]["key_env"] = KEY_ENV
     path.write_text(json.dumps(config))
@@ -79,7 +79,7 @@ def test_post_credential_decision_error_stays_redacted_in_actual_sagerror(env, c
     keyed_runner(config_dir)
     monkeypatch.setenv(KEY_ENV, KEY)
     with pytest.raises(sc_agent.SagError) as caught:
-        sc_agent.models(runner="dec", config_dir=str(config_dir))
+        sc_agent.models(runner="dec")
     identity, message, encoded = caught.value.args
     detail = json.loads(encoded)
     assert identity == "decidr.decision"
@@ -109,13 +109,13 @@ def test_invalid_environment_key_auth_cancels_and_redacts(
     record_property("model", options["model"])
     record_property("mode", "loopback")
     cancel = sc_agent.CancelToken()
-    result = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
+    result = consumer.call_result(REQUEST, **{k:v for k,v in options.items() if k != "agent_role"}, abort_on=frozenset({"auth"}),
                                category_codes={"auth": "AUTH"}, cancel=cancel)
     text = result["line"]
     detail = json.loads(text)["error"]
     assert detail["status"] == 401 and detail["category"] == "auth"
     assert result["error"].code == "AUTH" and cancel.is_cancelled()
-    cancelled = consumer.call_result(REQUEST, **options, abort_on=frozenset({"auth"}),
+    cancelled = consumer.call_result(REQUEST, **{k:v for k,v in options.items() if k != "agent_role"}, abort_on=frozenset({"auth"}),
                                  category_codes={}, cancel=cancel)
     assert json.loads(cancelled["line"])["error"]["category"] == "cancelled"
     assert key not in text + cancelled["line"]

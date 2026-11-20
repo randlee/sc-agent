@@ -20,9 +20,6 @@ fn every_configuration_error_matches_its_own_catalog() {
             file: "f".into(),
             cause: serde_json::from_str::<serde_json::Value>("{").unwrap_err(),
         },
-        AgentConfigError::Load(sc_config::ConfigError::MissingDefault {
-            path: "missing".into(),
-        }),
         AgentConfigError::Catalog(TypesError::UnknownProvider { text: "x".into() }),
         AgentConfigError::HomeUnknown,
         AgentConfigError::FileTooLarge {

@@ -41,7 +41,11 @@ mod tests {
             calls: calls.clone(),
         }));
         let opts = options("jev", Some(Provider::TypeSafe), ctx, &log);
-        std::fs::write(dir.path().join("default.json"), r#"{"max_sends":0}"#).expect("config");
+        std::fs::write(
+            dir.path().join(".sc-agent/decidr.json"),
+            r#"{"max_sends":0}"#,
+        )
+        .expect("config");
         let error = send(&opts, request(NOUL), &CancelToken::new()).expect_err("config refused");
         assert_eq!(error.id(), "decidr.config");
         assert_eq!(

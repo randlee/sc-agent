@@ -49,7 +49,7 @@ mod tests {
             model
                 .options()
                 .iter()
-                .any(|option| option.long() == Some("--config-dir"))
+                .any(|option| option.long() == Some("--project"))
         );
         assert!(model.options().iter().all(|option| option.name() != "help"));
         let send = model

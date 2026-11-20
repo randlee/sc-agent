@@ -4,16 +4,16 @@ owner_crate_path = "sc_agent_config"
 name = "ScAgentConfigLayer"
 
 [public]
-facade = "load"
+facade = "load_layered"
 
 [implementation]
-type = "load"
+type = "load_layered"
 module = "sc_agent_config"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["load"]
+roots = ["load_layered"]
 
 [dependencies]
 allowed_dev_dependencies = ["sc-agent-testkit", "sc-agent-secrets"]

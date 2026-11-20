@@ -42,16 +42,19 @@ impl KeyringSource for MapKeyring {
     }
 }
 
-/// A config dir holding `default.json` = `json`.
+/// A config dir holding `decidr.json` = `json`.
 pub fn config_dir(json: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
-    std::fs::write(dir.path().join("default.json"), json).expect("default.json");
+    std::fs::create_dir_all(dir.path().join(".sc-agent")).expect("global folder");
+    std::fs::write(dir.path().join(".sc-agent/decidr.json"), json).expect("decidr.json");
     dir
 }
 
-/// A config dir with no `default.json` (the default configuration).
+/// A config dir with no `decidr.json` (the default configuration).
 pub fn empty_config_dir() -> tempfile::TempDir {
-    tempfile::tempdir().expect("tempdir")
+    let home = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(home.path().join(".sc-agent")).expect("global folder");
+    home
 }
 
 pub fn environment(vars: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
@@ -69,15 +72,19 @@ pub fn context(
     log: &MemoryLog,
 ) -> Context {
     Context {
-        service: "decidr",
-        config_dir: Some(dir.to_path_buf()),
+        cli: sc_agent_config::CliName::Decidr,
+        loaded: None,
+        flags: std::collections::BTreeMap::new(),
+        session: None,
+        general: None,
+        home: Some(dir.to_path_buf()),
         // No real `.env` is read (QA-011): the repo root is the tempdir config dir.
         repo_root: Some(dir.to_path_buf()),
         environment: Some(environment(vars)),
         keyring: Some(Arc::new(MapKeyring::default())),
         keyring_override: None,
         transport: Some(transport),
-        general: Some(log.general()),
+        opened_general: Some(log.general()),
         clock: None,
     }
 }

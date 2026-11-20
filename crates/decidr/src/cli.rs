@@ -16,9 +16,9 @@ use sc_agent_config::RunnerName;
     about = "Send TypeSafe (Jev) decision requests."
 )]
 pub(crate) struct Cli {
-    /// Configuration directory holding default.json (and local.json); default ~/.sc-agent. Logs go to the configured log_root, else ~/.sc-agent.
-    #[arg(long, global = true, value_name = "PATH", value_parser = non_empty_path)]
-    pub(crate) config_dir: Option<PathBuf>,
+    /// Optional project/phase for session rows; overrides SC_PROJECT and configuration files.
+    #[arg(long, global = true, value_name = "SLUG", allow_hyphen_values = true, value_parser = non_empty_text)]
+    pub(crate) project: Option<String>,
     #[command(subcommand)]
     pub(crate) command: Command,
 }
@@ -42,9 +42,6 @@ pub(crate) struct SendArgs {
     /// Short name (jev, haiku, luna, ...), a model id, or a configured local runner name.
     #[arg(long, value_name = "NAME", allow_hyphen_values = true, value_parser = non_empty_text)]
     pub(crate) model: String,
-    /// Project slug for the session rows.
-    #[arg(long, value_name = "SLUG", allow_hyphen_values = true, value_parser = non_empty_text)]
-    pub(crate) project: String,
     /// Agent-role slug for the session rows (e.g. plan-anchor, judge-jev, sanity).
     #[arg(long, value_name = "SLUG", allow_hyphen_values = true, value_parser = non_empty_text)]
     pub(crate) agent_role: String,
@@ -138,10 +135,6 @@ fn parse_runner_name(value: &str) -> Result<RunnerName, String> {
         .map_err(|reason| format!("{reason}: {value:?}. See decidr --help."))
 }
 
-fn non_empty_path(value: &str) -> Result<PathBuf, String> {
-    non_empty_text(value).map(PathBuf::from)
-}
-
 fn non_empty_text(value: &str) -> Result<String, String> {
     if value.is_empty() {
         Err("a flag value must not be empty. See decidr --help.".to_owned())
@@ -203,7 +196,7 @@ mod tests {
 
     /// AC: REQ-SAG-0004 (no --agent-name flag; project and agent role required).
     #[test]
-    fn there_is_no_agent_name_flag_and_both_slugs_are_required() {
+    fn there_is_no_agent_name_flag_and_agent_role_is_required() {
         let base = ["decidr", "send", "--model", "jev", "--project", "p"];
         let error = parse(base.iter().chain(&["--agent-name", "x"])).expect_err("no flag");
         assert_eq!(sc_agent_types::ErrorId::id(&error), "decidr.usage");
@@ -239,33 +232,19 @@ mod tests {
         );
     }
 
-    /// `--config-dir` is global: accepted before or after the subcommand, on send, models and
-    /// doctor.
     #[test]
-    fn config_dir_is_a_global_flag() {
+    fn project_is_optional_global_and_legacy_config_dir_is_rejected() {
         for args in [
-            &["decidr", "--config-dir", "/c", "doctor"][..],
-            &["decidr", "doctor", "--config-dir", "/c"],
-            &["decidr", "models", "--config-dir", "/c"],
-            &[
-                "decidr",
-                "send",
-                "--model",
-                "jev",
-                "--project",
-                "p",
-                "--agent-role",
-                "r",
-                "--config-dir",
-                "/c",
-            ],
+            vec!["decidr", "--project", "phase", "doctor"],
+            vec!["decidr", "models", "--project", "phase"],
         ] {
             let Ok(Parsed::Run(cli)) = parse(args) else {
-                panic!("parses: {args:?}");
+                panic!("parses");
             };
-            assert_eq!(cli.config_dir, Some(PathBuf::from("/c")), "{args:?}");
+            assert_eq!(cli.project.as_deref(), Some("phase"));
         }
-        assert!(parse(["decidr", "--config-dir", "", "doctor"]).is_err());
+        assert!(parse(["decidr", "send", "--model", "jev", "--agent-role", "role"]).is_ok());
+        assert!(parse(["decidr", "--config-dir", "/c", "doctor"]).is_err());
     }
 
     #[test]

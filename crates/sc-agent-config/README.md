@@ -48,12 +48,8 @@ lowercase slugs using letters, digits, `.`, `_`, `-` that are safe directory
 names on every supported platform, bounded by `MAX_SEGMENT_BYTES`.
 Layer errors preserve the validation error and add its file, variable or flag.
 
-Existing model, worker, send-count, runner, host, port and timeout checks are
-shared with the legacy loader. Workers are bounded by `MAX_WORKERS`, sends by
+The layered loader validates models, workers, send counts, runners, hosts, ports
+and timeouts. Workers are bounded by `MAX_WORKERS`, sends by
 `MAX_MAX_SENDS`, and model/runner maps by `MAX_MODELS` / `MAX_LOCAL_RUNNERS`.
 Runner request and load timeouts use `RUNNER_REQUEST_TIMEOUT_SECS` and
 `RUNNER_LOAD_TIMEOUT_SECS`; a runner key is accepted only on a loopback host.
-
-The legacy `load`, `default_dir` and `APP_NAME` remain available for callers
-that have not yet adopted the layered API. Their behavior is unchanged; the
-integration sprint removes them when it migrates those callers.

@@ -30,13 +30,15 @@ mod select;
 mod timeout;
 
 #[doc(inline)]
-pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
+pub use doctor::{
+    DetectedKey, DoctorOptions, DoctorReport, KeyringError, MissingModel, Tie, doctor,
+};
 #[doc(inline)]
 pub use error::DecidrError;
 #[doc(inline)]
 pub use select::{
-    Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,
-    send_batch, send_batch_on, send_batch_with, send_on, send_with, session_identity,
+    Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, load_context,
+    models, send, send_batch, send_batch_on, send_batch_with, send_on, send_with, session_identity,
     session_logger,
 };
 #[doc(inline)]

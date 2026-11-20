@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 0.2.10 configuration and logging
+
+- Share layered configuration and doctor settings/source/file rows between decidr and sitr; project/phase resolves from flags, SC_PROJECT and files.
+- Remove the old configuration directory API and loader. Python adds `resolved_config(project=None)`; calls without a resolved project fail before sending or writing a session row.
+- Use one caller-owned Logger for injected Python logging; default decidr diagnostics are `logs/decidr.log.jsonl`, with non-rotating sessions under `sessions/`.
+- Generated clients require `client_name`, fix agent_role to that name and inject one client Logger into every wheel operation; apps may supply their Logger.
+- Add `sitr doctor` (e-5), and sitr wheel `general_log=` / `log_root=` injection (e-6), shipping in the same release.
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.

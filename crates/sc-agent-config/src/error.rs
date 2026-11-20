@@ -7,7 +7,7 @@ use sc_agent_types::{ErrorDetail, ErrorId, TypesError};
 
 /// The configuration could not be loaded or used.
 ///
-/// [`Display`](fmt::Display) writes `"<id>: <message>"`; a wrapped sc-config
+/// [`Display`](fmt::Display) writes `"<id>: <message>"`; a wrapped I/O, JSON
 /// or sc-agent-types error is in [`source`](std::error::Error::source) and
 /// [`cause_detail`](ErrorId::cause_detail), never in the message.
 #[derive(Debug)]
@@ -39,8 +39,6 @@ pub enum AgentConfigError {
         /// The original parser failure.
         cause: serde_json::Error,
     },
-    /// sc-config failed: a file is unreadable or not JSON, or an override cannot be applied.
-    Load(sc_config::ConfigError),
     /// A `models` entry conflicts with the catalog (a model on two lines).
     Catalog(TypesError),
     /// There is no home directory, so `~/.sc-agent` cannot be located.
@@ -86,7 +84,6 @@ sc_agent_types::error_catalog! { AgentConfigError {
     AgentConfigError::Layer { .. } => ("config.layer", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Read { .. } => ("config.read", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Json { .. } => ("config.json", Some(sc_agent_types::ErrorCategory::Config)),
-    AgentConfigError::Load(_) => ("config.load", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::Catalog(_) => ("config.catalog", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::HomeUnknown => ("config.home_unknown", Some(sc_agent_types::ErrorCategory::Config)),
     AgentConfigError::FileTooLarge { .. } => ("config.file_too_large", Some(sc_agent_types::ErrorCategory::Config)),
@@ -112,7 +109,6 @@ impl ErrorId for AgentConfigError {
             Self::Layer { source, cause } => format!("{source}: {cause}"),
             Self::Read { file, cause } => format!("{} at $: {cause}", file.display()),
             Self::Json { file, cause } => format!("{} at $: {cause}", file.display()),
-            Self::Load(_) => "the sc-agent configuration could not be loaded".to_owned(),
             Self::Catalog(_) => "a configured model conflicts with the model catalog".to_owned(),
             Self::HomeUnknown => {
                 "no home directory is known, so ~/.sc-agent cannot be located".to_owned()
@@ -141,7 +137,6 @@ impl ErrorId for AgentConfigError {
             Self::Read { cause, .. } => Some(ErrorDetail::foreign("std.io", cause)),
             Self::Json { cause, .. } => Some(ErrorDetail::foreign("serde_json", cause)),
             Self::ProjectRequired { .. } => None,
-            Self::Load(inner) => Some(ErrorDetail::foreign(inner.code(), inner)),
             Self::Catalog(inner) => Some(inner.detail()),
             Self::HomeUnknown
             | Self::FileTooLarge { .. }
@@ -165,13 +160,11 @@ impl ErrorId for AgentConfigError {
             Self::Invalid { .. } => Some("fix the value at the reported configuration path"),
             Self::KeyOnPlainHttp { .. } => Some("use a loopback host or remove key_env"),
             Self::RunnerName { .. } => Some("rename the runner"),
-            // sc-config's own advice for its error code (files, JSON, overrides).
-            Self::Load(inner) => Some(inner.recovery()),
             Self::Catalog(inner) => Some(inner.recovery().unwrap_or(
                 "keep the model under the line its id already has, or choose a different id",
             )),
             Self::HomeUnknown => Some(
-                "set HOME (USERPROFILE on Windows), or set log_root in the config and pass an explicit config_dir to load",
+                "set HOME (USERPROFILE on Windows), or pass an explicit home to the layered loader",
             ),
             Self::FileTooLarge { .. } => {
                 Some("shrink the config file below 1 MiB; a real config is a few kilobytes")
@@ -196,7 +189,6 @@ impl std::error::Error for AgentConfigError {
             Self::Read { cause, .. } => Some(cause),
             Self::Json { cause, .. } => Some(cause),
             Self::ProjectRequired { .. } => None,
-            Self::Load(inner) => Some(inner),
             Self::Catalog(inner) => Some(inner),
             Self::HomeUnknown
             | Self::FileTooLarge { .. }
@@ -205,12 +197,6 @@ impl std::error::Error for AgentConfigError {
             | Self::Invalid { .. }
             | Self::KeyOnPlainHttp { .. } => None,
         }
-    }
-}
-
-impl From<sc_config::ConfigError> for AgentConfigError {
-    fn from(inner: sc_config::ConfigError) -> Self {
-        Self::Load(inner)
     }
 }
 

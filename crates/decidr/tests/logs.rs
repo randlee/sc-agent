@@ -47,7 +47,7 @@ mod tests {
             Arc::new(transport),
             &MemoryLog::new().expect("log"),
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let log = MemoryLog::new().expect("log");
         let mut options = options("jev", None, ctx, &log);
         options.session = None;
@@ -101,7 +101,7 @@ mod tests {
             Arc::new(transport.clone()),
             &unused,
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let mut options = options("jev", None, ctx, &unused);
         options.session = None;
         let cancel = CancelToken::new();
@@ -188,7 +188,7 @@ mod tests {
             Arc::new(transport),
             &unused,
         );
-        ctx.general = None;
+        ctx.opened_general = None;
         let mut options = options("jev", None, ctx, &unused);
         options.session = None;
         send(&options, request(NOUL), &CancelToken::new()).expect("send");
@@ -289,8 +289,12 @@ mod tests {
             ANTHROPIC_KEY.to_owned(),
         );
         Context {
-            service: "decidr",
-            config_dir: Some(dir.to_path_buf()),
+            cli: sc_agent_config::CliName::Decidr,
+            loaded: None,
+            flags: std::collections::BTreeMap::new(),
+            session: None,
+            general: None,
+            home: Some(dir.to_path_buf()),
             repo_root: Some(dir.to_path_buf()),
             environment: Some(environment(&[(
                 sc_agent_secrets::TYPESAFE_API_KEY,
@@ -299,7 +303,7 @@ mod tests {
             keyring: Some(Arc::new(MapKeyring(keyring))),
             keyring_override: None,
             transport: Some(Arc::new(transport)),
-            general: Some(log.general()),
+            opened_general: Some(log.general()),
             clock: None,
         }
     }
@@ -402,5 +406,60 @@ mod tests {
             "{report:?}"
         );
         assert_eq!(report.keys.len(), 2);
+    }
+
+    /// Exercise the real session-file writer with the shared local-repo constructor's
+    /// controlled hostname, independently of this test process's hostname and cwd.
+    #[test]
+    fn controlled_local_identity_reaches_the_actual_session_file() {
+        let root = tempfile::tempdir().expect("root");
+        let work = root.path().join("work");
+        std::fs::create_dir(&work).expect("work");
+        assert!(Repo::work_tree_root(&work).expect("lookup").is_none());
+        let home = config_dir(&serde_json::json!({"log_root":root.path()}).to_string());
+        let memory = MemoryLog::new().expect("memory");
+        let ctx = context(
+            home.path(),
+            &[(sc_agent_secrets::TYPESAFE_API_KEY, TYPESAFE_KEY)],
+            Arc::new(ScriptedTransport::responses(vec![ok_noul()])),
+            &memory,
+        );
+        let mut options = options("jev", None, ctx, &memory);
+        let identity = sc_agent_log::SessionIdentity::new(
+            Repo::local(
+                "m5",
+                work.file_name().expect("folder").to_str().expect("UTF8"),
+            )
+            .expect("repo"),
+            options.project.as_str(),
+            options.agent_role.as_str(),
+        )
+        .expect("identity");
+        let session =
+            sc_agent_log::SessionLogger::open_default(root.path(), identity).expect("session");
+        options.session = Some(session.clone());
+        assert!(
+            send(&options, request(NOUL), &CancelToken::new())
+                .expect("send")
+                .outcome
+                .is_ok()
+        );
+        drop(options);
+        session.close().expect("session barrier");
+        let path = root
+            .path()
+            .join("sessions")
+            .join("local")
+            .join("m5")
+            .join("work")
+            .join("role")
+            .join("proj")
+            .join("sessions.jsonl");
+        let row: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).expect("session bytes"))
+                .expect("row");
+        assert_eq!(row["fields"]["repo"], "local/m5/work");
+        assert_eq!(row["fields"]["agent_role"], "role");
+        assert_eq!(row["fields"]["project"], "proj");
     }
 }
