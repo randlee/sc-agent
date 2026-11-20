@@ -13,6 +13,8 @@ use std::time::Duration;
 
 use sc_agent_types::{Catalog, ModelId, ReleaseDate, ShortName, VarName};
 use sc_config::{AppName, ConfigError, Loader};
+#[cfg(test)]
+use serde::Serialize;
 use serde::de::{Error as _, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_path_to_error::Segment;
@@ -68,6 +70,7 @@ pub const RUNNER_LOAD_TIMEOUT_SECS: RangeInclusive<u32> = 10..=7200;
 /// [`Default`] has no models, no `log_root`, 8 workers, 5 sends and no
 /// runners. Unknown keys are rejected.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct AgentConfig {
@@ -162,6 +165,7 @@ impl AgentConfig {
 
 /// One extra catalog row: the model's line and release date.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct ExtraModel {
@@ -181,6 +185,7 @@ const RUNNER_NAME_IS_SHORT_NAME: &str = "runner name must not be a built-in shor
 /// refused while the config is deserialized; [`load`] reports it as
 /// [`AgentConfigError::RunnerName`] with the key path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(try_from = "String")]
 pub struct RunnerName(String);
 
@@ -230,6 +235,7 @@ impl fmt::Display for RunnerName {
 
 /// One local decision runner (REQ-SAG-0801); its name is the map key.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct LocalRunner {
@@ -280,6 +286,7 @@ fn secs(value: NonZeroU32) -> Duration {
 /// sc-decision-local maps each to its own daemon kind; a new daemon adds a
 /// variant here and there, so both crates match exhaustively.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(rename_all = "lowercase")]
 pub enum RunnerKind {
     /// A Strands daemon.
@@ -298,6 +305,7 @@ pub enum RunnerKind {
 /// characters of `[A-Za-z0-9-]` with no leading or trailing `-`. Paths, `@`,
 /// `:` ports, whitespace and empty text are rejected.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(try_from = "String")]
 pub struct RunnerHost(String);
 
