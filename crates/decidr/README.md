@@ -27,7 +27,7 @@ decidr doctor
   - `--workers COUNT` sets batch concurrency from 1 through 64 and requires `--batch`.
 - `models [--runner NAME]`: lists the models of TypeSafe, or of a configured local runner.
 - `doctor`: lists the keys found, in use order, and warns about provider models missing from the catalog.
-- Configuration resolves flags, CLI environment variables (`DECIDR_`, plus `SC_PROJECT`), local `.sc/sc-agent/decidr.json` and `sc-agent.json`, then global `~/.sc-agent/decidr.json` and `sc-agent.json`. Outside a git worktree, local files are skipped. `doctor` reports settings, sources and file existence; unreadable keyrings appear as typed rows. It opens no file logger.
+- Configuration resolves flags, CLI environment variables (`DECIDR_`, plus `SC_PROJECT`), local `.sc/sc-agent/decidr.json` and `sc-agent.json`, then global `~/.sc-agent/decidr.json` and `sc-agent.json`. Outside a git worktree, local files are skipped. `doctor` reports settings, sources and file existence. A keyring that cannot be read fails `doctor`, and `doctor` writes its `decidr.doctor` record to the general log like every call.
 
 Exit codes: 0 when the command ran and every result succeeded, 1 otherwise, 130 after an interrupt. Ctrl-C or SIGTERM cancels the run: every unfinished request ends as `decision.cancelled` and the logs are flushed. A third interrupt exits at once.
 

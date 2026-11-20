@@ -139,11 +139,10 @@ impl Writer {
 
     /// The one injected-destination dispatch: a native logger keeps `ledger`, a Python target
     /// is classified here.
-    #[cfg_attr(not(feature = "python"), allow(unused_variables))]
     pub(crate) fn from_injected(
         injected: crate::Injected,
         ledger: Option<Arc<Ledger>>,
-        service: &'static str,
+        #[cfg(feature = "python")] service: &'static str,
         kind: LogKind,
     ) -> Result<Self, LogError> {
         match injected {

@@ -362,7 +362,7 @@ fn snapshot_config_tree(root: &Path) -> std::io::Result<Vec<(PathBuf, Vec<u8>)>>
 }
 
 #[test]
-fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() -> std::io::Result<()> {
+fn doctor_matches_shared_rows_lists_four_files_and_logs_like_every_call() -> std::io::Result<()> {
     let home = temp_home().expect("temp home and git worktree");
     let canonical_home = std::fs::canonicalize(home.path()).expect("canonical temp home");
     let shared = canonical_home
@@ -422,18 +422,12 @@ fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() -> std::io::
     .map(|path| canonical_path_with_missing_tail(path))
     .collect::<std::io::Result<Vec<_>>>()?;
     assert_eq!(actual_paths, expected_paths);
-    assert_eq!(
-        snapshot_config_tree(home.path()).expect("snapshot temp worktree"),
-        before
-    );
-    assert!(
-        !home
-            .path()
-            .join(".sc-agent")
-            .join("logs")
-            .join("sitr.log.jsonl")
-            .exists()
-    );
+    let log = Path::new(".sc-agent").join("logs").join("sitr.log.jsonl");
+    let (logged, after): (Vec<_>, Vec<_>) = snapshot_config_tree(home.path())?
+        .into_iter()
+        .partition(|(path, _)| *path == log);
+    assert_eq!(after, before);
+    assert!(String::from_utf8_lossy(&logged[0].1).contains(r#""subcommand":"doctor""#));
     Ok(())
 }
 

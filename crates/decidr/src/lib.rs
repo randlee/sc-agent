@@ -30,9 +30,7 @@ mod select;
 mod timeout;
 
 #[doc(inline)]
-pub use doctor::{
-    DetectedKey, DoctorOptions, DoctorReport, KeyringError, MissingModel, Tie, doctor,
-};
+pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
 #[doc(inline)]
 pub use error::DecidrError;
 #[doc(inline)]

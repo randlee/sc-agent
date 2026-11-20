@@ -775,10 +775,10 @@ mod tests {
     }
 }
 
-/// Doctor's binary path prints the shared loader rows even when the guarded keyring refuses.
+/// Doctor's binary path fails on a refused keyring and logs that call to the general log.
 #[test]
-fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
-    use serde_json::{Value, json};
+fn layered_doctor_fails_on_keyring_error_and_logs_the_call() {
+    use serde_json::json;
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
     fn files(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, std::time::SystemTime)> {
@@ -847,71 +847,26 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     };
     let before = files(root.path());
     let output = common::run_bounded(&mut command());
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
+        stderr.contains(r#""cause":{"id":"secrets.keyring_construction_refused""#),
+        "{stderr}"
     );
-    let report: Value = serde_json::from_slice(&output.stdout).expect("doctor JSON");
-    let loaded = sc_agent_config::load_layered(&sc_agent_config::LoadOptions {
-        cli: sc_agent_config::CliName::Decidr,
-        home: home.clone(),
-        worktree: Some(work.clone()),
-        default_log_root: sc_agent_log::default_log_root(&home),
-        flags: BTreeMap::new(),
-        flag_names: BTreeMap::new(),
-        environment: Vec::new(),
-    })
-    .expect("canonical config");
-    assert_eq!(
-        report["settings"],
-        serde_json::to_value(sc_agent_config::doctor_rows(&loaded)).expect("canonical rows")
+    let log = home.join(".sc-agent/logs/decidr.log.jsonl");
+    let mut after = files(root.path());
+    let (logged, _) = after
+        .remove(&log)
+        .expect("doctor logged to the general log");
+    let logged = String::from_utf8(logged).expect("log UTF8");
+    assert!(
+        logged.contains(r#""action":"decidr.doctor""#)
+            && logged.contains(r#""outcome":"decidr.secrets""#),
+        "{logged}"
     );
     assert_eq!(
-        report["files"],
-        serde_json::to_value(&loaded.files).expect("canonical files")
-    );
-    assert_eq!(report["files"].as_array().expect("files").len(), 4);
-    assert_eq!(
-        report["keyring"].as_array().expect("keyring rows").len(),
-        sc_agent_types::Provider::ALL.len()
-    );
-    assert!(
-        report["keyring"]
-            .as_array()
-            .expect("rows")
-            .iter()
-            .all(|row| row["error"]["id"] == "secrets.keyring_construction_refused")
-    );
-    assert_eq!(files(root.path()), before, "doctor changed a file");
-    let outside = root.path().join("outside");
-    std::fs::create_dir(&outside).expect("outside");
-    let output = common::run_bounded(command().current_dir(&outside));
-    assert!(output.status.success());
-    let report: Value = serde_json::from_slice(&output.stdout).expect("outside JSON");
-    assert_eq!(report["files"].as_array().expect("files").len(), 2);
-    let output = common::run_bounded(
-        command()
-            .env("DECIDR_WORKERS", "3")
-            .env("SC_PROJECT", "phase-d")
-            .env("DECIDR_LOG_ROOT", root.path().join("other")),
-    );
-    assert!(output.status.success());
-    let report: Value = serde_json::from_slice(&output.stdout).expect("env JSON");
-    let rows = report["settings"].as_array().expect("rows");
-    for (name, value, source) in [
-        ("project", "phase-d", "SC_PROJECT"),
-        ("workers", "3", "DECIDR_WORKERS"),
-    ] {
-        assert!(
-            rows.iter().any(|row| row["setting"] == name
-                && row["value"] == value
-                && row["source"] == source)
-        );
-    }
-    assert!(
-        rows.iter()
-            .any(|row| row["setting"] == "log_root" && row["source"] == "DECIDR_LOG_ROOT")
+        after, before,
+        "doctor changed a file other than its general log"
     );
     let output = common::run_bounded(command().env("DECIDR_WORKERS", "0"));
     assert!(!output.status.success());
@@ -934,9 +889,5 @@ fn layered_doctor_reports_sources_files_and_keyring_without_writes() {
     assert!(
         requests.try_recv().is_err(),
         "doctor sent a request to the configured runner"
-    );
-    assert!(
-        !root.path().join("other").exists(),
-        "doctor opened the configured log root"
     );
 }
