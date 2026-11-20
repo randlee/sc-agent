@@ -1951,7 +1951,6 @@ dependencies = [
  "sc-agent-config",
  "sc-agent-log",
  "sc-agent-testkit",
- "sc-observability",
  "sc-treesitter",
  "serde",
  "serde_json",
