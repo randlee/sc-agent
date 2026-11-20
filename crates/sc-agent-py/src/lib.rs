@@ -220,17 +220,18 @@ impl BoxAnswer {
 }
 
 fn invalid_result(message: impl Into<String>) -> PyErr {
-    py_binding_error(&PyBindingError::InvalidResult {
-        message: message.into(),
+    py_binding_error(&PyBindingError::InvalidOption {
+        option: "result".into(),
+        bound: message.into(),
     })
 }
 
-fn encode_result(message: String) -> PyErr {
-    py_binding_error(&PyBindingError::EncodeResult { message })
+fn encode_result(source: serde_json::Error) -> PyErr {
+    sag_error(&DecidrError::Encode { source })
 }
 
 fn json_object(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<PyAny>> {
-    let encoded = serde_json::to_string(value).map_err(|e| encode_result(e.to_string()))?;
+    let encoded = serde_json::to_string(value).map_err(encode_result)?;
     Ok(py
         .import("json")?
         .call_method1("loads", (encoded,))?
@@ -252,7 +253,7 @@ fn parse_result(py: Python<'_>, line: &str) -> PyResult<Py<PyAny>> {
         result.set_item(field, json_object(py, value)?)?;
     }
     if let Some(response) = row.get("response") {
-        let encoded = serde_json::to_vec(response).map_err(|e| encode_result(e.to_string()))?;
+        let encoded = serde_json::to_vec(response).map_err(encode_result)?;
         let response = SystemOneResponse::from_json(200, &encoded)
             .map_err(|e| invalid_result(format!("invalid typed response: {}", e.message())))?;
         let answers = PyDict::new(py);
@@ -266,8 +267,7 @@ fn parse_result(py: Python<'_>, line: &str) -> PyResult<Py<PyAny>> {
                 } => {
                     let probs = json_object(
                         py,
-                        &serde_json::to_value(probabilities)
-                            .map_err(|e| encode_result(e.to_string()))?,
+                        &serde_json::to_value(probabilities).map_err(encode_result)?,
                     )?;
                     let probs = py
                         .import("types")?
@@ -290,14 +290,11 @@ fn parse_result(py: Python<'_>, line: &str) -> PyResult<Py<PyAny>> {
                     legend,
                     probabilities,
                 } => {
-                    let legend = json_object(
-                        py,
-                        &serde_json::to_value(legend).map_err(|e| encode_result(e.to_string()))?,
-                    )?;
+                    let legend =
+                        json_object(py, &serde_json::to_value(legend).map_err(encode_result)?)?;
                     let probs = json_object(
                         py,
-                        &serde_json::to_value(probabilities)
-                            .map_err(|e| encode_result(e.to_string()))?,
+                        &serde_json::to_value(probabilities).map_err(encode_result)?,
                     )?;
                     let legend = py
                         .import("types")?
@@ -343,12 +340,12 @@ fn parse_result(py: Python<'_>, line: &str) -> PyResult<Py<PyAny>> {
             "usage",
             json_object(
                 py,
-                &serde_json::to_value(response.usage).map_err(|e| encode_result(e.to_string()))?,
+                &serde_json::to_value(response.usage).map_err(encode_result)?,
             )?,
         )?;
         result.set_item("error", py.None())?;
     } else if let Some(error) = row.get("error") {
-        let encoded = serde_json::to_string(error).map_err(|e| encode_result(e.to_string()))?;
+        let encoded = serde_json::to_string(error).map_err(encode_result)?;
         let detail: sc_agent_types::ErrorDetail = serde_json::from_str(&encoded)
             .map_err(|e| invalid_result(format!("invalid typed error: {e}")))?;
         let module = py.import("sc_agent")?;

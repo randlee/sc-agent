@@ -475,7 +475,15 @@ fn load_timeout_in_bounds<'de, D: Deserializer<'de>>(
 
 /// Maps a deserialization failure to `config.invalid`, or `config.runner_name` for a short-name runner key.
 pub(crate) fn invalid(error: serde_path_to_error::Error<serde_json::Error>) -> AgentConfigError {
-    let path = error.path().to_string();
+    let path = error
+        .path()
+        .iter()
+        .fold(String::new(), |path, segment| match segment {
+            Segment::Map { key } => crate::layers::join_path(&path, key),
+            Segment::Enum { variant } => crate::layers::join_path(&path, variant),
+            Segment::Seq { index } => format!("{path}[{index}]"),
+            Segment::Unknown => crate::layers::join_path(&path, "?"),
+        });
     let message = error.inner().to_string();
     let segments: Vec<&Segment> = error.path().iter().collect();
     if let [Segment::Map { key: field }, Segment::Map { key: name }] = segments.as_slice()
@@ -495,7 +503,10 @@ pub(crate) fn check_runners(config: &AgentConfig) -> Result<(), AgentConfigError
     for (name, runner) in &config.local_runners {
         if runner.key_env.is_some() && !runner.host.is_loopback() {
             return Err(AgentConfigError::KeyOnPlainHttp {
-                path: format!("local_runners.{name}.key_env"),
+                path: crate::layers::join_path(
+                    &crate::layers::join_path("local_runners", name.as_str()),
+                    "key_env",
+                ),
                 host: runner.host.as_str().to_owned(),
             });
         }

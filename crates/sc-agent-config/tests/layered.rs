@@ -48,6 +48,37 @@ fn row(loaded: &sc_agent_config::Loaded, name: &str) -> DoctorRow {
 }
 
 #[test]
+fn dotted_runner_error_names_its_actual_layer() {
+    let root = tempfile::tempdir().unwrap();
+    let o = options(root.path());
+    let global = global_cli_file(&o);
+    let local = local_file(&o, "decidr.json");
+    write(
+        &global,
+        &json!({"local_runners":{"runner.one":{
+            "kind":"mapika", "host":"http://invalid", "port":8000, "model":"jev"
+        }}}),
+    );
+    write(
+        &local,
+        &json!({"local_runners":{"runner.one":{"port":9000}}}),
+    );
+    let error = load_layered(&o).unwrap_err();
+    assert!(
+        error.message().contains(&global.display().to_string()),
+        "{error}"
+    );
+    assert!(
+        error
+            .detail()
+            .cause
+            .expect("decode cause")
+            .message
+            .contains("runner.one")
+    );
+}
+
+#[test]
 fn every_project_layer_wins_in_order_and_missing_is_typed() {
     let root = tempfile::tempdir().unwrap();
     let mut o = options(root.path());

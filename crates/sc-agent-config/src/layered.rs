@@ -169,7 +169,14 @@ fn decode_path(error: &AgentConfigError) -> Option<&str> {
         AgentConfigError::Invalid { path, .. }
         | AgentConfigError::RunnerName { path, .. }
         | AgentConfigError::KeyOnPlainHttp { path, .. } => Some(path),
-        _ => None,
+        AgentConfigError::ProjectRequired { .. }
+        | AgentConfigError::Layer { .. }
+        | AgentConfigError::Read { .. }
+        | AgentConfigError::Json { .. }
+        | AgentConfigError::Catalog(_)
+        | AgentConfigError::HomeUnknown
+        | AgentConfigError::FileTooLarge { .. }
+        | AgentConfigError::NotAFile { .. } => None,
     }
 }
 

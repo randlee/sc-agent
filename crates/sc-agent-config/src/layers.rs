@@ -295,6 +295,20 @@ fn put<E>(root: &mut Value, parts: &[&str], value: Value) -> Result<(), LayersEr
     )
 }
 
+/// Joins a path segment, quoting keys that would otherwise be ambiguous.
+pub(crate) fn join_path(path: &str, key: &str) -> String {
+    let key = if key.contains(['.', '"', '\\']) {
+        format!("{key:?}")
+    } else {
+        key.to_owned()
+    };
+    if path.is_empty() {
+        key
+    } else {
+        format!("{path}.{key}")
+    }
+}
+
 fn merge(
     into: &mut Value,
     value: &Value,
@@ -307,11 +321,7 @@ fn merge(
             sources.insert(path.into(), source.clone());
         }
         for (key, val) in src {
-            let next = if path.is_empty() {
-                key.clone()
-            } else {
-                format!("{path}.{key}")
-            };
+            let next = join_path(path, key);
             merge(
                 dst.entry(key.clone()).or_insert(Value::Null),
                 val,
@@ -326,7 +336,7 @@ fn merge(
         sources.retain(|key, _| key != path && !key.starts_with(&prefix));
         if let Some(obj) = value.as_object() {
             for (key, val) in obj {
-                let next = format!("{path}.{key}");
+                let next = join_path(path, key);
                 let mut ignored = Value::Null;
                 merge(&mut ignored, val, &next, source, sources);
             }
@@ -499,7 +509,7 @@ pub fn resolved<T: Serialize>(layered: &Layered<T>, keys: &[Key]) -> Vec<Resolve
 fn walk(value: &Value, path: String, sources: &BTreeMap<String, Source>, rows: &mut Vec<Resolved>) {
     if let Some(fields) = value.as_object().filter(|fields| !fields.is_empty()) {
         for (key, child) in fields {
-            walk(child, format!("{path}.{key}"), sources, rows);
+            walk(child, join_path(&path, key), sources, rows);
         }
         return;
     }
