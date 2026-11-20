@@ -1,9 +1,9 @@
 # Requirement: Credential variable names live in the secrets crate
 
 **Status:** Approved  
-**Version:** 0.1.1  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -24,27 +24,19 @@ Definitions: A *provider* is a language-model service whose API key `sc-agent-se
 
 - When a source earlier in the resolution order holds a present but invalid credential, `sc-agent-secrets` MUST treat that credential as authoritative.
 
-- Callers MUST be able to override the keyring service independently per provider.
-- Callers MUST be able to override the keyring account independently per provider.
+- A caller may pass a keyring service and account; they replace the defaults for that call.
 - When a call omits the keyring service, the keyring service MUST default to that provider's credential-variable name.
 - When a call omits the keyring account, the keyring account MUST default to the current OS account.
-- The length of each provided keyring component MUST lie in the range 1–255 UTF-8 bytes.
-- When a provided keyring component is outside 1–255 UTF-8 bytes, the call MUST be refused.
-- When a call is refused for a keyring component outside 1–255 UTF-8 bytes, the error MUST name the option that carried the component.
-- When a call is refused for a keyring component outside 1–255 UTF-8 bytes, the error MUST name the bound of 1–255 UTF-8 bytes.
-- When a Python call supplies a keyring override, the call MUST name `provider`.
-- When a Python call supplies a keyring override without naming `provider`, the call MUST end in an invalid-option refusal.
-- When a Python call supplies no keyring override, the call MUST retain automatic provider selection.
 
 **MUST NOT statements:**
 
 - When a source earlier in the resolution order holds a present but invalid credential, `sc-agent-secrets` MUST NOT fall back to a later source in the resolution order.
-- When a call is refused for a keyring component outside 1–255 UTF-8 bytes, the error MUST NOT retain the supplied value.
-- Overrides for one provider MUST NOT affect another provider.
 
 ### Rationale
 
 Credential handling stays in one crate, so redaction and key lookup cannot disagree about which variables hold secrets.
+
+Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic." The keyring account defaults to the current user account unless something else is passed in.
 
 ### Success Criteria
 

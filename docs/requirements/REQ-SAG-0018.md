@@ -1,9 +1,9 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -44,7 +44,7 @@ Definitions:
 - The consumer template MUST ship in the sc-decidr wheel as package data.
 - The consumer module MUST make the decision call through `send` or `send_batch`.
 - The consumer module MUST pass the model selector through unchanged.
-- Every decision call in the consumer module MUST pass the keyring overrides.
+- A decision call in the consumer module MUST pass a keyring service and account only when the consumer supplies them.
 - Every decision call in the consumer module MUST pass the session tags.
 - When `general_log` is true, the consumer module MUST contain the logging wiring.
 - The consumer module MUST contain the error mapping.
@@ -61,7 +61,6 @@ Definitions:
 - The consumer module MUST cancel the remaining batch on the first result whose category is in the `abort_on` set.
 - The template's Python floor and sc-compose minimum MUST match `floors.toml`.
 - The template header's sc-decidr version literal MUST match the workspace version (`[workspace.package].version` in `Cargo.toml`).
-- When a keyring override is passed, it MUST apply only to the provider the model selector resolves to.
 - A decision call with a keyring override MUST be refused with a typed error when more than one provider ranks, with `decidr.ambiguous_keyring_override` (category `config`).
 - The public API MUST stay documented in `sc_agent.pyi`.
 - The public API MUST stay documented in the wheel README.
@@ -79,6 +78,8 @@ Definitions:
 ### Rationale
 
 The owner requires judge-jev, plan-anchor and every later Python consumer to integrate identically for errors, API keys, model selection (the jev, haiku, luna, decider and laya alternates), the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees. Session logging is always on and always at the wheel's default location, so every consumer's Jev data takes the same path and can be filtered by repository and agent. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context). One template rendered by every consumer removes that divergence. Shipping the template as package data makes its version the installed wheel's version. Leaving `provider` unset keeps the jev, haiku, luna, decider and laya alternates available. The header's recorded versions are troubleshooting information only.
+
+Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic." A keyring service and account are passed only when the consumer supplies them (REQ-SAG-0401).
 
 ### Success Criteria
 

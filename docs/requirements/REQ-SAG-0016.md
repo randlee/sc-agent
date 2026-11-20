@@ -1,9 +1,9 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -52,10 +52,7 @@ Definitions:
 - A leaf variant's detail MUST carry the leaf variant's own typed fields.
 - `retry_after_ms` MUST be the parsed Retry-After rounded up to whole milliseconds.
 - A `retry_after_ms` too large for a `u64` MUST be `u64::MAX`.
-- `sc_agent.SagError` MUST be an exception class whose args are `(id, message, detail_json)`.
-- `sc_agent.SagError` MUST expose the SagError attributes as read-only attributes.
-- A `SagError` built in Python MUST have the SagError attributes.
-- A `SagError` restored from a pickle MUST have the SagError attributes.
+- The sc-decidr wheel MUST return a failed request as an error value carrying the typed fields, and MUST NOT raise an exception for it.
 
 **MUST NOT statements:**
 
@@ -66,6 +63,8 @@ Definitions:
 ### Rationale
 
 Consumers decide whether to retry or back off, and how to fix authentication, from the status, the send count and the Retry-After. Without typed fields these values exist only in English message text. `retry_after_ms` is a transport timing hint; REQ-SAG-0007 governs decision values.
+
+Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is prohibited on the repo.
 
 ### Success Criteria
 

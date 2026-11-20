@@ -59,7 +59,7 @@ Nothing not in these three is built.
 
 ## Not built
 
-Image parts, the long-context header, provider ranking, the user model catalog, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
+Image parts, the long-context header, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
 
 ## Layout
 
