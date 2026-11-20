@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.2  
+**Version:** 0.7.3  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), NFR-SAG-0002 (0.1.0 detail JSON still reads) and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count, the worker cap and the timeout bounds. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
+New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count, the worker cap and the timeout bounds. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
 
 **Requirements:**
 
@@ -23,7 +23,6 @@ New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), R
 - REQ-SAG-0017
 - REQ-SAG-0702
 - REQ-SAG-0018
-- NFR-SAG-0002
 - NFR-SAG-0003
 - REQ-SAG-0007
 - REQ-SAG-0002
@@ -176,7 +175,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
 10. **Category assignments are part of the contract.**
 
-    Moving an id to a different category, or changing the status refinement, is a breaking change (NFR-SAG-0002). Adding an id with a category is not.
+    Moving an id to a different category, or changing the status refinement, is a breaking change. Adding an id with a category is not.
 
 11. **sitr is an optional, separate section of the consumer template.**
 
@@ -253,7 +252,7 @@ sc-agent-types cannot see higher crates' rows (ADR-SAG-0004), and a detail read 
 
 ### Implementation
 
-The work lands in sc-agent as fixes on top of the integration stack, with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702, NFR-SAG-0002 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
+The work lands in sc-agent as fixes on top of the integration stack, with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
 
 Deliverables beyond the code:
 

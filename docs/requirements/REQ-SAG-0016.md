@@ -1,7 +1,7 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -64,6 +64,8 @@ Definitions:
 
 Consumers decide whether to retry or back off, and how to fix authentication, from the status, the send count and the Retry-After. Without typed fields these values exist only in English message text. `retry_after_ms` is a transport timing hint; REQ-SAG-0007 governs decision values.
 
+The 0.1.0 error-JSON compatibility rule is withdrawn (2026-11-20), Rand Lee: "We are still using python, schema isn't locked yet. I haven't mentioned locking schema yet. I have tools to do this that aren't on this repo. No hand built checks."
+
 Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is prohibited on the repo.
 
 ### Success Criteria
@@ -99,4 +101,3 @@ Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is proh
 - REQ-SAG-0017
 - REQ-SAG-0601
 - REQ-SAG-0602
-- NFR-SAG-0002
