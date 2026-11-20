@@ -604,3 +604,33 @@ fn valid_project_slugs_are_returned_unchanged_from_every_input_kind() {
         }
     }
 }
+
+#[test]
+fn validation_names_the_winning_key_source_despite_unrelated_lower_files() {
+    let root = tempfile::tempdir().unwrap();
+    let mut o = options(root.path());
+    let file = o.home.join(".sc-agent/decidr.json");
+    write(&file, &json!({"workers": 2}));
+    o.flags.insert("project".into(), json!("Phase B"));
+    let AgentConfigError::Layer { source, cause } = load_layered(&o).unwrap_err() else {
+        panic!("layer");
+    };
+    assert_eq!(source, "--project");
+    assert!(matches!(*cause, AgentConfigError::Invalid { ref path, .. } if path == "project"));
+    o.flags.clear();
+    env(&mut o, "DECIDR_WORKERS", "0");
+    let AgentConfigError::Layer { source, cause } = load_layered(&o).unwrap_err() else {
+        panic!("layer");
+    };
+    assert_eq!(source, "DECIDR_WORKERS");
+    assert!(matches!(*cause, AgentConfigError::Invalid { ref path, .. } if path == "workers"));
+    // Masked invalid input is still rejected and keeps its own source.
+    o.environment.clear();
+    write(&file, &json!({"workers": 0}));
+    o.flags.insert("workers".into(), json!(3));
+    let AgentConfigError::Layer { source, cause } = load_layered(&o).unwrap_err() else {
+        panic!("layer");
+    };
+    assert_eq!(source, file.display().to_string());
+    assert!(matches!(*cause, AgentConfigError::Invalid { ref path, .. } if path == "workers"));
+}
