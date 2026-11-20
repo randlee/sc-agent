@@ -5,6 +5,7 @@
 
 use clap::error::ErrorKind;
 use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -14,10 +15,9 @@ use clap::{Args, Parser, Subcommand};
     about = "Run predefined tree-sitter queries."
 )]
 pub(crate) struct Cli {
-    /// The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of
-    /// `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators).
+    /// Override the resolved log root; the general log is written to `<PATH>/logs/sitr.log.jsonl`.
     #[arg(long, value_name = "PATH", global = true)]
-    pub(crate) log_root: Option<std::path::PathBuf>,
+    pub(crate) log_root: Option<PathBuf>,
     /// The command to run.
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -26,6 +26,8 @@ pub(crate) struct Cli {
 /// `sitr` commands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Report resolved settings and configuration files without writing anything.
+    Doctor,
     /// Print the loaded grammars as a JSON array of language ids.
     Languages,
     /// Print the predefined queries as a JSON array of {language, query}.
@@ -38,6 +40,7 @@ impl Command {
     /// The subcommand name, for the general log.
     pub(crate) fn name(&self) -> &'static str {
         match self {
+            Self::Doctor => "doctor",
             Self::Languages => "languages",
             Self::Queries(_) => "queries",
             Self::Query(_) => "query",

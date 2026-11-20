@@ -10,7 +10,7 @@
       "name": "log_root",
       "long": "--log-root",
       "short": null,
-      "help": "The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators)",
+      "help": "Override the resolved log root; the general log is written to `<PATH>/logs/sitr.log.jsonl`",
       "long_help": "",
       "value_name": "PATH",
       "required": false,
@@ -22,6 +22,17 @@
   ],
   "arguments": [],
   "subcommands": [
+    {
+      "name": "doctor",
+      "version": null,
+      "description": "Report resolved settings and configuration files without writing anything",
+      "long_description": "",
+      "epilogue": "",
+      "usage": "Usage: sitr doctor",
+      "options": [],
+      "arguments": [],
+      "subcommands": []
+    },
     {
       "name": "languages",
       "version": null,

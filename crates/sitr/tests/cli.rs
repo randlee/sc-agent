@@ -9,6 +9,22 @@ fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_sitr")
 }
 
+fn temp_home() -> std::io::Result<tempfile::TempDir> {
+    let home = tempfile::tempdir()?;
+    let output = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(home.path())
+        .output()?;
+    if !output.status.success() {
+        return Err(std::io::Error::other(format!(
+            "git init failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
+    }
+    Ok(home)
+}
+
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -22,11 +38,15 @@ fn command(home: &Path, args: &[&str]) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .arg("--log-root")
-        .arg(home.join(".sc-agent"))
         .args(args)
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .env_remove("SC_LOG_ROOT");
+        .current_dir(home)
+        .env("HOME", home)
+        .env("USERPROFILE", home)
+        .env_remove("SC_PROJECT")
+        .env_remove("SITR_LOG_ROOT")
+        .env_remove("DECIDR_LOG_ROOT")
+        .env_remove("DECIDR_WORKERS")
+        .env_remove("SC_AGENT__WORKERS");
     command
 }
 
@@ -83,7 +103,7 @@ fn success(output: &Output) {
 #[cfg(all(feature = "grammar-python", feature = "grammar-rust"))]
 #[test]
 fn cli_languages_and_queries_list_pinned_assets() {
-    let home = tempfile::tempdir().expect("home");
+    let home = temp_home().expect("temp home and git worktree");
     let languages = run(home.path(), &["languages"]).expect("spawn sitr");
     success(&languages);
     assert_eq!(languages.stdout, b"[\"python\",\"rust\"]\n");
@@ -105,7 +125,7 @@ fn cli_languages_and_queries_list_pinned_assets() {
 #[cfg(feature = "grammar-rust")]
 #[test]
 fn query_prints_captures_matching_the_golden() {
-    let home = tempfile::tempdir().expect("home");
+    let home = temp_home().expect("temp home and git worktree");
     let file = fixture("match.rs");
     let output = run(
         home.path(),
@@ -118,6 +138,7 @@ fn query_prints_captures_matching_the_golden() {
     )
     .expect("spawn sitr");
     success(&output);
+    assert!(!home.path().join(".sc-agent/sessions").exists());
     let golden = std::fs::read(fixture("match.rs.json")).expect("golden");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
@@ -129,7 +150,7 @@ fn query_prints_captures_matching_the_golden() {
 /// AC: sitr query.
 #[test]
 fn unknown_language_and_missing_positional_fail_with_ids() {
-    let home = tempfile::tempdir().expect("home");
+    let home = temp_home().expect("temp home and git worktree");
     let file = fixture("match.rs");
     let path = file.to_str().expect("utf8 path");
     let unknown =
@@ -158,7 +179,7 @@ fn unknown_language_and_missing_positional_fail_with_ids() {
 #[cfg(feature = "grammar-python")]
 #[test]
 fn non_utf8_file_reaches_stderr_as_not_utf8() {
-    let home = tempfile::tempdir().expect("home");
+    let home = temp_home().expect("temp home and git worktree");
     let file = fixture("not-utf8.py");
     let path = file.to_str().expect("utf8 path");
     let value =
@@ -174,7 +195,7 @@ fn non_utf8_file_reaches_stderr_as_not_utf8() {
 /// AC: REQ-SAG-0003 sitr.log.
 #[test]
 fn each_run_writes_one_sitr_command_event_to_its_own_log() {
-    let home = tempfile::tempdir().expect("home");
+    let home = temp_home().expect("temp home and git worktree");
     success(&run(home.path(), &["languages"]).expect("spawn sitr"));
     let log = home
         .path()
@@ -193,7 +214,7 @@ fn each_run_writes_one_sitr_command_event_to_its_own_log() {
     assert_eq!(commands.len(), 1, "{text}");
     let event = commands[0];
     assert_eq!(event["service"], "sitr");
-    assert_eq!(event["outcome"], "ok");
+    assert_eq!(event["fields"]["outcome"], "ok");
     assert_eq!(event["fields"]["subcommand"], "languages");
 
     let failed = run(home.path(), &["query", "cobol", "x", "y"]).expect("spawn sitr");
@@ -204,7 +225,7 @@ fn each_run_writes_one_sitr_command_event_to_its_own_log() {
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
         .rfind(|event| event["action"] == "sitr.command")
         .expect("second event");
-    assert_eq!(last["outcome"], "error");
+    assert_eq!(last["fields"]["outcome"], "error");
     assert_eq!(last["fields"]["subcommand"], "query");
     assert_eq!(last["fields"]["error_id"], "treesitter.unknown_language");
     assert_eq!(last["fields"]["language"], "cobol");
@@ -223,7 +244,7 @@ fn each_run_writes_one_sitr_command_event_to_its_own_log() {
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
         .rfind(|event| event["action"] == "sitr.command")
         .expect("third event");
-    assert_eq!(last["outcome"], "ok");
+    assert_eq!(last["fields"]["outcome"], "ok");
     assert_eq!(last["fields"]["language"], "rust");
     assert_eq!(last["fields"]["query"], "match-arms");
     assert_eq!(last["fields"]["file"], path);
@@ -236,4 +257,192 @@ fn each_run_writes_one_sitr_command_event_to_its_own_log() {
         .map(|entry| entry.file_name())
         .collect();
     assert_eq!(files, ["sitr.log.jsonl"]);
+}
+
+fn snapshot_config_tree(root: &Path) -> std::io::Result<Vec<(PathBuf, Vec<u8>)>> {
+    fn visit(root: &Path, dir: &Path, files: &mut Vec<(PathBuf, Vec<u8>)>) -> std::io::Result<()> {
+        if !dir.exists() {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit(root, &path, files)?;
+            } else {
+                files.push((
+                    path.strip_prefix(root)
+                        .map_err(|error| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, error)
+                        })?
+                        .into(),
+                    std::fs::read(&path)?,
+                ));
+            }
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    visit(root, root, &mut files)?;
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(files)
+}
+
+#[test]
+fn doctor_matches_shared_rows_lists_four_files_and_does_not_write() {
+    let home = temp_home().expect("temp home and git worktree");
+    let canonical_home = std::fs::canonicalize(home.path()).expect("canonical temp home");
+    let shared = canonical_home.join(".sc/sc-agent/sc-agent.json");
+    std::fs::create_dir_all(shared.parent().expect("parent")).expect("create local config");
+    std::fs::write(&shared, br#"{"project":"phase-a"}"#).expect("write local config");
+    let before = snapshot_config_tree(home.path()).expect("snapshot temp worktree");
+
+    let output = run(home.path(), &["doctor"]).expect("spawn sitr doctor");
+    success(&output);
+    assert!(output.stderr.is_empty());
+    let report: serde_json::Value =
+        serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
+    let settings = report["settings"].as_array().expect("settings");
+    assert_eq!(settings.len(), 2);
+    assert_eq!(
+        settings[0],
+        serde_json::json!({
+            "setting": "project",
+            "value": "phase-a",
+            "source": shared.display().to_string(),
+        })
+    );
+    assert_eq!(
+        settings[1],
+        serde_json::json!({
+            "setting": "log_root",
+            "value": home.path().join(".sc-agent").display().to_string(),
+            "source": "default",
+        })
+    );
+    let files = report["files"].as_array().expect("files");
+    assert_eq!(files.len(), 4);
+    assert_eq!(
+        files.iter().filter(|file| file["exists"] == true).count(),
+        1
+    );
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file["path"].as_str().expect("path"))
+            .collect::<Vec<_>>(),
+        vec![
+            canonical_home
+                .join(".sc/sc-agent/sitr.json")
+                .to_str()
+                .expect("path"),
+            shared.to_str().expect("path"),
+            home.path()
+                .join(".sc-agent/sitr.json")
+                .to_str()
+                .expect("path"),
+            home.path()
+                .join(".sc-agent/sc-agent.json")
+                .to_str()
+                .expect("path"),
+        ]
+    );
+    assert_eq!(
+        snapshot_config_tree(home.path()).expect("snapshot temp worktree"),
+        before
+    );
+    assert!(!home.path().join(".sc-agent/logs/sitr.log.jsonl").exists());
+}
+
+#[test]
+fn doctor_uses_shared_project_and_sitr_prefix_only() {
+    let home = temp_home().expect("temp home and git worktree");
+    let output = command(home.path(), &["doctor"])
+        .env("SC_PROJECT", "phase-d")
+        .env("DECIDR_WORKERS", "3")
+        .env("DECIDR_LOG_ROOT", home.path().join("other"))
+        .output()
+        .expect("spawn sitr doctor");
+    success(&output);
+    let report: serde_json::Value =
+        serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
+    assert_eq!(report["settings"][0]["value"], "phase-d");
+    assert_eq!(report["settings"][0]["source"], "SC_PROJECT");
+    assert_eq!(report["settings"][1]["source"], "default");
+
+    let output = command(home.path(), &["doctor"])
+        .env("SITR_LOG_ROOT", home.path().join("sitr-root"))
+        .output()
+        .expect("spawn sitr doctor");
+    success(&output);
+    let report: serde_json::Value =
+        serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
+    assert_eq!(
+        report["settings"][1]["value"],
+        home.path().join("sitr-root").display().to_string()
+    );
+    assert_eq!(report["settings"][1]["source"], "SITR_LOG_ROOT");
+}
+
+#[test]
+fn doctor_resolves_all_four_config_files_in_layer_order() {
+    let home = temp_home().expect("temp home and git worktree");
+    let local = home.path().join(".sc/sc-agent");
+    let global = home.path().join(".sc-agent");
+    std::fs::create_dir_all(&local).expect("create local config");
+    std::fs::create_dir_all(&global).expect("create global config");
+    let layers = [
+        (local.join("sitr.json"), "local-sitr"),
+        (local.join("sc-agent.json"), "local-shared"),
+        (global.join("sitr.json"), "global-sitr"),
+        (global.join("sc-agent.json"), "global-shared"),
+    ];
+    for (file, root) in &layers {
+        std::fs::write(file, serde_json::json!({"log_root": root}).to_string())
+            .expect("write config layer");
+    }
+    for (index, (file, root)) in layers.iter().enumerate() {
+        let output = run(home.path(), &["doctor"]).expect("spawn sitr doctor");
+        success(&output);
+        let report: serde_json::Value =
+            serde_json::from_slice(trim_newline(&output.stdout)).expect("doctor JSON");
+        assert_eq!(report["settings"][1]["value"], *root);
+        let source = if index < 2 {
+            std::fs::canonicalize(file).expect("canonical local config path")
+        } else {
+            file.clone()
+        };
+        assert_eq!(
+            report["settings"][1]["source"],
+            source.display().to_string()
+        );
+        if index + 1 < layers.len() {
+            std::fs::remove_file(file).expect("remove winning config layer");
+        }
+    }
+}
+
+#[test]
+fn shared_global_log_root_and_flag_override_choose_the_log_path() {
+    let home = temp_home().expect("temp home and git worktree");
+    let configured = home.path().join("configured");
+    let shared = home.path().join(".sc-agent/sc-agent.json");
+    std::fs::create_dir_all(shared.parent().expect("parent")).expect("create global config");
+    std::fs::write(
+        &shared,
+        serde_json::json!({"log_root": configured}).to_string(),
+    )
+    .expect("write global config");
+    success(&run(home.path(), &["languages"]).expect("spawn sitr"));
+    assert!(home.path().join("configured/logs/sitr.log.jsonl").exists());
+
+    let flag_root = home.path().join("flag-root");
+    success(
+        &run(
+            home.path(),
+            &["--log-root", flag_root.to_str().expect("path"), "languages"],
+        )
+        .expect("spawn sitr"),
+    );
+    assert!(flag_root.join("logs/sitr.log.jsonl").exists());
 }
