@@ -295,6 +295,10 @@ fn active_path(config: &LoggerConfig) -> PathBuf {
 /// sc-observability's LoggerBuilder registers its file sink without startup maintenance;
 /// building the logger schedules periodic maintenance. `JsonlFileSink::open` is its public
 /// synchronous startup pass. The policy and rotation/pruning work remain sc-observability's.
+/// In 1.5.0, `builder.rs:73-80,103-105,151-167` registers the sink and starts the
+/// runtime without a startup pass (`runtime.rs:534-547`, `maintenance.rs:96-114`);
+/// `maintenance.rs:592,604,830` schedules the later pass
+/// against a real clock. The unit test below exercises this pass before that worker exists.
 fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
     let active = active_path(config);
     JsonlFileSink::open(active.clone(), config.retained_log_policy)
@@ -308,6 +312,29 @@ fn prepare_log_file(config: &LoggerConfig) -> Result<(), LogError> {
 #[cfg(test)]
 mod home_tests {
     use super::*;
+
+    #[test]
+    fn startup_retention_runs_before_a_worker_exists() {
+        let root = tempfile::tempdir().expect("root");
+        let logs = root.path().join("logs");
+        std::fs::create_dir(&logs).expect("logs");
+        let active = logs.join("decidr.log.jsonl");
+        const OVERSIZED: u64 = 65 * 1024 * 1024;
+        let file = std::fs::File::create(&active).expect("active file");
+        file.set_len(OVERSIZED).expect("sparse file");
+        drop(file);
+
+        let config = logger_config("decidr", root.path(), true).expect("config");
+        prepare_log_file(&config).expect("startup retention");
+
+        assert_eq!(
+            std::fs::metadata(logs.join("decidr.log.jsonl.1"))
+                .expect("rotated file")
+                .len(),
+            OVERSIZED
+        );
+        assert!(!active.exists() || std::fs::metadata(active).expect("active").len() == 0);
+    }
 
     #[test]
     fn stderr_logger_writes_and_closes_without_creating_files() {
