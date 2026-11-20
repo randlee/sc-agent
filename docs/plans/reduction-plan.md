@@ -6,7 +6,7 @@ Owner: Rand Lee. Written by the lead, 2026-11-19. The owner asked for a plan, no
 
 sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target (owner, 2026-11-19): **code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown.** Budget: **under 2,000 lines of Rust in total across every `.rs` file in the repository, tests, examples and scripts included** (owner). Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
 
-**"Remove the bullshit wrappers and handwritten library code" (owner, 2026-11-19).** This settles the wheel question: the callable handle is a handwritten bridge (records serialized to JSON in Python and parsed back in Rust) that exists only because there are two wheels. One wheel holds the decidr and sitr APIs and passes its Logger to both directly, so no bridge is written.
+**Wheels (owner, verbatim, as given to tai):** "The two wheels are separate compiled modules, so the logger crosses as a handle owned by the sc-decidr wheel: a callable object that receives each record and writes it through decidr's Rust logger. The sitr wheel already accepts a callable that receives each record." and "Keep: the sitr wheel's callable path; sitr used alone writes logs/sitr.log.jsonl." Two wheels, one callable handle, inside the 2,000-line total. "Remove the bullshit wrappers and handwritten library code" applies to everything else.
 
 **No unnecessary wrapping:** ureq, keyring, dotenvy and sc-observability are called directly. No traits, no newtypes or wrapper structs over library types, no re-exports. A type exists only when it carries data the libraries do not (a provider table row, a result, an error).
 
@@ -45,13 +45,13 @@ Nothing not in these three is built.
 - **Config.** Only: `project` (`--project`, `SC_PROJECT`, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`), the Laya runner's `host`/`port`/`model`, and `workers`. Looked up in that order with the source recorded for `decidr doctor`.
 - **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; general-log failure not handled.
 - **Errors.** One error enum for the core with stable ids and an action string, logged and returned the same way from the CLI (non-zero exit plus the JSON error) and the wheel (a returned error value, never a raised exception).
-- **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), and **one wheel** (`sc-decidr`) holding the decidr API, `sc_agent.sitr`, and `logger(name)`, which returns the crate's Logger. No `sc-observability` Python dependency, no callable forwarding.
+- **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), the `sc-decidr` wheel (decidr API, `logger(name)` returning the callable handle over its Rust Logger), and the `sitr` wheel (sitr API, accepts that callable; alone it writes `logs/sitr.log.jsonl`). No `sc-observability` Python dependency, no forwarding to Python `logging`.
 - **Generated client.** The sc-compose template: obtains one Logger by client name, injects it into every call, hardcodes `agent_role`.
 - **Interrupt.** A cancel flag (about 10 lines): Ctrl-C stops sending new requests and the run returns what finished. (Owner: "probably nice to have"; kept because it is small.)
 
 ## Not built
 
-Image parts, the long-context header, provider ranking, release-date ordering, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, the Python logger bridge, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel.
+Image parts, the long-context header, provider ranking, release-date ordering, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it).
 
 ## Layout
 
@@ -68,7 +68,7 @@ Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-observ
 
 1. Total under 2,000 Rust lines (tests, examples, scripts included; after `cargo fmt`); new crates only until the old crates are deleted.
 2. Dependency allow-list (`cargo metadata`).
-3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `ReleaseDate`, `LoggerBuilder` outside the default-Logger function, `PyCallableSink`, `sc_observability` in any `pyproject.toml` dependency list, `sc-treesitter-py`.
+3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `ReleaseDate`, `LoggerBuilder` outside the default-Logger function, `sc_observability` in any `pyproject.toml` dependency list.
 4. Clippy with `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` denied in non-test code.
 5. No `raise` in the wheel's Python or the generated client; no `PyErr` returned from a wheel function.
 6. Contract tests pass (below).
@@ -81,7 +81,7 @@ Against a local HTTP server in the test, no network, no real home, no sleeps:
 - send_batch with workers=2 returns one result per request, matched by index.
 - key lookup order (env, `.env`, keyring double) and the never-printed key.
 - `project` lookup order and the missing-project error naming every place.
-- log files land at the fixed paths with the fixed fields; with a Logger injected, nothing is written to the default path; Python obtains `logger("t")`, logs to it, injects it into a decidr call and a sitr call, and finds all records in `t.log.jsonl`.
+- log files land at the fixed paths with the fixed fields; with a Logger injected, nothing is written to the default path; Python obtains `logger("t")`, logs to it, passes the handle to a decidr call and a sitr call, and finds all records in `t.log.jsonl`; sitr alone writes `sitr.log.jsonl`.
 - every wheel function, given bad input, a provider error and a network error, returns an error value and raises nothing.
 - `decidr send`, `decidr models`, `decidr doctor`, and the `sitr` commands.
 Existing boundary tests in `crates/decidr/tests/` and `crates/sc-agent-py/tests/` are mined for cases; internal-type tests are not carried.
