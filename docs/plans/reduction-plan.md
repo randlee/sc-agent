@@ -70,7 +70,7 @@ Image parts, the long-context header, provider ranking, the user model catalog, 
 | `sc-agent-py` | the one wheel: decidr API, sitr API, `logger(name)`; returns results, never raises | 250 |
 | `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI, rewritten the same way | 800 |
 
-Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-config, ctrlc, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
+Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-sha, sc-config, ctrlc, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
 
 ## Gates (one script, seconds, run before a task can close and before push)
 
