@@ -4,7 +4,9 @@ Owner: Rand Lee. Written by the lead, 2026-11-19. The owner asked for a plan, no
 
 ## Goal
 
-sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target (owner, 2026-11-19): **code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown.** Budget: sc-agent (core, CLI, wheel) at or under **800 lines of Rust source**; tree-sitter extraction (`sc-treesitter` + `sitr`, 2,334 lines today) keeps its own budget of 1,500.
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target (owner, 2026-11-19): **code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown.** Budget: **under 2,000 lines of Rust in total across every `.rs` file in the repository, tests, examples and scripts included** (owner). Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
+
+**"Remove the bullshit wrappers and handwritten library code" (owner, 2026-11-19).** This settles the wheel question: the callable handle is a handwritten bridge (records serialized to JSON in Python and parsed back in Rust) that exists only because there are two wheels. One wheel holds the decidr and sitr APIs and passes its Logger to both directly, so no bridge is written.
 
 **No unnecessary wrapping:** ureq, keyring, dotenvy and sc-observability are called directly. No traits, no newtypes or wrapper structs over library types, no re-exports. A type exists only when it carries data the libraries do not (a provider table row, a result, an error).
 
@@ -53,18 +55,18 @@ Image parts, the long-context header, provider ranking, release-date ordering, t
 
 ## Layout
 
-| Crate | Contents | Budget (Rust source lines after `cargo fmt`) |
+| Crate | Contents | Guide budget (Rust lines after `cargo fmt`, tests included; the hard limit is the 2,000 total) |
 |---|---|---|
-| `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 500 |
-| `decidr` | CLI | 100 |
-| `sc-agent-py` | the one wheel: decidr API, `sc_agent.sitr`, `logger(name)`; returns results, never raises | 200 |
-| `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI (kept, trimmed) | 1,500 |
+| `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
+| `decidr` | CLI | 150 |
+| `sc-agent-py` | the one wheel: decidr API, `sc_agent.sitr`, `logger(name)`; returns results, never raises | 250 |
+| `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI, rewritten the same way | 800 |
 
 Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
 
 ## Gates (one script, seconds, run before a task can close and before push)
 
-1. Line budget per crate and total (counted after `cargo fmt`).
+1. Total under 2,000 Rust lines (tests, examples, scripts included; after `cargo fmt`); new crates only until the old crates are deleted.
 2. Dependency allow-list (`cargo metadata`).
 3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `ReleaseDate`, `LoggerBuilder` outside the default-Logger function, `PyCallableSink`, `sc_observability` in any `pyproject.toml` dependency list, `sc-treesitter-py`.
 4. Clippy with `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` denied in non-test code.
