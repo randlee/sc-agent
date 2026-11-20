@@ -5,26 +5,37 @@ use std::path::PathBuf;
 use ::sc_treesitter::Capture;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
-use sc_agent_log::{GeneralLogger, Level, LogContext};
+use sc_agent_log::{GeneralLogger, Level, LogContext, LogError};
+use std::error::Error;
 
 /// Open the caller's logger or the default sitr log.
-fn logger(target: Option<Py<PyAny>>, root: Option<&std::path::Path>) -> PyResult<GeneralLogger> {
+fn logger(target: Option<Py<PyAny>>, root: Option<&std::path::Path>) -> Option<GeneralLogger> {
     let result = match target {
         Some(target) => GeneralLogger::injected_python(target, "sitr"),
         None => GeneralLogger::open_default(root, "sitr"),
     };
-    result.map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))
+    result.inspect_err(notice).ok()
+}
+
+fn notice(error: &LogError) {
+    eprintln!("sitr logging failed: {error}");
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        eprintln!("sitr logging cause: {error}");
+        cause = error.source();
+    }
 }
 
 /// Record the result without including the query or source contents.
 fn record<T>(
-    log: GeneralLogger,
+    log: Option<GeneralLogger>,
     action: &'static str,
     language: Option<&str>,
     query_size: usize,
     result: &PyResult<T>,
     py: Python<'_>,
 ) {
+    let Some(log) = log else { return };
     let error_id = result.as_ref().err().and_then(|error| {
         error
             .value(py)
@@ -52,10 +63,10 @@ fn record<T>(
         Level::Error
     };
     if let Err(error) = log.write(level, "sitr", action, LogContext::NONE, fields) {
-        eprintln!("sitr logging failed: {error}");
+        notice(&error);
     }
     if let Err(error) = log.close() {
-        eprintln!("sitr logging failed: {error}");
+        notice(&error);
     }
 }
 
@@ -66,7 +77,7 @@ fn languages(
     general_log: Option<Py<PyAny>>,
     log_root: Option<PathBuf>,
 ) -> PyResult<Vec<&'static str>> {
-    let log = logger(general_log, log_root.as_deref())?;
+    let log = logger(general_log, log_root.as_deref());
     let result = Ok(::sc_treesitter::python::languages());
     record(log, "sitr.languages", None, 0, &result, py);
     result
@@ -80,7 +91,7 @@ fn queries(
     general_log: Option<Py<PyAny>>,
     log_root: Option<PathBuf>,
 ) -> PyResult<Vec<(&'static str, &'static str)>> {
-    let log = logger(general_log, log_root.as_deref())?;
+    let log = logger(general_log, log_root.as_deref());
     let result = ::sc_treesitter::python::queries(language);
     record(log, "sitr.queries", language, 0, &result, py);
     result
@@ -95,7 +106,7 @@ fn query_source(
     general_log: Option<Py<PyAny>>,
     log_root: Option<PathBuf>,
 ) -> PyResult<&'static str> {
-    let log = logger(general_log, log_root.as_deref())?;
+    let log = logger(general_log, log_root.as_deref());
     let result = ::sc_treesitter::python::query_source(language, name);
     record(
         log,
@@ -119,7 +130,7 @@ fn run_query(
     general_log: Option<Py<PyAny>>,
     log_root: Option<PathBuf>,
 ) -> PyResult<Vec<Capture>> {
-    let log = logger(general_log, log_root.as_deref())?;
+    let log = logger(general_log, log_root.as_deref());
     let result = ::sc_treesitter::python::run_query(language, query, source, captures);
     record(
         log,
