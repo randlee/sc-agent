@@ -1,0 +1,88 @@
+# sc-agent reduction plan
+
+Owner: Rand Lee. Written by the lead, 2026-11-19. The owner asked for a plan, not more questions; every open choice below is decided here, recorded with its reason, and reversible.
+
+## Goal
+
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: **sc-agent (everything except the tree-sitter extraction) at or under 2,000 lines of Rust source**; tree-sitter extraction (`sc-treesitter` + `sitr`, 2,334 lines today) keeps its own budget of 1,500.
+
+## Method: rewrite to a spec, do not trim
+
+Trimming the old code in place keeps its structure (17 crates, traits, wrappers) and moves a few hundred lines per pass. The new code is written fresh on one branch from the spec below, then the old crates are deleted in one commit.
+
+## Spec (the only inputs)
+
+1. The records at commit `f023c0d` (ADR-SAG-0021 0.3.0 and the records it aligns).
+2. The original Python: judge-jev `plugins/sc-judge-jev/install/templates/skills/judge-jev/scripts/jev_judge.py.j2` at `0780e60^` (lines 794-840, 1006-1041, 1307-1380, 1456-1660), and plan-anchor `decidr_client.py.j2` at `fff69b2`.
+3. This file.
+
+Nothing not in these three is built.
+
+## What sc-agent does
+
+- **send / send_batch.** One request, or many with a worker fan-out and a per-call timeout. Result or typed error per request.
+- **Models: one table per provider**, static, in code:
+
+  | Provider | Base URL | Key variable | Request shape | Models (short name → id) |
+  |---|---|---|---|---|
+  | typesafe | `https://api.typesafe.ai/v1` | `TYPESAFE_API_KEY` | SystemOne | jev → `jev-1.14.0`, decider → (current id) |
+  | anthropic | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | Messages | haiku → `claude-haiku-5-5` |
+  | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` | chat/completions | luna → `gpt-6-luna` |
+  | local | host:port from config | none | SystemOne | laya |
+
+  `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. No ranking, no release dates, no config catalog. OpenRouter and Nous are dropped: no named model needs them (add a table row if one ever does).
+- **Retry.** Busy (429/502/529) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
+- **Keys.** Environment variable, then repo-root `.env` (via `dotenvy`, never written to the process environment), then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key type never prints itself.
+- **Config.** Only: `project` (`--project`, `SC_PROJECT`, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`), the Laya runner's `host`/`port`/`model`, and `workers`. Looked up in that order with the source recorded for `decidr doctor`.
+- **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; general-log failure not handled.
+- **Errors.** One error enum for the core with stable ids and an action string, logged and returned the same way from the CLI and the wheel.
+- **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), and **one wheel** (`sc-decidr`) holding the decidr API, `sc_agent.sitr`, and `logger(name)`, which returns the crate's Logger. No `sc-observability` Python dependency, no callable forwarding.
+- **Generated client.** The sc-compose template: obtains one Logger by client name, injects it into every call, hardcodes `agent_role`.
+- **Interrupt.** A cancel flag (about 10 lines): Ctrl-C stops sending new requests and the run returns what finished. (Owner: "probably nice to have"; kept because it is small.)
+
+## Not built
+
+Image parts, the long-context header, provider ranking, release-date ordering, the user model catalog, keyring location overrides, `VarName` key indirection, the generic layered config loader, logger wrappers, lost-row accounting, logging-failure error types, the Python logger bridge, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel.
+
+## Layout
+
+| Crate | Contents | Budget (Rust source lines after `cargo fmt`) |
+|---|---|---|
+| `sc-agent` | provider tables, send/send_batch, retry, keys, config, errors, logging paths, session rows | 1,300 |
+| `decidr` | CLI | 250 |
+| `sc-agent-py` | the one wheel: decidr API, `sc_agent.sitr`, `logger(name)` | 450 |
+| `sc-treesitter` + `sitr` | tree-sitter extraction and its CLI (kept, trimmed) | 1,500 |
+
+Dependencies allowed: ureq, serde, serde_json, keyring, dotenvy, ulid, sc-observability, clap, pyo3, tree-sitter and its grammars, thiserror. Anything else fails the gate.
+
+## Gates (one script, seconds, run before a task can close and before push)
+
+1. Line budget per crate and total (counted after `cargo fmt`).
+2. Dependency allow-list (`cargo metadata`).
+3. Banned names absent: `Transport`, `Clock`, `CancelToken`, `Catalog`, `ReleaseDate`, `LoggerBuilder` outside the default-Logger function, `PyCallableSink`, `sc_observability` in any `pyproject.toml` dependency list, `sc-treesitter-py`.
+4. Contract tests pass (below).
+The gate script and the budgets live in a path only the owner changes.
+
+## Contract tests (black box, at the product boundary)
+
+Against a local HTTP server in the test, no network, no real home, no sleeps:
+- send to each provider's request shape returns the parsed result; a 429 with `Retry-After` is resent and succeeds; a quota body is not resent; a 401 gives the auth error id.
+- send_batch with workers=2 returns one result per request, matched by index.
+- key lookup order (env, `.env`, keyring double) and the never-printed key.
+- `project` lookup order and the missing-project error naming every place.
+- log files land at the fixed paths with the fixed fields; with a Logger injected, nothing is written to the default path; Python obtains `logger("t")`, logs to it, injects it into a decidr call and a sitr call, and finds all records in `t.log.jsonl`.
+- `decidr send`, `decidr models`, `decidr doctor`, and the `sitr` commands.
+Existing boundary tests in `crates/decidr/tests/` and `crates/sc-agent-py/tests/` are mined for cases; internal-type tests are not carried.
+
+## Execution
+
+1. One developer agent, one branch `rewrite/v1` cut from `develop`, one worktree. Input: this file and the spec. No beads per deliverable, no stack, no QA panel.
+2. Order: gate script and contract tests first (they fail), then the code until they pass within budget.
+3. Review: one deletion reviewer ("what here can be removed or replaced by a library call") and one spec check by the lead against this file. Findings are fixed in place on the same branch; a fix may delete code.
+4. Done when the gates pass and plan-anchor's and judge-jev's suites pass against the new wheel. Then one PR into `develop` that also deletes the old crates; the owner merges.
+
+## Stopped
+
+- tai's in-place trim on `work/rust-under-2k` (it kept two wheels and added a callable bridge): stopped, nothing committed.
+- PR #324 (reverted the one-wheel and no-callable decisions): superseded by this plan.
+- Phase-e stack #319 and bead `agt-next-1`: superseded; not landed.
