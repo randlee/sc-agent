@@ -119,6 +119,8 @@ pub struct Client<C> {
     policy: Policy,
     /// Provider-wide pause: no sender on this client sends before this time.
     not_before: Mutex<Option<Instant>>,
+    #[cfg(test)]
+    clock: Option<Arc<dyn Fn() -> Instant + Send + Sync>>,
 }
 
 /// A valid Retry-After is clamped to this range (REQ-SAG-0601).
@@ -174,7 +176,17 @@ impl<C: Codec> Client<C> {
                 ..policy
             },
             not_before: Mutex::new(None),
+            #[cfg(test)]
+            clock: None,
         }
+    }
+
+    fn now(&self) -> Instant {
+        #[cfg(test)]
+        if let Some(clock) = &self.clock {
+            return clock();
+        }
+        Instant::now()
     }
 
     pub fn codec(&self) -> &C {
@@ -191,13 +203,13 @@ impl<C: Codec> Client<C> {
             if self.wait_unpaused(cancel, started) {
                 return Err(Error::Cancelled { sends: attempt - 1 });
             }
-            if started.is_some_and(|start| start.elapsed() >= BUDGET) {
+            if started.is_some_and(|start| self.now().saturating_duration_since(start) >= BUDGET) {
                 if let Error::ProviderBusy { reason, .. } = &mut last {
                     *reason = BusyReason::Budget;
                 }
                 return Err(last);
             }
-            started.get_or_insert_with(Instant::now);
+            started.get_or_insert_with(|| self.now());
             let wait = match self.once(request, attempt) {
                 Ok(response) => return Ok(response),
                 Err((error, _)) if !error.retryable() => return Err(error),
@@ -212,7 +224,9 @@ impl<C: Codec> Client<C> {
                 }
             };
             let remaining = started.map_or(wait, |start| {
-                BUDGET.saturating_sub(start.elapsed()).min(wait)
+                BUDGET
+                    .saturating_sub(self.now().saturating_duration_since(start))
+                    .min(wait)
             });
             if attempt < self.policy.max_sends && cancel.wait(remaining) {
                 return Err(Error::Cancelled { sends: attempt });
@@ -233,11 +247,11 @@ impl<C: Codec> Client<C> {
             if cancel.is_cancelled() {
                 return true;
             }
-            let left = self.not_before().map_or(Duration::ZERO, |t| {
-                t.saturating_duration_since(Instant::now())
-            });
+            let left = self
+                .not_before()
+                .map_or(Duration::ZERO, |t| t.saturating_duration_since(self.now()));
             let left = started.map_or(left, |start| {
-                left.min(BUDGET.saturating_sub(start.elapsed()))
+                left.min(BUDGET.saturating_sub(self.now().saturating_duration_since(start)))
             });
             if left.is_zero() {
                 return false;
@@ -250,7 +264,7 @@ impl<C: Codec> Client<C> {
 
     /// Extends the provider-wide pause to `wait` from now (at most 30.25 s, so no overflow).
     fn pause(&self, wait: Duration) {
-        let until = Instant::now() + wait;
+        let until = self.now() + wait;
         let mut not_before = self.not_before.lock().unwrap_or_else(|e| e.into_inner());
         if not_before.is_none_or(|t| t < until) {
             *not_before = Some(until);
@@ -316,7 +330,7 @@ impl<C: Codec> Client<C> {
         C::Request: Send,
         C::Response: Send,
     {
-        let now = Instant::now();
+        let now = self.now();
         let count = requests.len();
         let queue = Mutex::new((
             requests
@@ -347,7 +361,7 @@ impl<C: Codec> Client<C> {
                             if state.1 == 0 {
                                 return;
                             }
-                            let now = Instant::now();
+                            let now = self.now();
                             let pause = self.not_before().unwrap_or(now);
                             let next = ready(&state.0, now, pause, *cancelled);
                             if let Some(i) = next {
@@ -379,10 +393,10 @@ impl<C: Codec> Client<C> {
                             Some(Err(Error::Cancelled {
                                 sends: job.attempts,
                             }))
-                        } else if job.expired(Instant::now()) {
+                        } else if job.expired(self.now()) {
                             Some(Err(job.exhausted(true)))
                         } else {
-                            job.started.get_or_insert_with(Instant::now);
+                            job.started.get_or_insert_with(|| self.now());
                             job.attempts += 1;
                             match self.once(&job.request, job.attempts) {
                                 Ok(response) => Some(Ok(response)),
@@ -399,7 +413,7 @@ impl<C: Codec> Client<C> {
                                     if job.attempts >= self.policy.max_sends {
                                         Some(Err(job.exhausted(false)))
                                     } else {
-                                        job.ready = Instant::now() + wait;
+                                        job.ready = self.now() + wait;
                                         None
                                     }
                                 }
@@ -407,6 +421,9 @@ impl<C: Codec> Client<C> {
                         };
                         let _guard = flag.lock().unwrap_or_else(|e| e.into_inner());
                         let mut state = queue.lock().unwrap_or_else(|e| e.into_inner());
+                        if state.1 == 0 {
+                            return;
+                        }
                         if let Some(result) = result {
                             state.1 -= 1;
                             if tx
@@ -436,6 +453,50 @@ impl<C: Codec> Client<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct AdvanceOnSend {
+        base: String,
+        seconds: Arc<AtomicU64>,
+    }
+
+    impl Codec for AdvanceOnSend {
+        type Request = ();
+        type Response = ();
+        fn encode(&self, _: &()) -> Result<crate::http::Request<Vec<u8>>, Error> {
+            self.seconds.store(90, Ordering::SeqCst);
+            crate::post_json(&self.base, None, &[], &serde_json::json!({}))
+        }
+        fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
+            Err(Error::Invalid("unexpected response".into()))
+        }
+    }
+
+    #[test]
+    fn busy_request_exhausts_its_budget_without_another_send() {
+        let server = crate::test_server::Server::start(vec![(503, vec![], "{}".into())]);
+        let seconds = Arc::new(AtomicU64::new(0));
+        let mut client = Client::new(
+            AdvanceOnSend {
+                base: server.base.clone(),
+                seconds: seconds.clone(),
+            },
+            Policy::default(),
+        );
+        let start = Instant::now();
+        client.clock = Some(Arc::new(move || {
+            start + Duration::from_secs(seconds.load(Ordering::SeqCst))
+        }));
+        assert!(matches!(
+            client.send(&(), &Cancel::default()),
+            Err(Error::ProviderBusy {
+                attempts: 1,
+                reason: BusyReason::Budget,
+                ..
+            })
+        ));
+        assert_eq!(server.finish().len(), 1);
+    }
 
     fn job(position: usize, started: Option<Instant>, ready: Instant) -> Job<usize> {
         Job {
