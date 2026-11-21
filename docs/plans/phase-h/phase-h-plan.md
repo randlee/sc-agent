@@ -1,12 +1,12 @@
 # Phase H plan: land the starting code, close three gaps
 
-Four sprints. Every sprint's result already exists and passes: `origin/ref/phase-h-result` (cbc3712), one commit per sprint on top of integrate/phase-h 2da3049: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712. To check a sprint's scope, fence and size, diff its commit against its parent.
+Four sprints. Every sprint's result already exists and passes: `origin/ref/phase-h-result` (e308c0b), one commit per sprint on top of integrate/phase-h 2da3049: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b. To check a sprint's scope, fence and size, diff its commit against its parent.
 
-Measured at cbc3712 (macOS):
-- crates/ (the active workspace): 4,508 Rust source lines and 912 test lines (.rs and .py under tests/). Of the source, 2,402 are the three kept crates (sitr 565, sc-treesitter 1,822, sc-treesitter-py 15) and 2,106 are the starting code plus h-1 to h-3. Before h-0, crates/ held 31,085 source and 22,027 test lines.
+Measured at e308c0b (macOS):
+- crates/ (the active workspace): 5,146 Rust source lines and 1,201 test lines (.rs and .py under tests/). Of the source, 2,402 are the three kept crates (sitr 565, sc-treesitter 1,822, sc-treesitter-py 15) and 2,744 are the starting code plus h-1 to h-3. Before h-0, crates/ held 31,085 source and 22,027 test lines.
 - crates-ref/ (old code, outside the workspace, not built): 47,337 Rust lines.
-- `cargo build --workspace --all-targets` passes; `cargo test --workspace` 74 passed, 0 failed; `cargo clippy --workspace --all-targets -- -D warnings` exit 0; on Python 3.11 with maturin 1.14.1, both wheels build as cp311-abi3 with Requires-Python >=3.11 (sc-decidr, sitr) and pytest passes 9 (sc-agent-py 5, sc-treesitter-py 4).
-- `cargo fmt --check` fails on the starting code and on this result alike (no rustfmt.toml; the starting code was never formatted). Not a gate in this plan.
+- `cargo build --workspace --all-targets` passes; `cargo test --workspace --all-features` 74 passed, 0 failed; `cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0; on Python 3.11 with maturin 1.14.1, both wheels build as cp311-abi3 with Requires-Python >=3.11 (sc-decidr, sitr) and pytest passes 9 (sc-agent-py 5, sc-treesitter-py 4).
+- `cargo fmt --check --all` exits 0: h-0 runs `cargo fmt --all` on the starting code (never formatted before), and every sprint keeps it formatted. Line counts and caps are after rustfmt.
 
 Order: h-0, then h-1 and h-2 in parallel, then h-3 (needs h-2).
 
@@ -28,26 +28,26 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 
 ### Deliverables
 1. `git mv` every crate in crates/ to crates-ref/ except sitr, sc-treesitter and sc-treesitter-py, which stay in crates/. sc-agent-testkit moves too: it needs the old sc-agent-types.
-2. Copy crates/* from origin/ref/phase-h-start (94503df) into crates/, unchanged except crates/sc-agent-py: pyo3 `abi3-py311` (not `abi3-py39`) and a new pyproject.toml (name `sc-decidr`, version 0.2.8, `requires-python = ">=3.11"`, license MIT, maturin `module-name = "sc_agent"`), so it matches `[python].floor` (3.11) in floors.toml (NFR-SAG-0003, ADR-SAG-0019). Root Cargo.toml and clippy.toml are the starting code's, plus `exclude = ["crates-ref"]` and [workspace.dependencies] entries for the three kept crates.
+2. Copy crates/* from origin/ref/phase-h-start (94503df) into crates/, unchanged except crates/sc-agent-py: pyo3 `abi3-py311` (not `abi3-py39`) and a new pyproject.toml (name `sc-decidr`, version 0.2.8, `requires-python = ">=3.11"`, license MIT, maturin `module-name = "sc_agent"`), so it matches `[python].floor` (3.11) in floors.toml (NFR-SAG-0003, ADR-SAG-0019). Root Cargo.toml and clippy.toml are the starting code's, plus `exclude = ["crates-ref"]` and [workspace.dependencies] entries for the three kept crates. Then run `cargo fmt --all`: the starting code was never formatted, and the repository lint runs `cargo fmt --check`.
 3. Exactly these kept-crate changes, so the workspace builds: sitr drops its sc-agent-testkit dev-dependency and its CLI test runs the binary with `Command::output()`; sc-treesitter-py drops pyo3's `extension-module` feature (it unified into sc-agent-py and broke its link). Every pyo3 dependency stays at `abi3-py311`, so every maturin version picks the same floor. Any other change needed is a stop: report it to the lead.
 
 ### Does Not Close
 - the code changes of h-1 to h-3
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] For every moved crate X, `git rev-parse <base>:crates/X` equals `git rev-parse HEAD:crates-ref/X` (moved byte for byte).
 2. [ ] On Python 3.11 with maturin 1.14.1 or later, `maturin build -m crates/<crate>/Cargo.toml` gives `sc_decidr-0.2.8-cp311-abi3-*.whl` and `sitr-0.2.8-cp311-abi3-*.whl`, each with METADATA `Requires-Python: >=3.11`; installed, `python -m pytest crates/sc-treesitter-py/tests` passes 4 tests.
-3. [ ] `git diff origin/ref/phase-h-start HEAD -- crates/decidr crates/sc-agent-config crates/sc-agent-http crates/sc-agent-log crates/sc-agent-py crates/sc-agent-secrets crates/sc-agent-types crates/sc-decision-llm crates/sc-decision-local crates/sc-decision-runner crates/sc-decision-schema crates/sc-decision-systemone crates/sc-llm-provider ':!crates/sc-agent-py/Cargo.toml' ':!crates/sc-agent-py/pyproject.toml'` is empty; the same diff on crates/sc-agent-py/Cargo.toml shows only `abi3-py39` replaced by `abi3-py311`, and crates/sc-agent-py/pyproject.toml is new with exactly the fields in deliverable 2.
+3. [ ] Formatting aside, the starting code is unchanged: in a scratch worktree of origin/ref/phase-h-start, run `cargo fmt --all`, then `git diff HEAD_OF_THIS_PR -- crates/decidr crates/sc-agent-config crates/sc-agent-http crates/sc-agent-log crates/sc-agent-py crates/sc-agent-secrets crates/sc-agent-types crates/sc-decision-llm crates/sc-decision-local crates/sc-decision-runner crates/sc-decision-schema crates/sc-decision-systemone crates/sc-llm-provider ':!crates/sc-agent-py/Cargo.toml' ':!crates/sc-agent-py/pyproject.toml'` there is empty. The diff of crates/sc-agent-py/Cargo.toml against the starting code shows only `abi3-py39` replaced by `abi3-py311`, and crates/sc-agent-py/pyproject.toml is new with exactly the fields in deliverable 2.
 4. [ ] `git diff --name-only <base>...HEAD` lists only the owned paths and `Cargo.lock`.
-5. [ ] `cargo build --workspace --all-targets`, `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
+5. [ ] `cargo fmt --check --all`, `cargo build --workspace --all-targets`, `cargo test --workspace --all-features` and `cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0 (the repository's test and lint commands).
 6. [ ] No test sleeps or depends on timing, load or thread order.
 7. [ ] Changes inside the three kept crates are at most 5 added lines in total (reference: 2).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b).
 
 ## h-1: sc-agent-http: busy replies are resent with REQ-SAG-0601 holdoffs; a busy reply pauses the client
 
@@ -74,19 +74,19 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - any other sc-agent-http change
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] `cargo test -p sc-agent-http` passes, including the five named tests; the removed test is gone.
 2. [ ] A quota 429 is still sent once (`quota_is_not_resent` passes unchanged).
 3. [ ] `grep -rn 'sleep(' crates` finds nothing.
 4. [ ] `git diff --name-only <base>...HEAD` lists only the owned paths and `Cargo.lock`.
-5. [ ] `cargo build --workspace --all-targets`, `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
+5. [ ] `cargo fmt --check --all`, `cargo build --workspace --all-targets`, `cargo test --workspace --all-features` and `cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0 (the repository's test and lint commands).
 6. [ ] No test sleeps or depends on timing, load or thread order.
-7. [ ] crates/sc-agent-http/src adds at most 90 lines and tests at most 65 (`git diff --numstat`; reference 85 and 60).
+7. [ ] crates/sc-agent-http/src adds at most 97 lines and tests at most 107 (`git diff --numstat`, after rustfmt; reference 92 and 102).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b).
 
 ## h-2: sc-agent-log: general Logger and one record helper
 
@@ -109,18 +109,18 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - the wheel (h-3)
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] `cargo test -p sc-agent-log` passes both new tests.
 2. [ ] Rows unchanged: with crates/sc-agent-log/src from h-0, `cargo test -p sc-agent-log --test session_row` passes.
 3. [ ] `git diff --name-only <base>...HEAD` lists only the owned paths and `Cargo.lock`.
-4. [ ] `cargo build --workspace --all-targets`, `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
+4. [ ] `cargo fmt --check --all`, `cargo build --workspace --all-targets`, `cargo test --workspace --all-features` and `cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0 (the repository's test and lint commands).
 5. [ ] No test sleeps or depends on timing, load or thread order.
-6. [ ] crates/sc-agent-log/src adds at most 35 lines and tests at most 60 (reference 32 and 58).
+6. [ ] crates/sc-agent-log/src adds at most 47 lines and tests at most 85 (`git diff --numstat`, after rustfmt; reference 42 and 80).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b).
 
 ## h-3: sc-agent-py: send, send_batch, CancelToken and the injected Logger
 
@@ -150,15 +150,15 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - category, retryable, SagError and the consumer template (not planned; owner decides)
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] On Python 3.11, `maturin develop -m crates/sc-agent-py/Cargo.toml && python -m pytest crates/sc-agent-py/tests` passes 5 tests.
 2. [ ] No test touches a real API key or the keyring.
 3. [ ] `git diff --name-only <base>...HEAD` lists only the owned paths and `Cargo.lock`.
-4. [ ] `cargo build --workspace --all-targets`, `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
+4. [ ] `cargo fmt --check --all`, `cargo build --workspace --all-targets`, `cargo test --workspace --all-features` and `cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0 (the repository's test and lint commands).
 5. [ ] No test sleeps or depends on timing, load or thread order.
-6. [ ] crates/sc-agent-py/src adds at most 140 lines and tests at most 60 (reference 133 and 53).
+6. [ ] crates/sc-agent-py/src adds at most 185 lines and tests at most 60 (`git diff --numstat`, after rustfmt; reference 177 and 53).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (cbc3712; one commit per sprint: h-0 30d5f27, h-1 3419030, h-2 25d9acb, h-3 cbc3712).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (e308c0b; one commit per sprint: h-0 b6641d3, h-1 1cdda9e, h-2 e9bc558, h-3 e308c0b).
