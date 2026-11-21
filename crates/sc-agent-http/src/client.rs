@@ -67,7 +67,6 @@ pub struct Item<Q, R> {
     pub result: Result<R, Error>,
 }
 
-const BUSY: [u16; 3] = [429, 502, 529];
 const QUOTA: [&str; 4] = [
     "insufficient_quota",
     "credit_balance_exhausted",
@@ -81,6 +80,45 @@ pub struct Client<C> {
     codec: C,
     agent: ureq::Agent,
     policy: Policy,
+    /// Provider-wide pause: no sender on this client sends before this time.
+    not_before: Mutex<Option<Instant>>,
+}
+
+/// A valid Retry-After is clamped to this range (REQ-SAG-0601).
+pub const RETRY_AFTER_MIN: Duration = Duration::from_millis(250);
+/// The longest holdoff before jitter, from Retry-After or from backoff.
+pub const HOLDOFF_MAX: Duration = Duration::from_secs(30);
+/// Every holdoff adds up to this much jitter.
+pub const JITTER_MAX: Duration = Duration::from_millis(250);
+
+/// A valid Retry-After: 1 to 32 ASCII characters, digits with an optional fractional part.
+/// Parsed exactly, unclamped: whole seconds past `u64::MAX` saturate to `u64::MAX`, and a
+/// fraction finer than a nanosecond rounds up to the next nanosecond.
+pub fn retry_after(text: &str) -> Option<Duration> {
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, "0"));
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    if text.len() > 32 || !digits(whole) || !digits(fraction) {
+        return None;
+    }
+    let nanos = format!("{fraction:0<9}")[..9].parse().ok()?;
+    let finer = fraction.bytes().skip(9).any(|b| b != b'0');
+    let exact = Duration::new(whole.parse().unwrap_or(u64::MAX), nanos);
+    Some(exact.saturating_add(Duration::from_nanos(u64::from(finer))))
+}
+
+/// The holdoff before jitter: a valid Retry-After clamped to 0.25..=30 s, else `backoff`
+/// doubled per attempt (1, 2, 4, 8 s with the default policy) and capped at 30 s.
+pub fn holdoff(backoff: Duration, attempt: u32, retry_after: Option<Duration>) -> Duration {
+    match retry_after {
+        Some(wait) => wait.clamp(RETRY_AFTER_MIN, HOLDOFF_MAX),
+        None => backoff
+            .saturating_mul(1 << attempt.saturating_sub(1).min(16))
+            .min(HOLDOFF_MAX),
+    }
+}
+
+fn jitter() -> Duration {
+    JITTER_MAX.mul_f64((ulid::Ulid::new().random() % 1024) as f64 / 1024.0)
 }
 
 impl<C: Codec> Client<C> {
@@ -98,6 +136,7 @@ impl<C: Codec> Client<C> {
                 max_sends: policy.max_sends.max(1),
                 ..policy
             },
+            not_before: Mutex::new(None),
         }
     }
 
@@ -105,20 +144,26 @@ impl<C: Codec> Client<C> {
         &self.codec
     }
 
-    /// Sends `request`; busy, network and invalid replies are resent after Retry-After or
-    /// exponential backoff, until max sends. Quota replies are returned at once.
+    /// Sends `request`; busy, network and invalid replies are resent until max sends. A busy
+    /// reply pauses every sender on this client for its [`holdoff`] plus jitter; network and
+    /// invalid replies wait the same holdoff (no Retry-After). Quota replies return at once.
     pub fn send(&self, request: &C::Request, cancel: &Cancel) -> Result<C::Response, Error> {
         let mut last = Error::Cancelled { sends: 0 };
         for attempt in 1..=self.policy.max_sends {
-            if cancel.is_cancelled() {
+            if self.wait_unpaused(cancel) {
                 return Err(Error::Cancelled { sends: attempt - 1 });
             }
             let wait = match self.once(request, attempt) {
                 Ok(response) => return Ok(response),
                 Err((error, _)) if !error.retryable() => return Err(error),
-                Err((error, retry_after)) => {
+                Err((error @ Error::ProviderBusy { .. }, retry_after)) => {
                     last = error;
-                    retry_after.unwrap_or_else(|| self.backoff(attempt))
+                    self.pause(holdoff(self.policy.backoff, attempt, retry_after) + jitter());
+                    continue;
+                }
+                Err((error, _)) => {
+                    last = error;
+                    holdoff(self.policy.backoff, attempt, None) + jitter()
                 }
             };
             if attempt < self.policy.max_sends && cancel.wait(wait) {
@@ -126,6 +171,39 @@ impl<C: Codec> Client<C> {
             }
         }
         Err(last)
+    }
+
+    /// The time before which no sender on this client sends; `None` when never paused.
+    pub fn not_before(&self) -> Option<Instant> {
+        *self.not_before.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Waits until the client is not paused, re-reading the pause after each wait because
+    /// another sender may have extended it. True when cancelled.
+    fn wait_unpaused(&self, cancel: &Cancel) -> bool {
+        loop {
+            if cancel.is_cancelled() {
+                return true;
+            }
+            let left = self.not_before().map_or(Duration::ZERO, |t| {
+                t.saturating_duration_since(Instant::now())
+            });
+            if left.is_zero() {
+                return false;
+            }
+            if cancel.wait(left) {
+                return true;
+            }
+        }
+    }
+
+    /// Extends the provider-wide pause to `wait` from now (at most 30.25 s, so no overflow).
+    fn pause(&self, wait: Duration) {
+        let until = Instant::now() + wait;
+        let mut not_before = self.not_before.lock().unwrap_or_else(|e| e.into_inner());
+        if not_before.is_none_or(|t| t < until) {
+            *not_before = Some(until);
+        }
     }
 
     /// One send. A retryable error comes back with the Retry-After wait, if any.
@@ -143,14 +221,14 @@ impl<C: Codec> Client<C> {
             .headers()
             .get("retry-after")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.trim().parse::<u64>().ok());
+            .and_then(retry_after);
         let body = reply
             .body_mut()
             .with_config()
             .limit(MAX_BODY)
             .read_to_vec()
             .map_err(|e| (Error::Network(e.to_string()), None))?;
-        if !BUSY.contains(&status) {
+        if status != 429 && !(500..=599).contains(&status) {
             return self
                 .codec
                 .decode(request, status, &body)
@@ -168,15 +246,10 @@ impl<C: Codec> Client<C> {
         }
         let busy = Error::ProviderBusy {
             attempts: attempt,
-            retry_after_seconds: retry_after,
+            retry_after_seconds: retry_after
+                .map(|d| d.as_secs().saturating_add(u64::from(d.subsec_nanos() > 0))),
         };
-        Err((busy, retry_after.map(Duration::from_secs)))
-    }
-
-    fn backoff(&self, attempt: u32) -> Duration {
-        self.policy
-            .backoff
-            .saturating_mul(1 << (attempt - 1).min(16))
+        Err((busy, retry_after))
     }
 
     /// Sends every request on `workers` threads. Results reach `on_result` on the caller's
