@@ -199,8 +199,6 @@ fn decode(value: Value) -> Result<Config, String> {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsString;
-
     use super::*;
 
     #[test]
@@ -214,19 +212,11 @@ mod tests {
     #[test]
     fn local_runner_fields_load_from_explicit_nested_environment() {
         let environment = [
-            (
-                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__KIND"),
-                OsString::from("generic"),
-            ),
-            (
-                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__HOST"),
-                OsString::from("127.0.0.1"),
-            ),
-            (
-                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__PORT"),
-                OsString::from("12345"),
-            ),
-        ];
+            ("DECIDR_LOCAL_RUNNERS__TEST__KIND", "generic"),
+            ("DECIDR_LOCAL_RUNNERS__TEST__HOST", "127.0.0.1"),
+            ("DECIDR_LOCAL_RUNNERS__TEST__PORT", "12345"),
+        ]
+        .map(|(name, value)| (name.into(), value.into()));
         let inputs = Inputs {
             files: Vec::new(),
             env_prefix: "DECIDR_",
