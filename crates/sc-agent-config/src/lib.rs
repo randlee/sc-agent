@@ -308,14 +308,8 @@ mod tests {
         .to_string();
         assert!(error.contains("DECIDR_LOCAL_RUNNERS__TEST__PORT"));
     }
-}
-
-#[cfg(test)]
-mod home_tests {
-    use super::*;
-
     #[test]
-    fn missing_empty_and_relative_homes_are_errors() {
+    fn homes_must_be_absolute() {
         for home in [
             None,
             Some(PathBuf::new()),
@@ -324,10 +318,6 @@ mod home_tests {
             assert!(matches!(checked_home(home), Err(Error::Config(message))
                 if message.contains("absolute home directory")));
         }
-    }
-
-    #[test]
-    fn an_absolute_home_is_preserved() {
         let absolute = PathBuf::from(if cfg!(windows) {
             r"C:\controlled-home"
         } else {
