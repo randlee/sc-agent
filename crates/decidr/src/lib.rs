@@ -2,11 +2,64 @@
 //! decidr's composition root: picks the provider and key, builds the backend once, and
 //! returns a [`Decision`]. The CLI and the Python module both start here.
 
-use sc_agent_http::Policy;
+use sc_agent_http::{Cancel, Policy};
 use sc_agent_log::Session;
 use sc_agent_types::Error;
-use sc_decision_runner::{Decider, Decision};
-use sc_decision_schema::Backend;
+use sc_decision_runner::{Decider, Decision, Outcome};
+use sc_decision_schema::{Backend, DecisionRequest};
+
+struct LocalDecision {
+    probe: sc_decision_local::Local,
+    decider: Decider<sc_decision_systemone::SystemOne>,
+}
+
+impl Decision for LocalDecision {
+    fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
+        match self.probe.wait_loaded(&request.model, cancel) {
+            Ok(()) => self.decider.decide(request, cancel),
+            Err(error) => Outcome::failed(0, request, error),
+        }
+    }
+
+    fn decide_batch(
+        &self,
+        requests: Vec<DecisionRequest>,
+        workers: usize,
+        cancel: &Cancel,
+        on_result: &mut dyn FnMut(Outcome),
+    ) {
+        let model = requests
+            .first()
+            .map(|r| r.model.as_str())
+            .unwrap_or_default();
+        match self.probe.wait_loaded(model, cancel) {
+            Ok(()) => self
+                .decider
+                .decide_batch(requests, workers, cancel, on_result),
+            Err(error) => requests
+                .into_iter()
+                .enumerate()
+                .for_each(|(i, r)| on_result(Outcome::failed(i, r, error.clone()))),
+        }
+    }
+}
+
+pub fn open_local(
+    base: &str,
+    kind: &str,
+    policy: Policy,
+    session: Option<Session>,
+    load_timeout: std::time::Duration,
+) -> Result<Box<dyn Decision>, Error> {
+    Ok(Box::new(LocalDecision {
+        probe: sc_decision_local::Local::new(base, kind, load_timeout)?,
+        decider: Decider::new(
+            sc_decision_systemone::SystemOne::new(base, None)?,
+            policy,
+            session,
+        ),
+    }))
+}
 
 /// The decision backend for a provider: the Jev API itself, or a chat model through
 /// [`FromLlm`]. The key and base URL are checked here, once.

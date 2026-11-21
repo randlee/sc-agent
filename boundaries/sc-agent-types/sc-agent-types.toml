@@ -17,7 +17,7 @@ roots = ["Error", "providers"]
 
 [dependencies]
 allowed_dev_dependents = []
-allowed_dev_dependencies = ["sc-agent-types"]
+allowed_dev_dependencies = []
 allowed_dependents = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
 allowed_dependencies = []
 forbidden_edges = []
