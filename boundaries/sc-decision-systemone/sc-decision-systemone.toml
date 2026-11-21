@@ -19,7 +19,7 @@ roots = ["SystemOne"]
 allowed_dev_dependencies = []
 allowed_dev_dependents = ["sc-decision-runner"]
 allowed_dependents = ["decidr", "sc-decision-local"]
-allowed_dependencies = ["sc-agent-http", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-types", "sc-decision-schema"]
 forbidden_edges = []
 
 [references]
