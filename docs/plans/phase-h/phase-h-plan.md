@@ -51,7 +51,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-1: sc-agent-http: busy replies are resent with REQ-SAG-0601 holdoffs; a busy reply pauses the client
 
-Branch `sprint/h-1-busy-pause` → PR into `sprint/h-0-crates-ref-layout`. Difficulty normal. Requirements REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0012; ADRs NONE.
+Branch `sprint/h-1-busy-pause` → PR into `sprint/h-0-crates-ref-layout`. Difficulty normal. Requirements REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0012; ADRs ADR-SAG-0004, ADR-SAG-0019.
 
 ### Goal
 A busy reply is resent after the holdoff REQ-SAG-0601 sets, and every sender on the same client waits it out.
