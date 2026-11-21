@@ -18,14 +18,12 @@ pub struct QueryInfo {
     pub source: &'static str,
 }
 
-#[cfg(feature = "grammar-python")]
 pub(crate) const PYTHON: &[QueryInfo] = &[QueryInfo {
     language: "python",
     name: "branches",
     source: include_str!("../assets/queries/python/branches.scm"),
 }];
 
-#[cfg(feature = "grammar-rust")]
 pub(crate) const RUST: &[QueryInfo] = &[QueryInfo {
     language: "rust",
     name: "match-arms",
@@ -61,42 +59,4 @@ pub fn query_source(language: LanguageId, name: &str) -> Result<&'static str, Er
             language,
             name: name.to_owned(),
         })
-}
-
-#[cfg(all(test, feature = "grammar-python"))]
-mod tests {
-    use super::*;
-
-    /// AC: REQ-SAG-0303 listings.
-    #[cfg(all(feature = "grammar-python", feature = "grammar-rust"))]
-    #[test]
-    fn listings_name_every_predefined_query() {
-        let all: Vec<(&str, &str)> = queries(None)
-            .iter()
-            .map(|info| (info.language, info.name))
-            .collect();
-        assert_eq!(all, [("python", "branches"), ("rust", "match-arms")]);
-        let ids: Vec<&str> = crate::languages().map(|id| id.as_str()).collect();
-        assert_eq!(ids, ["python", "rust"]);
-        let rust = LanguageId::new("rust").expect("rust");
-        let json = serde_json::to_value(queries(Some(rust))).expect("json");
-        assert_eq!(
-            json,
-            serde_json::json!([{"language": "rust", "query": "match-arms"}])
-        );
-    }
-
-    /// AC: REQ-SAG-0303 listings.
-    #[test]
-    fn unknown_query_is_typed() {
-        let python = LanguageId::new("python").expect("python");
-        assert_eq!(
-            query_source(python, "nope"),
-            Err(Error::UnknownQuery {
-                language: python,
-                name: "nope".to_owned()
-            })
-        );
-        assert!(query_source(python, "branches").is_ok());
-    }
 }

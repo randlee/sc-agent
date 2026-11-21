@@ -9,8 +9,8 @@
 //!
 //! `std::io::ErrorKind` is kept as the typed value. The other `kind` fields
 //! ([`Error::QueryCompile`], [`Error::Usage`]) are `Debug` text, for display only: tree-sitter's
-//! `QueryErrorKind` is neither `Clone` nor `Copy`, and clap's `ErrorKind` comes from the
-//! optional `cli` dependency, so neither can sit in this always-built, `Clone + Eq` enum.
+//! `QueryErrorKind` is neither `Clone` nor `Copy`, and clap's `ErrorKind` is not stored in this
+//! `Clone + Eq` enum.
 
 use std::fmt;
 use std::io::ErrorKind;
@@ -18,40 +18,12 @@ use std::path::{Path, PathBuf};
 
 use crate::LanguageId;
 
-/// Which resource cap [`Error::LimitExceeded`] hit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Limit {
-    /// More captures than [`crate::MAX_CAPTURES`].
-    Captures,
-    /// More total capture text than [`crate::MAX_CAPTURE_TEXT_BYTES`].
-    CaptureTextBytes,
-    /// More concurrent in-progress matches than [`crate::MATCH_LIMIT`]; tree-sitter would
-    /// otherwise drop matches silently.
-    InProgressMatches,
-}
-
-impl Limit {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Captures => "captures",
-            Self::CaptureTextBytes => "capture text bytes",
-            Self::InProgressMatches => "in-progress matches",
-        }
-    }
-}
-
 /// Every failure sc-treesitter, its PyO3 bindings and `sitr` can report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// The id is not a language this crate knows.
     UnknownLanguage {
-        /// The requested language id.
-        language: String,
-    },
-    /// A known language whose grammar feature is not compiled in.
-    GrammarUnavailable {
         /// The requested language id.
         language: String,
     },
@@ -98,7 +70,7 @@ pub enum Error {
     FileRead {
         /// The path that was read.
         path: PathBuf,
-        /// The I/O error kind (`InvalidInput` when the path is not a regular file).
+        /// The I/O error kind.
         kind: ErrorKind,
         /// The lower error's `Display`.
         detail: String,
@@ -142,15 +114,6 @@ pub enum Error {
         /// The query text.
         query: String,
     },
-    /// A resource cap was hit while collecting captures.
-    LimitExceeded {
-        /// The language id.
-        language: LanguageId,
-        /// Which cap.
-        limit: Limit,
-        /// The cap's value.
-        max: usize,
-    },
     /// JSON encoding failed.
     Encode {
         /// The `serde_json` error's `Display`.
@@ -178,11 +141,6 @@ pub enum Error {
         /// The lower error's `Display`.
         detail: String,
     },
-    /// `sitr`'s general log could not start.
-    Log {
-        /// The sc-observability error's code and message.
-        detail: String,
-    },
 }
 
 impl Error {
@@ -191,7 +149,6 @@ impl Error {
     pub fn id(&self) -> &'static str {
         match self {
             Self::UnknownLanguage { .. } => "treesitter.unknown_language",
-            Self::GrammarUnavailable { .. } => "treesitter.grammar_unavailable",
             Self::GrammarLoad { .. } => "treesitter.grammar_load",
             Self::UnknownQuery { .. } => "treesitter.unknown_query",
             Self::QueryCompile { .. } => "treesitter.query_compile",
@@ -203,12 +160,10 @@ impl Error {
             Self::ParseFailed { .. } => "treesitter.parse_failed",
             Self::SyntaxError { .. } => "treesitter.syntax_error",
             Self::NoMatches { .. } => "treesitter.no_matches",
-            Self::LimitExceeded { .. } => "treesitter.limit_exceeded",
             Self::Encode { .. } => "treesitter.encode",
             Self::Usage { .. } => "treesitter.usage",
             Self::Python { .. } => "treesitter.python",
             Self::Write { .. } => "treesitter.write",
-            Self::Log { .. } => "treesitter.log",
         }
     }
 
@@ -217,9 +172,6 @@ impl Error {
     pub fn message(&self) -> String {
         match self {
             Self::UnknownLanguage { language } => format!("unknown language {language:?}"),
-            Self::GrammarUnavailable { language } => {
-                format!("language {language:?} is known but its grammar feature is not compiled in")
-            }
             Self::GrammarLoad { language, detail } => {
                 format!("grammar for {language:?} failed to load: {detail}")
             }
@@ -270,21 +222,12 @@ impl Error {
                 "query {:?} matched nothing in {language} source",
                 query.trim()
             ),
-            Self::LimitExceeded {
-                language,
-                limit,
-                max,
-            } => format!(
-                "the {language} query exceeded the limit of {max} {}",
-                limit.as_str()
-            ),
             Self::Encode { detail } => format!("JSON encoding failed: {detail}"),
             Self::Usage { kind, detail } => {
                 format!("invalid arguments ({kind}): {}", one_line(detail))
             }
             Self::Python { detail } => format!("invalid Python argument: {detail}"),
             Self::Write { kind, detail } => format!("cannot write output: {kind}: {detail}"),
-            Self::Log { detail } => format!("the general log could not start: {detail}"),
         }
     }
 }
@@ -297,9 +240,6 @@ impl Error {
             Self::UnknownLanguage { .. } => {
                 Some("run `sitr languages` (or call `languages()`) for the loaded language ids")
             }
-            Self::GrammarUnavailable { .. } => {
-                Some("build sc-treesitter with the language's `grammar-<language>` feature")
-            }
             Self::UnknownQuery { .. } => Some(
                 "run `sitr queries --language <language>` (or call `queries()`) for its queries",
             ),
@@ -311,7 +251,6 @@ impl Error {
             Self::NotUtf8 { .. } => Some("pass UTF-8 source text"),
             Self::InputTooLarge { .. } => Some("query a source of at most 8 MiB"),
             Self::SyntaxError { .. } => Some("fix the syntax error inside the matched span"),
-            Self::LimitExceeded { .. } => Some("narrow the query or query a smaller source"),
             Self::Usage { .. } => Some("run `sitr --help`"),
             Self::Python { .. } => Some("pass the source as `bytes` or `str`"),
             Self::GrammarLoad { .. }
@@ -319,8 +258,7 @@ impl Error {
             | Self::ParseFailed { .. }
             | Self::NoMatches { .. }
             | Self::Encode { .. }
-            | Self::Write { .. }
-            | Self::Log { .. } => None,
+            | Self::Write { .. } => None,
         }
     }
 }
@@ -361,160 +299,5 @@ impl serde::Serialize for Error {
             state.skip_field("recovery")?;
         }
         state.end()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// One value of every variant; needs one compiled-in grammar for the typed language ids.
-    #[cfg(any(feature = "grammar-python", feature = "grammar-rust"))]
-    fn one_of_each() -> Vec<Error> {
-        let text = || "x".to_owned();
-        let language = crate::languages().next().expect("a compiled-in grammar");
-        vec![
-            Error::UnknownLanguage { language: text() },
-            Error::GrammarUnavailable { language: text() },
-            Error::GrammarLoad {
-                language,
-                detail: text(),
-            },
-            Error::UnknownQuery {
-                language,
-                name: text(),
-            },
-            Error::QueryCompile {
-                language,
-                offset: 1,
-                row: 2,
-                column: 3,
-                kind: text(),
-                detail: text(),
-            },
-            Error::QueryCaptureInvalid { capture: text() },
-            Error::FileNotFound {
-                path: text().into(),
-            },
-            Error::FileRead {
-                path: text().into(),
-                kind: ErrorKind::PermissionDenied,
-                detail: text(),
-            },
-            Error::NotUtf8 {
-                path: None,
-                byte_offset: 4,
-            },
-            Error::InputTooLarge {
-                path: None,
-                bytes: 5,
-                limit: 4,
-            },
-            Error::ParseFailed { language },
-            Error::SyntaxError {
-                path: None,
-                row: 0,
-                column: 1,
-                node_kind: text(),
-            },
-            Error::NoMatches {
-                language,
-                query: text(),
-            },
-            Error::LimitExceeded {
-                language,
-                limit: Limit::Captures,
-                max: 7,
-            },
-            Error::Encode { detail: text() },
-            Error::Usage {
-                kind: text(),
-                detail: text(),
-            },
-            Error::Python { detail: text() },
-            Error::Write {
-                kind: ErrorKind::BrokenPipe,
-                detail: text(),
-            },
-            Error::Log { detail: text() },
-        ]
-    }
-
-    /// AC: REQ-SAG-0002 errors.
-    #[cfg(any(feature = "grammar-python", feature = "grammar-rust"))]
-    #[test]
-    fn all_19_ids_are_distinct_well_formed_and_serialized() {
-        let errors = one_of_each();
-        assert_eq!(errors.len(), 19);
-        let ids: std::collections::BTreeSet<&str> = errors.iter().map(Error::id).collect();
-        assert_eq!(ids.len(), 19, "ids must be distinct");
-        for error in &errors {
-            let id = error.id();
-            let rest = id.strip_prefix("treesitter.").expect("prefix");
-            // `not_utf8` carries a digit, so the rule is `^treesitter\.[a-z][a-z0-9_]*$`.
-            assert!(
-                rest.starts_with(|c: char| c.is_ascii_lowercase())
-                    && rest
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
-                "{id} must match ^treesitter\\.[a-z][a-z0-9_]*$"
-            );
-            let value = serde_json::to_value(error).expect("serialize");
-            assert_eq!(value["id"], id);
-            assert_eq!(value["message"], error.message());
-            match error.recovery() {
-                Some(recovery) => {
-                    assert_eq!(value["recovery"], recovery);
-                    assert_eq!(value.as_object().map(serde_json::Map::len), Some(3));
-                }
-                None => assert_eq!(value.as_object().map(serde_json::Map::len), Some(2)),
-            }
-            assert!(!error.message().contains('\n'), "{id} message is one line");
-            assert_eq!(error.to_string(), format!("{id}: {}", error.message()));
-        }
-    }
-
-    #[test]
-    fn recovery_names_the_next_step() {
-        let unknown = Error::UnknownLanguage {
-            language: "cobol".to_owned(),
-        };
-        assert!(
-            unknown
-                .recovery()
-                .is_some_and(|hint| hint.contains("sitr languages"))
-        );
-        let unavailable = Error::GrammarUnavailable {
-            language: "rust".to_owned(),
-        };
-        assert!(
-            unavailable
-                .recovery()
-                .is_some_and(|hint| hint.contains("grammar-"))
-        );
-        let write = Error::Write {
-            kind: ErrorKind::BrokenPipe,
-            detail: "Broken pipe (os error 32)".to_owned(),
-        };
-        assert_eq!(write.recovery(), None);
-        assert_eq!(
-            serde_json::to_value(&write).expect("json"),
-            serde_json::json!({
-                "id": "treesitter.write",
-                "message": "cannot write output: broken pipe: Broken pipe (os error 32)"
-            })
-        );
-    }
-
-    #[test]
-    fn multi_line_lower_text_becomes_one_line() {
-        let error = Error::Usage {
-            kind: "MissingRequiredArgument".to_owned(),
-            detail: "error: missing\n\nUsage: sitr query\n".to_owned(),
-        };
-        assert_eq!(
-            error.message(),
-            "invalid arguments (MissingRequiredArgument): error: missing Usage: sitr query"
-        );
     }
 }

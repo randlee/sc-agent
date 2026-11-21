@@ -1,7 +1,7 @@
 //! The grammar table: every tree-sitter grammar this build can load.
 //!
-//! Adding a grammar is one [`GRAMMARS`] row, one [`KNOWN_LANGUAGES`] entry, its queries and a
-//! test sample; the public API does not change.
+//! Adding a grammar is one [`GRAMMARS`] row, its queries and a test sample; the public API does
+//! not change.
 
 use crate::Error;
 use crate::query::QueryInfo;
@@ -13,28 +13,21 @@ pub(crate) struct Grammar {
     pub(crate) queries: &'static [QueryInfo],
 }
 
-/// Every language id this crate version can be built with, compiled in or not.
-pub(crate) const KNOWN_LANGUAGES: &[&str] = &["python", "rust"];
-
-#[cfg(feature = "grammar-python")]
 fn load_python() -> tree_sitter::Language {
     tree_sitter_python::LANGUAGE.into()
 }
 
-#[cfg(feature = "grammar-rust")]
 fn load_rust() -> tree_sitter::Language {
     tree_sitter_rust::LANGUAGE.into()
 }
 
 /// Every grammar compiled into this build, in listing order.
 static GRAMMARS: &[Grammar] = &[
-    #[cfg(feature = "grammar-python")]
     Grammar {
         id: "python",
         load: load_python,
         queries: crate::query::PYTHON,
     },
-    #[cfg(feature = "grammar-rust")]
     Grammar {
         id: "rust",
         load: load_rust,
@@ -50,10 +43,8 @@ static GRAMMARS: &[Grammar] = &[
 /// # Examples
 ///
 /// ```
-/// # #[cfg(feature = "grammar-python")] {
 /// let python = sc_treesitter::LanguageId::new("python")?;
 /// assert_eq!(python.as_str(), "python");
-/// # }
 /// assert!(sc_treesitter::LanguageId::new("cobol").is_err());
 /// # Ok::<(), sc_treesitter::Error>(())
 /// ```
@@ -67,8 +58,7 @@ impl LanguageId {
     ///
     /// # Errors
     ///
-    /// [`Error::GrammarUnavailable`] for a known id whose grammar feature is off, otherwise
-    /// [`Error::UnknownLanguage`].
+    /// [`Error::UnknownLanguage`] when no loaded grammar has that id.
     pub fn new(id: &str) -> Result<Self, Error> {
         lookup(id).map(|grammar| Self { grammar })
     }
@@ -93,12 +83,6 @@ impl PartialEq for LanguageId {
 
 impl Eq for LanguageId {}
 
-impl std::hash::Hash for LanguageId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-}
-
 impl std::fmt::Debug for LanguageId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("LanguageId").field(&self.as_str()).finish()
@@ -108,14 +92,6 @@ impl std::fmt::Debug for LanguageId {
 impl std::fmt::Display for LanguageId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for LanguageId {
-    type Err = Error;
-
-    fn from_str(id: &str) -> Result<Self, Error> {
-        Self::new(id)
     }
 }
 
@@ -141,22 +117,13 @@ pub fn languages() -> impl ExactSizeIterator<Item = LanguageId> {
 
 /// Single lookup into [`GRAMMARS`] by language id.
 ///
-/// [`Error::GrammarUnavailable`] for a known id whose feature is off, otherwise
-/// [`Error::UnknownLanguage`].
+/// [`Error::UnknownLanguage`] when no loaded grammar has that id.
 fn lookup(id: &str) -> Result<&'static Grammar, Error> {
     GRAMMARS
         .iter()
         .find(|grammar| grammar.id == id)
-        .ok_or_else(|| {
-            if KNOWN_LANGUAGES.contains(&id) {
-                Error::GrammarUnavailable {
-                    language: id.to_owned(),
-                }
-            } else {
-                Error::UnknownLanguage {
-                    language: id.to_owned(),
-                }
-            }
+        .ok_or_else(|| Error::UnknownLanguage {
+            language: id.to_owned(),
         })
 }
 
@@ -165,33 +132,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_loaded_language_is_known() {
-        for id in languages() {
-            assert!(KNOWN_LANGUAGES.contains(&id.as_str()), "{id}");
-        }
-    }
-
-    #[test]
     fn unknown_id_is_unknown_language() {
         assert!(matches!(
             LanguageId::new("cobol"),
             Err(Error::UnknownLanguage { language }) if language == "cobol"
         ));
-    }
-
-    /// AC: REQ-SAG-0302 every id (built with `--no-default-features --features grammar-python`).
-    #[cfg(all(feature = "grammar-python", not(feature = "grammar-rust")))]
-    #[test]
-    fn known_language_without_its_feature_is_grammar_unavailable() {
-        let ids: Vec<&str> = languages().map(|id| id.as_str()).collect();
-        assert_eq!(ids, ["python"]);
-        let error = LanguageId::new("rust").expect_err("rust is not compiled in");
-        assert_eq!(
-            error,
-            Error::GrammarUnavailable {
-                language: "rust".to_owned()
-            }
-        );
-        assert_eq!(error.id(), "treesitter.grammar_unavailable");
     }
 }

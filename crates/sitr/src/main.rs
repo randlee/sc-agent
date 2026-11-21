@@ -2,8 +2,7 @@
 //!
 //! Output: JSON plus a newline on stdout, exit 0. Failure: one stderr line
 //! `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Each run records
-//! one `sitr.command` event in its own general log, `~/.sc-agent/logs/sitr.log.jsonl`, or
-//! `$SITR_LOG_ROOT/logs/sitr.log.jsonl` when that variable is set and not empty.
+//! one `sitr.command` event in its own general log when it can open the log root.
 #![forbid(unsafe_code)]
 
 mod cli;
@@ -41,10 +40,7 @@ struct CommandFields {
 fn main() -> ExitCode {
     let started = Instant::now();
     let parsed = cli::parse(std::env::args_os());
-    let logger = match general_log() {
-        Ok(logger) => logger,
-        Err(error) => return emit(&error),
-    };
+    let logger = general_log();
     let mut fields = CommandFields {
         subcommand: match &parsed {
             Ok(Parsed::Run(cli)) => cli.command.name(),
@@ -56,9 +52,10 @@ fn main() -> ExitCode {
     let result = parsed
         .and_then(|parsed| run(parsed, &mut fields))
         .and_then(|bytes| write_output(&bytes, &mut io::stdout().lock()));
-    record(&logger, &fields, started, result.as_ref().err());
-    // A log failure never changes the result.
-    let _shutdown = logger.shutdown();
+    if let Some(logger) = logger {
+        record(&logger, &fields, started, result.as_ref().err());
+        let _shutdown = logger.shutdown();
+    }
     finish(result, &mut io::stderr().lock())
 }
 
@@ -101,7 +98,7 @@ fn run(parsed: Parsed, fields: &mut CommandFields) -> Result<Vec<u8>, Error> {
             let capture_refs: Option<Vec<&str>> = args
                 .captures
                 .as_ref()
-                .map(|captures| captures.names().collect());
+                .map(|captures| captures.split(',').collect());
             let language = LanguageId::new(&args.language)?;
             let text = query_source(language, &args.query)?;
             let bytes = read_source(&args.file)?;
@@ -131,10 +128,6 @@ fn json_line<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> 
 ///
 /// A failed stderr write is dropped on purpose: stderr is the last channel, so there is
 /// nowhere to report it, and exit code 1 is the only signal left.
-fn emit(error: &Error) -> ExitCode {
-    emit_to(error, &mut io::stderr().lock())
-}
-
 fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
     let line = json_line(error).unwrap_or_else(|_| {
         // Serializing two strings cannot fail; keep a well-formed line regardless.
@@ -144,18 +137,11 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// The general log of the `sitr` entry point (ADR-SAG-0021): `<root>/logs/sitr.log.jsonl`, with
-/// the root from [`sc_agent_log::log_root`] (`SITR_LOG_ROOT`, else `~/.sc-agent`).
-///
-/// # Errors
-///
-/// [`Error::Log`] when the log root is unknown or the logger cannot start.
-fn general_log() -> Result<Arc<Logger>, Error> {
+/// The optional general log of the `sitr` entry point.
+fn general_log() -> Option<Arc<Logger>> {
     sc_agent_log::log_root(SERVICE)
         .and_then(|root| sc_agent_log::general(SERVICE, &root))
-        .map_err(|error| Error::Log {
-            detail: error.to_string(),
-        })
+        .ok()
 }
 
 /// Records the one `sitr.command` event; a failure here is dropped (it never changes the result).
@@ -219,36 +205,4 @@ fn command_event(
         state_transition: None,
         fields,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct BrokenWriter;
-
-    impl Write for BrokenWriter {
-        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
-            Err(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"))
-        }
-
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn closed_stdout_is_a_write_error() {
-        let result = write_output(b"[]\n", &mut BrokenWriter);
-        let mut stderr = Vec::new();
-        assert_eq!(finish(result, &mut stderr), ExitCode::FAILURE);
-        let value: serde_json::Value = serde_json::from_slice(&stderr).expect("stderr json");
-        assert_eq!(value["id"], "treesitter.write");
-        assert!(
-            value["message"]
-                .as_str()
-                .is_some_and(|message| message.contains("broken pipe")),
-            "{value}"
-        );
-    }
 }

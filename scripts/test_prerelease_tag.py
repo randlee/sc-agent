@@ -25,8 +25,6 @@ class ReleaseContract(unittest.TestCase):
             (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.3\n\n- Shipped note.\n')
             (root / "release").mkdir()
             (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\ntag_prefix = "prerelease/v"\n')
-            (root / "release/publish-preflight.toml").write_text(
-                '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n')
             fetched = False
 
             def git(*args, capture=True):
@@ -54,15 +52,13 @@ class ReleaseContract(unittest.TestCase):
                 ("push", "origin", "refs/tags/prerelease/v1.2.4")])
             self.assertEqual([call.args[0] for call in commands.call_args_list], [
                 ["gh", "release", "list", "--limit", "1000", "--json", "tagName"],
-                ["cargo", "update", "--workspace"], ["bash", "scripts/generate-cli-docs.sh"]])
+                ["cargo", "update", "--workspace"]])
 
     def test_current_version_freezes_notes_without_updating_release_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             payloads = {"Cargo.toml": '[workspace]\nmembers = []\n[workspace.package]\nversion = "1.2.3"\n',
-                        "Cargo.lock": "unchanged lockfile\n", "fixtures/cli/model.json": "unchanged model\n",
-                        "site/cli/index.html": "unchanged docs\n",
-                        "release/publish-preflight.toml": '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n'}
+                        "Cargo.lock": "unchanged lockfile\n"}
             for name, text in payloads.items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,8 +82,6 @@ class ReleaseContract(unittest.TestCase):
             (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.3\n\n- Shipped note.\n')
             (root / "release").mkdir()
             (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\n')
-            (root / "release/publish-preflight.toml").write_text(
-                '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n')
             before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
             with patch.object(tag, "ROOT", root), patch.object(tag.subprocess, "run") as commands, patch.object(tag, "git") as git:
                 with self.assertRaises(tag.ReleaseNotesError) as caught:
@@ -112,8 +106,8 @@ class ReleaseContract(unittest.TestCase):
             (root / "CHANGELOG.md").write_text('# Changelog\n\n## Unreleased\n\n- Pending note.\n\n## 1.2.2\n\n- Shipped note.\n')
             (root / "release").mkdir()
             (root / "release/publish-artifacts.toml").write_text('[prerelease]\nprotected_branches = ["main"]\ntag_prefix = "prerelease/v"\n')
-            for tags, expected in [("", "keep manifests/Cargo.lock and CLI docs unchanged"),
-                                   ("prerelease/v1.2.3", "update manifests/Cargo.lock and regenerate CLI docs")]:
+            for tags, expected in [("", "keep manifests and Cargo.lock unchanged"),
+                                   ("prerelease/v1.2.3", "update manifests and Cargo.lock")]:
                 output = io.StringIO()
                 with patch.object(tag, "ROOT", root), patch.object(sys, "argv", ["prerelease_tag.py", "--dry-run"]), patch.object(tag, "git", side_effect=["fix/release", "", tags]), patch.object(tag.subprocess, "run") as commands, contextlib.redirect_stdout(output):
                     self.assertEqual(tag.main(), 0)
@@ -131,8 +125,6 @@ class ReleaseContract(unittest.TestCase):
             changelog = root / "CHANGELOG.md"
             changelog.write_text('# Changelog\n\n## Unreleased\n\n- First pending change.\n\n' + history)
             (root / "release").mkdir()
-            (root / "release/publish-preflight.toml").write_text(
-                '[docli]\ngenerate_script = "scripts/generate-cli-docs.sh"\ndrift_paths = ["fixtures/cli/", "site/cli/"]\n')
 
             selected = "1.2.4"
 
@@ -143,9 +135,9 @@ class ReleaseContract(unittest.TestCase):
             with patch.object(tag, "ROOT", root), patch.object(tag.subprocess, "run", side_effect=run) as commands, patch.object(tag, "git") as git:
                 tag.bump_version("1.2.3", "1.2.4")
             self.assertEqual([call.args[0] for call in commands.call_args_list], [
-                ["cargo", "update", "--workspace"], ["bash", "scripts/generate-cli-docs.sh"]])
+                ["cargo", "update", "--workspace"]])
             self.assertEqual(git.call_args_list[0].args, (
-                "add", "--", "Cargo.toml", "Cargo.lock", "CHANGELOG.md", "fixtures/cli/", "site/cli/"))
+                "add", "--", "Cargo.toml", "Cargo.lock", "CHANGELOG.md"))
             self.assertEqual(git.call_args_list[1].args, ("commit", "-m", "release: prepare prerelease 1.2.4"))
             first_release = '## 1.2.4\n\n- First pending change.\n\n' + history
             self.assertEqual(changelog.read_text(), '# Changelog\n\n## Unreleased\n\n' + first_release)

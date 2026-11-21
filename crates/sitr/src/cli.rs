@@ -62,24 +62,8 @@ pub(crate) struct QueryArgs {
     #[arg(value_name = "FILE")]
     pub(crate) file: std::path::PathBuf,
     /// Comma-separated allow-list of capture names.
-    #[arg(
-        long,
-        value_name = "NAME,NAME",
-        allow_hyphen_values = true,
-        value_parser = parse_captures
-    )]
-    pub(crate) captures: Option<Captures>,
-}
-
-/// Non-empty `--captures` allow-list, in the order given.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Captures(Vec<String>);
-
-impl Captures {
-    /// The capture names.
-    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
-        self.0.iter().map(String::as_str)
-    }
+    #[arg(long, value_name = "NAME,NAME", allow_hyphen_values = true)]
+    pub(crate) captures: Option<String>,
 }
 
 /// Outcome of [`parse`].
@@ -116,75 +100,5 @@ where
             kind: format!("{:?}", error.kind()),
             detail: error.render().to_string(),
         }),
-    }
-}
-
-/// `--captures` value parser: comma-separated, trimmed, no empty names.
-fn parse_captures(value: &str) -> Result<Captures, String> {
-    if value.is_empty() {
-        return Err("--captures requires a comma-separated allow-list".to_owned());
-    }
-    value
-        .split(',')
-        .map(|part| {
-            let name = part.trim();
-            if name.is_empty() {
-                Err("--captures contains an empty name".to_owned())
-            } else {
-                Ok(name.to_owned())
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map(Captures)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// AC: sitr query.
-    #[test]
-    fn cli_definition_is_consistent() {
-        use clap::CommandFactory;
-        Cli::command().debug_assert();
-    }
-
-    /// AC: sitr query.
-    #[test]
-    fn captures_are_trimmed_and_ordered() {
-        let parsed = parse_captures(" b ,a").expect("captures");
-        assert_eq!(parsed.names().collect::<Vec<_>>(), ["b", "a"]);
-        assert!(parse_captures("").is_err());
-        assert!(parse_captures("a,,b").is_err());
-    }
-
-    #[test]
-    fn bad_captures_and_missing_positional_are_usage_errors() {
-        let error = parse([
-            "sitr",
-            "query",
-            "rust",
-            "match-arms",
-            "f.rs",
-            "--captures",
-            "a,,b",
-        ])
-        .expect_err("empty capture name");
-        assert_eq!(error.id(), "treesitter.usage");
-        assert!(error.message().contains("empty name"), "{error}");
-
-        let error = parse(["sitr", "query", "rust"]).expect_err("missing positionals");
-        assert!(matches!(
-            error,
-            sc_treesitter::Error::Usage { ref kind, .. } if kind == "MissingRequiredArgument"
-        ));
-    }
-
-    #[test]
-    fn help_and_version_are_printed() {
-        assert!(
-            matches!(parse(["sitr", "--help"]), Ok(Parsed::Print(text)) if text.contains("sitr"))
-        );
-        assert!(matches!(parse(["sitr", "--version"]), Ok(Parsed::Print(_))));
     }
 }

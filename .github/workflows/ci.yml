@@ -197,9 +197,6 @@ jobs:
           print(f"sc-treesitter default features {default}; sitr CLI crate present")
           PY
 
-      - name: Test with only the Python grammar
-        run: cargo test --locked -p sc-treesitter --no-default-features --features grammar-python
-
       - name: Test the sitr CLI crate
         run: cargo test --locked -p sitr
 

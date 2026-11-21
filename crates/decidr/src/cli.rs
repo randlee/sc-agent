@@ -1,4 +1,4 @@
-//! decidr argument parsing; the gen-cli-model example reads it for the CLI docs.
+//! decidr argument parsing.
 
 use clap::{Parser, Subcommand};
 
