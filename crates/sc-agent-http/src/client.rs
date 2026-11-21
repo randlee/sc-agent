@@ -6,7 +6,7 @@ use sc_agent_types::Error;
 
 /// Cancel flag; [`Cancel::wait`] ends at once when cancelled (no sleep).
 #[derive(Clone, Default)]
-pub struct Cancel(Arc<(Mutex<bool>, Condvar)>);
+pub struct Cancel(pub(crate) Arc<(Mutex<bool>, Condvar)>);
 
 impl Cancel {
     pub fn cancel(&self) {
