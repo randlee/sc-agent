@@ -233,29 +233,31 @@ fn busy_reply_pauses_the_client_for_its_holdoff() {
 #[test]
 fn provider_busy_reports_the_retry_after_unclamped_and_rounded_up() {
     let max = u64::MAX.to_string();
-    for (header, seconds) in [
-        ("2.5", 3),
-        ("2.0000000000000001", 3),
-        ("99", 99),
-        (max.as_str(), u64::MAX),
+    for (headers, attempts, seconds) in [
+        (&["2.5"][..], 1, 3),
+        (&["2.0000000000000001"][..], 1, 3),
+        (&["99"][..], 1, 99),
+        (&[max.as_str()][..], 1, u64::MAX),
+        (&["0", "bad"][..], 2, 0),
     ] {
-        let server = Server::start(vec![(
-            503,
-            vec![("retry-after", header.into())],
-            "{}".into(),
-        )]);
+        let server = Server::start(
+            headers
+                .iter()
+                .map(|header| (503, vec![("retry-after", (*header).into())], "{}".into()))
+                .collect(),
+        );
         let client = Client::new(
             Echo(format!("{}/x", server.base)),
             Policy {
-                max_sends: 1,
+                max_sends: attempts,
                 ..policy()
             },
         );
         let result = client.send(&1, &Cancel::default());
-        server.finish();
         assert!(
-            matches!(result, Err(Error::ProviderBusy { attempts: 1, retry_after_seconds: Some(s), reason: BusyReason::Sends }) if s == seconds),
-            "{header}: {result:?}"
+            matches!(result, Err(Error::ProviderBusy { attempts: n, retry_after_seconds: Some(s), reason: BusyReason::Sends }) if n == attempts && s == seconds),
+            "{headers:?}: {result:?}"
         );
+        assert_eq!(server.finish().len(), attempts as usize);
     }
 }
