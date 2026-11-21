@@ -77,7 +77,14 @@ pub struct Session {
 }
 
 impl Session {
-    /// Rows to an injected Logger.
+    /// Creates a session backed by a caller-provided logger.
+    ///
+    /// This is the supported extension point for routing session rows to a
+    /// caller-managed `sc_observability` logger instead of the JSONL file
+    /// created by [`Session::open`]. Each [`Session::row`] is delivered through
+    /// the injected logger. This constructor does not create or shut down the
+    /// logger; its lifecycle stays with the caller. Calling [`Session::flush`]
+    /// forwards a flush to that logger.
     pub fn injected(
         logger: Arc<Logger>,
         repo: String,
