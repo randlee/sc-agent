@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use sc_agent_http::test_server::{Server, ok};
 use sc_agent_http::{Cancel, Policy};
-use sc_decision_local::{Availability, Laya, LocalDaemon, Strands};
+use sc_decision_local::{Availability, Laya};
 use sc_decision_schema::DecisionRequest;
 use serde_json::json;
 
@@ -23,7 +23,7 @@ fn request() -> DecisionRequest {
 }
 
 #[test]
-fn daemons_read_their_own_health() {
+fn laya_reports_loaded_or_loads_on_demand() {
     assert_eq!(
         Laya.availability(br#"{"loaded":["m"]}"#, "m").unwrap(),
         Availability::Loaded
@@ -31,10 +31,6 @@ fn daemons_read_their_own_health() {
     assert_eq!(
         Laya.availability(br#"{"loaded":null}"#, "m").unwrap(),
         Availability::LoadsOnDemand
-    );
-    assert_eq!(
-        Strands.availability(br#"{"model":"x"}"#, "m").unwrap(),
-        Availability::Other(vec!["x".into()])
     );
 }
 
@@ -61,26 +57,4 @@ fn local_runner_probes_once_then_decides_the_whole_batch() {
             ["/health", "/v1/systemone", "/v1/systemone"]
         );
     }
-}
-
-#[test]
-fn local_runner_serving_another_model_fails_every_item_without_sending() {
-    let server = Server::start(vec![ok(json!({ "model": "other" }))]);
-    let local = decidr::open_local(
-        &server.base,
-        "strands",
-        policy(),
-        None,
-        Duration::from_secs(5),
-    )
-    .unwrap();
-    let mut got = Vec::new();
-    local.decide_batch(
-        vec![request(), request()],
-        2,
-        &Cancel::default(),
-        &mut |o| got.push(o.position),
-    );
-    assert_eq!(got, vec![0, 1]);
-    assert_eq!(server.finish().len(), 1);
 }

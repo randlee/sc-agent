@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use sc_agent_http::{Codec, http};
 use sc_agent_types::Error;
 use sc_decision_schema::{Answer, DecisionRequest, DecisionResponse, Question};
-use sc_llm_provider::{Chat, Llm, Message, Reply};
+use sc_llm_provider::{Chat, Message, Reply};
 use serde_json::{Value, json};
 
 const SYSTEM: &str = "You answer decision questions about the given state. Reply only with JSON \
@@ -19,7 +19,7 @@ pub struct FromLlm<L> {
     max_tokens: u32,
 }
 
-impl<L: Llm> FromLlm<L> {
+impl<L: Codec<Request = Chat, Response = Reply>> FromLlm<L> {
     pub fn new(llm: L) -> Self {
         Self {
             llm,
@@ -44,7 +44,6 @@ impl<L: Llm> FromLlm<L> {
             messages: vec![Message::user(prompt.to_string())],
             max_tokens: self.max_tokens,
             output_schema: Some(schema),
-            ..Chat::default()
         })
     }
 }
@@ -96,7 +95,7 @@ fn answer_schema(question: &Question) -> Value {
     json!({ "type": "object", "additionalProperties": false, "required": required, "properties": properties })
 }
 
-impl<L: Llm> Codec for FromLlm<L> {
+impl<L: Codec<Request = Chat, Response = Reply>> Codec for FromLlm<L> {
     type Request = DecisionRequest;
     type Response = DecisionResponse;
 

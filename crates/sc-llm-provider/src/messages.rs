@@ -5,7 +5,7 @@ use sc_agent_types::Error;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::{Chat, Part, Reply, Stop, Usage};
+use crate::{Chat, Part, Reply, Usage};
 
 const VERSION: &str = "2026-10-21";
 
@@ -29,16 +29,6 @@ fn part(part: &Part) -> Value {
         Part::Image { media_type, data } => {
             json!({ "type": "image", "source": { "type": "base64", "media_type": media_type, "data": data } })
         }
-        Part::ToolUse { id, name, input } => {
-            json!({ "type": "tool_use", "id": id, "name": name, "input": input })
-        }
-        Part::ToolResult {
-            id,
-            content,
-            is_error,
-        } => {
-            json!({ "type": "tool_result", "tool_use_id": id, "content": content, "is_error": is_error })
-        }
     }
 }
 
@@ -48,11 +38,6 @@ enum Block {
     Text {
         text: String,
     },
-    ToolUse {
-        id: String,
-        name: String,
-        input: Value,
-    },
     #[serde(other)]
     Other,
 }
@@ -60,7 +45,6 @@ enum Block {
 #[derive(Deserialize)]
 struct Envelope {
     content: Vec<Block>,
-    stop_reason: Option<String>,
     #[serde(default)]
     usage: Usage,
 }
@@ -78,12 +62,6 @@ impl Codec for Messages {
         }
         let messages = chat.messages.iter().map(|m| json!({ "role": m.role, "content": m.content.iter().map(part).collect::<Vec<_>>() }));
         body.insert("messages".into(), messages.collect());
-        if !chat.tools.is_empty() {
-            body.insert(
-                "tools".into(),
-                chat.tools.iter().map(crate::tool_value).collect(),
-            );
-        }
         if let Some(schema) = &chat.output_schema {
             body.insert(
                 "output_config".into(),
@@ -106,19 +84,11 @@ impl Codec for Messages {
             .into_iter()
             .filter_map(|block| match block {
                 Block::Text { text } => Some(Part::Text { text }),
-                Block::ToolUse { id, name, input } => Some(Part::ToolUse { id, name, input }),
                 Block::Other => None,
             })
             .collect();
-        let stop = match reply.stop_reason.as_deref() {
-            Some("end_turn") => Stop::EndTurn,
-            Some("tool_use") => Stop::ToolUse,
-            Some("max_tokens") => Stop::MaxTokens,
-            other => Stop::Other(other.unwrap_or_default().to_owned()),
-        };
         Ok(Reply {
             content,
-            stop,
             usage: reply.usage,
         })
     }
