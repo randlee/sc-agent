@@ -831,6 +831,7 @@ dependencies = [
  "sc-observability",
  "sc-observability-types",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
