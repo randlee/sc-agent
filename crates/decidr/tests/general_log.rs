@@ -19,16 +19,6 @@ fn events(log: &Path) -> Result<Vec<Value>> {
         .collect::<std::result::Result<_, _>>()?)
 }
 
-fn actions(log: &Path) -> Result<Vec<String>> {
-    let mut actions = Vec::new();
-    for line in std::fs::read_to_string(log)?.lines() {
-        let event: Value = serde_json::from_str(line)?;
-        let action = event.get("action").and_then(Value::as_str);
-        actions.push(action.unwrap_or_default().to_owned());
-    }
-    Ok(actions)
-}
-
 fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();
@@ -41,35 +31,28 @@ fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> 
     Ok(())
 }
 
-#[test]
-fn a_failed_command_is_recorded_in_the_general_log_under_the_variable() -> Result<()> {
-    let dir = tempfile::tempdir()?;
-    let root = dir.path().join("root");
-    let output = Command::new(env!("CARGO_BIN_EXE_decidr"))
-        .args([
-            "--project",
-            "p",
-            "send",
-            "--model",
-            "haiku",
-            "--agent-role",
-            "t",
-        ])
-        .current_dir(dir.path())
-        .env("DECIDR_LOG_ROOT", &root)
-        .stdin(Stdio::null())
-        .output()?;
-    assert!(!output.status.success());
-    assert_eq!(
-        actions(&root.join("logs").join("decidr.log.jsonl"))?,
-        ["decidr.error"]
-    );
-    assert!(!root.join("sessions").exists());
-    Ok(())
+fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_decidr"));
+    command
+        .args(args.split_whitespace())
+        .current_dir(dir)
+        .env("DECIDR_LOG_ROOT", root);
+    command
 }
 
 #[test]
-fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -> Result<()> {
+fn successful_and_failed_commands_are_logged_outside_sessions() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let root = dir.path().join("root");
+    let output = decidr_command(
+        dir.path(),
+        &root,
+        "--project p send --model haiku --agent-role t",
+    )
+    .stdin(Stdio::null())
+    .output()?;
+    assert!(!output.status.success());
+    assert!(!root.join("sessions").exists());
     let server = Server::start(vec![
         ok(json!({ "models": [{ "name": "m" }] })),
         ok(json!({ "model": "m", "answers": { "q": { "type": "noul", "noul": 0.5 } } })),
@@ -83,27 +66,16 @@ fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -
     let runner = json!({
         "test": { "kind": "generic", "host": "127.0.0.1", "port": port }
     });
-    let dir = tempfile::tempdir()?;
-    let root = dir.path().join("root");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_decidr"))
-        .args([
-            "--project",
-            "p",
-            "send",
-            "--model",
-            "m",
-            "--runner",
-            "test",
-            "--agent-role",
-            "t",
-        ])
-        .current_dir(dir.path())
-        .env("DECIDR_LOG_ROOT", &root)
-        .env("DECIDR_LOCAL_RUNNERS", runner.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    let mut child = decidr_command(
+        dir.path(),
+        &root,
+        "--project p send --model m --runner test --agent-role t",
+    )
+    .env("DECIDR_LOCAL_RUNNERS", runner.to_string())
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()?;
     child
         .stdin
         .take()
@@ -120,9 +92,10 @@ fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -
 
     let general_log = root.join("logs").join("decidr.log.jsonl");
     let events = events(&general_log)?;
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0]["action"], "decidr.send");
-    assert_eq!(events[0]["fields"]["position"], 0);
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["action"], "decidr.error");
+    assert_eq!(events[1]["action"], "decidr.send");
+    assert_eq!(events[1]["fields"]["position"], 0);
 
     let sessions = root.join("sessions");
     let mut session_files = Vec::new();
