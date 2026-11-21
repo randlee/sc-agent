@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.4  
+**Version:** 0.8.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count, the worker cap and the timeout bounds. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
+New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
 
 **Requirements:**
 
@@ -72,100 +72,78 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. | Pass its keyring overrides, if any. |
    | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
    | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
-   | Errors | Typed fields with a stored `category`, `category()`, `retryable()` and `SagError` (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
+   | Errors | Typed fields with a stored `category`, `category()` and `retryable()`, on the returned error value (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the start budget and cancellation (decision 7). | Pass its own flags through. |
-   | Batch order | `send_batch` returns input order (decision 8). | Nothing. |
+   | Batch order | `send_batch` returns one result per request, each with its input position (decision 8). | Nothing. |
 
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
-   - The template covers the decision call, model pass-through, API keys, logging wiring, cancellation, `abort_on` and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
+   - The template covers the decision call, model pass-through, API keys, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
    - Its feature variables are `models` and `sitr` (`true` or `false`). Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of either wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
-   - The generated header records the sc-decidr version, and the sitr version when `sitr` is on, as troubleshooting information. Nothing checks it at runtime.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
-   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken` remain public. The generated code uses only them and the standard library.
+   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable` and `CancelToken` remain public; `category` and `retryable` work on the returned error value. The generated code uses only them and the standard library.
 
-2. **Typed fields: `status` (exists), `attempts`, `retry_after_ms` and `category` (new).**
+2. **Typed fields: `status` (exists), `attempts`, `retry_after` and `category` (new).**
 
-   `ErrorDetail` gains three optional fields beside phase b's `status`. Each is optional: absent on read means unset, and unset is not written. They are declared after `cause`. The struct keeps `Eq`.
+   `ErrorDetail` gains three optional fields beside phase b's `status`. Each is optional: absent on read means unset, and unset is not written. They are declared after `cause`.
 
    | Field | Type | Meaning |
    | --- | --- | --- |
    | `status` | `Option<u16>` | The HTTP status of the reply this error is about. |
    | `attempts` | `Option<u32>` | The sends made for this request, the first one included. |
-   | `retry_after_ms` | `Option<u64>` | The last reply's valid `Retry-After`, in whole milliseconds. |
+   | `retry_after` | `Option<Duration>` | The last reply's valid `Retry-After`. |
    | `category` | `Option<ErrorCategory>` | The error's category (decision 6). |
 
-   `ErrorId` gains the provided methods `attempts()` and `retry_after_ms()`, each `None` by default, following `status()`.
+   `ErrorId` gains the provided methods `attempts()` and `retry_after()`, each `None` by default, following `status()`.
 
-   `detail()` remains the only builder. It stores the category and does the copy-up in one place:
+   The detail stores the category and does the copy-up:
 
    - A wrapper takes all four fields from its cause's detail.
    - A leaf keeps its own.
 
-   The top-level fields are therefore those of the first leaf in the chain, so `SagError.status` and `SagError.category` always describe the same reply, and a wrapper needs no code of its own.
+   The top-level fields are therefore those of the first leaf in the chain, so the error's `status` and `category` always describe the same reply, and a wrapper needs no code of its own.
 
-   REQ-SAG-0016 holds the leaf field table: which leaf variant sets which field.
+   REQ-SAG-0016 holds the requirements.
 
-   **`retry_after_ms`** is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser holds: rounded up to whole milliseconds, saturating at `u64::MAX`, never clamped. Fraction digits past the ninth are truncated by the parser. `ProviderReply` carries it beside the exact `retry_after_seconds`. REQ-SAG-0007 is amended to allow this rounding of a transport timing hint.
+   **Retry-After is kept as a Duration.**
 
 4. **Breaking minor release.**
 
-   The Rust change breaks SemVer: fields are added to an exhaustive public struct, and the call-limits API changes (decision 7). Below 1.0 a minor bump is the breaking bump. For Python the change only adds things, except the batch return order (decision 8).
+   The Rust change breaks SemVer: fields are added to an exhaustive public struct, and the call-limits API changes (decision 7). Below 1.0 a minor bump is the breaking bump. For Python the change only adds things.
 
    All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. sc-decidr and sitr are released together at the same version, both to PyPI. Mixed versions are not supported; this is documented, not enforced.
 
 5. **Python errors.**
 
-   `SagError` is one exception class importable from `sc_agent`. Its constructor takes `(id, message, detail)` and parses the detail JSON once. `args` stays `(id, message, detail_json)`, so copying and pickling rebuild it. Its read-only attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` (`other` when the detail has none) and `retryable` (REQ-SAG-0016). This decision states behaviour, not mechanism, because pyo3 cannot subclass `PyException` in an abi3 wheel below Python 3.12, and the floor is 3.11.
-
-   Result lines keep their shape; each level of `error` gains the new fields when they are set. A failed decision stays as data in its line; `SagError` is for command errors.
+   Every wheel call returns ok with a value or an error with its id and message; nothing raises.
 
 6. **The category is stored when the detail is built.**
 
    `sc-agent-types` gains `ErrorCategory`, an enum with `as_str()` and `retryable()`. Its values are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
 
-   It also gains the macro `error_catalog!`. Each crate writes one table per error enum:
-
-   ```rust
-   error_catalog! { HttpError {
-       ProviderBusy { .. } => ("http.provider_busy", Some(Busy)),
-       Network { .. }      => ("http.network", Some(Network)),
-       ...
-   } }
-   ```
-
-   The macro expands to an exhaustive `catalog_row` match that returns the variant's id and its category, `None` for a wrapper. `ErrorId::id()` becomes `self.catalog_row().0`. A variant with no row does not compile.
-
-   - Each crate keeps its own tables. No table is combined with another crate's, and no category is looked up across crates.
-   - The two Python-binding ids become variants of a new `PyBindingError` enum in sc-agent-py, with its own table.
-   - A leaf stores its row's category. A wrapper copies its cause's (decision 2).
-   - `llm.api_status`, `decision.api_status` and `local.probe_status` store the status refinement of their status: 401 and 403 are `auth`, 402 is `quota`, 400 and 422 are `validation`, and 429, 500, 503 and 504 are `busy`.
-   - 500, 503 and 504 are `busy` because the HTTP layer resends only 429, 502 and 529, so these arrive as final replies and must stay retryable.
-
-   REQ-SAG-0017 holds the category table: the category of every id.
+   - Every error has a stable id.
+   - A leaf stores its category. A wrapper copies its cause's (decision 2).
 
    Python reads the stored field through `sc_agent.category(detail)` and `sc_agent.retryable(detail)`. A detail with no stored category (written before categories existed, or foreign) is `other`.
 
-   **`retryable` means "worth resubmitting as a new call later, after the wheel's own resends have run out."** It is true for `busy` and `network` only. A consumer that resubmits waits first, at least `retry_after_ms` when it is set, and does not wrap the wheel in an immediate retry loop.
+   **`retryable` means "worth resubmitting as a new call later, after the wheel's own resends have run out."** It is true for `busy` and `network` only. A consumer that resubmits waits first, at least `retry_after` when it is set, and does not wrap the wheel in an immediate retry loop.
 
 7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
 
-   Both limits travel in `decidr::CallLimits { timeout: Option<RequestTimeout>, workers: Option<Workers> }`, which implements `Default`.
+   `send` and `send_batch` take an optional timeout (a Duration) and an optional worker count; each applies to that call only; a bad value is an error value.
 
-   - `send_with` and `send_batch_with` take `&CallLimits`. They replace phase b's unreleased `send_with_timeout` and `send_batch_with_timeout`. `SendOptions` is unchanged.
-   - `Workers::new(i64)` checks 1..=64 and returns `decidr.invalid_workers`. `RequestTimeout::from_secs` checks 10..=3600 s. Validation is these two range checks only; out-of-range values are refused, never clamped.
-   - Python: `send_batch(workers=, timeout_secs=)` and `send(timeout_secs=)`. CLI: `--workers N` (with `--batch` only) and `--timeout-secs SECS`.
+   - Python: `send_batch(workers=, timeout_secs=)` and `send(timeout_secs=)`. CLI: `--workers N` and `--timeout-secs SECS`.
    - A limit applies to its own call only. `None` means the configured value. A `workers` value below or above the configured count is honored.
    - `timeout_secs` replaces the per-send request timeout at both sites, `decision_transport` and `local_backend`. For a load-on-first-request runner the sends before the first 2xx get `load_timeout + timeout_secs`.
    - Every send gets the full timeout, resends included. The start budget limits when a send may start and never cuts a send in flight.
 
    REQ-SAG-0702 holds the requirements.
 
-8. **`send_batch` returns its list in input order.**
+8. **`send_batch` returns one result per request, each with its input position.**
 
-   The returned list is sorted by `position`. `on_result` still receives each line as it finishes.
+   `on_result` still receives each line as it finishes.
 
 9. **Prerelease verification is real-provider integration tests; the integration gate is removed.**
 
@@ -185,11 +163,11 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
     - `floors.toml` at the repository root writes down the Python floor (`[python] floor`) and the sc-compose minimum (`[tools] sc-compose`). It only records values.
     - The pyo3 abi3 feature in `sc-agent-py` and `sc-treesitter` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` the wheel declares.
-    - Until sc-compose can read `floors.toml`, the template carries these values as literals, and one sc-agent unit test compares them with `floors.toml`.
+    - Until sc-compose can read `floors.toml`, the template carries these values as literals.
 
 ### Rationale
 
-Two consumers rebuilt the wheel boundary and the copies diverged, so every concern except prompt authoring and result interpretation moves into sc-decidr, and the integration code is generated from one template. Typed fields and a stored category replace message-text parsing and pinned id lists. Storing the category when the detail is built, and copying it up with the other fields, needs no lookup across crates and keeps `status` and `category` describing the same reply. Per-call limits and input-order batch results remove the consumer code that worked around their absence. Prerelease tooling leaves the product API so it does not freeze into the error contract.
+Two consumers rebuilt the wheel boundary and the copies diverged, so every concern except prompt authoring and result interpretation moves into sc-decidr, and the integration code is generated from one template. Typed fields and a stored category replace message-text parsing and pinned id lists. Storing the category when the detail is built, and copying it up with the other fields, needs no lookup across crates and keeps `status` and `category` describing the same reply. Per-call limits and position-tagged batch results remove the consumer code that worked around their absence. Prerelease tooling leaves the product API so it does not freeze into the error contract.
 
 ### Consequences
 
@@ -203,10 +181,9 @@ Two consumers rebuilt the wheel boundary and the copies diverged, so every conce
 **Negative:**
 
 - This is a breaking release for Rust dependents: `ErrorDetail` gains fields and `send_with_timeout` becomes `send_with`.
-- `ErrorId` gains a required method, `base_category()`, so implementors outside the workspace must add it.
-- `id()` moves into the macro across the error enums, a one-time mechanical diff.
-- The order of the list `send_batch` returns changes.
 - The wheel moves to maturin's mixed layout.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
 ### Alternatives Considered
 
@@ -239,16 +216,6 @@ Raise on import when the versions recorded in the generated header differ from t
 **Why Rejected:**
 
 A fail-fast check makes troubleshooting and development harder. Mixed versions are documented as unsupported, not enforced.
-
-#### Alternative 4: A catalog combined across crates, with the category looked up when a detail is read
-
-**Description:**
-
-Combine every crate's rows in `decidr::error_catalog()` and compute the category from the cause chain on read.
-
-**Why Rejected:**
-
-sc-agent-types cannot see higher crates' rows (ADR-SAG-0004), and a detail read back from JSON carries no rows. Storing the category at build time needs neither.
 
 ### Implementation
 

@@ -1,9 +1,9 @@
 # Decision: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-18  
 
@@ -52,7 +52,7 @@ The CLIs and the files each one reads are these, and no others:
 | `decidr` | `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
 | `sitr` | `~/.sc-agent/sitr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/sitr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `SITR_`, plus `SC_PROJECT` |
 
-Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. A plan that adds a CLI, or changes a file or prefix a CLI reads, is not approved until it includes a new version of this ADR with that row.
+Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.
 
 A setting is looked up in seven layers, and the first layer that sets it wins:
 
@@ -87,8 +87,10 @@ One file per CLI keeps each CLI's settings separate and lets a new CLI be added 
 
 **Negative:**
 
-- A setting can now come from seven places; every CLI's `doctor` reports a `setting | value | source` table, with the shared rows from one shared routine; sitr gains a `doctor` command.
+- A setting can now come from seven places; every CLI's `doctor` reports a `setting | value | source` table; sitr gains a `doctor` command.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
 
 ### Alternatives Considered
 

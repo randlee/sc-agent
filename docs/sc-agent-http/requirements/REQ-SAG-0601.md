@@ -1,9 +1,9 @@
 # Requirement: Busy resend and holdoff
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -25,7 +25,7 @@ Definitions: A busy response is a non-quota HTTP 429 or 5xx (including 529). A s
 - When the provider gives a `Retry-After`, it MUST set the holdoff.
 - When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.
 - A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.
-- When sends run out after a busy response, the result MUST be `HttpError::ProviderBusy` with the number of attempts and the last `retry_after_seconds`.
+- When sends run out on busy replies, the error MUST say busy, with the send count and the last Retry-After.
 
 **MUST NOT statements:**
 
@@ -38,11 +38,13 @@ Providers signal overload with busy responses and expect clients to back off. Ho
 
 Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry when busy (i.e. 1,2,4,8,..). Nothing precise or fancy." "My words are what I want, not excess control resulting." "1,2,4,8 is an example of exp backoff not something to hard code."
 
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] With the default configuration, a request answered busy every time is sent 5 times and ends `HttpError::ProviderBusy` with 5 attempts.
+- [ ] With the default configuration, a request answered busy every time is sent 5 times and ends with a busy error carrying a send count of 5.
 - [ ] With the maximum set to 2, the same request is sent 2 times.
 - [ ] A busy response with `Retry-After: 3` holds the request off 3 seconds; with no `Retry-After`, each holdoff is longer than the one before.
 - [ ] Cancelling a held-off request ends its wait at once and returns a cancelled result.

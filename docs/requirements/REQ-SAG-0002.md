@@ -1,9 +1,9 @@
 # Requirement: Errors are a discriminated union carried from bottom to top
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-10  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -23,8 +23,8 @@ Definitions: A discriminated union is a tagged result type whose variant names t
 - An error MUST carry the error id and message of every lower-layer error that caused it.
 - A layer that changes an error MUST change it only by adding detail.
 - Error text received from a provider MUST be kept whole.
-- Exception (owner-approved): every occurrence of an API key that was attached to the request MUST be replaced by `[redacted]` in error text, error causes and log fields. The error id and the rest of the message MUST be kept, and no other text may be removed or rewritten.
-- Every error variant MUST have a stable id of the form `<crate>.<variant>`, such as `http.provider_busy`.
+- Exception (owner-approved): the API key MUST never appear in an error or log.
+- Every error MUST have a stable id.
 
 **MUST NOT statements:**
 
@@ -35,12 +35,14 @@ Definitions: A discriminated union is a tagged result type whose variant names t
 
 Agents and tools act on errors programmatically. A dropped lower-layer id or a panic removes the information needed to decide the next step. This rule applies to every repository the owner maintains.
 
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A test that injects a failure at the lowest layer of a call path receives, at the CLI and PyO3 entry points, that failure's error id and message in the returned error.
-- [ ] A test in which a provider or local runner echoes the attached key receives an error whose id is unchanged, whose message is otherwise whole, and which contains `[redacted]` in place of every copy of the key.
+- [ ] A test in which a provider or local runner echoes the attached key receives an error whose id is unchanged and which contains no copy of the key.
 - [ ] Clippy passes with the workspace lint configuration (`[workspace.lints.clippy]` in `Cargo.toml`), which denies panicking constructs in non-test code.
 
 ### Product Applicability

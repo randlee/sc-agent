@@ -1,9 +1,9 @@
 # Requirement: One Python floor for sc-agent's wheels and their consumers
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -23,17 +23,19 @@ Definitions:
 
 **MUST statements:**
 
-- The abi3 feature of every Python binding crate MUST match the Python floor.
+- The wheels MUST declare Python 3.11 or newer.
 
 ### Rationale
 
-The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change.
+The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change. `floors.toml` records the value; nothing in sc-agent checks it.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "No hand built checks."
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] The abi3 feature of each Python binding crate matches `[python].floor` in `floors.toml`.
+- [ ] The built wheels declare Python 3.11 or newer.
 
 ### Dependencies
 

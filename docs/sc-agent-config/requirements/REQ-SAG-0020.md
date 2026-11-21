@@ -1,9 +1,9 @@
 # Requirement: Configuration environment variable names
 
 **Status:** Proposed  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -26,12 +26,13 @@ Definitions: A CLI is one of sc-agent's command-line programs, such as `decidr` 
 
 **MUST NOT statements:**
 
-- When a variable prefixed `SC_AGENT__` is set, a CLI MUST NOT read a setting from it.
 - A CLI MUST NOT read a setting from another CLI's prefix.
 
 ### Rationale
 
 A per-CLI prefix keeps an override meant for one CLI from changing another. The project/phase has one name because one phase spans every CLI and tools outside sc-agent.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
 
 ### Success Criteria
 
@@ -41,7 +42,6 @@ A per-CLI prefix keeps an override meant for one CLI from changing another. The 
 - [ ] With `DECIDR_WORKERS=3` set, `decidr doctor` reports the setting `workers` with value 3 and source `DECIDR_WORKERS`, and `sitr doctor` reports the same rows as it reports without `DECIDR_WORKERS` set.
 - [ ] With `SC_PROJECT=phase-d` set, `decidr doctor` and `sitr doctor` both report the setting `project` with value `phase-d` and source `SC_PROJECT`.
 - [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the setting `log_root` with value `/tmp/x` and source `DECIDR_LOG_ROOT`, and `sitr doctor` reports no setting whose source is `DECIDR_LOG_ROOT`.
-- [ ] With `SC_AGENT__WORKERS=3` set, `decidr doctor` reports no setting whose source is `SC_AGENT__WORKERS`.
 - [ ] With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `"workers": 0` in the local `decidr.json` it exits with the same check's error naming that file and `workers`.
 
 ### Dependencies
