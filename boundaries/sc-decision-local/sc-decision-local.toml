@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["LocalBackend"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dev_dependencies = []
 allowed_dependents = ["decidr"]
 allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema", "sc-decision-systemone"]
 forbidden_edges = []

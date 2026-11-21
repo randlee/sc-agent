@@ -10,11 +10,10 @@ reason = "Enforce the declared crate boundaries and publishable Cargo dependenci
 # Normal/build dependencies retain their publishable workspace versions.
 # SCB-MANIFEST-002: https://github.com/randlee/sc-lint/issues/976; remove its
 # exclusion when the pinned sc-lint version contains the fix.
-# Forwarding to Arc<T>/&T calls T's implementation, not the forwarding method;
-# serde remote=Self resolves to the generated serializer, not the wrapper method.
-# SCB-CYCLE-003: https://github.com/randlee/sc-lint/issues/974; remove these
-# four exclusions when the pinned sc-lint version contains the fix.
-exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml", "crates/sc-agent-secrets/Cargo.toml", "crates/sc-agent-log/Cargo.toml", "crates/sc-agent-http/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/transport.rs", "crates/sc-decision-schema/src/models.rs", "crates/sc-decision-schema/src/request.rs", "crates/sc-decision-schema/src/response.rs"] }
+# Forwarding to Box<C> calls C's implementation, not the forwarding method.
+# SCB-CYCLE-003: https://github.com/randlee/sc-lint/issues/974; remove this
+# exclusion when the pinned sc-lint version contains the fix.
+exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml", "crates/sc-agent-secrets/Cargo.toml", "crates/sc-agent-log/Cargo.toml", "crates/sc-agent-http/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/lib.rs"] }
 
 [tool.sc-lint.analyzers.portability]
 enabled = true
@@ -26,11 +25,10 @@ fail_rules = ["PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-
 enabled = true
 reason = "Enforce bounded production waits, runtime safety and production panic prohibition."
 # The released analyzer requires exact package names to enable its panic rule.
-# The dev-only testkit is excluded because its helpers intentionally fail tests.
+# sc-agent-http's test_server module compiles only with the `test-server` feature (dev-dependencies
+# only); its helpers intentionally panic to fail a test, so it is excluded from the panic rule.
 panic_rule_packages = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-py", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider", "sc-treesitter", "sc-treesitter-py", "sitr"]
-# Only the feature-gated manual clock reaches the untimed wait; real-clock
-# production waits always use wait_timeout. Manual time advances by notification.
-exclude_paths_by_rule = { "SCB-RUNTIME-001" = ["crates/sc-agent-types/src/clock.rs"] }
+exclude_paths_by_rule = { "SCB-RUNTIME-008" = ["crates/sc-agent-http/src/test_server.rs"] }
 
 [[tool.sc-lint.lint]]
 name = "fmt"

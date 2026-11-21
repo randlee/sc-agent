@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["input", "CallLimits", "Workers", "RequestTimeout", "send_with", "send_batch_with"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dev_dependencies = []
 allowed_dependents = ["sc-agent-py"]
 allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
 forbidden_edges = []
