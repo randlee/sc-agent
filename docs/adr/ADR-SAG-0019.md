@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.4  
+**Version:** 0.7.5  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -72,7 +72,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. | Pass its keyring overrides, if any. |
    | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
    | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
-   | Errors | Typed fields with a stored `category`, `category()`, `retryable()` and `SagError` (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
+   | Errors | Tagged error values with typed fields and a stored `category`; `category()` and `retryable()` work on the error value (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns input order (decision 8). | Nothing. |
 
@@ -84,7 +84,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    - The generated header records the sc-decidr version, and the sitr version when `sitr` is on, as troubleshooting information. Nothing checks it at runtime.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
-   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken` remain public. The generated code uses only them and the standard library.
+   **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable` and `CancelToken` remain public. The generated code uses only them and the standard library. Every call returns a tagged result: `ok` with a value or `error` with error information; it does not raise.
 
 2. **Typed fields: `status` (exists), `attempts`, `retry_after_ms` and `category` (new).**
 
@@ -94,7 +94,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | --- | --- | --- |
    | `status` | `Option<u16>` | The HTTP status of the reply this error is about. |
    | `attempts` | `Option<u32>` | The sends made for this request, the first one included. |
-   | `retry_after_ms` | `Option<u64>` | The last reply's valid `Retry-After`, in whole milliseconds. |
+   | `retry_after_ms` | `Option<u64>` | The last reply's valid `Retry-After` carried in error information. |
    | `category` | `Option<ErrorCategory>` | The error's category (decision 6). |
 
    `ErrorId` gains the provided methods `attempts()` and `retry_after_ms()`, each `None` by default, following `status()`.
@@ -104,11 +104,11 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    - A wrapper takes all four fields from its cause's detail.
    - A leaf keeps its own.
 
-   The top-level fields are therefore those of the first leaf in the chain, so `SagError.status` and `SagError.category` always describe the same reply, and a wrapper needs no code of its own.
+   The top-level fields are therefore those of the first leaf in the chain, so `ErrorDetail.status` and `ErrorDetail.category` always describe the same reply, and a wrapper needs no code of its own.
 
    REQ-SAG-0016 holds the leaf field table: which leaf variant sets which field.
 
-   **`retry_after_ms`** is computed once, in `RetryAfter::parse`, from the integer seconds and nanoseconds the parser holds: rounded up to whole milliseconds, saturating at `u64::MAX`, never clamped. Fraction digits past the ninth are truncated by the parser. `ProviderReply` carries it beside the exact `retry_after_seconds`. REQ-SAG-0007 is amended to allow this rounding of a transport timing hint.
+   `Retry-After` is read as seconds into a `Duration` and honored as given. The record does not specify precision already decided by the standard type.
 
 4. **Breaking minor release.**
 
@@ -116,11 +116,11 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. sc-decidr and sitr are released together at the same version, both to PyPI. Mixed versions are not supported; this is documented, not enforced.
 
-5. **Python errors.**
+5. **Python error values.**
 
-   `SagError` is one exception class importable from `sc_agent`. Its constructor takes `(id, message, detail)` and parses the detail JSON once. `args` stays `(id, message, detail_json)`, so copying and pickling rebuild it. Its read-only attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` (`other` when the detail has none) and `retryable` (REQ-SAG-0016). This decision states behaviour, not mechanism, because pyo3 cannot subclass `PyException` in an abi3 wheel below Python 3.12, and the floor is 3.11.
+   Every Python call returns a tagged result: `ok` with a value or `error` with error information. The error value carries `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms` and `category`; `category` and `retryable` work on that error value. A missing category is `other` (REQ-SAG-0016). Failed decisions and command failures remain data in the result; Python calls do not raise for them. An exception raised while a wheel call runs, including by an `on_result` callback, is caught and returned as error information.
 
-   Result lines keep their shape; each level of `error` gains the new fields when they are set. A failed decision stays as data in its line; `SagError` is for command errors.
+   Owner ruling (2026-11-21), Rand Lee: `SagError` is removed; calls return tagged results and do not raise.
 
 6. **The category is stored when the detail is built.**
 

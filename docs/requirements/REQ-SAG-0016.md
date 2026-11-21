@@ -1,9 +1,9 @@
 # Requirement: Error details carry the HTTP status, send count and Retry-After as typed fields
 
 **Status:** Approved  
-**Version:** 0.6.0  
+**Version:** 0.7.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -22,10 +22,10 @@ Definitions:
 - The typed fields are four optional fields of an error detail:
   - `status`, the HTTP status, a `u16`;
   - `attempts`, the sends made with the first included, a `u32`;
-  - `retry_after_ms`, the last reply's valid `Retry-After` in whole milliseconds, a `u64`;
+  - `retry_after_ms`, the last reply's valid `Retry-After` carried with the error value, a `u64`;
   - `category`, the error category that REQ-SAG-0017 assigns.
-- The parsed Retry-After is the integer seconds and nanoseconds that `RetryAfter::parse` holds for a valid `Retry-After` header.
-- The SagError attributes are `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms`, `category` and `retryable`. The last five take their values from the error's top-level detail; `category` is `"other"` when that detail has none.
+- A failed result carries its error value in `error`.
+- The error value has `id`, `message`, `detail`, `status`, `attempts`, `retry_after_ms` and `category`; `retryable` and `category` work on the error value. The typed fields come from the error's top-level detail; `category` is `"other"` when that detail has none.
 - The leaf field table gives the typed fields each leaf variant sets (`—` means not set):
 
   | Id | status | attempts | retry_after_ms |
@@ -50,15 +50,12 @@ Definitions:
 - `ErrorId::detail()` MUST be the only builder of an error detail.
 - A wrapper's detail MUST carry the typed fields of its cause's detail.
 - A leaf variant's detail MUST carry the leaf variant's own typed fields.
-- `retry_after_ms` MUST be the parsed Retry-After rounded up to whole milliseconds.
-- A `retry_after_ms` too large for a `u64` MUST be `u64::MAX`.
 - The sc-decidr wheel MUST return a failed request as an error value carrying the typed fields, and MUST NOT raise an exception for it.
 - An exception raised in Python while a wheel call runs, including one raised by a caller's `on_result` callback, MUST be caught and returned as an error value.
 
 **MUST NOT statements:**
 
 - `ErrorDetail` MUST NOT lose `Eq`.
-- `retry_after_ms` MUST NOT be clamped.
 - A consumer MUST NOT need to parse message text to obtain a status, send count or Retry-After.
 
 ### Rationale
@@ -75,23 +72,12 @@ Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (retur
 
 **Acceptance Criteria:**
 
-- [ ] For each row of the leaf field table, a Rust test asserts the detail's fields. A Python test reads the same values through `SagError` or the result line's `error`.
+- [ ] For each row of the leaf field table, a Rust test asserts the detail's fields. A Python test reads the same values from the returned result's `error`.
 - [ ] `decision.http` over `ProviderBusy`, and `decision.backend` over a 401 `llm.api_status`, carry the cause's fields, `category` included, at the top level.
 - [ ] A leaf reports its own fields and its own `category`.
 - [ ] `http.response_too_large` with status 0 has `status` `None`.
 - [ ] `decision.cancelled` carries `attempts` equal to its sends.
-- [ ] `RetryAfter::parse` gives these `retry_after_ms` values:
-
-  | Header | `retry_after_ms` |
-  | --- | --- |
-  | `1.1` | 1100 |
-  | `2.0001` | 2001 |
-  | `0` | 0 |
-  | `0.0000001` | 1 |
-  | 32 nines | `u64::MAX` |
-  | a malformed header | `None` |
-- [ ] `SagError("x", "y", "{}")` has `status` `None` and `category` `"other"`.
-- [ ] A pickle round trip of a `SagError` keeps its `status`.
+- [ ] The returned result's `error` has `status` `None` and `category` `"other"` when its detail has no typed fields.
 - [ ] Each crate's test that `detail()` equals the value built from the accessors covers all four fields and the copy-up.
 
 ### Dependencies
