@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["DecisionRunner"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dev_dependencies = ["sc-decision-systemone"]
 allowed_dependents = ["decidr"]
 allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-types", "sc-decision-schema"]
 forbidden_edges = []
