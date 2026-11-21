@@ -61,7 +61,6 @@ pub struct Item<Q, R> {
     pub result: Result<R, Error>,
 }
 
-const BUSY: [u16; 3] = [429, 502, 529];
 const QUOTA: [&str; 4] =
     ["insufficient_quota", "credit_balance_exhausted", "billing_error", "enforced_spend_limit_reached"];
 const MAX_BODY: u64 = 64 * 1024 * 1024;
@@ -71,6 +70,8 @@ pub struct Client<C> {
     codec: C,
     agent: ureq::Agent,
     policy: Policy,
+    /// Provider-wide pause: no sender on this client sends before this time.
+    not_before: Mutex<Option<Instant>>,
 }
 
 impl<C: Codec> Client<C> {
@@ -81,27 +82,33 @@ impl<C: Codec> Client<C> {
             .http_status_as_error(false)
             .build()
             .into();
-        Self { codec, agent, policy: Policy { max_sends: policy.max_sends.max(1), ..policy } }
+        Self { codec, agent, policy: Policy { max_sends: policy.max_sends.max(1), ..policy }, not_before: Mutex::new(None) }
     }
 
     pub fn codec(&self) -> &C {
         &self.codec
     }
 
-    /// Sends `request`; busy, network and invalid replies are resent after Retry-After or
-    /// exponential backoff, until max sends. Quota replies are returned at once.
+    /// Sends `request`; busy, network and invalid replies are resent until max sends. A busy
+    /// reply pauses every sender on this client for max(Retry-After, backoff) plus jitter;
+    /// network and invalid replies wait the backoff. Quota replies are returned at once.
     pub fn send(&self, request: &C::Request, cancel: &Cancel) -> Result<C::Response, Error> {
         let mut last = Error::Cancelled { sends: 0 };
         for attempt in 1..=self.policy.max_sends {
-            if cancel.is_cancelled() {
+            if cancel.is_cancelled() || cancel.wait(self.paused_for()) {
                 return Err(Error::Cancelled { sends: attempt - 1 });
             }
             let wait = match self.once(request, attempt) {
                 Ok(response) => return Ok(response),
                 Err((error, _)) if !error.retryable() => return Err(error),
-                Err((error, retry_after)) => {
+                Err((error @ Error::ProviderBusy { .. }, retry_after)) => {
                     last = error;
-                    retry_after.unwrap_or_else(|| self.backoff(attempt))
+                    self.pause(retry_after.unwrap_or_default().max(self.backoff(attempt)));
+                    continue;
+                }
+                Err((error, _)) => {
+                    last = error;
+                    self.backoff(attempt)
                 }
             };
             if attempt < self.policy.max_sends && cancel.wait(wait) {
@@ -109,6 +116,22 @@ impl<C: Codec> Client<C> {
             }
         }
         Err(last)
+    }
+
+    /// How long a sender on this client waits before its next send (zero when not paused).
+    pub fn paused_for(&self) -> Duration {
+        let not_before = *self.not_before.lock().unwrap_or_else(|e| e.into_inner());
+        not_before.map_or(Duration::ZERO, |t| t.saturating_duration_since(Instant::now()))
+    }
+
+    /// Extends the provider-wide pause to `wait` from now, plus up to 1/8 jitter.
+    fn pause(&self, wait: Duration) {
+        let jitter = wait.mul_f64((ulid::Ulid::new().random() % 1024) as f64 / 8192.0);
+        let until = Instant::now() + wait + jitter;
+        let mut not_before = self.not_before.lock().unwrap_or_else(|e| e.into_inner());
+        if not_before.is_none_or(|t| t < until) {
+            *not_before = Some(until);
+        }
     }
 
     /// One send. A retryable error comes back with the Retry-After wait, if any.
@@ -129,7 +152,7 @@ impl<C: Codec> Client<C> {
             .limit(MAX_BODY)
             .read_to_vec()
             .map_err(|e| (Error::Network(e.to_string()), None))?;
-        if !BUSY.contains(&status) {
+        if status != 429 && !(500..=599).contains(&status) {
             return self.codec.decode(request, status, &body).map_err(|e| (e, None));
         }
         let text = String::from_utf8_lossy(&body);

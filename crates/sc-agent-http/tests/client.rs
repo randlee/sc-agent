@@ -84,11 +84,35 @@ fn cancel_ends_the_wait_between_sends() {
 }
 
 #[test]
-fn non_busy_5xx_is_decoded_not_resent() {
-    let server = Server::start(vec![(503, vec![], "down".into())]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert!(matches!(client.send(&1, &Cancel::default()), Err(Error::ApiStatus { status: 503, .. })));
+fn every_5xx_is_busy_and_resent() {
+    for status in [500, 501, 503, 599] {
+        let server = Server::start(vec![(status, vec![], "down".into()), ok(json!({ "n": 4 }))]);
+        let client = Client::new(Echo(format!("{}/x", server.base)), policy());
+        assert_eq!(client.send(&4, &Cancel::default()).unwrap(), 4, "status {status}");
+        assert_eq!(server.finish().len(), 2);
+    }
+}
+
+#[test]
+fn busy_reply_pauses_every_sender_on_the_client() {
+    let server = Server::start(vec![(503, vec![("retry-after", "3600".into())], "{}".into())]);
+    let cancel = Cancel::default();
+    let client = Client::new(CancelOnSend(Echo(format!("{}/x", server.base)), cancel.clone()), policy());
+    assert!(matches!(client.send(&1, &cancel), Err(Error::Cancelled { sends: 1 })));
     assert_eq!(server.finish().len(), 1);
+    // Shared: the pause the first sender hit holds for the client, not just that request.
+    assert!(client.paused_for() > Duration::from_secs(3500));
+}
+
+#[test]
+fn retry_after_zero_still_waits_the_backoff_floor() {
+    let server = Server::start(vec![(429, vec![("retry-after", "0".into())], "{}".into())]);
+    let cancel = Cancel::default();
+    let floor = Policy { backoff: Duration::from_secs(3600), ..policy() };
+    let client = Client::new(CancelOnSend(Echo(format!("{}/x", server.base)), cancel.clone()), floor);
+    assert!(matches!(client.send(&1, &cancel), Err(Error::Cancelled { sends: 1 })));
+    server.finish();
+    assert!(client.paused_for() > Duration::from_secs(3500));
 }
 
 #[test]
