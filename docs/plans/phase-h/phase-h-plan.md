@@ -1,9 +1,9 @@
 # Phase H plan: land the starting code, close three gaps
 
-Four sprints. Every sprint's result already exists and passes: `origin/ref/phase-h-result` (64ed773), one commit per sprint on top of integrate/phase-h 2da3049: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773. To check a sprint's scope, fence and size, diff its commit against its parent.
+Four sprints. Every sprint's result already exists and passes: `origin/ref/phase-h-result` (7a3aab3), one commit per sprint on top of integrate/phase-h 2da3049: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3. To check a sprint's scope, fence and size, diff its commit against its parent.
 
-Measured at 64ed773 (macOS):
-- crates/ (the active workspace): 4,484 Rust source lines and 896 test lines (.rs and .py under tests/). Of the source, 2,406 are the three kept crates (sitr 565, sc-treesitter 1,826, sc-treesitter-py 15) and 2,078 are the starting code plus h-1 to h-3. Before h-0, crates/ held 31,085 source and 22,027 test lines.
+Measured at 7a3aab3 (macOS):
+- crates/ (the active workspace): 4,487 Rust source lines and 899 test lines (.rs and .py under tests/). Of the source, 2,406 are the three kept crates (sitr 565, sc-treesitter 1,826, sc-treesitter-py 15) and 2,081 are the starting code plus h-1 to h-3. Before h-0, crates/ held 31,085 source and 22,027 test lines.
 - crates-ref/ (old code, outside the workspace, not built): 47,337 Rust lines.
 - `cargo build --workspace --all-targets` passes; `cargo test --workspace` 73 passed, 0 failed; `cargo clippy --workspace --all-targets -- -D warnings` exit 0; with maturin 1.14.1, both wheels build and pytest passes 9 (sc-agent-py 5, sc-treesitter-py 4).
 - `cargo fmt --check` fails on the starting code and on this result alike (no rustfmt.toml; the starting code was never formatted). Not a gate in this plan.
@@ -33,7 +33,7 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - the code changes of h-1 to h-3
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] For every moved crate X, `git rev-parse <base>:crates/X` equals `git rev-parse HEAD:crates-ref/X` (moved byte for byte).
@@ -45,7 +45,7 @@ The starting code is origin/ref/phase-h-start (94503df). This sprint's expected 
 7. [ ] Changes inside the three kept crates are at most 15 added lines in total (reference: 10).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3).
 
 ## h-1: sc-agent-http: busy is any non-quota 429 or 5xx; a busy reply pauses the client
 
@@ -61,17 +61,17 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 
 ### Deliverables
 1. Busy is status 429 or any 5xx whose body has no quota marker; the fixed BUSY list is removed. Quota replies are still returned at once.
-2. Client holds one provider-wide not-before time. Every send attempt first waits (cancellably) until it. A busy reply extends it to now + max(Retry-After, the attempt's backoff) + up to 1/8 jitter. Network and invalid replies keep their per-request backoff.
-3. A pause is capped at 24 hours, so no Retry-After value (up to u64::MAX seconds) can overflow an Instant or panic.
+2. Client holds one provider-wide not-before time. Every send attempt first waits (cancellably) until it. A busy reply extends it to now + min(max(Retry-After, the attempt's backoff) + up to 1/8 jitter, `MAX_PAUSE`). Network and invalid replies keep their per-request backoff.
+3. `pub const MAX_PAUSE: Duration` = 24 hours: the whole pause, jitter included, never exceeds it, so no Retry-After value (up to u64::MAX seconds) can overflow an Instant or panic.
 4. The wait before a send re-reads the not-before time after every wait, because another sender may have extended it.
 5. `Client::not_before(&self) -> Option<Instant>`: the pause end, `None` when never paused.
-6. Tests in crates/sc-agent-http/tests/client.rs: `every_5xx_is_busy_and_resent` (500, 501, 503, 599 each resent once, then 200), `busy_reply_pauses_the_client_for_retry_after` (Retry-After 3600: after the cancelled send, `not_before() >= Some(before + 3600 s)` with `before` taken before the send), `retry_after_zero_still_waits_the_backoff_floor` (backoff 3600 s, Retry-After 0: same). `huge_retry_after_is_capped_not_a_panic` (Retry-After u64::MAX: the send returns Cancelled, `not_before() >= Some(before + 24 h)`). These compare Instants, so no delay can fail them. `non_busy_5xx_is_decoded_not_resent` is removed.
+6. Tests in crates/sc-agent-http/tests/client.rs: `every_5xx_is_busy_and_resent` (500, 501, 503, 599 each resent once, then 200), `busy_reply_pauses_the_client_for_retry_after` (Retry-After 3600: after the cancelled send, `not_before() >= Some(before + 3600 s)` with `before` taken before the send), `retry_after_zero_still_waits_the_backoff_floor` (backoff 3600 s, Retry-After 0: same). `huge_retry_after_is_capped_not_a_panic` (Retry-After u64::MAX: the send returns Cancelled and `before + MAX_PAUSE <= not_before() <= after + MAX_PAUSE`, with `before` and `after` taken around the send). These compare Instants, so no delay can fail them. `non_busy_5xx_is_decoded_not_resent` is removed.
 
 ### Does Not Close
 - any other sc-agent-http change
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] `cargo test -p sc-agent-http` passes, including the three named tests; the removed test is gone.
@@ -80,10 +80,10 @@ The starting code is origin/ref/phase-h-start (94503df). This sprint's expected 
 4. [ ] `git diff --name-only <base>...HEAD` lists only the owned paths and `Cargo.lock`.
 5. [ ] `cargo build --workspace --all-targets`, `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
 6. [ ] No test sleeps or depends on timing, load or thread order.
-7. [ ] crates/sc-agent-http/src adds at most 55 lines and tests at most 45 (`git diff --numstat`; reference 49 and 42).
+7. [ ] crates/sc-agent-http/src adds at most 55 lines and tests at most 50 (`git diff --numstat`; reference 53 and 46).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3).
 
 ## h-2: sc-agent-log: general Logger and one record helper
 
@@ -106,7 +106,7 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - the wheel (h-3)
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] `cargo test -p sc-agent-log` passes both new tests.
@@ -117,7 +117,7 @@ The starting code is origin/ref/phase-h-start (94503df). This sprint's expected 
 6. [ ] crates/sc-agent-log/src adds at most 35 lines and tests at most 60 (reference 32 and 58).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3).
 
 ## h-3: sc-agent-py: send, send_batch, CancelToken and the injected Logger
 
@@ -145,7 +145,7 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 - category, retryable, SagError and the consumer template (not planned; owner decides)
 
 ### Starting point
-The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773); it is the size and shape to match. Reviewers diff that commit against its parent.
+The starting code is origin/ref/phase-h-start (94503df). This sprint's expected result is its commit in origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3); it is the size and shape to match. Reviewers diff that commit against its parent.
 
 ### Acceptance Criteria
 1. [ ] `maturin develop -m crates/sc-agent-py/Cargo.toml && python -m pytest crates/sc-agent-py/tests` passes 5 tests.
@@ -156,4 +156,4 @@ The starting code is origin/ref/phase-h-start (94503df). This sprint's expected 
 6. [ ] crates/sc-agent-py/src adds at most 140 lines and tests at most 60 (reference 133 and 53).
 
 ### Verification
-Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (64ed773; one commit per sprint: h-0 d9bfa54, h-1 40eff14, h-2 5f17f9c, h-3 64ed773).
+Sanity and QA re-run every command above at the PR head and compare the behaviour with the reference result origin/ref/phase-h-result (7a3aab3; one commit per sprint: h-0 d9bfa54, h-1 ae0990c, h-2 1099913, h-3 7a3aab3).
