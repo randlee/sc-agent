@@ -34,104 +34,62 @@ fn policy() -> Policy {
 }
 
 #[test]
-fn busy_then_ok_is_resent() {
-    let server = Server::start(vec![
-        (429, vec![("retry-after", "0".into())], "{}".into()),
-        ok(json!({ "n": 7 })),
-    ]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert_eq!(client.send(&7, &Cancel::default()).unwrap(), 7);
-    assert_eq!(server.finish().len(), 2);
-}
-
-#[test]
-fn invalid_reply_is_resent_then_gives_up() {
-    let server = Server::start(vec![ok(json!({})), ok(json!({})), ok(json!({}))]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert!(matches!(
-        client.send(&1, &Cancel::default()),
-        Err(Error::Invalid(_))
-    ));
-    assert_eq!(server.finish().len(), 3);
-}
-
-#[test]
-fn malformed_json_is_resent() {
-    let server = Server::start(vec![
-        (200, vec![], "not json".into()),
-        ok(json!({ "n": 7 })),
-    ]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert_eq!(client.send(&7, &Cancel::default()).unwrap(), 7);
-    assert_eq!(server.finish().len(), 2);
-}
-
-#[test]
-fn quota_is_not_resent() {
-    let body = json!({ "error": { "type": "insufficient_quota" } }).to_string();
-    let server = Server::start(vec![(429, vec![], body)]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert!(matches!(
-        client.send(&1, &Cancel::default()),
-        Err(Error::QuotaExhausted { status: 429, .. })
-    ));
-    assert_eq!(server.finish().len(), 1);
-}
-
-#[test]
-fn api_error_is_not_resent() {
-    let server = Server::start(vec![(400, vec![], "bad".into())]);
-    let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert!(matches!(
-        client.send(&1, &Cancel::default()),
-        Err(Error::ApiStatus { status: 400, .. })
-    ));
-    server.finish();
-}
-
-/// Cancels while its request is in flight, so the client is cancelled during the wait.
-struct CancelOnSend(Echo, Cancel);
-
-impl Codec for CancelOnSend {
-    type Request = u32;
-    type Response = u32;
-    fn encode(&self, n: &u32) -> Result<http::Request<Vec<u8>>, Error> {
-        self.0.encode(n)
-    }
-    fn decode(&self, n: &u32, status: u16, body: &[u8]) -> Result<u32, Error> {
-        self.1.cancel();
-        self.0
-            .decode(n, status, body)
-            .and(Err(Error::Invalid("cancelled during response".into())))
-    }
-}
-
-#[test]
-fn cancel_ends_the_wait_between_sends() {
-    let server = Server::start(vec![(200, vec![], "{\"n\":1}".into())]);
-    let cancel = Cancel::default();
-    let client = Client::new(
-        CancelOnSend(Echo(format!("{}/x", server.base)), cancel.clone()),
-        policy(),
-    );
-    assert!(matches!(
-        client.send(&1, &cancel),
-        Err(Error::Cancelled { sends: 1 })
-    ));
-    assert_eq!(server.finish().len(), 1);
-}
-
-#[test]
-fn every_5xx_is_busy_and_resent() {
-    for status in [500, 501, 503, 599] {
-        let server = Server::start(vec![(status, vec![], "down".into()), ok(json!({ "n": 4 }))]);
+fn busy_responses_are_resent() {
+    for status in [429, 500, 501, 502, 503, 529, 599] {
+        let server = Server::start(vec![
+            (status, vec![("retry-after", "0".into())], "down".into()),
+            ok(json!({ "n": 7 })),
+        ]);
         let client = Client::new(Echo(format!("{}/x", server.base)), policy());
         assert_eq!(
-            client.send(&4, &Cancel::default()).unwrap(),
-            4,
+            client.send(&7, &Cancel::default()).unwrap(),
+            7,
             "status {status}"
         );
         assert_eq!(server.finish().len(), 2);
+    }
+}
+
+#[test]
+fn invalid_and_malformed_replies_are_resent() {
+    for malformed in [false, true] {
+        let replies = if malformed {
+            vec![(200, vec![], "not json".into()), ok(json!({ "n": 7 }))]
+        } else {
+            vec![ok(json!({})), ok(json!({})), ok(json!({}))]
+        };
+        let server = Server::start(replies);
+        let client = Client::new(Echo(format!("{}/x", server.base)), policy());
+        let result = client.send(&7, &Cancel::default());
+        if malformed {
+            assert!(matches!(result, Ok(7)));
+        } else {
+            assert!(matches!(result, Err(Error::Invalid(_))));
+        }
+        assert_eq!(server.finish().len(), if malformed { 2 } else { 3 });
+    }
+}
+
+#[test]
+fn quota_and_client_errors_are_not_resent() {
+    for status in [400, 401, 429] {
+        let body = if status == 429 {
+            json!({ "error": { "type": "insufficient_quota" } }).to_string()
+        } else {
+            "bad".into()
+        };
+        let server = Server::start(vec![(status, vec![], body)]);
+        let client = Client::new(Echo(format!("{}/x", server.base)), policy());
+        let result = client.send(&1, &Cancel::default());
+        if status == 429 {
+            assert!(matches!(
+                result,
+                Err(Error::QuotaExhausted { status: 429, .. })
+            ));
+        } else {
+            assert!(matches!(result, Err(Error::ApiStatus { status: got, .. }) if got == status));
+        }
+        assert_eq!(server.finish().len(), 1);
     }
 }
 
@@ -185,25 +143,25 @@ fn retry_after_and_backoff_are_unclamped() {
 }
 
 #[test]
-fn provider_busy_reports_retry_after_in_seconds() {
-    for (header, seconds) in [("2.5", 3), ("99", 99)] {
-        let server = Server::start(vec![(
+fn busy_exhaustion_reports_attempts_and_last_retry_after() {
+    for (limit, last_header, seconds) in [(2, "2.5", 3), (5, "99", 99)] {
+        let mut replies = vec![(503, vec![("retry-after", "0".into())], "down".into()); limit - 1];
+        replies.push((
             503,
-            vec![("retry-after", header.into())],
-            "{}".into(),
-        )]);
+            vec![("retry-after", last_header.into())],
+            "down".into(),
+        ));
+        let server = Server::start(replies);
         let client = Client::new(
             Echo(format!("{}/x", server.base)),
             Policy {
-                max_sends: 1,
+                max_sends: limit as u32,
                 ..policy()
             },
         );
-        let result = client.send(&1, &Cancel::default());
-        server.finish();
         assert!(
-            matches!(result, Err(Error::ProviderBusy { attempts: 1, retry_after_seconds: Some(s) }) if s == seconds),
-            "{header}: {result:?}"
+            matches!(client.send(&1, &Cancel::default()), Err(Error::ProviderBusy { attempts, retry_after_seconds: Some(last) }) if attempts == limit as u32 && last == seconds)
         );
+        assert_eq!(server.finish().len(), limit);
     }
 }

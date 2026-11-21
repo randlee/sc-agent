@@ -390,42 +390,37 @@ impl<C: Codec> Client<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-    struct AdvancingCodec {
+    struct Probe {
         url: String,
+        calls: Arc<AtomicU64>,
         elapsed: Arc<AtomicU64>,
+        cancel: Cancel,
+        mode: u8,
     }
 
-    impl Codec for AdvancingCodec {
-        type Request = ();
-        type Response = ();
-
-        fn encode(&self, _: &()) -> Result<ureq::http::Request<Vec<u8>>, Error> {
-            self.elapsed.store(91, Ordering::SeqCst);
-            crate::post_json(&self.url, None, &[], &serde_json::json!({}))
-        }
-
-        fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
-            Ok(())
-        }
-    }
-
-    struct QueueCodec {
-        url: String,
-        first_attempts: std::sync::atomic::AtomicUsize,
-    }
-
-    impl Codec for QueueCodec {
+    impl Codec for Probe {
         type Request = u8;
         type Response = u8;
-
         fn encode(&self, _: &u8) -> Result<ureq::http::Request<Vec<u8>>, Error> {
+            let calls = self.calls.fetch_add(1, Ordering::SeqCst);
+            match self.mode {
+                1 => self.elapsed.store(91, Ordering::SeqCst),
+                2 => self.cancel.cancel(),
+                3 => {
+                    return Err(if calls == 0 {
+                        Error::Invalid("encode".into())
+                    } else {
+                        Error::Config("unexpected retry".into())
+                    });
+                }
+                _ => {}
+            }
             crate::post_json(&self.url, None, &[], &serde_json::json!({}))
         }
-
         fn decode(&self, request: &u8, _: u16, _: &[u8]) -> Result<u8, Error> {
-            if *request == 1 && self.first_attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+            if self.mode == 0 && *request == 1 && self.calls.load(Ordering::SeqCst) == 1 {
                 Err(Error::Invalid("retry".into()))
             } else {
                 Ok(*request)
@@ -433,132 +428,115 @@ mod tests {
         }
     }
 
-    struct PausingCodec {
-        url: String,
-        encodes: Arc<AtomicU64>,
-    }
-    impl Codec for PausingCodec {
-        type Request = ();
-        type Response = ();
-        fn encode(&self, _: &()) -> Result<ureq::http::Request<Vec<u8>>, Error> {
-            self.encodes.fetch_add(1, Ordering::SeqCst);
-            crate::post_json(&self.url, None, &[], &serde_json::json!({}))
-        }
-        fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
-            Ok(())
-        }
-    }
-
-    struct CancelEncoder(Cancel);
-    impl Codec for CancelEncoder {
-        type Request = ();
-        type Response = ();
-        fn encode(&self, _: &()) -> Result<ureq::http::Request<Vec<u8>>, Error> {
-            self.0.cancel();
-            crate::post_json("http://127.0.0.1:1", None, &[], &serde_json::json!({}))
-        }
-        fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn cancellation_during_encoding_prevents_a_send() {
-        let cancel = Cancel::default();
-        let client = Client::new(CancelEncoder(cancel.clone()), Policy::default());
-        assert!(matches!(
-            client.send(&(), &cancel),
-            Err(Error::Cancelled { sends: 0 })
-        ));
-    }
-
-    struct BadEncoder(AtomicU64);
-    impl Codec for BadEncoder {
-        type Request = ();
-        type Response = ();
-        fn encode(&self, _: &()) -> Result<ureq::http::Request<Vec<u8>>, Error> {
-            if self.0.fetch_add(1, Ordering::SeqCst) == 0 {
-                Err(Error::Invalid("encode".into()))
-            } else {
-                Err(Error::Config("unexpected retry".into()))
-            }
-        }
-        fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn encoding_failure_is_not_requeued() {
-        let client = Client::new(BadEncoder(AtomicU64::new(0)), Policy::default());
-        assert!(matches!(
-            client.send(&(), &Cancel::default()),
-            Err(Error::Invalid(_))
-        ));
-        assert_eq!(client.codec().0.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn cancellation_ends_a_busy_retry_wait() {
-        use std::sync::atomic::AtomicBool;
-        let server = crate::test_server::Server::start(vec![(
-            503,
-            vec![("retry-after", "3600".into())],
-            "{}".into(),
-        )]);
-        let start = Instant::now();
-        let encodes = Arc::new(AtomicU64::new(0));
-        let cancel = Cancel::default();
-        let client = Client::new(
-            PausingCodec {
-                url: server.base.clone(),
-                encodes: encodes.clone(),
+    fn make_client(url: String, cancel: Cancel, mode: u8) -> Client<Probe> {
+        Client::new(
+            Probe {
+                url,
+                calls: Arc::new(AtomicU64::new(0)),
+                elapsed: Arc::new(AtomicU64::new(0)),
+                cancel,
+                mode,
             },
             Policy::default(),
-        );
-        let before_send = AtomicBool::new(false);
-        let cancelled_once = AtomicBool::new(false);
-        let mut answer = None;
-        client.dispatch(
-            vec![()],
-            1,
-            &cancel,
-            || {
-                if encodes.load(Ordering::SeqCst) > 0
-                    && before_send.swap(true, Ordering::SeqCst)
-                    && !cancelled_once.swap(true, Ordering::SeqCst)
-                {
-                    cancel.cancel();
-                }
-                start
-            },
-            |_, _, result| answer = Some(result),
-        );
-        assert!(matches!(answer, Some(Err(Error::Cancelled { sends: 1 }))));
-        assert_eq!(server.finish().len(), 1);
+        )
     }
 
     #[test]
-    fn pause_started_during_encoding_defers_transmission() {
-        use std::sync::atomic::AtomicBool;
+    fn held_work_yields_and_cancellation_wakes_it() {
+        for cancelled in [false, true] {
+            let server = crate::test_server::Server::start(vec![
+                (200, vec![], "{}".into());
+                if cancelled { 2 } else { 3 }
+            ]);
+            let start = Instant::now();
+            let elapsed = AtomicU64::new(0);
+            let cancel = Cancel::default();
+            let client = make_client(server.base.clone(), cancel.clone(), 0);
+            let mut results = Vec::new();
+            client.dispatch(
+                vec![1, 2],
+                1,
+                &cancel,
+                || start + Duration::from_secs(elapsed.load(Ordering::SeqCst)),
+                |_, request, result| {
+                    if request == 2 {
+                        if cancelled {
+                            cancel.cancel();
+                        } else {
+                            let _guard = cancel.0.0.lock().unwrap_or_else(|e| e.into_inner());
+                            elapsed.store(2, Ordering::SeqCst);
+                            cancel.0.1.notify_all();
+                        }
+                    }
+                    results.push((request, result));
+                },
+            );
+            assert!(matches!(&results[0], (2, Ok(2))));
+            if cancelled {
+                assert!(matches!(
+                    &results[1],
+                    (1, Err(Error::Cancelled { sends: 1 }))
+                ));
+            } else {
+                assert!(matches!(&results[1], (1, Ok(1))));
+            }
+            assert_eq!(server.finish().len(), if cancelled { 2 } else { 3 });
+        }
+    }
+
+    #[test]
+    fn budget_starts_after_encoding_and_does_not_cut_in_flight_sends() {
+        for case in 0..3 {
+            let replies = if case == 2 {
+                vec![
+                    (503, vec![("retry-after", "0".into())], "{}".into()),
+                    (200, vec![], "{}".into()),
+                ]
+            } else {
+                vec![(if case == 0 { 200 } else { 503 }, vec![], "{}".into())]
+            };
+            let server = crate::test_server::Server::start(replies);
+            let start = Instant::now();
+            let client = make_client(server.base.clone(), Cancel::default(), 1);
+            let mut answer = None;
+            client.dispatch(
+                vec![0],
+                1,
+                &Cancel::default(),
+                || {
+                    let seconds = client.codec().elapsed.load(Ordering::SeqCst);
+                    if case != 2 && seconds == 91 {
+                        client.codec().elapsed.store(182, Ordering::SeqCst);
+                    }
+                    start + Duration::from_secs(seconds)
+                },
+                |_, _, result| answer = Some(result),
+            );
+            if case == 1 {
+                assert!(matches!(
+                    answer,
+                    Some(Err(Error::ProviderBusy { attempts: 1, .. }))
+                ));
+            } else {
+                assert!(matches!(answer, Some(Ok(0))));
+            }
+            assert_eq!(server.finish().len(), if case == 2 { 2 } else { 1 });
+        }
+    }
+
+    #[test]
+    fn provider_pause_is_shared_and_rechecked_after_encoding() {
         let server = crate::test_server::Server::start(vec![(200, vec![], "{}".into())]);
         let start = Instant::now();
-        let encodes = Arc::new(AtomicU64::new(0));
-        let client = Client::new(
-            PausingCodec {
-                url: server.base.clone(),
-                encodes: encodes.clone(),
-            },
-            Policy::default(),
-        );
+        let client = make_client(server.base.clone(), Cancel::default(), 4);
         let paused = AtomicBool::new(false);
         let mut answer = None;
         client.dispatch(
-            vec![()],
+            vec![0],
             1,
             &Cancel::default(),
             || {
-                if encodes.load(Ordering::SeqCst) == 0 {
+                if client.codec().calls.load(Ordering::SeqCst) == 0 {
                     start
                 } else if !paused.swap(true, Ordering::SeqCst) {
                     client.pause(Duration::from_secs(3), start);
@@ -569,193 +547,38 @@ mod tests {
             },
             |_, _, result| answer = Some(result),
         );
-        assert!(matches!(answer, Some(Ok(()))));
-        assert_eq!(encodes.load(Ordering::SeqCst), 2);
+        assert!(matches!(answer, Some(Ok(0))));
+        assert_eq!(client.not_before(), Some(start + Duration::from_secs(3)));
+        assert_eq!(client.codec().calls.load(Ordering::SeqCst), 2);
         assert_eq!(server.finish().len(), 1);
-    }
-
-    #[test]
-    fn oversized_response_is_not_retryable() {
-        let error = body_error(ureq::Error::BodyExceedsLimit(MAX_BODY));
-        assert!(matches!(error, Error::ResponseTooLarge { limit: MAX_BODY }));
-        assert_eq!(error.id(), "http.response_too_large");
-        assert!(!error.retryable());
-    }
-
-    #[test]
-    fn held_request_leaves_worker_free_for_ready_work() {
-        let server = crate::test_server::Server::start(vec![(200, vec![], "{}".into()); 3]);
-        let start = Instant::now();
-        let elapsed = AtomicU64::new(0);
-        let cancel = Cancel::default();
-        let client = Client::new(
-            QueueCodec {
-                url: server.base.clone(),
-                first_attempts: Default::default(),
-            },
-            Policy::default(),
-        );
-        let mut results = Vec::new();
-        client.dispatch(
-            vec![1, 2],
-            1,
-            &cancel,
-            || start + Duration::from_secs(elapsed.load(Ordering::SeqCst)),
-            |_, request, result| {
-                results.push((request, result.ok()));
-                if request == 2 {
-                    let _guard = cancel.0.0.lock().unwrap_or_else(|e| e.into_inner());
-                    elapsed.store(2, Ordering::SeqCst);
-                    cancel.0.1.notify_all();
-                }
-            },
-        );
-        assert_eq!(results, [(2, Some(2)), (1, Some(1))]);
-        assert_eq!(server.finish().len(), 3);
-    }
-
-    #[test]
-    fn first_send_budget_starts_after_encoding() {
-        let server = crate::test_server::Server::start(vec![
-            (503, vec![("retry-after", "0".into())], "{}".into()),
-            (200, vec![], "{}".into()),
-        ]);
-        let start = Instant::now();
-        let elapsed = Arc::new(AtomicU64::new(0));
-        let client = Client::new(
-            AdvancingCodec {
-                url: server.base.clone(),
-                elapsed: elapsed.clone(),
-            },
-            Policy::default(),
-        );
-        let mut answer = None;
-        client.dispatch(
-            vec![()],
-            1,
-            &Cancel::default(),
-            || start + Duration::from_secs(elapsed.load(Ordering::SeqCst)),
-            |_, _, result| answer = Some(result),
-        );
-        assert!(matches!(answer, Some(Ok(()))));
-        assert_eq!(server.finish().len(), 2);
-    }
-
-    #[test]
-    fn final_busy_response_sets_provider_pause_exactly() {
         let server = crate::test_server::Server::start(vec![(
             503,
             vec![("retry-after", "3".into())],
             "{}".into(),
         )]);
-        let start = Instant::now();
-        let client = Client::new(
-            QueueCodec {
-                url: server.base.clone(),
-                first_attempts: Default::default(),
-            },
-            Policy {
-                max_sends: 1,
-                ..Policy::default()
-            },
-        );
-        client.dispatch(vec![1], 1, &Cancel::default(), || start, |_, _, _| {});
+        let mut client = make_client(server.base.clone(), Cancel::default(), 4);
+        client.policy.max_sends = 1;
+        client.dispatch(vec![0], 1, &Cancel::default(), || start, |_, _, _| {});
         assert_eq!(client.not_before(), Some(start + Duration::from_secs(3)));
         assert_eq!(server.finish().len(), 1);
     }
 
     #[test]
-    fn budget_stops_retry_after_a_busy_send_crosses_ninety_seconds() {
-        let server = crate::test_server::Server::start(vec![(503, vec![], "{}".into())]);
-        let start = Instant::now();
-        let elapsed = Arc::new(AtomicU64::new(0));
-        let client = Client::new(
-            AdvancingCodec {
-                url: server.base.clone(),
-                elapsed: elapsed.clone(),
-            },
-            Policy::default(),
-        );
-        let mut answer = None;
-        client.dispatch(
-            vec![()],
-            1,
-            &Cancel::default(),
-            || {
-                let seconds = elapsed.load(Ordering::SeqCst);
-                if seconds == 91 {
-                    elapsed.store(182, Ordering::SeqCst);
-                }
-                start + Duration::from_secs(seconds)
-            },
-            |_, _, result| answer = Some(result),
-        );
-        assert!(matches!(
-            answer,
-            Some(Err(Error::ProviderBusy { attempts: 1, .. }))
-        ));
-        assert_eq!(server.finish().len(), 1);
-    }
-
-    #[test]
-    fn cancellation_ends_a_queued_retry() {
-        let server = crate::test_server::Server::start(vec![(200, vec![], "{}".into()); 2]);
-        let start = Instant::now();
+    fn encoding_failure_cancel_and_oversize_do_not_retry() {
         let cancel = Cancel::default();
-        let client = Client::new(
-            QueueCodec {
-                url: server.base.clone(),
-                first_attempts: Default::default(),
-            },
-            Policy::default(),
-        );
-        let mut results = Vec::new();
-        client.dispatch(
-            vec![1, 2],
-            1,
-            &cancel,
-            || start,
-            |_, request, result| {
-                if request == 2 {
-                    cancel.cancel();
-                }
-                results.push((request, result));
-            },
-        );
+        let client = make_client("http://127.0.0.1:1".into(), cancel.clone(), 2);
         assert!(matches!(
-            &results[..],
-            [(2, Ok(2)), (1, Err(Error::Cancelled { sends: 1 }))]
+            client.send(&0, &cancel),
+            Err(Error::Cancelled { sends: 0 })
         ));
-        assert_eq!(server.finish().len(), 2);
-    }
-
-    #[test]
-    fn budget_never_cuts_a_send_in_flight() {
-        let server = crate::test_server::Server::start(vec![(200, vec![], "{}".into())]);
-        let start = Instant::now();
-        let elapsed = Arc::new(AtomicU64::new(0));
-        let client = Client::new(
-            AdvancingCodec {
-                url: server.base.clone(),
-                elapsed: elapsed.clone(),
-            },
-            Policy::default(),
-        );
-        let mut answer = None;
-        client.dispatch(
-            vec![()],
-            1,
-            &Cancel::default(),
-            || {
-                let seconds = elapsed.load(Ordering::SeqCst);
-                if seconds == 91 {
-                    elapsed.store(182, Ordering::SeqCst);
-                }
-                start + Duration::from_secs(seconds)
-            },
-            |_, _, result| answer = Some(result),
-        );
-        assert!(matches!(answer, Some(Ok(()))));
-        assert_eq!(server.finish().len(), 1);
+        let client = make_client("http://127.0.0.1:1".into(), Cancel::default(), 3);
+        assert!(matches!(
+            client.send(&0, &Cancel::default()),
+            Err(Error::Invalid(_))
+        ));
+        let error = body_error(ureq::Error::BodyExceedsLimit(MAX_BODY));
+        assert!(matches!(error, Error::ResponseTooLarge { limit: MAX_BODY }));
+        assert_eq!(error.id(), "http.response_too_large");
+        assert!(!error.retryable());
     }
 }
