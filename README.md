@@ -12,5 +12,5 @@ the crate's record gaps.
 Not for merging: this branch shares no history with develop.
 
 Known gaps:
-- `sc-config` is a local path dependency. The `layers` module is not published yet (needed by h-6 and decidr).
+- `sc-config` is a git dependency pinned to sc-runtime `eb293db` (feature/sc-config-layers), because the `layers` module is not published yet. Replace it with the crates.io version once that release exists.
 - `clippy.toml` drops the `ApiKey::as_str` entry, since there is no ApiKey newtype.

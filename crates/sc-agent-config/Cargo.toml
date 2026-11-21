@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 sc-agent-types.workspace = true
-sc-config = { path = "/Users/randlee/github/sc-runtime-worktrees/feature/sc-config-layers/crates/sc-config" }
+sc-config = { git = "https://github.com/randlee/sc-runtime", rev = "eb293db8324a5129a8cf719b34b0687f9351de13" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 
