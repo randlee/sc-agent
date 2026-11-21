@@ -23,6 +23,7 @@ pub enum Availability {
 }
 
 /// One kind of local runner.
+/// This is an open trait; downstream crates may implement it.
 pub trait LocalDaemon: Send + Sync {
     /// The probe path, from the base URL.
     fn probe_path(&self) -> &'static str {
