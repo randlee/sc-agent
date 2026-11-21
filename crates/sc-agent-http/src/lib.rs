@@ -1,61 +1,106 @@
-//! Sync HTTP layer of sc-agent: one send per call, no queue, no sleep.
-//!
-//! - [`HttpRequest`] / [`HttpResponse`] carry byte bodies (multipart works);
-//!   [`Endpoint`] accepts https, or http only for a configured local runner,
-//!   and a key only over https or to a loopback host (REQ-SAG-0013).
-//! - [`Transport`] sends one request once; [`UreqTransport`] is the
-//!   production transport, bounded by [`Timeouts`].
-//! - [`HttpClient`] admits a send ([`HttpClient::may_start`] /
-//!   [`HttpClient::may_resend`]), makes it ([`HttpClient::send_once`]) and
-//!   classifies the reply: final ([`Next::Done`], decoded by the backend),
-//!   busy or timed out ([`Next::ResendAt`], a not-before instant for the
-//!   resend under [`ResendPolicy`]), or quota ([`HttpError::QuotaExhausted`]).
-//!   A busy reply pauses the host for every clone of the client
-//!   ([`ProviderPause`], REQ-SAG-0012).
-//! - [`HttpError`] is the one error type, with stable `http.*` ids
-//!   ([`ErrorId`](sc_agent_types::ErrorId), REQ-SAG-0002); every error and log
-//!   event is free of the key.
-//!
-//! The crate never waits and takes no `CancelToken`: the holdoff wait and
-//! cancellation belong to the caller's queue. It sits above sc-agent-types,
-//! sc-agent-secrets and sc-agent-log and below sc-decision-schema and
-//! sc-llm-provider (ADR-SAG-0004); it starts no runtime and never sleeps
-//! (REQ-SAG-0009, REQ-SAG-0010).
-//!
-//! Feature `testing` (not default) adds [`testing`]: transport test doubles
-//! for consumers' tests.
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+//! The shared core every sc-agent call goes through.
+//!
+//! One trait, [`Codec`], describes a remote API: build the HTTP request, read the reply.
+//! One client, [`Client`], does the I/O for any codec: send, retry, cancel, batch.
+//! LLM chat backends, decision backends and local-runner probes are all codecs, so none of
+//! them carries its own send or retry code, and a plain tool loop gets the same client.
 
-mod error;
-mod quota;
-mod redact;
-mod reply;
-mod request;
-mod resend;
-mod retry_after;
-#[cfg(test)]
-mod test_key;
-mod transport;
-mod ureq_transport;
+mod client;
 
-#[doc(inline)]
-pub use error::{BusyReason, HttpError, NetworkKind};
-#[doc(inline)]
-pub use reply::ProviderReply;
-#[doc(inline)]
-pub use request::{Endpoint, HttpRequest, HttpResponse, Method, SecretHeader};
-#[doc(inline)]
-pub use resend::{
-    Attempts, HttpClient, Jitter, Next, Pending, ProviderPause, ResendPolicy, SendPermit, Start,
-};
-/// Which request a log event belongs to; re-exported because
-/// [`HttpClient::send_once`] takes it.
-pub use sc_agent_log::LogContext;
-#[doc(inline)]
-pub use transport::{Timeouts, Transport};
-#[doc(inline)]
-pub use ureq_transport::UreqTransport;
+pub use client::{Cancel, Client, Item, Policy};
+use sc_agent_types::Error;
+pub use ureq::http;
 
-#[cfg(feature = "testing")]
-pub mod testing;
+/// A remote API, sans I/O: how to build a request and how to read its reply.
+pub trait Codec: Send + Sync {
+    type Request;
+    type Response;
+
+    /// The HTTP request for `request`. Called again for every resend.
+    fn encode(&self, request: &Self::Request) -> Result<http::Request<Vec<u8>>, Error>;
+
+    /// The reply of a non-busy status to `request`. An [`Error::Invalid`] reply is resent.
+    fn decode(
+        &self,
+        request: &Self::Request,
+        status: u16,
+        body: &[u8],
+    ) -> Result<Self::Response, Error>;
+}
+
+impl<C: Codec + ?Sized> Codec for Box<C> {
+    type Request = C::Request;
+    type Response = C::Response;
+
+    fn encode(&self, request: &Self::Request) -> Result<http::Request<Vec<u8>>, Error> {
+        (**self).encode(request)
+    }
+
+    fn decode(
+        &self,
+        request: &Self::Request,
+        status: u16,
+        body: &[u8],
+    ) -> Result<Self::Response, Error> {
+        (**self).decode(request, status, body)
+    }
+}
+
+/// A JSON POST with an optional auth header: the request shape every codec here sends.
+pub fn post_json(
+    url: &str,
+    auth: Option<(&str, &str)>,
+    headers: &[(&str, &str)],
+    body: &serde_json::Value,
+) -> Result<http::Request<Vec<u8>>, Error> {
+    let bytes = serde_json::to_vec(body).map_err(|e| Error::Encode(e.to_string()))?;
+    let mut builder = http::Request::post(url).header("content-type", "application/json");
+    for (name, value) in auth.iter().chain(headers) {
+        builder = builder.header(*name, *value);
+    }
+    builder
+        .body(bytes)
+        .map_err(|e| Error::Encode(e.to_string()))
+}
+
+/// A GET with an optional auth header.
+pub fn get(url: &str, auth: Option<(&str, &str)>) -> Result<http::Request<Vec<u8>>, Error> {
+    let mut builder = http::Request::get(url);
+    if let Some((name, value)) = auth {
+        builder = builder.header(name, value);
+    }
+    builder
+        .body(Vec::new())
+        .map_err(|e| Error::Encode(e.to_string()))
+}
+
+/// A 2xx body parsed as JSON, any other status as [`Error::ApiStatus`] with the body whole.
+pub fn json_reply<T: serde::de::DeserializeOwned>(status: u16, body: &[u8]) -> Result<T, Error> {
+    if (200..300).contains(&status) {
+        serde_json::from_slice(body).map_err(|e| Error::ResponseParse(e.to_string()))
+    } else {
+        Err(Error::ApiStatus {
+            status,
+            body: String::from_utf8_lossy(body).into_owned(),
+        })
+    }
+}
+
+/// Checked once, when a backend is built: a key never goes over plain http to another host.
+pub fn check_base(base: &str, has_key: bool) -> Result<String, Error> {
+    let base = base.trim_end_matches('/');
+    let uri: http::Uri = base
+        .parse()
+        .map_err(|e| Error::Config(format!("base URL {base}: {e}")))?;
+    let loopback = matches!(uri.host(), Some("localhost" | "127.0.0.1" | "[::1]"));
+    if has_key && uri.scheme_str() != Some("https") && !loopback {
+        return Err(Error::Config(format!(
+            "a key is never sent over plain http ({base})"
+        )));
+    }
+    Ok(base.to_owned())
+}
+
+#[cfg(feature = "test-server")]
+pub mod test_server;

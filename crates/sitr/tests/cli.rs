@@ -31,10 +31,7 @@ fn command(home: &Path, args: &[&str]) -> Command {
 }
 
 fn run(home: &Path, args: &[&str]) -> std::io::Result<Output> {
-    Ok(
-        sc_agent_testkit::ChildGuard::spawn(&mut command(home, args))
-            .wait_with_output(sc_agent_testkit::HANG_GUARD),
-    )
+    command(home, args).output()
 }
 
 /// The failure contract: exit 1, empty stdout, one stderr line `{"id", "message", "recovery"?}`.
