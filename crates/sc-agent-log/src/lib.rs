@@ -215,7 +215,7 @@ mod root_tests {
     use super::*;
 
     #[test]
-    fn the_variable_wins_when_set_and_not_empty() {
+    fn log_root_uses_override_fallback_and_requires_home() {
         let home = Some(PathBuf::from("/h"));
         assert_eq!(root_var("plan-anchor"), "PLAN_ANCHOR_LOG_ROOT");
         let set = Some(OsString::from("/r"));
@@ -226,10 +226,6 @@ mod root_tests {
         let empty = Some(OsString::new());
         let fallback = root_from("V", empty, home).ok();
         assert_eq!(fallback, Some(PathBuf::from("/h/.sc-agent")));
-    }
-
-    #[test]
-    fn no_home_and_no_variable_is_an_error_naming_the_variable() {
         let error = root_from("SITR_LOG_ROOT", None, Some(PathBuf::new())).err();
         assert!(error.is_some_and(|e| e.to_string().contains("SITR_LOG_ROOT")));
     }
