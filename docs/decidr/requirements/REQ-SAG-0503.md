@@ -1,9 +1,9 @@
 # Requirement: doctor warns about models missing from the catalog
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -22,10 +22,13 @@ Definitions: The catalog is the union of the models built into sc-agent and the 
 - `decidr doctor` MUST warn about every model a provider lists that is neither built in nor in the global configuration, naming the provider and the model.
 - `decidr doctor` MUST warn when a global-configuration model has the same release date as a built-in model of the same line.
 - `decidr doctor` MUST list every detected provider key in the order sc-agent would use it.
+- For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.
 
 ### Rationale
 
 Short names run the latest model, so the catalog must keep up with what providers release.
+
+Owner ruling (2026-11-20), Rand Lee, on showing where a key came from: "I think this will help if there is key issue."
 
 ### Success Criteria
 

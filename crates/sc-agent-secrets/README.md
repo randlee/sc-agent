@@ -1,6 +1,6 @@
 # sc-agent-secrets
 
-API key resolution for sc-agent. It sits in the config, secrets and logging layer, above `sc-agent-types`. A key is looked up by its variable name in the repo-root `.env` file, then in the process environment, then in the platform keyring (service = variable name, account = OS user).
+API key resolution for sc-agent. It sits in the config, secrets and logging layer, above `sc-agent-types`. A key is looked up by its variable name in the process environment, then in the repo-root `.env` file, then in the platform keyring (service = variable name, account = OS user).
 
 On macOS, a new interpreter or executable may prompt for Keychain access; choose
 **Always Allow** for a trusted binary to permit future reads by that binary. A

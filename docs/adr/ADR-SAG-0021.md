@@ -1,4 +1,4 @@
-# Decision: Rust-owned client logging and separate session logs
+# Decision: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
 **Status:** Proposed  
 **Version:** 0.3.0  
@@ -9,7 +9,7 @@
 
 ---
 
-## ADR-SAG-0021: Rust-owned client logging and separate session logs
+## ADR-SAG-0021: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
 **Status:** Proposed  
 
@@ -35,15 +35,25 @@ sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the
 
 **Problem Statement:**
 
-Each client's general records must reach one Rust-owned Logger, and every log must land at a fixed, known path, with session logs never mixed with general logs.
+Every record of a process must reach one Logger that the process's entry point owns, and every log must land at a fixed, known path, with session logs never mixed with general logs.
 
 ### Decision
 
-**Rust-owned client logger.** Each CLI uses the Rust sc-observability Logger it links. The sc-decidr wheel opens one Rust Logger named for the client and owns it. The generated client supplies its name and holds the returned handle; it does not own a Python Logger. The same Logger writes the client's decidr and sitr records to one file.
+**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process, injects it into every sc-agent call, and closes it on exit. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
 
-**Separate wheels.** sc-decidr and sitr are separate compiled wheels. The sc-decidr-owned handle is a callable that accepts records and writes them through its Rust Logger. The generated client passes it to both wheels; sitr uses its existing callable path. Sitr alone uses its own Rust Logger. Neither wheel depends on the sc-observability Python package.
+**The wheel exposes the crate's Logger.** The sc-decidr wheel returns the sc-observability crate's `Logger` to Python, named by the caller. Python may write its own records to it and injects it into every sc-decidr call; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue. The wheel has no dependency on the `sc-observability` Python package.
 
-**Session log.** Rust writes the same session log for every client. It is not injectable from Python.
+**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.
+
+| Product | Contains |
+|---|---|
+| `decidr` CLI | decidr, sc-observability |
+| `sitr` CLI | sitr, sc-observability |
+| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |
+
+There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses. There is no separate sitr wheel.
+
+**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. The session logger is optionally injectable; no app injects one today.
 
 **Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path.
 
@@ -57,7 +67,7 @@ Each client's general records must reach one Rust-owned Logger, and every log mu
 | `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
 | `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
 
-A plan that adds an entry point or changes its log includes an updated row in this ADR.
+A wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. A plan that adds an entry point, or changes a log one writes, is not approved until it includes a new version of this ADR with that row.
 
 **Session identity.**
 
@@ -68,13 +78,13 @@ A plan that adds an entry point or changes its log includes an updated row in th
 
 **Key Principles:**
 
-- One Rust-owned general Logger, one writer, and one file per client.
+- One process, one Logger, one queue, owned by the entry point.
 - Session logs and general logs are never written to the same folder tree.
 - A session is never filed under a guessed project/phase.
 
 ### Rationale
 
-The sc-decidr wheel owns the Logger and its handle, and the separate sitr wheel sends its records through that handle. This keeps one writer and needs no Python logging package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob.
+The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it opens before the first record and closes after the last. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob.
 
 ### Consequences
 
@@ -107,10 +117,24 @@ Each layer opens and closes loggers as it needs them.
 
 **Why Rejected:**
 
-Several owners of one file handle risk lost or duplicated records. The sc-decidr wheel owns the client Logger.
+Several owners of one file handle; records are lost or duplicated on interrupt. The entry point owns the Logger.
 
-#### Alternative 3: One Python wheel for both APIs
+#### Alternative 3: A separate sitr wheel
 
-**Description:** Combine the decidr and sitr APIs into one wheel.
+**Description:**
 
-**Why Rejected:** The owner requires two separately compiled wheels and a Rust-owned callable handle between them.
+Ship decidr and sitr as two Python wheels.
+
+**Why Rejected:**
+
+Each wheel carries its own copy of sc-observability, so a process loading both cannot inject one Logger into both without a bridge. One wheel gives one Logger.
+
+#### Alternative 4: Log root as a configuration setting
+
+**Description:**
+
+`log_root` in the configuration files and on the command line.
+
+**Why Rejected:**
+
+Not requested. Logs live in one known place; tests use `<CLI>_LOG_ROOT`.
