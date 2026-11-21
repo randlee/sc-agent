@@ -7,7 +7,7 @@ use sc_agent_http::{
     Cancel, Client, Codec, HOLDOFF_MAX, JITTER_MAX, Policy, RETRY_AFTER_MIN, holdoff, http,
     retry_after,
 };
-use sc_agent_types::Error;
+use sc_agent_types::{BusyReason, Error};
 use serde_json::{Value, json};
 
 /// The smallest codec: posts `{"n": n}`, reads `{"n": n}` back.
@@ -113,6 +113,24 @@ fn cancel_ends_the_wait_between_sends() {
         Err(Error::Cancelled { sends: 1 })
     ));
     assert_eq!(server.finish().len(), 1);
+}
+
+#[test]
+fn batch_cancels_the_held_and_unsent_requests() {
+    let server = Server::start(vec![(429, vec![("retry-after", "30".into())], "{}".into())]);
+    let cancel = Cancel::default();
+    let client = Client::new(
+        CancelOnSend(Echo(format!("{}/x", server.base)), cancel.clone()),
+        policy(),
+    );
+    let mut results = Vec::new();
+    client.batch(vec![1, 2], 1, &cancel, |item| {
+        results.push((item.position, item.result))
+    });
+    assert_eq!(server.finish().len(), 1);
+    results.sort_by_key(|(position, _)| *position);
+    assert!(matches!(results[0].1, Err(Error::Cancelled { sends: 1 })));
+    assert!(matches!(results[1].1, Err(Error::Cancelled { sends: 0 })));
 }
 
 #[test]
@@ -236,7 +254,7 @@ fn provider_busy_reports_the_retry_after_unclamped_and_rounded_up() {
         let result = client.send(&1, &Cancel::default());
         server.finish();
         assert!(
-            matches!(result, Err(Error::ProviderBusy { attempts: 1, retry_after_seconds: Some(s) }) if s == seconds),
+            matches!(result, Err(Error::ProviderBusy { attempts: 1, retry_after_seconds: Some(s), reason: BusyReason::Sends }) if s == seconds),
             "{header}: {result:?}"
         );
     }

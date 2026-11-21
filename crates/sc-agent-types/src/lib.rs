@@ -4,4 +4,4 @@
 mod error;
 pub mod providers;
 
-pub use error::Error;
+pub use error::{BusyReason, Error};

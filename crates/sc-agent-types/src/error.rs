@@ -9,10 +9,11 @@ pub enum Error {
     Keyring(String),
     #[error("could not build the request: {0}")]
     Encode(String),
-    #[error("provider busy after {attempts} sends")]
+    #[error("provider busy after {attempts} sends ({reason})")]
     ProviderBusy {
         attempts: u32,
         retry_after_seconds: Option<u64>,
+        reason: BusyReason,
     },
     #[error("quota exhausted (status {status}): {body}")]
     QuotaExhausted { status: u16, body: String },
@@ -29,6 +30,15 @@ pub enum Error {
     Cancelled { sends: u32 },
     #[error("log: {0}")]
     Log(String),
+}
+
+/// Why a busy request stopped being retried.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum BusyReason {
+    #[error("sends")]
+    Sends,
+    #[error("budget")]
+    Budget,
 }
 
 impl Error {
