@@ -23,6 +23,7 @@ def test_bad_request_is_a_value_and_is_logged(log):
     logger, root = log
     reply = json.loads(sc_agent.send("not json", "haiku", "p", "t", logger))
     assert reply["ok"] is False and reply["error"]["id"]
+    assert reply["error"]["attempts"] == 0
     assert [r["fields"]["ok"] for r in records(root)] == [False]
 
 
@@ -141,5 +142,24 @@ def test_precancelled_batch_delivers_each_result_and_catches_callback(log):
     assert first["error"]["message"] == "on_result raised: ValueError: controlled callback failure"
     assert sc_agent.retryable(first["error"]) is False
     assert json.loads(seen[0])["error"]["id"] == "request.cancelled"
-    assert returned[1] == seen[1]
+    assert json.loads(seen[1])["position"] == 1
+    assert len(json.loads(seen[1])["session_id"]) == 26
+    assert {k: v for k, v in json.loads(seen[1]).items() if k not in {"position", "session_id"}} == second
     assert second["error"]["id"] == "request.cancelled"
+    assert first["error"]["attempts"] == second["error"]["attempts"] == 0
+
+
+def test_callback_lines_map_back_to_inputs_when_consumed_out_of_order(log):
+    logger, _ = log
+    token = sc_agent.CancelToken()
+    token.cancel()
+    seen = []
+    returned = sc_agent.send_batch(["{}", "{}"], "haiku", "p", "t", logger,
+                                   cancel=token, on_result=lambda line: seen.append(json.loads(line)))
+    received = {line["position"]: line for line in reversed(seen)}
+    assert list(received) == [1, 0]
+    for position, reply in enumerate(map(json.loads, returned)):
+        assert received[position]["error"] == reply["error"]
+        assert len(received[position]["session_id"]) == 26
+        assert "position" not in reply and "session_id" not in reply
+    assert received[0]["session_id"] != received[1]["session_id"]

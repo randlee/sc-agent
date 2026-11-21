@@ -56,13 +56,13 @@ impl Codec for Probe {
     }
 }
 
-/// A local runner: waits for the model to load, then decides through the Jev API.
+/// Laya availability through the shared HTTP client.
 pub struct Local {
     probe: Client<Probe>,
 }
 
 impl Local {
-    pub fn new(base: &str, kind: &str, _load_timeout: Duration) -> Result<Self, Error> {
+    pub fn new(base: &str, kind: &str) -> Result<Self, Error> {
         let base = sc_agent_http::check_base(base, false)?;
         if kind != "laya" {
             return Err(Error::Config(format!("unknown local runner kind {kind}")));

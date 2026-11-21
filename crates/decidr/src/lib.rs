@@ -3,158 +3,156 @@
 //! returns a [`Decision`]. The CLI and the Python module both start here.
 
 use sc_agent_http::{Cancel, Policy};
-use sc_agent_log::Session;
+use sc_agent_log::{Session, record};
 use sc_agent_types::Error;
-use sc_decision_runner::{Decider, Decision, Outcome};
+use sc_decision_runner::{Decider, Decision, Outcome, digests};
 use sc_decision_schema::{Backend, DecisionRequest};
+use sc_observability::v2::Logger;
+use serde_json::Map;
 use std::time::Duration;
 
-struct LocalDecision {
-    probe: sc_decision_local::Local,
-    decider: Decider<sc_decision_systemone::SystemOne>,
-    loading: Decider<sc_decision_systemone::SystemOne>,
-}
-
-impl Decision for LocalDecision {
-    fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
-        match self.probe.wait_loaded(&request.model, cancel) {
-            Ok(sc_decision_local::Availability::LoadsOnDemand) => {
-                self.loading.decide(request, cancel)
-            }
-            Ok(_) => self.decider.decide(request, cancel),
-            Err(error) => Outcome::failed(0, request, error),
-        }
-    }
-
-    fn decide_batch(
-        &self,
-        mut requests: Vec<DecisionRequest>,
-        workers: usize,
-        cancel: &Cancel,
-        on_result: &mut dyn FnMut(Outcome),
-    ) {
-        let model = requests
-            .first()
-            .map(|r| r.model.as_str())
-            .unwrap_or_default();
-        let mut offset = 0;
-        match self.probe.wait_loaded(model, cancel) {
-            Ok(sc_decision_local::Availability::LoadsOnDemand) => {
-                while !requests.is_empty() {
-                    let mut first = self.loading.decide(requests.remove(0), cancel);
-                    first.position = offset;
-                    let loaded = matches!(first.result, Ok(_) | Err(Error::ResponseParse(_)));
-                    on_result(first);
-                    offset += 1;
-                    if loaded {
-                        break;
-                    }
-                }
-            }
-            Ok(_) => {}
-            Err(error) => {
-                requests
-                    .into_iter()
-                    .enumerate()
-                    .for_each(|(i, r)| on_result(Outcome::failed(i, r, error.clone())));
-                return;
-            }
-        }
-        self.decider
-            .decide_batch(requests, workers, cancel, &mut |mut outcome| {
-                outcome.position += offset;
-                on_result(outcome);
-            });
+/// The first request may load the model; later requests use the normal policy.
+pub fn load_policy(policy: Policy, load: Duration) -> Policy {
+    Policy {
+        timeout: policy.timeout + load,
+        ..policy
     }
 }
 
-pub fn open_local(
-    base: &str,
-    kind: &str,
-    policy: Policy,
-    session: Option<Session>,
-    load_timeout: std::time::Duration,
-) -> Result<Box<dyn Decision>, Error> {
-    Ok(Box::new(LocalDecision {
-        probe: sc_decision_local::Local::new(base, kind, load_timeout)?,
-        loading: Decider::new(
-            sc_decision_systemone::SystemOne::new(base, None)?,
-            Policy {
-                timeout: policy.timeout + load_timeout,
-                ..policy
-            },
-            session.clone(),
-        ),
-        decider: Decider::new(
-            sc_decision_systemone::SystemOne::new(base, None)?,
-            policy,
-            session,
-        ),
-    }))
-}
-
-/// The decision backend for a provider: the Jev API itself, or a chat model through
-/// [`FromLlm`]. The key and base URL are checked here, once.
-pub fn backend(
-    provider: &sc_agent_types::providers::Provider,
-    key: Option<String>,
-) -> Result<Box<dyn Backend>, Error> {
-    match provider.wire {
-        sc_agent_types::providers::Wire::SystemOne => Ok(Box::new(
-            sc_decision_systemone::SystemOne::new(provider.base_url, key.as_deref())?,
-        )),
-        _ => Ok(Box::new(sc_decision_llm::FromLlm::new(
-            sc_llm_provider::backend(provider, key)?,
-        ))),
-    }
-}
-
-/// A decider for `model` (short name or id) on `provider`, or the first provider in ranking
-/// order with a key. Returns it with the provider's model id, which goes into each request.
-pub fn open(
+/// One execution path for CLI and Python: resolve, choose the backend, stamp models, run.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "shared CLI and Python call inputs"
+)]
+pub fn send(
+    mut requests: Vec<DecisionRequest>,
     model: &str,
     provider: Option<&str>,
-    repo_root: Option<&std::path::Path>,
-    policy: Policy,
-    session: Option<Session>,
-    keyring: Option<(Option<&str>, Option<&str>)>,
-) -> Result<(Box<dyn Decision>, String), Error> {
-    let key = |p: &sc_agent_types::providers::Provider| {
-        sc_agent_secrets::key(p.key_var, repo_root, keyring)
-    };
-    let (chosen, id) = sc_agent_types::providers::Provider::choose(model, provider, |p| {
-        matches!(key(p), Ok(Some(_)))
-    })?;
-    let found = key(chosen)?.map(|(value, _)| value);
-    let found = Some(found.ok_or_else(|| Error::MissingKey {
-        provider: chosen.name.into(),
-        var: chosen.key_var.into(),
-    })?);
-    Ok((
-        Box::new(Decider::new(backend(chosen, found)?, policy, session)),
-        id,
-    ))
-}
-
-/// Resolve the configured policy once for CLI and wheel callers; overrides are already validated.
-pub fn policy(
+    runner: Option<&str>,
     config: &sc_agent_config::Config,
     workers: Option<usize>,
     timeout: Option<Duration>,
-    runner: Option<&sc_agent_config::Runner>,
-) -> (Policy, usize) {
-    (
-        Policy {
-            max_sends: config.max_sends.unwrap_or(5),
-            timeout: timeout.unwrap_or(Duration::from_secs(
-                runner.map_or(config.request_timeout_secs.unwrap_or(120), |r| {
-                    r.request_timeout_secs
-                }),
-            )),
-            ..Policy::default()
-        },
-        workers.or(config.workers).unwrap_or(8),
-    )
+    root: Option<&std::path::Path>,
+    session: Option<Session>,
+    keyring: Option<(Option<&str>, Option<&str>)>,
+    logger: &Logger,
+    cancel: &Cancel,
+    on_result: &mut dyn FnMut(&mut Outcome),
+) -> Result<(), Error> {
+    let runner =
+        runner.or_else(|| provider.filter(|name| config.local_runners.contains_key(*name)));
+    let local = runner
+        .map(|name| {
+            config
+                .local_runners
+                .get(name)
+                .ok_or_else(|| Error::Config(format!("no local runner {name} in config")))
+        })
+        .transpose()?;
+    let policy = Policy {
+        max_sends: config.max_sends.unwrap_or(5),
+        timeout: timeout.unwrap_or(Duration::from_secs(
+            local.map_or(120, |r| r.request_timeout_secs),
+        )),
+        ..Policy::default()
+    };
+    let workers = workers.or(config.workers).unwrap_or(8);
+    let (backend, id, loading): (Box<dyn Backend>, String, _) = match local {
+        Some(r) => {
+            let base = format!("http://{}:{}", r.host, r.port);
+            let id = r.model.as_deref().unwrap_or(model).to_owned();
+            let loading =
+                match sc_decision_local::Local::new(&base, &r.kind)?.wait_loaded(&id, cancel) {
+                    Ok(sc_decision_local::Availability::LoadsOnDemand) => Some(Ok(Decider::new(
+                        sc_decision_systemone::SystemOne::new(&base, None)?,
+                        load_policy(policy, Duration::from_secs(r.load_timeout_secs)),
+                        session.clone(),
+                    ))),
+                    Ok(_) => None,
+                    Err(e) => Some(Err(e)),
+                };
+            (
+                Box::new(sc_decision_systemone::SystemOne::new(&base, None)?) as Box<dyn Backend>,
+                id,
+                loading,
+            )
+        }
+        None => {
+            let key = |p: &sc_agent_types::providers::Provider| {
+                sc_agent_secrets::key(p.key_var, root, keyring)
+            };
+            let (chosen, id) = sc_agent_types::providers::Provider::choose(model, provider, |p| {
+                matches!(key(p), Ok(Some(_)))
+            })?;
+            let found =
+                Some(
+                    key(chosen)?
+                        .map(|(value, _)| value)
+                        .ok_or_else(|| Error::MissingKey {
+                            provider: chosen.name.into(),
+                            var: chosen.key_var.into(),
+                        })?,
+                );
+            let backend: Box<dyn Backend> = match chosen.wire {
+                sc_agent_types::providers::Wire::SystemOne => Box::new(
+                    sc_decision_systemone::SystemOne::new(chosen.base_url, found.as_deref())?,
+                ),
+                _ => Box::new(sc_decision_llm::FromLlm::new(sc_llm_provider::backend(
+                    chosen, found,
+                )?)),
+            };
+            (backend, id, None)
+        }
+    };
+    let decision = Decider::new(backend, policy, session);
+    for request in &mut requests {
+        request.model.clone_from(&id);
+    }
+    let mut finish = |mut outcome: Outcome| {
+        if let Ok(response) = &mut outcome.result {
+            response
+                .extra
+                .insert("digests".into(), digests(&outcome.request).into());
+        }
+        on_result(&mut outcome);
+        let mut fields = Map::new();
+        fields.insert("model".into(), outcome.request.model.clone().into());
+        fields.insert("position".into(), outcome.position.into());
+        fields.insert("session_id".into(), outcome.session.to_string().into());
+        fields.insert("ok".into(), outcome.result.is_ok().into());
+        fields.insert(
+            "error_id".into(),
+            outcome.result.as_ref().err().map(|e| e.id()).into(),
+        );
+        record(logger, "sc_agent.decidr", "decidr.send", fields);
+    };
+    let mut offset = 0;
+    if let Some(Err(error)) = &loading {
+        requests
+            .into_iter()
+            .enumerate()
+            .for_each(|(position, request)| {
+                finish(sc_decision_runner::failed(position, request, error.clone()))
+            });
+        return Ok(());
+    }
+    if let Some(Ok(loading)) = loading {
+        while !requests.is_empty() {
+            let mut first = loading.decide(requests.remove(0), cancel);
+            first.position = offset;
+            let loaded = matches!(first.result, Ok(_) | Err(Error::ResponseParse(_)));
+            finish(first);
+            offset += 1;
+            if loaded {
+                break;
+            }
+        }
+    }
+    decision.decide_batch(requests, workers, cancel, &mut |mut outcome| {
+        outcome.position += offset;
+        finish(outcome);
+    });
+    Ok(())
 }
 
 /// Validate per-call overrides once. None leaves the caller's configured value intact.

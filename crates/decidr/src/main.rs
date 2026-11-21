@@ -14,7 +14,7 @@ use sc_agent_secrets as keys;
 use sc_agent_types::Error;
 use sc_agent_types::providers::{MODELS, PROVIDERS};
 use sc_config::layers;
-use sc_decision_runner::{Decision, Outcome};
+use sc_decision_runner::Outcome;
 use sc_decision_schema::DecisionRequest;
 use sc_observability::v2::Logger;
 use serde_json::{Map, json};
@@ -111,12 +111,6 @@ fn send(
     let layered = config(project, root)?;
     let config = layered.config;
     let project = config.project.as_deref().ok_or_else(|| Error::Config("project is required: --project, SC_PROJECT, or \"project\" in sc-agent.json or decidr.json".into()))?;
-    let (policy, workers) = decidr::policy(
-        &config,
-        workers.map(|n| n as usize),
-        timeout_secs.map(Duration::from_secs_f64),
-        runner.and_then(|name| config.local_runners.get(name)),
-    );
     let requests = read_requests(batch)?;
     let session = Session::open(
         log_root,
@@ -124,51 +118,37 @@ fn send(
         project,
         agent_role,
     )?;
-    let (decision, model_id): (Box<dyn Decision>, String) = match runner {
-        Some(name) => {
-            let r = config
-                .local_runners
-                .get(name)
-                .ok_or_else(|| Error::Config(format!("no local runner {name} in config")))?;
-            let base = format!("http://{}:{}", r.host, r.port);
-            let local = decidr::open_local(
-                &base,
-                &r.kind,
-                policy,
-                Some(session),
-                Duration::from_secs(r.load_timeout_secs),
-            )?;
-            (local, model.to_owned())
-        }
-        None => decidr::open(model, provider, root, policy, Some(session), None)?,
-    };
-    let requests = requests
-        .into_iter()
-        .map(|r| DecisionRequest {
-            model: model_id.clone(),
-            ..r
-        })
-        .collect();
     let cancel = Cancel::default();
     let handler = cancel.clone();
     let _ = ctrlc::set_handler(move || handler.cancel());
     let mut failed = false;
     let mut out = std::io::stdout().lock();
-    decision.decide_batch(requests, workers, &cancel, &mut |outcome: Outcome| {
-        failed |= outcome.result.is_err();
-        let mut fields = Map::new();
-        fields.insert("model".into(), model_id.clone().into());
-        fields.insert("position".into(), outcome.position.into());
-        fields.insert("session_id".into(), outcome.session.to_string().into());
-        fields.insert("ok".into(), outcome.result.is_ok().into());
-        fields.insert("error_id".into(), outcome.result.as_ref().err().map(|e| e.id()).into());
-        record(logger, "sc_agent.decidr", "decidr.send", fields);
-        let line = match outcome.result {
-            Ok(value) => json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": true, "value": value }),
-            Err(e) => json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": false, "error": { "id": e.id(), "message": e.to_string() } }),
-        };
-        let _ = writeln!(out, "{line}");
-    });
+    decidr::send(
+        requests,
+        model,
+        provider,
+        runner,
+        &config,
+        workers.map(|n| n as usize),
+        timeout_secs.map(Duration::from_secs_f64),
+        root,
+        Some(session),
+        None,
+        logger,
+        &cancel,
+        &mut |outcome: &mut Outcome| {
+            failed |= outcome.result.is_err();
+            let line = match &outcome.result {
+                Ok(value) => {
+                    json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": true, "value": value })
+                }
+                Err(e) => {
+                    json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": false, "error": { "id": e.id(), "message": e.to_string() } })
+                }
+            };
+            let _ = writeln!(out, "{line}");
+        },
+    )?;
     Ok(if cancel.is_cancelled() {
         ExitCode::from(130)
     } else if failed {
@@ -223,9 +203,6 @@ fn doctor(project: Option<&str>, root: Option<&Path>) -> Result<ExitCode, Error>
             "{}",
             json!({ "setting": row.path, "value": row.value, "source": row.source })
         );
-    }
-    for file in &layered.files {
-        println!("{}", json!({ "file": file.path, "exists": file.exists }));
     }
     for provider in &PROVIDERS {
         let source = match keys::key(provider.key_var, root, None) {

@@ -38,23 +38,65 @@ fn laya_reports_loaded_or_loads_on_demand() {
 fn local_runner_probes_once_then_decides_the_whole_batch() {
     let answer =
         |n: f64| ok(json!({ "model": "m", "answers": { "cat": { "type": "noul", "noul": n } } }));
-    for health in [json!({"loaded": ["m"]}), json!({"loaded": null})] {
-        let server = Server::start(vec![ok(health), answer(0.1), answer(0.2)]);
-        let local =
-            decidr::open_local(&server.base, "laya", policy(), None, Duration::from_secs(5))
-                .unwrap();
+    for (health, expected) in [
+        (ok(json!({"loaded": ["m"]})), true),
+        (ok(json!({"loaded": null})), true),
+        ((401, vec![], "probe refused".into()), false),
+    ] {
+        let mut replies = vec![health];
+        if expected {
+            replies.extend([answer(0.1), answer(0.2)]);
+        }
+        let server = Server::start(replies);
+        let port: u16 = server.base.rsplit(':').next().unwrap().parse().unwrap();
+        let config: sc_agent_config::Config = serde_json::from_value(json!({"local_runners": {"test": {"kind":"laya", "host":"127.0.0.1", "port":port, "request_timeout_secs":10}}})).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let logger = sc_agent_log::general("t", root.path()).unwrap();
         let mut got = Vec::new();
-        local.decide_batch(
+        decidr::send(
             vec![request(), request()],
-            1,
+            "m",
+            None,
+            Some("test"),
+            &config,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+            &logger,
             &Cancel::default(),
-            &mut |o| got.push(o.result.is_ok()),
-        );
-        assert_eq!(got, vec![true, true]);
+            &mut |o| {
+                got.push(o.result.is_ok());
+                if !expected {
+                    assert_eq!(o.result.as_ref().unwrap_err().id(), "api.status");
+                }
+            },
+        )
+        .unwrap();
+        assert_eq!(got, vec![expected, expected]);
         let seen = server.finish();
         assert_eq!(
             seen.iter().map(|s| s.path.as_str()).collect::<Vec<_>>(),
-            ["/health", "/v1/systemone", "/v1/systemone"]
+            if expected {
+                vec!["/health", "/v1/systemone", "/v1/systemone"]
+            } else {
+                vec!["/health"]
+            }
         );
     }
+}
+
+#[test]
+fn first_load_deadline_adds_load_time_to_the_request_override() {
+    let normal = Policy {
+        timeout: Duration::from_millis(10125),
+        ..policy()
+    };
+    let load = Duration::from_secs(600);
+    assert_eq!(
+        decidr::load_policy(normal, load).timeout,
+        normal.timeout + load
+    );
+    assert_eq!(normal.timeout, Duration::from_millis(10125));
 }

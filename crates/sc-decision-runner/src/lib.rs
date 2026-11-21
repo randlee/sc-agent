@@ -7,23 +7,16 @@ use sc_agent_types::Error;
 use sc_decision_schema::{Backend, DecisionRequest, DecisionResponse};
 use serde_json::{Map, Value, json};
 
-/// One decided request, matched to its input.
-#[derive(Debug)]
-pub struct Outcome {
-    pub position: usize,
-    pub session: ulid::Ulid,
-    pub request: DecisionRequest,
-    pub result: Result<DecisionResponse, Error>,
-}
+/// The shared client's result, with decision request and response types.
+pub type Outcome = sc_agent_http::Item<DecisionRequest, DecisionResponse>;
 
-impl Outcome {
-    pub fn failed(position: usize, request: DecisionRequest, error: Error) -> Self {
-        Self {
-            position,
-            session: ulid::Ulid::new(),
-            request,
-            result: Err(error),
-        }
+pub fn failed(position: usize, request: DecisionRequest, error: Error) -> Outcome {
+    Outcome {
+        position,
+        session: ulid::Ulid::new(),
+        request,
+        result: Err(error),
+        sends: 0,
     }
 }
 
@@ -65,12 +58,13 @@ impl<B: Backend> Decider<B> {
 
 impl<B: Backend> Decision for Decider<B> {
     fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
-        let result = self.client.send(&request, cancel);
+        let (result, sends) = self.client.send_counted(&request, cancel);
         let outcome = Outcome {
             position: 0,
             session: ulid::Ulid::new(),
             request,
             result,
+            sends,
         };
         self.record(&outcome);
         outcome
@@ -83,17 +77,27 @@ impl<B: Backend> Decision for Decider<B> {
         cancel: &Cancel,
         on_result: &mut dyn FnMut(Outcome),
     ) {
-        self.client.batch(requests, workers, cancel, |item| {
-            let outcome = Outcome {
-                position: item.position,
-                session: item.session,
-                request: item.request,
-                result: item.result,
-            };
+        self.client.batch(requests, workers, cancel, |outcome| {
             self.record(&outcome);
             on_result(outcome);
         });
     }
+}
+
+/// The same question digests are carried by session rows and public replies.
+pub fn digests(request: &DecisionRequest) -> Map<String, Value> {
+    request
+        .questions
+        .iter()
+        .map(|(id, q)| {
+            (
+                id.clone(),
+                DecisionRequest::digest(id, q)
+                    .map(Value::from)
+                    .unwrap_or(Value::Null),
+            )
+        })
+        .collect()
 }
 
 /// The session row of one outcome: the request text, per-question digests, and the response or error.
@@ -107,20 +111,7 @@ fn row(outcome: &Outcome) -> Map<String, Value> {
             .unwrap_or_default()
             .into(),
     );
-    let digests: Map<String, Value> = outcome
-        .request
-        .questions
-        .iter()
-        .map(|(id, q)| {
-            (
-                id.clone(),
-                DecisionRequest::digest(id, q)
-                    .map(Value::from)
-                    .unwrap_or(Value::Null),
-            )
-        })
-        .collect();
-    fields.insert("digests".into(), digests.into());
+    fields.insert("digests".into(), digests(&outcome.request).into());
     match &outcome.result {
         Ok(response) => fields.insert(
             "response".into(),
@@ -128,7 +119,7 @@ fn row(outcome: &Outcome) -> Map<String, Value> {
         ),
         Err(error) => fields.insert(
             "error".into(),
-            json!({ "id": error.id(), "message": error.to_string() }),
+            json!({ "id": error.id(), "message": error.to_string(), "attempts": outcome.sends }),
         ),
     };
     fields

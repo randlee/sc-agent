@@ -63,6 +63,7 @@ impl Default for Policy {
 pub struct Item<Q, R> {
     pub position: usize,
     pub session: ulid::Ulid,
+    pub sends: u32,
     pub request: Q,
     pub result: Result<R, Error>,
 }
@@ -148,14 +149,24 @@ impl<C: Codec> Client<C> {
     /// reply pauses every sender on this client for its [`holdoff`] plus jitter; network and
     /// invalid replies wait the same holdoff (no Retry-After). Quota replies return at once.
     pub fn send(&self, request: &C::Request, cancel: &Cancel) -> Result<C::Response, Error> {
+        self.send_counted(request, cancel).0
+    }
+
+    /// The same send path, retaining how many HTTP sends actually started.
+    pub fn send_counted(
+        &self,
+        request: &C::Request,
+        cancel: &Cancel,
+    ) -> (Result<C::Response, Error>, u32) {
+        let mut sends = 0;
         let mut last = Error::Cancelled { sends: 0 };
         for attempt in 1..=self.policy.max_sends {
             if self.wait_unpaused(cancel) {
-                return Err(Error::Cancelled { sends: attempt - 1 });
+                return (Err(Error::Cancelled { sends }), sends);
             }
-            let wait = match self.once(request, attempt) {
-                Ok(response) => return Ok(response),
-                Err((error, _)) if !error.retryable() => return Err(error),
+            let wait = match self.once(request, attempt, &mut sends) {
+                Ok(response) => return (Ok(response), sends),
+                Err((error, _)) if !error.retryable() => return (Err(error), sends),
                 Err((error @ Error::ProviderBusy { .. }, retry_after)) => {
                     last = error;
                     self.pause(holdoff(self.policy.backoff, attempt, retry_after) + jitter());
@@ -167,10 +178,10 @@ impl<C: Codec> Client<C> {
                 }
             };
             if attempt < self.policy.max_sends && cancel.wait(wait) {
-                return Err(Error::Cancelled { sends: attempt });
+                return (Err(Error::Cancelled { sends }), sends);
             }
         }
-        Err(last)
+        (Err(last), sends)
     }
 
     /// The time before which no sender on this client sends; `None` when never paused.
@@ -211,10 +222,13 @@ impl<C: Codec> Client<C> {
         &self,
         request: &C::Request,
         attempt: u32,
+        sends: &mut u32,
     ) -> Result<C::Response, (Error, Option<Duration>)> {
+        let encoded = self.codec.encode(request).map_err(|e| (e, None))?;
+        *sends += 1;
         let mut reply = self
             .agent
-            .run(self.codec.encode(request).map_err(|e| (e, None))?)
+            .run(encoded)
             .map_err(|e| (Error::Network(e.to_string()), None))?;
         let status = reply.status().as_u16();
         let retry_after = reply
@@ -276,12 +290,13 @@ impl<C: Codec> Client<C> {
                         let Some((position, request)) = next else {
                             break;
                         };
-                        let result = self.send(&request, cancel);
+                        let (result, sends) = self.send_counted(&request, cancel);
                         let item = Item {
                             position,
                             session: ulid::Ulid::new(),
                             request,
                             result,
+                            sends,
                         };
                         if tx.send(item).is_err() {
                             break;

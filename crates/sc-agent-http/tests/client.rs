@@ -43,7 +43,9 @@ fn busy_then_ok_is_resent() {
         ok(json!({ "n": 7 })),
     ]);
     let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert_eq!(client.send(&7, &Cancel::default()).unwrap(), 7);
+    let (reply, sends) = client.send_counted(&7, &Cancel::default());
+    assert_eq!(reply.unwrap(), 7);
+    assert_eq!(sends, 2);
     assert_eq!(server.finish().len(), 2);
 }
 
@@ -74,10 +76,9 @@ fn quota_is_not_resent() {
 fn api_error_is_not_resent() {
     let server = Server::start(vec![(400, vec![], "bad".into())]);
     let client = Client::new(Echo(format!("{}/x", server.base)), policy());
-    assert!(matches!(
-        client.send(&1, &Cancel::default()),
-        Err(Error::ApiStatus { status: 400, .. })
-    ));
+    let (reply, sends) = client.send_counted(&1, &Cancel::default());
+    assert_eq!(sends, 1);
+    assert!(matches!(reply, Err(Error::ApiStatus { status: 400, .. })));
     server.finish();
 }
 
@@ -136,6 +137,7 @@ fn batch_matches_every_result_to_its_input() {
     let client = Client::new(Echo(format!("{}/x", server.base)), policy());
     let mut got = Vec::new();
     client.batch((10..16).collect(), 3, &Cancel::default(), |item| {
+        assert_eq!(item.sends, 1);
         got.push((item.position, item.request, item.result.unwrap()))
     });
     got.sort_unstable();

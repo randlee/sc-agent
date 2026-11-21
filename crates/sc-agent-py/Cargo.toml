@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 decidr.workspace = true
+ulid = "1"
 sc-agent-config.workspace = true
 sc-agent-types.workspace = true
 sc-agent-http.workspace = true

@@ -12,20 +12,36 @@ use sc_agent_types::Error;
 use sc_decision_schema::DecisionRequest;
 use serde_json::{Map, Value, json};
 
-fn error_value(e: &Error) -> Value {
-    json!({ "ok": false, "error": { "id": e.id(), "message": e.to_string(), "category": match e {
+fn error_value(e: &Error, attempts: u32) -> Value {
+    let mut value = json!({ "ok": false, "error": { "id": e.id(), "message": e.to_string(), "attempts": attempts, "category": match e {
         Error::ProviderBusy { .. } => "busy", Error::Network(_) => "network",
         Error::QuotaExhausted { .. } => "quota", Error::MissingKey { .. } | Error::Keyring(_) => "auth",
+        Error::ApiStatus { status: 401 | 403, .. } => "auth",
         Error::Config(_) => "config",
         Error::InvalidRequestTimeout(_) | Error::InvalidWorkers(_) => "validation", Error::Cancelled { .. } => "cancelled",
         Error::Log(_) => "log", _ => "other",
-    } } })
+    } } });
+    if let Some(error) = value.get_mut("error").and_then(Value::as_object_mut) {
+        match e {
+            Error::ApiStatus { status, .. } | Error::QuotaExhausted { status, .. } => {
+                error.insert("status".into(), (*status).into());
+            }
+            Error::ProviderBusy {
+                retry_after_seconds: Some(seconds),
+                ..
+            } => {
+                error.insert("retry_after_ms".into(), seconds.saturating_mul(1000).into());
+            }
+            _ => {}
+        }
+    }
+    value
 }
 
-fn reply(result: Result<Value, Error>) -> Value {
+fn reply(result: Result<Value, Error>, attempts: u32) -> Value {
     match result {
         Ok(value) => json!({ "ok": true, "value": value }),
-        Err(e) => error_value(&e),
+        Err(e) => error_value(&e, attempts),
     }
 }
 
@@ -93,7 +109,7 @@ fn logger(name: &str) -> (Option<Logger>, Option<String>) {
         .and_then(|root| Ok(Logger(sc_agent_log::general(name, &root)?, root)));
     match opened {
         Ok(l) => (Some(l), None),
-        Err(e) => (None, Some(error_value(&e).to_string())),
+        Err(e) => (None, Some(error_value(&e, 0).to_string())),
     }
 }
 
@@ -116,12 +132,18 @@ fn decide_all(
 ) -> Vec<Value> {
     let count = requests.len();
     let cancel = cancel.map(|c| c.0.clone()).unwrap_or_default();
-    let notify = |value: Value| match on_result
-        .as_ref()
-        .map(|cb| Python::attach(|py| cb.call1(py, (value.to_string(),))))
-    {
-        Some(Err(e)) => error_value(&Error::Config(format!("on_result raised: {e}"))),
-        _ => value,
+    let notify = |value: Value, position: usize, session_id: String| {
+        if let Some(cb) = &on_result {
+            let mut line = value
+                .as_object()
+                .cloned()
+                .ok_or_else(|| Error::Config("callback reply must be an object".into()))?;
+            line.insert("position".into(), position.into());
+            line.insert("session_id".into(), session_id.into());
+            Python::attach(|py| cb.call1(py, (Value::Object(line).to_string(),)))
+                .map_err(|e| Error::Config(format!("on_result raised: {e}")))?;
+        }
+        Ok::<_, Error>(value)
     };
     let options = (|| {
         let numeric = |v: &Bound<'_, PyAny>| {
@@ -166,46 +188,62 @@ fn decide_all(
                 .collect::<Result<Vec<_>, _>>()?;
             let cwd = std::env::current_dir().unwrap_or_default();
             let root = sc_agent_config::repo_root();
-            let config = sc_agent_config::config(Some(project), root.as_deref())?.config;
-            let (policy, workers) = decidr::policy(&config, workers, timeout, None);
             let session = Session::open(&logger.1, repo_id(&cwd), project, agent_role)?;
-            let (decision, id) = decidr::open(
+            let config = sc_agent_config::config(Some(project), root.as_deref())?.config;
+            let mut replies = vec![Value::Null; count];
+            decidr::send(
+                requests,
                 model,
                 provider,
+                None,
+                &config,
+                workers,
+                timeout,
                 root.as_deref(),
-                policy,
                 Some(session),
                 Some((service.as_deref(), account.as_deref())),
+                &logger.0,
+                &cancel,
+                &mut |outcome| {
+                    let value = outcome.result.as_ref().map_err(Clone::clone).and_then(|r| {
+                        serde_json::to_value(r).map_err(|e| Error::ResponseParse(e.to_string()))
+                    });
+                    if let Some(slot) = replies.get_mut(outcome.position) {
+                        let notified = notify(
+                            reply(value, outcome.sends),
+                            outcome.position,
+                            outcome.session.to_string(),
+                        );
+                        if let Err(e) = &notified {
+                            outcome.result = Err(e.clone());
+                        }
+                        *slot = notified.unwrap_or_else(|e| error_value(&e, outcome.sends));
+                    }
+                },
             )?;
-            let requests = requests
-                .into_iter()
-                .map(|r| DecisionRequest {
-                    model: id.clone(),
-                    ..r
-                })
-                .collect();
-            let mut replies = vec![Value::Null; count];
-            decision.decide_batch(requests, workers, &cancel, &mut |outcome| {
-                let value = outcome.result.and_then(|r| {
-                    serde_json::to_value(r).map_err(|e| Error::ResponseParse(e.to_string()))
-                });
-                if let Some(slot) = replies.get_mut(outcome.position) {
-                    *slot = notify(reply(value));
-                }
-            });
             Ok(replies)
         })
     });
-    let replies = result.unwrap_or_else(|e| (0..count).map(|_| notify(error_value(&e))).collect());
-    for r in &replies {
-        let mut fields = Map::new();
-        fields.insert("model".into(), model.into());
-        fields.insert("ok".into(), r.get("ok").cloned().unwrap_or_default());
-        fields.insert(
-            "error_id".into(),
-            r.pointer("/error/id").cloned().unwrap_or_default(),
-        );
-        record(&logger.0, "sc_agent.decidr", "decidr.send", fields);
+    let failed = result.is_err();
+    let replies = result.unwrap_or_else(|e| {
+        (0..count)
+            .map(|position| {
+                notify(error_value(&e, 0), position, ulid::Ulid::new().to_string())
+                    .unwrap_or_else(|e| error_value(&e, 0))
+            })
+            .collect()
+    });
+    if failed {
+        for r in &replies {
+            let mut fields = Map::new();
+            fields.insert("model".into(), model.into());
+            fields.insert("ok".into(), r.get("ok").cloned().unwrap_or_default());
+            fields.insert(
+                "error_id".into(),
+                r.pointer("/error/id").cloned().unwrap_or_default(),
+            );
+            record(&logger.0, "sc_agent.decidr", "decidr.send", fields);
+        }
     }
     let _ = logger.0.flush();
     replies
@@ -343,4 +381,32 @@ fn sc_agent(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(category, m)?)?;
     m.add_function(wrap_pyfunction!(retryable, m)?)?;
     m.add_function(wrap_pyfunction!(send_batch, m)?)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn api_auth_status_is_preserved_and_classified() {
+        for status in [401, 403] {
+            let value = super::error_value(
+                &sc_agent_types::Error::ApiStatus {
+                    status,
+                    body: "refused".into(),
+                },
+                1,
+            );
+            assert_eq!(
+                value.pointer("/error/category"),
+                Some(&serde_json::json!("auth"))
+            );
+            assert_eq!(
+                value.pointer("/error/status"),
+                Some(&serde_json::json!(status))
+            );
+            assert_eq!(
+                value.pointer("/error/attempts"),
+                Some(&serde_json::json!(1))
+            );
+        }
+    }
 }

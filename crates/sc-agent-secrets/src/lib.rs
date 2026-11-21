@@ -35,7 +35,14 @@ pub fn key(
         |v| std::env::var(v).ok(),
         repo_root,
         |var| {
-            let user = whoami::username();
+            let user = keyring
+                .and_then(|(_, account)| account)
+                .map(str::to_owned)
+                .or_else(|| std::env::var("USER").ok())
+                .or_else(|| std::env::var("USERNAME").ok())
+                .ok_or_else(|| {
+                    Error::Keyring("OS user is unknown; supply keyring_account".into())
+                })?;
             let (service, account) = entry(var, keyring, &user);
             let entry =
                 keyring::Entry::new(service, account).map_err(|e| Error::Keyring(e.to_string()))?;

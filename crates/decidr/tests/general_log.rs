@@ -1,11 +1,7 @@
-//! ADR-SAG-0021 row `decidr` CLI: the general log is `<root>/logs/decidr.log.jsonl` with the root
-//! from `DECIDR_LOG_ROOT`, a successful send is recorded once, and the general log is separate
-//! from the session JSONL file (the empty-variable fallback to `~/.sc-agent` is
-//! `sc_agent_log::log_root`'s unit test).
+//! The shared CLI/wheel send path writes one general record separately from session rows.
+//! Controlled Config inputs keep this test independent of the host's global configuration.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use sc_agent_http::test_server::{Server, ok};
 use serde_json::{Value, json};
@@ -25,16 +21,6 @@ fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> 
     Ok(())
 }
 
-// Trace: docs/requirements/REQ-SAG-0003.md:24,26 — use decidr's configured log root.
-fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_decidr"));
-    command
-        .args(args.split_whitespace())
-        .current_dir(dir)
-        .env("DECIDR_LOG_ROOT", root);
-    command
-}
-
 fn events(log: &Path) -> Result<Vec<Value>> {
     let mut events = Vec::new();
     for line in std::fs::read_to_string(log)?.lines() {
@@ -44,12 +30,12 @@ fn events(log: &Path) -> Result<Vec<Value>> {
 }
 
 #[test]
-fn successful_command_is_logged_outside_sessions() -> Result<()> {
+fn shared_send_is_logged_outside_sessions() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    // Finding agt-h-2.cli-general-log-r2-fix remedy: exercise a real successful send.
+    // Exercise the same send path as CLI/Python with controlled configuration.
     let server = Server::start(vec![
-        ok(json!({ "models": [{ "name": "m" }] })),
+        ok(json!({ "loaded": ["m"] })),
         ok(json!({ "model": "m", "answers": { "q": { "type": "noul", "noul": 0.5 } } })),
     ]);
     let port = server
@@ -58,33 +44,43 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
         .next()
         .ok_or("test server address has no port")?
         .parse::<u16>()?;
-    let runner = json!({
-        "test": { "kind": "laya", "host": "127.0.0.1", "port": port }
-    });
-    let mut command = decidr_command(
-        dir.path(),
-        &root,
-        "--project p send --model m --runner test --agent-role t",
-    );
-    command.env("DECIDR_LOCAL_RUNNERS", runner.to_string());
-    let mut child = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    child
-        .stdin
-        .take()
-        .ok_or("decidr stdin was not piped")?
-        .write_all(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#)?;
-    let output = child.wait_with_output()?;
-    assert!(
-        output.status.success(),
-        "stdout: {}; stderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    server.finish();
+    let config: sc_agent_config::Config = serde_json::from_value(json!({ "local_runners": {
+        "test": { "kind": "laya", "model": "m", "host": "127.0.0.1", "port": port }
+    }}))?;
+    let logger = sc_agent_log::general("decidr", &root)?;
+    let session = sc_agent_log::Session::open(&root, sc_agent_log::repo_id(dir.path()), "p", "t")?;
+    let request: sc_decision_schema::DecisionRequest = serde_json::from_value(
+        json!({"model":"m","state":"test","questions":{"q":{"type":"noul"}}}),
+    )?;
+    let digests = sc_decision_runner::digests(&request);
+    let mut results = Vec::new();
+    decidr::send(
+        vec![request],
+        "m",
+        Some("test"),
+        None,
+        &config,
+        None,
+        None,
+        Some(dir.path()),
+        Some(session),
+        None,
+        &logger,
+        &sc_agent_http::Cancel::default(),
+        &mut |o| {
+            assert_eq!(o.sends, 1);
+            assert!(
+                o.result
+                    .as_ref()
+                    .is_ok_and(|r| r.extra.get("digests") == Some(&json!(digests)))
+            );
+            results.push(o.result.is_ok());
+        },
+    )?;
+    assert_eq!(results, [true]);
+    logger.flush()?;
+    let seen = server.finish();
+    assert_eq!(seen[1].json()["model"], "m");
 
     // Trace: docs/requirements/REQ-SAG-0003.md:26; agt-h-2.cli-general-log-r2-fix remedy.
     let general_log = root.join("logs").join("decidr.log.jsonl");
@@ -97,6 +93,13 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
     let mut session_files = Vec::new();
     files_under(&sessions, &sessions, &mut session_files)?;
     assert_eq!(session_files.len(), 1);
+    let row: Value = serde_json::from_str(
+        std::fs::read_to_string(sessions.join(&session_files[0]))?
+            .lines()
+            .next()
+            .ok_or("session row missing")?,
+    )?;
+    assert_eq!(row["fields"]["digests"], json!(digests));
     assert_eq!(
         session_files[0].file_name().and_then(|name| name.to_str()),
         Some("sessions.jsonl")

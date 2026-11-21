@@ -15,7 +15,6 @@ pub struct Config {
     pub project: Option<String>,
     pub workers: Option<usize>,
     pub max_sends: Option<u32>,
-    pub request_timeout_secs: Option<u64>,
     #[serde(default)]
     pub local_runners: BTreeMap<String, Runner>,
 }
@@ -52,10 +51,6 @@ pub const KEYS: &[Key] = &[
     },
     Key {
         path: "max_sends",
-        env: EnvValue::Json,
-    },
-    Key {
-        path: "request_timeout_secs",
         env: EnvValue::Json,
     },
     Key {
@@ -182,7 +177,7 @@ fn decode(value: Value) -> Result<Config, String> {
                 "request_timeout_secs",
                 (10..=3600).contains(&r.request_timeout_secs),
             ),
-            ("kind", matches!(r.kind.as_str(), "laya" | "strands")),
+            ("kind", r.kind == "laya"),
         ] {
             if !valid {
                 return Err(format!(

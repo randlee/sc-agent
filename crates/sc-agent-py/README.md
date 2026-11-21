@@ -28,17 +28,24 @@ if error is None:
 timeout_secs=None, keyring_service=None, keyring_account=None)` returns JSON text
 containing `{"ok": true, "value": response}` or
 `{"ok": false, "error": {"id": ..., "message": ..., "category": ...}}`.
-A decision failure is returned as a value; it is not raised.
+A decision failure is returned as a value; it is not raised. Its error carries
+`attempts` (HTTP sends made), plus `status` and `retry_after_ms` when the underlying
+error supplies them. Successful reply values include `digests`, keyed by question id.
 
 `send_batch(requests, model, project, agent_role, logger, provider=None,
 workers=None, cancel=None, *, timeout_secs=None, keyring_service=None,
 keyring_account=None, on_result=None)` returns one JSON string per input, in input order.
-An empty batch returns `[]`. `on_result(line)` receives each tagged JSON reply as it finishes; a callback exception becomes that request's non-retryable error value in the returned list. `workers` is a per-call integer override in 1..=64;
+An empty batch returns `[]`. `on_result(line)` receives each tagged JSON reply as it
+finishes, with `position` and `session_id` identifying its input. The returned list
+keeps its existing envelope without those callback-only fields. A callback exception
+becomes that request's non-retryable error value. `workers` is a per-call integer override in 1..=64;
 omitted, it uses the configured value (default 8). `send` does not accept `workers`.
 
 `timeout_secs` is finite numeric seconds in 10..=3600, including fractions.
 It overrides the HTTP send deadline for this call only. Omitted, it keeps the
-configured value (default 120 seconds). Invalid limits return errors with ids
+remote default of 120 seconds or the local runner's configured timeout. If `provider`
+names a configured local runner, the wheel uses that runner; otherwise it selects a
+remote provider. Invalid limits return errors with ids
 `decidr.invalid_request_timeout` or `decidr.invalid_workers`; no request is sent.
 
 The optional keyring service and account override only this call. Missing service

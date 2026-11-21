@@ -120,17 +120,8 @@ impl Session {
         };
         let log = |e: &dyn std::fmt::Display| Error::Log(e.to_string());
         let sink = JsonlFileSink::open(dir.join("sessions.jsonl"), keep).map_err(|e| log(&e))?;
-        let mut config = LoggerConfig::default_for(
-            ServiceName::new("sc-agent-session").map_err(|e| log(&e))?,
-            dir.clone(),
-        );
-        config.enable_console_sink = false;
-        config.enable_file_sink = false;
-        config.retained_log_policy = keep;
-        let mut builder = LoggerBuilder::new(config).map_err(|e| log(&e))?;
-        builder.register_sink(SinkRegistration::typed(Arc::new(sink)));
-        let logger = builder.build().map_err(|e| log(&e))?;
-        Self::injected(Arc::new(logger), repo, project, agent_role)
+        let logger = default_logger("sc-agent-session", &dir, Some((sink, keep)))?;
+        Self::injected(logger, repo, project, agent_role)
     }
 
     /// Writes one row: `fields` plus repo, project and agent role. A failed write is not
@@ -197,18 +188,29 @@ fn root_from(var: &str, set: Option<OsString>, home: Option<PathBuf>) -> Result<
 
 /// The general Logger of `service`: `<log_root>/logs/<service>.log.jsonl`, no console.
 pub fn general(service: &str, log_root: &Path) -> Result<Arc<Logger>, Error> {
+    default_logger(service, log_root, None)
+}
+
+fn default_logger(
+    service: &str,
+    log_root: &Path,
+    sink: Option<(JsonlFileSink, RetainedLogPolicy)>,
+) -> Result<Arc<Logger>, Error> {
     let log = |e: &dyn std::fmt::Display| Error::Log(e.to_string());
     let mut config = LoggerConfig::default_for(
         ServiceName::new(service).map_err(|e| log(&e))?,
         log_root.to_path_buf(),
     );
     config.enable_console_sink = false;
-    Ok(Arc::new(
-        LoggerBuilder::new(config)
-            .map_err(|e| log(&e))?
-            .build()
-            .map_err(|e| log(&e))?,
-    ))
+    if let Some((_, keep)) = &sink {
+        config.enable_file_sink = false;
+        config.retained_log_policy = *keep;
+    }
+    let mut builder = LoggerBuilder::new(config).map_err(|e| log(&e))?;
+    if let Some((sink, _)) = sink {
+        builder.register_sink(SinkRegistration::typed(Arc::new(sink)));
+    }
+    Ok(Arc::new(builder.build().map_err(|e| log(&e))?))
 }
 
 /// Rows are written in the background; a dropped session waits for them.
