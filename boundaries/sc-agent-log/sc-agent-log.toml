@@ -4,16 +4,16 @@ owner_crate_path = "sc_agent_log"
 name = "ScAgentLogLayer"
 
 [public]
-facade = "GeneralLogger"
+facade = "Session"
 
 [implementation]
-type = "GeneralLogger"
+type = "Session"
 module = "sc_agent_log"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["GeneralLogger"]
+roots = ["Session", "general", "record", "log_root"]
 
 [dependencies]
 allowed_dev_dependents = []

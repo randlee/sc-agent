@@ -4,16 +4,16 @@ owner_crate_path = "sc_llm_provider"
 name = "ScLlmProviderLayer"
 
 [public]
-facade = "LlmClient"
+facade = "Llm"
 
 [implementation]
-type = "LlmClient"
+type = "Llm"
 module = "sc_llm_provider"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["LlmClient"]
+roots = ["Llm", "ChatCompletions", "Messages", "backend"]
 
 [dependencies]
 allowed_dev_dependencies = []

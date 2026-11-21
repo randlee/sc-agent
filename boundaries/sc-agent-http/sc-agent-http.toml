@@ -4,16 +4,16 @@ owner_crate_path = "sc_agent_http"
 name = "ScAgentHttpLayer"
 
 [public]
-facade = "HttpClient"
+facade = "Client"
 
 [implementation]
-type = "HttpClient"
+type = "Client"
 module = "sc_agent_http"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["HttpClient"]
+roots = ["Client", "Cancel", "Codec", "Policy"]
 
 [dependencies]
 allowed_dev_dependents = ["sc-agent-http"]
