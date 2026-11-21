@@ -884,7 +884,6 @@ dependencies = [
  "indexmap",
  "sc-agent-http",
  "sc-agent-types",
- "sc-decision-runner",
  "sc-decision-schema",
  "sc-llm-provider",
  "serde",
@@ -897,9 +896,6 @@ version = "0.2.8"
 dependencies = [
  "sc-agent-http",
  "sc-agent-types",
- "sc-decision-runner",
- "sc-decision-schema",
- "sc-decision-systemone",
  "serde",
  "serde_json",
 ]
@@ -911,8 +907,10 @@ dependencies = [
  "sc-agent-http",
  "sc-agent-log",
  "sc-agent-types",
+ "sc-decision-llm",
  "sc-decision-schema",
  "sc-decision-systemone",
+ "sc-llm-provider",
  "serde_json",
  "ulid",
 ]
@@ -935,7 +933,6 @@ version = "0.2.8"
 dependencies = [
  "sc-agent-http",
  "sc-agent-types",
- "sc-decision-runner",
  "sc-decision-schema",
  "serde_json",
 ]

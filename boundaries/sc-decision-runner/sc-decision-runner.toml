@@ -16,9 +16,9 @@ constructor = "none"
 roots = ["Decider", "Decision", "Outcome"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-decision-systemone"]
+allowed_dev_dependencies = ["sc-decision-systemone", "sc-decision-llm", "sc-llm-provider"]
 allowed_dependents = ["decidr"]
-allowed_dependencies = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-types", "sc-decision-schema"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-log", "sc-agent-types", "sc-decision-schema"]
 forbidden_edges = []
 
 [references]

@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
+use decidr::Local;
 use sc_agent_config::{KEYS, config, repo_root};
 use sc_agent_http::{Cancel, Policy};
 use sc_agent_log::{Session, general, log_root, record, repo_id};
@@ -14,7 +15,6 @@ use sc_agent_secrets as keys;
 use sc_agent_types::Error;
 use sc_agent_types::providers::{MODELS, PROVIDERS};
 use sc_config::layers;
-use sc_decision_local::Local;
 use sc_decision_runner::{Decider, Decision, Outcome};
 use sc_decision_schema::DecisionRequest;
 use sc_observability::v2::Logger;
