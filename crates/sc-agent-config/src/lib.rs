@@ -26,12 +26,19 @@ pub struct Runner {
     pub kind: String,
     pub host: String,
     pub port: u16,
+    pub model: Option<String>,
+    #[serde(default = "request_timeout")]
+    pub request_timeout_secs: u64,
     #[serde(default = "load_timeout")]
     pub load_timeout_secs: u64,
 }
 
 fn load_timeout() -> u64 {
     600
+}
+
+fn request_timeout() -> u64 {
+    300
 }
 
 pub const KEYS: &[Key] = &[
@@ -69,6 +76,14 @@ pub const KEYS: &[Key] = &[
     },
     Key {
         path: "local_runners.*.port",
+        env: EnvValue::Json,
+    },
+    Key {
+        path: "local_runners.*.model",
+        env: EnvValue::String,
+    },
+    Key {
+        path: "local_runners.*.request_timeout_secs",
         env: EnvValue::Json,
     },
     Key {
@@ -164,6 +179,10 @@ fn decode(value: Value) -> Result<Config, String> {
                 (10..=7200).contains(&r.load_timeout_secs),
             ),
             (
+                "request_timeout_secs",
+                (10..=3600).contains(&r.request_timeout_secs),
+            ),
+            (
                 "kind",
                 matches!(r.kind.as_str(), "generic" | "laya" | "strands" | "mapika"),
             ),
@@ -222,6 +241,8 @@ mod tests {
         assert_eq!(runner.host, "127.0.0.1");
         assert_eq!(runner.port, 12345);
         assert_eq!(runner.load_timeout_secs, 600);
+        assert_eq!(runner.request_timeout_secs, 300);
+        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1,"request_timeout_secs":9}}})).unwrap_err().contains("local_runners.test.request_timeout_secs"));
         assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
         let invalid = [("DECIDR_WORKERS".into(), "0".into())];
         let inputs = Inputs {
