@@ -22,6 +22,7 @@ grammar-rust = ["sc-treesitter/grammar-rust"]
 sc-treesitter = { workspace = true, default-features = false }
 clap = { version = "4", features = ["derive"] }
 sc-observability = "=1.5.0"
+sc-agent-log.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

@@ -18,7 +18,7 @@ roots = ["GeneralLogger"]
 [dependencies]
 allowed_dev_dependents = []
 allowed_dev_dependencies = ["sc-agent-log"]
-allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-runner"]
+allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-runner", "sitr"]
 allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 

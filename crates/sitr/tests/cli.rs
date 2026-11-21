@@ -1,5 +1,5 @@
 //! `sitr` end-to-end tests (feature `cli`): each runs the built binary with
-//! `--log-root <tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
+//! `SITR_LOG_ROOT=<tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
 use std::path::{Path, PathBuf};
@@ -22,8 +22,7 @@ fn command(home: &Path, args: &[&str]) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .arg("--log-root")
-        .arg(home.join(".sc-agent"))
+        .env("SITR_LOG_ROOT", home.join(".sc-agent"))
         .args(args)
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .env_remove("SC_LOG_ROOT");

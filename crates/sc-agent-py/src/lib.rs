@@ -12,17 +12,6 @@ use sc_agent_types::Error;
 use sc_decision_schema::DecisionRequest;
 use serde_json::{Map, Value, json};
 
-/// `SC_DECIDR_LOG_ROOT` (tests), else `~/.sc-agent`; an error when there is no home directory.
-fn log_root() -> Result<PathBuf, Error> {
-    match std::env::var_os("SC_DECIDR_LOG_ROOT").filter(|v| !v.is_empty()) {
-        Some(root) => Ok(PathBuf::from(root)),
-        None => std::env::home_dir()
-            .filter(|home| home.is_absolute())
-            .map(|home| home.join(".sc-agent"))
-            .ok_or_else(|| Error::Config("no home directory for ~/.sc-agent".into())),
-    }
-}
-
 fn error_value(e: &Error) -> Value {
     json!({ "ok": false, "error": { "id": e.id(), "message": e.to_string() } })
 }
@@ -43,9 +32,10 @@ fn guarded<T: Send>(
         .unwrap_or_else(|_| Err(Error::Invalid("internal error (panic)".into())))
 }
 
-/// The general logger: obtained from this module, passed back into every call.
+/// The general logger: obtained from this module, passed back into every decidr and sitr call,
+/// with the log root it was opened under (sessions are written beside it, ADR-SAG-0021).
 #[pyclass(frozen)]
-struct Logger(Arc<sc_observability::v2::Logger>);
+struct Logger(Arc<sc_observability::v2::Logger>, PathBuf);
 
 /// Cancels a running `send` or `send_batch`; unfinished requests come back cancelled.
 #[pyclass(frozen)]
@@ -66,11 +56,14 @@ impl CancelToken {
     }
 }
 
-/// `(Logger, None)` writing to `~/.sc-agent/logs/<name>.log.jsonl`, or `(None, error JSON)`.
+/// `(Logger, None)` writing to `<root>/logs/<name>.log.jsonl`, the root from
+/// `sc_agent_log::log_root(name)` (`<NAME>_LOG_ROOT`, else `~/.sc-agent`), or `(None, error JSON)`.
 #[pyfunction]
 fn logger(name: &str) -> (Option<Logger>, Option<String>) {
-    match log_root().and_then(|root| sc_agent_log::general(name, &root)) {
-        Ok(l) => (Some(Logger(l)), None),
+    let opened = sc_agent_log::log_root(name)
+        .and_then(|root| Ok(Logger(sc_agent_log::general(name, &root)?, root)));
+    match opened {
+        Ok(l) => (Some(l), None),
         Err(e) => (None, Some(error_value(&e).to_string())),
     }
 }
@@ -106,7 +99,7 @@ fn decide_all(
             })
             .collect::<Result<Vec<_>, _>>()?;
         let cwd = std::env::current_dir().unwrap_or_default();
-        let session = Session::open(&log_root()?, repo_id(&cwd), project, agent_role)?;
+        let session = Session::open(&logger.1, repo_id(&cwd), project, agent_role)?;
         let (decision, id) = decidr::open(
             model,
             provider,
@@ -199,8 +192,56 @@ fn send_batch(
     .collect()
 }
 
+/// sitr `run_query` with the injected Logger: one `sitr.query` record per call, then the
+/// captures (or the `TreesitterError`) exactly as sc-treesitter returns them.
+#[pyfunction]
+#[pyo3(signature = (language, query, source, logger, captures=None))]
+fn run_query(
+    language: &str,
+    query: &str,
+    source: &Bound<'_, PyAny>,
+    logger: &Logger,
+    captures: Option<Vec<String>>,
+) -> PyResult<Vec<sc_treesitter::Capture>> {
+    let result = sc_treesitter::python::run_query(language, query, source, captures);
+    let mut fields = Map::new();
+    fields.insert("language".into(), language.into());
+    fields.insert("ok".into(), result.is_ok().into());
+    fields.insert(
+        "captures".into(),
+        result.as_ref().map_or(0, Vec::len).into(),
+    );
+    fields.insert(
+        "error".into(),
+        result.as_ref().err().map(ToString::to_string).into(),
+    );
+    record(&logger.0, "sc_agent.sitr", "sitr.query", fields);
+    let _ = logger.0.flush();
+    result
+}
+
+/// `sc_agent.sitr`: the sitr Python API in this one wheel (ADR-SAG-0021); `run_query` takes
+/// the same injected Logger as the decidr calls.
+fn sitr(parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    use sc_treesitter::python as ts;
+    let m = PyModule::new(parent.py(), "sitr")?;
+    m.add_function(wrap_pyfunction!(ts::languages, &m)?)?;
+    m.add_function(wrap_pyfunction!(ts::queries, &m)?)?;
+    m.add_function(wrap_pyfunction!(ts::query_source, &m)?)?;
+    m.add_function(wrap_pyfunction!(run_query, &m)?)?;
+    m.add_class::<sc_treesitter::Capture>()?;
+    m.add(
+        "TreesitterError",
+        parent.py().get_type::<ts::TreesitterError>(),
+    )?;
+    parent.add_submodule(&m)?;
+    let modules = parent.py().import("sys")?.getattr("modules")?;
+    modules.set_item("sc_agent.sitr", &m)
+}
+
 #[pymodule]
 fn sc_agent(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    sitr(m)?;
     m.add_class::<Logger>()?;
     m.add_class::<CancelToken>()?;
     m.add_function(wrap_pyfunction!(logger, m)?)?;

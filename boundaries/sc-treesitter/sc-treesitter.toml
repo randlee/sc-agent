@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["to_json_bytes"]
 
 [dependencies]
-allowed_dependents = ["sc-treesitter-py", "sitr"]
+allowed_dependents = ["sc-agent-py", "sc-treesitter-py", "sitr"]
 allowed_dependencies = []
 forbidden_edges = []
 

@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 //! Session rows (one per model request) and repo/slug identity, through an sc-observability Logger.
 
-use std::path::Path;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
@@ -163,6 +164,29 @@ pub fn record(logger: &Logger, target: &str, action: &str, fields: Map<String, V
     let _ = logger.log(event);
 }
 
+/// The log root of the entry point `name` (ADR-SAG-0021): `<NAME>_LOG_ROOT` when set and not
+/// empty, else `~/.sc-agent`; an error when neither is known. The only function that computes
+/// a log root: the CLIs and the wheel call it.
+pub fn log_root(name: &str) -> Result<PathBuf, Error> {
+    let var = root_var(name);
+    root_from(&var, std::env::var_os(&var), std::env::home_dir())
+}
+
+/// `<NAME>_LOG_ROOT`: `name` upper-cased, `-` as `_`.
+fn root_var(name: &str) -> String {
+    format!("{}_LOG_ROOT", name.to_ascii_uppercase().replace('-', "_"))
+}
+
+fn root_from(var: &str, set: Option<OsString>, home: Option<PathBuf>) -> Result<PathBuf, Error> {
+    match set.filter(|v| !v.is_empty()) {
+        Some(root) => Ok(PathBuf::from(root)),
+        None => home
+            .filter(|h| !h.as_os_str().is_empty())
+            .map(|h| h.join(".sc-agent"))
+            .ok_or_else(|| Error::Config(format!("the home directory is unknown; set {var}"))),
+    }
+}
+
 /// The general Logger of `service`: `<log_root>/logs/<service>.log.jsonl`, no console.
 pub fn general(service: &str, log_root: &Path) -> Result<Arc<Logger>, Error> {
     let log = |e: &dyn std::fmt::Display| Error::Log(e.to_string());
@@ -183,5 +207,30 @@ pub fn general(service: &str, log_root: &Path) -> Result<Arc<Logger>, Error> {
 impl Drop for Session {
     fn drop(&mut self) {
         self.flush();
+    }
+}
+
+#[cfg(test)]
+mod root_tests {
+    use super::*;
+
+    #[test]
+    fn the_variable_wins_when_set_and_not_empty() {
+        let home = Some(PathBuf::from("/h"));
+        assert_eq!(root_var("plan-anchor"), "PLAN_ANCHOR_LOG_ROOT");
+        let set = Some(OsString::from("/r"));
+        assert_eq!(
+            root_from("V", set, home.clone()).ok(),
+            Some(PathBuf::from("/r"))
+        );
+        let empty = Some(OsString::new());
+        let fallback = root_from("V", empty, home).ok();
+        assert_eq!(fallback, Some(PathBuf::from("/h/.sc-agent")));
+    }
+
+    #[test]
+    fn no_home_and_no_variable_is_an_error_naming_the_variable() {
+        let error = root_from("SITR_LOG_ROOT", None, Some(PathBuf::new())).err();
+        assert!(error.is_some_and(|e| e.to_string().contains("SITR_LOG_ROOT")));
     }
 }
