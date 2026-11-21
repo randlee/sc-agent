@@ -28,7 +28,8 @@ Definitions:
   | 401, 403 | `auth` |
   | 402 | `quota` |
   | 400, 422 | `validation` |
-  | any 429 or 5xx | `busy` |
+  | a 429 with a quota marker (REQ-SAG-0602) | `quota` |
+  | any other 429, or any 5xx | `busy` |
   | any other status | `other` |
 
 - Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out. It is not a signal for an immediate retry loop.
