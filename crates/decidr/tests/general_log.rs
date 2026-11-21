@@ -3,14 +3,147 @@
 //! from the session JSONL file (the empty-variable fallback to `~/.sc-agent` is
 //! `sc_agent_log::log_root`'s unit test).
 
-use std::io::Write;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Output, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use sc_agent_http::test_server::{Server, ok};
 use serde_json::{Value, json};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+const CHILD_DEADLINE: Duration = Duration::from_secs(30);
+const CHILD_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+enum ChildWait {
+    Exited(io::Result<ExitStatus>),
+    TimedOut(io::Result<ExitStatus>),
+}
+
+fn run_with_deadline(command: &mut Command, stdin_data: Option<&[u8]>) -> Result<Output> {
+    command
+        .stdin(if stdin_data.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn()?;
+    let mut stdout = child.stdout.take().ok_or("stdout was not piped")?;
+    let mut stderr = child.stderr.take().ok_or("stderr was not piped")?;
+    let stdout_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stderr.read_to_end(&mut bytes).map(|_| bytes)
+    });
+
+    // Save stdin errors, including BrokenPipe, until the child's output is drained.
+    let stdin_result = if let Some(data) = stdin_data {
+        let result = match child.stdin.take() {
+            Some(mut stdin) => stdin.write_all(data),
+            None => Err(io::Error::other("stdin was not piped")),
+        };
+        result.err()
+    } else {
+        None
+    };
+
+    let (kill_tx, kill_rx) = mpsc::channel();
+    let (wait_tx, wait_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    let _ = wait_tx.send(ChildWait::Exited(Ok(status)));
+                    return;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = wait_tx.send(ChildWait::Exited(Err(error)));
+                    return;
+                }
+            }
+            match kill_rx.recv_timeout(CHILD_POLL_INTERVAL) {
+                Ok(()) => {
+                    let _ = child.kill();
+                    let status = child.wait();
+                    let _ = wait_tx.send(ChildWait::TimedOut(status));
+                    return;
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    let _ = child.kill();
+                    let status = child.wait();
+                    let _ = wait_tx.send(ChildWait::TimedOut(status));
+                    return;
+                }
+            }
+        }
+    });
+
+    let wait = match wait_rx.recv_timeout(CHILD_DEADLINE) {
+        Ok(wait) => wait,
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            let _ = kill_tx.send(());
+            wait_rx.recv()?
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            return Err(io::Error::other("decidr child waiter disconnected").into());
+        }
+    };
+    drop(kill_tx);
+    waiter
+        .join()
+        .map_err(|_| io::Error::other("decidr child waiter panicked"))?;
+
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| io::Error::other("stdout reader panicked"))??;
+    let stderr = stderr_reader
+        .join()
+        .map_err(|_| io::Error::other("stderr reader panicked"))??;
+    let captured = format!(
+        "stdout: {}; stderr: {}",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+    );
+    if let Some(error) = stdin_result {
+        return Err(io::Error::new(
+            error.kind(),
+            format!("writing decidr stdin failed: {error}; {captured}"),
+        )
+        .into());
+    }
+    match wait {
+        ChildWait::Exited(Ok(status)) => Ok(Output {
+            status,
+            stdout,
+            stderr,
+        }),
+        ChildWait::Exited(Err(error)) => Err(io::Error::new(
+            error.kind(),
+            format!("waiting for decidr failed: {error}; {captured}"),
+        )
+        .into()),
+        ChildWait::TimedOut(status) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!(
+                "decidr exceeded the {:?} failure-only deadline ({status:?}); {captured}",
+                CHILD_DEADLINE
+            ),
+        )
+        .into()),
+    }
+}
 
 fn events(log: &Path) -> Result<Vec<Value>> {
     let mut events = Vec::new();
@@ -49,7 +182,8 @@ fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> 
 fn a_failed_command_is_recorded_in_the_general_log_under_the_variable() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    let output = Command::new(env!("CARGO_BIN_EXE_decidr"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_decidr"));
+    command
         .args([
             "--project",
             "p",
@@ -60,9 +194,8 @@ fn a_failed_command_is_recorded_in_the_general_log_under_the_variable() -> Resul
             "t",
         ])
         .current_dir(dir.path())
-        .env("DECIDR_LOG_ROOT", &root)
-        .stdin(Stdio::null())
-        .output()?;
+        .env("DECIDR_LOG_ROOT", &root);
+    let output = run_with_deadline(&mut command, None)?;
     assert!(!output.status.success());
     assert_eq!(
         actions(&root.join("logs").join("decidr.log.jsonl"))?,
@@ -89,7 +222,8 @@ fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -
     });
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_decidr"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_decidr"));
+    command
         .args([
             "--project",
             "p",
@@ -103,17 +237,11 @@ fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -
         ])
         .current_dir(dir.path())
         .env("DECIDR_LOG_ROOT", &root)
-        .env("DECIDR_LOCAL_RUNNERS", runner.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    child
-        .stdin
-        .take()
-        .ok_or("decidr stdin was not piped")?
-        .write_all(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#)?;
-    let output = child.wait_with_output()?;
+        .env("DECIDR_LOCAL_RUNNERS", runner.to_string());
+    let output = run_with_deadline(
+        &mut command,
+        Some(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#),
+    )?;
     assert!(
         output.status.success(),
         "stdout: {}; stderr: {}",
