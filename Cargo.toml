@@ -1,5 +1,22 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/decidr",
+    "crates/sc-agent-config",
+    "crates/sc-agent-http",
+    "crates/sc-agent-log",
+    "crates/sc-agent-py",
+    "crates/sc-agent-secrets",
+    "crates/sc-agent-types",
+    "crates/sc-decision-llm",
+    "crates/sc-decision-local",
+    "crates/sc-decision-runner",
+    "crates/sc-decision-schema",
+    "crates/sc-decision-systemone",
+    "crates/sc-llm-provider",
+    "crates/sc-treesitter",
+    "crates/sc-treesitter-py",
+    "crates/sitr",
+]
 exclude = ["crates-ref"]
 resolver = "3"
 
