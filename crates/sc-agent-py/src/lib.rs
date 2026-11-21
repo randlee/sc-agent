@@ -187,7 +187,7 @@ fn send(
     keyring_service: Option<String>,
     keyring_account: Option<String>,
 ) -> String {
-    let resolved = resolve_logger(logger, general_log);
+    let resolved = resolve_logger(logger, general_log, "decidr");
     let owned = match resolved {
         Ok(l) => l,
         Err(e) => return error_value(&e).to_string(),
@@ -231,7 +231,7 @@ fn send_batch(
     keyring_service: Option<String>,
     keyring_account: Option<String>,
 ) -> Vec<String> {
-    let owned = match resolve_logger(logger, general_log) {
+    let owned = match resolve_logger(logger, general_log, "decidr") {
         Ok(l) => l,
         Err(e) => return vec![error_value(&e).to_string(); requests.len()],
     };
@@ -267,7 +267,7 @@ fn run_query(
     captures: Option<Vec<String>>,
     general_log: Option<Py<PyAny>>,
 ) -> PyResult<Vec<sc_treesitter::Capture>> {
-    let logger = resolve_logger(logger, general_log)
+    let logger = resolve_logger(logger, general_log, "sitr")
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
     let result = sc_treesitter::python::run_query(language, query, source, captures);
     let mut fields = Map::new();
@@ -317,9 +317,13 @@ fn sc_agent(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(send_batch, m)?)
 }
 
-fn resolve_logger(legacy: Option<&Logger>, injected: Option<Py<PyAny>>) -> Result<Logger, Error> {
+fn resolve_logger(
+    legacy: Option<&Logger>,
+    injected: Option<Py<PyAny>>,
+    service: &str,
+) -> Result<Logger, Error> {
     if let Some(target) = injected {
-        let root = sc_agent_log::log_root("decidr")?;
+        let root = sc_agent_log::log_root(service)?;
         return Ok(Logger(
             sc_agent_log::python::PythonSink::open(target)?,
             root,
@@ -328,8 +332,8 @@ fn resolve_logger(legacy: Option<&Logger>, injected: Option<Py<PyAny>>) -> Resul
     if let Some(l) = legacy {
         return Ok(Logger(l.0.clone(), l.1.clone()));
     }
-    let root = sc_agent_log::log_root("decidr")?;
-    Ok(Logger(sc_agent_log::general("decidr", &root)?, root))
+    let root = sc_agent_log::log_root(service)?;
+    Ok(Logger(sc_agent_log::general(service, &root)?, root))
 }
 
 #[pyfunction]

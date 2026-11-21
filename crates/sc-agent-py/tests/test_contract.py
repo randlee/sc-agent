@@ -119,3 +119,11 @@ def test_ambiguous_override_is_refused_before_credential_lookup(tmp_path, monkey
     assert result["error"]["id"] == "decidr.ambiguous_keyring_override"
     assert result["error"]["category"] == "config"
     assert all(name in result["error"]["message"] for name in ["anthropic", "openrouter", "together"])
+
+
+def test_sitr_without_injection_uses_its_cli_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("SITR_LOG_ROOT", str(tmp_path))
+    sc_agent.sitr.run_query("rust", "(function_item name: (identifier) @name)", "fn f() {}")
+    rows = [json.loads(line) for line in (tmp_path / "logs/sitr.log.jsonl").read_text().splitlines()]
+    assert [row["action"] for row in rows] == ["sitr.query"]
+    assert not (tmp_path / "logs/decidr.log.jsonl").exists()
