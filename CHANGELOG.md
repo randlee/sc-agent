@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prerelease for plan-anchor and judge-jev testing. Not reviewed by QA.
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
