@@ -1,24 +1,17 @@
 [package]
-repository.workspace = true
-homepage.workspace = true
-authors.workspace = true
 name = "sc-agent-config"
 version.workspace = true
-description = "Global sc-agent configuration (~/.sc-agent/default.json) loaded with sc-config."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 
 [dependencies]
-sc-agent-types = { workspace = true }
-sc-config = "0.2.0"
+sc-agent-types.workspace = true
+sc-config = { git = "https://github.com/randlee/sc-runtime", rev = "eb293db8324a5129a8cf719b34b0687f9351de13" }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_path_to_error = "0.1"
-
-[dev-dependencies]
-sc-agent-testkit = { workspace = true }
-tempfile = "3"
+serde_json = { version = "1", features = ["preserve_order"] }
 
 [lints]
 workspace = true

@@ -1,30 +1,24 @@
 [package]
-repository.workspace = true
-homepage.workspace = true
-authors.workspace = true
 name = "sc-decision-llm"
 version.workspace = true
-description = "Haiku and Luna decision backends for sc-agent: the Jev request as a JSON-schema LLM call, self-reported probabilities and confidence."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 
 [dependencies]
-base64 = "0.22"
-sc-agent-http = { workspace = true }
-sc-agent-log = { workspace = true }
-sc-agent-types = { workspace = true }
-sc-decision-schema = { workspace = true }
-sc-llm-provider = { workspace = true }
-# preserve_order: answers and probabilities keep request order; float_roundtrip: 0.123456789
-# is returned exactly (REQ-SAG-0007).
-serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+sc-agent-types.workspace = true
+sc-agent-http.workspace = true
+sc-decision-schema.workspace = true
+sc-llm-provider.workspace = true
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
 
 [dev-dependencies]
-sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
-sc-agent-testkit = { workspace = true }
-sc-agent-http = { workspace = true, features = ["testing"] }
-sc-agent-log = { workspace = true, features = ["testing"] }
+sc-agent-http = { workspace = true, features = ["test-server"] }
+sc-decision-runner.workspace = true
 
 [lints]
 workspace = true
