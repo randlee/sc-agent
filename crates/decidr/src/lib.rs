@@ -14,6 +14,17 @@ struct LocalDecision {
     decider: Decider<sc_decision_systemone::SystemOne>,
 }
 
+fn local_policy(policy: Policy, kind: &str, load_timeout: Duration) -> Policy {
+    if kind == "laya" {
+        Policy {
+            timeout: load_timeout.saturating_add(policy.timeout),
+            ..policy
+        }
+    } else {
+        policy
+    }
+}
+
 impl Decision for LocalDecision {
     fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
         match self.probe.wait_loaded(&request.model, cancel) {
@@ -52,6 +63,7 @@ pub fn open_local(
     session: Option<Session>,
     load_timeout: std::time::Duration,
 ) -> Result<Box<dyn Decision>, Error> {
+    let policy = local_policy(policy, kind, load_timeout);
     Ok(Box::new(LocalDecision {
         probe: sc_decision_local::Local::new(base, kind, load_timeout)?,
         decider: Decider::new(
@@ -124,4 +136,31 @@ pub fn validate_limits(
         timeout.map(Duration::from_secs_f64),
         workers.map(|n| n as usize),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::local_policy;
+    use sc_agent_http::Policy;
+    use std::time::Duration;
+
+    /// REQ-SAG-0702: Laya can report `Availability::LoadsOnDemand`, so its send allowance
+    /// is the model load timeout plus the selected request timeout.
+    #[test]
+    fn laya_local_runner_timeout_includes_load_allowance() {
+        let policy = Policy {
+            max_sends: 3,
+            backoff: Duration::ZERO,
+            timeout: Duration::from_secs(10),
+        };
+
+        assert_eq!(
+            local_policy(policy, "laya", Duration::from_secs(17)).timeout,
+            Duration::from_secs(27),
+        );
+        assert_eq!(
+            local_policy(policy, "strands", Duration::from_secs(17)).timeout,
+            Duration::from_secs(10),
+        );
+    }
 }

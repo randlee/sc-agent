@@ -132,10 +132,11 @@ fn send(
                 .get(name)
                 .ok_or_else(|| Error::Config(format!("no local runner {name} in config")))?;
             let base = format!("http://{}:{}", r.host, r.port);
+            let local_policy = runner_policy(policy, r.request_timeout_secs, timeout_secs);
             let local = decidr::open_local(
                 &base,
                 &r.kind,
-                policy,
+                local_policy,
                 Some(session),
                 Duration::from_secs(r.load_timeout_secs),
             )?;
@@ -240,4 +241,38 @@ fn doctor(project: Option<&str>, root: Option<&Path>) -> Result<ExitCode, Error>
         );
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn runner_policy(policy: Policy, request_timeout_secs: u64, timeout_secs: Option<f64>) -> Policy {
+    Policy {
+        timeout: timeout_secs
+            .map(Duration::from_secs_f64)
+            .unwrap_or_else(|| Duration::from_secs(request_timeout_secs)),
+        ..policy
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::runner_policy;
+    use sc_agent_http::Policy;
+    use std::time::Duration;
+
+    #[test]
+    fn local_runner_timeout_uses_override_or_configured_value() {
+        let policy = Policy {
+            max_sends: 3,
+            backoff: Duration::ZERO,
+            timeout: Duration::from_secs(120),
+        };
+
+        assert_eq!(
+            runner_policy(policy, 300, None).timeout,
+            Duration::from_secs(300),
+        );
+        assert_eq!(
+            runner_policy(policy, 300, Some(10.5)).timeout,
+            Duration::from_millis(10_500),
+        );
+    }
 }
