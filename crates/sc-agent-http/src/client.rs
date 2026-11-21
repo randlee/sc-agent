@@ -6,6 +6,13 @@ use crate::{
 };
 use sc_agent_types::Error;
 
+fn body_error(error: ureq::Error) -> Error {
+    match error {
+        ureq::Error::BodyExceedsLimit(limit) => Error::ResponseTooLarge { limit },
+        other => Error::Network(other.to_string()),
+    }
+}
+
 /// How hard to try.
 #[derive(Clone, Copy, Debug)]
 pub struct Policy {
@@ -130,7 +137,7 @@ impl<C: Codec> Client<C> {
             .with_config()
             .limit(MAX_BODY)
             .read_to_vec()
-            .map_err(|e| (Error::Network(e.to_string()), None))?;
+            .map_err(|e| (body_error(e), None))?;
         if status != 429 && !(500..=599).contains(&status) {
             return self
                 .codec
@@ -183,5 +190,19 @@ impl<C: Codec> Client<C> {
                 })
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn oversized_response_is_not_retryable() {
+        let error = super::body_error(ureq::Error::BodyExceedsLimit(123));
+        assert!(matches!(
+            error,
+            sc_agent_types::Error::ResponseTooLarge { limit: 123 }
+        ));
+        assert_eq!(error.id(), "http.response_too_large");
+        assert!(!error.retryable());
     }
 }

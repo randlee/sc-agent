@@ -20,6 +20,8 @@ pub enum Error {
     ApiStatus { status: u16, body: String },
     #[error("network: {0}")]
     Network(String),
+    #[error("response exceeds the {limit}-byte limit")]
+    ResponseTooLarge { limit: u64 },
     #[error("reply is not the expected JSON: {0}")]
     ResponseParse(String),
     /// A well-formed reply that does not answer the request; resent up to max sends.
@@ -42,6 +44,7 @@ impl Error {
             Self::QuotaExhausted { .. } => "http.quota_exhausted",
             Self::ApiStatus { .. } => "api.status",
             Self::Network(_) => "http.network",
+            Self::ResponseTooLarge { .. } => "http.response_too_large",
             Self::ResponseParse(_) => "response.parse",
             Self::Invalid(_) => "response.schema_mismatch",
             Self::Cancelled { .. } => "request.cancelled",

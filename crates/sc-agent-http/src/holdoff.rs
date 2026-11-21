@@ -22,7 +22,7 @@ impl Cancel {
     /// Waits up to `wait`; true when cancelled first.
     pub fn wait(&self, wait: Duration) -> bool {
         let (flag, cvar) = &*self.0;
-        let deadline = Instant::now() + wait;
+        let deadline = deadline_after(Instant::now(), wait);
         let mut cancelled = flag.lock().unwrap_or_else(|e| e.into_inner());
         while !*cancelled {
             let Some(left) = deadline.checked_duration_since(Instant::now()) else {
@@ -38,6 +38,22 @@ impl Cancel {
         }
         true
     }
+}
+
+fn deadline_after(now: Instant, delay: Duration) -> Instant {
+    if let Some(end) = now.checked_add(delay) {
+        return end;
+    }
+    let (mut low, mut high) = (0_u64, delay.as_secs());
+    while low < high {
+        let middle = low + (high - low).div_ceil(2);
+        if now.checked_add(Duration::from_secs(middle)).is_some() {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    now.checked_add(Duration::from_secs(low)).unwrap_or(now)
 }
 
 /// The maximum time between the first send and a later resend.
@@ -98,7 +114,7 @@ impl<T> Queue<T> {
 
     /// Requeues work until its holdoff ends.
     pub fn retry(&mut self, mut item: Held<T>, now: Instant, delay: Duration) {
-        item.ready = now.checked_add(delay).unwrap_or(now + BUDGET);
+        item.ready = deadline_after(now, delay);
         self.items.push_back(item);
     }
 
@@ -274,7 +290,7 @@ pub fn run<T: Send, R: Send, E: Send>(
                     } = &outcome
                     {
                         let now = pause.now();
-                        pause.extend(now.checked_add(*delay).unwrap_or(now + BUDGET));
+                        pause.extend(deadline_after(now, *delay));
                     }
                     match outcome {
                         Attempt::Retry { error, delay, .. } if held.sends < max_sends.max(1) => {
@@ -338,7 +354,7 @@ pub fn run_one<T, R, E>(
             Attempt::Done(result) => return result,
             Attempt::Retry { error, delay, busy } => {
                 let now = pause.now();
-                held.ready = now.checked_add(delay).unwrap_or(now + BUDGET);
+                held.ready = deadline_after(now, delay);
                 if busy {
                     pause.extend(held.ready);
                 }
@@ -354,6 +370,26 @@ pub fn run_one<T, R, E>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn huge_retry_after_keeps_a_far_future_provider_pause() {
+        let now = Instant::now();
+        let end = deadline_after(now, Duration::MAX);
+        assert!(end.saturating_duration_since(now) > BUDGET);
+        let pause = ProviderPause::default();
+        pause.extend(end);
+        assert_eq!(pause.not_before(), Some(end));
+        let mut queue = Queue::default();
+        queue.push(1, now);
+        let item = queue.take(now, false, None);
+        assert!(item.is_some());
+        if let Some(mut item) = item {
+            item.sent(now);
+            queue.retry(item, now, Duration::MAX);
+        }
+        assert_eq!(queue.next_wait(now, pause.not_before()), Some(BUDGET));
+        assert!(pause.not_before().is_some_and(|value| value > now + BUDGET));
+    }
 
     #[test]
     fn held_item_yields_to_ready_work_and_expires() {
