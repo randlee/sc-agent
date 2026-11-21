@@ -156,6 +156,10 @@ pub fn holdoff(backoff: Duration, attempt: u32, retry_after: Option<Duration>) -
     }
 }
 
+fn retry_millis(wait: Duration) -> u64 {
+    u64::try_from(wait.as_nanos().div_ceil(1_000_000)).unwrap_or(u64::MAX)
+}
+
 fn jitter() -> Duration {
     JITTER_MAX.mul_f64((ulid::Ulid::new().random() % 1024) as f64 / 1024.0)
 }
@@ -280,7 +284,15 @@ impl<C: Codec> Client<C> {
         let mut reply = self
             .agent
             .run(self.codec.encode(request).map_err(|e| (e, None))?)
-            .map_err(|e| (Error::Network(e.to_string()), None))?;
+            .map_err(|e| {
+                (
+                    Error::Network {
+                        message: e.to_string(),
+                        attempts: attempt,
+                    },
+                    None,
+                )
+            })?;
         let status = reply.status().as_u16();
         let retry_after = reply
             .headers()
@@ -292,12 +304,22 @@ impl<C: Codec> Client<C> {
             .with_config()
             .limit(MAX_BODY)
             .read_to_vec()
-            .map_err(|e| (Error::Network(e.to_string()), None))?;
+            .map_err(|e| {
+                (
+                    Error::Network {
+                        message: e.to_string(),
+                        attempts: attempt,
+                    },
+                    None,
+                )
+            })?;
         if status != 429 && !(500..=599).contains(&status) {
-            return self
-                .codec
-                .decode(request, status, &body)
-                .map_err(|e| (e, None));
+            return self.codec.decode(request, status, &body).map_err(|mut e| {
+                if let Error::ApiStatus { retry_after_ms, .. } = &mut e {
+                    *retry_after_ms = retry_after.map(retry_millis);
+                }
+                (e, None)
+            });
         }
         let text = String::from_utf8_lossy(&body);
         if QUOTA.iter().any(|marker| text.contains(marker)) {
@@ -305,12 +327,16 @@ impl<C: Codec> Client<C> {
                 Error::QuotaExhausted {
                     status,
                     body: text.into_owned(),
+                    attempts: attempt,
+                    retry_after_ms: retry_after.map(retry_millis),
                 },
                 None,
             ));
         }
         let busy = Error::ProviderBusy {
             attempts: attempt,
+            status,
+            retry_after_ms: retry_after.map(retry_millis),
             reason: BusyReason::Sends,
             retry_after_seconds: retry_after
                 .map(|d| d.as_secs().saturating_add(u64::from(d.subsec_nanos() > 0))),
@@ -490,6 +516,8 @@ mod tests {
         assert!(matches!(
             client.send(&(), &Cancel::default()),
             Err(Error::ProviderBusy {
+                status: 503,
+                retry_after_ms: None,
                 attempts: 1,
                 reason: BusyReason::Budget,
                 ..
@@ -507,6 +535,8 @@ mod tests {
             started,
             ready,
             last: Some(Error::ProviderBusy {
+                status: 429,
+                retry_after_ms: None,
                 attempts: 1,
                 retry_after_seconds: Some(3),
                 reason: BusyReason::Sends,
@@ -539,6 +569,8 @@ mod tests {
         assert!(matches!(
             by_budget.exhausted(true),
             Error::ProviderBusy {
+                status: 429,
+                retry_after_ms: None,
                 attempts: 1,
                 retry_after_seconds: Some(3),
                 reason: BusyReason::Budget
@@ -553,7 +585,10 @@ mod tests {
             }
         ));
         let mut network = job(0, Some(start), start);
-        network.last = Some(Error::Network("timeout".into()));
-        assert!(matches!(network.exhausted(true), Error::Network(_)));
+        network.last = Some(Error::Network {
+            message: "timeout".into(),
+            attempts: 1,
+        });
+        assert!(matches!(network.exhausted(true), Error::Network { .. }));
     }
 }

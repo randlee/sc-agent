@@ -11,8 +11,8 @@ use sc_agent_config::{KEYS, config, repo_root};
 use sc_agent_http::{Cancel, Policy};
 use sc_agent_log::{Session, general, log_root, record, repo_id};
 use sc_agent_secrets as keys;
-use sc_agent_types::Error;
 use sc_agent_types::providers::{MODELS, PROVIDERS};
+use sc_agent_types::{Error, ErrorId};
 use sc_config::layers;
 use sc_decision_local::Local;
 use sc_decision_runner::{Decider, Decision, Outcome};
@@ -94,7 +94,7 @@ fn main() -> ExitCode {
         let mut fields = Map::new();
         fields.insert("error_id".into(), error.id().into());
         fields.insert("message".into(), error.to_string().into());
-        record(&logger, "sc_agent.decidr", "decidr.error", fields);
+        record(logger.as_ref(), "sc_agent.decidr", "decidr.error", fields);
         fail(&error)
     });
     let _ = logger.flush();
@@ -178,7 +178,7 @@ fn send(
         record(logger, "sc_agent.decidr", "decidr.send", fields);
         let line = match outcome.result {
             Ok(value) => json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": true, "value": value }),
-            Err(e) => json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": false, "error": { "id": e.id(), "message": e.to_string() } }),
+            Err(e) => json!({ "position": outcome.position, "session_id": outcome.session.to_string(), "ok": false, "error": e.detail() }),
         };
         let _ = writeln!(out, "{line}");
     });

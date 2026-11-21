@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 thiserror = "2"
+serde = { version = "1", features = ["derive"] }
 
 [lints]
 workspace = true

@@ -69,8 +69,28 @@ fn whoami_host() -> String {
         .unwrap_or_else(|| "localhost".into())
 }
 
+/// A borrowed logging destination; the caller retains its lifecycle.
+pub trait RecordSink: Send + Sync {
+    fn service(&self) -> &ServiceName;
+    fn write(&self, event: LogEvent) -> Result<(), Error>;
+    fn flush_records(&self) {}
+}
+impl RecordSink for Logger {
+    fn service(&self) -> &ServiceName {
+        self.service_name()
+    }
+    fn write(&self, event: LogEvent) -> Result<(), Error> {
+        self.log(event)
+            .map(|_| ())
+            .map_err(|e| Error::Log(e.to_string()))
+    }
+    fn flush_records(&self) {
+        let _ = self.flush();
+    }
+}
+
 pub struct Session {
-    logger: Arc<Logger>,
+    logger: Arc<dyn RecordSink>,
     repo: String,
     project: String,
     agent_role: String,
@@ -86,7 +106,7 @@ impl Session {
     /// logger; its lifecycle stays with the caller. Calling [`Session::flush`]
     /// forwards a flush to that logger.
     pub fn injected(
-        logger: Arc<Logger>,
+        logger: Arc<dyn RecordSink>,
         repo: String,
         project: &str,
         agent_role: &str,
@@ -138,16 +158,21 @@ impl Session {
         fields.insert("repo".into(), self.repo.clone().into());
         fields.insert("project".into(), self.project.clone().into());
         fields.insert("agent_role".into(), self.agent_role.clone().into());
-        record(&self.logger, "sc_agent.session", "session.row", fields);
+        record(
+            self.logger.as_ref(),
+            "sc_agent.session",
+            "session.row",
+            fields,
+        );
     }
 
     pub fn flush(&self) {
-        let _ = self.logger.flush();
+        self.logger.flush_records();
     }
 }
 
 /// One Info record on `logger`. A failed write is not an error of the call it records.
-pub fn record(logger: &Logger, target: &str, action: &str, fields: Map<String, Value>) {
+pub fn record(logger: &dyn RecordSink, target: &str, action: &str, fields: Map<String, Value>) {
     let (Ok(target), Ok(action)) = (TargetCategory::new(target), ActionName::new(action)) else {
         return;
     };
@@ -155,7 +180,7 @@ pub fn record(logger: &Logger, target: &str, action: &str, fields: Map<String, V
         version: sc_observability_types::OBSERVATION_SCHEMA_VERSION.clone(),
         timestamp: Timestamp::now_utc(),
         level: Level::Info,
-        service: logger.service_name().clone(),
+        service: logger.service().clone(),
         target,
         action,
         message: None,
@@ -168,7 +193,7 @@ pub fn record(logger: &Logger, target: &str, action: &str, fields: Map<String, V
         state_transition: None,
         fields,
     };
-    let _ = logger.log(event);
+    let _ = logger.write(event);
 }
 
 /// The log root of the entry point `name` (ADR-SAG-0021): `<NAME>_LOG_ROOT` when set and not
@@ -241,3 +266,6 @@ mod root_tests {
         assert!(error.is_some_and(|e| e.to_string().contains("SITR_LOG_ROOT")));
     }
 }
+
+#[cfg(feature = "pyo3")]
+pub mod python;

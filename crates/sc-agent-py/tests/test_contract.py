@@ -1,0 +1,121 @@
+"""Installed-wheel contract checks; no provider or keychain calls."""
+import itertools
+import json
+import pickle
+import subprocess
+from pathlib import Path
+
+import pytest
+import sc_agent
+import sc_observability as obs
+
+
+def test_native_error_detail_and_pickle_are_read_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(tmp_path))
+    rows = []
+    result = json.loads(sc_agent.send("not json", "haiku", "phase-h", "consumer", general_log=rows.append))
+    error = result["error"]
+    assert error["category"] == "config"
+    assert "status" not in error and "attempts" not in error and "retry_after_ms" not in error
+    assert sc_agent.category(error) == "config" and not sc_agent.retryable(error)
+    exc = sc_agent.SagError(error["id"], error["message"], json.dumps(error))
+    restored = pickle.loads(pickle.dumps(exc))
+    assert restored.args == exc.args and restored.category == "config"
+    with pytest.raises(AttributeError):
+        restored.status = 401
+    assert len(rows) == 1 and rows[0]["action"] == "decidr.send"
+    assert not (tmp_path / "logs").exists()
+    legacy = sc_agent.SagError("x", "y", "{}")
+    assert legacy.status is None and legacy.category == "other"
+
+
+def test_caller_logger_receives_wheel_and_app_records_without_lifecycle_takeover(tmp_path, monkeypatch):
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(tmp_path / "default"))
+    made = obs.create_logger(obs.LoggerConfig(service="caller", log_root=str(tmp_path / "caller")))
+    assert made.kind == "ok"
+    logger = made.value
+    original_flush, original_shutdown = logger.flush, logger.shutdown
+    def forbidden():
+        pytest.fail("the caller owns flush and shutdown")
+    logger.flush = logger.shutdown = forbidden
+    try:
+        assert logger.log(obs.LogEvent(level="info", target="caller", action="before")).kind == "ok"
+        result = json.loads(sc_agent.send("not json", "haiku", "phase-h", "consumer", general_log=logger))
+        assert not result["ok"]
+        sc_agent.sitr.run_query("rust", "(function_item name: (identifier) @name)", "fn f() {}", general_log=logger)
+        assert logger.log(obs.LogEvent(level="info", target="caller", action="after")).kind == "ok"
+        assert original_flush().kind == "ok"
+        actions = [json.loads(line)["action"] for line in (tmp_path / "caller/logs/caller.log.jsonl").read_text().splitlines()]
+        assert actions == ["before", "decidr.send", "sitr.query", "after"]
+        assert not (tmp_path / "default/logs").exists()
+    finally:
+        logger.flush, logger.shutdown = original_flush, original_shutdown
+        assert original_shutdown().kind == "ok"
+
+
+@pytest.mark.parametrize("general_log,sitr", list(itertools.product([False, True], repeat=2)))
+def test_generated_client_maps_errors_and_uses_one_logger(tmp_path, monkeypatch, general_log, sitr):
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(tmp_path))
+    template_root = Path(sc_agent.__file__).parent / "templates"
+    variables = tmp_path / "vars.json"
+    variables.write_text(json.dumps({"general_log": general_log, "sitr": sitr, "models": ["haiku"], "client_name": "consumer"}))
+    rendered = tmp_path / "client.py"
+    subprocess.run(["sc-compose", "render", "--root", str(template_root), "--file", "consumer.py.j2", "--var-file", str(variables), "--strict", "--output", str(rendered)], check=True)
+    namespace = {}
+    exec(compile(rendered.read_text(), str(rendered), "exec"), namespace)
+    client = namespace["Client"]("phase-h")
+    try:
+        result = client.send("not json", "unchanged-model-selector", {"config": "APP.CONFIG", "other": "APP.ERROR"})
+        assert result["error"]["code"] == "APP.CONFIG"
+        assert result["error"]["message"]
+        if sitr:
+            captures = client.extract("rust", "(function_item name: (identifier) @name)", "fn example() {}")
+            assert captures
+        else:
+            assert not hasattr(client, "extract")
+        assert client.logger.flush().kind == "ok"
+        records = [json.loads(line) for line in (tmp_path / "logs/consumer.log.jsonl").read_text().splitlines()]
+        assert records[0]["fields"]["model"] == "unchanged-model-selector"
+        assert [r["action"] for r in records] == ["decidr.send"] + (["sitr.query"] if sitr else [])
+        assert not (tmp_path / "logs/decidr.log.jsonl").exists()
+    finally:
+        assert client.logger.shutdown().kind == "ok"
+
+
+def test_template_versions_match_owning_config():
+    import tomllib
+    root = Path(__file__).resolve().parents[3]
+    floors = tomllib.loads((root / "floors.toml").read_text())
+    version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    template = (Path(sc_agent.__file__).parent / "templates/consumer.py.j2").read_text()
+    assert f"minimum_version: \"{floors['tools']['sc-compose']}\"" in template
+    assert f"Python >={floors['python']['floor']}" in template
+    assert f"Generated by sc-decidr {version};" in template
+
+
+def test_cancelled_call_is_native_error_data_without_key_lookup(tmp_path, monkeypatch):
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(tmp_path))
+    token = sc_agent.CancelToken()
+    token.cancel()
+    rows = []
+    result = json.loads(sc_agent.send("{}", "haiku", "phase-h", "consumer", general_log=rows.append, cancel=token))
+    assert result["error"]["category"] == "cancelled"
+    assert result["error"]["attempts"] == 0
+    assert len(rows) == 1
+
+
+def test_sag_error_preserves_status_retry_data_and_large_integers():
+    detail = {"status": 503, "attempts": 3, "retry_after_ms": 2**64 - 1, "category": "busy"}
+    error = pickle.loads(pickle.dumps(sc_agent.SagError("http.provider_busy", "unaltered native message", json.dumps(detail))))
+    assert (error.status, error.attempts, error.retry_after_ms) == (503, 3, 2**64 - 1)
+    assert error.message == "unaltered native message" and error.retryable
+
+
+@pytest.mark.parametrize("override", [{"keyring_service": "unit-test"}, {"keyring_account": "unit-test"}])
+def test_ambiguous_override_is_refused_before_credential_lookup(tmp_path, monkeypatch, override):
+    monkeypatch.setenv("DECIDR_LOG_ROOT", str(tmp_path))
+    request = json.dumps({"model": "m", "state": "s", "questions": {"q": {"type": "noul"}}})
+    result = json.loads(sc_agent.send(request, "haiku", "phase-h", "consumer", general_log=lambda row: None, **override))
+    assert result["error"]["id"] == "decidr.ambiguous_keyring_override"
+    assert result["error"]["category"] == "config"
+    assert all(name in result["error"]["message"] for name in ["anthropic", "openrouter", "together"])

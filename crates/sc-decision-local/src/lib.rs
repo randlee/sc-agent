@@ -33,7 +33,10 @@ pub trait LocalDaemon: Send + Sync {
 }
 
 fn parse<'a, T: Deserialize<'a>>(body: &'a [u8]) -> Result<T, Error> {
-    serde_json::from_slice(body).map_err(|e| Error::ResponseParse(e.to_string()))
+    serde_json::from_slice(body).map_err(|e| Error::ResponseParse {
+        message: e.to_string(),
+        status: None,
+    })
 }
 
 pub struct Laya;
@@ -143,6 +146,7 @@ impl Codec for Probe {
             _ => Err(Error::ApiStatus {
                 status,
                 body: String::from_utf8_lossy(body).into_owned(),
+                retry_after_ms: None,
             }),
         }
     }
