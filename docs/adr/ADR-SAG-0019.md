@@ -143,7 +143,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    - The two Python-binding ids become variants of a new `PyBindingError` enum in sc-agent-py, with its own table.
    - A leaf stores its row's category. A wrapper copies its cause's (decision 2).
    - `llm.api_status`, `decision.api_status` and `local.probe_status` store the status refinement of their status: 401 and 403 are `auth`, 402 is `quota`, 400 and 422 are `validation`, and 429, 500, 503 and 504 are `busy`.
-   - 500, 503 and 504 are `busy` because the HTTP layer resends only 429, 502 and 529, so these arrive as final replies and must stay retryable.
+   - The HTTP layer resends every busy response, a non-quota 429 or any 5xx (REQ-SAG-0601); 500, 503 and 504 stay `busy` when they arrive as the final reply after sends run out, so they remain retryable.
 
    REQ-SAG-0017 holds the category table: the category of every id.
 

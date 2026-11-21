@@ -3,7 +3,7 @@
 //! Output: JSON plus a newline on stdout, exit 0. Failure: one stderr line
 //! `{"id": "treesitter.<variant>", "message": ...}`, exit 1, empty stdout. Each run records
 //! one `sitr.command` event in its own general log, `~/.sc-agent/logs/sitr.log.jsonl`, or
-//! `<PATH>/logs/sitr.log.jsonl` with `--log-root <PATH>`.
+//! `$SITR_LOG_ROOT/logs/sitr.log.jsonl` when that variable is set and not empty.
 #![forbid(unsafe_code)]
 
 mod cli;
@@ -11,12 +11,13 @@ mod cli;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Instant;
 
-use sc_observability::v2::{Logger, LoggerConfig};
+use sc_observability::v2::Logger;
 use sc_observability::{
     ActionName, Level, LogEvent, OBSERVATION_ENVELOPE_VERSION, OutcomeLabel, ProcessIdentity,
-    SchemaVersion, ServiceName, TargetCategory, Timestamp,
+    SchemaVersion, TargetCategory, Timestamp,
 };
 use sc_treesitter::{
     Error, LanguageId, queries, query_source, read_source, run_query, to_json_bytes,
@@ -39,13 +40,8 @@ struct CommandFields {
 
 fn main() -> ExitCode {
     let started = Instant::now();
-    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
-    let parsed = cli::parse(args.clone());
-    let flag = match &parsed {
-        Ok(Parsed::Run(cli)) => cli.log_root.clone(),
-        Ok(Parsed::Print(_)) | Err(_) => cli::log_root_arg(&args),
-    };
-    let logger = match general_log(flag) {
+    let parsed = cli::parse(std::env::args_os());
+    let logger = match general_log() {
         Ok(logger) => logger,
         Err(error) => return emit(&error),
     };
@@ -148,34 +144,18 @@ fn emit_to(error: &Error, stderr: &mut impl Write) -> ExitCode {
     ExitCode::FAILURE
 }
 
-/// sc-observability logger, service `sitr`, log root `log_root` (`--log-root`), else
-/// `home_dir()/.sc-agent`.
+/// The general log of the `sitr` entry point (ADR-SAG-0021): `<root>/logs/sitr.log.jsonl`, with
+/// the root from [`sc_agent_log::log_root`] (`SITR_LOG_ROOT`, else `~/.sc-agent`).
 ///
 /// # Errors
 ///
-/// [`Error::Log`] when no log root is given and the home directory is unknown, or the logger
-/// cannot start.
-fn general_log(log_root: Option<PathBuf>) -> Result<Logger, Error> {
-    let root = match log_root {
-        Some(root) => root,
-        None => std::env::home_dir()
-            .filter(|home| !home.as_os_str().is_empty())
-            .map(default_log_root)
-            .ok_or_else(|| Error::Log {
-                detail: "the home directory is unknown".to_owned(),
-            })?,
-    };
-    let service = ServiceName::new(SERVICE).map_err(|error| Error::Log {
-        detail: error.to_string(),
-    })?;
-    let config = LoggerConfig::default_for(service, root);
-    Logger::new(config).map_err(|error| Error::Log {
-        detail: format!("{}: {}", error.code(), error.diagnostic().message),
-    })
-}
-
-fn default_log_root(home: PathBuf) -> PathBuf {
-    home.join(".sc-agent")
+/// [`Error::Log`] when the log root is unknown or the logger cannot start.
+fn general_log() -> Result<Arc<Logger>, Error> {
+    sc_agent_log::log_root(SERVICE)
+        .and_then(|root| sc_agent_log::general(SERVICE, &root))
+        .map_err(|error| Error::Log {
+            detail: error.to_string(),
+        })
 }
 
 /// Records the one `sitr.command` event; a failure here is dropped (it never changes the result).

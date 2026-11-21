@@ -18,7 +18,7 @@ roots = ["CancelToken", "SagError", "send", "send_batch", "category", "retryable
 [dependencies]
 allowed_dependents = []
 allowed_dev_dependencies = []
-allowed_dependencies = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema"]
+allowed_dependencies = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema", "sc-treesitter"]
 forbidden_edges = []
 
 [references]

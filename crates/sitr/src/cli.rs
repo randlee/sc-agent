@@ -14,10 +14,6 @@ use clap::{Args, Parser, Subcommand};
     about = "Run predefined tree-sitter queries."
 )]
 pub(crate) struct Cli {
-    /// The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of
-    /// `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators).
-    #[arg(long, value_name = "PATH", global = true)]
-    pub(crate) log_root: Option<std::path::PathBuf>,
     /// The command to run.
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -123,21 +119,6 @@ where
     }
 }
 
-/// The `--log-root` value of `args` (`--log-root PATH` or `--log-root=PATH`), read without
-/// clap so that a run whose arguments fail to parse still logs where it was told to.
-pub(crate) fn log_root_arg(args: &[std::ffi::OsString]) -> Option<std::path::PathBuf> {
-    let mut args = args.iter();
-    while let Some(arg) = args.next() {
-        if arg == "--log-root" {
-            return args.next().map(std::path::PathBuf::from);
-        }
-        if let Some(value) = arg.to_str().and_then(|arg| arg.strip_prefix("--log-root=")) {
-            return Some(std::path::PathBuf::from(value));
-        }
-    }
-    None
-}
-
 /// `--captures` value parser: comma-separated, trimmed, no empty names.
 fn parse_captures(value: &str) -> Result<Captures, String> {
     if value.is_empty() {
@@ -197,27 +178,6 @@ mod tests {
             error,
             sc_treesitter::Error::Usage { ref kind, .. } if kind == "MissingRequiredArgument"
         ));
-    }
-
-    /// `--log-root` is read by clap and, for a run that fails to parse, by `log_root_arg`.
-    #[test]
-    fn the_log_root_flag_is_read_with_or_without_clap() {
-        let Ok(Parsed::Run(cli)) = parse(["sitr", "languages", "--log-root", "/srv/logs"]) else {
-            panic!("parsed");
-        };
-        assert_eq!(cli.log_root, Some(std::path::PathBuf::from("/srv/logs")));
-        let args = |list: &[&str]| -> Vec<std::ffi::OsString> {
-            list.iter().map(std::ffi::OsString::from).collect()
-        };
-        assert_eq!(
-            log_root_arg(&args(&["sitr", "--log-root", "/a", "query", "rust"])),
-            Some(std::path::PathBuf::from("/a"))
-        );
-        assert_eq!(
-            log_root_arg(&args(&["sitr", "query", "--log-root=/b"])),
-            Some(std::path::PathBuf::from("/b"))
-        );
-        assert_eq!(log_root_arg(&args(&["sitr", "languages"])), None);
     }
 
     #[test]
