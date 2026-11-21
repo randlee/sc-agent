@@ -86,14 +86,6 @@ fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
     command
 }
 
-fn events(log: &Path) -> Result<Vec<Value>> {
-    let mut events = Vec::new();
-    for line in std::fs::read_to_string(log)?.lines() {
-        events.push(serde_json::from_str(line)?);
-    }
-    Ok(events)
-}
-
 #[test]
 fn successful_command_is_logged_outside_sessions() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -132,9 +124,11 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
 
     // Trace: docs/requirements/REQ-SAG-0003.md:26; agt-h-2.cli-general-log-r2-fix remedy.
     let general_log = root.join("logs").join("decidr.log.jsonl");
-    let events = events(&general_log)?;
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0]["action"], "decidr.send");
+    let records = std::fs::read_to_string(&general_log)?;
+    let mut lines = records.lines();
+    let event: Value = serde_json::from_str(lines.next().ok_or("general log is empty")?)?;
+    assert!(lines.next().is_none(), "expected exactly one log record");
+    assert_eq!(event["action"], "decidr.send");
 
     // Trace: docs/requirements/REQ-SAG-0003.md:41; docs/requirements/REQ-SAG-0005.md:23.
     let sessions = root.join("sessions");
@@ -144,11 +138,6 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
     assert_eq!(
         session_files[0].file_name().and_then(|name| name.to_str()),
         Some("sessions.jsonl")
-    );
-    assert!(
-        !session_files
-            .iter()
-            .any(|path| path.ends_with("decidr.log.jsonl"))
     );
     Ok(())
 }
