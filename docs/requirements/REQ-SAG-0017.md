@@ -1,9 +1,9 @@
 # Requirement: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -73,6 +73,8 @@ Definitions:
 
 Consumers that branch on error ids pin their own lists and add fallbacks today, and the top-level id of a failure is usually a wrapper. A category stored when the detail is built, and copied up by wrappers, removes both problems without a lookup across crates.
 
+NFR-SAG-0002 is withdrawn (2026-11-20). Rand Lee: "schema isn't locked yet ... No hand built checks."
+
 ### Success Criteria
 
 **Acceptance Criteria:**
@@ -101,4 +103,3 @@ Consumers that branch on error ids pin their own lists and add fallbacks today, 
 - ADR-SAG-0019
 - REQ-SAG-0002
 - REQ-SAG-0016
-- NFR-SAG-0002

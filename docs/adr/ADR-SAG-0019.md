@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.1  
+**Version:** 0.7.4  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), NFR-SAG-0002 (0.1.0 detail JSON still reads) and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count, the worker cap and the timeout bounds. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
+New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), REQ-SAG-0017 (the category table and status refinement), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 is amended so it covers decision values, which makes `retry_after_ms` a permitted transport hint. REQ-SAG-0601 and REQ-SAG-0602 are the sources of the status, send count and Retry-After. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count, the worker cap and the timeout bounds. ADR-SAG-0004 sets the crate layering; this ADR extends its error chain with typed fields.
 
 **Requirements:**
 
@@ -23,7 +23,6 @@ New with this ADR: REQ-SAG-0016 (typed error fields and the leaf field table), R
 - REQ-SAG-0017
 - REQ-SAG-0702
 - REQ-SAG-0018
-- NFR-SAG-0002
 - NFR-SAG-0003
 - REQ-SAG-0007
 - REQ-SAG-0002
@@ -72,7 +71,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | Model and provider | `model=` takes any selector string. `provider=None` ranks the detected keys (REQ-SAG-0103). | Pass the selector unchanged. Never set `provider`. |
    | API keys | The environment, dotenv and keyring, with `keyring_service`/`keyring_account` overrides. | Pass its keyring overrides, if any. |
    | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
-   | General log | The generated client obtains one `sc_observability.Logger` named after the client, writing `<log_root>/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022); the sitr wheel accepts it too. | Log its own records to the client's Logger, or pass its own Logger to the client. |
+   | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
    | Errors | Typed fields with a stored `category`, `category()`, `retryable()` and `SagError` (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, resends, the start budget and cancellation (decision 7). | Pass its own flags through. |
    | Batch order | `send_batch` returns input order (decision 8). | Nothing. |
@@ -174,18 +173,18 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    Integration tests send real queries through the rendered consumer. One suite runs once per provider (TypeSafe, Anthropic, OpenAI); each run's environment holds only that provider's key, so the consumer's automatic selection resolves to it. A provider with no key is reported as not run; any other error fails. The developer runs the suite on a locally built wheel and fixes every failure before the prerelease is cut. The same suite then runs on the installed prerelease wheels on a clean install, and each run renders one XHTML panel (provider x platform) recording the prerelease tag and commit; the panels are committed and pushed. One passing platform is sufficient. REQ-SAG-0133 is superseded by this decision.
 
-10. **Category assignments are part of the contract.**
+10. **Category assignments are not locked.**
 
-    Moving an id to a different category, or changing the status refinement, is a breaking change (NFR-SAG-0002). Adding an id with a category is not.
+    Rand Lee (2026-11-20): "schema isn't locked yet ... No hand built checks."
 
 11. **sitr is an optional, separate section of the consumer template.**
 
-    sitr is a separate wheel (package `sitr`, module `sc_treesitter`), version-locked with sc-decidr (decision 4). The template's sitr section is kept separate from the decision call: extraction runs outside the decision path, and its output is passed into the consumer's prompt authoring. The section imports `sc_treesitter` lazily. In this phase one offline test shows extraction output reaching a dry-run request; sitr is not used beyond that yet.
+    sitr's Python API is `sc_agent.sitr`, inside the sc-decidr wheel (ADR-SAG-0005, ADR-SAG-0021). The template's sitr section is kept separate from the decision call: extraction runs outside the decision path, and its output is passed into the consumer's prompt authoring. The section uses `sc_agent.sitr` only. In this phase one offline test shows extraction output reaching a dry-run request; sitr is not used beyond that yet.
 
 12. **One Python floor (NFR-SAG-0003).**
 
     - `floors.toml` at the repository root writes down the Python floor (`[python] floor`) and the sc-compose minimum (`[tools] sc-compose`). It only records values.
-    - The pyo3 abi3 feature in `sc-agent-py`, `sc-treesitter-py` and `sc-treesitter` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` both wheels declare.
+    - The pyo3 abi3 feature in `sc-agent-py` and `sc-treesitter` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` the wheel declares.
     - Until sc-compose can read `floors.toml`, the template carries these values as literals, and one sc-agent unit test compares them with `floors.toml`.
 
 ### Rationale
@@ -253,7 +252,7 @@ sc-agent-types cannot see higher crates' rows (ADR-SAG-0004), and a detail read 
 
 ### Implementation
 
-The work lands in sc-agent as fixes on top of the integration stack, with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702, NFR-SAG-0002 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
+The work lands in sc-agent as fixes on top of the integration stack, with no mid-stack edits. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702 and NFR-SAG-0003. A `/prerelease` is cut from the stack top for the consumers to build on.
 
 Deliverables beyond the code:
 

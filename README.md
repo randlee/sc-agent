@@ -62,7 +62,7 @@ Every `decidr` operation has a matching Python function. They also accept `image
 ## Configuration, keys and logs
 
 - **Configuration:** read from `~/.sc-agent/default.json`, then `local.json`, then `SC_AGENT__*` overrides. All values are checked when the configuration loads.
-- **Keys:** read from the environment, from the repository-root `.env`, or from the OS keyring. An attached key is redacted from all error text.
+- **Keys:** read from the environment, then the repository-root `.env`, then the OS keyring; the first source that has the key wins. An attached key is redacted from all error text.
 - **Logs:** everything goes under `<log_root>/logs/` (default `~/.sc-agent/logs/`):
   - each CLI writes its own general log, rotated by sc-observability;
   - session logs go to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.

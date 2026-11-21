@@ -1,51 +1,45 @@
-# Requirement: The generated client's general logger
+# Requirement: The generated client owns its Logger
 
-**Status:** Approved  
-**Version:** 0.2.1  
+**Status:** Proposed  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-19  
 **Owner:** Rand Lee  
 
 ---
 
-## REQ-SAG-0022: The generated client's general logger
+## REQ-SAG-0022: The generated client owns its Logger
 
-**Status:** Approved  
+**Status:** Proposed  
 
 ### Requirement Statement
 
-Definitions: The general logger writes the general log. The session logger writes session logs. Injecting a logger means the caller passes in the logger sc-agent uses. A wheel is the sc-decidr or the sitr Python package. The generated client is the Python module a consumer renders from the sc-decidr wheel's sc-compose template (REQ-SAG-0018). A wheel call is a call to the sc-decidr wheel or to the sitr wheel. The client Logger is the `sc_observability.Logger` named after the client. The client log file is `<log_root>/logs/<client>.log.jsonl`. A client record is a record the generated client writes itself. A wheel-call record is a record written by a wheel call the generated client made, including a failed wheel call. The generated client is unconfigured when no logger is injected and no log setting is configured. The default session log is the session log REQ-SAG-0005 defines. The client name is the consumer's product name and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`.
+Definitions: The generated client is the Python module a consumer renders from the sc-decidr wheel's sc-compose template (REQ-SAG-0018). The client name is the consumer's product name, a constant in the generated client, and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`. The client Logger is the Logger the generated client obtains from the wheel under the client name (REQ-SAG-0008). A wheel call is a call the generated client makes to the sc-decidr wheel's decidr or sitr API.
 
 **MUST statements:**
 
-- The generated client MUST obtain exactly one client Logger.
-- The generated client MUST inject its client Logger as the general logger into every wheel call it makes.
-- When no app Logger is given, the generated client's client Logger MUST write to the client log file.
-- When no app Logger is given, the client Logger MUST write every client record to the client log file.
-- When the client Logger writes to the client log file, that file MUST hold every wheel-call record.
-- The generated client MUST accept an app's own `sc_observability.Logger` in place of its client Logger.
-- When given an app's own `sc_observability.Logger`, the generated client MUST inject the app's Logger into every wheel call.
-- The generated client MUST leave the session logger optional.
-- When no session logger is injected, the generated client MUST write its sessions to the default session log.
-- When the generated client is unconfigured, it MUST write its general log under `<log_root>`.
-- When the generated client is unconfigured, it MUST write its session log under `<log_root>`.
-- When the generated client is unconfigured, it MUST log every wheel call it makes.
+- The generated client MUST obtain exactly one client Logger per process.
+- The generated client MUST inject the client Logger as the general logger into every wheel call.
+- With nothing injected by the app, the client Logger MUST write to `~/.sc-agent/logs/<client name>.log.jsonl`.
+- The generated client MUST accept an app's Logger in place of the client Logger and inject it into every wheel call.
+- The generated client MUST leave the session logger optional; with none injected, sessions MUST go to the default session log (REQ-SAG-0005).
 
 **MUST NOT statements:**
 
-- When the generated client has no general logger, it MUST NOT make a wheel call.
+- The generated client MUST NOT have a log-root variable.
+- The generated client MUST NOT make a wheel call without a general logger.
 
 ### Rationale
 
-One Logger per client puts an app's records, its decidr calls and its sitr calls in one file, and default logs under `<log_root>` give the owner every log in one place for audit.
+One Logger per client puts an app's records and all its decidr and sitr calls in one file, and default logs under `~/.sc-agent/` give the owner every log in one place for audit.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A Python test imports judge-jev's generated client with nothing injected or configured and makes one sc-decidr call, one sitr call and one failed sitr call through it; it then finds the records of all three calls in `<log_root>/logs/judge-jev.log.jsonl`, the session rows in `<log_root>/sessions/<repo>/judge-jev/<project>/sessions.jsonl`, and no `decidr.log.jsonl`, `sitr.log.jsonl` or `sc-agent-py.log.jsonl`.
-- [ ] A Python test imports plan-anchor's generated client, makes one sc-decidr call through it, and finds that call's records in `<log_root>/logs/plan-anchor.log.jsonl`.
-- [ ] A Python test passes its own `sc_observability.Logger` to a generated client, makes one sc-decidr call and one sitr call, and finds both calls' records in that Logger and no default general log file written.
+- [ ] With nothing injected, judge-jev's generated client makes one sc-decidr call, one sitr call and one failed sitr call; all three calls' records are in `~/.sc-agent/logs/judge-jev.log.jsonl`, the session rows are in `~/.sc-agent/sessions/<repo>/judge-jev/<project>/sessions.jsonl`, and no `decidr.log.jsonl` or `sitr.log.jsonl` is written.
+- [ ] With nothing injected, plan-anchor's generated client makes one sc-decidr call and its records are in `~/.sc-agent/logs/plan-anchor.log.jsonl`.
+- [ ] A test injects its own Logger into a generated client, makes one sc-decidr call and one sitr call, and finds both calls' records in that Logger and no default general log written.
 
 ### Dependencies
 
