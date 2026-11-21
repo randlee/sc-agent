@@ -21,7 +21,7 @@ fn general_logger_writes_records_to_the_service_log() {
     let root = tempfile::tempdir().expect("tempdir");
     let logger = general("t", root.path()).expect("logger");
     record(
-        &logger,
+        logger.as_ref(),
         "sc_agent.test",
         "test.done",
         fields(json!({ "k": 1 })),

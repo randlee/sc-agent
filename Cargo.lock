@@ -829,6 +829,7 @@ dependencies = [
 name = "sc-agent-log"
 version = "0.2.8"
 dependencies = [
+ "pyo3",
  "sc-agent-types",
  "sc-observability",
  "sc-observability-types",
@@ -865,6 +866,7 @@ dependencies = [
 name = "sc-agent-types"
 version = "0.2.8"
 dependencies = [
+ "serde",
  "thiserror",
 ]
 

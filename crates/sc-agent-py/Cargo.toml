@@ -13,7 +13,7 @@ publish = false
 decidr.workspace = true
 sc-agent-types.workspace = true
 sc-agent-http.workspace = true
-sc-agent-log.workspace = true
+sc-agent-log = { workspace = true, features = ["pyo3"] }
 sc-decision-schema.workspace = true
 sc-treesitter = { workspace = true, features = ["python", "grammar-python", "grammar-rust"] }
 serde_json = { version = "1", features = ["preserve_order"] }

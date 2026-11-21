@@ -33,8 +33,38 @@ pub fn open(
     policy: Policy,
     session: Option<Session>,
 ) -> Result<(Box<dyn Decision>, String), Error> {
-    let key =
-        |p: &sc_agent_types::providers::Provider| sc_agent_secrets::key(p.key_var, repo_root, None);
+    open_with_keyring(model, provider, repo_root, policy, session, None)
+}
+
+/// Like open, with an explicitly supplied keyring location for the selected provider only.
+pub fn open_with_keyring(
+    model: &str,
+    provider: Option<&str>,
+    repo_root: Option<&std::path::Path>,
+    policy: Policy,
+    session: Option<Session>,
+    keyring: Option<(Option<&str>, Option<&str>)>,
+) -> Result<(Box<dyn Decision>, String), Error> {
+    let provider = if keyring.is_some() && provider.is_none() {
+        let id = sc_agent_types::providers::model_id(model);
+        let ranked: Vec<_> = sc_agent_types::providers::PROVIDERS
+            .iter()
+            .filter(|p| !p.serves.is_empty() && p.serves(id))
+            .collect();
+        match ranked.as_slice() {
+            [one] => Some(one.name),
+            _ => {
+                return Err(Error::AmbiguousKeyringOverride(
+                    ranked.iter().map(|p| p.name).collect::<Vec<_>>().join(", "),
+                ));
+            }
+        }
+    } else {
+        provider
+    };
+    let key = |p: &sc_agent_types::providers::Provider| {
+        sc_agent_secrets::key_with_location(p.key_var, repo_root, keyring)
+    };
     let (chosen, id) = sc_agent_types::providers::Provider::choose(model, provider, |p| {
         matches!(key(p), Ok(Some(_)))
     })?;

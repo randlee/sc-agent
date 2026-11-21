@@ -3,9 +3,9 @@
 
 use sc_agent_http::{Cancel, Client, Policy};
 use sc_agent_log::Session;
-use sc_agent_types::Error;
+use sc_agent_types::{Error, ErrorId};
 use sc_decision_schema::{Backend, DecisionRequest, DecisionResponse};
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 /// One decided request, matched to its input.
 #[derive(Debug)]
@@ -127,7 +127,7 @@ fn row(outcome: &Outcome) -> Map<String, Value> {
         ),
         Err(error) => fields.insert(
             "error".into(),
-            json!({ "id": error.id(), "message": error.to_string() }),
+            serde_json::to_value(error.detail()).unwrap_or_default(),
         ),
     };
     fields

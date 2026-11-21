@@ -80,11 +80,15 @@ pub fn get(url: &str, auth: Option<(&str, &str)>) -> Result<http::Request<Vec<u8
 /// A 2xx body parsed as JSON, any other status as [`Error::ApiStatus`] with the body whole.
 pub fn json_reply<T: serde::de::DeserializeOwned>(status: u16, body: &[u8]) -> Result<T, Error> {
     if (200..300).contains(&status) {
-        serde_json::from_slice(body).map_err(|e| Error::ResponseParse(e.to_string()))
+        serde_json::from_slice(body).map_err(|e| Error::ResponseParse {
+            message: e.to_string(),
+            status: Some(status),
+        })
     } else {
         Err(Error::ApiStatus {
             status,
             body: String::from_utf8_lossy(body).into_owned(),
+            retry_after_ms: None,
         })
     }
 }

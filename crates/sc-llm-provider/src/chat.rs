@@ -142,7 +142,10 @@ impl Codec for ChatCompletions {
             .choices
             .into_iter()
             .next()
-            .ok_or_else(|| Error::ResponseParse("no choices".into()))?;
+            .ok_or_else(|| Error::ResponseParse {
+                message: "no choices".into(),
+                status: None,
+            })?;
         let mut content: Vec<Part> = choice
             .message
             .content
@@ -150,8 +153,12 @@ impl Codec for ChatCompletions {
             .map(|text| Part::Text { text })
             .collect();
         for call in choice.message.tool_calls {
-            let input = serde_json::from_str(&call.function.arguments)
-                .map_err(|e| Error::ResponseParse(e.to_string()))?;
+            let input = serde_json::from_str(&call.function.arguments).map_err(|e| {
+                Error::ResponseParse {
+                    message: e.to_string(),
+                    status: None,
+                }
+            })?;
             content.push(Part::ToolUse {
                 id: call.id,
                 name: call.function.name,

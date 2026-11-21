@@ -7,6 +7,8 @@ name = "sc-decidr"
 version = "0.2.8"
 requires-python = ">=3.11"
 license = "MIT"
+dependencies = ["sc-observability==1.5.0"]
 
 [tool.maturin]
-module-name = "sc_agent"
+module-name = "sc_agent._native"
+python-source = "python"
