@@ -92,8 +92,14 @@ pub const KEYS: &[Key] = &[
     },
 ];
 
-pub fn home() -> PathBuf {
-    std::env::home_dir().unwrap_or_default()
+pub fn home() -> Result<PathBuf, Error> {
+    checked_home(std::env::home_dir())
+}
+
+fn checked_home(home: Option<PathBuf>) -> Result<PathBuf, Error> {
+    home.filter(|path| path.is_absolute()).ok_or_else(|| {
+        Error::Config("an absolute home directory is required to read global configuration".into())
+    })
 }
 
 pub fn repo_root() -> Option<PathBuf> {
@@ -118,7 +124,7 @@ pub fn config(
     project: Option<&str>,
     root: Option<&Path>,
 ) -> Result<layers::Layered<Config>, Error> {
-    let global = home().join(".sc-agent");
+    let global = home()?.join(".sc-agent");
     let mut files: Vec<PathBuf> = root.map(|r| repo_files(r).to_vec()).unwrap_or_default();
     files.extend([global.join("decidr.json"), global.join("sc-agent.json")]);
     let environment: Vec<_> = std::env::vars_os().collect();
@@ -288,5 +294,23 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(error.contains("DECIDR_LOCAL_RUNNERS__TEST__PORT"));
+    }
+    #[test]
+    fn homes_must_be_absolute() {
+        for home in [
+            None,
+            Some(PathBuf::new()),
+            Some(PathBuf::from("relative/home")),
+        ] {
+            assert!(matches!(checked_home(home), Err(Error::Config(message))
+                if message.contains("absolute home directory")));
+        }
+        let absolute = PathBuf::from(if cfg!(windows) {
+            r"C:\controlled-home"
+        } else {
+            "/controlled-home"
+        });
+        assert!(absolute.is_absolute());
+        assert_eq!(checked_home(Some(absolute.clone())).ok(), Some(absolute));
     }
 }
