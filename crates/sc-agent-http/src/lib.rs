@@ -8,7 +8,9 @@
 
 mod client;
 
-pub use client::{Cancel, Client, Item, Policy};
+pub use client::{
+    Cancel, Client, HOLDOFF_MAX, Item, JITTER_MAX, Policy, RETRY_AFTER_MIN, holdoff, retry_after,
+};
 use sc_agent_types::Error;
 pub use ureq::http;
 
