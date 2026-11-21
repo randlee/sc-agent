@@ -223,6 +223,10 @@ mod tests {
                 OsString::from("127.0.0.1"),
             ),
             (
+                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__MODEL"),
+                OsString::from("model-a"),
+            ),
+            (
                 OsString::from("DECIDR_LOCAL_RUNNERS__TEST__PORT"),
                 OsString::from("12345"),
             ),
@@ -250,6 +254,9 @@ mod tests {
         assert_eq!(runner.port, 12345);
         assert_eq!(runner.load_timeout_secs, 600);
         assert_eq!(runner.request_timeout_secs, 300);
+        assert_eq!(runner.model.as_deref(), Some("model-a"));
+        let unset = decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1}}})).expect("runner without model loads");
+        assert_eq!(unset.local_runners.get("test").expect("runner").model, None);
         assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1,"request_timeout_secs":9}}})).unwrap_err().contains("local_runners.test.request_timeout_secs"));
         assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
         for (field, bad) in [
