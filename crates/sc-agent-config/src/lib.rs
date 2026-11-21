@@ -182,10 +182,7 @@ fn decode(value: Value) -> Result<Config, String> {
                 "request_timeout_secs",
                 (10..=3600).contains(&r.request_timeout_secs),
             ),
-            (
-                "kind",
-                matches!(r.kind.as_str(), "generic" | "laya" | "strands" | "mapika"),
-            ),
+            ("kind", matches!(r.kind.as_str(), "laya" | "strands")),
         ] {
             if !valid {
                 return Err(format!(
@@ -212,7 +209,7 @@ mod tests {
     #[test]
     fn local_runner_fields_load_from_explicit_nested_environment() {
         let environment = [
-            ("DECIDR_LOCAL_RUNNERS__TEST__KIND", "generic"),
+            ("DECIDR_LOCAL_RUNNERS__TEST__KIND", "laya"),
             ("DECIDR_LOCAL_RUNNERS__TEST__HOST", "127.0.0.1"),
             ("DECIDR_LOCAL_RUNNERS__TEST__MODEL", "model-a"),
             ("DECIDR_LOCAL_RUNNERS__TEST__PORT", "12345"),
@@ -236,16 +233,16 @@ mod tests {
             .local_runners
             .get("test")
             .expect("runner is loaded");
-        assert_eq!(runner.kind, "generic");
+        assert_eq!(runner.kind, "laya");
         assert_eq!(runner.host, "127.0.0.1");
         assert_eq!(runner.port, 12345);
         assert_eq!(runner.load_timeout_secs, 600);
         assert_eq!(runner.request_timeout_secs, 300);
         assert_eq!(runner.model.as_deref(), Some("model-a"));
-        let unset = decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1}}})).expect("runner without model loads");
+        let unset = decode(serde_json::json!({"local_runners":{"test":{"kind":"laya","host":"localhost","port":1}}})).expect("runner without model loads");
         assert_eq!(unset.local_runners.get("test").expect("runner").model, None);
-        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1,"request_timeout_secs":9}}})).unwrap_err().contains("local_runners.test.request_timeout_secs"));
-        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
+        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"laya","host":"localhost","port":1,"request_timeout_secs":9}}})).unwrap_err().contains("local_runners.test.request_timeout_secs"));
+        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"laya","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
         for (field, bad) in [
             ("workers", serde_json::json!(65)),
             ("max_sends", serde_json::json!(0)),
@@ -259,7 +256,7 @@ mod tests {
             ("load_timeout_secs", serde_json::json!(7201)),
             ("request_timeout_secs", serde_json::json!(3601)),
         ] {
-            let mut value = serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1}}});
+            let mut value = serde_json::json!({"local_runners":{"test":{"kind":"laya","host":"localhost","port":1}}});
             let path = if matches!(field, "workers" | "max_sends") {
                 value[field] = bad;
                 field.to_owned()

@@ -12,19 +12,23 @@ use std::time::Duration;
 struct LocalDecision {
     probe: sc_decision_local::Local,
     decider: Decider<sc_decision_systemone::SystemOne>,
+    loading: Decider<sc_decision_systemone::SystemOne>,
 }
 
 impl Decision for LocalDecision {
     fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
         match self.probe.wait_loaded(&request.model, cancel) {
-            Ok(()) => self.decider.decide(request, cancel),
+            Ok(sc_decision_local::Availability::LoadsOnDemand) => {
+                self.loading.decide(request, cancel)
+            }
+            Ok(_) => self.decider.decide(request, cancel),
             Err(error) => Outcome::failed(0, request, error),
         }
     }
 
     fn decide_batch(
         &self,
-        requests: Vec<DecisionRequest>,
+        mut requests: Vec<DecisionRequest>,
         workers: usize,
         cancel: &Cancel,
         on_result: &mut dyn FnMut(Outcome),
@@ -33,15 +37,34 @@ impl Decision for LocalDecision {
             .first()
             .map(|r| r.model.as_str())
             .unwrap_or_default();
+        let mut offset = 0;
         match self.probe.wait_loaded(model, cancel) {
-            Ok(()) => self
-                .decider
-                .decide_batch(requests, workers, cancel, on_result),
-            Err(error) => requests
-                .into_iter()
-                .enumerate()
-                .for_each(|(i, r)| on_result(Outcome::failed(i, r, error.clone()))),
+            Ok(sc_decision_local::Availability::LoadsOnDemand) => {
+                while !requests.is_empty() {
+                    let mut first = self.loading.decide(requests.remove(0), cancel);
+                    first.position = offset;
+                    let loaded = matches!(first.result, Ok(_) | Err(Error::ResponseParse(_)));
+                    on_result(first);
+                    offset += 1;
+                    if loaded {
+                        break;
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(error) => {
+                requests
+                    .into_iter()
+                    .enumerate()
+                    .for_each(|(i, r)| on_result(Outcome::failed(i, r, error.clone())));
+                return;
+            }
         }
+        self.decider
+            .decide_batch(requests, workers, cancel, &mut |mut outcome| {
+                outcome.position += offset;
+                on_result(outcome);
+            });
     }
 }
 
@@ -54,6 +77,14 @@ pub fn open_local(
 ) -> Result<Box<dyn Decision>, Error> {
     Ok(Box::new(LocalDecision {
         probe: sc_decision_local::Local::new(base, kind, load_timeout)?,
+        loading: Decider::new(
+            sc_decision_systemone::SystemOne::new(base, None)?,
+            Policy {
+                timeout: policy.timeout + load_timeout,
+                ..policy
+            },
+            session.clone(),
+        ),
         decider: Decider::new(
             sc_decision_systemone::SystemOne::new(base, None)?,
             policy,
@@ -103,6 +134,27 @@ pub fn open(
         Box::new(Decider::new(backend(chosen, found)?, policy, session)),
         id,
     ))
+}
+
+/// Resolve the configured policy once for CLI and wheel callers; overrides are already validated.
+pub fn policy(
+    config: &sc_agent_config::Config,
+    workers: Option<usize>,
+    timeout: Option<Duration>,
+    runner: Option<&sc_agent_config::Runner>,
+) -> (Policy, usize) {
+    (
+        Policy {
+            max_sends: config.max_sends.unwrap_or(5),
+            timeout: timeout.unwrap_or(Duration::from_secs(
+                runner.map_or(config.request_timeout_secs.unwrap_or(120), |r| {
+                    r.request_timeout_secs
+                }),
+            )),
+            ..Policy::default()
+        },
+        workers.or(config.workers).unwrap_or(8),
+    )
 }
 
 /// Validate per-call overrides once. None leaves the caller's configured value intact.

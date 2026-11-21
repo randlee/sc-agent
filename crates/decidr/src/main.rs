@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use sc_agent_config::{KEYS, config, repo_root};
-use sc_agent_http::{Cancel, Policy};
+use sc_agent_http::Cancel;
 use sc_agent_log::{Session, general, log_root, record, repo_id};
 use sc_agent_secrets as keys;
 use sc_agent_types::Error;
@@ -111,13 +111,12 @@ fn send(
     let layered = config(project, root)?;
     let config = layered.config;
     let project = config.project.as_deref().ok_or_else(|| Error::Config("project is required: --project, SC_PROJECT, or \"project\" in sc-agent.json or decidr.json".into()))?;
-    let policy = Policy {
-        max_sends: config.max_sends.unwrap_or(5),
-        timeout: timeout_secs
-            .map(Duration::from_secs_f64)
-            .unwrap_or_else(|| Duration::from_secs(config.request_timeout_secs.unwrap_or(120))),
-        ..Policy::default()
-    };
+    let (policy, workers) = decidr::policy(
+        &config,
+        workers.map(|n| n as usize),
+        timeout_secs.map(Duration::from_secs_f64),
+        runner.and_then(|name| config.local_runners.get(name)),
+    );
     let requests = read_requests(batch)?;
     let session = Session::open(
         log_root,
@@ -155,7 +154,7 @@ fn send(
     let _ = ctrlc::set_handler(move || handler.cancel());
     let mut failed = false;
     let mut out = std::io::stdout().lock();
-    decision.decide_batch(requests, workers.map(|n| n as usize).or(config.workers).unwrap_or(8), &cancel, &mut |outcome: Outcome| {
+    decision.decide_batch(requests, workers, &cancel, &mut |outcome: Outcome| {
         failed |= outcome.result.is_err();
         let mut fields = Map::new();
         fields.insert("model".into(), model_id.clone().into());

@@ -121,3 +121,25 @@ def test_error_helpers_read_values_without_raising(value, category, retryable):
     if isinstance(value, dict):
         assert sc_agent.category(json.dumps(value)) == category
         assert sc_agent.retryable(json.dumps(value)) is retryable
+
+
+def test_precancelled_batch_delivers_each_result_and_catches_callback(log):
+    logger, _ = log
+    token = sc_agent.CancelToken()
+    token.cancel()
+    seen = []
+
+    def persist(line):
+        seen.append(line)
+        if len(seen) == 1:
+            raise ValueError("controlled callback failure")
+
+    returned = sc_agent.send_batch(["{}", "{}"], "haiku", "p", "t", logger,
+                                   cancel=token, on_result=persist)
+    assert len(seen) == len(returned) == 2
+    first, second = map(json.loads, returned)
+    assert first["error"]["message"] == "on_result raised: ValueError: controlled callback failure"
+    assert sc_agent.retryable(first["error"]) is False
+    assert json.loads(seen[0])["error"]["id"] == "request.cancelled"
+    assert returned[1] == seen[1]
+    assert second["error"]["id"] == "request.cancelled"

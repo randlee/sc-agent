@@ -32,13 +32,13 @@ A decision failure is returned as a value; it is not raised.
 
 `send_batch(requests, model, project, agent_role, logger, provider=None,
 workers=None, cancel=None, *, timeout_secs=None, keyring_service=None,
-keyring_account=None)` returns one JSON string per input, in input order.
-An empty batch returns `[]`. `workers` is a per-call integer override in 1..=64;
-omitted, it uses the current default of 8. `send` does not accept `workers`.
+keyring_account=None, on_result=None)` returns one JSON string per input, in input order.
+An empty batch returns `[]`. `on_result(line)` receives each tagged JSON reply as it finishes; a callback exception becomes that request's non-retryable error value in the returned list. `workers` is a per-call integer override in 1..=64;
+omitted, it uses the configured value (default 8). `send` does not accept `workers`.
 
 `timeout_secs` is finite numeric seconds in 10..=3600, including fractions.
 It overrides the HTTP send deadline for this call only. Omitted, it keeps the
-current default of 120 seconds. Invalid limits return errors with ids
+configured value (default 120 seconds). Invalid limits return errors with ids
 `decidr.invalid_request_timeout` or `decidr.invalid_workers`; no request is sent.
 
 The optional keyring service and account override only this call. Missing service

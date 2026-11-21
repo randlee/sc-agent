@@ -59,7 +59,7 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
         .ok_or("test server address has no port")?
         .parse::<u16>()?;
     let runner = json!({
-        "test": { "kind": "generic", "host": "127.0.0.1", "port": port }
+        "test": { "kind": "laya", "host": "127.0.0.1", "port": port }
     });
     let mut command = decidr_command(
         dir.path(),

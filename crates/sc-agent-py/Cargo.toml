@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 decidr.workspace = true
+sc-agent-config.workspace = true
 sc-agent-types.workspace = true
 sc-agent-http.workspace = true
 sc-agent-log.workspace = true
@@ -26,7 +27,3 @@ workspace = true
 [lib]
 name = "sc_agent"
 crate-type = ["cdylib"]
-
-[dev-dependencies]
-keyring = "3"
-tempfile = "3"

@@ -69,6 +69,7 @@ fn whoami_host() -> String {
         .unwrap_or_else(|| "localhost".into())
 }
 
+#[derive(Clone)]
 pub struct Session {
     logger: Arc<Logger>,
     repo: String,
