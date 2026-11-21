@@ -12,9 +12,11 @@ Order: h-0, then h-1 and h-2 in parallel, then h-3 (needs h-2).
 
 Not planned (owner decides): the sitr API in the sc-agent wheel and deleting sc-treesitter-py; category, retryable, SagError and the consumer template; comparing the FromLlm prompt with the Python tools; turning a wrong-type Python argument into an error value instead of TypeError.
 
+Cited REQ/NFR/ADR records say what each sprint touches. Where an older record conflicts with the owner's later logging rulings, the rulings win; a citation is not a reason to add code.
+
 ## h-0: move crates/ to crates-ref/ and land the starting code
 
-Branch `sprint/h-0-crates-ref-layout` → PR into `integrate/phase-h`. Difficulty fast. Requirements REQ-SAG-0134; ADRs ADR-SAG-0004, ADR-SAG-0019.
+Branch `sprint/h-0-crates-ref-layout` → PR into `integrate/phase-h`. Difficulty fast. Requirements NFR-SAG-0003; ADRs ADR-SAG-0004, ADR-SAG-0019.
 
 ### Goal
 The starting code replaces the old crates, with the old crates kept beside it as crates-ref/.
@@ -26,7 +28,7 @@ No public item, dependency, test or behaviour beyond the Deliverables. crates-re
 
 ### Deliverables
 1. `git mv` every crate in crates/ to crates-ref/ except sitr, sc-treesitter and sc-treesitter-py, which stay in crates/. sc-agent-testkit moves too: it needs the old sc-agent-types.
-2. Copy crates/* from origin/ref/phase-h-start (94503df) into crates/, unchanged except crates/sc-agent-py: pyo3 `abi3-py311` (not `abi3-py39`) and a new pyproject.toml (name `sc-decidr`, version 0.2.8, `requires-python = ">=3.11"`, license MIT, maturin `module-name = "sc_agent"`), per REQ-SAG-0134 and ADR-SAG-0019. Root Cargo.toml and clippy.toml are the starting code's, plus `exclude = ["crates-ref"]` and [workspace.dependencies] entries for the three kept crates.
+2. Copy crates/* from origin/ref/phase-h-start (94503df) into crates/, unchanged except crates/sc-agent-py: pyo3 `abi3-py311` (not `abi3-py39`) and a new pyproject.toml (name `sc-decidr`, version 0.2.8, `requires-python = ">=3.11"`, license MIT, maturin `module-name = "sc_agent"`), so it matches `[python].floor` (3.11) in floors.toml (NFR-SAG-0003, ADR-SAG-0019). Root Cargo.toml and clippy.toml are the starting code's, plus `exclude = ["crates-ref"]` and [workspace.dependencies] entries for the three kept crates.
 3. Exactly these kept-crate changes, so the workspace builds: sitr drops its sc-agent-testkit dev-dependency and its CLI test runs the binary with `Command::output()`; sc-treesitter-py drops pyo3's `extension-module` feature (it unified into sc-agent-py and broke its link). Every pyo3 dependency stays at `abi3-py311`, so every maturin version picks the same floor. Any other change needed is a stop: report it to the lead.
 
 ### Does Not Close
@@ -87,7 +89,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-2: sc-agent-log: general Logger and one record helper
 
-Branch `sprint/h-2-log-general` → PR into `sprint/h-0-crates-ref-layout`. Difficulty fast. Requirements REQ-SAG-0008, REQ-SAG-0005; ADRs ADR-SAG-0021.
+Branch `sprint/h-2-log-general` → PR into `sprint/h-0-crates-ref-layout`. Difficulty fast. Requirements REQ-SAG-0008, REQ-SAG-0005, REQ-SAG-0004; ADRs ADR-SAG-0021, ADR-SAG-0002.
 
 ### Goal
 Callers get a general sc-observability Logger and write records through one helper.
@@ -121,7 +123,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-3: sc-agent-py: send, send_batch, CancelToken and the injected Logger
 
-Branch `sprint/h-3-wheel` → PR into `sprint/h-2-log-general`. Difficulty normal. Requirements REQ-SAG-0018, REQ-SAG-0022, REQ-SAG-0016, REQ-SAG-0005; ADRs ADR-SAG-0005, ADR-SAG-0021.
+Branch `sprint/h-3-wheel` → PR into `sprint/h-2-log-general`. Difficulty normal. Requirements REQ-SAG-0018, REQ-SAG-0022, REQ-SAG-0016, REQ-SAG-0005, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0008; ADRs ADR-SAG-0005, ADR-SAG-0021, ADR-SAG-0019.
 
 ### Goal
 Python calls decisions through the wheel with errors as values, cancel, and its own Logger.
