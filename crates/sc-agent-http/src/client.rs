@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -75,42 +76,6 @@ const QUOTA: [&str; 4] = [
 ];
 const MAX_BODY: u64 = 64 * 1024 * 1024;
 const BUDGET: Duration = Duration::from_secs(90);
-
-struct Job<Q> {
-    position: usize,
-    request: Q,
-    session: ulid::Ulid,
-    attempts: u32,
-    started: Option<Instant>,
-    ready: Instant,
-    last: Option<Error>,
-}
-
-impl<Q> Job<Q> {
-    fn expired(&self, now: Instant) -> bool {
-        self.started
-            .is_some_and(|start| now.duration_since(start) >= BUDGET)
-    }
-
-    fn exhausted(&mut self, budget: bool) -> Error {
-        let mut error = self.last.take().unwrap_or(Error::Cancelled {
-            sends: self.attempts,
-        });
-        if let Error::ProviderBusy { reason, .. } = &mut error {
-            *reason = if budget {
-                BusyReason::Budget
-            } else {
-                BusyReason::Sends
-            };
-        }
-        error
-    }
-}
-
-fn ready<Q>(jobs: &[Job<Q>], now: Instant, pause: Instant, cancelled: bool) -> Option<usize> {
-    jobs.iter()
-        .position(|job| cancelled || job.expired(now) || (job.ready <= now && pause <= now))
-}
 
 /// The one place that sends: any [`Codec`], with retry, cancel and batching.
 pub struct Client<C> {
@@ -340,25 +305,24 @@ impl<C: Codec> Client<C> {
         C::Request: Send,
         C::Response: Send,
     {
-        // This mutex contains only the batch work queue; recovering poison retains queued work.
         let now = self.now();
-        let count = requests.len();
-        let queue = Mutex::new((
+        let queue = Mutex::new(
             requests
                 .into_iter()
                 .enumerate()
-                .map(|(position, request)| Job {
-                    position,
-                    request,
-                    session: ulid::Ulid::new(),
-                    attempts: 0,
-                    started: None,
-                    ready: now,
-                    last: None,
+                .map(|(position, request)| {
+                    (
+                        position,
+                        request,
+                        ulid::Ulid::new(),
+                        0_u32,
+                        None::<Instant>,
+                        now,
+                        None::<Error>,
+                    )
                 })
-                .collect::<Vec<_>>(),
-            count,
-        ));
+                .collect::<VecDeque<_>>(),
+        );
         let (tx, rx) = mpsc::channel();
         std::thread::scope(|scope| {
             for _ in 0..workers.max(1) {
@@ -368,88 +332,92 @@ impl<C: Codec> Client<C> {
                         let (flag, wake) = &*cancel.0;
                         let mut cancelled = flag.lock().unwrap_or_else(|e| e.into_inner());
                         let mut job = loop {
-                            let mut state = queue.lock().unwrap_or_else(|e| e.into_inner());
-                            if state.1 == 0 {
+                            let mut q = queue.lock().unwrap_or_else(|e| e.into_inner());
+                            if q.is_empty() {
                                 return;
                             }
                             let now = self.now();
                             let pause = self.not_before().unwrap_or(now);
-                            let next = ready(&state.0, now, pause, *cancelled);
-                            if let Some(i) = next {
-                                break state.0.swap_remove(i);
+                            if let Some(i) = q.iter().position(|j| {
+                                *cancelled
+                                    || j.4.is_some_and(|start| {
+                                        now.saturating_duration_since(start) >= BUDGET
+                                    })
+                                    || (j.5 <= now && pause <= now)
+                            }) && let Some(job) = q.remove(i)
+                            {
+                                break job;
                             }
-                            let wait = state
-                                .0
+                            let wait = q
                                 .iter()
                                 .map(|j| {
-                                    let ready = j.ready.max(pause);
-                                    let deadline =
-                                        j.started.map_or(ready, |start| ready.min(start + BUDGET));
-                                    deadline.saturating_duration_since(now)
+                                    j.4.map_or(j.5.max(pause), |start| {
+                                        j.5.max(pause).min(start + BUDGET)
+                                    })
+                                    .saturating_duration_since(now)
                                 })
-                                .min();
-                            drop(state);
-                            cancelled = match wait {
-                                Some(wait) => {
-                                    wake.wait_timeout(cancelled, wait)
-                                        .unwrap_or_else(|e| e.into_inner())
-                                        .0
-                                }
-                                None => wake.wait(cancelled).unwrap_or_else(|e| e.into_inner()),
-                            };
+                                .min()
+                                .unwrap_or_default();
+                            drop(q);
+                            cancelled = wake
+                                .wait_timeout(cancelled, wait)
+                                .unwrap_or_else(|e| e.into_inner())
+                                .0;
                         };
-                        let was_cancelled = *cancelled;
+                        let stopped = *cancelled;
                         drop(cancelled);
-                        let result = if was_cancelled {
-                            Some(Err(Error::Cancelled {
-                                sends: job.attempts,
-                            }))
-                        } else if job.expired(self.now()) {
-                            Some(Err(job.exhausted(true)))
+                        let result = if stopped {
+                            Some(Err(Error::Cancelled { sends: job.3 }))
+                        } else if job.4.is_some_and(|start| {
+                            self.now().saturating_duration_since(start) >= BUDGET
+                        }) {
+                            let mut error =
+                                job.6.take().unwrap_or(Error::Cancelled { sends: job.3 });
+                            if let Error::ProviderBusy { reason, .. } = &mut error {
+                                *reason = BusyReason::Budget;
+                            }
+                            Some(Err(error))
                         } else {
-                            job.started.get_or_insert_with(|| self.now());
-                            job.attempts += 1;
-                            match self.once(&job.request, job.attempts) {
-                                Ok(response) => Some(Ok(response)),
+                            job.4.get_or_insert_with(|| self.now());
+                            job.3 += 1;
+                            match self.once(&job.1, job.3) {
+                                Ok(value) => Some(Ok(value)),
                                 Err((error, _)) if !error.retryable() => Some(Err(error)),
                                 Err((error, retry_after)) => {
                                     let busy = matches!(error, Error::ProviderBusy { .. });
-                                    job.last = Some(error);
                                     let wait =
-                                        holdoff(self.policy.backoff, job.attempts, retry_after)
-                                            + jitter();
+                                        holdoff(self.policy.backoff, job.3, retry_after) + jitter();
                                     if busy {
                                         self.pause(wait);
                                     }
-                                    if job.attempts >= self.policy.max_sends {
-                                        Some(Err(job.exhausted(false)))
+                                    if job.3 >= self.policy.max_sends {
+                                        Some(Err(error))
                                     } else {
-                                        job.ready = self.now() + wait;
+                                        job.5 = self.now() + wait;
+                                        job.6 = Some(error);
                                         None
                                     }
                                 }
                             }
                         };
                         let _guard = flag.lock().unwrap_or_else(|e| e.into_inner());
-                        let mut state = queue.lock().unwrap_or_else(|e| e.into_inner());
-                        if state.1 == 0 {
-                            return;
-                        }
                         if let Some(result) = result {
-                            state.1 -= 1;
                             if tx
                                 .send(Item {
-                                    position: job.position,
-                                    session: job.session,
-                                    request: job.request,
+                                    position: job.0,
+                                    request: job.1,
+                                    session: job.2,
                                     result,
                                 })
                                 .is_err()
                             {
-                                state.1 = 0;
+                                return;
                             }
                         } else {
-                            state.0.push(job);
+                            queue
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .push_back(job);
                         }
                         wake.notify_all();
                     }
@@ -469,6 +437,7 @@ mod tests {
     struct AdvanceOnSend {
         base: String,
         seconds: Arc<AtomicU64>,
+        network: bool,
     }
 
     impl Codec for AdvanceOnSend {
@@ -476,6 +445,9 @@ mod tests {
         type Response = ();
         fn encode(&self, _: &()) -> Result<crate::http::Request<Vec<u8>>, Error> {
             self.seconds.store(90, Ordering::SeqCst);
+            if self.network {
+                return Err(Error::Network("timeout".into()));
+            }
             crate::post_json(&self.base, None, &[], &serde_json::json!({}))
         }
         fn decode(&self, _: &(), _: u16, _: &[u8]) -> Result<(), Error> {
@@ -483,88 +455,94 @@ mod tests {
         }
     }
 
-    #[test]
-    fn busy_request_exhausts_its_budget_without_another_send() {
-        let server = crate::test_server::Server::start(vec![(503, vec![], "{}".into())]);
-        let seconds = Arc::new(AtomicU64::new(0));
-        let mut client = Client::new(
-            AdvanceOnSend {
-                base: server.base.clone(),
-                seconds: seconds.clone(),
-            },
-            Policy::default(),
-        );
-        let start = Instant::now();
-        client.clock = Some(Arc::new(move || {
-            start + Duration::from_secs(seconds.load(Ordering::SeqCst))
-        }));
-        assert!(matches!(
-            client.send(&(), &Cancel::default()),
-            Err(Error::ProviderBusy {
-                attempts: 1,
-                reason: BusyReason::Budget,
-                ..
-            })
-        ));
-        assert_eq!(server.finish().len(), 1);
-    }
+    struct YieldOnRetry(String, Cancel);
 
-    fn job(position: usize, started: Option<Instant>, ready: Instant) -> Job<usize> {
-        Job {
-            position,
-            request: position,
-            session: ulid::Ulid::nil(),
-            attempts: 1,
-            started,
-            ready,
-            last: Some(Error::ProviderBusy {
-                attempts: 1,
-                retry_after_seconds: Some(3),
-                reason: BusyReason::Sends,
-            }),
+    impl Codec for YieldOnRetry {
+        type Request = u8;
+        type Response = u8;
+        fn encode(&self, request: &u8) -> Result<crate::http::Request<Vec<u8>>, Error> {
+            if *request == 2 {
+                self.1.cancel();
+            }
+            crate::post_json(&self.0, None, &[], &serde_json::json!({"n": request}))
+        }
+        fn decode(&self, request: &u8, _: u16, _: &[u8]) -> Result<u8, Error> {
+            if *request == 1 {
+                Err(Error::Invalid("retry".into()))
+            } else {
+                Ok(*request)
+            }
         }
     }
 
     #[test]
-    fn queue_selects_ready_jobs_and_expires_or_cancels_without_waiting() {
-        let start = Instant::now();
-        let jobs = [
-            job(0, Some(start), start + Duration::from_secs(10)),
-            job(1, None, start),
-        ];
-        assert_eq!(ready(&jobs, start, start, false), Some(1));
-        assert_eq!(ready(&jobs[..1], start, start, false), None);
-        assert_eq!(ready(&jobs[..1], start, start, true), Some(0));
-        assert_eq!(
-            ready(&jobs[..1], start + BUDGET, start + BUDGET, false),
-            Some(0)
+    fn held_retry_yields_to_ready_request() {
+        let server = crate::test_server::Server::start(vec![
+            (200, vec![], "{}".into()),
+            (200, vec![], "{}".into()),
+        ]);
+        let cancel = Cancel::default();
+        let mut client = Client::new(
+            YieldOnRetry(server.base.clone(), cancel.clone()),
+            Policy::default(),
         );
-        assert!(!jobs[0].expired(start + BUDGET - Duration::from_nanos(1)));
-        assert!(jobs[0].expired(start + BUDGET));
+        let start = Instant::now();
+        client.clock = Some(Arc::new(move || start));
+        let mut results = Vec::new();
+        client.batch(vec![1, 2], 1, &cancel, |item| {
+            results.push((item.request, item.result))
+        });
+        assert!(matches!(
+            results.as_slice(),
+            [(2, Ok(2)), (1, Err(Error::Cancelled { sends: 1 }))]
+        ));
+        assert_eq!(server.finish().len(), 2);
     }
 
     #[test]
-    fn exhaustion_preserves_busy_details_and_distinguishes_budget() {
-        let start = Instant::now();
-        let mut by_budget = job(0, Some(start), start);
-        assert!(matches!(
-            by_budget.exhausted(true),
-            Error::ProviderBusy {
-                attempts: 1,
-                retry_after_seconds: Some(3),
-                reason: BusyReason::Budget
+    fn busy_request_exhausts_its_budget_without_another_send() {
+        for (batch, network) in [(false, false), (true, false), (true, true)] {
+            let replies = if network {
+                vec![]
+            } else {
+                vec![(503, vec![("retry-after", "3".into())], "{}".into())]
+            };
+            let server = crate::test_server::Server::start(replies);
+            let seconds = Arc::new(AtomicU64::new(0));
+            let mut client = Client::new(
+                AdvanceOnSend {
+                    base: server.base.clone(),
+                    seconds: seconds.clone(),
+                    network,
+                },
+                Policy::default(),
+            );
+            let start = Instant::now();
+            client.clock = Some(Arc::new(move || {
+                start + Duration::from_secs(seconds.load(Ordering::SeqCst))
+            }));
+            let result = if batch {
+                let mut result = None;
+                client.batch(vec![()], 1, &Cancel::default(), |item| {
+                    result = Some(item.result)
+                });
+                result.expect("batch emits one result")
+            } else {
+                client.send(&(), &Cancel::default())
+            };
+            if network {
+                assert!(matches!(result, Err(Error::Network(message)) if message == "timeout"));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(Error::ProviderBusy {
+                        attempts: 1,
+                        reason: BusyReason::Budget,
+                        retry_after_seconds: Some(3)
+                    })
+                ));
             }
-        ));
-        let mut by_sends = job(0, Some(start), start);
-        assert!(matches!(
-            by_sends.exhausted(false),
-            Error::ProviderBusy {
-                reason: BusyReason::Sends,
-                ..
-            }
-        ));
-        let mut network = job(0, Some(start), start);
-        network.last = Some(Error::Network("timeout".into()));
-        assert!(matches!(network.exhausted(true), Error::Network(_)));
+            assert_eq!(server.finish().len(), usize::from(!network));
+        }
     }
 }
