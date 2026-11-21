@@ -13,7 +13,7 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["config", "Config", "Runner", "home", "repo_root"]
+roots = ["config", "Config", "Runner", "home", "repo_root", "KEYS"]
 
 [dependencies]
 allowed_dev_dependencies = []
