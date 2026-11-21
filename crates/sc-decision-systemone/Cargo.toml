@@ -17,7 +17,6 @@ serde_json = { version = "1", features = ["preserve_order"] }
 
 [dev-dependencies]
 sc-agent-http = { workspace = true, features = ["test-server"] }
-sc-decision-runner.workspace = true
 
 [lints]
 workspace = true

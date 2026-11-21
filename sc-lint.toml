@@ -5,15 +5,13 @@ default_lint_profile = "ci"
 [tool.sc-lint.analyzers.boundary]
 enabled = true
 reason = "Enforce the declared crate boundaries and publishable Cargo dependencies."
-# A path-only self dev-dependency enables the crate's existing tests; pinning
-# its unpublished version makes Cargo resolve it from crates.io during package.
-# Normal/build dependencies retain their publishable workspace versions.
-# SCB-MANIFEST-002: https://github.com/randlee/sc-lint/issues/976; remove its
-# exclusion when the pinned sc-lint version contains the fix.
+# The path-only sc-agent-http self dev-dependency enables test-server helpers.
+# SCB-MANIFEST-002: https://github.com/randlee/sc-lint/issues/976; remove
+# this exclusion when the pinned analyzer fixes unpublished self dev-dependencies.
 # Forwarding to Box<C> calls C's implementation, not the forwarding method.
 # SCB-CYCLE-003: https://github.com/randlee/sc-lint/issues/974; remove this
 # exclusion when the pinned sc-lint version contains the fix.
-exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-types/Cargo.toml", "crates/sc-agent-secrets/Cargo.toml", "crates/sc-agent-log/Cargo.toml", "crates/sc-agent-http/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/lib.rs"] }
+exclude_paths_by_rule = { "SCB-MANIFEST-002" = ["crates/sc-agent-http/Cargo.toml"], "SCB-CYCLE-003" = ["crates/sc-agent-http/src/lib.rs"] }
 
 [tool.sc-lint.analyzers.portability]
 enabled = true

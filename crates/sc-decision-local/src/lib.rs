@@ -8,10 +8,6 @@ use sc_agent_http::{Cancel, Client, Codec, Policy, http};
 use sc_agent_types::Error;
 use serde::Deserialize;
 
-use sc_decision_runner::{Decider, Decision, Outcome};
-use sc_decision_schema::DecisionRequest;
-use sc_decision_systemone::SystemOne;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Availability {
     Loaded,
@@ -148,21 +144,15 @@ impl Codec for Probe {
     }
 }
 
-/// A local runner: waits for the model to load, then decides through the Jev API.
+/// A local runner readiness probe. Decision composition belongs to the caller.
 pub struct Local {
     probe: Client<Probe>,
-    decider: Decider<SystemOne>,
     load_timeout: Duration,
     poll: Duration,
 }
 
 impl Local {
-    pub fn new(
-        base: &str,
-        kind: &str,
-        decider: impl FnOnce(SystemOne) -> Decider<SystemOne>,
-        load_timeout: Duration,
-    ) -> Result<Self, Error> {
+    pub fn new(base: &str, kind: &str, load_timeout: Duration) -> Result<Self, Error> {
         let base = sc_agent_http::check_base(base, false)?;
         let daemon = daemon(kind)?;
         let probe = Probe {
@@ -176,7 +166,6 @@ impl Local {
         };
         Ok(Self {
             probe: Client::new(probe, policy),
-            decider: decider(SystemOne::new(&base, None)?),
             load_timeout,
             poll: Duration::from_secs(1),
         })
@@ -206,37 +195,6 @@ impl Local {
             if cancel.wait(self.poll) {
                 return Err(Error::Cancelled { sends: 0 });
             }
-        }
-    }
-}
-
-impl Decision for Local {
-    fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
-        match self.wait_loaded(&request.model, cancel) {
-            Ok(()) => self.decider.decide(request, cancel),
-            Err(error) => Outcome::failed(0, request, error),
-        }
-    }
-
-    fn decide_batch(
-        &self,
-        requests: Vec<DecisionRequest>,
-        workers: usize,
-        cancel: &Cancel,
-        on_result: &mut dyn FnMut(Outcome),
-    ) {
-        let first = requests
-            .first()
-            .map(|r| r.model.clone())
-            .unwrap_or_default();
-        match self.wait_loaded(&first, cancel) {
-            Ok(()) => self
-                .decider
-                .decide_batch(requests, workers, cancel, on_result),
-            Err(error) => requests
-                .into_iter()
-                .enumerate()
-                .for_each(|(i, r)| on_result(Outcome::failed(i, r, error.clone()))),
         }
     }
 }

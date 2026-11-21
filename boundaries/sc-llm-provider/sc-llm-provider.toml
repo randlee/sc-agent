@@ -16,9 +16,10 @@ constructor = "none"
 roots = ["Llm", "ChatCompletions", "Messages", "backend"]
 
 [dependencies]
+allowed_dev_dependents = ["sc-decision-runner"]
 allowed_dev_dependencies = []
 allowed_dependents = ["decidr", "sc-decision-llm"]
-allowed_dependencies = ["sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-types"]
 forbidden_edges = []
 
 [references]

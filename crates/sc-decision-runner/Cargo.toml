@@ -20,6 +20,8 @@ ulid = "1"
 [dev-dependencies]
 sc-agent-http = { workspace = true, features = ["test-server"] }
 sc-decision-systemone.workspace = true
+sc-decision-llm.workspace = true
+sc-llm-provider.workspace = true
 
 [lints]
 workspace = true
