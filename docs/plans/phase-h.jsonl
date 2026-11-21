@@ -3,3 +3,5 @@
 {"sprint": "h-2", "depends_on": ["h-0"]}
 {"sprint": "h-3", "depends_on": ["h-2"]}
 {"sprint": "h-6", "depends_on": ["h-1"]}
+{"sprint": "h-12", "depends_on": ["h-1"]}
+{"sprint": "h-13", "depends_on": ["h-12"]}
