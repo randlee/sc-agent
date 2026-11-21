@@ -199,6 +199,7 @@ impl<C: Codec> Client<C> {
     pub fn send(&self, request: &C::Request, cancel: &Cancel) -> Result<C::Response, Error> {
         let mut last = Error::Cancelled { sends: 0 };
         let mut started: Option<Instant> = None;
+        let mut last_retry_after_seconds = None;
         for attempt in 1..=self.policy.max_sends {
             if self.wait_unpaused(cancel, started) {
                 return Err(Error::Cancelled { sends: attempt - 1 });
@@ -213,7 +214,16 @@ impl<C: Codec> Client<C> {
             let wait = match self.once(request, attempt) {
                 Ok(response) => return Ok(response),
                 Err((error, _)) if !error.retryable() => return Err(error),
-                Err((error @ Error::ProviderBusy { .. }, retry_after)) => {
+                Err((mut error @ Error::ProviderBusy { .. }, retry_after)) => {
+                    if let Error::ProviderBusy {
+                        retry_after_seconds,
+                        ..
+                    } = &mut error
+                    {
+                        last_retry_after_seconds =
+                            (*retry_after_seconds).or(last_retry_after_seconds);
+                        *retry_after_seconds = last_retry_after_seconds;
+                    }
                     last = error;
                     self.pause(holdoff(self.policy.backoff, attempt, retry_after) + jitter());
                     continue;
