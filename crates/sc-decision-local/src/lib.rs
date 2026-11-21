@@ -1,8 +1,7 @@
 #![forbid(unsafe_code)]
-//! Local runners: Jev-compatible daemons on host:port. Each kind differs only in how it
-//! reports whether a model is loaded, so that is all a [`LocalDaemon`] says.
+//! Laya local runner: probe availability before sending through the Jev API.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use sc_agent_http::{Cancel, Client, Codec, Policy, http};
 use sc_agent_types::Error;
@@ -13,34 +12,18 @@ pub enum Availability {
     Loaded,
     /// Loads on the first request (Laya).
     LoadsOnDemand,
-    Loading,
-    /// Serving a different model.
-    Other(Vec<String>),
-}
-
-/// One kind of local runner.
-/// This is an open trait; downstream crates may implement it.
-pub trait LocalDaemon: Send + Sync {
-    /// The probe path, from the base URL.
-    fn probe_path(&self) -> &'static str {
-        "/health"
-    }
-    /// What a 200 probe body says about `model`.
-    fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error>;
-}
-
-fn parse<'a, T: Deserialize<'a>>(body: &'a [u8]) -> Result<T, Error> {
-    serde_json::from_slice(body).map_err(|e| Error::ResponseParse(e.to_string()))
 }
 
 pub struct Laya;
-impl LocalDaemon for Laya {
-    fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error> {
+impl Laya {
+    pub fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error> {
         #[derive(Deserialize)]
         struct Health {
             loaded: Option<Vec<String>>,
         }
-        let loaded = parse::<Health>(body)?.loaded.unwrap_or_default();
+        let health: Health =
+            serde_json::from_slice(body).map_err(|e| Error::ResponseParse(e.to_string()))?;
+        let loaded = health.loaded.unwrap_or_default();
         Ok(if loaded.iter().any(|m| m == model) {
             Availability::Loaded
         } else {
@@ -49,34 +32,9 @@ impl LocalDaemon for Laya {
     }
 }
 
-pub struct Strands;
-impl LocalDaemon for Strands {
-    fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error> {
-        #[derive(Deserialize)]
-        struct Health {
-            model: String,
-        }
-        let served = parse::<Health>(body)?.model;
-        Ok(if served == model {
-            Availability::Loaded
-        } else {
-            Availability::Other(vec![served])
-        })
-    }
-}
-
-pub fn daemon(kind: &str) -> Result<Box<dyn LocalDaemon>, Error> {
-    Ok(match kind {
-        "laya" => Box::new(Laya),
-        "strands" => Box::new(Strands),
-        other => return Err(Error::Config(format!("unknown local runner kind {other}"))),
-    })
-}
-
 /// The probe as a codec, so it goes through the same client as every other call.
 struct Probe {
     url: String,
-    daemon: Box<dyn LocalDaemon>,
 }
 
 impl Codec for Probe {
@@ -89,7 +47,7 @@ impl Codec for Probe {
 
     fn decode(&self, model: &String, status: u16, body: &[u8]) -> Result<Availability, Error> {
         match status {
-            200 => self.daemon.availability(body, model),
+            200 => Laya.availability(body, model),
             _ => Err(Error::ApiStatus {
                 status,
                 body: String::from_utf8_lossy(body).into_owned(),
@@ -101,17 +59,16 @@ impl Codec for Probe {
 /// A local runner: waits for the model to load, then decides through the Jev API.
 pub struct Local {
     probe: Client<Probe>,
-    load_timeout: Duration,
-    poll: Duration,
 }
 
 impl Local {
-    pub fn new(base: &str, kind: &str, load_timeout: Duration) -> Result<Self, Error> {
+    pub fn new(base: &str, kind: &str, _load_timeout: Duration) -> Result<Self, Error> {
         let base = sc_agent_http::check_base(base, false)?;
-        let daemon = daemon(kind)?;
+        if kind != "laya" {
+            return Err(Error::Config(format!("unknown local runner kind {kind}")));
+        }
         let probe = Probe {
-            url: format!("{base}{}", daemon.probe_path()),
-            daemon,
+            url: format!("{base}/health"),
         };
         let policy = Policy {
             max_sends: 1,
@@ -120,35 +77,11 @@ impl Local {
         };
         Ok(Self {
             probe: Client::new(probe, policy),
-            load_timeout,
-            poll: Duration::from_secs(1),
         })
     }
 
-    /// Probes until the model is loaded (or loads on demand), the load timeout passes, or
-    /// cancel. The wait between probes is cancellable; nothing sleeps.
+    /// Probes once; Laya either has the model loaded or loads it on the first request.
     pub fn wait_loaded(&self, model: &str, cancel: &Cancel) -> Result<Availability, Error> {
-        let deadline = Instant::now() + self.load_timeout;
-        loop {
-            let model = model.to_owned();
-            match self.probe.send(&model, cancel)? {
-                a @ (Availability::Loaded | Availability::LoadsOnDemand) => return Ok(a),
-                Availability::Other(served) => {
-                    return Err(Error::Config(format!(
-                        "runner serves {served:?}, not {model}"
-                    )));
-                }
-                Availability::Loading => {}
-            }
-            if Instant::now() >= deadline {
-                return Err(Error::Config(format!(
-                    "{model} did not load within {:?}",
-                    self.load_timeout
-                )));
-            }
-            if cancel.wait(self.poll) {
-                return Err(Error::Cancelled { sends: 0 });
-            }
-        }
+        self.probe.send(&model.to_owned(), cancel)
     }
 }
