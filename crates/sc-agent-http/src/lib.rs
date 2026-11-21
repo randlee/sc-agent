@@ -8,17 +8,15 @@
 
 mod client;
 
-pub use client::{
-    Cancel, Client, HOLDOFF_MAX, Item, JITTER_MAX, Policy, RETRY_AFTER_MIN, holdoff, retry_after,
-};
+pub use client::{Cancel, Client, Item, Policy, holdoff, retry_after};
 use sc_agent_types::Error;
 pub use ureq::http;
 
 /// A remote API, sans I/O: how to build a request and how to read its reply.
 /// This is an open trait; downstream crates may implement it.
 pub trait Codec: Send + Sync {
-    type Request;
-    type Response;
+    type Request: Sync;
+    type Response: Send;
 
     /// The HTTP request for `request`. Called again for every resend.
     fn encode(&self, request: &Self::Request) -> Result<http::Request<Vec<u8>>, Error>;
