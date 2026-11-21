@@ -1,13 +1,4 @@
 {"sprint": "h-0"}
 {"sprint": "h-1", "depends_on": ["h-0"]}
 {"sprint": "h-2", "depends_on": ["h-0"]}
-{"sprint": "h-3", "depends_on": ["h-0"]}
-{"sprint": "h-5", "depends_on": ["h-0"]}
-{"sprint": "h-6", "depends_on": ["h-0"]}
-{"sprint": "h-7", "depends_on": ["h-0"]}
-{"sprint": "h-8", "depends_on": ["h-0"]}
-{"sprint": "h-9", "depends_on": ["h-0"]}
-{"sprint": "h-10", "depends_on": ["h-0"]}
-{"sprint": "h-12", "depends_on": ["h-0"]}
-{"sprint": "h-11", "depends_on": ["h-1", "h-2", "h-3", "h-5", "h-6", "h-7", "h-8", "h-9", "h-10"]}
-{"sprint": "h-4", "depends_on": ["h-1", "h-2", "h-3", "h-5", "h-6", "h-7", "h-8", "h-9", "h-10", "h-12"]}
+{"sprint": "h-3", "depends_on": ["h-2"]}
