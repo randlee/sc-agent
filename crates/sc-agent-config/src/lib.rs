@@ -106,8 +106,8 @@ pub fn config(
     let mut files: Vec<PathBuf> = root
         .map(|r| {
             vec![
-                r.join(".sc-agent/decidr.json"),
-                r.join(".sc-agent/sc-agent.json"),
+                r.join(".sc/sc-agent/decidr.json"),
+                r.join(".sc/sc-agent/sc-agent.json"),
             ]
         })
         .unwrap_or_default();
