@@ -14,6 +14,7 @@ sc-agent-http.workspace = true
 sc-agent-log.workspace = true
 sc-decision-schema.workspace = true
 serde_json = { version = "1", features = ["preserve_order"] }
+sc-observability = "=1.5.0"
 pyo3 = { version = "0.29", features = ["abi3-py311"] }
 
 [lints]
