@@ -1,47 +1,28 @@
 [package]
-repository.workspace = true
-homepage.workspace = true
-authors.workspace = true
-name = "decidr"            # crates.io name decidr
+name = "decidr"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Command-line client for the TypeSafe (Jev) decision API."
+repository.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types.workspace = true
+sc-agent-http.workspace = true
+sc-agent-secrets.workspace = true
+sc-agent-log.workspace = true
+sc-agent-config.workspace = true
+sc-llm-provider.workspace = true
+sc-decision-schema.workspace = true
+sc-decision-systemone.workspace = true
+sc-decision-llm.workspace = true
+sc-decision-runner.workspace = true
+sc-decision-local.workspace = true
+serde_json = { version = "1", features = ["preserve_order"] }
+sc-config = { git = "https://github.com/randlee/sc-runtime", rev = "eb293db8324a5129a8cf719b34b0687f9351de13" }
+clap = { version = "4", features = ["derive"] }
+ctrlc = "3"
 
 [lints]
 workspace = true
-
-[dependencies]
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "raw_value"] }
-sc-agent-types = { workspace = true }
-sc-agent-config = { workspace = true }
-sc-agent-secrets = { workspace = true }
-sc-agent-log = { workspace = true }
-sc-agent-http = { workspace = true }
-sc-decision-schema = { workspace = true }
-sc-decision-systemone = { workspace = true }
-sc-decision-local = { workspace = true }
-sc-llm-provider = { workspace = true }
-sc-decision-llm = { workspace = true }
-sc-decision-runner = { workspace = true }
-
-ctrlc = { version = "3", features = ["termination"] }   # sync; SIGINT/SIGTERM, Ctrl-C/Ctrl-Break; no tokio (REQ-SAG-0011)
-
-[dev-dependencies]
-sc-agent-secrets = { workspace = true, features = ["test-keyring-guard"] }
-sc-agent-testkit = { workspace = true }
-sc-agent-http = { workspace = true, features = ["testing"] }   # ScriptedTransport, BlockingTransport
-sc-agent-log = { workspace = true, features = ["testing"] }     # MemoryLog
-tempfile = "3"
-sc-observability = "=1.5.0"   # a notifying LogSink for ordering tests (tests/common)
-
-[lib]
-name = "decidr"
-path = "src/lib.rs"
-
-[[bin]]
-name = "decidr"
-path = "src/main.rs"

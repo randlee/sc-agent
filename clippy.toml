@@ -8,5 +8,4 @@ allow-indexing-slicing-in-tests = true
 disallowed-methods = [
     { path = "std::thread::sleep", reason = "no sleep: wait on a deadline or a CancelToken (REQ-SAG-0010)" },
     { path = "std::thread::sleep_until", reason = "no sleep: wait on a deadline or a CancelToken (REQ-SAG-0010)" },
-    { path = "sc_agent_secrets::ApiKey::as_str", reason = "the key is read only at sc-agent-http's ureq_transport (A-5)" },
 ]

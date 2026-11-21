@@ -34,7 +34,6 @@ name = "cli"
 path = "tests/cli.rs"
 
 [dev-dependencies]
-sc-agent-testkit = { workspace = true }
 tempfile = "3"
 
 [[example]]

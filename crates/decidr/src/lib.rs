@@ -1,43 +1,50 @@
-//! decidr's library target: the composition root shared by the `decidr` binary and
-//! sc-agent-py (ADR-SAG-0004).
-//!
-//! It chooses the backend (a configured local runner, TypeSafe, or an LLM provider by
-//! ranking), wires one `DecisionRunner` over one `HttpClient`, reads requests within the
-//! REQ-SAG-0014 limits, and lists models and diagnostics. Every operation returns
-//! [`DecidrError`]; a failed decision is data in its `DecisionResult`.
-//!
-//! # Examples
-//!
-//! ```
-//! use decidr::input::build_request;
-//!
-//! let json = br#"{"model":"jev-latest","state":"s","questions":{"q":{"type":"noul"}}}"#;
-//! let request = build_request(json, &[], false, None)?;
-//! assert_eq!(request.digests().len(), 1);
-//! # Ok::<(), decidr::DecidrError>(())
-//! ```
-
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+//! decidr's composition root: picks the provider and key, builds the backend once, and
+//! returns a [`Decision`]. The CLI and the Python module both start here.
 
-pub mod input;
-pub mod output;
-pub mod signal;
+use sc_agent_http::Policy;
+use sc_agent_log::Session;
+use sc_agent_types::Error;
+use sc_decision_runner::{Decider, Decision};
+use sc_decision_schema::Backend;
 
-mod doctor;
-mod error;
-mod select;
-mod timeout;
+/// The decision backend for a provider: the Jev API itself, or a chat model through
+/// [`FromLlm`]. The key and base URL are checked here, once.
+pub fn backend(
+    provider: &sc_agent_types::providers::Provider,
+    key: Option<String>,
+) -> Result<Box<dyn Backend>, Error> {
+    match provider.wire {
+        sc_agent_types::providers::Wire::SystemOne => Ok(Box::new(
+            sc_decision_systemone::SystemOne::new(provider.base_url, key.as_deref())?,
+        )),
+        _ => Ok(Box::new(sc_decision_llm::FromLlm::new(
+            sc_llm_provider::backend(provider, key)?,
+        ))),
+    }
+}
 
-#[doc(inline)]
-pub use doctor::{DetectedKey, DoctorOptions, DoctorReport, MissingModel, Tie, doctor};
-#[doc(inline)]
-pub use error::DecidrError;
-#[doc(inline)]
-pub use select::{
-    Context, ModelSelector, ModelsOptions, SendOptions, general_logger, load_config, models, send,
-    send_batch, send_batch_on, send_batch_with, send_on, send_with, session_identity,
-    session_logger,
-};
-#[doc(inline)]
-pub use timeout::{CallLimits, RequestTimeout, Workers};
+/// A decider for `model` (short name or id) on `provider`, or the first provider in ranking
+/// order with a key. Returns it with the provider's model id, which goes into each request.
+pub fn open(
+    model: &str,
+    provider: Option<&str>,
+    repo_root: Option<&std::path::Path>,
+    policy: Policy,
+    session: Option<Session>,
+) -> Result<(Box<dyn Decision>, String), Error> {
+    let key =
+        |p: &sc_agent_types::providers::Provider| sc_agent_secrets::key(p.key_var, repo_root, None);
+    let (chosen, id) = sc_agent_types::providers::Provider::choose(model, provider, |p| {
+        matches!(key(p), Ok(Some(_)))
+    })?;
+    let found = key(chosen)?.map(|(value, _)| value);
+    let found = Some(found.ok_or_else(|| Error::MissingKey {
+        provider: chosen.name.into(),
+        var: chosen.key_var.into(),
+    })?);
+    Ok((
+        Box::new(Decider::new(backend(chosen, found)?, policy, session)),
+        id,
+    ))
+}
