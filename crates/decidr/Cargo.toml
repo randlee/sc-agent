@@ -32,10 +32,5 @@ serde = { version = "1", features = ["derive"] }
 sc-agent-http = { workspace = true, features = ["test-server"] }
 tempfile = "3"
 
-[[example]]
-name = "gen-cli-model"
-path = "examples/gen-cli-model.rs"
-test = true
-
 [lints]
 workspace = true

@@ -83,9 +83,7 @@ def bump_version(current: str, version: str) -> None:
     changelog.write_text(notes)
     if version != current:
         subprocess.run(["cargo", "update", "--workspace"], cwd=ROOT, check=True)
-        docli = tomllib.loads((ROOT / "release/publish-preflight.toml").read_text())["docli"]
-        subprocess.run(["bash", docli["generate_script"]], cwd=ROOT, check=True)
-        changed.extend(["Cargo.lock", "CHANGELOG.md", *docli["drift_paths"]])
+        changed.extend(["Cargo.lock", "CHANGELOG.md"])
     else:
         changed.append("CHANGELOG.md")
     git("add", "--", *changed, capture=False)
@@ -119,8 +117,8 @@ def main() -> int:
         return 2
     tag = policy["tag_prefix"] + version
     if args.dry_run:
-        updates = ("update manifests/Cargo.lock and regenerate CLI docs" if version != current
-                   else "keep manifests/Cargo.lock and CLI docs unchanged")
+        updates = ("update manifests and Cargo.lock" if version != current
+                   else "keep manifests and Cargo.lock unchanged")
         print(f"would select {tag}; freeze Unreleased as {version}; {updates}; commit release notes and create/push tag")
         return 0
     bump_version(current, version)

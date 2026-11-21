@@ -41,7 +41,7 @@ except sc_treesitter.TreesitterError as error:
 
 ## Features
 
-None of its own. It builds `sc-treesitter` with the `python` feature and the default grammars (`grammar-python`, `grammar-rust`). PyO3 uses `abi3-py311` and `extension-module`.
+None of its own. It builds `sc-treesitter` with the `python` feature; both shipped grammars are compiled in. PyO3 uses `abi3-py311` and `extension-module`.
 
 ## Depends on
 

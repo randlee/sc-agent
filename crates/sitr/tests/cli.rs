@@ -1,4 +1,4 @@
-//! `sitr` end-to-end tests (feature `cli`): each runs the built binary with
+//! `sitr` end-to-end tests: each runs the built binary with
 //! `SITR_LOG_ROOT=<tempdir>/.sc-agent`, so the general log lands in the tempdir. No test sets
 //! HOME or USERPROFILE (cross-platform guidelines; closes agt-bkj).
 
@@ -76,7 +76,6 @@ fn success(output: &Output) {
 }
 
 /// AC: REQ-SAG-0303 sitr listings.
-#[cfg(all(feature = "grammar-python", feature = "grammar-rust"))]
 #[test]
 fn cli_languages_and_queries_list_pinned_assets() {
     let home = tempfile::tempdir().expect("home");
@@ -98,7 +97,6 @@ fn cli_languages_and_queries_list_pinned_assets() {
 }
 
 /// AC: sitr query.
-#[cfg(feature = "grammar-rust")]
 #[test]
 fn query_prints_captures_matching_the_golden() {
     let home = tempfile::tempdir().expect("home");
@@ -151,7 +149,6 @@ fn unknown_language_and_missing_positional_fail_with_ids() {
 }
 
 /// AC: REQ-SAG-0002 lowest-layer sitr.
-#[cfg(feature = "grammar-python")]
 #[test]
 fn non_utf8_file_reaches_stderr_as_not_utf8() {
     let home = tempfile::tempdir().expect("home");

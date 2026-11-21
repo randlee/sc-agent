@@ -358,15 +358,6 @@
       "installer_target": "x86_64-pc-windows-msvc"
     }
   },
-  "docli": {
-    "enabled": true,
-    "generate_script": "scripts/generate-cli-docs.sh",
-    "drift_paths": [
-      "fixtures/cli/",
-      "site/cli/"
-    ],
-    "description": "CLI reference HTML for decidr and sitr matches the clap command trees"
-  },
   "prerelease": {
     "tag_prefix": "prerelease/v",
     "tag_script": "scripts/prerelease_tag.py",
