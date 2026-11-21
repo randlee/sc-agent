@@ -65,57 +65,10 @@ impl LocalDaemon for Strands {
     }
 }
 
-pub struct Mapika;
-impl LocalDaemon for Mapika {
-    fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error> {
-        #[derive(Deserialize)]
-        struct Health {
-            ok: bool,
-            model: Option<String>,
-        }
-        let health = parse::<Health>(body)?;
-        Ok(match health.model {
-            Some(m) if m == model && health.ok => Availability::Loaded,
-            Some(m) if m != model => Availability::Other(vec![m]),
-            _ => Availability::Loading,
-        })
-    }
-}
-
-/// Any daemon serving the Jev model list.
-pub struct Generic;
-impl LocalDaemon for Generic {
-    fn probe_path(&self) -> &'static str {
-        "/v1/models"
-    }
-    fn availability(&self, body: &[u8], model: &str) -> Result<Availability, Error> {
-        #[derive(Deserialize)]
-        struct Entry {
-            name: String,
-        }
-        #[derive(Deserialize)]
-        struct List {
-            models: Vec<Entry>,
-        }
-        let names: Vec<String> = parse::<List>(body)?
-            .models
-            .into_iter()
-            .map(|e| e.name)
-            .collect();
-        Ok(if names.iter().any(|n| n == model) {
-            Availability::Loaded
-        } else {
-            Availability::Other(names)
-        })
-    }
-}
-
 pub fn daemon(kind: &str) -> Result<Box<dyn LocalDaemon>, Error> {
     Ok(match kind {
         "laya" => Box::new(Laya),
         "strands" => Box::new(Strands),
-        "mapika" => Box::new(Mapika),
-        "generic" => Box::new(Generic),
         other => return Err(Error::Config(format!("unknown local runner kind {other}"))),
     })
 }
@@ -174,12 +127,12 @@ impl Local {
 
     /// Probes until the model is loaded (or loads on demand), the load timeout passes, or
     /// cancel. The wait between probes is cancellable; nothing sleeps.
-    pub fn wait_loaded(&self, model: &str, cancel: &Cancel) -> Result<(), Error> {
+    pub fn wait_loaded(&self, model: &str, cancel: &Cancel) -> Result<Availability, Error> {
         let deadline = Instant::now() + self.load_timeout;
         loop {
             let model = model.to_owned();
             match self.probe.send(&model, cancel)? {
-                Availability::Loaded | Availability::LoadsOnDemand => return Ok(()),
+                a @ (Availability::Loaded | Availability::LoadsOnDemand) => return Ok(a),
                 Availability::Other(served) => {
                     return Err(Error::Config(format!(
                         "runner serves {served:?}, not {model}"

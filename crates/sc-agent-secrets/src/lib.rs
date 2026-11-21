@@ -36,8 +36,7 @@ pub fn key(
         repo_root,
         |var| {
             let user = whoami::username();
-            let (service, account) = keyring.unwrap_or_default();
-            let (service, account) = (service.unwrap_or(var), account.unwrap_or(&user));
+            let (service, account) = entry(var, keyring, &user);
             let entry =
                 keyring::Entry::new(service, account).map_err(|e| Error::Keyring(e.to_string()))?;
             match entry.get_password() {
@@ -47,6 +46,16 @@ pub fn key(
             }
         },
     )
+}
+
+/// The keyring entry for this call; omitted components use the provider and OS user.
+pub fn entry<'a>(
+    var: &'a str,
+    keyring: Option<(Option<&'a str>, Option<&'a str>)>,
+    user: &'a str,
+) -> (&'a str, &'a str) {
+    let (service, account) = keyring.unwrap_or_default();
+    (service.unwrap_or(var), account.unwrap_or(user))
 }
 
 /// The lookup order over given sources; a blank value counts as absent.

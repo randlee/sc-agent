@@ -20,6 +20,19 @@ fn key_lookup_order_and_redaction() {
             .0,
         "from-dotenv"
     );
+    assert_eq!(keys::entry("K", None, "os-user"), ("K", "os-user"));
+    assert_eq!(
+        keys::entry("K", Some((Some("custom"), None)), "os-user"),
+        ("custom", "os-user")
+    );
+    assert_eq!(
+        keys::entry("K", Some((None, Some("alice"))), "os-user"),
+        ("K", "alice")
+    );
+    assert_eq!(
+        keys::entry("K", Some((Some("both"), Some("bob"))), "os-user"),
+        ("both", "bob")
+    );
     let ring = |_: &str| Ok(Some("from-ring".to_owned()));
     assert_eq!(
         keys::lookup("K", |_| None, None, ring).unwrap().unwrap().1,

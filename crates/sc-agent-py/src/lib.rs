@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
-use sc_agent_http::{Cancel, Policy};
+use sc_agent_http::Cancel;
 use sc_agent_log::{Session, record, repo_id};
 use sc_agent_types::Error;
 use sc_decision_schema::DecisionRequest;
@@ -112,9 +112,17 @@ fn decide_all(
     keyring_service: Option<&Bound<'_, PyAny>>,
     keyring_account: Option<&Bound<'_, PyAny>>,
     cancel: Option<&CancelToken>,
+    on_result: Option<Py<PyAny>>,
 ) -> Vec<Value> {
     let count = requests.len();
     let cancel = cancel.map(|c| c.0.clone()).unwrap_or_default();
+    let notify = |value: Value| match on_result
+        .as_ref()
+        .map(|cb| Python::attach(|py| cb.call1(py, (value.to_string(),))))
+    {
+        Some(Err(e)) => error_value(&Error::Config(format!("on_result raised: {e}"))),
+        _ => value,
+    };
     let options = (|| {
         let numeric = |v: &Bound<'_, PyAny>| {
             if v.is_instance_of::<pyo3::types::PyBool>() {
@@ -138,12 +146,15 @@ fn decide_all(
         };
         let service = keyring_service.map(text).transpose()?;
         let account = keyring_account.map(text).transpose()?;
-        Ok::<_, Error>((timeout, workers.unwrap_or(8), service, account))
+        Ok::<_, Error>((timeout, workers, service, account))
     })();
     let result = options.and_then(|(timeout, workers, service, account)| {
         guarded(py, || {
             if count == 0 {
                 return Ok(Vec::new());
+            }
+            if cancel.is_cancelled() {
+                return Err(Error::Cancelled { sends: 0 });
             }
             let requests = requests
                 .iter()
@@ -154,15 +165,15 @@ fn decide_all(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let cwd = std::env::current_dir().unwrap_or_default();
+            let root = sc_agent_config::repo_root();
+            let config = sc_agent_config::config(Some(project), root.as_deref())?.config;
+            let (policy, workers) = decidr::policy(&config, workers, timeout, None);
             let session = Session::open(&logger.1, repo_id(&cwd), project, agent_role)?;
             let (decision, id) = decidr::open(
                 model,
                 provider,
-                Some(&cwd),
-                Policy {
-                    timeout: timeout.unwrap_or(Policy::default().timeout),
-                    ..Policy::default()
-                },
+                root.as_deref(),
+                policy,
                 Some(session),
                 Some((service.as_deref(), account.as_deref())),
             )?;
@@ -179,13 +190,13 @@ fn decide_all(
                     serde_json::to_value(r).map_err(|e| Error::ResponseParse(e.to_string()))
                 });
                 if let Some(slot) = replies.get_mut(outcome.position) {
-                    *slot = reply(value);
+                    *slot = notify(reply(value));
                 }
             });
             Ok(replies)
         })
     });
-    let replies = result.unwrap_or_else(|e| vec![error_value(&e); count]);
+    let replies = result.unwrap_or_else(|e| (0..count).map(|_| notify(error_value(&e))).collect());
     for r in &replies {
         let mut fields = Map::new();
         fields.insert("model".into(), model.into());
@@ -230,6 +241,7 @@ fn send(
         keyring_service,
         keyring_account,
         cancel,
+        None,
     )
     .swap_remove(0)
     .to_string()
@@ -237,7 +249,7 @@ fn send(
 
 /// Decide every request on `workers` threads; one reply per request, in input order.
 #[pyfunction]
-#[pyo3(signature = (requests, model, project, agent_role, logger, provider=None, workers=None, cancel=None, *, timeout_secs=None, keyring_service=None, keyring_account=None))]
+#[pyo3(signature = (requests, model, project, agent_role, logger, provider=None, workers=None, cancel=None, *, timeout_secs=None, keyring_service=None, keyring_account=None, on_result=None))]
 #[expect(clippy::too_many_arguments, reason = "the Python keyword arguments")]
 fn send_batch(
     py: Python<'_>,
@@ -252,6 +264,7 @@ fn send_batch(
     timeout_secs: Option<&Bound<'_, PyAny>>,
     keyring_service: Option<&Bound<'_, PyAny>>,
     keyring_account: Option<&Bound<'_, PyAny>>,
+    on_result: Option<Py<PyAny>>,
 ) -> Vec<String> {
     decide_all(
         py,
@@ -266,6 +279,7 @@ fn send_batch(
         keyring_service,
         keyring_account,
         cancel,
+        on_result,
     )
     .iter()
     .map(Value::to_string)
