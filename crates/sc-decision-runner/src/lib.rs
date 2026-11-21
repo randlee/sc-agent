@@ -28,6 +28,7 @@ impl Outcome {
 }
 
 /// What callers use, whatever is behind it.
+/// This is an open trait; downstream crates may implement it.
 pub trait Decision: Send + Sync {
     fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome;
 

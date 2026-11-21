@@ -15,6 +15,7 @@ use sc_agent_types::Error;
 pub use ureq::http;
 
 /// A remote API, sans I/O: how to build a request and how to read its reply.
+/// This is an open trait; downstream crates may implement it.
 pub trait Codec: Send + Sync {
     type Request;
     type Response;
