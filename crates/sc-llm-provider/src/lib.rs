@@ -124,6 +124,8 @@ impl Reply {
 }
 
 /// Any chat backend: a [`Codec`] from [`Chat`] to [`Reply`].
+/// Implemented automatically for every [`Codec`] with these request and response types;
+/// implement [`Codec`] rather than this trait.
 pub trait Llm: Codec<Request = Chat, Response = Reply> {}
 impl<T: Codec<Request = Chat, Response = Reply> + ?Sized> Llm for T {}
 

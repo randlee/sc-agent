@@ -16,7 +16,7 @@ Cited REQ/NFR/ADR records say what each sprint touches. Where an older record co
 
 ## h-0: move crates/ to crates-ref/ and land the starting code
 
-Branch `sprint/h-0-crates-ref-layout` → PR into `integrate/phase-h`. Difficulty fast. Requirements NFR-SAG-0003; ADRs ADR-SAG-0004, ADR-SAG-0019.
+Branch `sprint/h-0-crates-ref-layout` → PR into `integrate/phase-h`. Difficulty fast. Requirements NFR-SAG-0003; ADRs ADR-SAG-0004, ADR-SAG-0019, ADR-SAG-0005.
 
 ### Goal
 The starting code replaces the old crates, with the old crates kept beside it as crates-ref/.
@@ -51,7 +51,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-1: sc-agent-http: busy replies are resent with REQ-SAG-0601 holdoffs; a busy reply pauses the client
 
-Branch `sprint/h-1-busy-pause` → PR into `sprint/h-0-crates-ref-layout`. Difficulty normal. Requirements REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0012; ADRs NONE.
+Branch `sprint/h-1-busy-pause` → PR into `sprint/h-0-crates-ref-layout`. Difficulty normal. Requirements REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0012; ADRs ADR-SAG-0004, ADR-SAG-0019.
 
 ### Goal
 A busy reply is resent after the holdoff REQ-SAG-0601 sets, and every sender on the same client waits it out.
@@ -90,7 +90,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-2: sc-agent-log: general Logger and one record helper
 
-Branch `sprint/h-2-log-general` → PR into `sprint/h-0-crates-ref-layout`. Difficulty fast. Requirements REQ-SAG-0008, REQ-SAG-0005, REQ-SAG-0004; ADRs ADR-SAG-0021, ADR-SAG-0002.
+Branch `sprint/h-2-log-general` → PR into `sprint/h-0-crates-ref-layout`. Difficulty fast. Requirements REQ-SAG-0008, REQ-SAG-0005, REQ-SAG-0004; ADRs ADR-SAG-0021, ADR-SAG-0002, ADR-SAG-0004.
 
 ### Goal
 Callers get a general sc-observability Logger and write records through one helper.
@@ -124,7 +124,7 @@ Sanity and QA re-run every command above at the PR head and compare the behaviou
 
 ## h-3: sc-agent-py: send, send_batch, CancelToken and the injected Logger
 
-Branch `sprint/h-3-wheel` → PR into `sprint/h-2-log-general`. Difficulty normal. Requirements REQ-SAG-0018, REQ-SAG-0022, REQ-SAG-0016, REQ-SAG-0005, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0008; ADRs ADR-SAG-0005, ADR-SAG-0021, ADR-SAG-0019.
+Branch `sprint/h-3-wheel` → PR into `sprint/h-2-log-general`. Difficulty normal. Requirements REQ-SAG-0018, REQ-SAG-0022, REQ-SAG-0016, REQ-SAG-0005, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0008; ADRs ADR-SAG-0005, ADR-SAG-0021, ADR-SAG-0019, ADR-SAG-0004, ADR-SAG-0020.
 
 ### Goal
 Python calls decisions through the wheel with errors as values, cancel, and its own Logger.

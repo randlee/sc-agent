@@ -127,5 +127,7 @@ impl DecisionRequest {
 
 /// Any decision backend: a [`Codec`] from a [`DecisionRequest`] to a [`DecisionResponse`]
 /// (ADR-SAG-0001). The shared client does the sending.
+/// Implemented automatically for every [`Codec`] with these request and response types;
+/// implement [`Codec`] rather than this trait.
 pub trait Backend: Codec<Request = DecisionRequest, Response = DecisionResponse> {}
 impl<T: Codec<Request = DecisionRequest, Response = DecisionResponse> + ?Sized> Backend for T {}

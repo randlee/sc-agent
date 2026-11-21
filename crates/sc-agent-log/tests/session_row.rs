@@ -27,7 +27,13 @@ fn session_row_carries_repo_project_and_role() {
     let rows = lines(
         &root
             .path()
-            .join("sessions/github.com/o/r/role/proj/sessions.jsonl"),
+            .join("sessions")
+            .join("github.com")
+            .join("o")
+            .join("r")
+            .join("role")
+            .join("proj")
+            .join("sessions.jsonl"),
     );
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0]["target"], "sc_agent.session");

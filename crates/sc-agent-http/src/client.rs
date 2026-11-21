@@ -264,6 +264,7 @@ impl<C: Codec> Client<C> {
         C::Request: Send,
         C::Response: Send,
     {
+        // This mutex contains only the batch work queue; recovering poison retains queued work.
         let queue = Mutex::new(requests.into_iter().enumerate());
         let (tx, rx) = mpsc::channel();
         std::thread::scope(|scope| {
