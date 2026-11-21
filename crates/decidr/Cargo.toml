@@ -30,6 +30,7 @@ ctrlc = "3"
 [dev-dependencies]
 sc-agent-http = { workspace = true, features = ["test-server"] }
 tempfile = "3"
+wait-timeout = "0.2"
 
 [lints]
 workspace = true
