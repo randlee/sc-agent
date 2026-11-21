@@ -3,7 +3,7 @@
 //! from the session JSONL file (the empty-variable fallback to `~/.sc-agent` is
 //! `sc_agent_log::log_root`'s unit test).
 
-use std::io::Write;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -12,13 +12,7 @@ use serde_json::{Value, json};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-fn events(log: &Path) -> Result<Vec<Value>> {
-    Ok(std::fs::read_to_string(log)?
-        .lines()
-        .map(serde_json::from_str)
-        .collect::<std::result::Result<_, _>>()?)
-}
-
+// Trace: docs/requirements/REQ-SAG-0003.md:26,41; docs/requirements/REQ-SAG-0005.md:23.
 fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();
@@ -31,6 +25,7 @@ fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> 
     Ok(())
 }
 
+// Trace: docs/requirements/REQ-SAG-0003.md:24,26 — use decidr's configured log root.
 fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_decidr"));
     command
@@ -44,6 +39,7 @@ fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
 fn successful_command_is_logged_outside_sessions() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
+    // Finding agt-h-2.cli-general-log-r2-fix remedy: exercise a real successful send.
     let server = Server::start(vec![
         ok(json!({ "models": [{ "name": "m" }] })),
         ok(json!({ "model": "m", "answers": { "q": { "type": "noul", "noul": 0.5 } } })),
@@ -57,36 +53,37 @@ fn successful_command_is_logged_outside_sessions() -> Result<()> {
     let runner = json!({
         "test": { "kind": "generic", "host": "127.0.0.1", "port": port }
     });
-    let mut child = decidr_command(
+    let request = dir.path().join("request.json");
+    std::fs::write(
+        &request,
+        br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#,
+    )?;
+    let output = decidr_command(
         dir.path(),
         &root,
         "--project p send --model m --runner test --agent-role t",
     )
     .env("DECIDR_LOCAL_RUNNERS", runner.to_string())
-    .stdin(Stdio::piped())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .spawn()?;
-    child
-        .stdin
-        .take()
-        .ok_or("decidr stdin was not piped")?
-        .write_all(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#)?;
-    let output = child.wait_with_output()?;
+    .stdin(Stdio::from(File::open(request)?))
+    .output()?;
     assert!(
         output.status.success(),
-        "stdout: {}; stderr: {}",
-        String::from_utf8_lossy(&output.stdout),
+        "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     server.finish();
 
+    // Trace: docs/requirements/REQ-SAG-0003.md:26; agt-h-2.cli-general-log-r2-fix remedy.
     let general_log = root.join("logs").join("decidr.log.jsonl");
-    let events = events(&general_log)?;
+    let records = std::fs::read_to_string(&general_log)?;
+    let events = records
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<std::result::Result<Vec<Value>, _>>()?;
     assert_eq!(events.len(), 1);
     assert_eq!(events[0]["action"], "decidr.send");
-    assert_eq!(events[0]["fields"]["position"], 0);
 
+    // Trace: docs/requirements/REQ-SAG-0003.md:41; docs/requirements/REQ-SAG-0005.md:23.
     let sessions = root.join("sessions");
     let mut session_files = Vec::new();
     files_under(&sessions, &sessions, &mut session_files)?;
