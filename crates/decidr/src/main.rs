@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use sc_agent_config::{KEYS, config, repo_root};
 use sc_agent_http::{Cancel, Policy};
 use sc_agent_log::{Session, general, log_root, record, repo_id};
@@ -19,40 +19,8 @@ use sc_decision_schema::DecisionRequest;
 use sc_observability::v2::Logger;
 use serde_json::{Map, json};
 
-#[derive(Parser)]
-#[command(name = "decidr", version)]
-struct Cli {
-    #[arg(long, global = true)]
-    project: Option<String>,
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Decide the request on stdin (or a JSONL batch with --batch).
-    Send {
-        #[arg(long)]
-        model: String,
-        #[arg(long)]
-        provider: Option<String>,
-        /// A local runner named in config.
-        #[arg(long, conflicts_with = "provider")]
-        runner: Option<String>,
-        #[arg(long)]
-        agent_role: String,
-        #[arg(long)]
-        batch: bool,
-        #[arg(long, requires = "batch")]
-        workers: Option<usize>,
-        #[arg(long)]
-        timeout_secs: Option<u64>,
-    },
-    /// The model table.
-    Models,
-    /// Settings with their sources, and where each provider key comes from.
-    Doctor,
-}
+mod cli;
+use cli::{Cli, Command};
 
 /// The entry point owns the process's one Logger (ADR-SAG-0021): `logs/decidr.log.jsonl`
 /// under [`log_root`]. Every send and every failed command is recorded to it.
