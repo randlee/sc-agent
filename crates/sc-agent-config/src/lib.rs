@@ -132,8 +132,50 @@ pub fn config(
         keys: KEYS,
         environment: &environment,
     };
-    layers::load(&inputs, serde_json::from_value::<Config>, |_| None)
-        .map_err(|e| Error::Config(e.to_string()))
+    layers::load(&inputs, decode, |e| {
+        e.strip_prefix("invalid ")
+            .and_then(|s| s.split_once(':').map(|(path, _)| path))
+    })
+    .map_err(|e| Error::Config(e.to_string()))
+}
+
+fn decode(value: Value) -> Result<Config, String> {
+    let config: Config = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    if config.workers.is_some_and(|v| !(1..=64).contains(&v)) {
+        return Err("invalid workers: out of range".into());
+    }
+    if config.max_sends.is_some_and(|v| !(1..=10).contains(&v)) {
+        return Err("invalid max_sends: out of range".into());
+    }
+    for (name, r) in &config.local_runners {
+        for (field, valid) in [
+            ("port", r.port != 0),
+            (
+                "host",
+                r.host.parse::<std::net::IpAddr>().is_ok()
+                    || (!r.host.is_empty()
+                        && !r
+                            .host
+                            .chars()
+                            .any(|c| c.is_whitespace() || ":/?#@".contains(c))),
+            ),
+            (
+                "load_timeout_secs",
+                (10..=7200).contains(&r.load_timeout_secs),
+            ),
+            (
+                "kind",
+                matches!(r.kind.as_str(), "generic" | "laya" | "strands" | "mapika"),
+            ),
+        ] {
+            if !valid {
+                return Err(format!(
+                    "invalid local_runners.{name}.{field}: invalid value"
+                ));
+            }
+        }
+    }
+    Ok(config)
 }
 
 #[cfg(test)]
@@ -177,7 +219,7 @@ mod tests {
             environment: &environment,
         };
 
-        let loaded = layers::load(&inputs, serde_json::from_value::<Config>, |_| None)
+        let loaded = layers::load(&inputs, decode, |_| None)
             .expect("valid local runner environment is accepted");
         let runner = loaded
             .config
@@ -188,6 +230,19 @@ mod tests {
         assert_eq!(runner.host, "127.0.0.1");
         assert_eq!(runner.port, 12345);
         assert_eq!(runner.load_timeout_secs, 600);
+        assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
+        let invalid = [("DECIDR_WORKERS".into(), "0".into())];
+        let inputs = Inputs {
+            environment: &invalid,
+            ..inputs
+        };
+        let error = layers::load(&inputs, decode, |e| {
+            e.strip_prefix("invalid ")
+                .and_then(|s| s.split_once(':').map(|(path, _)| path))
+        })
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("DECIDR_WORKERS"));
     }
 }
 
