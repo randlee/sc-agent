@@ -1,9 +1,9 @@
 # Requirement: Configuration environment variable names
 
 **Status:** Proposed  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -20,7 +20,7 @@ Definitions: A CLI is one of sc-agent's command-line programs, such as `decidr` 
 
 - The environment variable for a CLI setting MUST be `<CLI>_` followed by the key path's keys in upper case joined by `__`, such as `DECIDR_WORKERS` for `workers` and `DECIDR_LOCAL_RUNNERS__LAYA__PORT` for `local_runners.laya.port`.
 - Every CLI MUST take the project/phase from the `SC_PROJECT` environment variable.
-- When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_LOG_ROOT` and `SITR_LOG_ROOT`.
+- When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
 - A failed validation of an environment value MUST name the environment variable.
 
@@ -40,7 +40,6 @@ A per-CLI prefix keeps an override meant for one CLI from changing another. The 
 - [ ] With `DECIDR_LOCAL_RUNNERS__LAYA__PORT=9000` set, `decidr doctor` reports the setting `local_runners.laya.port` with value 9000 and source `DECIDR_LOCAL_RUNNERS__LAYA__PORT`.
 - [ ] With `DECIDR_WORKERS=3` set, `decidr doctor` reports the setting `workers` with value 3 and source `DECIDR_WORKERS`, and `sitr doctor` reports the same rows as it reports without `DECIDR_WORKERS` set.
 - [ ] With `SC_PROJECT=phase-d` set, `decidr doctor` and `sitr doctor` both report the setting `project` with value `phase-d` and source `SC_PROJECT`.
-- [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the setting `log_root` with value `/tmp/x` and source `DECIDR_LOG_ROOT`, and `sitr doctor` reports no setting whose source is `DECIDR_LOG_ROOT`.
 - [ ] With `SC_AGENT__WORKERS=3` set, `decidr doctor` reports no setting whose source is `SC_AGENT__WORKERS`.
 - [ ] With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `"workers": 0` in the local `decidr.json` it exits with the same check's error naming that file and `workers`.
 

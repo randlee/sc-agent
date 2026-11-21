@@ -1,9 +1,9 @@
 # Requirement: Configuration file locations and lookup order
 
 **Status:** Proposed  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -59,7 +59,7 @@ One shared doctor routine makes the shared rows the same in every CLI. One file 
 **Acceptance Criteria:**
 
 - [ ] With `workers` set to 4 in the global `decidr.json` and 2 in the local `decidr.json`, decidr uses 2 and reports the local `decidr.json` as its source.
-- [ ] With `log_root` set only in the global `sc-agent.json`, decidr and sitr both use it.
+- [ ] With `project` set only in the global `sc-agent.json`, decidr and sitr both use it.
 - [ ] With a setting in the local `sc-agent.json` and the global `decidr.json`, decidr uses the local `sc-agent.json` value.
 - [ ] A flag value beats the same setting in the environment and in every file.
 - [ ] Outside a git work tree, a `.sc/sc-agent/decidr.json` in the current folder is not read.

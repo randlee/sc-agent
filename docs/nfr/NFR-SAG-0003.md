@@ -1,14 +1,14 @@
-# Requirement: One Python floor for sc-agent's wheels and their consumers
+# Requirement: One Python floor for sc-agent's wheel and its consumers
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
 
-## NFR-SAG-0003: One Python floor for sc-agent's wheels and their consumers
+## NFR-SAG-0003: One Python floor for sc-agent's wheel and its consumers
 
 **Status:** Approved  
 
@@ -18,7 +18,7 @@ Definitions:
 
 - `floors.toml` is the file at the repository root that writes down the workspace's floor values for sc-compose templates to read.
 - The Python floor is `[python].floor` in `floors.toml`.
-- The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel's stable-ABI tag.
+- The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets the wheel's stable-ABI tag.
 - The Python binding crates are `crates/sc-agent-py` and `crates/sc-treesitter` (its optional pyo3).
 
 **MUST statements:**

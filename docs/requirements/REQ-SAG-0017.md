@@ -1,7 +1,7 @@
 # Requirement: Every error id has a category or wrapper designation in its crate's catalog table, and the category is stored in the detail
 
 **Status:** Approved  
-**Version:** 0.3.1  
+**Version:** 0.4.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -17,7 +17,7 @@
 Definitions:
 
 - A catalog table is the `error_catalog!` table a crate writes for one of its error enums. Each row gives one variant's id and either its category or a wrapper designation. sc-agent-py's `PyBindingError` has its own catalog table.
-- The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
+- The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config` and `other`.
 - A wrapper is a variant whose cause is a whole lower error. Its detail takes its cause's category (REQ-SAG-0016).
 - A leaf variant is a variant that is not a wrapper.
 - A status-refined id is `llm.api_status`, `decision.api_status` or `local.probe_status`.
@@ -28,7 +28,7 @@ Definitions:
   | 401, 403 | `auth` |
   | 402 | `quota` |
   | 400, 422 | `validation` |
-  | 429, 500, 503, 504 | `busy` |
+  | any 429 or 5xx | `busy` |
   | any other status | `other` |
 
 - Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out. It is not a signal for an immediate retry loop.
@@ -44,7 +44,6 @@ Definitions:
   | validation | `decision.context_exceeded`, `decision.request_parse`, `decision.duplicate_key`, `decision.image_parts`, `decision.limits`, `decision.api_bad_request`, `decision.api_validation`, `decision_llm.invalid_max_tokens`, `decidr.usage`, `decidr.request_invalid`, `decidr.limit_exceeded`, `decidr.input_not_found`, `decidr.image_format`, `decidr.invalid_request_timeout`, `decidr.invalid_workers`, `http.invalid_request`, `log.invalid_slug`, `types.invalid_model_id`, `types.unknown_short_name`, `types.unknown_provider`, `types.invalid_var_name`, `types.invalid_session_id`, `sc_agent_py.invalid_option` |
   | cancelled | `decision.cancelled`, `decidr.signal` |
   | config | `decidr.ambiguous_keyring_override`, every `config.*` id, `decidr.unknown_runner`, `local.model_not_served`, `http.invalid_endpoint`, `http.key_on_plain_http`, `secrets.invalid_location`, `secrets.dotenv_read`, `types.invalid_release_date`, `types.model_on_two_lines`, `runner.invalid_config` |
-  | log | every `log.*` id except `log.invalid_slug` |
   | other | the status-refined ids, `llm.refused`, `decision.encode`, `decision_llm.encode`, `decision_llm.invariant`, `decision.shutdown`, `decidr.encode`, `decidr.write`, `decidr.input_read`, `decidr.image_read`, `sc_agent_py.worker_panicked` |
   | wrapper | `decision.http`, `decision.backend`, `llm.http`, `decision_llm.llm`, `local.http`, `local.decision`, `runner.session_log`, `decidr.config`, `decidr.types`, `decidr.secrets`, `decidr.log`, `decidr.local`, `decidr.decision`, `decidr.http`, `decidr.llm`, `decidr.runner` |
 
@@ -91,8 +90,8 @@ NFR-SAG-0002 is withdrawn (2026-11-20). Rand Lee: "schema isn't locked yet ... N
   | `decision.backend` over a 401 `llm.api_status` | `auth` |
   | `local.probe_status` with 429 | `busy` |
   | `decision.api_status` with 402 | `quota` |
-  | `decision.api_status` with 500, 503 or 504 | `busy` |
-  | `decision.api_status` with 501 | `other` |
+  | `decision.api_status` with 500, 501, 503 or 504 | `busy` |
+  | `decision.api_status` with 418 | `other` |
 - [ ] `sc_agent.category` of a checked-in detail written before `category` existed, which has no stored category, is `"other"`.
 - [ ] The published decidr crate exports no `integration_cases` or `validate_integration_results`, and the wheel has no `sc_agent.integration_cases` or `sc_agent.validate_integration_results`.
 

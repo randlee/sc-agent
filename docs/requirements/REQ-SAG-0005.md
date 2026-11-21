@@ -1,9 +1,9 @@
 # Requirement: Session log JSONL layout
 
 **Status:** Approved  
-**Version:** 0.3.1  
+**Version:** 0.3.2  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project.
+Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set; `<CLI>_LOG_ROOT` is a test override only (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project.
 
 **MUST statements:**
 

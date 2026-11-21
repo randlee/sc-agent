@@ -1,9 +1,9 @@
 # Requirement: Cancel token
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -17,7 +17,7 @@
 **MUST statements:**
 
 - `sc-agent-types` MUST provide the cancel token type.
-- The cancel token MUST be usable from every sc-agent crate other than `sc-treesitter`, the CLI and the PyO3 bindings.
+- The cancel token MUST be usable from every sc-agent crate other than `sc-treesitter`, including the CLI and the PyO3 bindings.
 
 ### Rationale
 

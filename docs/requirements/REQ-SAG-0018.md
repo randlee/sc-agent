@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.5.1  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -16,7 +16,7 @@
 
 Definitions:
 
-- The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum. sc-compose is an external tool, not a dependency of either wheel.
+- The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum. sc-compose is an external tool, not a dependency of the wheel.
 - The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
 - `floors.toml` is the file at the repository root that writes down the workspace's Python floor and sc-compose minimum.
 - The sc-decidr wheel holds both the decidr and the sitr Python API (ADR-SAG-0021), so they always have the same version.
