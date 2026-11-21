@@ -9,9 +9,16 @@
 )]
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::Duration;
+
+/// Failure-only bound: a passing test never waits on it. A connection that stalls, or a
+/// scripted reply the client never asks for, fails the test after this long instead of hanging.
+const DEADLINE: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug)]
 pub struct Seen {
@@ -35,7 +42,11 @@ impl Seen {
 
 pub struct Server {
     pub base: String,
+    addr: SocketAddr,
+    scripted: usize,
     seen: Arc<Mutex<Vec<Seen>>>,
+    stop: Arc<AtomicBool>,
+    done: Receiver<()>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -46,12 +57,24 @@ impl Server {
     /// Serves exactly `replies.len()` connections, in order.
     pub fn start(replies: Vec<Reply>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
+        let addr = listener.local_addr().unwrap();
+        let base = format!("http://{addr}");
+        let scripted = replies.len();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let log = seen.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopped = stop.clone();
+        // Dropped when the thread ends, normally or by panic, which ends `finish`'s wait.
+        let (done_tx, done) = channel::<()>();
         let thread = std::thread::spawn(move || {
+            let _done = done_tx;
             for (status, headers, body) in replies {
                 let (stream, _) = listener.accept().unwrap();
+                if stopped.load(Ordering::SeqCst) {
+                    return;
+                }
+                stream.set_read_timeout(Some(DEADLINE)).unwrap();
+                stream.set_write_timeout(Some(DEADLINE)).unwrap();
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut line = String::new();
                 reader.read_line(&mut line).unwrap();
@@ -96,14 +119,31 @@ impl Server {
         });
         Self {
             base,
+            addr,
+            scripted,
             seen,
+            stop,
+            done,
             thread: Some(thread),
         }
     }
 
-    /// Waits for every scripted reply to be served, then returns what was received.
+    /// Waits for every scripted reply to be served, then returns what was received. Panics,
+    /// naming how many of the scripted replies were served, when they are not all served
+    /// within [`DEADLINE`] (the server thread is woken and joined first, so nothing leaks).
     pub fn finish(mut self) -> Vec<Seen> {
-        self.thread.take().unwrap().join().unwrap();
+        let thread = self.thread.take().unwrap();
+        if let Err(RecvTimeoutError::Timeout) = self.done.recv_timeout(DEADLINE) {
+            self.stop.store(true, Ordering::SeqCst);
+            let _wake = TcpStream::connect(self.addr);
+            let _ = thread.join();
+            let served = self.seen.lock().unwrap().len();
+            panic!(
+                "test server: {served} of {} scripted replies served within {DEADLINE:?}",
+                self.scripted
+            );
+        }
+        thread.join().unwrap();
         self.seen.lock().unwrap().clone()
     }
 }

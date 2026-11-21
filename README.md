@@ -63,9 +63,9 @@ Every `decidr` operation has a matching Python function. They also accept `image
 
 - **Configuration:** read from `~/.sc-agent/default.json`, then `local.json`, then `SC_AGENT__*` overrides. All values are checked when the configuration loads.
 - **Keys:** read from the environment, then the repository-root `.env`, then the OS keyring; the first source that has the key wins. An attached key is redacted from all error text.
-- **Logs:** everything goes under `<log_root>/logs/` (default `~/.sc-agent/logs/`):
-  - each CLI writes its own general log, rotated by sc-observability;
-  - session logs go to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.
+- **Logs** (ADR-SAG-0021): the log root is `~/.sc-agent`, or `<NAME>_LOG_ROOT` when set and not empty (`DECIDR_LOG_ROOT`, `SITR_LOG_ROOT`, and for a Python Logger named `plan-anchor`, `PLAN_ANCHOR_LOG_ROOT`). `sc_agent_log::log_root` is the only code that computes it.
+  - each entry point owns one general Logger, `<log_root>/logs/<name>.log.jsonl`, rotated by sc-observability: `decidr.log.jsonl`, `sitr.log.jsonl`, or the name a Python app gives `sc_agent.logger()`; a Python app injects that one Logger into every decidr and `sc_agent.sitr` call;
+  - session logs go to `<log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, one row per request, never rotated or pruned, and never under `logs/`.
 
 ## Workspace
 

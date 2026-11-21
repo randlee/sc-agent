@@ -8,7 +8,7 @@ import sc_agent
 
 @pytest.fixture
 def log(tmp_path, monkeypatch):
-    monkeypatch.setenv("SC_DECIDR_LOG_ROOT", str(tmp_path))
+    monkeypatch.setenv("T_LOG_ROOT", str(tmp_path))
     logger, error = sc_agent.logger("t")
     assert error is None
     return logger, tmp_path

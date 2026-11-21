@@ -239,7 +239,9 @@ dependencies = [
  "sc-decision-schema",
  "sc-decision-systemone",
  "sc-llm-provider",
+ "sc-observability",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -845,6 +847,7 @@ dependencies = [
  "sc-agent-types",
  "sc-decision-schema",
  "sc-observability",
+ "sc-treesitter",
  "serde_json",
 ]
 
@@ -1098,6 +1101,7 @@ name = "sitr"
 version = "0.2.8"
 dependencies = [
  "clap",
+ "sc-agent-log",
  "sc-observability",
  "sc-treesitter",
  "serde",
