@@ -13,7 +13,7 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["CancelToken", "SagError", "send", "send_batch", "category", "retryable"]
+roots = ["CancelToken", "Logger", "logger", "send", "send_batch"]
 
 [dependencies]
 allowed_dependents = []
