@@ -252,6 +252,29 @@ mod tests {
         assert_eq!(runner.request_timeout_secs, 300);
         assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1,"request_timeout_secs":9}}})).unwrap_err().contains("local_runners.test.request_timeout_secs"));
         assert!(decode(serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":0}}})).unwrap_err().contains("local_runners.test.port"));
+        for (field, bad) in [
+            ("workers", serde_json::json!(65)),
+            ("max_sends", serde_json::json!(0)),
+            ("max_sends", serde_json::json!(11)),
+            ("host", serde_json::json!("")),
+            ("host", serde_json::json!("http://example.com")),
+            ("host", serde_json::json!("example.com/path")),
+            ("host", serde_json::json!("example.com:80")),
+            ("kind", serde_json::json!("unknown")),
+            ("load_timeout_secs", serde_json::json!(9)),
+            ("load_timeout_secs", serde_json::json!(7201)),
+            ("request_timeout_secs", serde_json::json!(3601)),
+        ] {
+            let mut value = serde_json::json!({"local_runners":{"test":{"kind":"generic","host":"localhost","port":1}}});
+            let path = if matches!(field, "workers" | "max_sends") {
+                value[field] = bad;
+                field.to_owned()
+            } else {
+                value["local_runners"]["test"][field] = bad;
+                format!("local_runners.test.{field}")
+            };
+            assert!(decode(value).unwrap_err().contains(&path), "{path}");
+        }
         let invalid = [("DECIDR_WORKERS".into(), "0".into())];
         let inputs = Inputs {
             environment: &invalid,
@@ -264,6 +287,19 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(error.contains("DECIDR_WORKERS"));
+        let mut nested = environment.to_vec();
+        nested.last_mut().expect("port entry").1 = "0".into();
+        let inputs = Inputs {
+            environment: &nested,
+            ..inputs
+        };
+        let error = layers::load(&inputs, decode, |e| {
+            e.strip_prefix("invalid ")
+                .and_then(|s| s.split_once(':').map(|(path, _)| path))
+        })
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("DECIDR_LOCAL_RUNNERS__TEST__PORT"));
     }
 }
 
