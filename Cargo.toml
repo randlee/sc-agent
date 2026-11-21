@@ -24,28 +24,28 @@ resolver = "3"
 authors = ["Rand Lee"]
 repository = "https://github.com/randlee/sc-agent"
 homepage = "https://github.com/randlee/sc-agent"
-version = "0.2.8"
+version = "0.2.10"
 edition = "2024"
 rust-version = "1.94.1"
 license = "MIT"
 
 [workspace.dependencies]
-decidr = { path = "crates/decidr", version = "0.2.8" }
-sc-agent-config = { path = "crates/sc-agent-config", version = "0.2.8" }
-sc-agent-http = { path = "crates/sc-agent-http", version = "0.2.8" }
-sc-agent-log = { path = "crates/sc-agent-log", version = "0.2.8" }
-sc-agent-py = { path = "crates/sc-agent-py", version = "0.2.8" }
-sc-agent-secrets = { path = "crates/sc-agent-secrets", version = "0.2.8" }
-sc-agent-types = { path = "crates/sc-agent-types", version = "0.2.8" }
-sc-decision-llm = { path = "crates/sc-decision-llm", version = "0.2.8" }
-sc-decision-local = { path = "crates/sc-decision-local", version = "0.2.8" }
-sc-decision-runner = { path = "crates/sc-decision-runner", version = "0.2.8" }
-sc-decision-schema = { path = "crates/sc-decision-schema", version = "0.2.8" }
-sc-decision-systemone = { path = "crates/sc-decision-systemone", version = "0.2.8" }
-sc-llm-provider = { path = "crates/sc-llm-provider", version = "0.2.8" }
-sc-treesitter = { path = "crates/sc-treesitter", version = "0.2.8", default-features = false }
-sc-treesitter-py = { path = "crates/sc-treesitter-py", version = "0.2.8" }
-sitr = { path = "crates/sitr", version = "0.2.8" }
+decidr = { path = "crates/decidr", version = "0.2.10" }
+sc-agent-config = { path = "crates/sc-agent-config", version = "0.2.10" }
+sc-agent-http = { path = "crates/sc-agent-http", version = "0.2.10" }
+sc-agent-log = { path = "crates/sc-agent-log", version = "0.2.10" }
+sc-agent-py = { path = "crates/sc-agent-py", version = "0.2.10" }
+sc-agent-secrets = { path = "crates/sc-agent-secrets", version = "0.2.10" }
+sc-agent-types = { path = "crates/sc-agent-types", version = "0.2.10" }
+sc-decision-llm = { path = "crates/sc-decision-llm", version = "0.2.10" }
+sc-decision-local = { path = "crates/sc-decision-local", version = "0.2.10" }
+sc-decision-runner = { path = "crates/sc-decision-runner", version = "0.2.10" }
+sc-decision-schema = { path = "crates/sc-decision-schema", version = "0.2.10" }
+sc-decision-systemone = { path = "crates/sc-decision-systemone", version = "0.2.10" }
+sc-llm-provider = { path = "crates/sc-llm-provider", version = "0.2.10" }
+sc-treesitter = { path = "crates/sc-treesitter", version = "0.2.10", default-features = false }
+sc-treesitter-py = { path = "crates/sc-treesitter-py", version = "0.2.10" }
+sitr = { path = "crates/sitr", version = "0.2.10" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

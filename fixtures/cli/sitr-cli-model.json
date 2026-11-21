@@ -1,25 +1,11 @@
 {
   "name": "sitr",
-  "version": "0.2.8",
+  "version": "0.2.10",
   "description": "Run predefined tree-sitter queries.",
   "long_description": "",
   "epilogue": "",
-  "usage": "Usage: sitr [OPTIONS] <COMMAND>",
-  "options": [
-    {
-      "name": "log_root",
-      "long": "--log-root",
-      "short": null,
-      "help": "The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators)",
-      "long_help": "",
-      "value_name": "PATH",
-      "required": false,
-      "default_value": null,
-      "choices": [],
-      "min_values": null,
-      "max_values": null
-    }
-  ],
+  "usage": "Usage: sitr <COMMAND>",
+  "options": [],
   "arguments": [],
   "subcommands": [
     {

@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "decidr"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "clap",
  "ctrlc",
@@ -805,7 +805,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sc-agent-config"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-types",
  "sc-config",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-http"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-http",
  "sc-agent-secrets",
@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-log"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-types",
  "sc-observability",
@@ -839,7 +839,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-py"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "decidr",
  "pyo3",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-secrets"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "dotenvy",
  "keyring",
@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-types"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "thiserror",
 ]
@@ -880,7 +880,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-llm"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "indexmap",
  "sc-agent-http",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-local"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-http",
  "sc-agent-types",
@@ -903,7 +903,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-runner"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-http",
  "sc-agent-log",
@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-schema"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "indexmap",
  "sc-agent-http",
@@ -928,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "sc-decision-systemone"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-http",
  "sc-agent-types",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "sc-llm-provider"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "sc-agent-http",
  "sc-agent-types",
@@ -1004,7 +1004,7 @@ dependencies = [
 
 [[package]]
 name = "sc-treesitter"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "pyo3",
  "serde",
@@ -1017,7 +1017,7 @@ dependencies = [
 
 [[package]]
 name = "sc-treesitter-py"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "pyo3",
  "pyo3-build-config",
@@ -1094,7 +1094,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
 name = "sitr"
-version = "0.2.8"
+version = "0.2.10"
 dependencies = [
  "clap",
  "sc-agent-log",
