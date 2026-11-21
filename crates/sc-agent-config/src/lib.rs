@@ -55,6 +55,26 @@ pub const KEYS: &[Key] = &[
         path: "local_runners",
         env: EnvValue::Json,
     },
+    Key {
+        path: "local_runners.*",
+        env: EnvValue::Json,
+    },
+    Key {
+        path: "local_runners.*.kind",
+        env: EnvValue::String,
+    },
+    Key {
+        path: "local_runners.*.host",
+        env: EnvValue::String,
+    },
+    Key {
+        path: "local_runners.*.port",
+        env: EnvValue::Json,
+    },
+    Key {
+        path: "local_runners.*.load_timeout_secs",
+        env: EnvValue::Json,
+    },
 ];
 
 pub fn home() -> PathBuf {
@@ -108,4 +128,51 @@ pub fn config(
     };
     layers::load(&inputs, serde_json::from_value::<Config>, |_| None)
         .map_err(|e| Error::Config(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+
+    use super::*;
+
+    #[test]
+    fn local_runner_fields_load_from_explicit_nested_environment() {
+        let environment = [
+            (
+                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__KIND"),
+                OsString::from("generic"),
+            ),
+            (
+                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__HOST"),
+                OsString::from("127.0.0.1"),
+            ),
+            (
+                OsString::from("DECIDR_LOCAL_RUNNERS__TEST__PORT"),
+                OsString::from("12345"),
+            ),
+        ];
+        let inputs = Inputs {
+            files: Vec::new(),
+            env_prefix: "DECIDR_",
+            env_aliases: &[],
+            env_accepts: KEYS,
+            flags: BTreeMap::new(),
+            flag_names: BTreeMap::new(),
+            keys: KEYS,
+            environment: &environment,
+        };
+
+        let loaded = layers::load(&inputs, serde_json::from_value::<Config>, |_| None)
+            .expect("valid local runner environment is accepted");
+        let runner = loaded
+            .config
+            .local_runners
+            .get("test")
+            .expect("runner is loaded");
+        assert_eq!(runner.kind, "generic");
+        assert_eq!(runner.host, "127.0.0.1");
+        assert_eq!(runner.port, 12345);
+        assert_eq!(runner.load_timeout_secs, 600);
+    }
 }
