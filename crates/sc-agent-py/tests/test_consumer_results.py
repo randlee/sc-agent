@@ -10,7 +10,7 @@ COMMON = dict(model="jev", project="consumer", agent_role="judge", abort_on=froz
 CATEGORY_CASES = [
     ("auth", "AUTH.CREDENTIALS", False), ("quota", "DECIDR.RATE_LIMITED", False),
     ("busy", "DECIDR.OVERLOADED", True), ("network", "DECIDR.NETWORK", True),
-    ("response_invalid", "DECIDR.RESPONSE_INVALID", True), ("validation", "DECIDR.VALIDATION", False),
+    ("response_invalid", "DECIDR.RESPONSE_INVALID", False), ("validation", "DECIDR.VALIDATION", False),
     ("cancelled", "CANCELED", False), ("config", "DECIDR.CONFIG", False),
     ("log", "DECIDR.LOG", False), ("other", "DECIDR.ERROR", False),
 ]
@@ -24,7 +24,7 @@ def error_fields(error):
 def wire(position=0, *, sends=3, error=None):
     row = {"session_id": "01J00000000000000000000000", "position": position, "sends": sends,
            "digests": {"q": "0" * 64}}
-    row.update(error=error) if error is not None else row.update(response={
+    row.update(ok=False, error=error) if error is not None else row.update(ok=True, value={
         "model": "jev", "answers": {"q": {"type": "noul", "noul": 0.5}},
         "usage": {"input_tokens": 1, "output_tokens": 1}})
     return json.dumps(row)
@@ -37,10 +37,10 @@ def test_each_shared_category(consumer, category, code, retryable):
     detail["recovery"] = "Rust recovery text"
     result = consumer.decode_result(wire(error=detail))
     assert not result["ok"]
-    assert result["attempts"] == 3
+    assert result["attempts"] == 9
     assert error_fields(result["error"]) == dict(code=code, message="typed message", retryable=retryable,
                                   action=detail.get("recovery"), status=429,
-                                  retry_after_ms=1100, attempts=3, data=detail)
+                                  retry_after_ms=1100, attempts=9, data=detail)
 
 
 @pytest.mark.parametrize("identifier,category,expected", [
@@ -53,7 +53,7 @@ def test_each_shared_id(consumer, identifier, category, expected):
     detail = dict(id=identifier, category=category, message="failure")
     result = consumer.decode_result(wire(error=detail))
     assert result["error"].code == expected
-    assert result["error"].retryable is (category == "response_invalid")
+    assert result["error"].retryable is False
 
 
 def test_consumer_overrides_and_wheel_retryability(consumer, monkeypatch):
@@ -74,7 +74,7 @@ def test_consumer_overrides_and_wheel_retryability(consumer, monkeypatch):
 def test_metadata_rejects_non_integer_fields(consumer, value):
     assert consumer.error_metadata(dict(status=value, attempts=value, retry_after_ms=value)) == dict(
         status=None, attempts=None, retry_after_ms=None)
-    result = consumer.decode_result(wire(sends=value, error=dict(id="x", category="busy", message="busy", attempts=7)))
+    result = consumer.decode_result(wire(sends=value, error=dict(id="x", category="busy", message="busy", attempts=value)))
     assert result["attempts"] is None and result["error"].attempts is None
     assert result["error"].code == "DECIDR.OVERLOADED"
 
@@ -85,7 +85,7 @@ def test_metadata_zero_and_unknown_sends(consumer):
     result = consumer.decode_result(wire(sends="bad"))
     assert result["ok"] and result["attempts"] is None
     result = consumer.decode_result(wire(sends="bad", error={"id": "x", "category": "busy", "message": "busy", "attempts": 8}))
-    assert result["error"].attempts is None
+    assert result["error"].attempts == 8
     assert result["error"].code == "DECIDR.OVERLOADED"
 
 
@@ -94,16 +94,6 @@ def test_invalid_result_is_a_plain_failure(consumer, line):
     result = consumer.decode_result(line)
     assert not result["ok"] and result["error"].code == "DECIDR.INVALID_RESULT"
     assert "invalid sc-decidr result" in result["error"].action
-
-
-def test_sag_error_retains_typed_fields(consumer):
-    detail = dict(id="http.network", category="network", message="transport details", attempts=4,
-                  retry_after_ms=900, status=503)
-    exc = sc_agent.SagError(detail["id"], detail["message"], json.dumps(detail))
-    result = consumer.exception_result(exc)
-    assert error_fields(result["error"]) == dict(code="DECIDR.NETWORK", message="transport details", retryable=True,
-                                   action=detail.get("recovery"), attempts=4,
-                                   retry_after_ms=900, status=503, data=detail)
 
 
 @pytest.mark.parametrize("method,payload", [("call_result", "{}"), ("call_batch_results", ["{}"])])
@@ -121,11 +111,10 @@ def test_missing_wheel_has_one_action(consumer, monkeypatch, method, payload):
 @pytest.mark.parametrize("method,operation,payload", [
     ("call_result", "send", "{}"), ("call_batch_results", "send_batch", ["{}"]),
 ])
-@pytest.mark.parametrize("error_kind", ["client", "sag", "unexpected"])
+@pytest.mark.parametrize("error_kind", ["client", "unexpected"])
 def test_call_failure_paths(consumer, monkeypatch, method, operation, payload, error_kind):
     errors = {
         "client": consumer.ClientError("DECIDR.INVALID_RESULT", "invalid wire"),
-        "sag": sc_agent.SagError("auth", "auth details", '{"id":"auth", "message":"auth details", "category":"auth"}'),
         "unexpected": RuntimeError("caller defect"),
     }
     exc = errors[error_kind]
@@ -140,8 +129,8 @@ def test_call_failure_paths(consumer, monkeypatch, method, operation, payload, e
             getattr(consumer, method)(payload, **COMMON, cancel=cancel)
     else:
         result = getattr(consumer, method)(payload, **COMMON, cancel=cancel)
-        assert result["error"].code == ("DECIDR.INVALID_RESULT" if error_kind == "client" else "AUTH.CREDENTIALS")
-        assert cancel.is_cancelled() is (error_kind == "sag")
+        assert result["error"].code == "DECIDR.INVALID_RESULT"
+        assert cancel.cancelled() is False
 
 
 def test_single_helper_forwards_context_and_preserves_wire(consumer, monkeypatch):
@@ -153,23 +142,20 @@ def test_single_helper_forwards_context_and_preserves_wire(consumer, monkeypatch
         return line
 
     monkeypatch.setattr(sc_agent, "send", send)
-    log = lambda _: None
-    result = consumer.call_result({"model": "jev"}, **COMMON, config_dir="config", keyring_service="service",
-                                  keyring_account="account", timeout_secs=30, general_log=log,
-                                  images={"image": b"data"}, long_context=True)
+    result = consumer.call_result({"model": "jev"}, **COMMON, keyring_service="service",
+                                  keyring_account="account", timeout_secs=30)
     assert result["ok"] and result["value"]["q"].noul == 0.5
     assert result["usage"] == {"input_tokens": 1, "output_tokens": 1}
-    assert result["position"] == 0 and result["attempts"] == 5 and result["line"] == line
+    assert result["position"] == 0 and result["attempts"] is None and result["line"] == line
     assert json.loads(observed["request"]) == {"model": "jev"}
     assert {key: value for key, value in observed.items() if key != "request"} == dict(model="jev", project="consumer", agent_role="judge",
-                            config_dir="config", keyring_service="service", keyring_account="account",
-                            timeout_secs=30, general_log=log, images={"image": b"data"}, long_context=True,
-                            cancel=observed["cancel"])
+                            keyring_service="service", keyring_account="account", logger=observed["logger"],
+                            timeout_secs=30, cancel=observed["cancel"])
     assert isinstance(observed["cancel"], sc_agent.CancelToken)
 
 
 def test_batch_streams_immediately_once_and_returns_input_order(consumer, monkeypatch):
-    first, second = wire(0), wire(1, sends=5, error=dict(id="busy", category="busy", message="retry later"))
+    first, second = wire(0), wire(1, sends=5, error=dict(id="busy", category="busy", message="retry later", attempts=5))
     callbacks, observed = [], {}
 
     def send_batch(requests, *, on_result, **kwargs):
@@ -182,14 +168,26 @@ def test_batch_streams_immediately_once_and_returns_input_order(consumer, monkey
 
     monkeypatch.setattr(sc_agent, "send_batch", send_batch)
     result = consumer.call_batch_results([{"x": "a"}, "b"], **COMMON, on_result=callbacks.append,
-                                         config_dir="config", keyring_service="service", keyring_account="account",
+                                         keyring_service="service", keyring_account="account",
                                          timeout_secs=30, workers=2)
     assert result == dict(ok=True, value=[callbacks[1], callbacks[0]])
     assert callbacks[0]["error"].attempts == 5
     assert observed["requests"] == ['{"x": "a"}', "b"]
     assert {key: value for key, value in observed.items() if key != "cancel"} == dict(
-        requests=['{"x": "a"}', "b"], model="jev", project="consumer", agent_role="judge", config_dir="config",
-        keyring_service="service", keyring_account="account", timeout_secs=30, workers=2, general_log=None)
+        requests=['{"x": "a"}', "b"], model="jev", project="consumer", agent_role="judge", logger=observed["logger"],
+        keyring_service="service", keyring_account="account", timeout_secs=30, workers=2)
+
+
+def test_batch_auth_before_send_does_not_persist(consumer, monkeypatch):
+    line = wire(0, error=dict(id="auth.credentials", category="auth", message="missing key", attempts=0))
+    def send_batch(requests, *, on_result, **kwargs):
+        on_result(line)
+        return [line]
+    monkeypatch.setattr(sc_agent, "send_batch", send_batch)
+    callbacks, cancel = [], sc_agent.CancelToken()
+    result = consumer.call_batch_results(["a"], **COMMON, on_result=callbacks.append, cancel=cancel)
+    assert result["error"].code == "AUTH.CREDENTIALS" and cancel.cancelled()
+    assert callbacks == []
 
 
 @pytest.mark.parametrize("position", [None, True, "0", -1, 1])
@@ -221,9 +219,9 @@ def test_interrupted_batch_preserves_callback_and_cancels(consumer, monkeypatch)
 
     monkeypatch.setattr(sc_agent, "send_batch", interrupted)
     cancel = sc_agent.CancelToken()
-    with pytest.raises(KeyboardInterrupt):
-        consumer.call_batch_results(["a", "b"], **COMMON, cancel=cancel, on_result=callbacks.append)
-    assert cancel.is_cancelled()
+    result = consumer.call_batch_results(["a", "b"], **COMMON, cancel=cancel, on_result=callbacks.append)
+    assert result["error"].code == "CANCELED"
+    assert cancel.cancelled()
     assert len(callbacks) == 1 and callbacks[0]["position"] == 1
 
 
@@ -279,25 +277,3 @@ def test_rust_error_text_and_single_log_entry_are_shared_across_consumers(env, a
     assert common_fields[0] == common_fields[1]
 
 
-@pytest.mark.parametrize("batch", [False, True])
-def test_each_wire_line_is_parsed_once(consumer, monkeypatch, batch):
-    line = wire(error={"id": "decision.context_exceeded", "category": "validation", "message": "too large"})
-    parse_result, seen = sc_agent.parse_result, []
-
-    def tracked(value):
-        if value == line:
-            seen.append(value)
-        return parse_result(value)
-
-    def send_batch(requests, *, on_result, **kwargs):
-        on_result(line)
-        return [line]
-
-    monkeypatch.setattr(sc_agent, "parse_result", tracked)
-    monkeypatch.setattr(sc_agent, "send", lambda *args, **kwargs: line)
-    monkeypatch.setattr(sc_agent, "send_batch", send_batch)
-    result = (consumer.call_batch_results(["request"], **COMMON)["value"][0] if batch else
-              consumer.call_result("request", **COMMON))
-    assert result["error"].code == "DECIDR.CONTEXT_EXCEEDED"
-    assert result["attempts"] == 3
-    assert seen == [line]

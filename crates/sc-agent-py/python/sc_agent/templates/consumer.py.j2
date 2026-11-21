@@ -2,7 +2,7 @@
 name: sc-decidr-consumer
 version: {{ sc_decidr_version }}
 format: python
-required_variables: [general_log, models, sitr, sc_decidr_version, sitr_version, batch_records, settings_module, settings_file, settings_set_command]
+required_variables: [client_name, models, sitr, sc_decidr_version, sitr_version, batch_records, settings_module, settings_file, settings_set_command]
 requires:
   cli:
     - name: sc-compose
@@ -19,25 +19,26 @@ when a caller makes a decision request.
 from __future__ import annotations
 
 import json
+import threading
 from typing import TYPE_CHECKING, Any, Callable, Mapping, NamedTuple, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from sc_agent import CancelToken
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
+CLIENT_NAME = {{ client_name | tojson }}
 MODELS = {{ models | tojson }}
 REMOTE_JUDGE_SETTING = "{{ settings_file }}"
 REMOTE_JUDGE_SET = "{{ settings_set_command }}"
 REPO_ROOT_HELP = (f"any path inside the repository; the nearest {REMOTE_JUDGE_SETTING} at or above it holds "
                   "allow_remote_judge (read for live Jev calls only; default .)")
-LogSink = Callable[[dict], None]
 CategoryCodes = Mapping[str, str]
 AbortOn = frozenset[str]
 Request = Union[str, dict]
-BatchItem = Union[Request, tuple[Request, Optional[dict[str, bytes]], bool]]
+BatchItem = Request
 
 __all__ = [
-    "SC_DECIDR_VERSION", "MODELS", "LogSink", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
+    "SC_DECIDR_VERSION", "MODELS", "CategoryCodes", "AbortOn", "BatchItem", "ClientError",
     "DECIDR_CATEGORY_CODES", "new_cancel_token", "error_metadata", "wheel_error",
     "decode_result", "exception_result", "from_tool_error", "call_result", "call_batch_results", "remote_judge_consent",
     "remote_preflight", "REPO_ROOT_HELP", "REMOTE_JUDGE_SETTING", "REMOTE_JUDGE_SET", "CANCELED_EXIT", "canceled_envelope",
@@ -187,16 +188,7 @@ def _failed(error):
 
 
 def exception_result(exc: Exception, *, category_codes=None) -> dict:
-    if isinstance(exc, ClientError):
-        return _failed(exc)
-    detail = exc.detail
-    detail = json.loads(detail) if isinstance(detail, str) else detail
-    detail = dict(detail) if isinstance(detail, dict) else {}
-    for key in ("id", "message", "category", "status", "attempts", "retry_after_ms"):
-        value = getattr(exc, key, None)
-        if value is not None:
-            detail[key] = value
-    return _failed(wheel_error(detail, category_codes=category_codes))
+    return _failed(exc if isinstance(exc, ClientError) else ClientError("DECIDR.ERROR", str(exc)))
 
 
 class NoulAnswer(NamedTuple):
@@ -242,65 +234,69 @@ def _typed_answer(answer):
                 return BoxAnswer(box["top"], box["bottom"], box["left"], box["right"], answer.get("confidence"))
         except (KeyError, TypeError):
             pass
-        return answer
-    if hasattr(answer, "noul"):
-        return NoulAnswer(answer.noul)
-    if hasattr(answer, "choice"):
-        return ChoiceAnswer(answer.choice, answer.confidence, answer.probabilities)
-    if hasattr(answer, "score"):
-        return ScoreAnswer(answer.score, answer.confidence, answer.legend, answer.probabilities)
-    if hasattr(answer, "top"):
-        return BoxAnswer(answer.top, answer.bottom, answer.left, answer.right, answer.confidence)
     return answer
 
 
 def decode_result(line: str, *, category_codes=None) -> dict:
-    """Decode one Rust wire result, retaining its position and observed sends."""
+    """Decode a tagged wheel reply and preserve available result metadata."""
     try:
-        parsed = _load_wheel().parse_result(line)
-        sends = parsed["sends"]
-        attempts = sends if type(sends) is int and sends >= 0 else None
-        if parsed["error"] is not None:
-            result = exception_result(parsed["error"], category_codes=category_codes)
-            result["error"].attempts = attempts
+        parsed = json.loads(line)
+        if not isinstance(parsed, dict) or type(parsed.get("ok")) is not bool:
+            raise ValueError("missing result tag")
+        attempts = None
+        if parsed["ok"]:
+            response = parsed["value"]
+            answers = {key: _typed_answer(answer) for key, answer in response["answers"].items()}
+            result = dict(ok=True, value=answers, usage=response.get("usage"), model_answered=response.get("model"))
         else:
-            response = json.loads(line).get("response", {})
-            answers = {key: _typed_answer(answer) for key, answer in parsed["answers"].items()}
-            result = dict(ok=True, value=answers, usage=parsed["usage"], model_answered=response.get("model"))
-        result.update(position=parsed["position"], session_id=parsed["session_id"],
-                      digests=parsed["digests"], line=line, attempts=attempts)
+            detail = parsed["error"]
+            if not isinstance(detail, dict):
+                raise ValueError("invalid error value")
+            error = wheel_error(detail, category_codes=category_codes)
+            attempts = error.attempts
+            result = _failed(error)
+        result.update(position=parsed.get("position"), session_id=parsed.get("session_id"),
+                      digests=response.get("digests") if parsed["ok"] else None, line=line, attempts=attempts)
         return result
-    except (TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         return _failed(_invalid(f"sc-decidr returned invalid JSON: {exc}"))
     except ClientError as exc:
         return _failed(exc)
 
 
+_logger_lock = threading.Lock()
+_logger_handle = None
+
+
+def _native_logger(wheel):
+    global _logger_handle
+    with _logger_lock:
+        if _logger_handle is None:
+            _logger_handle, error = wheel.logger(CLIENT_NAME)
+            if error is not None:
+                return None, decode_result(error)["error"]
+        return _logger_handle, None
+
+
 def _invoke(method, request, abort_on, kwargs, category_codes, *, repository_root=".", consent_what="The request text"):
     if frozenset(abort_on) not in _ALLOWED_ABORT_ON:
-        raise ClientError("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}")
+        return _failed(ClientError("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}"))
     try:
         remote_preflight(repository_root=repository_root, what=consent_what)
-    except ClientError as exc:
-        return _failed(exc)
-    try:
         wheel = _load_wheel()
     except ClientError as exc:
         return _failed(exc)
     kwargs["cancel"] = kwargs.get("cancel") if kwargs.get("cancel") is not None else wheel.CancelToken()
+    logger, error = _native_logger(wheel)
+    if error is not None:
+        return _failed(error)
+    kwargs["logger"] = logger
     try:
-        if method == "send":
-            request = _encode_request(request)
-        elif method == "send_batch":
-            request = [_encode_batch_item(item) for item in request]
+        request = _encode_request(request) if method == "send" else [_encode_request(item) for item in request]
         return dict(ok=True, value=getattr(wheel, method)(request, **kwargs))
     except KeyboardInterrupt:
         kwargs["cancel"].cancel()
-        raise
-    except wheel.SagError as exc:
-        if exc.category in abort_on:
-            kwargs["cancel"].cancel()
-        return exception_result(exc, category_codes=category_codes)
+        return _failed(ClientError("CANCELED", "request was interrupted", True))
     except ClientError as exc:
         return _failed(exc)
 
@@ -313,32 +309,17 @@ def _encode_request(request: Request) -> str:
     raise ClientError("DECIDR.INVALID_REQUEST", "request must be a JSON string or object")
 
 
-def _encode_batch_item(item: BatchItem):
-    if isinstance(item, tuple):
-        if len(item) != 3:
-            raise ClientError("DECIDR.INVALID_REQUEST", "batch tuple must be (request, images, long_context)")
-        request, images, long_context = item
-        return (_encode_request(request), images, long_context)
-    return _encode_request(item)
-
-
 def call_result(
     request: Request, *, model: str, project: str, agent_role: str, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
-    images: Optional[dict[str, bytes]] = None, long_context: bool = False,
-    config_dir: Optional[str] = None, keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-{% if general_log %}
-    general_log: Optional[LogSink] = None,
-{% endif %}
-    timeout_secs: Optional[float] = None,
+    keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
+    provider: Optional[str] = None, timeout_secs: Optional[float] = None,
     consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
-    kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, images=images,
-                  long_context=long_context, config_dir=config_dir, keyring_service=keyring_service,
-                  keyring_account=keyring_account)
-{% if general_log %}
-    kwargs["general_log"] = general_log
-{% endif %}
+    kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel,
+                  keyring_service=keyring_service, keyring_account=keyring_account)
+    if provider is not None:
+        kwargs["provider"] = provider
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     sent = _invoke("send", request, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
@@ -353,35 +334,32 @@ def call_result(
 def call_batch_results(
     requests: Sequence[BatchItem], *, model: str, project: str, agent_role: str, abort_on: AbortOn,
     category_codes: Optional[CategoryCodes] = None, cancel: Optional["CancelToken"] = None,
-    config_dir: Optional[str] = None, keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
-{% if general_log %}
-    general_log: Optional[LogSink] = None,
-{% endif %}
-    timeout_secs: Optional[float] = None, workers: Optional[int] = None,
+    keyring_service: Optional[str] = None, keyring_account: Optional[str] = None,
+    provider: Optional[str] = None, timeout_secs: Optional[float] = None, workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
     consent_what: str = "The request text", repository_root: str = ".",
 ) -> dict:
-    completed, decoded = {}, {}
+    completed = {}
+    fatal = None
 
-    def record(line):
-        if line in decoded:
-            return decoded[line]
+    def record(line, position_hint=None):
+        nonlocal fatal
         result = decode_result(line, category_codes=category_codes)
-        position = result["position"]
+        position = result["position"] if result["position"] is not None else position_hint
         if type(position) is not int or not 0 <= position < len(requests) or position in completed:
             raise _invalid("sc-decidr batch result has an invalid or repeated input position")
-        completed[position] = decoded[line] = result
+        result["position"] = position
+        completed[position] = result
         if not result["ok"] and (result["error"].data or {}).get("category") in abort_on:
             kwargs["cancel"].cancel()
-        if on_result is not None:
+            if result["attempts"] == 0 and result["error"].data.get("category") == "auth":
+                fatal = result["error"]
+        if on_result is not None and fatal is None:
             on_result(result)
-        return result
-
     kwargs = dict(model=model, project=project, agent_role=agent_role, cancel=cancel, on_result=record,
-                  config_dir=config_dir, keyring_service=keyring_service, keyring_account=keyring_account)
-{% if general_log %}
-    kwargs["general_log"] = general_log
-{% endif %}
+                  keyring_service=keyring_service, keyring_account=keyring_account)
+    if provider is not None:
+        kwargs["provider"] = provider
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     if workers is not None:
@@ -389,13 +367,24 @@ def call_batch_results(
     sent = _invoke("send_batch", requests, abort_on, kwargs, category_codes, repository_root=repository_root, consent_what=consent_what)
     if not sent["ok"]:
         return sent
+    if fatal is not None:
+        return _failed(fatal)
     try:
         if len(sent["value"]) != len(requests):
             raise _invalid(f"sc-decidr returned {len(sent['value'])} results for {len(requests)} batch requests")
-        for line in sent["value"]:
-            record(line)
-        if len(completed) != len(requests):
-            raise _invalid("sc-decidr batch results repeat an input position")
+        for position, line in enumerate(sent["value"]):
+            if position not in completed:
+                record(line, position)
+                if fatal is not None:
+                    return _failed(fatal)
+            elif {key: value for key, value in json.loads(line).items() if key not in {"position", "session_id"}} != {
+                    key: value for key, value in json.loads(completed[position]["line"]).items()
+                    if key not in {"position", "session_id"}}:
+                result = decode_result(line, category_codes=category_codes)
+                result["position"] = position
+                completed[position] = result
+    except (TypeError, ValueError) as exc:
+        return _failed(_invalid(f"sc-decidr returned invalid JSON: {exc}"))
     except ClientError as exc:
         return _failed(exc)
     return dict(ok=True, value=[completed[position] for position in range(len(requests))])
@@ -566,6 +555,7 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
           error_message_limit: Optional[int] = None) -> dict:
     """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
     native_sends = None
+    native_success = isinstance(raw, dict) and raw.get("ok") is True and "attempts" in raw
     if isinstance(raw, dict) and type(raw.get("ok")) is bool and "attempts" in raw:
         native_sends = raw.get("attempts")
         if raw["ok"] and "value" in raw:
@@ -596,7 +586,7 @@ def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dr
         "model_answered": raw.get("model") if isinstance(raw, dict) else None,
         "sends": native_sends,
         "threshold": settings.threshold, "verdict": None, "min_confidence": None, "leaning": None,
-        "retry_count": max((native_sends if native_sends is not None else len(attempts)) - 1, 0), "attempts": attempts,
+        "retry_count": None if native_success and native_sends is None else max((native_sends if native_sends is not None else len(attempts)) - 1, 0), "attempts": attempts,
         "error": None if error is None else {"code": error.code, "message": message,
                                                "recoverable": getattr(error, "recoverable", getattr(error, "retryable", False))},
     }
@@ -809,10 +799,9 @@ def streamed_result(results: list) -> StreamedResult:
 
 
 def extract(language: str, query: str, source: Union[str, bytes], captures=None):
-    try:
-        import sc_treesitter
-    except ImportError as exc:
-        raise ClientError("DEPENDENCY.SITR", "sitr=={{ sitr_version }} is required for extraction",
-                          action="Install sitr=={{ sitr_version }} in the active Python environment.") from exc
-    return sc_treesitter.run_query(language, query, source, captures=captures)
+    wheel = _load_wheel()
+    logger, error = _native_logger(wheel)
+    if error is not None:
+        return _failed(error)
+    return wheel.sitr.run_query(language, query, source, logger, captures=captures)
 {% endif %}

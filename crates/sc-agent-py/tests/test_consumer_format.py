@@ -18,7 +18,7 @@ class ConsumerFormatTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             variables = Path(directory) / "variables.json"
             output = Path(directory) / "consumer.py"
-            variables.write_text(json.dumps({"general_log": False, "sitr": True, "batch_records": False,
+            variables.write_text(json.dumps({"client_name": "test-consumer", "sitr": True, "batch_records": False,
                                              "settings_module": "consumer_settings", "settings_file": ".sc/app/settings.yaml",
                                              "settings_set_command": "app-settings set allow_remote_judge true|false",
                                              "models": ["dec"], "sc_decidr_version": "1.2.3", "sitr_version": "4.5.6"}))
@@ -27,18 +27,17 @@ class ConsumerFormatTest(unittest.TestCase):
                            check=True, stdin=subprocess.DEVNULL, timeout=60)
             namespace = {}
             exec(compile(output.read_text(), str(output), "exec"), namespace)
-            with mock.patch.dict(sys.modules, {"sc_treesitter": None}):
+            with mock.patch.dict(sys.modules, {"sc_agent": None}):
                 with self.assertRaises(namespace["ClientError"]) as caught:
                     namespace["extract"]("python", "query", "source")
-            self.assertEqual(caught.exception.code, "DEPENDENCY.SITR")
-            self.assertIn("sitr==4.5.6", caught.exception.message)
-            self.assertIn("sitr==4.5.6", caught.exception.action)
-            self.assertIsInstance(caught.exception.__cause__, ImportError)
-            captures = [object()]
-            wheel = types.SimpleNamespace(run_query=mock.Mock(return_value=captures))
-            with mock.patch.dict(sys.modules, {"sc_treesitter": wheel}):
+            self.assertEqual(caught.exception.code, "DEPENDENCY.SC_DECIDR")
+            captures, logger = [object()], object()
+            sitr = types.SimpleNamespace(run_query=mock.Mock(return_value=captures))
+            wheel = types.SimpleNamespace(logger=mock.Mock(return_value=(logger, None)), sitr=sitr)
+            with mock.patch.dict(sys.modules, {"sc_agent": wheel}):
                 self.assertIs(namespace["extract"]("python", "query", "source", captures=["c"]), captures)
-            wheel.run_query.assert_called_once_with("python", "query", "source", captures=["c"])
+            wheel.logger.assert_called_once_with("test-consumer")
+            sitr.run_query.assert_called_once_with("python", "query", "source", logger, captures=["c"])
 
     def test_rendered_indentation(self):
         for general_log in (False, True):
@@ -47,7 +46,7 @@ class ConsumerFormatTest(unittest.TestCase):
                     variables = Path(directory) / "variables.json"
                     output = Path(directory) / "consumer.py"
                     variables.write_text(json.dumps({
-                        "general_log": general_log, "sitr": sitr, "batch_records": False,
+                        "client_name": "test-consumer", "sitr": sitr, "batch_records": False,
                         "settings_module": "consumer_settings", "settings_file": ".sc/app/settings.yaml",
                         "settings_set_command": "app-settings set allow_remote_judge true|false", "models": ["dec"],
                         "sc_decidr_version": "0.2.2", "sitr_version": "0.2.2",
@@ -64,7 +63,7 @@ class ConsumerFormatTest(unittest.TestCase):
                     for name in ("call_result", "call_batch_results"):
                         arguments = {arg.arg for arg in functions[name].args.kwonlyargs}
                         self.assertIn("timeout_secs", arguments)
-                        self.assertEqual("general_log" in arguments, general_log)
+                        self.assertNotIn("general_log", arguments)
                     self.assertNotIn("general_log=general_log,)", text)
                     if sitr:
                         lines = text.splitlines()

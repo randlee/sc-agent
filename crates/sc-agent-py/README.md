@@ -56,14 +56,29 @@ own resends. Neither helper raises on invalid input.
 `Logger` is the native handle returned by `logger`, with no Python constructor.
 The exact decision API is declared in `python/sc_agent/__init__.pyi`.
 
-The generated consumer module is owned by the companion consumer-template sprint.
-Its wheel package resource is `sc_agent/templates/consumer.py.j2`; once shipped,
-render it with a typed variables file:
+## Generated consumer
+
+Render the shipped template with typed variables. For example:
 
 ```bash
-sc-compose render --root <installed-sc_agent>/templates --file consumer.py.j2 \
+python - <<'PYCODE'
+import importlib.resources, json, pathlib, sc_agent
+root = importlib.resources.files(sc_agent) / "templates"
+pathlib.Path("consumer-root.txt").write_text(str(root))
+pathlib.Path("consumer-vars.json").write_text(json.dumps({
+    "client_name": "my-client", "models": ["jev"], "sitr": False,
+    "batch_records": False, "sc_decidr_version": "0.2.8", "sitr_version": "0.2.8",
+    "settings_module": "my_settings", "settings_file": ".sc/my/settings.yaml",
+    "settings_set_command": "my-settings set allow_remote_judge true|false",
+}))
+PYCODE
+sc-compose render --root "$(cat consumer-root.txt)" --file consumer.py.j2 \
   --var-file consumer-vars.json --strict --output consumer.py
 ```
+
+The generated client opens one native logger named `client_name` and passes it
+to decision and sitr calls. It returns decoded tagged results and accepts the
+optional `provider`, `timeout_secs`, keyring overrides and batch `on_result`.
 
 The `sc_agent.sitr` submodule exposes `languages`, `queries`, `query_source`,
 `run_query`, `Capture`, and `TreesitterError`. `run_query(language, query, source,

@@ -205,10 +205,7 @@ def test_duplicate_request_ids_are_rejected_before_batch_execution(tmp_path, mon
 
 def test_plain_dict_result_and_public_error_conversion(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
-    wheel_result = {"position": 0, "session_id": "s", "sends": 1, "digests": {},
-                    "error": None, "answers": {}, "usage": {}}
-    monkeypatch.setattr(client, "_load_wheel", lambda: SimpleNamespace(parse_result=lambda _: wheel_result))
-    result = client.decode_result(json.dumps({"response": {"model": "fixture"}}))
+    result = client.decode_result(json.dumps({"ok": True, "value": {"model": "fixture", "answers": {}, "usage": {}}}))
     assert type(result) is dict
     assert result["ok"] is True and result["value"] == {} and result["model_answered"] == "fixture"
 
@@ -360,16 +357,13 @@ def test_affirmative_consent_allows_shared_send_path_and_cancel_envelope(tmp_pat
         def cancel(self):
             pass
 
-    class SagError(Exception):
-        pass
-
-    wheel = SimpleNamespace(CancelToken=CancelToken, SagError=SagError,
-                            send=lambda request, **kwargs: sent.append(("send", request)) or "wire",
+    wheel = SimpleNamespace(CancelToken=CancelToken, logger=lambda _: (object(), None),
+                            send=lambda request, **kwargs: sent.append(("send", request)) or "{}",
                             send_batch=lambda requests, **kwargs: (sent.append(("send_batch", requests)),
-                                                                    kwargs["on_result"]("wire"), ["wire"])[2])
+                                                                    kwargs["on_result"]("{}"), ["{}"])[2])
     monkeypatch.setattr(client, "_load_wheel", lambda: wheel)
     monkeypatch.setattr(client, "decode_result", lambda line, **kwargs:
-                        {"ok": True, "value": {}, "position": 0, "error": None, "attempts": 1})
+                        {"ok": True, "value": {}, "position": 0, "error": None, "attempts": 1, "line": line})
     result = client.call_result("{}", model="jev", project="p", agent_role="r", abort_on=frozenset())
     batch = client.call_batch_results(["{}"], model="jev", project="p", agent_role="r", abort_on=frozenset())
     assert result["ok"] and batch["ok"]
@@ -398,19 +392,21 @@ def test_real_wheel_and_offline_fixture_share_typed_batch_records(tmp_path, monk
         question["criteria"] = {"yes": "yes", "no": "no"}
     job = _job(client)._replace(questions={"q": question})
     wire = json.dumps({"session_id": "session", "position": 0, "sends": 3, "digests": {},
-                       "response": {"model": "jev-real", "answers": {"q": answer},
+                       "ok": True, "value": {"model": "jev-real", "answers": {"q": answer},
                                     "usage": {"input_tokens": 1, "output_tokens": 1}}})
     live = client.decode_result(wire)
     assert live["ok"] is True
     fixture = client._fixture_attempt(job, {"*": {"q": answer}}, 1)
     assert type(live["value"]["q"]) is type(fixture["answers"]["q"])
     assert live["value"]["q"] == fixture["answers"]["q"]
-    for raw, model, sends in ((live, "jev-real", 3), (fixture, "fixture", None)):
+    for raw, model, sends in ((live, "jev-real", None), (fixture, "fixture", None)):
         record = client._line(job, _settings(client), raw, [], None, False)
         decoded = json.loads(client.encode_result_line(record))
         assert decoded["answers"]["q"] == expected
         assert decoded["raw_response"]["answers"]["q"] == expected
         assert decoded["model_answered"] == model and decoded["sends"] == sends
+        if raw is live:
+            assert decoded["retry_count"] is None
 
 
 def test_fixture_conversion_does_not_import_wheel(tmp_path, monkeypatch):
@@ -429,14 +425,12 @@ def test_batch_error_retains_recovery_action(tmp_path, monkeypatch):
 
 
 def test_batch_line_encodes_each_native_wheel_answer(tmp_path, monkeypatch):
-    import sc_agent
-
     client = _client(tmp_path, monkeypatch)
     answers = {
-        "n": sc_agent.NoulAnswer(0.5),
-        "c": sc_agent.ChoiceAnswer("yes", 0.8, {"yes": 0.8}),
-        "s": sc_agent.ScoreAnswer(2, 0.8, {"2": "high"}, {"2": 0.8}),
-        "b": sc_agent.BoxAnswer(0.1, 0.9, 0.2, 0.8, 0.7),
+        "n": client.NoulAnswer(0.5),
+        "c": client.ChoiceAnswer("yes", 0.8, {"yes": 0.8}),
+        "s": client.ScoreAnswer(2, 0.8, {"2": "high"}, {"2": 0.8}),
+        "b": client.BoxAnswer(0.1, 0.9, 0.2, 0.8, 0.7),
     }
     for key, answer in answers.items():
         line = client._line(_job(client), _settings(client), {"model": "jev", "answers": {key: answer}},
@@ -528,11 +522,11 @@ def test_send_rechecks_selected_repository_consent(tmp_path, monkeypatch, batch,
     class CancelToken:
         def cancel(self):
             pass
-    wheel = SimpleNamespace(CancelToken=CancelToken, SagError=type("SagError", (Exception,), {}),
-                            send=lambda request, **kwargs: sent.append(request) or "wire",
-                            send_batch=lambda requests, **kwargs: sent.append(requests) or ["wire"])
+    wheel = SimpleNamespace(CancelToken=CancelToken, logger=lambda _: (object(), None),
+                            send=lambda request, **kwargs: sent.append(request) or "{}",
+                            send_batch=lambda requests, **kwargs: sent.append(requests) or ["{}"])
     monkeypatch.setattr(client, "_load_wheel", lambda: wheel)
-    monkeypatch.setattr(client, "decode_result", lambda line, **kwargs: {"ok": True, "value": {}, "position": 0})
+    monkeypatch.setattr(client, "decode_result", lambda line, **kwargs: {"ok": True, "value": {}, "position": 0, "line": line})
     if change:
         client.remote_preflight(repository_root=str(selected_root))
         values[selected_root] = False
@@ -572,7 +566,7 @@ def test_real_wheel_error_wire_keeps_action_and_send_count_in_batch_line(tmp_pat
     client = _client(tmp_path, monkeypatch)
     wire = json.dumps({
         "session_id": "01J00000000000000000000000", "position": 0, "sends": 4, "digests": {},
-        "error": {"id": "http.network", "category": "network", "message": "network unavailable",
+        "ok": False, "error": {"id": "http.network", "category": "network", "message": "network unavailable", "attempts": 4,
                   "recovery": "Retry later"},
     })
     decoded = client.decode_result(wire)
