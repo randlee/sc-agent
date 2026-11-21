@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["LlmClient"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-agent-testkit"]
+allowed_dev_dependencies = []
 allowed_dependents = ["decidr", "sc-decision-llm"]
 allowed_dependencies = ["sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
 forbidden_edges = []

@@ -16,8 +16,8 @@ constructor = "none"
 roots = ["load"]
 
 [dependencies]
-allowed_dev_dependencies = ["sc-agent-testkit"]
-allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-local", "sc-decision-runner"]
+allowed_dev_dependencies = []
+allowed_dependents = ["decidr"]
 allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 

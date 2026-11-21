@@ -16,9 +16,9 @@ constructor = "none"
 roots = ["GeneralLogger"]
 
 [dependencies]
-allowed_dev_dependents = ["sc-agent-log"]
-allowed_dev_dependencies = ["sc-agent-log", "sc-agent-testkit"]
-allowed_dependents = ["decidr", "sc-agent-http", "sc-agent-py", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-llm-provider"]
+allowed_dev_dependents = []
+allowed_dev_dependencies = ["sc-agent-log"]
+allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-runner"]
 allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 

@@ -58,9 +58,7 @@ pub const KEYS: &[Key] = &[
 ];
 
 pub fn home() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default()
+    std::env::home_dir().unwrap_or_default()
 }
 
 pub fn repo_root() -> Option<PathBuf> {
