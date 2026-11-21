@@ -18,7 +18,7 @@ roots = ["Local", "LocalDaemon", "daemon"]
 [dependencies]
 allowed_dev_dependencies = []
 allowed_dependents = ["decidr"]
-allowed_dependencies = ["sc-agent-http", "sc-agent-types", "sc-decision-schema", "sc-decision-systemone"]
+allowed_dependencies = ["sc-agent-http", "sc-agent-types"]
 forbidden_edges = []
 
 [references]

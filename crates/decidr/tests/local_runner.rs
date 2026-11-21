@@ -4,8 +4,7 @@ use std::time::Duration;
 
 use sc_agent_http::test_server::{Server, ok};
 use sc_agent_http::{Cancel, Policy};
-use sc_decision_local::{Availability, Generic, Laya, Local, LocalDaemon, Mapika, Strands};
-use sc_decision_runner::{Decider, Decision};
+use sc_decision_local::{Availability, Generic, Laya, LocalDaemon, Mapika, Strands};
 use sc_decision_schema::DecisionRequest;
 use serde_json::json;
 
@@ -66,13 +65,8 @@ fn local_runner_probes_once_then_decides_the_whole_batch() {
         answer(0.1),
         answer(0.2),
     ]);
-    let local = Local::new(
-        &server.base,
-        "laya",
-        |s| Decider::new(s, policy(), None),
-        Duration::from_secs(5),
-    )
-    .unwrap();
+    let local =
+        decidr::open_local(&server.base, "laya", policy(), None, Duration::from_secs(5)).unwrap();
     let mut got = Vec::new();
     local.decide_batch(
         vec![request(), request()],
@@ -91,10 +85,11 @@ fn local_runner_probes_once_then_decides_the_whole_batch() {
 #[test]
 fn local_runner_serving_another_model_fails_every_item_without_sending() {
     let server = Server::start(vec![ok(json!({ "model": "other" }))]);
-    let local = Local::new(
+    let local = decidr::open_local(
         &server.base,
         "strands",
-        |s| Decider::new(s, policy(), None),
+        policy(),
+        None,
         Duration::from_secs(5),
     )
     .unwrap();
