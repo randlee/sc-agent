@@ -34,11 +34,11 @@ fn run_with_deadline(command: &mut Command, input: Option<&[u8]>) -> Result<Outp
     };
     let stdout = drain(Box::new(child.stdout.take().ok_or("stdout was not piped")?));
     let stderr = drain(Box::new(child.stderr.take().ok_or("stderr was not piped")?));
-    let stdin_error = input.and_then(|input| {
-        child
-            .stdin
-            .take()
-            .and_then(|mut stdin| stdin.write_all(input).err())
+    let stdin_writer = input.and_then(|input| {
+        child.stdin.take().map(|mut stdin| {
+            let input = input.to_vec();
+            thread::spawn(move || stdin.write_all(&input))
+        })
     });
     let status = child.wait_timeout(Duration::from_secs(30))?;
     let timed_out = status.is_none();
@@ -53,6 +53,10 @@ fn run_with_deadline(command: &mut Command, input: Option<&[u8]>) -> Result<Outp
         status,
         stdout: stdout.join().map_err(|_| "stdout reader panicked")??,
         stderr: stderr.join().map_err(|_| "stderr reader panicked")??,
+    };
+    let stdin_error = match stdin_writer {
+        Some(writer) => writer.join().map_err(|_| "stdin writer panicked")?.err(),
+        None => None,
     };
     if timed_out {
         return Err(format!("decidr timed out: {output:?}").into());
