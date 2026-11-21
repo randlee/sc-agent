@@ -77,8 +77,14 @@ pub const KEYS: &[Key] = &[
     },
 ];
 
-pub fn home() -> PathBuf {
-    std::env::home_dir().unwrap_or_default()
+pub fn home() -> Result<PathBuf, Error> {
+    checked_home(std::env::home_dir())
+}
+
+fn checked_home(home: Option<PathBuf>) -> Result<PathBuf, Error> {
+    home.filter(|path| path.is_absolute()).ok_or_else(|| {
+        Error::Config("an absolute home directory is required to read global configuration".into())
+    })
 }
 
 pub fn repo_root() -> Option<PathBuf> {
@@ -96,7 +102,7 @@ pub fn config(
     project: Option<&str>,
     root: Option<&Path>,
 ) -> Result<layers::Layered<Config>, Error> {
-    let global = home().join(".sc-agent");
+    let global = home()?.join(".sc-agent");
     let mut files: Vec<PathBuf> = root
         .map(|r| {
             vec![
@@ -174,5 +180,33 @@ mod tests {
         assert_eq!(runner.host, "127.0.0.1");
         assert_eq!(runner.port, 12345);
         assert_eq!(runner.load_timeout_secs, 600);
+    }
+}
+
+#[cfg(test)]
+mod home_tests {
+    use super::*;
+
+    #[test]
+    fn missing_empty_and_relative_homes_are_errors() {
+        for home in [
+            None,
+            Some(PathBuf::new()),
+            Some(PathBuf::from("relative/home")),
+        ] {
+            assert!(matches!(checked_home(home), Err(Error::Config(message))
+                if message.contains("absolute home directory")));
+        }
+    }
+
+    #[test]
+    fn an_absolute_home_is_preserved() {
+        let absolute = PathBuf::from(if cfg!(windows) {
+            r"C:\controlled-home"
+        } else {
+            "/controlled-home"
+        });
+        assert!(absolute.is_absolute());
+        assert_eq!(checked_home(Some(absolute.clone())).ok(), Some(absolute));
     }
 }
