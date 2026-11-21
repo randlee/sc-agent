@@ -130,35 +130,53 @@ impl Session {
         fields.insert("repo".into(), self.repo.clone().into());
         fields.insert("project".into(), self.project.clone().into());
         fields.insert("agent_role".into(), self.agent_role.clone().into());
-        let (Ok(target), Ok(action)) = (
-            TargetCategory::new("sc_agent.session"),
-            ActionName::new("session.row"),
-        ) else {
-            return;
-        };
-        let event = LogEvent {
-            version: sc_observability_types::OBSERVATION_SCHEMA_VERSION.clone(),
-            timestamp: Timestamp::now_utc(),
-            level: Level::Info,
-            service: self.logger.service_name().clone(),
-            target,
-            action,
-            message: None,
-            identity: ProcessIdentity::default(),
-            trace: None,
-            request_id: None,
-            correlation_id: None,
-            outcome: None,
-            diagnostic: None,
-            state_transition: None,
-            fields,
-        };
-        let _ = self.logger.log(event);
+        record(&self.logger, "sc_agent.session", "session.row", fields);
     }
 
     pub fn flush(&self) {
         let _ = self.logger.flush();
     }
+}
+
+/// One Info record on `logger`. A failed write is not an error of the call it records.
+pub fn record(logger: &Logger, target: &str, action: &str, fields: Map<String, Value>) {
+    let (Ok(target), Ok(action)) = (TargetCategory::new(target), ActionName::new(action)) else {
+        return;
+    };
+    let event = LogEvent {
+        version: sc_observability_types::OBSERVATION_SCHEMA_VERSION.clone(),
+        timestamp: Timestamp::now_utc(),
+        level: Level::Info,
+        service: logger.service_name().clone(),
+        target,
+        action,
+        message: None,
+        identity: ProcessIdentity::default(),
+        trace: None,
+        request_id: None,
+        correlation_id: None,
+        outcome: None,
+        diagnostic: None,
+        state_transition: None,
+        fields,
+    };
+    let _ = logger.log(event);
+}
+
+/// The general Logger of `service`: `<log_root>/logs/<service>.log.jsonl`, no console.
+pub fn general(service: &str, log_root: &Path) -> Result<Arc<Logger>, Error> {
+    let log = |e: &dyn std::fmt::Display| Error::Log(e.to_string());
+    let mut config = LoggerConfig::default_for(
+        ServiceName::new(service).map_err(|e| log(&e))?,
+        log_root.to_path_buf(),
+    );
+    config.enable_console_sink = false;
+    Ok(Arc::new(
+        LoggerBuilder::new(config)
+            .map_err(|e| log(&e))?
+            .build()
+            .map_err(|e| log(&e))?,
+    ))
 }
 
 /// Rows are written in the background; a dropped session waits for them.
