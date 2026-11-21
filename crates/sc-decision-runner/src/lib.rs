@@ -1,39 +1,134 @@
-//! The decision runner of sc-agent: one [`Decision`](sc_decision_schema::Decision)
-//! implementation over any [`Backend`](sc_decision_schema::Backend).
-//!
-//! [`DecisionRunner`] owns an `Arc<dyn Backend>`, one
-//! [`HttpClient`](sc_agent_http::HttpClient) and the session and general loggers.
-//! `decide_stream` starts one feeder thread and [`RunnerConfig::workers`] worker
-//! threads; `decide` runs the same machinery with one request and one worker, so a
-//! send never runs on the caller's thread (ADR-SAG-0001, REQ-SAG-0701).
-//!
-//! - A busy or timed-out send ([`Next::ResendAt`](sc_agent_http::Next::ResendAt)) and a
-//!   provider pause ([`Start::Wait`](sc_agent_http::Start::Wait)) hold the job in the
-//!   queue until its instant; the worker is freed (REQ-SAG-0601, REQ-SAG-0012).
-//! - A reply that does not match the schema is resent unchanged, counted against the
-//!   same `max_sends` and 90 s budget (REQ-SAG-0901).
-//! - Cancelling the caller's [`CancelToken`](sc_agent_types::CancelToken) ends every
-//!   unfinished request at once with `decision.cancelled`, in-flight sends included;
-//!   a late reply is discarded.
-//! - Exactly one result and one session row per request, enforced by non-`Clone`
-//!   proof tokens (ADR-SAG-0002, NFR-SAG-0001).
-//!
-//! Sync threads, `Mutex` and `Condvar` only: no tokio, no sleep (REQ-SAG-0009,
-//! REQ-SAG-0010). The crate sits in the runner layer above sc-decision-schema and
-//! depends on no decision-backend crate (ADR-SAG-0004).
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+//! Decisions: one request form, a typed answer per question, any backend.
 
-mod config;
-mod error;
-mod pool;
-mod queue;
-mod row;
-mod runner;
+use sc_agent_http::{Cancel, Client, Policy};
+use sc_agent_log::Session;
+use sc_agent_types::Error;
+use sc_decision_schema::{Backend, DecisionRequest, DecisionResponse};
+use serde_json::{Map, Value, json};
 
-#[doc(inline)]
-pub use config::{JOBS_PER_WORKER, MAX_WORKERS, RunnerConfig};
-#[doc(inline)]
-pub use error::RunnerError;
-#[doc(inline)]
-pub use runner::DecisionRunner;
+/// One decided request, matched to its input.
+#[derive(Debug)]
+pub struct Outcome {
+    pub position: usize,
+    pub session: ulid::Ulid,
+    pub request: DecisionRequest,
+    pub result: Result<DecisionResponse, Error>,
+}
+
+impl Outcome {
+    pub fn failed(position: usize, request: DecisionRequest, error: Error) -> Self {
+        Self {
+            position,
+            session: ulid::Ulid::new(),
+            request,
+            result: Err(error),
+        }
+    }
+}
+
+/// What callers use, whatever is behind it.
+pub trait Decision: Send + Sync {
+    fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome;
+
+    /// Results reach `on_result` in any order, each with its input position.
+    fn decide_batch(
+        &self,
+        requests: Vec<DecisionRequest>,
+        workers: usize,
+        cancel: &Cancel,
+        on_result: &mut dyn FnMut(Outcome),
+    );
+}
+
+/// A backend on the shared client, writing one session row per result.
+pub struct Decider<B> {
+    client: Client<B>,
+    session: Option<Session>,
+}
+
+impl<B: Backend> Decider<B> {
+    pub fn new(backend: B, policy: Policy, session: Option<Session>) -> Self {
+        Self {
+            client: Client::new(backend, policy),
+            session,
+        }
+    }
+
+    fn record(&self, outcome: &Outcome) {
+        if let Some(session) = &self.session {
+            session.row(row(outcome));
+        }
+    }
+}
+
+impl<B: Backend> Decision for Decider<B> {
+    fn decide(&self, request: DecisionRequest, cancel: &Cancel) -> Outcome {
+        let result = self.client.send(&request, cancel);
+        let outcome = Outcome {
+            position: 0,
+            session: ulid::Ulid::new(),
+            request,
+            result,
+        };
+        self.record(&outcome);
+        outcome
+    }
+
+    fn decide_batch(
+        &self,
+        requests: Vec<DecisionRequest>,
+        workers: usize,
+        cancel: &Cancel,
+        on_result: &mut dyn FnMut(Outcome),
+    ) {
+        self.client.batch(requests, workers, cancel, |item| {
+            let outcome = Outcome {
+                position: item.position,
+                session: item.session,
+                request: item.request,
+                result: item.result,
+            };
+            self.record(&outcome);
+            on_result(outcome);
+        });
+    }
+}
+
+/// The session row of one outcome: the request text, per-question digests, and the response or error.
+fn row(outcome: &Outcome) -> Map<String, Value> {
+    let mut fields = Map::new();
+    fields.insert("session_id".into(), outcome.session.to_string().into());
+    fields.insert("position".into(), outcome.position.into());
+    fields.insert(
+        "request".into(),
+        serde_json::to_string(&outcome.request)
+            .unwrap_or_default()
+            .into(),
+    );
+    let digests: Map<String, Value> = outcome
+        .request
+        .questions
+        .iter()
+        .map(|(id, q)| {
+            (
+                id.clone(),
+                DecisionRequest::digest(id, q)
+                    .map(Value::from)
+                    .unwrap_or(Value::Null),
+            )
+        })
+        .collect();
+    fields.insert("digests".into(), digests.into());
+    match &outcome.result {
+        Ok(response) => fields.insert(
+            "response".into(),
+            serde_json::to_value(response).unwrap_or_default(),
+        ),
+        Err(error) => fields.insert(
+            "error".into(),
+            json!({ "id": error.id(), "message": error.to_string() }),
+        ),
+    };
+    fields
+}
