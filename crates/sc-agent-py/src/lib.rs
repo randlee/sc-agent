@@ -57,7 +57,8 @@ impl CancelToken {
 }
 
 /// `(Logger, None)` writing to `<root>/logs/<name>.log.jsonl`, the root from
-/// `sc_agent_log::log_root(name)` (`<NAME>_LOG_ROOT`, else `~/.sc-agent`), or `(None, error JSON)`.
+/// `sc_agent_log::log_root(name)` (`<NAME>_LOG_ROOT`, else `~/.sc-agent`), or `(None, error JSON)`. For
+/// `name == "decidr"`, `DECIDR_LOG_ROOT` is a supported override; the shared rule applies to other names.
 #[pyfunction]
 fn logger(name: &str) -> (Option<Logger>, Option<String>) {
     let opened = sc_agent_log::log_root(name)
