@@ -1,9 +1,9 @@
 # Requirement: Log locations and retention
 
 **Status:** Proposed  
-**Version:** 0.5.0  
+**Version:** 0.5.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -19,7 +19,7 @@ Definitions: The general log is the diagnostic log of one entry point (ADR-SAG-0
 **MUST statements:**
 
 - With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`: `decidr.log.jsonl` for decidr, `sitr.log.jsonl` for sitr.
-- When `<CLI>_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.
+- When `<CLI>_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`. `<CLI>_LOG_ROOT` is a test override only.
 - Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).
 - The general log MUST use the sc-observability retained-log policy.
 - A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.
@@ -40,7 +40,7 @@ sc-observability already rotates and prunes the general log. Session logs are th
 **Acceptance Criteria:**
 
 - [ ] With nothing configured, decidr writes `~/.sc-agent/logs/decidr.log.jsonl` and sitr writes `~/.sc-agent/logs/sitr.log.jsonl`, and `~/.sc-agent/logs/` holds no session log.
-- [ ] With `DECIDR_LOG_ROOT` set to `<dir>`, decidr writes `<dir>/logs/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
+- [ ] In a test, with the test override `DECIDR_LOG_ROOT` set to `<dir>`, decidr writes `<dir>/logs/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
 - [ ] A `log_root` key in any configuration file is rejected as an unknown key.
 - [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
 - [ ] A session log file whose modification time is older than the sc-observability retention age is still present and unchanged after decidr runs a new session.

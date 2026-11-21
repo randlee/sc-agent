@@ -40,7 +40,7 @@ Nothing not in these three is built.
   | local | host:port from config | none | SystemOne | laya |
 
   Each provider table lists its models as (short name, model id, release date). `send(model, provider=None)`: with a provider, look in that table; without, the first table in list order that has the name. When several rows share a short name, the one with the most recent date is used by default; a full model id selects that row exactly. With a reseller provider (openrouter, together, nous) and a name in no table, the text is sent as the model id unchanged. No provider ranking and no config catalog: the tables are static code. All six providers the current code supports are kept; the reseller model ids are taken from the current code's tables.
-- **Retry.** Busy (429/502/529) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
+- **Retry.** Busy (any non-quota 429 or 5xx) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; a busy reply pauses every send to that provider until its not-before time (REQ-SAG-0012); quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
 - **Keys.** Environment variable, then repo-root `.env` (via `dotenvy`, never written to the process environment), then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key is a plain `String` that is never put into an error, a log record or a Debug output (a contract test checks the key text appears nowhere).
 - **Config.** sc-config's `layers` module (sc-runtime PR #153), used as a git dependency on `feature/sc-config-layers` until it is released, then the crates.io version; no local copy. sc-agent supplies its files (local then global `decidr.json`, `sc-agent.json`), the `DECIDR` env prefix, `--project`, and its keys. Settings: `project`, `workers`, Laya `host`/`port`/`model`. `decidr doctor` prints setting, value and source from `layers::resolved`.
 - **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; general-log failure not handled.
@@ -110,7 +110,7 @@ After Rand's marks. Removed items are deleted with their tests. Kept items are a
 
 ## Sprint QA reviews
 
-Each sprint of `docs/decider-design.md` section 10 that writes or changes Rust ends with one QA review. Every one applies "Size trip".
+Each sprint below that writes or changes Rust ends with one QA review. Every one applies "Size trip".
 
 | QA review | Sprint | Applies |
 |---|---|---|
@@ -146,5 +146,5 @@ Existing boundary tests in `crates/decidr/tests/` and `crates/sc-agent-py/tests/
 ## Stopped
 
 - tai's in-place trim on `work/rust-under-2k` (it kept two wheels and added a callable bridge): stopped, nothing committed.
-- PR #324 (reverted the one-wheel and no-callable decisions): superseded by this plan.
+- PR #324: now only adds ADR-SAG-0022 on top of `develop`.
 - Phase-e stack #319 and bead `agt-next-1`: superseded; not landed.

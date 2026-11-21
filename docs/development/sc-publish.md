@@ -33,8 +33,9 @@ the pin, then re-run install.
   `sc-agent-config`, `sc-agent-secrets`, `sc-agent-log`, `sc-agent-http`,
   `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider`,
   `sc-decision-llm`, `sc-decision-runner`, `sc-treesitter`, `decidr`.
-- **PyPI**: `sc-agent` and `sc-treesitter` maturin wheels (see
-  `python_distributions` in consumer input).
+- **PyPI**: one maturin wheel, `sc-decidr`, built by `sc-agent-py` and holding
+  the decidr and sitr Python APIs (ADR-SAG-0021; see `python_distributions` in
+  consumer input).
 - **Release binaries**: `decidr`, `sitr` (five-target matrix in consumer input).
 - **Homebrew / Scoop / WinGet**: configured in consumer input (`Formula/decidr.rb`,
   `bucket/decidr.json`, `randlee.decidr`).

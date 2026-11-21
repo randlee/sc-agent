@@ -1,7 +1,7 @@
 # Requirement: Busy resend and holdoff
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -44,7 +44,7 @@ Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry 
 
 - [ ] With the default configuration, a request answered busy every time is sent 5 times and ends `HttpError::ProviderBusy` with 5 attempts.
 - [ ] With the maximum set to 2, the same request is sent 2 times.
-- [ ] A busy response with `Retry-After: 3` holds the request off 3 seconds; with no `Retry-After`, each holdoff is longer than the one before.
+- [ ] With an injected clock, a busy response carrying `Retry-After: 3` sets the provider endpoint's not-before time to at least 3 s after the response, with jitter added (REQ-SAG-0012), and no send of the request starts before it; with no `Retry-After`, each holdoff is longer than the one before.
 - [ ] Cancelling a held-off request ends its wait at once and returns a cancelled result.
 - [ ] A send that times out is resent unchanged and counts toward the maximum number of sends, and a request whose last attempt timed out ends with the timeout error.
 - [ ] A 402 response is returned after one send with the remote error id and message.
@@ -54,5 +54,6 @@ Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry 
 
 **Related:**
 
+- REQ-SAG-0012
 - REQ-SAG-0602
 - REQ-SAG-0104

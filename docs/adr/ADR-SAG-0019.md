@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: typed error fields, a stored error category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.7.4  
+**Version:** 0.8.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
@@ -80,8 +80,8 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    - The template covers the decision call, model pass-through, API keys, logging wiring, cancellation, `abort_on` and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
    - Its feature variables are `models` and `sitr` (`true` or `false`). Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
-   - sc-compose is an external render tool, not a dependency of either wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
-   - The generated header records the sc-decidr version, and the sitr version when `sitr` is on, as troubleshooting information. Nothing checks it at runtime.
+   - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
+   - The generated header records the sc-decidr version, which is also the sitr API's version, as troubleshooting information. Nothing checks it at runtime.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
    **The lower-level API stays the contract.** `send`, `send_batch`, `category`, `retryable`, `SagError` and `CancelToken` remain public. The generated code uses only them and the standard library.
@@ -114,7 +114,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    The Rust change breaks SemVer: fields are added to an exhaustive public struct, and the call-limits API changes (decision 7). Below 1.0 a minor bump is the breaking bump. For Python the change only adds things, except the batch return order (decision 8).
 
-   All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. sc-decidr and sitr are released together at the same version, both to PyPI. Mixed versions are not supported; this is documented, not enforced.
+   All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. The one sc-decidr wheel, holding the decidr and sitr Python APIs, is released to PyPI. Mixed versions are not supported; this is documented, not enforced.
 
 5. **Python errors.**
 
@@ -124,7 +124,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
 6. **The category is stored when the detail is built.**
 
-   `sc-agent-types` gains `ErrorCategory`, an enum with `as_str()` and `retryable()`. Its values are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
+   `sc-agent-types` gains `ErrorCategory`, an enum with `as_str()` and `retryable()`. Its values are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config` and `other`.
 
    It also gains the macro `error_catalog!`. Each crate writes one table per error enum:
 
@@ -141,8 +141,8 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    - Each crate keeps its own tables. No table is combined with another crate's, and no category is looked up across crates.
    - The two Python-binding ids become variants of a new `PyBindingError` enum in sc-agent-py, with its own table.
    - A leaf stores its row's category. A wrapper copies its cause's (decision 2).
-   - `llm.api_status`, `decision.api_status` and `local.probe_status` store the status refinement of their status: 401 and 403 are `auth`, 402 is `quota`, 400 and 422 are `validation`, and 429, 500, 503 and 504 are `busy`.
-   - 500, 503 and 504 are `busy` because the HTTP layer resends only 429, 502 and 529, so these arrive as final replies and must stay retryable.
+   - `llm.api_status`, `decision.api_status` and `local.probe_status` store the status refinement of their status: 401 and 403 are `auth`, 402 is `quota`, 400 and 422 are `validation`, and any 429 or 5xx is `busy`.
+   - Busy is any non-quota 429 or 5xx; the HTTP layer resends every busy reply through its one shared loop (REQ-SAG-0601, REQ-SAG-0012), and a busy reply that is still final after the resends run out stays retryable.
 
    REQ-SAG-0017 holds the category table: the category of every id.
 
@@ -234,7 +234,7 @@ A recipe is copied by hand, and two hand-written copies already diverged.
 
 **Description:**
 
-Raise on import when the versions recorded in the generated header differ from the installed sc-decidr or sitr.
+Raise on import when the versions recorded in the generated header differ from the installed sc-decidr.
 
 **Why Rejected:**
 
@@ -259,6 +259,6 @@ Deliverables beyond the code:
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
 - The consumer template and the `sc_agent.pyi` stub.
 - `floors.toml`.
-- sc-decidr and sitr released to PyPI at the same version.
+- The one sc-decidr wheel, holding the decidr and sitr Python APIs, released to PyPI.
 
 Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope.

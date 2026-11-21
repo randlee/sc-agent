@@ -1,9 +1,9 @@
 # Decision: Crate layering and per-crate error unions
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -31,7 +31,7 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` (over `sc-decision-systemone`, whose Jev encode and decode it reuses) and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decidr` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decidr` CLI. `sc-agent-py` is a thin PyO3 layer over the `decidr` library. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. `sc-agent-types` defines the `ErrorId` trait and `ErrorDetail` (id, message, cause) that every sc-agent crate's error union uses; `sc-treesitter` defines its own. Each crate defines its own error union, except a crate whose public functions all return the error type fixed by a trait it implements (such as `sc-decision-systemone`, which returns `DecisionError` through `Backend`); a union wraps the error of the layer below it; an error from a crate that is not below (such as an LLM error inside a decision error) is carried as its id, message and cause chain.
+Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` (over `sc-decision-systemone`, whose Jev encode and decode it reuses) and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decidr` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decidr` CLI. `sc-agent-py` is a thin PyO3 layer over the `decidr` library; it also depends on `sc-treesitter` with its `python` feature, for the sitr Python API (ADR-SAG-0005). CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. `sc-agent-types` defines the `ErrorId` trait and `ErrorDetail` (id, message, cause) that every sc-agent crate's error union uses; `sc-treesitter` defines its own. Each crate defines its own error union, except a crate whose public functions all return the error type fixed by a trait it implements (such as `sc-decision-systemone`, which returns `DecisionError` through `Backend`); a union wraps the error of the layer below it; an error from a crate that is not below (such as an LLM error inside a decision error) is carried as its id, message and cause chain.
 
 **Key Principles:**
 

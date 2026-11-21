@@ -1,3 +1,5 @@
+Superseded: one wheel, sc-decidr (ADR-SAG-0021).
+
 # Pre-release rename stack: `decidr` + `sitr`
 
 Six append-only **gh stack** layers on trunk **`develop`**, each layer in its own **`/sc-git-worktree`**, with a **Composer QA** pass on that layer’s diff before the next layer is cut. Bead epic: **agt-edv**.

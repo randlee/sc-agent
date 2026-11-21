@@ -1,9 +1,9 @@
 # Requirement: A send or batch call may override the send timeout and the worker count for that call only
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-15  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -26,7 +26,7 @@ Definitions:
 - `sc_agent.send_batch` and `decidr send --batch` MUST accept a per-call worker count, `workers` (`--workers` on the CLI). It MUST be an integer in 1..=64.
 - A worker count below or above the configured `workers` within that range MUST be honored.
 - An override MUST apply to its own call only. An absent override MUST mean the configured value.
-- Each override MUST be validated once, in decidr. Python arguments MUST be refused with `SagError`:
+- Each override MUST be validated once, in decidr. A bad Python argument MUST be returned as an error value with category `validation`, not thrown:
   - `decidr.invalid_request_timeout` for a bad timeout;
   - `decidr.invalid_workers` for a bad worker count.
 
@@ -52,14 +52,14 @@ Different callers in one process need different parallelism and different patien
 
 - [ ] A Rust test shows the runner built for a call with `workers` 2 has 2 workers.
 - [ ] A Python `send_batch(workers=2)` call finds `workers == 2` in the `runner.stream.start` record written through its injected general Logger.
-- [ ] `workers` of 0, 65 or -1 raises `SagError` `decidr.invalid_workers`, and the loopback runner receives no request.
+- [ ] `workers` of 0, 65 or -1 returns an error value `decidr.invalid_workers` with category `validation`, and the loopback runner receives no request.
 - [ ] `decidr send --workers 2` without `--batch` exits with `decidr.invalid_workers`.
 - [ ] `decidr send --timeout-secs 10` and `--batch --workers 2` reach the effective timeout and worker count, as shown by Rust tests.
 - [ ] With `max_sends = 1` and a loopback runner that never answers, `timeout_secs=10` returns a line with:
   - top id `decision.http`;
   - cause `http.network` with `attempts == 1`;
   - a message that begins `timeout failure`.
-- [ ] `timeout_secs` of 9.99, 3600.01, NaN or infinity raises `SagError` `decidr.invalid_request_timeout`.
+- [ ] `timeout_secs` of 9.99, 3600.01, NaN or infinity returns an error value `decidr.invalid_request_timeout` with category `validation`.
 - [ ] Rust tests show the override at both sites:
   - the cloud-provider transport timeout;
   - the local-runner request timeout, where the Laya deadline equals `load_timeout + timeout_secs`.
