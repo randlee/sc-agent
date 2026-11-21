@@ -330,6 +330,7 @@ impl<C: Codec> Client<C> {
         C::Request: Send,
         C::Response: Send,
     {
+        // This mutex contains only the batch work queue; recovering poison retains queued work.
         let now = self.now();
         let count = requests.len();
         let queue = Mutex::new((
