@@ -1,7 +1,44 @@
 //! Provider-wide pause and deadlines for generic queued work.
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
+
+/// Cancel flag; [`Cancel::wait`] ends at once when cancelled (no sleep).
+#[derive(Clone, Default)]
+pub struct Cancel(Arc<(Mutex<bool>, Condvar)>);
+
+impl Cancel {
+    pub fn cancel(&self) {
+        let (flag, cvar) = &*self.0;
+        *flag.lock().unwrap_or_else(|e| e.into_inner()) = true;
+        cvar.notify_all();
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        *self.0.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Waits up to `wait`; true when cancelled first.
+    pub fn wait(&self, wait: Duration) -> bool {
+        let (flag, cvar) = &*self.0;
+        let deadline = Instant::now() + wait;
+        let mut cancelled = flag.lock().unwrap_or_else(|e| e.into_inner());
+        while !*cancelled {
+            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                return false;
+            };
+            if left.is_zero() {
+                return false;
+            }
+            cancelled = match cvar.wait_timeout(cancelled, left) {
+                Ok((guard, _)) => guard,
+                Err(e) => e.into_inner().0,
+            };
+        }
+        true
+    }
+}
 
 /// The maximum time between the first send and a later resend.
 pub const BUDGET: Duration = Duration::from_secs(90);
@@ -40,17 +77,15 @@ impl<T> Held<T> {
     }
 }
 
-/// A queue and shared provider pause. Callers supply time so selection is deterministic.
+/// A queue of held work. Callers supply time so selection is deterministic.
 pub struct Queue<T> {
     items: VecDeque<Held<T>>,
-    pause: Option<Instant>,
 }
 
 impl<T> Default for Queue<T> {
     fn default() -> Self {
         Self {
             items: VecDeque::new(),
-            pause: None,
         }
     }
 }
@@ -61,36 +96,33 @@ impl<T> Queue<T> {
         self.items.push_back(Held::new(item, now));
     }
 
-    /// Requeues work until its holdoff ends. A busy reply also pauses the provider.
-    pub fn retry(&mut self, mut item: Held<T>, now: Instant, delay: Duration, busy: bool) {
+    /// Requeues work until its holdoff ends.
+    pub fn retry(&mut self, mut item: Held<T>, now: Instant, delay: Duration) {
         item.ready = now.checked_add(delay).unwrap_or(now + BUDGET);
-        if busy && self.pause.is_none_or(|pause| pause < item.ready) {
-            self.pause = Some(item.ready);
-        }
         self.items.push_back(item);
     }
 
     /// Removes the first runnable, expired, or cancelled item, preserving held work.
-    pub fn take(&mut self, now: Instant, cancelled: bool) -> Option<Held<T>> {
+    pub fn take(
+        &mut self,
+        now: Instant,
+        cancelled: bool,
+        pause: Option<Instant>,
+    ) -> Option<Held<T>> {
         let index = self.items.iter().position(|item| {
             cancelled
                 || item.expired(now)
-                || (item.ready <= now && self.pause.is_none_or(|pause| pause <= now))
+                || (item.ready <= now && pause.is_none_or(|until| until <= now))
         })?;
         self.items.remove(index)
     }
 
-    /// The time before which the provider is paused.
-    pub fn not_before(&self) -> Option<Instant> {
-        self.pause
-    }
-
     /// Duration until any item may become runnable or exhaust its budget.
-    pub fn next_wait(&self, now: Instant) -> Option<Duration> {
+    pub fn next_wait(&self, now: Instant, pause: Option<Instant>) -> Option<Duration> {
         self.items
             .iter()
             .map(|item| {
-                let ready = self.pause.map_or(item.ready, |pause| pause.max(item.ready));
+                let ready = pause.map_or(item.ready, |until| until.max(item.ready));
                 let deadline = item
                     .started
                     .map_or(ready, |start| ready.min(start + BUDGET));
@@ -98,6 +130,11 @@ impl<T> Queue<T> {
             })
             .min()
     }
+}
+
+/// Uses Retry-After when supplied, otherwise doubles the configured backoff.
+pub fn delay(backoff: Duration, sends: u32, retry_after: Option<Duration>) -> Duration {
+    retry_after.unwrap_or_else(|| backoff.saturating_mul(1_u32 << sends.saturating_sub(1).min(31)))
 }
 
 /// A retry decision returned by the caller after one send.
@@ -113,17 +150,37 @@ pub enum Attempt<R, E> {
 }
 
 /// A pause shared by all calls to the same provider.
-#[derive(Default)]
-pub struct ProviderPause(std::sync::Mutex<Option<Instant>>);
+pub struct ProviderPause {
+    deadline: Mutex<Option<Instant>>,
+    clock: Arc<dyn Fn() -> Instant + Send + Sync>,
+}
+
+impl Default for ProviderPause {
+    fn default() -> Self {
+        Self::with_clock(Instant::now)
+    }
+}
 
 impl ProviderPause {
+    /// Uses the supplied monotonic time source for scheduling and budget checks.
+    pub fn with_clock(clock: impl Fn() -> Instant + Send + Sync + 'static) -> Self {
+        Self {
+            deadline: Mutex::new(None),
+            clock: Arc::new(clock),
+        }
+    }
+
+    fn now(&self) -> Instant {
+        (self.clock)()
+    }
+
     /// Returns the provider's current pause deadline.
     pub fn not_before(&self) -> Option<Instant> {
-        *self.0.lock().unwrap_or_else(|e| e.into_inner())
+        *self.deadline.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     fn extend(&self, until: Instant) {
-        let mut pause = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut pause = self.deadline.lock().unwrap_or_else(|e| e.into_inner());
         if pause.is_none_or(|previous| previous < until) {
             *pause = Some(until);
         }
@@ -145,8 +202,7 @@ struct Batch<T, E> {
 /// A held item remains in the queue, leaving workers free for other runnable work.
 pub fn run<T: Send, R: Send, E: Send>(
     items: Vec<T>,
-    workers: usize,
-    max_sends: u32,
+    limits: (usize, u32),
     pause: &ProviderPause,
     cancel: &crate::Cancel,
     attempt: impl Fn(&T, u32) -> Attempt<R, E> + Sync,
@@ -154,7 +210,8 @@ pub fn run<T: Send, R: Send, E: Send>(
     mut result: impl FnMut(usize, T, Result<R, E>),
 ) {
     use std::sync::{Mutex, mpsc};
-    let now = Instant::now();
+    let (workers, max_sends) = limits;
+    let now = pause.now();
     let mut queue = Queue::default();
     for (position, item) in items.into_iter().enumerate() {
         queue.push(
@@ -177,16 +234,13 @@ pub fn run<T: Send, R: Send, E: Send>(
                     let (flag, wake) = &*cancel.0;
                     let mut guard = flag.lock().unwrap_or_else(|e| e.into_inner());
                     let mut state = batch.lock().unwrap_or_else(|e| e.into_inner());
-                    let now = Instant::now();
-                    if let Some(deadline) = pause.not_before() {
-                        state.queue.pause =
-                            Some(state.queue.pause.map_or(deadline, |p| p.max(deadline)));
-                    }
-                    let Some(mut held) = state.queue.take(now, *guard) else {
+                    let now = pause.now();
+                    let deadline = pause.not_before();
+                    let Some(mut held) = state.queue.take(now, *guard, deadline) else {
                         if state.running == 0 && state.queue.items.is_empty() {
                             break;
                         }
-                        let wait = state.queue.next_wait(now);
+                        let wait = state.queue.next_wait(now, deadline);
                         drop(state);
                         guard = match wait {
                             Some(delay) => {
@@ -203,10 +257,11 @@ pub fn run<T: Send, R: Send, E: Send>(
                     drop(state);
                     let was_cancelled = *guard;
                     drop(guard);
+                    let expired = held.expired(now);
                     let outcome = if was_cancelled {
                         Attempt::Done(Err(cancelled(held.sends)))
-                    } else if held.expired(now) {
-                        Attempt::Done(Err(held.item.last.take().expect("expired work was sent")))
+                    } else if let Some(error) = held.item.last.take_if(|_| expired) {
+                        Attempt::Done(Err(error))
                     } else {
                         held.sent(now);
                         attempt(&held.item.item, held.sends)
@@ -214,14 +269,18 @@ pub fn run<T: Send, R: Send, E: Send>(
                     let _guard = flag.lock().unwrap_or_else(|e| e.into_inner());
                     let mut state = batch.lock().unwrap_or_else(|e| e.into_inner());
                     state.running -= 1;
+                    if let Attempt::Retry {
+                        delay, busy: true, ..
+                    } = &outcome
+                    {
+                        let now = pause.now();
+                        pause.extend(now.checked_add(*delay).unwrap_or(now + BUDGET));
+                    }
                     match outcome {
-                        Attempt::Retry { error, delay, busy } if held.sends < max_sends.max(1) => {
+                        Attempt::Retry { error, delay, .. } if held.sends < max_sends.max(1) => {
                             held.item.last = Some(error);
-                            let now = Instant::now();
-                            if busy {
-                                pause.extend(now.checked_add(delay).unwrap_or(now + BUDGET));
-                            }
-                            state.queue.retry(held, now, delay, busy);
+                            let now = pause.now();
+                            state.queue.retry(held, now, delay);
                         }
                         outcome => {
                             let answer = match outcome {
@@ -252,15 +311,17 @@ pub fn run_one<T, R, E>(
     mut attempt: impl FnMut(&T, u32) -> Attempt<R, E>,
     cancelled: impl Fn(u32) -> E,
 ) -> Result<R, E> {
-    let mut held = Held::new(item, Instant::now());
+    let mut held = Held::new(item, pause.now());
     let mut last = None;
     loop {
         if cancel.is_cancelled() {
             return Err(cancelled(held.sends));
         }
-        let now = Instant::now();
-        if held.expired(now) {
-            return Err(last.expect("expired work was sent"));
+        let now = pause.now();
+        if held.expired(now)
+            && let Some(error) = last.take()
+        {
+            return Err(error);
         }
         let ready = pause.not_before().map_or(held.ready, |p| p.max(held.ready));
         if ready > now {
@@ -276,15 +337,15 @@ pub fn run_one<T, R, E>(
         match attempt(item, held.sends) {
             Attempt::Done(result) => return result,
             Attempt::Retry { error, delay, busy } => {
-                if held.sends >= max_sends.max(1) {
-                    return Err(error);
-                }
-                last = Some(error);
-                let now = Instant::now();
+                let now = pause.now();
                 held.ready = now.checked_add(delay).unwrap_or(now + BUDGET);
                 if busy {
                     pause.extend(held.ready);
                 }
+                if held.sends >= max_sends.max(1) {
+                    return Err(error);
+                }
+                last = Some(error);
             }
         }
     }
@@ -299,18 +360,95 @@ mod tests {
         let now = Instant::now();
         let mut queue = Queue::default();
         queue.push(1, now);
-        let mut first = queue.take(now, false).unwrap();
+        let mut first = queue.take(now, false, None).unwrap();
         first.sent(now);
-        queue.retry(first, now, Duration::from_secs(100), false);
+        queue.retry(first, now, Duration::from_secs(100));
         queue.push(2, now);
-        assert_eq!(queue.take(now, false).unwrap().item, 2);
-        assert_eq!(queue.next_wait(now), Some(BUDGET));
+        assert_eq!(queue.take(now, false, None).unwrap().item, 2);
+        assert_eq!(queue.next_wait(now, None), Some(BUDGET));
         assert!(
             queue
-                .take(now + BUDGET, false)
+                .take(now + BUDGET, false, None)
                 .unwrap()
                 .expired(now + BUDGET)
         );
+    }
+
+    #[test]
+    fn budget_does_not_cut_a_send_in_flight() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let start = Instant::now();
+        let elapsed = Arc::new(AtomicU64::new(0));
+        let clock = elapsed.clone();
+        let pause = ProviderPause::with_clock(move || {
+            start + Duration::from_secs(clock.load(Ordering::SeqCst))
+        });
+        let cancel = Cancel::default();
+        let result = run_one(
+            &(),
+            5,
+            &pause,
+            &cancel,
+            |_, _| {
+                elapsed.store(91, Ordering::SeqCst);
+                Attempt::<_, &str>::Done(Ok("finished"))
+            },
+            |_| "cancelled",
+        );
+        assert_eq!(result, Ok("finished"));
+    }
+
+    #[test]
+    fn cancellation_stops_a_queued_retry_without_another_send() {
+        let cancel = crate::Cancel::default();
+        let pause = ProviderPause::default();
+        let mut calls = 0;
+        let result = run_one(
+            &(),
+            5,
+            &pause,
+            &cancel,
+            |_, _| {
+                calls += 1;
+                cancel.cancel();
+                Attempt::<(), _>::Retry {
+                    error: "busy",
+                    delay: Duration::from_secs(3),
+                    busy: true,
+                }
+            },
+            |_| "cancelled",
+        );
+        assert_eq!(calls, 1);
+        assert_eq!(result, Err("cancelled"));
+    }
+
+    #[test]
+    fn batch_retries_and_returns_each_original_item() {
+        let cancel = crate::Cancel::default();
+        let pause = ProviderPause::default();
+        let mut received = Vec::new();
+        run(
+            vec![7, 8],
+            (1, 2),
+            &pause,
+            &cancel,
+            |item, sends| {
+                if sends == 1 {
+                    Attempt::Retry {
+                        error: "busy",
+                        delay: Duration::ZERO,
+                        busy: false,
+                    }
+                } else {
+                    Attempt::Done(Ok(*item * 2))
+                }
+            },
+            |_| "cancelled",
+            |position, item, result| received.push((position, item, result)),
+        );
+        received.sort_by_key(|item| item.0);
+        assert_eq!(received, [(0, 7, Ok(14)), (1, 8, Ok(16))]);
     }
 
     #[test]
@@ -318,12 +456,31 @@ mod tests {
         let now = Instant::now();
         let mut queue = Queue::default();
         queue.push(1, now);
-        let first = queue.take(now, false).unwrap();
-        queue.retry(first, now, Duration::from_secs(3), true);
+        let first = queue.take(now, false, None).unwrap();
+        queue.retry(first, now, Duration::from_secs(3));
         queue.push(2, now);
-        assert!(queue.take(now, false).is_none());
-        assert_eq!(queue.next_wait(now), Some(Duration::from_secs(3)));
-        assert!(queue.take(now, true).is_some());
-        assert!(queue.take(now + Duration::from_secs(3), false).is_some());
+        assert!(
+            queue
+                .take(now, false, Some(now + Duration::from_secs(3)))
+                .is_none()
+        );
+        assert_eq!(
+            queue.next_wait(now, Some(now + Duration::from_secs(3))),
+            Some(Duration::from_secs(3))
+        );
+        assert!(
+            queue
+                .take(now, true, Some(now + Duration::from_secs(3)))
+                .is_some()
+        );
+        assert!(
+            queue
+                .take(
+                    now + Duration::from_secs(3),
+                    false,
+                    Some(now + Duration::from_secs(3))
+                )
+                .is_some()
+        );
     }
 }

@@ -11,9 +11,8 @@ mod client;
 /// Generic queue and deadlines for retrying held work.
 pub mod holdoff;
 
-pub use client::{
-    Cancel, Client, HOLDOFF_MAX, Item, JITTER_MAX, Policy, RETRY_AFTER_MIN, holdoff, retry_after,
-};
+pub use client::{Client, Item, Policy, retry_after};
+pub use holdoff::Cancel;
 use sc_agent_types::Error;
 pub use ureq::http;
 
