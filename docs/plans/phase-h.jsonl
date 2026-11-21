@@ -2,3 +2,4 @@
 {"sprint": "h-1", "depends_on": ["h-0"]}
 {"sprint": "h-2", "depends_on": ["h-0"]}
 {"sprint": "h-3", "depends_on": ["h-2"]}
+{"sprint": "h-6", "depends_on": ["h-1"]}

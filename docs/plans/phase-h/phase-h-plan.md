@@ -12,6 +12,8 @@ Order: h-0, then h-1 and h-2 in parallel, then h-3 (needs h-2).
 
 Not planned (owner decides): REQ-SAG-0011 (KeyboardInterrupt cancels the CancelToken); REQ-SAG-0601's 90-second budget, ProviderBusy reason and queue holdoff (waits hold a worker); REQ-SAG-0016's error detail fields; the sitr API in the sc-agent wheel and deleting sc-treesitter-py; category, retryable, SagError and the consumer template; comparing the FromLlm prompt with the Python tools; turning a wrong-type Python argument into an error value instead of TypeError.
 
+Restart, 2026-11-21 (owner direction): REQ-SAG-0601's queue holdoff and 90-second budget are now planned as h-6, one isolated, reusable sc-agent-http module of at most 250 lines of source. The standalone sitr wheel is out of scope for phase h and returns after the MVP works. It was removed from the plan only because agents were "continuously confused on how the sc-observability single log was supposed to work". Findings about it are not accepted in this phase.
+
 Cited REQ/NFR/ADR records say what each sprint touches. Where an older record conflicts with the owner's later logging rulings, the rulings win; a citation is not a reason to add code.
 
 ## h-0: move crates/ to crates-ref/ and land the starting code
