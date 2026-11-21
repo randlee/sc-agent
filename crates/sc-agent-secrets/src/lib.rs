@@ -28,7 +28,7 @@ impl KeySource {
 pub fn key(
     var: &str,
     repo_root: Option<&Path>,
-    keyring: Option<(&str, &str)>,
+    keyring: Option<(Option<&str>, Option<&str>)>,
 ) -> Result<Option<(String, KeySource)>, Error> {
     lookup(
         var,
@@ -36,7 +36,8 @@ pub fn key(
         repo_root,
         |var| {
             let user = whoami::username();
-            let (service, account) = keyring.unwrap_or((var, user.as_str()));
+            let (service, account) = keyring.unwrap_or_default();
+            let (service, account) = (service.unwrap_or(var), account.unwrap_or(&user));
             let entry =
                 keyring::Entry::new(service, account).map_err(|e| Error::Keyring(e.to_string()))?;
             match entry.get_password() {

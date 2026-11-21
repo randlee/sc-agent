@@ -7,6 +7,7 @@ use sc_agent_log::Session;
 use sc_agent_types::Error;
 use sc_decision_runner::{Decider, Decision, Outcome};
 use sc_decision_schema::{Backend, DecisionRequest};
+use std::time::Duration;
 
 struct LocalDecision {
     probe: sc_decision_local::Local,
@@ -85,9 +86,11 @@ pub fn open(
     repo_root: Option<&std::path::Path>,
     policy: Policy,
     session: Option<Session>,
+    keyring: Option<(Option<&str>, Option<&str>)>,
 ) -> Result<(Box<dyn Decision>, String), Error> {
-    let key =
-        |p: &sc_agent_types::providers::Provider| sc_agent_secrets::key(p.key_var, repo_root, None);
+    let key = |p: &sc_agent_types::providers::Provider| {
+        sc_agent_secrets::key(p.key_var, repo_root, keyring)
+    };
     let (chosen, id) = sc_agent_types::providers::Provider::choose(model, provider, |p| {
         matches!(key(p), Ok(Some(_)))
     })?;
@@ -99,5 +102,26 @@ pub fn open(
     Ok((
         Box::new(Decider::new(backend(chosen, found)?, policy, session)),
         id,
+    ))
+}
+
+/// Validate per-call overrides once. None leaves the caller's configured value intact.
+pub fn validate_limits(
+    timeout: Option<f64>,
+    workers: Option<i64>,
+) -> Result<(Option<Duration>, Option<usize>), Error> {
+    if let Some(value) = timeout
+        && (!value.is_finite() || !(10.0..=3600.0).contains(&value))
+    {
+        return Err(Error::InvalidRequestTimeout(value));
+    }
+    if let Some(value) = workers
+        && !(1..=64).contains(&value)
+    {
+        return Err(Error::InvalidWorkers(value));
+    }
+    Ok((
+        timeout.map(Duration::from_secs_f64),
+        workers.map(|n| n as usize),
     ))
 }

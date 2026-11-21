@@ -1,6 +1,10 @@
 /// Every failure is a value with a stable id; nothing panics or raises.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
+    #[error("timeout_secs {0} must be a finite number in 10..=3600")]
+    InvalidRequestTimeout(f64),
+    #[error("workers {0} must be an integer in 1..=64 (batch only)")]
+    InvalidWorkers(i64),
     #[error("{0}")]
     Config(String),
     #[error("no API key for {provider}: set {var}, add it to .env, or store it in the keyring")]
@@ -34,6 +38,8 @@ pub enum Error {
 impl Error {
     pub fn id(&self) -> &'static str {
         match self {
+            Self::InvalidRequestTimeout(_) => "decidr.invalid_request_timeout",
+            Self::InvalidWorkers(_) => "decidr.invalid_workers",
             Self::Config(_) => "config.invalid",
             Self::MissingKey { .. } => "secrets.missing_key",
             Self::Keyring(_) => "secrets.keyring",

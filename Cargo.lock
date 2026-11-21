@@ -842,6 +842,7 @@ name = "sc-agent-py"
 version = "0.2.8"
 dependencies = [
  "decidr",
+ "keyring",
  "pyo3",
  "sc-agent-http",
  "sc-agent-log",
@@ -850,6 +851,7 @@ dependencies = [
  "sc-observability",
  "sc-treesitter",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

@@ -26,3 +26,7 @@ workspace = true
 [lib]
 name = "sc_agent"
 crate-type = ["cdylib"]
+
+[dev-dependencies]
+keyring = "3"
+tempfile = "3"

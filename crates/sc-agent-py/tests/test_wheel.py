@@ -51,3 +51,73 @@ def test_empty_batch_is_no_replies(log):
     logger, root = log
     assert sc_agent.send_batch([], "haiku", "p", "t", logger) == []
     assert not (root / "logs" / "t.log.jsonl").exists() or records(root) == []
+
+
+@pytest.mark.parametrize("method", [sc_agent.send, sc_agent.send_batch])
+@pytest.mark.parametrize("value", [9.99, 3600.01, float("nan"), float("inf"), "bad", True, [], {}])
+def test_timeout_invalid_is_an_error_value(method, value, log):
+    logger, _ = log
+    request = "not json" if method is sc_agent.send else ["not json"]
+    result = method(request, "haiku", "p", "t", logger, timeout_secs=value)
+    reply = json.loads(result if method is sc_agent.send else result[0])
+    assert reply["error"]["id"] == "decidr.invalid_request_timeout"
+    assert "10..=3600" in reply["error"]["message"]
+    assert sc_agent.category(reply["error"]) == "validation"
+    assert sc_agent.retryable(reply["error"]) is False
+
+
+@pytest.mark.parametrize("value", [-1, 0, 65, 1.5, True, "bad", []])
+def test_invalid_workers_do_not_raise(value, log):
+    logger, _ = log
+    replies = sc_agent.send_batch(["not json"], "haiku", "p", "t", logger, workers=value)
+    assert json.loads(replies[0])["error"]["id"] == "decidr.invalid_workers"
+
+
+@pytest.mark.parametrize("method", [sc_agent.send, sc_agent.send_batch])
+@pytest.mark.parametrize("timeout", [10.125, 3600, None])
+def test_valid_timeout_reaches_request_parsing(method, timeout, log):
+    logger, _ = log
+    request = "not json" if method is sc_agent.send else ["not json"]
+    result = method(request, "haiku", "p", "t", logger, timeout_secs=timeout)
+    reply = json.loads(result if method is sc_agent.send else result[0])
+    assert reply["error"]["id"] == "config.invalid"
+    assert "request 0" in reply["error"]["message"]
+
+
+@pytest.mark.parametrize("method", [sc_agent.send, sc_agent.send_batch])
+@pytest.mark.parametrize("options", [
+    {"keyring_service": "custom"}, {"keyring_account": "alice"},
+    {"keyring_service": "custom", "keyring_account": "alice"},
+])
+def test_keyring_options_are_accepted_without_reading_keys(method, options, log):
+    logger, _ = log
+    request = "not json" if method is sc_agent.send else ["not json"]
+    result = method(request, "haiku", "p", "t", logger, **options)
+    reply = json.loads(result if method is sc_agent.send else result[0])
+    assert "request 0" in reply["error"]["message"]
+
+
+@pytest.mark.parametrize("option", ["keyring_service", "keyring_account"])
+@pytest.mark.parametrize("method", [sc_agent.send, sc_agent.send_batch])
+def test_invalid_keyring_type_is_a_value(method, option, log):
+    logger, _ = log
+    request = "not json" if method is sc_agent.send else ["not json"]
+    result = method(request, "haiku", "p", "t", logger, **{option: 42})
+    reply = json.loads(result if method is sc_agent.send else result[0])
+    assert reply["ok"] is False
+    assert "keyring" in reply["error"]["message"]
+
+
+@pytest.mark.parametrize("value,category,retryable", [
+    ({"category": "busy"}, "busy", True), ({"category": "network"}, "network", True),
+    ({"category": "quota"}, "quota", False), ({"category": "auth"}, "auth", False),
+    ({"category": "validation"}, "validation", False), ({}, "other", False),
+    ({"category": None}, "other", False), (None, "other", False),
+    ("bad json", "other", False), (42, "other", False),
+])
+def test_error_helpers_read_values_without_raising(value, category, retryable):
+    assert sc_agent.category(value) == category
+    assert sc_agent.retryable(value) is retryable
+    if isinstance(value, dict):
+        assert sc_agent.category(json.dumps(value)) == category
+        assert sc_agent.retryable(json.dumps(value)) is retryable

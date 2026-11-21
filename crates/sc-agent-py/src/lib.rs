@@ -13,7 +13,13 @@ use sc_decision_schema::DecisionRequest;
 use serde_json::{Map, Value, json};
 
 fn error_value(e: &Error) -> Value {
-    json!({ "ok": false, "error": { "id": e.id(), "message": e.to_string() } })
+    json!({ "ok": false, "error": { "id": e.id(), "message": e.to_string(), "category": match e {
+        Error::ProviderBusy { .. } => "busy", Error::Network(_) => "network",
+        Error::QuotaExhausted { .. } => "quota", Error::MissingKey { .. } | Error::Keyring(_) => "auth",
+        Error::Config(_) => "config",
+        Error::InvalidRequestTimeout(_) | Error::InvalidWorkers(_) => "validation", Error::Cancelled { .. } => "cancelled",
+        Error::Log(_) => "log", _ => "other",
+    } } })
 }
 
 fn reply(result: Result<Value, Error>) -> Value {
@@ -21,6 +27,28 @@ fn reply(result: Result<Value, Error>) -> Value {
         Ok(value) => json!({ "ok": true, "value": value }),
         Err(e) => error_value(&e),
     }
+}
+
+/// The stored category of a reply's error value (a dict or JSON text).
+#[pyfunction]
+fn category(error: &Bound<'_, PyAny>) -> String {
+    if let Ok(text) = error.extract::<String>() {
+        return serde_json::from_str::<Value>(&text)
+            .ok()
+            .and_then(|v| v.get("category").and_then(Value::as_str).map(str::to_owned))
+            .unwrap_or_else(|| "other".into());
+    }
+    error
+        .get_item("category")
+        .ok()
+        .and_then(|v| v.extract().ok())
+        .unwrap_or_else(|| "other".into())
+}
+
+/// True only for busy and network errors, after the wheel's own resends.
+#[pyfunction]
+fn retryable(error: &Bound<'_, PyAny>) -> bool {
+    matches!(category(error).as_str(), "busy" | "network")
 }
 
 /// Runs `f` with the GIL released; a panic becomes an error value.
@@ -79,52 +107,87 @@ fn decide_all(
     agent_role: &str,
     logger: &Logger,
     provider: Option<&str>,
-    workers: usize,
+    workers: Option<&Bound<'_, PyAny>>,
+    timeout_secs: Option<&Bound<'_, PyAny>>,
+    keyring_service: Option<&Bound<'_, PyAny>>,
+    keyring_account: Option<&Bound<'_, PyAny>>,
     cancel: Option<&CancelToken>,
 ) -> Vec<Value> {
     let count = requests.len();
     let cancel = cancel.map(|c| c.0.clone()).unwrap_or_default();
-    let result = guarded(py, || {
-        if workers == 0 {
-            return Err(Error::Config("workers must be at least 1".into()));
-        }
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-        let requests = requests
-            .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                serde_json::from_str::<DecisionRequest>(r)
-                    .map_err(|e| Error::Config(format!("request {i}: {e}")))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let cwd = std::env::current_dir().unwrap_or_default();
-        let session = Session::open(&logger.1, repo_id(&cwd), project, agent_role)?;
-        let (decision, id) = decidr::open(
-            model,
-            provider,
-            Some(&cwd),
-            Policy::default(),
-            Some(session),
-        )?;
-        let requests = requests
-            .into_iter()
-            .map(|r| DecisionRequest {
-                model: id.clone(),
-                ..r
-            })
-            .collect();
-        let mut replies = vec![Value::Null; count];
-        decision.decide_batch(requests, workers, &cancel, &mut |outcome| {
-            let value = outcome.result.and_then(|r| {
-                serde_json::to_value(r).map_err(|e| Error::ResponseParse(e.to_string()))
-            });
-            if let Some(slot) = replies.get_mut(outcome.position) {
-                *slot = reply(value);
+    let options = (|| {
+        let numeric = |v: &Bound<'_, PyAny>| {
+            if v.is_instance_of::<pyo3::types::PyBool>() {
+                f64::NAN
+            } else {
+                v.extract::<f64>().unwrap_or(f64::NAN)
             }
-        });
-        Ok(replies)
+        };
+        let integer = |v: &Bound<'_, PyAny>| {
+            if v.is_instance_of::<pyo3::types::PyBool>() {
+                i64::MIN
+            } else {
+                v.extract::<i64>().unwrap_or(i64::MIN)
+            }
+        };
+        let (timeout, workers) =
+            decidr::validate_limits(timeout_secs.map(numeric), workers.map(integer))?;
+        let text = |v: &Bound<'_, PyAny>| {
+            v.extract::<String>()
+                .map_err(|_| Error::Config("keyring service/account must be strings".into()))
+        };
+        let service = keyring_service.map(text).transpose()?;
+        let account = keyring_account.map(text).transpose()?;
+        Ok::<_, Error>((timeout, workers.unwrap_or(8), service, account))
+    })();
+    let result = options.and_then(|(timeout, workers, service, account)| {
+        guarded(py, || {
+            if count == 0 {
+                return Ok(Vec::new());
+            }
+            let requests = requests
+                .iter()
+                .enumerate()
+                .map(|(i, r)| {
+                    serde_json::from_str::<DecisionRequest>(r)
+                        .map_err(|e| Error::Config(format!("request {i}: {e}")))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let session = Session::open(&logger.1, repo_id(&cwd), project, agent_role)?;
+            let (decision, id) = decidr::open(
+                model,
+                provider,
+                Some(&cwd),
+                Policy {
+                    timeout: timeout.unwrap_or(Policy::default().timeout),
+                    ..Policy::default()
+                },
+                Some(session),
+                if service.is_some() || account.is_some() {
+                    Some((service.as_deref(), account.as_deref()))
+                } else {
+                    None
+                },
+            )?;
+            let requests = requests
+                .into_iter()
+                .map(|r| DecisionRequest {
+                    model: id.clone(),
+                    ..r
+                })
+                .collect();
+            let mut replies = vec![Value::Null; count];
+            decision.decide_batch(requests, workers, &cancel, &mut |outcome| {
+                let value = outcome.result.and_then(|r| {
+                    serde_json::to_value(r).map_err(|e| Error::ResponseParse(e.to_string()))
+                });
+                if let Some(slot) = replies.get_mut(outcome.position) {
+                    *slot = reply(value);
+                }
+            });
+            Ok(replies)
+        })
     });
     let replies = result.unwrap_or_else(|e| vec![error_value(&e); count]);
     for r in &replies {
@@ -143,7 +206,7 @@ fn decide_all(
 
 /// Decide one request (JSON text) with `model` on `provider` (or the first with a key).
 #[pyfunction]
-#[pyo3(signature = (request, model, project, agent_role, logger, provider=None, cancel=None))]
+#[pyo3(signature = (request, model, project, agent_role, logger, provider=None, cancel=None, *, timeout_secs=None, keyring_service=None, keyring_account=None))]
 #[expect(clippy::too_many_arguments, reason = "the Python keyword arguments")]
 fn send(
     py: Python<'_>,
@@ -154,6 +217,9 @@ fn send(
     logger: &Logger,
     provider: Option<&str>,
     cancel: Option<&CancelToken>,
+    timeout_secs: Option<&Bound<'_, PyAny>>,
+    keyring_service: Option<&Bound<'_, PyAny>>,
+    keyring_account: Option<&Bound<'_, PyAny>>,
 ) -> String {
     decide_all(
         py,
@@ -163,7 +229,10 @@ fn send(
         agent_role,
         logger,
         provider,
-        1,
+        None,
+        timeout_secs,
+        keyring_service,
+        keyring_account,
         cancel,
     )
     .swap_remove(0)
@@ -172,7 +241,7 @@ fn send(
 
 /// Decide every request on `workers` threads; one reply per request, in input order.
 #[pyfunction]
-#[pyo3(signature = (requests, model, project, agent_role, logger, provider=None, workers=8, cancel=None))]
+#[pyo3(signature = (requests, model, project, agent_role, logger, provider=None, workers=None, cancel=None, *, timeout_secs=None, keyring_service=None, keyring_account=None))]
 #[expect(clippy::too_many_arguments, reason = "the Python keyword arguments")]
 fn send_batch(
     py: Python<'_>,
@@ -182,11 +251,25 @@ fn send_batch(
     agent_role: &str,
     logger: &Logger,
     provider: Option<&str>,
-    workers: usize,
+    workers: Option<&Bound<'_, PyAny>>,
     cancel: Option<&CancelToken>,
+    timeout_secs: Option<&Bound<'_, PyAny>>,
+    keyring_service: Option<&Bound<'_, PyAny>>,
+    keyring_account: Option<&Bound<'_, PyAny>>,
 ) -> Vec<String> {
     decide_all(
-        py, requests, model, project, agent_role, logger, provider, workers, cancel,
+        py,
+        requests,
+        model,
+        project,
+        agent_role,
+        logger,
+        provider,
+        workers,
+        timeout_secs,
+        keyring_service,
+        keyring_account,
+        cancel,
     )
     .iter()
     .map(Value::to_string)
@@ -247,5 +330,7 @@ fn sc_agent(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CancelToken>()?;
     m.add_function(wrap_pyfunction!(logger, m)?)?;
     m.add_function(wrap_pyfunction!(send, m)?)?;
+    m.add_function(wrap_pyfunction!(category, m)?)?;
+    m.add_function(wrap_pyfunction!(retryable, m)?)?;
     m.add_function(wrap_pyfunction!(send_batch, m)?)
 }

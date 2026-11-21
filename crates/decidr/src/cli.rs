@@ -26,10 +26,10 @@ pub enum Command {
         agent_role: String,
         #[arg(long)]
         batch: bool,
-        #[arg(long, requires = "batch")]
-        workers: Option<usize>,
+        #[arg(long, allow_hyphen_values = true)]
+        workers: Option<i64>,
         #[arg(long)]
-        timeout_secs: Option<u64>,
+        timeout_secs: Option<f64>,
     },
     /// The model table.
     Models,

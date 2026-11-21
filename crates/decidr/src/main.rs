@@ -26,6 +26,24 @@ use cli::{Cli, Command};
 /// under [`log_root`]. Every send and every failed command is recorded to it.
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Command::Send {
+        timeout_secs,
+        workers,
+        batch,
+        ..
+    } = &cli.command
+    {
+        let checked = decidr::validate_limits(*timeout_secs, *workers).and_then(|_| {
+            if !batch && workers.is_some() {
+                Err(Error::InvalidWorkers(workers.unwrap_or_default()))
+            } else {
+                Ok(())
+            }
+        });
+        if let Err(error) = checked {
+            return fail(&error);
+        }
+    }
     let opened = log_root("decidr").and_then(|dir| Ok((general("decidr", &dir)?, dir)));
     let (logger, log_dir) = match opened {
         Ok(opened) => opened,
@@ -85,8 +103,8 @@ fn send(
     runner: Option<&str>,
     agent_role: &str,
     batch: bool,
-    workers: Option<usize>,
-    timeout_secs: Option<u64>,
+    workers: Option<i64>,
+    timeout_secs: Option<f64>,
     logger: &Logger,
     log_root: &Path,
 ) -> Result<ExitCode, Error> {
@@ -95,7 +113,9 @@ fn send(
     let project = config.project.as_deref().ok_or_else(|| Error::Config("project is required: --project, SC_PROJECT, or \"project\" in sc-agent.json or decidr.json".into()))?;
     let policy = Policy {
         max_sends: config.max_sends.unwrap_or(5),
-        timeout: Duration::from_secs(timeout_secs.or(config.request_timeout_secs).unwrap_or(120)),
+        timeout: timeout_secs
+            .map(Duration::from_secs_f64)
+            .unwrap_or_else(|| Duration::from_secs(config.request_timeout_secs.unwrap_or(120))),
         ..Policy::default()
     };
     let requests = read_requests(batch)?;
@@ -121,7 +141,7 @@ fn send(
             )?;
             (local, model.to_owned())
         }
-        None => decidr::open(model, provider, root, policy, Some(session))?,
+        None => decidr::open(model, provider, root, policy, Some(session), None)?,
     };
     let requests = requests
         .into_iter()
@@ -135,7 +155,7 @@ fn send(
     let _ = ctrlc::set_handler(move || handler.cancel());
     let mut failed = false;
     let mut out = std::io::stdout().lock();
-    decision.decide_batch(requests, workers.or(config.workers).unwrap_or(8), &cancel, &mut |outcome: Outcome| {
+    decision.decide_batch(requests, workers.map(|n| n as usize).or(config.workers).unwrap_or(8), &cancel, &mut |outcome: Outcome| {
         failed |= outcome.result.is_err();
         let mut fields = Map::new();
         fields.insert("model".into(), model_id.clone().into());
