@@ -127,5 +127,6 @@ impl DecisionRequest {
 
 /// Any decision backend: a [`Codec`] from a [`DecisionRequest`] to a [`DecisionResponse`]
 /// (ADR-SAG-0001). The shared client does the sending.
+/// This is an open trait; downstream crates may implement it.
 pub trait Backend: Codec<Request = DecisionRequest, Response = DecisionResponse> {}
 impl<T: Codec<Request = DecisionRequest, Response = DecisionResponse> + ?Sized> Backend for T {}

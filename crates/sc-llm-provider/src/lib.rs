@@ -124,6 +124,7 @@ impl Reply {
 }
 
 /// Any chat backend: a [`Codec`] from [`Chat`] to [`Reply`].
+/// This is an open trait; downstream crates may implement it.
 pub trait Llm: Codec<Request = Chat, Response = Reply> {}
 impl<T: Codec<Request = Chat, Response = Reply> + ?Sized> Llm for T {}
 
