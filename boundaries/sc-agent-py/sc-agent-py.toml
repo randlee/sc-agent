@@ -13,12 +13,12 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["CancelToken", "SagError", "send", "send_batch", "category", "retryable"]
+roots = ["CancelToken", "Logger", "logger", "send", "send_batch"]
 
 [dependencies]
 allowed_dependents = []
 allowed_dev_dependencies = []
-allowed_dependencies = ["decidr", "sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-secrets", "sc-agent-types", "sc-decision-schema", "sc-treesitter"]
+allowed_dependencies = ["decidr", "sc-agent-http", "sc-agent-log", "sc-agent-types", "sc-decision-schema", "sc-treesitter"]
 forbidden_edges = []
 
 [references]

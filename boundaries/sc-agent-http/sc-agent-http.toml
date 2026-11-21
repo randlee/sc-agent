@@ -4,22 +4,22 @@ owner_crate_path = "sc_agent_http"
 name = "ScAgentHttpLayer"
 
 [public]
-facade = "HttpClient"
+facade = "Client"
 
 [implementation]
-type = "HttpClient"
+type = "Client"
 module = "sc_agent_http"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["HttpClient"]
+roots = ["Client", "Cancel", "Codec", "Policy"]
 
 [dependencies]
 allowed_dev_dependents = ["sc-agent-http"]
 allowed_dev_dependencies = ["sc-agent-http", "sc-agent-secrets"]
 allowed_dependents = ["decidr", "sc-agent-py", "sc-decision-llm", "sc-decision-local", "sc-decision-runner", "sc-decision-schema", "sc-decision-systemone", "sc-llm-provider"]
-allowed_dependencies = ["sc-agent-log", "sc-agent-secrets", "sc-agent-types"]
+allowed_dependencies = ["sc-agent-types"]
 forbidden_edges = []
 
 [references]

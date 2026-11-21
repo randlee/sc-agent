@@ -4,16 +4,16 @@ owner_crate_path = "decidr"
 name = "DecidrLayer"
 
 [public]
-facade = "input"
+facade = "open"
 
 [implementation]
-type = "input"
+type = "open"
 module = "decidr"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["input", "CallLimits", "Workers", "RequestTimeout", "send_with", "send_batch_with"]
+roots = ["open", "backend"]
 
 [dependencies]
 allowed_dev_dependencies = []

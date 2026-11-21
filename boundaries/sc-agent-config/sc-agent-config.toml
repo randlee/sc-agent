@@ -4,16 +4,16 @@ owner_crate_path = "sc_agent_config"
 name = "ScAgentConfigLayer"
 
 [public]
-facade = "load"
+facade = "config"
 
 [implementation]
-type = "load"
+type = "config"
 module = "sc_agent_config"
 visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["load"]
+roots = ["config", "Config", "Runner", "home", "repo_root", "KEYS"]
 
 [dependencies]
 allowed_dev_dependencies = []

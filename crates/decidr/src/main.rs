@@ -14,8 +14,7 @@ use sc_agent_secrets as keys;
 use sc_agent_types::Error;
 use sc_agent_types::providers::{MODELS, PROVIDERS};
 use sc_config::layers;
-use sc_decision_local::Local;
-use sc_decision_runner::{Decider, Decision, Outcome};
+use sc_decision_runner::{Decision, Outcome};
 use sc_decision_schema::DecisionRequest;
 use sc_observability::v2::Logger;
 use serde_json::{Map, json};
@@ -145,13 +144,14 @@ fn send(
                 .get(name)
                 .ok_or_else(|| Error::Config(format!("no local runner {name} in config")))?;
             let base = format!("http://{}:{}", r.host, r.port);
-            let local = Local::new(
+            let local = decidr::open_local(
                 &base,
                 &r.kind,
-                |s| Decider::new(s, policy, Some(session)),
+                policy,
+                Some(session),
                 Duration::from_secs(r.load_timeout_secs),
             )?;
-            (Box::new(local), model.to_owned())
+            (local, model.to_owned())
         }
         None => decidr::open(model, provider, root, policy, Some(session))?,
     };

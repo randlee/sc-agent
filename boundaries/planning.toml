@@ -1,4 +1,4 @@
 # Required by sc-lint boundary inventory parsing when records exist;
-# B.15 is the remaining phase-B sprint; Beads is authoritative for progress.
+# Phase h is current; Beads is authoritative for progress.
 [planning]
-current_sprint = "B.15"
+current_sprint = "h.0"
