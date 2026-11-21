@@ -3,14 +3,64 @@
 //! from the session JSONL file (the empty-variable fallback to `~/.sc-agent` is
 //! `sc_agent_log::log_root`'s unit test).
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::Duration;
+use wait_timeout::ChildExt;
 
 use sc_agent_http::test_server::{Server, ok};
 use serde_json::{Value, json};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn run_with_deadline(command: &mut Command, input: Option<&[u8]>) -> Result<Output> {
+    let mut child = command
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let drain = |mut pipe: Box<dyn Read + Send>| {
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            pipe.read_to_end(&mut bytes).map(|_| bytes)
+        })
+    };
+    let stdout = drain(Box::new(child.stdout.take().ok_or("stdout was not piped")?));
+    let stderr = drain(Box::new(child.stderr.take().ok_or("stderr was not piped")?));
+    let stdin_error = input.and_then(|input| {
+        child
+            .stdin
+            .take()
+            .and_then(|mut stdin| stdin.write_all(input).err())
+    });
+    let status = child.wait_timeout(Duration::from_secs(30))?;
+    let timed_out = status.is_none();
+    let status = match status {
+        Some(status) => status,
+        None => {
+            child.kill()?;
+            child.wait()?
+        }
+    };
+    let output = Output {
+        status,
+        stdout: stdout.join().map_err(|_| "stdout reader panicked")??,
+        stderr: stderr.join().map_err(|_| "stderr reader panicked")??,
+    };
+    if timed_out {
+        return Err(format!("decidr timed out: {output:?}").into());
+    }
+    if let Some(error) = stdin_error {
+        return Err(format!("writing decidr stdin failed: {error}; {output:?}").into());
+    }
+    Ok(output)
+}
 
 fn events(log: &Path) -> Result<Vec<Value>> {
     let mut events = Vec::new();
@@ -49,20 +99,13 @@ fn files_under(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> 
 fn a_failed_command_is_recorded_in_the_general_log_under_the_variable() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    let output = Command::new(env!("CARGO_BIN_EXE_decidr"))
-        .args([
-            "--project",
-            "p",
-            "send",
-            "--model",
-            "haiku",
-            "--agent-role",
-            "t",
-        ])
-        .current_dir(dir.path())
-        .env("DECIDR_LOG_ROOT", &root)
-        .stdin(Stdio::null())
-        .output()?;
+    let output = run_with_deadline(
+        Command::new(env!("CARGO_BIN_EXE_decidr"))
+            .args("--project p send --model haiku --agent-role t".split_whitespace())
+            .current_dir(dir.path())
+            .env("DECIDR_LOG_ROOT", &root),
+        None,
+    )?;
     assert!(!output.status.success());
     assert_eq!(
         actions(&root.join("logs").join("decidr.log.jsonl"))?,
@@ -89,31 +132,14 @@ fn a_successful_send_is_recorded_once_and_keeps_general_logs_out_of_sessions() -
     });
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_decidr"))
-        .args([
-            "--project",
-            "p",
-            "send",
-            "--model",
-            "m",
-            "--runner",
-            "test",
-            "--agent-role",
-            "t",
-        ])
-        .current_dir(dir.path())
-        .env("DECIDR_LOG_ROOT", &root)
-        .env("DECIDR_LOCAL_RUNNERS", runner.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    child
-        .stdin
-        .take()
-        .ok_or("decidr stdin was not piped")?
-        .write_all(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#)?;
-    let output = child.wait_with_output()?;
+    let output = run_with_deadline(
+        Command::new(env!("CARGO_BIN_EXE_decidr"))
+            .args("--project p send --model m --runner test --agent-role t".split_whitespace())
+            .current_dir(dir.path())
+            .env("DECIDR_LOG_ROOT", &root)
+            .env("DECIDR_LOCAL_RUNNERS", runner.to_string()),
+        Some(br#"{"model":"m","state":"test","questions":{"q":{"type":"noul"}}}"#),
+    )?;
     assert!(
         output.status.success(),
         "stdout: {}; stderr: {}",
