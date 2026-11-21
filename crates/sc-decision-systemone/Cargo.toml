@@ -1,0 +1,21 @@
+[package]
+name = "sc-decision-systemone"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types.workspace = true
+sc-agent-http.workspace = true
+sc-decision-schema.workspace = true
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[dev-dependencies]
+sc-agent-http = { workspace = true, features = ["test-server"] }
+sc-decision-runner.workspace = true
+
+[lints]
+workspace = true

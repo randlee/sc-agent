@@ -1,0 +1,17 @@
+[package]
+name = "sc-agent-secrets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types.workspace = true
+dotenvy = "0.15"
+keyring = "3"
+whoami = "1"
+
+[lints]
+workspace = true

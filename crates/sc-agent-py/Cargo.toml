@@ -1,0 +1,24 @@
+[package]
+name = "sc-agent-py"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+decidr.workspace = true
+sc-agent-types.workspace = true
+sc-agent-http.workspace = true
+sc-agent-log.workspace = true
+sc-decision-schema.workspace = true
+serde_json = { version = "1", features = ["preserve_order"] }
+pyo3 = { version = "0.29", features = ["abi3-py39"] }
+
+[lints]
+workspace = true
+
+[lib]
+name = "sc_agent"
+crate-type = ["cdylib"]

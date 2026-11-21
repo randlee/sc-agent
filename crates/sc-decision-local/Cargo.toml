@@ -1,0 +1,23 @@
+[package]
+name = "sc-decision-local"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types.workspace = true
+sc-agent-http.workspace = true
+sc-decision-schema.workspace = true
+sc-decision-systemone.workspace = true
+sc-decision-runner.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[dev-dependencies]
+sc-agent-http = { workspace = true, features = ["test-server"] }
+
+[lints]
+workspace = true

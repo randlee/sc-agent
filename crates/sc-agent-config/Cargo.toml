@@ -1,0 +1,17 @@
+[package]
+name = "sc-agent-config"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types.workspace = true
+sc-config = { path = "/Users/randlee/github/sc-runtime-worktrees/feature/sc-config-layers/crates/sc-config" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[lints]
+workspace = true
