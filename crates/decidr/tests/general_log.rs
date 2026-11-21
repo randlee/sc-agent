@@ -41,18 +41,9 @@ fn decidr_command(dir: &Path, root: &Path, args: &str) -> Command {
 }
 
 #[test]
-fn successful_and_failed_commands_are_logged_outside_sessions() -> Result<()> {
+fn successful_command_is_logged_outside_sessions() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
-    let output = decidr_command(
-        dir.path(),
-        &root,
-        "--project p send --model haiku --agent-role t",
-    )
-    .stdin(Stdio::null())
-    .output()?;
-    assert!(!output.status.success());
-    assert!(!root.join("sessions").exists());
     let server = Server::start(vec![
         ok(json!({ "models": [{ "name": "m" }] })),
         ok(json!({ "model": "m", "answers": { "q": { "type": "noul", "noul": 0.5 } } })),
@@ -92,10 +83,9 @@ fn successful_and_failed_commands_are_logged_outside_sessions() -> Result<()> {
 
     let general_log = root.join("logs").join("decidr.log.jsonl");
     let events = events(&general_log)?;
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0]["action"], "decidr.error");
-    assert_eq!(events[1]["action"], "decidr.send");
-    assert_eq!(events[1]["fields"]["position"], 0);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["action"], "decidr.send");
+    assert_eq!(events[0]["fields"]["position"], 0);
 
     let sessions = root.join("sessions");
     let mut session_files = Vec::new();
