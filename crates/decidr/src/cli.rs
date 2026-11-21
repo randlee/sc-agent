@@ -28,7 +28,7 @@ pub enum Command {
         batch: bool,
         #[arg(long, allow_hyphen_values = true)]
         workers: Option<i64>,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         timeout_secs: Option<f64>,
     },
     /// The model table.

@@ -164,11 +164,7 @@ fn decide_all(
                     ..Policy::default()
                 },
                 Some(session),
-                if service.is_some() || account.is_some() {
-                    Some((service.as_deref(), account.as_deref()))
-                } else {
-                    None
-                },
+                Some((service.as_deref(), account.as_deref())),
             )?;
             let requests = requests
                 .into_iter()
