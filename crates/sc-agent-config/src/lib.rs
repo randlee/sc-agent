@@ -97,20 +97,20 @@ pub fn repo_root() -> Option<PathBuf> {
         .then(|| PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()))
 }
 
+fn repo_files(root: &Path) -> [PathBuf; 2] {
+    [
+        root.join(".sc/sc-agent/decidr.json"),
+        root.join(".sc/sc-agent/sc-agent.json"),
+    ]
+}
+
 /// Flags, `DECIDR_*` / `SC_PROJECT`, then the repo's and the user's files.
 pub fn config(
     project: Option<&str>,
     root: Option<&Path>,
 ) -> Result<layers::Layered<Config>, Error> {
     let global = home()?.join(".sc-agent");
-    let mut files: Vec<PathBuf> = root
-        .map(|r| {
-            vec![
-                r.join(".sc/sc-agent/decidr.json"),
-                r.join(".sc/sc-agent/sc-agent.json"),
-            ]
-        })
-        .unwrap_or_default();
+    let mut files: Vec<PathBuf> = root.map(|r| repo_files(r).to_vec()).unwrap_or_default();
     files.extend([global.join("decidr.json"), global.join("sc-agent.json")]);
     let environment: Vec<_> = std::env::vars_os().collect();
     let flags = project
@@ -141,6 +141,14 @@ mod tests {
     use std::ffi::OsString;
 
     use super::*;
+
+    #[test]
+    fn repo_config_paths() {
+        let root = Path::new("worktree");
+        let [cli, shared] = repo_files(root);
+        assert_eq!(cli, root.join(".sc/sc-agent/decidr.json"));
+        assert_eq!(shared, root.join(".sc/sc-agent/sc-agent.json"));
+    }
 
     #[test]
     fn local_runner_fields_load_from_explicit_nested_environment() {
