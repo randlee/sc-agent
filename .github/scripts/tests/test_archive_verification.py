@@ -201,6 +201,21 @@ def test_windows_bash_runs_nested_preflight_checks(tmp_path):
     assert (tmp_path / "generated.marker").read_text() == "verified"
 
 
+@pytest.mark.parametrize("workflow", ["prerelease-archive.yml", "release.yml"])
+def test_windows_ci_extracts_packaging_step(tmp_path, monkeypatch, workflow):
+    job = yaml.safe_load((WORKFLOWS / "windows-archive-verification.yml").read_text())
+    step = next(s for s in job["jobs"]["package-windows"]["steps"] if s.get("name") == "Run both release packaging steps without publication")
+    script = step["run"].split("python - <<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    monkeypatch.chdir(INSTALL.PACKAGE_ROOT)
+    monkeypatch.setenv("CHECK_WORKFLOW", workflow)
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    exec(compile(script, "<packaging-extractor>", "exec"), {})
+    body = (tmp_path / "archive-step.sh").read_text()
+    assert "${{" not in body
+    assert 'target_name = "x86_64-pc-windows-msvc"' in body
+    assert "archive_verification.py" in body
+
+
 def test_manifest_loader_validates_and_preserves_declared_hook(tmp_path):
     from release_manifest import load_manifest
     path = tmp_path / "manifest.toml"
