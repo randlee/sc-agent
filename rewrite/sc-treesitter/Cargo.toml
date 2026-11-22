@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 [dependencies]
 serde_json.workspace = true
-thiserror = "2"
+sc-agent.workspace = true
 tree-sitter = "0.27"
 tree-sitter-python = "0.25"
 tree-sitter-rust = "0.24"

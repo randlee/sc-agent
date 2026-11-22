@@ -311,8 +311,6 @@ dependencies = [
  "clap",
  "ctrlc",
  "sc-agent",
- "sc-config",
- "sc-observability",
  "serde_json",
 ]
 
@@ -1080,8 +1078,8 @@ dependencies = [
 name = "sc-treesitter"
 version = "0.3.0"
 dependencies = [
+ "sc-agent",
  "serde_json",
- "thiserror",
  "tree-sitter",
  "tree-sitter-python",
  "tree-sitter-rust",

@@ -5,7 +5,6 @@ format: python
 description: Shared sc-decidr client, rendered by install.py for exactly one tracker (br or bd).
 required_variables:
   - client_name
-  - general_log
   - models
   - sitr
 requires:
@@ -55,17 +54,25 @@ def _validate_abort_on(abort_on: AbortOn) -> Optional[dict]:
     return None
 
 
-def _result_category(value: dict, sc_agent: Any) -> Optional[str]:
+def _logger(sc_agent: Any, injected: Any = None) -> dict:
+    global _LOGGER
+    if injected is not None:
+        return {"ok": True, "value": injected}
+    if _LOGGER is None:
+        created = sc_agent.logger(CLIENT_NAME)
+        if not created["ok"]:
+            return created
+        _LOGGER = created["value"]
+    return {"ok": True, "value": _LOGGER}
+
+
+def _result_category(value: dict) -> Optional[str]:
     error = value.get("error") if isinstance(value, dict) else None
-    if not isinstance(error, dict):
-        return None
-    category = sc_agent.category(error, general_log=_LOGGER)
-    return category.get("value", "other")
+    return error.get("category", "other") if isinstance(error, dict) else None
 
 
-def _decode(value: dict, category_codes: CategoryCodes, sc_agent: Any) -> tuple[tuple[str, Optional[str]], Optional[str]]:
-    """Return the mapped result and its category from one classification."""
-    category = _result_category(value, sc_agent)
+def _decode(value: dict, category_codes: CategoryCodes) -> tuple[tuple[str, Optional[str]], Optional[str]]:
+    category = _result_category(value)
     return (json.dumps(value), category_codes.get(category) if category is not None else None), category
 
 
@@ -94,15 +101,10 @@ def call(
         import sc_agent
     except ImportError as exc:
         return (json.dumps(_failure("DEPENDENCY.SC_DECIDR", str(exc))), category_codes.get("other"))
-    global _LOGGER
-    if general_log is None:
-        if _LOGGER is None:
-            created = sc_agent.logger(CLIENT_NAME)
-            if not created["ok"]:
-                return _decode(created, category_codes, sc_agent)[0]
-            _LOGGER = created["value"]
-        general_log = _LOGGER
-    _LOGGER = general_log
+    created = _logger(sc_agent, general_log)
+    if not created["ok"]:
+        return _decode(created, category_codes)[0]
+    general_log = created["value"]
     kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel,
                   config_dir=config_dir, general_log=general_log)
     if timeout_secs is not None:
@@ -112,7 +114,7 @@ def call(
     except KeyboardInterrupt:
         cancel.cancel()
         line = _failure("decision.cancelled", "interrupted", "cancelled")
-    result, category = _decode(line, category_codes, sc_agent)
+    result, category = _decode(line, category_codes)
     _cancel_if_selected(category, abort_on, cancel)
     return result
 
@@ -139,13 +141,8 @@ def call_batch(
         import sc_agent
     except ImportError as exc:
         return [(json.dumps(_failure("DEPENDENCY.SC_DECIDR", str(exc))), category_codes.get("other")) for _ in requests]
-    decoded: dict[str, tuple[tuple[str, Optional[str]], Optional[str]]] = {}
-
-    def classify(line: dict) -> tuple[tuple[str, Optional[str]], Optional[str]]:
-        key = json.dumps(line)
-        if key not in decoded:
-            decoded[key] = _decode(line, category_codes, sc_agent)
-        return decoded[key]
+    def classify(line: dict):
+        return _decode(line, category_codes)
 
     def handle(index: int, line: dict) -> None:
         line = dict(line, index=index)
@@ -154,15 +151,10 @@ def call_batch(
         if on_result is not None:
             on_result(json.dumps(line))
 
-    global _LOGGER
-    if general_log is None:
-        if _LOGGER is None:
-            created = sc_agent.logger(CLIENT_NAME)
-            if not created["ok"]:
-                return [_decode(created, category_codes, sc_agent)[0] for _ in requests]
-            _LOGGER = created["value"]
-        general_log = _LOGGER
-    _LOGGER = general_log
+    created = _logger(sc_agent, general_log)
+    if not created["ok"]:
+        return [_decode(created, category_codes)[0] for _ in requests]
+    general_log = created["value"]
     kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel,
                   on_result=handle, config_dir=config_dir, general_log=general_log)
     if timeout_secs is not None:
@@ -185,13 +177,9 @@ def extract(language: str, source: str, query: str, *, general_log: Any = None) 
         import sc_agent
     except ImportError as exc:
         return _failure("DEPENDENCY.SC_DECIDR", str(exc))
-    global _LOGGER
-    if general_log is None:
-        if _LOGGER is None:
-            created = sc_agent.logger(CLIENT_NAME)
-            if not created["ok"]:
-                return created
-            _LOGGER = created["value"]
-        general_log = _LOGGER
+    created = _logger(sc_agent, general_log)
+    if not created["ok"]:
+        return created
+    general_log = created["value"]
     return sc_agent.sitr.query(language, source, query, general_log=general_log)
 {% endif %}

@@ -1,6 +1,6 @@
 use pyo3::{
     prelude::*,
-    types::{PyCapsule, PyDict, PyTuple},
+    types::{PyCapsule, PyDict},
 };
 use sc_agent::{Error, error};
 use sc_observability::v2::Logger;
@@ -9,252 +9,125 @@ use std::{
     ffi::CStr,
     path::PathBuf,
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
 
-static DEFAULT_LOG: OnceLock<Result<Arc<Logger>, Error>> = OnceLock::new();
 static PAUSE: Mutex<()> = Mutex::new(());
-fn invalid(e: impl ToString) -> Error {
-    error("sc_agent_py.invalid_option", e)
+fn invalid(value: impl ToString) -> Error {
+    error("sc_agent_py.invalid_option", value)
 }
 fn decode(value: &Bound<'_, PyAny>) -> Result<Value, Error> {
-    let py = value.py();
-    let encoded = py
+    let encoded = value
+        .py()
         .import("json")
         .and_then(|m| m.call_method1("dumps", (value,)))
         .and_then(|v| v.extract::<String>())
         .map_err(invalid)?;
     serde_json::from_str(&encoded).map_err(invalid)
 }
-fn output(py: Python<'_>, result: Result<Value, Error>) -> Py<PyAny> {
-    raw(py, sc_agent::result(result))
-}
 fn raw(py: Python<'_>, value: Value) -> Py<PyAny> {
-    let text = value.to_string();
     match py
         .import("json")
-        .and_then(|m| m.call_method1("loads", (text,)))
+        .and_then(|m| m.call_method1("loads", (value.to_string(),)))
     {
         Ok(value) => value.unbind(),
         Err(_) => py.None(),
     }
 }
+fn required<'a, 'py>(value: Option<&'a Bound<'py, PyAny>>) -> Result<&'a Bound<'py, PyAny>, Error> {
+    value
+        .filter(|v| !v.is_none())
+        .ok_or_else(|| invalid("value is required"))
+}
+fn text(value: Option<&Bound<'_, PyAny>>) -> Result<String, Error> {
+    required(value)?.extract().map_err(invalid)
+}
 fn handle<T: Send + Sync + 'static>(
-    object: &Bound<'_, PyAny>,
+    value: &Bound<'_, PyAny>,
     name: &CStr,
 ) -> Result<Arc<T>, Error> {
-    let capsule = object.cast::<PyCapsule>().map_err(invalid)?;
-    let pointer = capsule
+    let pointer = value
+        .cast::<PyCapsule>()
+        .map_err(invalid)?
         .pointer_checked(Some(name))
         .map_err(invalid)?
         .cast::<Arc<T>>();
-    // This extension constructs the named capsule with exactly Arc<T> and retains
-    // its Python owner until the Arc has been cloned.
+    // The checked capsule is created in this extension with exactly Arc<T>.
     Ok(unsafe { pointer.as_ref() }.clone())
 }
-fn argument<'py>(args: &Bound<'py, PyTuple>, index: usize) -> Result<Bound<'py, PyAny>, Error> {
-    args.get_item(index).map_err(invalid)
-}
-fn text(args: &Bound<'_, PyTuple>, index: usize) -> Result<String, Error> {
-    argument(args, index)?.extract().map_err(invalid)
-}
-fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
-    kwargs: &Bound<'_, PyDict>,
-    name: &str,
-) -> Result<Option<T>, Error> {
-    kwargs
-        .get_item(name)
-        .map_err(invalid)?
-        .filter(|v| !v.is_none())
-        .map(|v| {
-            v.extract::<T>()
-                .map_err(|_| invalid(format!("invalid {name}")))
-        })
-        .transpose()
-}
-fn general(kwargs: &Bound<'_, PyDict>, name: &str) -> Result<Arc<Logger>, Error> {
-    if let Some(value) = kwargs
-        .get_item("general_log")
-        .map_err(invalid)?
-        .filter(|v| !v.is_none())
-    {
-        return handle(&value, c"sc_agent.Logger");
-    }
-    DEFAULT_LOG
-        .get_or_init(|| sc_agent::default_logger(name).map(Arc::new))
-        .as_ref()
-        .map(Arc::clone)
-        .map_err(invalid)
-}
-fn capsule_result<T: Send + Sync + 'static>(
+fn capsule<T: Send + Sync + 'static>(
     py: Python<'_>,
     value: T,
     name: &'static CStr,
 ) -> Result<Py<PyAny>, Error> {
-    let capsule = PyCapsule::new_with_value(py, Arc::new(value), name).map_err(invalid)?;
     let result = PyDict::new(py);
     result.set_item("ok", true).map_err(invalid)?;
-    result.set_item("value", capsule).map_err(invalid)?;
+    result
+        .set_item(
+            "value",
+            PyCapsule::new_with_value(py, Arc::new(value), name).map_err(invalid)?,
+        )
+        .map_err(invalid)?;
     Ok(result.into_any().unbind())
 }
-fn execute(
+fn respond(
     py: Python<'_>,
-    operation: &str,
-    args: &Bound<'_, PyTuple>,
-    kwargs: &Bound<'_, PyDict>,
-) -> Result<Py<PyAny>, Error> {
-    let arity = match operation {
-        "cancel_new" | "sitr.languages" => 0,
-        "digest" | "log" => 2,
-        "sitr.query" | "sitr.run" => 3,
-        _ => 1,
+    given: Option<&Bound<'_, PyAny>>,
+    name: &str,
+    run: impl FnOnce(&Logger) -> Result<Value, Error>,
+) -> Py<PyAny> {
+    let owned = given.is_none_or(|v| v.is_none());
+    let logger = match given.filter(|v| !v.is_none()) {
+        Some(value) => handle::<Logger>(value, c"sc_agent.Logger"),
+        None => sc_agent::default_logger(name).map(Arc::new),
     };
-    if args.len() != arity {
-        return Err(invalid(format!(
-            "{operation} requires {arity} positional arguments"
-        )));
-    }
-    if operation == "send" || operation == "send_batch" {
-        for (key, _) in kwargs.iter() {
-            let name = key.extract::<String>().map_err(invalid)?;
-            if ![
-                "model",
-                "provider",
-                "project",
-                "agent_role",
-                "timeout_secs",
-                "workers",
-                "config_dir",
-                "general_log",
-                "session_log",
-                "cancel",
-                "base_url",
-                "sleep",
-                "on_result",
-            ]
-            .contains(&name.as_str())
-            {
-                return Err(invalid(format!("unknown option {name}")));
+    match logger {
+        Err(error) => raw(py, sc_agent::result(Err(error))),
+        Ok(logger) => {
+            let value = sc_agent::report(&logger, run(&logger));
+            let _ = logger.flush();
+            if owned {
+                let _ = logger.shutdown();
             }
+            raw(py, value)
         }
     }
-    if operation == "logger" {
-        return capsule_result(
-            py,
-            sc_agent::default_logger(&text(args, 0)?)?,
-            c"sc_agent.Logger",
-        );
-    }
-    if operation == "cancel_new" {
-        return capsule_result(py, AtomicBool::new(false), c"sc_agent.Cancel");
-    }
-    if operation == "cancel" {
-        handle::<AtomicBool>(&argument(args, 0)?, c"sc_agent.Cancel")?
-            .store(true, Ordering::SeqCst);
-        return Ok(output(py, Ok(Value::Null)));
-    }
-    if ["category", "retryable"].contains(&operation) {
-        let value = decode(&argument(args, 0)?)?;
-        if !value.is_object() {
-            return Err(invalid("error detail must be an object"));
-        }
-        let category = value
-            .get("category")
-            .and_then(Value::as_str)
-            .unwrap_or("other");
-        return Ok(output(
-            py,
-            Ok(if operation == "category" {
-                json!(category)
-            } else {
-                json!(["busy", "network"].contains(&category))
-            }),
-        ));
-    }
-    if operation == "digest" {
-        let request = decode(&argument(args, 0)?)?;
-        return Ok(output(
-            py,
-            sc_agent::digest(&request, &text(args, 1)?).map(Value::String),
-        ));
-    }
-    if ["log", "flush"].contains(&operation) {
-        let logger = handle::<Logger>(&argument(args, 0)?, c"sc_agent.Logger")?;
-        if operation == "log" {
-            let event = decode(&argument(args, 1)?)?;
-            let action = event
-                .get("action")
-                .and_then(Value::as_str)
-                .ok_or_else(|| invalid("action is required"))?;
-            sc_agent::log(
-                &logger,
-                action,
-                event.get("fields").cloned().unwrap_or(json!({})),
-            );
-        }
-        let _ = logger.flush();
-        return Ok(output(py, Ok(Value::Null)));
-    }
-    if operation.starts_with("sitr.") {
-        let logger = general(kwargs, "sitr")?;
-        let result = match operation {
-            "sitr.languages" => Ok(sc_treesitter::languages()),
-            "sitr.queries" => {
-                sc_treesitter::queries(&text(args, 0)?).map_err(|e| error(e.id, e.message))
-            }
-            "sitr.query" => sc_treesitter::query(
-                &sc_treesitter::language(&text(args, 0)?).map_err(|e| error(e.id, e.message))?,
-                &text(args, 1)?,
-                &text(args, 2)?,
-            )
-            .map_err(|e| error(e.id, e.message)),
-            "sitr.run" => {
-                sc_treesitter::predefined(&text(args, 0)?, &text(args, 1)?, &text(args, 2)?)
-                    .map_err(|e| error(e.id, e.message))
-            }
-            _ => Err(invalid("unknown sitr operation")),
-        };
-        sc_agent::log(
-            &logger,
-            "sitr.result",
-            match &result {
-                Ok(v) => json!({"value":v}),
-                Err(e) => e.detail(),
-            },
-        );
-        let _ = logger.flush();
-        return Ok(output(py, result));
-    }
-    if argument(args, 0)?.is_none() {
-        return Err(invalid("request must not be None"));
-    }
-    let timeout = option::<f64>(kwargs, "timeout_secs")?.unwrap_or(120.0);
-    let workers = option::<i64>(kwargs, "workers")?;
-    let (timeout, workers) = sc_agent::limits(timeout, workers, operation == "send_batch")?;
-    for name in ["sleep", "on_result"] {
-        if let Some(value) = kwargs
-            .get_item(name)
-            .map_err(invalid)?
-            .filter(|v| !v.is_none())
-            && !value.is_callable()
-        {
-            return Err(invalid(format!("{name} must be callable")));
-        }
-    }
-    let model = option::<String>(kwargs, "model")?.unwrap_or_else(|| "jev".into());
-    let provider = option::<String>(kwargs, "provider")?;
+}
+fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
+    named: &[(&str, Option<&Bound<'_, PyAny>>)],
+    key: &str,
+) -> Result<Option<T>, Error> {
+    named
+        .iter()
+        .find(|(name, _)| *name == key)
+        .and_then(|(_, v)| *v)
+        .filter(|v| !v.is_none())
+        .map(|v| {
+            v.extract::<T>()
+                .map_err(|_| invalid(format!("invalid {key}")))
+        })
+        .transpose()
+}
+fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Options, Error> {
+    let timeout =
+        Duration::try_from_secs_f64(option::<f64>(named, "timeout_secs")?.unwrap_or(120.0))
+            .map_err(|e| error("decidr.invalid_request_timeout", e))?;
+    let workers = option::<usize>(named, "workers")?;
+    let agent_role =
+        option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
+    let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
+    let provider = option::<String>(named, "provider")?;
     sc_agent::model(&model, provider.as_deref())?;
     let (root, repo) = sc_agent::repository()?;
-    let global = option::<String>(kwargs, "config_dir")?
+    let global = option::<String>(named, "config_dir")?
         .map(PathBuf::from)
-        .map(Ok)
-        .unwrap_or_else(|| sc_agent::home().map(|p| p.join(".sc-agent")))?;
-    let project = option::<String>(kwargs, "project")?;
+        .or_else(|| std::env::home_dir().map(|p| p.join(".sc-agent")))
+        .ok_or_else(|| error("config.home", "Home directory unavailable"))?;
+    let project = option::<String>(named, "project")?;
     let mut settings = sc_agent::config(
-        "decidr",
         root.join(".git")
             .exists()
             .then_some(root.join(".sc/sc-agent"))
@@ -267,83 +140,217 @@ fn execute(
     if let Some(workers) = workers {
         settings.workers = workers;
     }
-    let options = sc_agent::Options {
+    Ok(sc_agent::Options {
         settings,
         model,
         provider,
-        agent_role: option::<String>(kwargs, "agent_role")?
-            .ok_or_else(|| invalid("agent_role is required"))?,
+        agent_role,
         timeout,
-        base_url: option(kwargs, "base_url")?,
+        base_url: option(named, "base_url")?,
         root,
-        log_root: sc_agent::log_root("decidr")?,
-        session_log: kwargs
-            .get_item("session_log")
-            .map_err(invalid)?
-            .filter(|v| !v.is_none())
-            .map(|v| handle::<Logger>(&v, c"sc_agent.Logger"))
-            .transpose()?,
         repo,
+        log_root: sc_agent::log_root("decidr")?,
+    })
+}
+fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
+    let value = required(value)?;
+    let parsed = if let Ok(text) = value.extract::<String>() {
+        serde_json::from_str(&text).map_err(|e| error("decision.request_parse", e))?
+    } else {
+        decode(value)?
     };
-    let logger = general(kwargs, "decidr")?;
-    let cancel = kwargs
-        .get_item("cancel")
-        .map_err(invalid)?
+    if !parsed.is_object() {
+        return Err(error(
+            "decision.request_parse",
+            "request must be a JSON object",
+        ));
+    }
+    Ok(parsed)
+}
+fn cancel_flag(value: Option<&Bound<'_, PyAny>>) -> Result<Arc<AtomicBool>, Error> {
+    value
         .filter(|v| !v.is_none())
         .map(|v| {
             v.getattr("_flag")
                 .map_err(invalid)
                 .and_then(|v| handle::<AtomicBool>(&v, c"sc_agent.Cancel"))
         })
-        .transpose()?
-        .unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
-    let sleep = kwargs
-        .get_item("sleep")
-        .map_err(invalid)?
+        .transpose()
+        .map(|v| v.unwrap_or_else(|| Arc::new(AtomicBool::new(false))))
+}
+fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error> {
+    value
         .filter(|v| !v.is_none())
-        .map(Bound::unbind);
-    let wait = |delay: Duration| {
-        if let Some(callback) = &sleep {
-            Python::attach(|py| {
-                let _ = callback.call1(py, (delay.as_secs_f64(),));
-            });
-        } else {
-            let (_sender, receiver) = std::sync::mpsc::channel::<()>();
-            let _ = receiver.recv_timeout(delay);
+        .map(|v| {
+            if v.is_callable() {
+                Ok(v.clone().unbind())
+            } else {
+                Err(invalid("callback must be callable"))
+            }
+        })
+        .transpose()
+}
+fn wait(delay: Duration, callback: &Option<Py<PyAny>>) {
+    if let Some(callback) = callback {
+        Python::attach(|py| {
+            let _ = callback.call1(py, (delay.as_secs_f64(),));
+        });
+    } else {
+        std::thread::sleep(delay);
+    }
+}
+fn lookup(name: &str, callback: &Option<Py<PyAny>>) -> Result<String, String> {
+    match callback {
+        None => sc_agent::os_keyring(name),
+        Some(callback) => Python::attach(|py| {
+            callback
+                .call1(py, (name,))
+                .and_then(|v| v.extract::<String>(py))
+                .map_err(|e| e.to_string())
+        }),
+    }
+}
+#[pyfunction(signature=(name=None))]
+fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+    match text(name)
+        .and_then(|name| sc_agent::default_logger(&name))
+        .and_then(|logger| capsule(py, logger, c"sc_agent.Logger"))
+    {
+        Ok(value) => value,
+        Err(error) => respond(py, None, "decidr", |_| Err(error)),
+    }
+}
+#[pyfunction(signature=(logger=None,event=None))]
+fn log(
+    py: Python<'_>,
+    logger: Option<&Bound<'_, PyAny>>,
+    event: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, logger, "decidr", |logger| {
+        let event = decode(required(event)?)?;
+        let action = event
+            .get("action")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("action is required"))?;
+        sc_agent::log(
+            logger,
+            action,
+            event.get("fields").cloned().unwrap_or(json!({})),
+        );
+        Ok(Value::Null)
+    })
+}
+#[pyfunction(signature=(logger=None))]
+fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+    match required(logger).and_then(|v| handle::<Logger>(v, c"sc_agent.Logger")) {
+        Ok(logger) => {
+            let _ = logger.flush();
+            raw(py, sc_agent::result(Ok(Value::Null)))
         }
-    };
-    let parsed = |value: Bound<'_, PyAny>| -> Result<Value, Error> {
-        if let Ok(text) = value.extract::<String>() {
-            serde_json::from_str(&text).map_err(|e| error("decision.request_parse", e))
-        } else {
-            decode(&value)
-        }
-    };
-    let result = if operation == "send" {
-        let request = parsed(argument(args, 0)?)?;
+        Err(error) => respond(py, None, "decidr", |_| Err(error)),
+    }
+}
+#[pyfunction(signature=(request=None,question=None,*,general_log=None))]
+fn digest(
+    py: Python<'_>,
+    request: Option<&Bound<'_, PyAny>>,
+    question: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "decidr", |_| {
+        sc_agent::digest(&decode(required(request)?)?, &text(question)?).map(Value::String)
+    })
+}
+#[expect(
+    clippy::too_many_arguments,
+    reason = "PyO3 requires a parameter for each public keyword"
+)]
+#[pyfunction(signature=(request=None,*,model=None,provider=None,project=None,agent_role=None,config_dir=None,general_log=None,timeout_secs=None,cancel=None,base_url=None,sleep=None,keyring_lookup=None))]
+fn send(
+    py: Python<'_>,
+    request: Option<&Bound<'_, PyAny>>,
+    model: Option<&Bound<'_, PyAny>>,
+    provider: Option<&Bound<'_, PyAny>>,
+    project: Option<&Bound<'_, PyAny>>,
+    agent_role: Option<&Bound<'_, PyAny>>,
+    config_dir: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+    timeout_secs: Option<&Bound<'_, PyAny>>,
+    cancel: Option<&Bound<'_, PyAny>>,
+    base_url: Option<&Bound<'_, PyAny>>,
+    sleep: Option<&Bound<'_, PyAny>>,
+    keyring_lookup: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "decidr", |logger| {
+        let value = self::request(request)?;
+        let options = options(&[
+            ("model", model),
+            ("provider", provider),
+            ("project", project),
+            ("agent_role", agent_role),
+            ("config_dir", config_dir),
+            ("timeout_secs", timeout_secs),
+            ("base_url", base_url),
+        ])?;
+        let flag = cancel_flag(cancel)?;
+        let sleep = callback(sleep)?;
+        let keyring = callback(keyring_lookup)?;
         py.detach(|| {
             sc_agent::send(
-                &request,
+                &value,
                 &options,
-                &logger,
-                (&cancel, &PAUSE),
-                &wait,
-                &sc_agent::os_keyring,
+                logger,
+                (&flag, &PAUSE),
+                &|delay| wait(delay, &sleep),
+                &|name| lookup(name, &keyring),
             )
         })
-    } else if operation == "send_batch" {
-        let requests = argument(args, 0)?
+    })
+}
+#[expect(
+    clippy::too_many_arguments,
+    reason = "PyO3 requires a parameter for each public keyword"
+)]
+#[pyfunction(signature=(requests=None,*,model=None,provider=None,project=None,agent_role=None,config_dir=None,general_log=None,timeout_secs=None,workers=None,on_result=None,cancel=None,base_url=None,sleep=None,keyring_lookup=None))]
+fn send_batch(
+    py: Python<'_>,
+    requests: Option<&Bound<'_, PyAny>>,
+    model: Option<&Bound<'_, PyAny>>,
+    provider: Option<&Bound<'_, PyAny>>,
+    project: Option<&Bound<'_, PyAny>>,
+    agent_role: Option<&Bound<'_, PyAny>>,
+    config_dir: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+    timeout_secs: Option<&Bound<'_, PyAny>>,
+    workers: Option<&Bound<'_, PyAny>>,
+    on_result: Option<&Bound<'_, PyAny>>,
+    cancel: Option<&Bound<'_, PyAny>>,
+    base_url: Option<&Bound<'_, PyAny>>,
+    sleep: Option<&Bound<'_, PyAny>>,
+    keyring_lookup: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "decidr", |logger| {
+        let requests = required(requests)?
             .try_iter()
             .map_err(invalid)?
-            .map(|v| v.map_err(invalid).and_then(&parsed))
+            .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
             .collect::<Result<Vec<_>, _>>()?;
-        let callback = kwargs
-            .get_item("on_result")
-            .map_err(invalid)?
-            .filter(|v| !v.is_none())
-            .map(Bound::unbind);
-        let completed = |index: usize, value: &Value| {
-            if let Some(callback) = &callback {
+        let options = options(&[
+            ("model", model),
+            ("provider", provider),
+            ("project", project),
+            ("agent_role", agent_role),
+            ("config_dir", config_dir),
+            ("timeout_secs", timeout_secs),
+            ("base_url", base_url),
+            ("workers", workers),
+        ])?;
+        let flag = cancel_flag(cancel)?;
+        let sleep = callback(sleep)?;
+        let keyring = callback(keyring_lookup)?;
+        let completed = callback(on_result)?;
+        let on_result = |index, value: &Value| {
+            if let Some(callback) = &completed {
                 Python::attach(|py| {
                     let _ = callback.call1(py, (index, raw(py, value.clone())));
                 });
@@ -353,49 +360,100 @@ fn execute(
             sc_agent::batch(
                 &requests,
                 &options,
-                &logger,
-                (&cancel, &PAUSE),
-                &wait,
-                &sc_agent::os_keyring,
-                &completed,
+                logger,
+                (&flag, &PAUSE),
+                &|delay| wait(delay, &sleep),
+                &|name| lookup(name, &keyring),
+                &on_result,
             )
         })
-    } else {
-        return Err(invalid("unknown operation"));
-    };
-    Ok(output(py, result))
+    })
 }
 #[pyfunction]
-fn invoke(
-    py: Python<'_>,
-    operation: &str,
-    args: &Bound<'_, PyTuple>,
-    kwargs: &Bound<'_, PyDict>,
-) -> Py<PyAny> {
-    match execute(py, operation, args, kwargs) {
+fn _new_cancel(py: Python<'_>) -> Py<PyAny> {
+    match capsule(py, AtomicBool::new(false), c"sc_agent.Cancel") {
         Ok(value) => value,
-        Err(error) => {
-            let detail = error.detail();
-            if !matches!(
-                detail.get("id").and_then(Value::as_str),
-                Some("decidr.invalid_request_timeout" | "decidr.invalid_workers")
-            ) && let Ok(logger) = general(
-                kwargs,
-                if operation.starts_with("sitr.") {
-                    "sitr"
-                } else {
-                    "decidr"
-                },
-            ) {
-                sc_agent::log(&logger, "error", detail);
-                let _ = logger.flush();
-            }
-            output(py, Err(error))
-        }
+        Err(error) => raw(py, sc_agent::result(Err(error))),
     }
+}
+#[pyfunction(signature=(flag=None))]
+fn _cancel(py: Python<'_>, flag: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+    raw(
+        py,
+        sc_agent::result(
+            required(flag)
+                .and_then(|v| handle::<AtomicBool>(v, c"sc_agent.Cancel"))
+                .map(|flag| {
+                    flag.store(true, Ordering::SeqCst);
+                    Value::Null
+                }),
+        ),
+    )
+}
+#[pyfunction(signature=(*,general_log=None))]
+fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+    respond(py, general_log, "sitr", |logger| {
+        sc_agent::log(logger, "sitr.languages", json!({}));
+        Ok(sc_treesitter::languages())
+    })
+}
+#[pyfunction(signature=(language=None,*,general_log=None))]
+fn queries(
+    py: Python<'_>,
+    language: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "sitr", |logger| {
+        let value = sc_treesitter::queries(&text(language)?)?;
+        sc_agent::log(logger, "sitr.queries", json!({}));
+        Ok(value)
+    })
+}
+#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None))]
+fn query(
+    py: Python<'_>,
+    language: Option<&Bound<'_, PyAny>>,
+    source: Option<&Bound<'_, PyAny>>,
+    query: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "sitr", |logger| {
+        let value = sc_treesitter::query(
+            &sc_treesitter::language(&text(language)?)?,
+            &text(source)?,
+            &text(query)?,
+        )?;
+        sc_agent::log(logger, "sitr.query", json!({}));
+        Ok(value)
+    })
+}
+#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None))]
+fn run(
+    py: Python<'_>,
+    language: Option<&Bound<'_, PyAny>>,
+    name: Option<&Bound<'_, PyAny>>,
+    source: Option<&Bound<'_, PyAny>>,
+    general_log: Option<&Bound<'_, PyAny>>,
+) -> Py<PyAny> {
+    respond(py, general_log, "sitr", |logger| {
+        let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
+        sc_agent::log(logger, "sitr.run", json!({}));
+        Ok(value)
+    })
 }
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(invoke, module)?)?;
+    module.add_function(wrap_pyfunction!(logger, module)?)?;
+    module.add_function(wrap_pyfunction!(log, module)?)?;
+    module.add_function(wrap_pyfunction!(flush, module)?)?;
+    module.add_function(wrap_pyfunction!(digest, module)?)?;
+    module.add_function(wrap_pyfunction!(send, module)?)?;
+    module.add_function(wrap_pyfunction!(send_batch, module)?)?;
+    module.add_function(wrap_pyfunction!(_new_cancel, module)?)?;
+    module.add_function(wrap_pyfunction!(_cancel, module)?)?;
+    module.add_function(wrap_pyfunction!(languages, module)?)?;
+    module.add_function(wrap_pyfunction!(queries, module)?)?;
+    module.add_function(wrap_pyfunction!(query, module)?)?;
+    module.add_function(wrap_pyfunction!(run, module)?)?;
     Ok(())
 }

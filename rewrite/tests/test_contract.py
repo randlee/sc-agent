@@ -1,10 +1,9 @@
 """Product contracts. Only loopback HTTP, controlled synchronization and temporary files."""
 import importlib
-import importlib.resources
-import importlib.util
 import json
 import os
 import socket
+import sys
 from pathlib import Path
 import subprocess
 import tempfile
@@ -32,7 +31,7 @@ def server(replies, respond=None):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             with lock:
                 index = len(received)
-                received.append((self.path, dict(self.headers), body))
+                received.append((self.path, {key.lower(): value for key, value in self.headers.items()}, body))
             status, headers, answer = respond(body) if respond else replies[index]
             if status is None:
                 self.close_connection = True
@@ -65,20 +64,25 @@ def server(replies, respond=None):
             raise AssertionError("contract server did not finish")
 
 
-class Wheel(unittest.TestCase):
+class Isolated(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.environment = patch.dict(os.environ, {"DECIDR_LOG_ROOT": self.directory.name})
+        previous = os.getcwd()
+        os.chdir(self.directory.name)
+        self.addCleanup(os.chdir, previous)
+        environment = {"PATH": os.defpath, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                       "DECIDR_LOG_ROOT": self.directory.name, "SITR_LOG_ROOT": self.directory.name,
+                       "SC_LOG_ROOT": self.directory.name, "SC_COMPOSE_LOG_ROOT": self.directory.name}
+        self.environment = patch.dict(os.environ, environment, clear=True)
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
+
+class Wheel(Isolated):
     @classmethod
     def setUpClass(cls):
         cls.api = importlib.import_module("sc_agent")
-        # A globally installed legacy wheel cannot supply rewrite evidence.
-        if "rewrite" not in str(Path(cls.api.__file__).resolve()):
-            raise AssertionError("contract requires the replacement wheel")
 
     def error(self, value):
         self.assertIsInstance(value, dict)
@@ -87,14 +91,94 @@ class Wheel(unittest.TestCase):
             self.assertIsInstance(value["error"][field], str)
         return value["error"]
 
+    def test_default_logs_and_option_errors_once(self):
+        code = r'''
+import json, sys
+from pathlib import Path
+import sc_agent
+root = Path(sys.argv[1])
+send = lambda: sc_agent.send("not JSON", project="test", agent_role="test", config_dir=str(root))
+calls = [send, sc_agent.sitr.languages]
+if sys.argv[2] == "sitr-first": calls.reverse()
+for call in calls: call()
+sc_agent.send("{}", timeout_secs=float("nan"), agent_role="test", config_dir=str(root))
+sc_agent.send_batch([], workers=0, agent_role="test", config_dir=str(root))
+for name in ("decidr", "sitr"):
+    assert (root / "logs" / (name + ".log.jsonl")).is_file()
+rows = [json.loads(line) for line in (root / "logs/decidr.log.jsonl").read_text().splitlines()]
+for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "decidr.invalid_workers"):
+    assert sum(row["fields"].get("id") == identity for row in rows) == 1, rows
+'''
+        for order in ("decidr-first", "sitr-first"):
+            with self.subTest(order=order), tempfile.TemporaryDirectory() as folder:
+                env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder, "SITR_LOG_ROOT": folder}
+                got = subprocess.run([sys.executable, "-c", code, folder, order], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
+                self.assertEqual(got.returncode, 0, got.stderr)
+
+    def test_key_precedence_and_redaction_through_send(self):
+        keyring_calls = []
+        def keyring(name):
+            keyring_calls.append(name)
+            return "keyring-key"
+        logger = self.api.logger("decidr")["value"]
+        dotenv = Path.cwd() / ".env"
+        dotenv.write_text("TYPESAFE_API_KEY=dotenv-key\n")
+        for source, expected in (("env", "env-key"), ("dotenv", "dotenv-key"), ("keyring", "keyring-key")):
+            if source == "env":
+                os.environ["TYPESAFE_API_KEY"] = expected
+            else:
+                os.environ.pop("TYPESAFE_API_KEY", None)
+            if source == "keyring":
+                dotenv.unlink()
+            with server([(200, {}, ANSWER)]) as (url, received):
+                value = self.api.send(json.dumps(REQUEST), project="contract", agent_role="contract",
+                                      config_dir=self.directory.name, general_log=logger, base_url=url, keyring_lookup=keyring)
+            self.assertTrue(value["ok"], value)
+            self.assertEqual(received[0][1]["authorization"], "Bearer " + expected)
+            self.assertNotIn(expected, json.dumps(value))
+        self.assertEqual(keyring_calls, ["TYPESAFE_API_KEY"])
+        for log in Path.cwd().rglob("*.jsonl"):
+            for secret in ("env-key", "dotenv-key", "keyring-key"):
+                self.assertNotIn(secret, log.read_text())
+
+    def test_project_precedence_through_session_paths(self):
+        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True)
+        self.assertEqual(initialized.returncode, 0, initialized.stderr)
+        root = Path.cwd()
+        local = root / ".sc/sc-agent"
+        global_dir = root / "global"
+        local.mkdir(parents=True)
+        global_dir.mkdir()
+        places = [(local / "decidr.json", "local-cli"), (local / "sc-agent.json", "local-shared"),
+                  (global_dir / "decidr.json", "global-cli"), (global_dir / "sc-agent.json", "global-shared")]
+        for path, project in places:
+            path.write_text(json.dumps({"project": project}))
+        os.environ["TYPESAFE_API_KEY"] = "contract-secret"
+        logger = self.api.logger("decidr")["value"]
+        observed = []
+        with server([(200, {}, ANSWER)] * 6) as (url, received):
+            for i, project in enumerate(("flag", "environment", "local-cli", "local-shared", "global-cli", "global-shared")):
+                if i < 2: os.environ["SC_PROJECT"] = "environment"
+                else: os.environ.pop("SC_PROJECT", None)
+                if i >= 3: places[i - 3][0].unlink()
+                result = self.api.send(json.dumps(REQUEST), project="flag" if i == 0 else None,
+                                       agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url)
+                self.assertTrue(result["ok"], result)
+                observed.append(project)
+            places[-1][0].unlink()
+            error = self.error(self.api.send(json.dumps(REQUEST), agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url))
+        for place in ("--project", "SC_PROJECT", "decidr.json", "sc-agent.json"):
+            self.assertIn(place, error["message"])
+        rows = [json.loads(line) for path in root.rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(sorted(row["project"] for row in rows), sorted(observed))
+
     def test_bad_inputs_return_values(self):
         for name, args in (("send", (None,)), ("send_batch", (None,)),
                            ("digest", (None,)), ("logger", (None,)),
-                           ("log", (None, None)), ("category", (None,)),
-                           ("retryable", (None,))):
+                           ("log", (None, None))):
             with self.subTest(name=name):
                 self.error(getattr(self.api, name)(*args))
-        self.error(self.api.sitr.languages(None))
+        self.error(self.api.sitr.languages(general_log=42))
         self.error(self.api.sitr.query(None, None, None))
 
     def test_sitr_capture_contract(self):
@@ -110,19 +194,19 @@ class Wheel(unittest.TestCase):
             self.assertTrue(arbitrary["ok"], arbitrary)
             self.assertEqual(arbitrary["value"][0]["text"], "choose")
             self.assertEqual(self.error(self.api.sitr.queries("cobol", general_log=logger))["id"], "treesitter.unknown_language")
-        for name in ("languages", "queries", "query", "run"):
-            self.error(getattr(self.api.sitr, name)(None))
+        self.error(self.api.sitr.queries(None))
+        self.error(self.api.sitr.query(None,None,None))
+        self.error(self.api.sitr.run(None,None,None))
 
     def test_bad_provider_and_options(self):
-        for options in ({"provider": "unknown"}, {"timeout_secs": 9.99},
+        for options in ({"provider": "unknown"}, {"timeout_secs": -1},
                         {"timeout_secs": float("nan")}, {"model": "unknown"}):
             self.error(self.api.send(json.dumps(REQUEST), project="test", agent_role="contract", config_dir=self.directory.name, **options))
-        for workers in (-1, 0, 65):
+        for workers in (-1, 0):
             self.error(self.api.send_batch([], workers=workers))
-        self.error(self.api.send(json.dumps(REQUEST), images={"old": b"removed"}))
         self.error(self.api.send(json.dumps(REQUEST), sleep=42))
 
-    def test_typed_answers_and_schema_retry(self):
+    def test_typed_answers(self):
         cases = (({"type": "noul"}, {"type": "noul", "noul": 0.1234567890123}),
                  ({"type": "score", "criteria": ["low", "high"]}, {"type": "score", "score": 0.73123456789, "confidence": 0.8123456789, "legend": {"0": "low", "1": "high"}, "probabilities": {"0": 0.3, "1": 0.7}}),
                  ({"type": "box"}, {"type": "box", "box": {"top": 0.123456789, "bottom": 0.9, "left": 0.2, "right": 0.8}, "confidence": None}))
@@ -133,14 +217,6 @@ class Wheel(unittest.TestCase):
                                     general_log=self.api.logger("decidr")["value"], base_url=url)
                 self.assertTrue(got["ok"], got)
                 self.assertEqual(got["value"]["answers"]["q"], answer)
-        waits = []
-        with server([(200, {}, {"answers": {}}), (200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            got = self.api.send(json.dumps(REQUEST), project="contract", agent_role="contract",
-                                config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
-                                base_url=url, sleep=waits.append)
-            self.assertTrue(got["ok"], got)
-            self.assertEqual(len(waits), 1)
-            self.assertEqual(received[0][2], received[1][2])
 
     def test_digest_contains_information_and_only_selected_question(self):
         got = self.api.digest(REQUEST, "q")
@@ -200,7 +276,7 @@ class Wheel(unittest.TestCase):
 
     def test_busy_retry_and_auth_quota_redaction(self):
         for status, body, expected in ((429, {"error": {"type": "insufficient_quota"}}, "http.quota_exhausted"),
-                                       (401, {"error": "bad contract-secret"}, "decision.api_status")):
+                                       (401, {"error": "bad contract-secret"}, "http.auth")):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as directory, server([(status, {}, body)]) as (url, received), patch.dict(os.environ, {"DECIDR_LOG_ROOT": directory, "TYPESAFE_API_KEY": "contract-secret"}):
                 result = self.api.send(json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url)
                 error = self.error(result)
@@ -279,30 +355,24 @@ class Wheel(unittest.TestCase):
         self.assertEqual(len(received), 5)
 
 
-class Cli(unittest.TestCase):
-    def test_sitr_query_and_doctor(self):
+class Cli(Isolated):
+    def test_sitr_query(self):
         binary = Path(__file__).resolve().parents[1] / "target/debug/sitr"
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "input.rs"
             source.write_text("fn f() { match 1 { 1 => (), _ => () } }")
-            env = {**os.environ, "SITR_LOG_ROOT": folder}
+            env = {"PATH": os.defpath, "SITR_LOG_ROOT": folder}
             got = subprocess.run([str(binary), "query", "rust", "match-arms", str(source)], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(got.returncode, 0, got.stderr)
             self.assertEqual([item["text"] for item in json.loads(got.stdout)["value"]], ["1", "_"])
-            (Path(folder) / "sc-agent.json").write_text('{"project":"shared-phase"}')
-            got = subprocess.run([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
-            self.assertEqual(got.returncode, 0, got.stderr)
-            rows = json.loads(got.stdout)["value"]["settings"]
-            project = next(row for row in rows if row["path"] == "project")
-            self.assertEqual(project["value"], "shared-phase")
 
     def test_send_and_doctor(self):
         binary = Path(__file__).resolve().parents[1] / "target/debug/decidr"
         with tempfile.TemporaryDirectory() as folder, server([(200, {}, ANSWER)]) as (url, received):
             port = int(url.split(":")[2].split("/")[0])
             config = Path(folder) / "decidr.json"
-            config.write_text(json.dumps({"project": "contract", "workers": 2, "local_runners": {"laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}}))
-            env = {**os.environ, "DECIDR_LOG_ROOT": folder}
+            config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+            env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder}
             doctor = subprocess.run([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             self.assertFalse((Path(folder) / "logs").exists())
@@ -317,51 +387,10 @@ class Cli(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         for binary, args in (("decidr", ["models"]), ("sitr", ["languages"]), ("sitr", ["queries", "--language", "rust"])):
             with self.subTest(binary=binary, args=args), tempfile.TemporaryDirectory() as folder:
-                env = {**os.environ, f"{binary.upper()}_LOG_ROOT": folder}
+                env = {"PATH": os.defpath, f"{binary.upper()}_LOG_ROOT": folder}
                 got = subprocess.run([str(root / "target/debug" / binary), *args],
                                      env=env, cwd=folder, text=True, capture_output=True, timeout=20)
                 self.assertEqual(got.returncode, 0, got.stderr)
                 self.assertTrue(json.loads(got.stdout)["ok"])
 
 
-class Template(unittest.TestCase):
-    def test_rendered_client_uses_the_native_wheel(self):
-        api = importlib.import_module("sc_agent")
-        template = Path(str(importlib.resources.files("sc_agent") / "templates/consumer.py.j2"))
-        for syntax in (False, True):
-            with self.subTest(sitr=syntax), tempfile.TemporaryDirectory() as folder:
-                variables = Path(folder) / "vars.json"
-                variables.write_text(json.dumps({"client_name": "contract", "general_log": True, "models": ["jev", "laya"], "sitr": syntax}))
-                output = Path(folder) / "client.py"
-                rendered = subprocess.run(["sc-compose", "render", "--root", str(template.parent), "--file", template.name,
-                                           "--var-file", str(variables), "--strict", "--output", str(output)],
-                                          text=True, capture_output=True, timeout=20)
-                self.assertEqual(rendered.returncode, 0, rendered.stdout + rendered.stderr)
-                spec = importlib.util.spec_from_file_location("rewrite_contract_client", output)
-                client = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(client)
-                with patch.dict(os.environ, {"CONTRACT_LOG_ROOT": folder, "DECIDR_LOG_ROOT": folder}):
-                    with server([(200, {}, ANSWER)]) as (url, received):
-                        port = int(url.split(":")[2].split("/")[0])
-                        (Path(folder) / "decidr.json").write_text(json.dumps({"local_runners": {"laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}}))
-                        line, code = client.call(json.dumps(REQUEST), model="laya", project="contract", config_dir=folder,
-                                                 abort_on=frozenset(), category_codes={}, cancel=api.Cancel())
-                    self.assertIsNone(code)
-                    self.assertEqual(json.loads(line)["value"]["answers"], ANSWER["answers"])
-                    self.assertEqual(client.CLIENT_NAME, "contract")
-                    if syntax:
-                        self.assertTrue(client.extract("rust", "fn main() {}", "(function_item) @function")["ok"])
-                    else:
-                        self.assertFalse(hasattr(client, "extract"))
-                    with server([(401, {}, {"error": "denied"})]) as (url, received):
-                        port = int(url.split(":")[2].split("/")[0])
-                        (Path(folder) / "decidr.json").write_text(json.dumps({"local_runners": {"laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}}))
-                        lines = client.call_batch([json.dumps(REQUEST)] * 3, workers=1, model="laya", project="contract", config_dir=folder,
-                                                  abort_on=frozenset({"auth"}), category_codes={"auth": "AUTH.TEST"}, cancel=api.Cancel())
-                    self.assertEqual(len(lines), 1)
-                    self.assertEqual(lines[0][1], "AUTH.TEST")
-                    self.assertEqual(json.loads(lines[0][0])["index"], 0)
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -1,22 +1,11 @@
 use serde_json::{Value, json};
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
-#[derive(Debug, thiserror::Error)]
-#[error("{message}")]
-pub struct Error {
-    pub id: &'static str,
-    pub message: String,
-}
-fn error(id: &'static str, message: impl ToString) -> Error {
-    Error {
-        id,
-        message: message.to_string(),
-    }
-}
+use sc_agent::error;
 pub fn languages() -> Value {
     json!(["python", "rust"])
 }
-pub fn language(name: &str) -> Result<Language, Error> {
+pub fn language(name: &str) -> Result<Language, sc_agent::Error> {
     match name {
         "python" => Ok(tree_sitter_python::LANGUAGE.into()),
         "rust" => Ok(tree_sitter_rust::LANGUAGE.into()),
@@ -26,7 +15,7 @@ pub fn language(name: &str) -> Result<Language, Error> {
         )),
     }
 }
-pub fn queries(name: &str) -> Result<Value, Error> {
+pub fn queries(name: &str) -> Result<Value, sc_agent::Error> {
     language(name)?;
     Ok(if name == "rust" {
         json!(["match-arms"])
@@ -34,7 +23,7 @@ pub fn queries(name: &str) -> Result<Value, Error> {
         json!(["branches"])
     })
 }
-pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, Error> {
+pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, sc_agent::Error> {
     let query = Query::new(language, query).map_err(|e| error("treesitter.query_compile", e))?;
     let mut parser = Parser::new();
     parser
@@ -58,7 +47,7 @@ pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, Er
     }
     Ok(json!(captures))
 }
-pub fn predefined(language_name: &str, name: &str, source: &str) -> Result<Value, Error> {
+pub fn predefined(language_name: &str, name: &str, source: &str) -> Result<Value, sc_agent::Error> {
     let text = match (language_name, name) {
         ("rust", "match-arms") => "(match_arm pattern: (_) @arm)",
         ("python", "branches") => "(case_clause (case_pattern) @arm)",

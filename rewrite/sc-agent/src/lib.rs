@@ -7,65 +7,32 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     sync::{
-        Arc, Mutex,
+        Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Serialize, thiserror::Error)]
+#[serde(untagged)]
 #[error("{id}: {message}")]
 pub enum Error {
     Failure {
         id: &'static str,
         message: String,
+        action: &'static str,
         category: &'static str,
-        status: Option<u16>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         attempts: Option<u32>,
-        retry_after: Option<Duration>,
-        session_id: Option<String>,
     },
-}
-impl Error {
-    pub fn detail(&self) -> Value {
-        let Self::Failure {
-            id,
-            message,
-            category,
-            status,
-            attempts,
-            retry_after,
-            session_id,
-        } = self;
-        let mut out = json!({"id":id,"message":message,"category":category,"action":match *category {"auth"=>"Check the provider API key.","config"=>"Fix the named configuration setting.","busy"|"network"=>"Retry later.",_=>"Fix the named input or provider response."}});
-        if let Some(value) = out.as_object_mut() {
-            if let Some(status) = status {
-                value.insert("status".into(), json!(status));
-            }
-            if let Some(attempts) = attempts {
-                value.insert("attempts".into(), json!(attempts));
-            }
-            if let Some(delay) = retry_after {
-                value.insert(
-                    "retry_after_ms".into(),
-                    json!(u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)),
-                );
-            }
-        }
-        if let Some(id) = session_id
-            && let Some(fields) = out.as_object_mut()
-        {
-            fields.insert("session_id".into(), json!(id));
-        }
-        out
-    }
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
     let category = match id {
         "secrets.key_missing"
         | "secrets.key_malformed"
         | "secrets.keyring_read"
-        | "secrets.keyring_timeout" => "auth",
+        | "secrets.keyring_timeout"
+        | "http.auth" => "auth",
         "http.network" => "network",
         "http.provider_busy" => "busy",
         "http.quota_exhausted" => "quota",
@@ -78,16 +45,18 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         id,
         message: message.to_string(),
         category,
-        status: None,
+        action: match category {
+            "auth" => "Check the provider API key.",
+            "busy" | "network" => "Retry later.",
+            _ => "Fix the named input or provider response.",
+        },
         attempts: None,
-        retry_after: None,
-        session_id: None,
     }
 }
 pub fn result(value: Result<Value, Error>) -> Value {
     match value {
         Ok(value) => json!({"ok":true,"value":value}),
-        Err(error) => json!({"ok":false,"error":error.detail()}),
+        Err(error) => json!({"ok":false,"error":error}),
     }
 }
 
@@ -104,7 +73,7 @@ pub struct Settings {
     #[serde(default = "default_workers")]
     pub workers: usize,
     #[serde(default)]
-    pub local_runners: BTreeMap<String, Runner>,
+    pub laya: Option<Runner>,
 }
 fn default_workers() -> usize {
     8
@@ -124,20 +93,19 @@ pub const KEYS: &[Key] = &[
         env: EnvValue::Json,
     },
     Key {
-        path: "local_runners.*.host",
+        path: "laya.host",
         env: EnvValue::String,
     },
     Key {
-        path: "local_runners.*.port",
+        path: "laya.port",
         env: EnvValue::Json,
     },
     Key {
-        path: "local_runners.*.model",
+        path: "laya.model",
         env: EnvValue::String,
     },
 ];
 pub fn config(
-    cli: &str,
     local: Option<&Path>,
     global: &Path,
     environment: &[(OsString, OsString)],
@@ -147,7 +115,7 @@ pub fn config(
         .into_iter()
         .chain(std::iter::once(global))
         .flat_map(|folder| {
-            [format!("{cli}.json"), "sc-agent.json".into()].map(|name| FileLayer {
+            ["decidr.json", "sc-agent.json"].map(|name| FileLayer {
                 path: folder.join(name),
                 accepts: KEYS,
             })
@@ -165,7 +133,7 @@ pub fn config(
     layers::load(
         &Inputs {
             files,
-            env_prefix: &format!("{}_", cli.to_uppercase()),
+            env_prefix: "DECIDR_",
             env_aliases: &[("SC_PROJECT", "project")],
             env_accepts: &env_keys,
             flags,
@@ -173,25 +141,7 @@ pub fn config(
             keys: KEYS,
             environment,
         },
-        |value| {
-            let settings: Settings =
-                serde_json::from_value(value).map_err(|e| error("config.invalid", e))?;
-            if !(1..=64).contains(&settings.workers) {
-                return Err(error("config.invalid", "workers must be in 1..=64"));
-            }
-            for runner in settings.local_runners.values() {
-                if runner.port == 0
-                    || runner.host.is_empty()
-                    || runner.host.contains(['/', ':', ' '])
-                {
-                    return Err(error(
-                        "config.invalid",
-                        "local_runners host/port is invalid",
-                    ));
-                }
-            }
-            Ok(settings)
-        },
+        |value| serde_json::from_value::<Settings>(value).map_err(|e| error("config.invalid", e)),
         |_| None,
     )
     .map_err(|e| error("config.invalid", e))
@@ -211,12 +161,6 @@ pub fn slug(value: &str) -> Result<(), Error> {
     }
     Ok(())
 }
-pub fn home() -> Result<PathBuf, Error> {
-    std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .ok_or_else(|| error("config.home", "Home directory unavailable"))
-}
 pub fn log_root(name: &str) -> Result<PathBuf, Error> {
     std::env::var_os(format!(
         "{}_LOG_ROOT",
@@ -225,7 +169,11 @@ pub fn log_root(name: &str) -> Result<PathBuf, Error> {
     .filter(|s| !s.is_empty())
     .map(PathBuf::from)
     .map(Ok)
-    .unwrap_or_else(|| home().map(|p| p.join(".sc-agent")))
+    .unwrap_or_else(|| {
+        std::env::home_dir()
+            .map(|p| p.join(".sc-agent"))
+            .ok_or_else(|| error("config.home", "Home directory unavailable"))
+    })
 }
 pub fn default_logger(name: &str) -> Result<Logger, Error> {
     slug(name)?;
@@ -322,10 +270,7 @@ pub static PROVIDERS: &[Provider] = &[
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
         wire: "systemone",
-        models: &[
-            ("jev", "jev-1.13.0", "2026-09-15"),
-            ("jev", "jev-1.14.0", "2026-10-14"),
-        ],
+        models: &[("jev", "jev-1.14.0", "2026-10-14")],
     },
     Provider {
         name: "anthropic",
@@ -499,7 +444,6 @@ pub struct Options {
     pub root: PathBuf,
     pub log_root: PathBuf,
     pub repo: String,
-    pub session_log: Option<Arc<Logger>>,
 }
 pub fn log(logger: &Logger, action: &str, fields: Value) {
     let event = serde_json::from_value(
@@ -508,53 +452,6 @@ pub fn log(logger: &Logger, action: &str, fields: Value) {
     if let Ok(event) = event {
         let _ = logger.log(event);
     }
-}
-pub fn validate(request: &Value) -> Result<(), Error> {
-    if request.to_string().len() > 8 * 1024 * 1024 {
-        return Err(error("decision.limits", "request exceeds 8 MiB"));
-    }
-    let questions = request
-        .get("questions")
-        .and_then(Value::as_object)
-        .filter(|q| !q.is_empty())
-        .ok_or_else(|| {
-            error(
-                "decision.request_parse",
-                "questions must be a nonempty object",
-            )
-        })?;
-    if !request.is_object() || request.get("state").is_none() {
-        return Err(error("decision.request_parse", "state is required"));
-    }
-    for (id, q) in questions {
-        if !matches!(
-            q.get("type").and_then(Value::as_str),
-            Some("choice" | "score" | "noul" | "box")
-        ) {
-            return Err(error(
-                "decision.request_parse",
-                format!("questions.{id}: unsupported question type"),
-            ));
-        }
-        let valid = match q.get("type").and_then(Value::as_str) {
-            Some("choice") => q
-                .get("criteria")
-                .and_then(Value::as_object)
-                .is_some_and(|v| !v.is_empty() && v.values().all(Value::is_string)),
-            Some("score") => q
-                .get("criteria")
-                .and_then(Value::as_array)
-                .is_some_and(|v| !v.is_empty() && v.iter().all(Value::is_string)),
-            _ => true,
-        };
-        if !valid {
-            return Err(error(
-                "decision.request_parse",
-                format!("questions.{id}.criteria is missing or invalid"),
-            ));
-        }
-    }
-    Ok(())
 }
 fn answer_schema(question: &Value) -> Value {
     let kind = question.get("type").and_then(Value::as_str).unwrap_or("");
@@ -666,14 +563,9 @@ fn response(request: &Value, raw: Value, wire: &str) -> Result<Value, Error> {
             format!("provider reply has no text: {raw}"),
         )
     })?;
-    let mut parsed: Value = serde_json::from_str(answer)
+    let parsed: Value = serde_json::from_str(answer)
         .map_err(|e| error("decision.response_parse", format!("{e}: {answer}")))?;
     schema(request, &parsed)?;
-    if let Some(model) = raw.get("model")
-        && let Some(fields) = parsed.as_object_mut()
-    {
-        fields.insert("model".into(), model.clone());
-    }
     Ok(parsed)
 }
 pub fn send(
@@ -696,18 +588,16 @@ pub fn send(
         });
     let mut sends = 0;
     let mut outcome = (|| {
-        validate(request)?;
         let project = options.settings.project_required()?;
         slug(project)?;
         slug(&options.agent_role)?;
         let (provider, model) = model(&options.model, options.provider.as_deref())?;
         let (base, model) = if provider.name == "local" {
-            let runner = options.settings.local_runners.get("laya").ok_or_else(|| {
-                error(
-                    "config.runner",
-                    "Set local_runners.laya host, port and model",
-                )
-            })?;
+            let runner = options
+                .settings
+                .laya
+                .as_ref()
+                .ok_or_else(|| error("config.runner", "Set laya host, port and model"))?;
             (
                 format!("http://{}:{}/v1", runner.host, runner.port),
                 runner.model.clone(),
@@ -734,15 +624,6 @@ pub fn send(
                 keyring,
             )?
         };
-        if !key.is_empty()
-            && url.starts_with("http:")
-            && !(url.starts_with("http://127.0.0.1:") || url.starts_with("http://localhost:"))
-        {
-            return Err(error(
-                "http.key_on_plain_http",
-                "Keys require HTTPS except on loopback",
-            ));
-        }
         let body = wire(request, &model, provider.wire);
         let agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
@@ -779,8 +660,6 @@ pub fn send(
                         .and_then(|s| Duration::try_from_secs_f64(s).ok());
                     let text = reply
                         .body_mut()
-                        .with_config()
-                        .limit(8 * 1024 * 1024)
                         .read_to_string()
                         .map_err(|e| error("decision.response_parse", e))?;
                     (
@@ -800,16 +679,14 @@ pub fn send(
                     }
                     return Err(Error::Failure {
                         id: "http.network",
+                        action: "Retry later.",
                         message: if key.is_empty() {
                             e.to_string()
                         } else {
                             e.to_string().replace(&key, "[redacted]")
                         },
                         category: "network",
-                        status: None,
                         attempts: Some(attempt),
-                        retry_after: None,
-                        session_id: None,
                     });
                 }
             };
@@ -817,10 +694,6 @@ pub fn send(
                 let decoded = serde_json::from_str(&text)
                     .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
                     .and_then(|raw| response(request, raw, provider.wire));
-                if decoded.is_err() && attempt < 5 {
-                    sleep(Duration::from_secs(1));
-                    continue;
-                }
                 return decoded;
             }
             let low = text.to_lowercase();
@@ -844,77 +717,66 @@ pub fn send(
                     "http.quota_exhausted"
                 } else if busy {
                     "http.provider_busy"
+                } else if status == 401 {
+                    "http.auth"
                 } else {
                     "decision.api_status"
                 },
                 message: text,
+                action: if status == 401 {
+                    "Check the provider API key."
+                } else {
+                    "Check the provider response."
+                },
                 category: if quota {
                     "quota"
                 } else if busy {
                     "busy"
-                } else if [401, 403].contains(&status) {
+                } else if status == 401 {
                     "auth"
-                } else if [400, 422].contains(&status) {
-                    "validation"
-                } else if [500, 503, 504].contains(&status) {
-                    "busy"
                 } else {
                     "other"
                 },
-                status: Some(status),
                 attempts: Some(attempt),
-                retry_after: delay,
-                session_id: None,
             });
         }
         Err(error("http.network", "send count exhausted"))
     })();
-    match &mut outcome {
-        Ok(value) => {
-            if let Some(fields) = value.as_object_mut() {
-                fields.insert("attempts".into(), json!(sends));
-                fields.insert("session_id".into(), json!(session_id));
-                fields.insert("question_digests".into(), json!(digests));
-            }
-        }
-        Err(Error::Failure {
-            session_id: field, ..
-        }) => *field = Some(session_id.clone()),
+    if let Ok(value) = &mut outcome
+        && let Some(fields) = value.as_object_mut()
+    {
+        fields.insert("attempts".into(), json!(sends));
+        fields.insert("session_id".into(), json!(session_id));
+        fields.insert("question_digests".into(), json!(digests));
     }
-    match &outcome {
-        Ok(value) => log(logger, "decision.result", json!({"response":value})),
-        Err(err) => log(logger, "error", err.detail()),
+    if let Ok(value) = &outcome {
+        log(logger, "decision.result", json!({"response":value}));
     }
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
         && slug(&options.agent_role).is_ok()
     {
-        let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e.detail()})}});
-        if let Some(session) = &options.session_log {
-            log(session, "session", row);
-            let _ = session.flush();
-        } else {
-            let path = options
-                .log_root
-                .join("sessions")
-                .join(&options.repo)
-                .join(&options.agent_role)
-                .join(project);
-            let _append = state.1.lock().map_err(|e| error("config.session", e))?;
-            let written = (|| -> std::io::Result<()> {
-                use std::io::Write;
-                std::fs::create_dir_all(&path)?;
-                writeln!(
-                    std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(path.join("sessions.jsonl"))?,
-                    "{row}"
-                )
-            })();
-            if let Err(e) = written {
-                return Err(error("log.session_write", e));
-            }
+        let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
+        let path = options
+            .log_root
+            .join("sessions")
+            .join(&options.repo)
+            .join(&options.agent_role)
+            .join(project);
+        let _append = state.1.lock().map_err(|e| error("config.session", e))?;
+        let written = (|| -> std::io::Result<()> {
+            use std::io::Write;
+            std::fs::create_dir_all(&path)?;
+            writeln!(
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path.join("sessions.jsonl"))?,
+                "{row}"
+            )
+        })();
+        if let Err(e) = written {
+            return Err(error("log.session_write", e));
         }
     }
     let _ = logger.flush();
@@ -929,22 +791,13 @@ pub fn batch(
     keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
-    if requests.len() > 10000
-        || requests.iter().map(|r| r.to_string().len()).sum::<usize>() > 256 * 1024 * 1024
-    {
-        return Err(error(
-            "decision.limits",
-            "batch exceeds 10000 requests or 256 MiB",
-        ));
-    }
-    for (index, request) in requests.iter().enumerate() {
-        validate(request)
-            .map_err(|e| error("decision.request_parse", format!("line {}: {e}", index + 1)))?;
+    if options.settings.workers == 0 {
+        return Err(error("decidr.invalid_workers", "workers must be positive"));
     }
     let next = std::sync::atomic::AtomicUsize::new(0);
     let (sender, receiver) = std::sync::mpsc::channel();
     Ok(std::thread::scope(|scope| {
-        for _ in 0..options.settings.workers {
+        for _ in 0..options.settings.workers.min(requests.len()) {
             let sender = sender.clone();
             let next = &next;
             scope.spawn(move || {
@@ -956,7 +809,10 @@ pub fn batch(
                     let Some(request) = requests.get(index) else {
                         break;
                     };
-                    let value = result(send(request, options, logger, state, sleep, keyring));
+                    let value = report(
+                        logger,
+                        send(request, options, logger, state, sleep, keyring),
+                    );
                     on_result(index, &value);
                     let _ = sender.send((index, value));
                 }
@@ -1010,42 +866,29 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
     Ok((root, name))
 }
 
-pub fn limits(
-    timeout: f64,
-    workers: Option<i64>,
-    batch: bool,
-) -> Result<(Duration, Option<usize>), Error> {
-    if !timeout.is_finite() || !(10.0..=3600.0).contains(&timeout) {
-        return Err(error(
-            "decidr.invalid_request_timeout",
-            format!("{timeout}: allowed range 10..=3600 seconds"),
-        ));
-    }
-    if workers.is_some_and(|w| !(1..=64).contains(&w)) || (workers.is_some() && !batch) {
-        return Err(error(
-            "decidr.invalid_workers",
-            "workers requires a batch and a value in 1..=64",
-        ));
-    }
-    Ok((
-        Duration::from_secs_f64(timeout),
-        workers.and_then(|w| usize::try_from(w).ok()),
-    ))
-}
-
-pub fn doctor(cli: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
+pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
     let (root, _) = repository()?;
     let local = root.join(".sc/sc-agent");
     let global = config_dir
         .map(Path::to_path_buf)
         .map(Ok)
-        .unwrap_or_else(|| home().map(|p| p.join(".sc-agent")))?;
+        .unwrap_or_else(|| {
+            std::env::home_dir()
+                .map(|p| p.join(".sc-agent"))
+                .ok_or_else(|| error("config.home", "Home directory unavailable"))
+        })?;
     let loaded = config(
-        cli,
         root.join(".git").exists().then_some(local.as_path()),
         &global,
         &std::env::vars_os().collect::<Vec<_>>(),
         project,
     )?;
-    Ok(json!({"settings":layers::resolved(&loaded,KEYS),"files":loaded.files}))
+    Ok(json!({"settings":layers::resolved(&loaded,KEYS)}))
+}
+
+pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
+    if let Err(error) = &outcome {
+        log(logger, "error", json!(error));
+    }
+    result(outcome)
 }
