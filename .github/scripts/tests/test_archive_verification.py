@@ -134,6 +134,95 @@ def test_declared_argv_is_executed_without_shell_expansion(tmp_path):
     assert json.loads(result.stdout) == [str(stage), "fixture", str(manifest), "literal; echo unsafe"]
 
 
+@pytest.mark.parametrize("git_dir", ["cmd", "ucrt64/bin"])
+def test_windows_bash_uses_git_bash_for_nested_commands(tmp_path, monkeypatch, git_dir):
+    git = tmp_path / "Git" / git_dir / "git.exe"
+    bash = tmp_path / "Git" / "bin" / "bash.exe"
+    git.parent.mkdir(parents=True); git.touch()
+    bash.parent.mkdir(parents=True); bash.touch()
+    stage = tmp_path / "stage"; stage.mkdir()
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('archive_verification = ["bash", "check.sh"]')
+    calls = []
+    with monkeypatch.context() as patch:
+        patch.setattr(hook.sys, "platform", "win32")
+        patch.setattr(hook.shutil, "which", lambda name: str(git))
+        patch.setattr(hook.subprocess, "run", lambda argv, **kwargs: calls.append((argv, kwargs)))
+        hook.verify(manifest, stage, "x86_64-pc-windows-msvc")
+    assert calls[0][0] == [str(bash), "check.sh"]
+    assert calls[0][1]["env"]["PATH"].split(os.pathsep)[0] == str(bash.parent)
+    assert calls[0][1]["env"]["SC_PUBLISH_GIT_BASH"] == str(bash)
+    assert calls[0][1]["check"] is True
+
+
+def test_windows_bash_fails_when_git_bash_is_missing(tmp_path, monkeypatch):
+    stage = tmp_path / "stage"; stage.mkdir()
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('archive_verification = ["bash", "check.sh"]')
+    with monkeypatch.context() as patch:
+        patch.setattr(hook.sys, "platform", "win32")
+        patch.setattr(hook.shutil, "which", lambda name: str(tmp_path / "cmd" / "git.exe"))
+        with pytest.raises(ValueError, match="Git Bash not found"):
+            hook.verify(manifest, stage, "x86_64-pc-windows-msvc")
+
+
+def test_docli_preflight_executes_generator_with_spaces(tmp_path):
+    scripts = tmp_path / ".github/scripts"; scripts.mkdir(parents=True)
+    shutil.copy2(Path(__file__).parents[1] / "release-preflight-docli.sh", scripts)
+    (tmp_path / "release").mkdir()
+    (tmp_path / "release/publish-preflight.toml").write_text(
+        '[docli]\ngenerate_script = "scripts/generate docs.sh"\ndrift_paths = ["fixtures/cli"]\n')
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/generate docs.sh").write_text('printf verified > generated.marker\n')
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=30)
+    bash = Path(shutil.which("git")).resolve().parent.parent / "bin/bash.exe" if sys.platform == "win32" else Path(shutil.which("bash"))
+    env = {**os.environ, "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
+    if sys.platform == "win32":
+        env["SC_PUBLISH_GIT_BASH"] = str(bash)
+    subprocess.run([str(bash), str(scripts / "release-preflight-docli.sh")], cwd=tmp_path,
+                   env=env, check=True, timeout=30)
+    assert (tmp_path / "generated.marker").read_text() == "verified"
+    drift = tmp_path / "fixtures/cli/new.json"; drift.parent.mkdir(parents=True)
+    drift.write_text("{}")
+    command = [str(bash), str(scripts / "release-preflight-docli.sh")]
+    assert subprocess.run(command, cwd=tmp_path, env=env, timeout=30).returncode != 0
+    subprocess.run(["git", "add", "fixtures/cli/new.json"], cwd=tmp_path, check=True, timeout=30)
+    assert subprocess.run(command, cwd=tmp_path, env=env, timeout=30).returncode != 0
+
+
+def test_windows_bash_runs_nested_preflight_checks(tmp_path):
+    scripts = tmp_path / ".github/scripts"; scripts.mkdir(parents=True)
+    for name in ("run-consumer-preflight.sh", "release-preflight-docli.sh"):
+        shutil.copy2(Path(__file__).parents[1] / name, scripts)
+    (tmp_path / "release").mkdir()
+    (tmp_path / "release/publish-preflight.toml").write_text(
+        '[docli]\ngenerate_script = "scripts/generate docs.sh"\ndrift_paths = ["fixtures/cli"]\n'
+        '[[checks]]\nid = "docli"\nrun = "bash .github/scripts/release-preflight-docli.sh"\n')
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/generate docs.sh").write_text('printf verified > generated.marker\n')
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=30)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('archive_verification = ["bash", ' + json.dumps(str(scripts / "run-consumer-preflight.sh")) + ']')
+    stage = tmp_path / "stage"; stage.mkdir()
+    hook.verify(manifest, stage, "x86_64-pc-windows-msvc")
+    assert (tmp_path / "generated.marker").read_text() == "verified"
+
+
+@pytest.mark.parametrize("workflow", ["prerelease-archive.yml", "release.yml"])
+def test_windows_ci_extracts_packaging_step(tmp_path, monkeypatch, workflow):
+    job = yaml.safe_load((WORKFLOWS / "windows-archive-verification.yml").read_text())
+    step = next(s for s in job["jobs"]["package-windows"]["steps"] if s.get("name") == "Run both release packaging steps without publication")
+    script = step["run"].split("python - <<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    monkeypatch.chdir(INSTALL.PACKAGE_ROOT)
+    monkeypatch.setenv("CHECK_WORKFLOW", workflow)
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    exec(compile(script, "<packaging-extractor>", "exec"), {})
+    body = (tmp_path / "archive-step.sh").read_text()
+    assert "${{" not in body
+    assert 'target_name = "x86_64-pc-windows-msvc"' in body
+    assert "archive_verification.py" in body
+
+
 def test_manifest_loader_validates_and_preserves_declared_hook(tmp_path):
     from release_manifest import load_manifest
     path = tmp_path / "manifest.toml"

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import shutil
 from string import Formatter
 import subprocess
+import sys
 import tomllib
 
 FIELDS = {"stage_dir", "target", "manifest"}
@@ -34,7 +37,21 @@ def verify(manifest_path, stage_dir, target):
     if not stage_dir.is_dir():
         raise ValueError("archive verification requires an existing staged directory")
     values = {"stage_dir": str(stage_dir), "target": target, "manifest": str(manifest_path)}
-    subprocess.run([arg.format_map(values) for arg in argv], check=True, timeout=900)
+    argv = [arg.format_map(values) for arg in argv]
+    env = None
+    if sys.platform == "win32" and argv[0] == "bash":
+        git = shutil.which("git")
+        if git is None:
+            raise ValueError("archive verification requires Git for Windows")
+        roots = Path(git).resolve().parents
+        bash = next((root / "bin" / "bash.exe" for root in roots[1:3]
+                     if (root / "bin" / "bash.exe").is_file()), None)
+        if bash is None:
+            raise ValueError(f"Git Bash not found for {git}")
+        argv[0] = str(bash)
+        env = {**os.environ, "SC_PUBLISH_GIT_BASH": str(bash),
+               "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
+    subprocess.run(argv, check=True, timeout=900, env=env)
 
 
 CALL = '''          import sys
