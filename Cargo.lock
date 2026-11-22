@@ -1078,7 +1078,7 @@ dependencies = [
 [[package]]
 name = "sc-config"
 version = "0.2.0"
-source = "git+https://github.com/randlee/sc-runtime?branch=feature%2Fsc-config-layers#eb293db8324a5129a8cf719b34b0687f9351de13"
+source = "git+https://github.com/randlee/sc-runtime?rev=eb293db8324a5129a8cf719b34b0687f9351de13#eb293db8324a5129a8cf719b34b0687f9351de13"
 dependencies = [
  "serde",
  "serde_json",

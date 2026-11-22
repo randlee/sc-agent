@@ -1,7 +1,9 @@
 """One native wheel for decisions, syntax queries and the entry point's logger."""
 from ._native import logger, log, flush, send, send_batch, digest, _new_cancel, _cancel
 
-__version__ = "0.3.0"
+from importlib.metadata import version as _version
+
+__version__ = _version("sc-decidr")
 __all__ = ["Cancel", "digest", "flush", "log", "logger", "send", "send_batch", "sitr"]
 
 class Cancel:
