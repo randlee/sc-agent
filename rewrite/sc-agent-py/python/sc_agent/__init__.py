@@ -1,7 +1,7 @@
 """One native wheel for decisions, syntax queries and the entry point's logger."""
 from . import _native
 
-__version__ = "0.2.8"
+__version__ = "0.3.0"
 
 def logger(*args, **kwargs):
     return _native.invoke("logger", args, kwargs)

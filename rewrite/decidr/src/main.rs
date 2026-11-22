@@ -7,7 +7,6 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
 };
 
 #[derive(Parser)]
@@ -35,7 +34,7 @@ enum Command {
         #[arg(long)]
         batch: bool,
         #[arg(long)]
-        workers: Option<usize>,
+        workers: Option<i64>,
         #[arg(long, default_value = "120")]
         timeout_secs: f64,
     },
@@ -45,6 +44,9 @@ fn run() -> Result<Value, sc_agent::Error> {
     if matches!(cli.command, Command::Models) {
         return Ok(json!(sc_agent::PROVIDERS));
     }
+    if matches!(cli.command, Command::Doctor) {
+        return sc_agent::doctor("decidr", cli.config_dir.as_deref(), cli.project.as_deref());
+    }
     let (root, repo) = sc_agent::repository()?;
     let global = cli
         .config_dir
@@ -52,16 +54,12 @@ fn run() -> Result<Value, sc_agent::Error> {
         .unwrap_or_else(|| sc_agent::home().map(|p| p.join(".sc-agent")))?;
     let local = root.join(".sc/sc-agent");
     let config = sc_agent::config(
-        Some(&local),
+        "decidr",
+        root.join(".git").exists().then_some(local.as_path()),
         &global,
         &std::env::vars_os().collect::<Vec<_>>(),
         cli.project.as_deref(),
     )?;
-    if matches!(cli.command, Command::Doctor) {
-        return Ok(
-            json!({"settings":sc_config::layers::resolved(&config,sc_agent::KEYS),"files":config.files}),
-        );
-    }
     let Command::Send {
         model,
         provider,
@@ -74,18 +72,7 @@ fn run() -> Result<Value, sc_agent::Error> {
     else {
         return Ok(Value::Null);
     };
-    if !timeout_secs.is_finite() || !(10.0..=3600.0).contains(&timeout_secs) {
-        return Err(sc_agent::error(
-            "decidr.invalid_request_timeout",
-            format!("{timeout_secs}: allowed range 10..=3600 seconds"),
-        ));
-    }
-    if workers.is_some_and(|w| !(1..=64).contains(&w)) || (workers.is_some() && !batch) {
-        return Err(sc_agent::error(
-            "decidr.invalid_workers",
-            "workers requires --batch and a value in 1..=64",
-        ));
-    }
+    let (timeout, workers) = sc_agent::limits(timeout_secs, workers, batch)?;
     let mut text = String::new();
     match input {
         Some(path) => {
@@ -106,11 +93,12 @@ fn run() -> Result<Value, sc_agent::Error> {
         model,
         provider,
         agent_role,
-        timeout: Duration::from_secs_f64(timeout_secs),
+        timeout,
         base_url: None,
         root,
         log_root: sc_agent::log_root("decidr")?,
         repo,
+        session_log: None,
     };
     let cancelled = Arc::new(AtomicBool::new(false));
     let flag = cancelled.clone();

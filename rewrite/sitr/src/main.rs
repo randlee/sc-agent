@@ -3,12 +3,15 @@ use serde_json::{Value, json};
 use std::{io::Write, path::PathBuf};
 #[derive(Parser)]
 struct Cli {
+    #[arg(long, global = true)]
+    config_dir: Option<PathBuf>,
     #[command(subcommand)]
     command: Command,
 }
 #[derive(Subcommand)]
 enum Command {
     Languages,
+    Doctor,
     Queries {
         #[arg(long)]
         language: String,
@@ -21,19 +24,35 @@ enum Command {
 }
 fn run() -> Result<Value, sc_agent::Error> {
     let cli = Cli::try_parse().map_err(|e| sc_agent::error("treesitter.usage", e))?;
+    if matches!(cli.command, Command::Doctor) {
+        return sc_agent::doctor("sitr", cli.config_dir.as_deref(), None);
+    }
     let logger = sc_agent::default_logger("sitr")?;
-    let result = match cli.command {
+    let result = (|| match cli.command {
         Command::Languages => Ok(sc_treesitter::languages()),
-        Command::Queries { language } => sc_treesitter::queries(&language),
+        Command::Queries { language } => {
+            sc_treesitter::queries(&language).map_err(|e| sc_agent::error(e.id, e.message))
+        }
         Command::Query {
             language,
             query,
             file,
-        } => std::fs::read_to_string(file)
-            .map_err(|e| e.to_string())
-            .and_then(|s| sc_treesitter::predefined(&language, &query, &s)),
-    }
-    .map_err(|e| sc_agent::error("treesitter.query", e));
+        } => {
+            let source = std::fs::read_to_string(&file).map_err(|e| {
+                sc_agent::error(
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        "treesitter.file_not_found"
+                    } else {
+                        "treesitter.file_read"
+                    },
+                    format!("{}: {e}", file.display()),
+                )
+            })?;
+            sc_treesitter::predefined(&language, &query, &source)
+                .map_err(|e| sc_agent::error(e.id, e.message))
+        }
+        Command::Doctor => Ok(Value::Null),
+    })();
     sc_agent::log(
         &logger,
         "sitr.result",

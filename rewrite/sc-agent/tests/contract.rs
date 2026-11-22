@@ -59,11 +59,11 @@ fn project_layers_and_missing_places() {
     .unwrap();
     fs::write(local.join("sc-agent.json"), r#"{"project":"shared-local"}"#).unwrap();
     let env = [(OsString::from("SC_PROJECT"), OsString::from("environment"))];
-    let got = config(Some(&local), &global, &[], None).unwrap();
+    let got = config("decidr", Some(&local), &global, &[], None).unwrap();
     assert_eq!(got.config.project.as_deref(), Some("shared-local"));
     assert_eq!(got.config.workers, 4);
     assert_eq!(
-        config(Some(&local), &global, &env, None)
+        config("decidr", Some(&local), &global, &env, None)
             .unwrap()
             .config
             .project
@@ -71,14 +71,14 @@ fn project_layers_and_missing_places() {
         Some("environment")
     );
     assert_eq!(
-        config(Some(&local), &global, &env, Some("flag"))
+        config("decidr", Some(&local), &global, &env, Some("flag"))
             .unwrap()
             .config
             .project
             .as_deref(),
         Some("flag")
     );
-    let error = config(None, &root.join("missing"), &[], None)
+    let error = config("decidr", None, &root.join("missing"), &[], None)
         .unwrap()
         .config
         .project_required()

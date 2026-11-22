@@ -7,7 +7,7 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -23,6 +23,7 @@ pub enum Error {
         status: Option<u16>,
         attempts: Option<u32>,
         retry_after: Option<Duration>,
+        session_id: Option<String>,
     },
 }
 impl Error {
@@ -34,6 +35,7 @@ impl Error {
             status,
             attempts,
             retry_after,
+            session_id,
         } = self;
         let mut out = json!({"id":id,"message":message,"category":category,"action":match *category {"auth"=>"Check the provider API key.","config"=>"Fix the named configuration setting.","busy"|"network"=>"Retry later.",_=>"Fix the named input or provider response."}});
         if let Some(value) = out.as_object_mut() {
@@ -49,6 +51,11 @@ impl Error {
                     json!(u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)),
                 );
             }
+        }
+        if let Some(id) = session_id
+            && let Some(fields) = out.as_object_mut()
+        {
+            fields.insert("session_id".into(), json!(id));
         }
         out
     }
@@ -74,6 +81,7 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         status: None,
         attempts: None,
         retry_after: None,
+        session_id: None,
     }
 }
 pub fn result(value: Result<Value, Error>) -> Value {
@@ -129,6 +137,7 @@ pub const KEYS: &[Key] = &[
     },
 ];
 pub fn config(
+    cli: &str,
     local: Option<&Path>,
     global: &Path,
     environment: &[(OsString, OsString)],
@@ -138,12 +147,17 @@ pub fn config(
         .into_iter()
         .chain(std::iter::once(global))
         .flat_map(|folder| {
-            ["decidr.json", "sc-agent.json"].map(|name| FileLayer {
+            [format!("{cli}.json"), "sc-agent.json".into()].map(|name| FileLayer {
                 path: folder.join(name),
                 accepts: KEYS,
             })
         })
         .collect();
+    let env_keys = KEYS
+        .iter()
+        .copied()
+        .filter(|key| key.path != "project")
+        .collect::<Vec<_>>();
     let flags = project
         .map(|s| ("project".into(), json!(s)))
         .into_iter()
@@ -151,9 +165,9 @@ pub fn config(
     layers::load(
         &Inputs {
             files,
-            env_prefix: "DECIDR_",
+            env_prefix: &format!("{}_", cli.to_uppercase()),
             env_aliases: &[("SC_PROJECT", "project")],
-            env_accepts: KEYS,
+            env_accepts: &env_keys,
             flags,
             flag_names: BTreeMap::new(),
             keys: KEYS,
@@ -399,6 +413,13 @@ pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, S
     Err(error("types.unknown_short_name", name))
 }
 #[derive(Debug, Deserialize, Serialize)]
+pub struct Bounds {
+    pub top: f64,
+    pub bottom: f64,
+    pub left: f64,
+    pub right: f64,
+}
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Answer {
     Choice {
@@ -409,12 +430,15 @@ pub enum Answer {
     Score {
         score: f64,
         confidence: f64,
+        legend: BTreeMap<String, String>,
+        probabilities: BTreeMap<String, f64>,
     },
     Noul {
         noul: f64,
     },
     Box {
-        r#box: Value,
+        r#box: Option<Bounds>,
+        confidence: Option<f64>,
     },
 }
 pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
@@ -456,7 +480,6 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
         .remove("questions")
         .and_then(|v| v.get(question).cloned())
         .ok_or_else(|| error("decision.request_parse", "question id missing"))?;
-    input.remove("model");
     input.insert("questions".into(), json!({question:selected}));
     let text = serde_json::to_vec(&input).map_err(|e| error("decision.encode", e))?;
     sc_sha::calculate_hash(sc_sha::HashInput::TextFileBytes {
@@ -476,10 +499,11 @@ pub struct Options {
     pub root: PathBuf,
     pub log_root: PathBuf,
     pub repo: String,
+    pub session_log: Option<Arc<Logger>>,
 }
 pub fn log(logger: &Logger, action: &str, fields: Value) {
     let event = serde_json::from_value(
-        json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),"level":sc_observability::Level::Info,"service":logger.service_name(),"target":"sc-agent","action":action,"identity":sc_observability::ProcessIdentity::default(),"fields":fields}),
+        json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),"level":if action=="error" {sc_observability::Level::Error}else{sc_observability::Level::Info},"service":logger.service_name(),"target":"sc-agent","action":action,"identity":sc_observability::ProcessIdentity::default(),"fields":fields}),
     );
     if let Ok(event) = event {
         let _ = logger.log(event);
@@ -512,8 +536,81 @@ pub fn validate(request: &Value) -> Result<(), Error> {
                 format!("questions.{id}: unsupported question type"),
             ));
         }
+        let valid = match q.get("type").and_then(Value::as_str) {
+            Some("choice") => q
+                .get("criteria")
+                .and_then(Value::as_object)
+                .is_some_and(|v| !v.is_empty() && v.values().all(Value::is_string)),
+            Some("score") => q
+                .get("criteria")
+                .and_then(Value::as_array)
+                .is_some_and(|v| !v.is_empty() && v.iter().all(Value::is_string)),
+            _ => true,
+        };
+        if !valid {
+            return Err(error(
+                "decision.request_parse",
+                format!("questions.{id}.criteria is missing or invalid"),
+            ));
+        }
     }
     Ok(())
+}
+fn answer_schema(question: &Value) -> Value {
+    let kind = question.get("type").and_then(Value::as_str).unwrap_or("");
+    let names = if kind == "choice" {
+        question
+            .get("criteria")
+            .and_then(Value::as_object)
+            .map(|v| v.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default()
+    } else {
+        question
+            .get("criteria")
+            .and_then(Value::as_array)
+            .map(|v| (0..v.len()).map(|i| i.to_string()).collect::<Vec<_>>())
+            .unwrap_or_default()
+    };
+    let object = |value_type| {
+        json!({
+            "type":"object",
+            "properties":names.iter().map(|name|(name.clone(),json!({"type":value_type}))).collect::<BTreeMap<_,_>>(),
+            "required":names,
+            "additionalProperties":false
+        })
+    };
+    let mut fields = json!({"type":{"type":"string","enum":[kind]}});
+    if let Some(fields) = fields.as_object_mut() {
+        match kind {
+            "choice" => {
+                fields.insert("choice".into(), json!({"type":"string","enum":names}));
+                fields.insert("confidence".into(), json!({"type":"number"}));
+                fields.insert("probabilities".into(), object("number"));
+            }
+            "score" => {
+                fields.insert("score".into(), json!({"type":"number"}));
+                fields.insert("confidence".into(), json!({"type":"number"}));
+                fields.insert("legend".into(), object("string"));
+                fields.insert("probabilities".into(), object("number"));
+            }
+            "box" => {
+                fields.insert("box".into(),json!({
+                    "type":["object","null"],
+                    "properties":(["top","bottom","left","right"].into_iter().map(|name|(name,json!({"type":"number"}))).collect::<BTreeMap<_,_>>()),
+                    "required":["top","bottom","left","right"],"additionalProperties":false
+                }));
+                fields.insert("confidence".into(), json!({"type":["number","null"]}));
+            }
+            _ => {
+                fields.insert("noul".into(), json!({"type":"number"}));
+            }
+        }
+    }
+    let required = fields
+        .as_object()
+        .map(|v| v.keys().cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    json!({"type":"object","properties":fields,"required":required,"additionalProperties":false})
 }
 fn wire(request: &Value, model: &str, wire: &str) -> Value {
     if wire == "systemone" {
@@ -523,17 +620,21 @@ fn wire(request: &Value, model: &str, wire: &str) -> Value {
         }
         return body;
     }
-    let properties=request.get("questions").and_then(Value::as_object).map(|questions|questions.iter().map(|(id,q)|{
-        let kind=q.get("type").and_then(Value::as_str).unwrap_or("");
-        let mut fields=json!({"type":{"type":"string","enum":[kind]}});
-        if let Some(properties)=fields.as_object_mut() {
-            for (name,value) in match kind {"choice"=>vec![("choice",json!({"type":"string"})),("confidence",json!({"type":"number"})),("probabilities",json!({"type":"object","additionalProperties":{"type":"number"}}))],"score"=>vec![("score",json!({"type":"number"})),("confidence",json!({"type":"number"}))],"noul"=>vec![("noul",json!({"type":"number"}))],_=>vec![("box",json!({"type":"object"}))]} {properties.insert(name.into(),value);}
-        }
-        let required=fields.as_object().map(|m|m.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
-        (id.clone(),json!({"type":"object","properties":fields,"required":required,"additionalProperties":false}))
-    }).collect::<BTreeMap<_,_>>()).unwrap_or_default();
+    let properties = request
+        .get("questions")
+        .and_then(Value::as_object)
+        .map(|questions| {
+            questions
+                .iter()
+                .map(|(id, question)| (id.clone(), answer_schema(question)))
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
     let required = properties.keys().cloned().collect::<Vec<_>>();
-    let schema = json!({"type":"object","properties":{"answers":{"type":"object","properties":properties,"required":required,"additionalProperties":false}},"required":["answers"],"additionalProperties":false});
+    let schema = json!({
+        "type":"object", "required":["answers"], "additionalProperties":false,
+        "properties":{"answers":{"type":"object","properties":properties,"required":required,"additionalProperties":false}}
+    });
     let messages = json!([{"role":"user","content":format!("Answer every question in this decision request using its required schema, including probabilities and confidence: {request}")}]);
     if wire == "messages" {
         json!({"model":model,"max_tokens":8192,"messages":messages,"output_config":{"format":{"type":"json_schema","schema":schema}}})
@@ -565,9 +666,14 @@ fn response(request: &Value, raw: Value, wire: &str) -> Result<Value, Error> {
             format!("provider reply has no text: {raw}"),
         )
     })?;
-    let parsed = serde_json::from_str(answer)
+    let mut parsed: Value = serde_json::from_str(answer)
         .map_err(|e| error("decision.response_parse", format!("{e}: {answer}")))?;
     schema(request, &parsed)?;
+    if let Some(model) = raw.get("model")
+        && let Some(fields) = parsed.as_object_mut()
+    {
+        fields.insert("model".into(), model.clone());
+    }
     Ok(parsed)
 }
 pub fn send(
@@ -578,7 +684,18 @@ pub fn send(
     sleep: &(dyn Fn(Duration) + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
 ) -> Result<Value, Error> {
-    let outcome = (|| {
+    let session_id = ulid::Ulid::new().to_string();
+    let digests = request
+        .get("questions")
+        .and_then(Value::as_object)
+        .map(|questions| {
+            questions
+                .keys()
+                .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
+                .collect::<BTreeMap<_, _>>()
+        });
+    let mut sends = 0;
+    let mut outcome = (|| {
         validate(request)?;
         let project = options.settings.project_required()?;
         slug(project)?;
@@ -638,6 +755,9 @@ pub fn send(
             }
             // A busy reply owns this lock through its injected wait. All senders use it.
             drop(state.1.lock().map_err(|e| error("http.network", e))?);
+            if state.0.load(Ordering::SeqCst) {
+                return Err(error("decision.cancelled", "request cancelled"));
+            }
             let mut post = agent.post(&url).header("Content-Type", "application/json");
             if provider.name == "anthropic" {
                 post = post
@@ -646,6 +766,7 @@ pub fn send(
             } else if !key.is_empty() {
                 post = post.header("Authorization", format!("Bearer {key}"));
             }
+            sends = attempt;
             let sent = post.send_json(&body);
             let (status, delay, text) = match sent {
                 Ok(mut reply) => {
@@ -688,13 +809,19 @@ pub fn send(
                         status: None,
                         attempts: Some(attempt),
                         retry_after: None,
+                        session_id: None,
                     });
                 }
             };
             if (200..300).contains(&status) {
-                let raw = serde_json::from_str(&text)
-                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))?;
-                return response(request, raw, provider.wire);
+                let decoded = serde_json::from_str(&text)
+                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
+                    .and_then(|raw| response(request, raw, provider.wire));
+                if decoded.is_err() && attempt < 5 {
+                    sleep(Duration::from_secs(1));
+                    continue;
+                }
+                return decoded;
             }
             let low = text.to_lowercase();
             let quota = status == 402
@@ -727,16 +854,33 @@ pub fn send(
                     "busy"
                 } else if [401, 403].contains(&status) {
                     "auth"
+                } else if [400, 422].contains(&status) {
+                    "validation"
+                } else if [500, 503, 504].contains(&status) {
+                    "busy"
                 } else {
                     "other"
                 },
                 status: Some(status),
                 attempts: Some(attempt),
                 retry_after: delay,
+                session_id: None,
             });
         }
         Err(error("http.network", "send count exhausted"))
     })();
+    match &mut outcome {
+        Ok(value) => {
+            if let Some(fields) = value.as_object_mut() {
+                fields.insert("attempts".into(), json!(sends));
+                fields.insert("session_id".into(), json!(session_id));
+                fields.insert("question_digests".into(), json!(digests));
+            }
+        }
+        Err(Error::Failure {
+            session_id: field, ..
+        }) => *field = Some(session_id.clone()),
+    }
     match &outcome {
         Ok(value) => log(logger, "decision.result", json!({"response":value})),
         Err(err) => log(logger, "error", err.detail()),
@@ -745,36 +889,32 @@ pub fn send(
         && slug(project).is_ok()
         && slug(&options.agent_role).is_ok()
     {
-        let session_id = ulid::Ulid::new().to_string();
-        let digests = request
-            .get("questions")
-            .and_then(Value::as_object)
-            .map(|q| {
-                q.keys()
-                    .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
-                    .collect::<BTreeMap<_, _>>()
-            });
         let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e.detail()})}});
-        let path = options
-            .log_root
-            .join("sessions")
-            .join(&options.repo)
-            .join(&options.agent_role)
-            .join(project);
-        let _append = state.1.lock().map_err(|e| error("config.session", e))?;
-        let written = (|| -> std::io::Result<()> {
-            use std::io::Write;
-            std::fs::create_dir_all(&path)?;
-            writeln!(
-                std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path.join("sessions.jsonl"))?,
-                "{row}"
-            )
-        })();
-        if let Err(e) = written {
-            return Err(error("config.session", e));
+        if let Some(session) = &options.session_log {
+            log(session, "session", row);
+            let _ = session.flush();
+        } else {
+            let path = options
+                .log_root
+                .join("sessions")
+                .join(&options.repo)
+                .join(&options.agent_role)
+                .join(project);
+            let _append = state.1.lock().map_err(|e| error("config.session", e))?;
+            let written = (|| -> std::io::Result<()> {
+                use std::io::Write;
+                std::fs::create_dir_all(&path)?;
+                writeln!(
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(path.join("sessions.jsonl"))?,
+                    "{row}"
+                )
+            })();
+            if let Err(e) = written {
+                return Err(error("log.session_write", e));
+            }
         }
     }
     let _ = logger.flush();
@@ -868,4 +1008,44 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         return Err(error("config.repo", "invalid repository identity"));
     }
     Ok((root, name))
+}
+
+pub fn limits(
+    timeout: f64,
+    workers: Option<i64>,
+    batch: bool,
+) -> Result<(Duration, Option<usize>), Error> {
+    if !timeout.is_finite() || !(10.0..=3600.0).contains(&timeout) {
+        return Err(error(
+            "decidr.invalid_request_timeout",
+            format!("{timeout}: allowed range 10..=3600 seconds"),
+        ));
+    }
+    if workers.is_some_and(|w| !(1..=64).contains(&w)) || (workers.is_some() && !batch) {
+        return Err(error(
+            "decidr.invalid_workers",
+            "workers requires a batch and a value in 1..=64",
+        ));
+    }
+    Ok((
+        Duration::from_secs_f64(timeout),
+        workers.and_then(|w| usize::try_from(w).ok()),
+    ))
+}
+
+pub fn doctor(cli: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
+    let (root, _) = repository()?;
+    let local = root.join(".sc/sc-agent");
+    let global = config_dir
+        .map(Path::to_path_buf)
+        .map(Ok)
+        .unwrap_or_else(|| home().map(|p| p.join(".sc-agent")))?;
+    let loaded = config(
+        cli,
+        root.join(".git").exists().then_some(local.as_path()),
+        &global,
+        &std::env::vars_os().collect::<Vec<_>>(),
+        project,
+    )?;
+    Ok(json!({"settings":layers::resolved(&loaded,KEYS),"files":loaded.files}))
 }

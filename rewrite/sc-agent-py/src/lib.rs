@@ -106,6 +106,41 @@ fn execute(
     args: &Bound<'_, PyTuple>,
     kwargs: &Bound<'_, PyDict>,
 ) -> Result<Py<PyAny>, Error> {
+    let arity = match operation {
+        "cancel_new" | "sitr.languages" => 0,
+        "digest" | "log" => 2,
+        "sitr.query" | "sitr.run" => 3,
+        _ => 1,
+    };
+    if args.len() != arity {
+        return Err(invalid(format!(
+            "{operation} requires {arity} positional arguments"
+        )));
+    }
+    if operation == "send" || operation == "send_batch" {
+        for (key, _) in kwargs.iter() {
+            let name = key.extract::<String>().map_err(invalid)?;
+            if ![
+                "model",
+                "provider",
+                "project",
+                "agent_role",
+                "timeout_secs",
+                "workers",
+                "config_dir",
+                "general_log",
+                "session_log",
+                "cancel",
+                "base_url",
+                "sleep",
+                "on_result",
+            ]
+            .contains(&name.as_str())
+            {
+                return Err(invalid(format!("unknown option {name}")));
+            }
+        }
+    }
     if operation == "logger" {
         return capsule_result(
             py,
@@ -167,19 +202,18 @@ fn execute(
         let logger = general(kwargs, "sitr")?;
         let result = match operation {
             "sitr.languages" => Ok(sc_treesitter::languages()),
-            "sitr.queries" => sc_treesitter::queries(&text(args, 0)?).map_err(invalid),
-            "sitr.query" => sc_treesitter::language(&text(args, 0)?)
-                .and_then(|language| {
-                    sc_treesitter::query(
-                        &language,
-                        &text(args, 1).map_err(|e| e.to_string())?,
-                        &text(args, 2).map_err(|e| e.to_string())?,
-                    )
-                })
-                .map_err(invalid),
+            "sitr.queries" => {
+                sc_treesitter::queries(&text(args, 0)?).map_err(|e| error(e.id, e.message))
+            }
+            "sitr.query" => sc_treesitter::query(
+                &sc_treesitter::language(&text(args, 0)?).map_err(|e| error(e.id, e.message))?,
+                &text(args, 1)?,
+                &text(args, 2)?,
+            )
+            .map_err(|e| error(e.id, e.message)),
             "sitr.run" => {
                 sc_treesitter::predefined(&text(args, 0)?, &text(args, 1)?, &text(args, 2)?)
-                    .map_err(invalid)
+                    .map_err(|e| error(e.id, e.message))
             }
             _ => Err(invalid("unknown sitr operation")),
         };
@@ -198,20 +232,17 @@ fn execute(
         return Err(invalid("request must not be None"));
     }
     let timeout = option::<f64>(kwargs, "timeout_secs")?.unwrap_or(120.0);
-    if !timeout.is_finite() || !(10.0..=3600.0).contains(&timeout) {
-        return Err(error(
-            "decidr.invalid_request_timeout",
-            format!("{timeout}: allowed 10..=3600 seconds"),
-        ));
-    }
     let workers = option::<i64>(kwargs, "workers")?;
-    if workers.is_some_and(|w| !(1..=64).contains(&w))
-        || (workers.is_some() && operation != "send_batch")
-    {
-        return Err(error(
-            "decidr.invalid_workers",
-            "workers must be in 1..=64 and only applies to send_batch",
-        ));
+    let (timeout, workers) = sc_agent::limits(timeout, workers, operation == "send_batch")?;
+    for name in ["sleep", "on_result"] {
+        if let Some(value) = kwargs
+            .get_item(name)
+            .map_err(invalid)?
+            .filter(|v| !v.is_none())
+            && !value.is_callable()
+        {
+            return Err(invalid(format!("{name} must be callable")));
+        }
     }
     let model = option::<String>(kwargs, "model")?.unwrap_or_else(|| "jev".into());
     let provider = option::<String>(kwargs, "provider")?;
@@ -223,14 +254,18 @@ fn execute(
         .unwrap_or_else(|| sc_agent::home().map(|p| p.join(".sc-agent")))?;
     let project = option::<String>(kwargs, "project")?;
     let mut settings = sc_agent::config(
-        Some(&root.join(".sc/sc-agent")),
+        "decidr",
+        root.join(".git")
+            .exists()
+            .then_some(root.join(".sc/sc-agent"))
+            .as_deref(),
         &global,
         &std::env::vars_os().collect::<Vec<_>>(),
         project.as_deref(),
     )?
     .config;
     if let Some(workers) = workers {
-        settings.workers = usize::try_from(workers).map_err(invalid)?;
+        settings.workers = workers;
     }
     let options = sc_agent::Options {
         settings,
@@ -238,10 +273,16 @@ fn execute(
         provider,
         agent_role: option::<String>(kwargs, "agent_role")?
             .ok_or_else(|| invalid("agent_role is required"))?,
-        timeout: Duration::from_secs_f64(timeout),
+        timeout,
         base_url: option(kwargs, "base_url")?,
         root,
         log_root: sc_agent::log_root("decidr")?,
+        session_log: kwargs
+            .get_item("session_log")
+            .map_err(invalid)?
+            .filter(|v| !v.is_none())
+            .map(|v| handle::<Logger>(&v, c"sc_agent.Logger"))
+            .transpose()?,
         repo,
     };
     let logger = general(kwargs, "decidr")?;

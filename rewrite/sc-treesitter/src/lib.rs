@@ -1,17 +1,32 @@
 use serde_json::{Value, json};
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct Error {
+    pub id: &'static str,
+    pub message: String,
+}
+fn error(id: &'static str, message: impl ToString) -> Error {
+    Error {
+        id,
+        message: message.to_string(),
+    }
+}
 pub fn languages() -> Value {
     json!(["python", "rust"])
 }
-pub fn language(name: &str) -> Result<Language, String> {
+pub fn language(name: &str) -> Result<Language, Error> {
     match name {
         "python" => Ok(tree_sitter_python::LANGUAGE.into()),
         "rust" => Ok(tree_sitter_rust::LANGUAGE.into()),
-        _ => Err(format!("unknown language {name:?}; use sitr languages")),
+        _ => Err(error(
+            "treesitter.unknown_language",
+            format!("unknown language {name:?}; use sitr languages"),
+        )),
     }
 }
-pub fn queries(name: &str) -> Result<Value, String> {
+pub fn queries(name: &str) -> Result<Value, Error> {
     language(name)?;
     Ok(if name == "rust" {
         json!(["match-arms"])
@@ -19,13 +34,15 @@ pub fn queries(name: &str) -> Result<Value, String> {
         json!(["branches"])
     })
 }
-pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, String> {
-    let query = Query::new(language, query).map_err(|e| e.to_string())?;
+pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, Error> {
+    let query = Query::new(language, query).map_err(|e| error("treesitter.query_compile", e))?;
     let mut parser = Parser::new();
-    parser.set_language(language).map_err(|e| e.to_string())?;
+    parser
+        .set_language(language)
+        .map_err(|e| error("treesitter.parse", e))?;
     let tree = parser
         .parse(source, None)
-        .ok_or("tree-sitter parse failed")?;
+        .ok_or_else(|| error("treesitter.parse", "tree-sitter parse failed"))?;
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
     let mut captures = Vec::new();
@@ -34,18 +51,23 @@ pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, St
             let name = query
                 .capture_names()
                 .get(capture.index as usize)
-                .ok_or("capture name absent")?;
+                .ok_or_else(|| error("treesitter.capture", "capture name absent"))?;
             let node = capture.node;
-            captures.push(json!({"name":name,"text":node.utf8_text(source.as_bytes()).map_err(|e|e.to_string())?,"start_byte":node.start_byte(),"end_byte":node.end_byte(),"start_point":{"row":node.start_position().row,"column":node.start_position().column},"end_point":{"row":node.end_position().row,"column":node.end_position().column}}));
+            captures.push(json!({"name":name,"text":node.utf8_text(source.as_bytes()).map_err(|e|error("treesitter.capture",e))?,"start_byte":node.start_byte(),"end_byte":node.end_byte(),"start_line":node.start_position().row+1,"end_line":node.end_position().row+1}));
         }
     }
     Ok(json!(captures))
 }
-pub fn predefined(language_name: &str, name: &str, source: &str) -> Result<Value, String> {
+pub fn predefined(language_name: &str, name: &str, source: &str) -> Result<Value, Error> {
     let text = match (language_name, name) {
-        ("rust", "match-arms") => "(match_arm) @arm",
-        ("python", "branches") => "[(if_statement) (elif_clause) (else_clause)] @branch",
-        _ => return Err(format!("unknown query {name:?}; use sitr queries")),
+        ("rust", "match-arms") => "(match_arm pattern: (_) @arm)",
+        ("python", "branches") => "(case_clause (case_pattern) @arm)",
+        _ => {
+            return Err(error(
+                "treesitter.unknown_query",
+                format!("unknown query {name:?}; use sitr queries"),
+            ));
+        }
     };
     query(&language(language_name)?, source, text)
 }

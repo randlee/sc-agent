@@ -63,6 +63,7 @@ check("wheel signatures", (
     str(p.relative_to(ROOT)) for p in rust if "sc-agent-py" in p.parts
     and re.search(r"(?s)#\[pyfunction[^]]*\]\s*fn\s+\w+[^{}]*->\s*(?:PyResult|Result\s*<[^;{}]*PyErr)", p.read_text())
 ))
+cli_ready = False
 if MANIFEST.exists():
     metadata = subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps",
                                "--manifest-path", str(MANIFEST)], cwd=ROOT, text=True,
@@ -82,17 +83,21 @@ if MANIFEST.exists():
                    "--", "-D", "warnings", "-D", "clippy::unwrap_used", "-D", "clippy::expect_used",
                    "-D", "clippy::panic", "-D", "clippy::indexing_slicing"])
     run("Rust contracts", ["cargo", "test", "--workspace", "--all-features", "--manifest-path", str(MANIFEST)])
-    run("CLI build", ["cargo", "build", "--workspace", "--bins", "--manifest-path", str(MANIFEST)])
+    cli_ready = run("CLI build", ["cargo", "build", "--workspace", "--bins", "--manifest-path", str(MANIFEST)])
 else:
     check("workspace", [f"missing {MANIFEST.relative_to(ROOT)}"])
 with tempfile.TemporaryDirectory(prefix="sc-agent-rewrite-") as temporary:
     wheel_manifest = SOURCE / "sc-agent-py/Cargo.toml" if STAGED else SOURCE / "crates/sc-agent-py/Cargo.toml"
+    installed = False
     if run("wheel build", ["maturin", "build", "--manifest-path", str(wheel_manifest), "--out", temporary]):
         wheels = list(Path(temporary).glob("*.whl"))
         if len(wheels) == 1:
-            run("wheel install", [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])])
+            installed = run("wheel install", [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])])
         else:
             check("wheel install", [f"expected one wheel, found {len(wheels)}"])
-    run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "rewrite/tests", "-v"])
+    if installed and cli_ready:
+        run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "rewrite/tests", "-v"])
+    else:
+        check("wheel and CLI contracts", ["not run: current binaries and wheel must build first"])
 print("FAILED: " + ", ".join(failed) if failed else "All rewrite gates passed", flush=True)
 sys.exit(bool(failed))
