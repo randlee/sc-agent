@@ -19,7 +19,7 @@ pub enum Command {
         model: String,
         #[arg(long)]
         provider: Option<String>,
-        #[arg(long, default_value = "decidr")]
+        #[arg(long)]
         agent_role: String,
         #[arg(long)]
         input: Option<PathBuf>,
