@@ -8,7 +8,7 @@ serde.workspace = true
 serde_json.workspace = true
 sc-observability.workspace = true
 ureq = { version = "3.5", features = ["json"] }
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "vendored"] }
 dotenvy = "0.15"
 ulid = "1"
 thiserror = "2"
