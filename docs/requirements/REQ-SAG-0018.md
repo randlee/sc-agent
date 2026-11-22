@@ -3,7 +3,7 @@
 **Status:** Approved  
 **Version:** 0.7.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
@@ -20,7 +20,7 @@ Definitions:
 - The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
 - The sc-decidr wheel holds both the decidr and the sitr Python API (ADR-SAG-0021), so they always have the same version.
 - The consumer module is the Python file a consumer renders from the consumer template.
-- A feature variable is a template variable that selects a section of the consumer module: `models` (the model selectors the consumer offers, passed through unchanged) and `sitr` (`true` or `false`).
+- The template variables are `client_name`, `sitr` (`true` or `false`, selecting the syntax-query section), and `sc_decidr_version`. Model selectors are passed unchanged as call arguments.
 - The client name is the template variable `client_name`. It names the consumer module's Logger and is the `agent_role` the module passes.
 - The public API is `send`, `send_batch`, `digest`, `logger`, `log`, `flush` and `Cancel`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section.
 - The session tags are the `project` and `agent_role` arguments of `send` and `send_batch`. They tag each session-log record with the consumer's repository and the calling agent's role.
@@ -56,7 +56,7 @@ Definitions:
 - The consumer module MUST call only the permitted API.
 - Every decision call in the consumer module MUST pass a `Cancel`.
 - The consumer module MUST cancel that `Cancel` on `KeyboardInterrupt`.
-- The public API MUST stay documented in `sc_agent.pyi`.
+- The public API MUST stay documented in `sc_agent/__init__.pyi`.
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
 - The wheel README MUST give the consumer template's render command.
@@ -83,7 +83,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] A sc-agent test renders the consumer template with every combination of feature variables and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
+- [ ] A sc-agent test renders the consumer template with the plan-anchor (`sitr=false`) and judge-jev (`sitr=true`) configurations, using `client_name` and the installed `sc_decidr_version` and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
   - a success returns the response;
   - an error returns the consumer code from the passed map for its category;
   - the session log has one record per query and response, carrying the session tags the call was given;
@@ -92,7 +92,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
 - [ ] A rendered module with `sitr` false makes no `sc_agent.sitr` call.
 - [ ] A `KeyboardInterrupt` during a rendered module's batch cancels the `Cancel` passed to its decision call.
-- [ ] Scanning the rendered modules finds only references to the permitted API.
+- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel`, and `sc_agent.sitr`.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command.
 
 ### Dependencies

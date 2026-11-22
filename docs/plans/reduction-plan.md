@@ -4,7 +4,7 @@ Owner: Rand Lee. 2026-11-19.
 
 ## Goal
 
-sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of non-test Rust source, with a hard limit of 2,200 lines across `.rs` files as counted by `scripts/gate/rewrite.py`; Rust test lines are excluded**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of non-test Rust source, with a hard limit of 2,500 lines across `.rs` files as counted by `scripts/gate/rewrite.py`; Rust test lines are excluded**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
 
 **Wheel.** One Python wheel (`sc-decidr`) holding the decidr and sitr APIs. `logger(name)` returns its Rust Logger, which every decidr and sitr call accepts directly; no callable bridge. The `sitr` and `decidr` CLIs each use their own Logger.
 
@@ -63,7 +63,7 @@ Image parts, the long-context header, keyring location overrides, `VarName` key 
 
 ## Layout
 
-| Crate | Contents | Guide budget (non-test Rust lines; these per-crate figures are guides, and the hard total limit is 2,200 lines as counted by `scripts/gate/rewrite.py`) |
+| Crate | Contents | Guide budget (non-test Rust lines; these per-crate figures are guides, and the hard total limit above applies as counted by `scripts/gate/rewrite.py`) |
 |---|---|---|
 | `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
 | `decidr` | CLI | 150 |
@@ -87,7 +87,7 @@ The gate script and the budgets live in a path only the owner changes.
 ```
 SIZE TRIP
 
-Trigger. At a sprint's QA review, non-test Rust source is over 2,500 lines. Rust test lines are excluded. Checked once per sprint, not per commit.
+Trigger. At a sprint's QA review, non-test Rust source exceeds the hard limit above. Rust test lines are excluded. Checked once per sprint, not per commit.
 
 Effect. The sprint stops. The dev changes nothing in response to the trip: no compressing code, no deleting tests, no moving code elsewhere.
 

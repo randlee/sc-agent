@@ -1,50 +1,28 @@
 # sc-agent
 
-sc-agent is one launch interface for the AI backends an agent workflow calls:
+sc-agent provides one synchronous Rust core for decision requests, provider selection, credentials, cancellation and session logging, plus syntax queries through tree-sitter.
 
-- **AI SDK providers**: services in the [`Provider` registry](crates/sc-agent-types/src/provider.rs), called through their APIs.
-- **System-one decision models**: TypeSafe's Jev model and local runners that serve the same Jev API.
-- **Agents in a harness**: CLI agents such as Claude Code and Codex, and SDK agents (planned; see Status).
+It ships the `decidr` and `sitr` CLIs and one Python wheel, `sc-decidr` (`import sc_agent`, including `sc_agent.sitr`).
 
-Every backend is launched the same way: one request form, one set of keys and configuration, one log layout, and one error shape. A caller can switch between a decision model, an LLM and, later, an agent without changing how it asks or what it gets back.
-
-## Status
-
-| Part | State |
-|---|---|
-| Decision models: Jev, local Jev-compatible runners, and supported LLMs answering in Jev's place | Done |
-| `decidr` CLI and the `sc_agent` Python module | Done |
-| `sitr` tree-sitter query tool and the `sc_treesitter` Python module | Done |
-| CLI agents (Claude Code, Codex) and SDK agents | Planned: they get their own crates on the same lower layers |
-
-## The `decidr` CLI
+## The CLIs
 
 ```bash
-decidr send --model jev --project my-project --agent-role judge request.json
-```
-
-```bash
-decidr send --batch --model haiku --project my-project --agent-role judge requests.jsonl
-```
-
-```bash
+decidr send --model jev --project my-project --agent-role judge --input request.json
+decidr send --batch --model haiku --project my-project --agent-role judge --input requests.jsonl
 decidr models
-```
-
-```bash
 decidr doctor
+sitr languages
+sitr queries --language rust
+sitr query rust match-arms input.rs
 ```
 
-- `send`: one JSON request, or a JSONL batch with `--batch`.
-  - `--model` takes a [short name](crates/sc-agent-types/src/short_name.rs), a model id, or the name of a configured local runner.
-  - `--provider` overrides the provider. Without it, the provider is chosen by ranking the keys that are found.
-  - `--image NAME=FILE` and `--long-context` apply to a single request.
-  - One result line is printed per request.
-- `models`: lists the models of TypeSafe or of a configured local runner.
-- `doctor`: lists the keys found, in the order they are used, and reports catalog mismatches.
-- `--config-dir PATH` (global): the configuration directory. The default is `~/.sc-agent`.
+- `decidr send` reads JSON from `--input` or stdin; `--batch` reads JSONL and returns one JSON array of indexed results. Single sends return one tagged JSON result.
+- `--model` accepts a short name or model id. `--provider` overrides the provider; otherwise the first provider table supporting the selector is used. A local `laya` runner uses its configured host, port and model.
+- `--workers` controls batch concurrency; `--timeout-secs` sets the request timeout. Images and long-context CLI flags are not exposed.
+- `models` reports the built-in provider tables. `doctor` reports configuration values, sources, layer-file paths/existence and the fixed log root without sending or writing files.
+- `--config-dir PATH` selects the global configuration directory; the default is `~/.sc-agent/`.
 
-Ctrl-C or SIGTERM cancels the run. Every unfinished request ends as `decision.cancelled`, the session log is flushed, and `decidr` exits 130. A third interrupt exits at once.
+Ctrl-C or SIGTERM cancels unfinished work. Cancellation returns a typed error and exit status 1; success exits 0. There is no third-interrupt escape.
 
 ## Python
 
@@ -53,35 +31,26 @@ import sc_agent
 
 line = sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
 lines = sc_agent.send_batch(requests, model="haiku", project="my-project", agent_role="judge")
-sc_agent.models()
-sc_agent.doctor()
+sc_agent.sitr.languages()
 ```
 
-Every `decidr` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `config_dir=`, and the `general_log=` and `session_log=` callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
+The wheel exposes decision calls, digests, cancellation and sitr queries. Calls return tagged success or error values. `general_log=` accepts an opaque Logger handle obtained with `sc_agent.logger(name)`; the generated client creates one named Logger and injects it into its decision and sitr calls. `cancel=` accepts `sc_agent.Cancel()`. A keyboard interrupt cancels unfinished work and returns a cancellation error.
 
 ## Configuration, keys and logs
 
-- **Configuration:** read from `~/.sc-agent/default.json`, then `local.json`, then `SC_AGENT__*` overrides. All values are checked when the configuration loads.
+- **Configuration:** first value wins: CLI flag, environment variable, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`, built-in default. Local files live in `<worktree>/.sc/sc-agent/`; global files live in `~/.sc-agent/`. `SC_PROJECT` sets project/phase; other variables use names such as `DECIDR_WORKERS` and `DECIDR_LAYA__PORT`. `decidr doctor` reports values, sources and layer-file paths/existence without sending a request.
 - **Keys:** read from the environment, then the repository-root `.env`, then the OS keyring; the first source that has the key wins. An attached key is redacted from all error text.
-- **Logs:** everything goes under `<log_root>/logs/` (default `~/.sc-agent/logs/`):
-  - each CLI writes its own general log, rotated by sc-observability;
-  - session logs go to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.
+- **Logs:** the fixed root is `~/.sc-agent/`, with a `<NAME>_LOG_ROOT` environment override for tests; it is not a configuration setting. General logs are `logs/<name>.log.jsonl`, rotated by sc-observability. Session rows append to `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` and are never rotated or pruned.
 
 ## Workspace
 
-The crates are layered: each one depends only on the layers below it (ADR-SAG-0004).
-
-| Layer | Crates |
+| Crate | Purpose |
 |---|---|
-| Types | `sc-agent-types` |
-| Config, secrets and logging | `sc-agent-config`, `sc-agent-secrets`, `sc-agent-log` |
-| HTTP | `sc-agent-http` (sync ureq, busy resend, provider-wide pause) |
-| Decision schema | `sc-decision-schema` (one sync `Decision` trait, one `DecisionRequest`) |
-| Decision backends | `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider` and `sc-decision-llm` |
-| Runner | `sc-decision-runner` (worker threads, holdoff, cancellation, session rows) |
-| Top | `decidr` (library, composition root and CLI) and `sc-agent-py` (the PyO3 `sc_agent` module) |
-| Stands alone | `sc-treesitter` (`sitr` and `sc_treesitter`) |
-| Test support only | `sc-agent-testkit` |
+| `sc-agent` | Shared decision, provider, configuration, credential and logging logic |
+| `decidr` | Decision CLI |
+| `sc-treesitter` | Grammar and query library |
+| `sitr` | Syntax-query CLI |
+| `sc-agent-py` | One wheel exposing `sc_agent` and `sc_agent.sitr` |
 
 There is no async runtime: the workspace is synchronous and uses no tokio.
 
@@ -95,7 +64,7 @@ cargo test --workspace --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
-The Python modules build with maturin from `crates/sc-agent-py` and `crates/sc-treesitter-py`.
+Build the Python wheel with maturin from `crates/sc-agent-py`.
 
 ## Docs
 

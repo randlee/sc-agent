@@ -1,16 +1,16 @@
 # Requirement: The project/phase setting is required and shared
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0021: The project/phase setting is required and shared
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 

@@ -324,3 +324,85 @@ fn adr_sag_0021_log_root_is_not_a_configuration_setting() -> Test {
     assert!(!path.exists());
     Ok(())
 }
+
+#[test]
+fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
+    let root = Temp::new()?;
+    for value in [json!(0), json!("abc")] {
+        let env = vec![(
+            "DECIDR_WORKERS".into(),
+            value.to_string().trim_matches('"').into(),
+        )];
+        let failure = config(None, &root.0, &env, None)
+            .err()
+            .ok_or("accepted invalid workers")?
+            .to_string();
+        assert!(failure.contains("DECIDR_WORKERS"), "{failure}");
+        assert!(failure.contains("workers"), "{failure}");
+        let file = root.0.join("decidr.json");
+        fs::write(&file, json!({"workers":value}).to_string())?;
+        let failure = config(None, &root.0, &[], None)
+            .err()
+            .ok_or("accepted invalid workers file")?
+            .to_string();
+        assert!(
+            failure.contains(file.to_str().ok_or("non-UTF8 path")?),
+            "{failure}"
+        );
+        assert!(failure.contains("workers"), "{failure}");
+        fs::remove_file(file)?;
+    }
+    let file = root.0.join("decidr.json");
+    fs::write(&file, json!({"laya":{"host":"localhost"}}).to_string())?;
+    let failure = config(None, &root.0, &[], None)
+        .err()
+        .ok_or("accepted partial runner")?
+        .to_string();
+    assert!(
+        failure.contains(file.to_str().ok_or("non-UTF8 path")?),
+        "{failure}"
+    );
+    assert!(failure.contains("laya.port"), "{failure}");
+    fs::write(
+        &file,
+        json!({"laya":{"host":"localhost","port":9000,"model":"local"}}).to_string(),
+    )?;
+    let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
+    let failure = config(None, &root.0, &env, None)
+        .err()
+        .ok_or("accepted invalid port")?
+        .to_string();
+    assert!(failure.contains("DECIDR_LAYA__PORT"), "{failure}");
+    assert!(failure.contains("laya.port"), "{failure}");
+    Ok(())
+}
+
+#[test]
+fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
+    let root = Temp::new()?;
+    let local = root.0.join("local");
+    fs::create_dir(&local)?;
+    fs::write(
+        local.join("decidr.json"),
+        json!({"laya":{"host":"localhost"}}).to_string(),
+    )?;
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"laya":{"model":"local"}}).to_string(),
+    )?;
+    let failure = config(Some(&local), &root.0, &[], None)
+        .err()
+        .ok_or("partial runner accepted")?
+        .to_string();
+    for term in [
+        "laya.port",
+        "DECIDR_LAYA__PORT",
+        "local decidr.json",
+        "local sc-agent.json",
+        "global decidr.json",
+        "global sc-agent.json",
+    ] {
+        assert!(failure.contains(term), "{failure}");
+    }
+    Ok(())
+}

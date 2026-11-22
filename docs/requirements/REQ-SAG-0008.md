@@ -1,37 +1,37 @@
 # Requirement: Logger injection into the Rust API and the wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0008: Logger injection into the Rust API and the wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
-Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. The session logger writes session logs. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default Logger of a log is the sc-observability Logger that writes that log's file at the path ADR-SAG-0021 gives.
+Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are appended directly to the session files. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives.
 
 **MUST statements:**
 
-- The general logger and the session logger MUST be separate Loggers.
+- The general log and session files MUST be separate; session files do not use the general Logger.
 - The Rust API MUST let its caller inject the general logger.
-- The Rust API MUST let its caller inject the session logger.
+- Session rows MUST be appended to the default session files; no session Logger injection is required.
 - The wheel MUST return, to a Python caller that names it, a Logger built from the sc-observability crate the wheel links.
 - The wheel MUST accept a Logger it returned as the injected general logger of every decidr and sitr call.
 - When a Logger is injected, every record of its log MUST be written through that Logger.
-- When no Logger is injected for a log, sc-agent MUST write that log through its default Logger.
+- When no general Logger is injected, sc-agent MUST write the general log through its default Logger.
 
 **MUST NOT statements:**
 
 - When a Logger is injected, sc-agent MUST NOT build another Logger for that log.
 - sc-agent MUST NOT forward records to Python `logging` or to a Python callable.
 - The wheel MUST NOT depend on the `sc-observability` Python package.
-- Library code MUST NOT close an injected Logger; its entry point closes it.
+- Library code MUST NOT close an injected Logger; each call MUST flush it.
 
 ### Rationale
 

@@ -8,6 +8,7 @@
 - Share one native sc-observability Logger between each consumer and its wheel calls.
 - Preserve session records up to 1 MiB and support `--version` on both decidr and sitr.
 - Defer crates.io publication until sc-config is released; wheel and binary distribution remain enabled.
+- Breaking: remove the `log_root` configuration setting; session rows and the general log both use the fixed `~/.sc-agent` root, which `doctor` reports as a value.
 
 ### Consumer migration
 

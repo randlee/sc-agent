@@ -24,6 +24,9 @@ fn main() {
         }
         return;
     }
+    let doctor = parsed
+        .as_ref()
+        .is_ok_and(|cli| matches!(cli.command, Command::Doctor));
     let value = match signal.and_then(|()| sc_agent::default_logger("decidr")) {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
@@ -144,7 +147,11 @@ fn main() {
                 }
                 result
             })();
-            let value = sc_agent::report(&logger, outcome);
+            let value = if doctor {
+                sc_agent::result(outcome)
+            } else {
+                sc_agent::report(&logger, outcome)
+            };
             let _ = logger.shutdown();
             value
         }

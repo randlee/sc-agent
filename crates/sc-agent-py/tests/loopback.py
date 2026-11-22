@@ -8,8 +8,10 @@ import sys
 import tempfile
 import threading
 import types
+import subprocess
+import ast
 import unittest
-from contextlib import nullcontext
+from contextlib import nullcontext, chdir
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
@@ -116,6 +118,93 @@ class RenderedWheelLoopback(unittest.TestCase):
             "timeout_secs": 5,
         }
 
+    def test_client_default_and_injected_logger_owns_every_call(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for injected in (False, True):
+                clients = self.load_clients(Path(temporary))
+                for client in clients:
+                    with self.subTest(client=client.CLIENT_NAME, injected=injected), tempfile.TemporaryDirectory() as work:
+                        root = Path(work)
+                        env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                               "DECIDR_LOG_ROOT": str(root / "wrong-root"), "SITR_LOG_ROOT": str(root / "wrong-root"),
+                               "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
+                               "PLAN_ANCHOR_LOG_ROOT": work, "JUDGE_JEV_LOG_ROOT": work, "CONSUMER_TEST_LOG_ROOT": work}
+                        subprocess.run(["git", "init", "--quiet", str(root)], check=True, timeout=20, env=env)
+                        subprocess.run(["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/test/client.git"], check=True, timeout=20, env=env)
+                        with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(os.environ, env, clear=True), patch.object(sc_agent, "logger", wraps=sc_agent.logger) as create, chdir(root):
+                            self.config(root, runner.address)
+                            handle = sc_agent.logger("consumer-test")["value"] if injected else None
+                            result = client.call_result(REQUEST, **self.call_options(client, root, handle))
+                            self.assertTrue(result["ok"], result)
+                            if client.CLIENT_NAME == "judge-jev":
+                                self.assertTrue(client.extract("python", "def f(): pass", "(function_definition) @f", general_log=handle)["ok"])
+                                failed = client.extract("missing-language", "", "", general_log=handle)
+                                self.assertFalse(failed["ok"])
+                            self.assertEqual(create.call_count, 1)
+                            self.assertEqual(create.call_args.args, ("consumer-test" if injected else client.CLIENT_NAME,))
+                            owned = handle if injected else client._logger_handle
+                            self.assertTrue(sc_agent.flush(owned)["ok"])
+                        name = "consumer-test" if injected else client.CLIENT_NAME
+                        files = list((root / "logs").glob("*.jsonl"))
+                        self.assertEqual([file.name for file in files], [name + ".log.jsonl"])
+                        events = [json.loads(line) for line in files[0].read_text().splitlines()]
+                        self.assertTrue(any(event["action"] == "decision.result" for event in events), events)
+                        if client.CLIENT_NAME == "judge-jev":
+                            self.assertTrue(any(event["action"] == "sitr.query" for event in events), events)
+                            self.assertEqual(sum(event["fields"].get("id") == failed["error"]["id"] and "missing-language" in event["fields"].get("message", "") for event in events), 1)
+                        expected = root / "sessions/example.invalid/test/client" / client.CLIENT_NAME / "phase-i-loopback/sessions.jsonl"
+                        self.assertEqual(list((root / "sessions").rglob("sessions.jsonl")), [expected])
+                        self.assertFalse((root / "wrong-root").exists())
+                        rows = [json.loads(line) for line in expected.read_text().splitlines()]
+                        self.assertEqual(len(rows), 1)
+                        self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
+
+    def test_rendered_modules_only_reference_the_permitted_api(self):
+        allowed = {"send", "send_batch", "digest", "logger", "log", "flush", "Cancel", "sitr"}
+        with tempfile.TemporaryDirectory() as folder:
+            for path in render_consumers(Path(folder)):
+                refs = {node.attr for node in ast.walk(ast.parse(path.read_text()))
+                        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "sc_agent"}
+                self.assertTrue(refs)
+                self.assertLessEqual(refs, allowed)
+                self.assertEqual("sitr" in refs, path.stem == "judge_jev_client")
+
+    def test_logger_initialization_is_serialized(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for client in self.load_clients(Path(folder)):
+                entered, contended, release = threading.Event(), threading.Event(), threading.Event()
+                mutex = threading.Lock()
+                calls, results = [], []
+                class Guard:
+                    def __enter__(self):
+                        if entered.is_set():
+                            contended.set()
+                        mutex.acquire()
+                    def __exit__(self, *_):
+                        mutex.release()
+                def create(name):
+                    calls.append(name)
+                    entered.set()
+                    if not release.wait(5):
+                        return {"ok": False, "error": "test release absent"}
+                    return {"ok": True, "value": object()}
+                client._logger_lock = Guard()
+                threads = [threading.Thread(target=lambda: results.append(client._logger(create, None))) for _ in range(2)]
+                try:
+                    threads[0].start()
+                    self.assertTrue(entered.wait(5), "factory not reached")
+                    threads[1].start()
+                    self.assertTrue(contended.wait(5), "second caller did not take the lock")
+                finally:
+                    release.set()
+                    for thread in threads:
+                        if thread.ident is not None:
+                            thread.join(5)
+                            self.assertFalse(thread.is_alive())
+                self.assertEqual(calls, [client.CLIENT_NAME])
+                self.assertEqual(len(results), 2)
+                self.assertIs(results[0]["value"], results[1]["value"])
+
     def test_rendered_clients_run_against_the_installed_wheel(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -130,8 +219,10 @@ class RenderedWheelLoopback(unittest.TestCase):
                         {
                             "DECIDR_LOG_ROOT": str(root),
                             "CONSUMER_TEST_LOG_ROOT": str(root),
+                            "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                            "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                         },
-                    ), sitr_guard:
+                        clear=True), sitr_guard, chdir(root):
                         self.config(root, runner.address)
                         logger = sc_agent.logger("consumer-test")
                         self.assertTrue(logger["ok"], logger)
@@ -180,8 +271,10 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
-            ):
+                clear=True), chdir(root):
                 self.config(root, runner.address)
                 logger = sc_agent.logger("consumer-test")
                 self.assertTrue(logger["ok"], logger)
@@ -223,8 +316,10 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
-            ):
+                clear=True), chdir(root):
                 self.config(root, runner.address)
                 logger = sc_agent.logger("consumer-test")
                 self.assertTrue(logger["ok"], logger)
@@ -264,8 +359,10 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
-            ):
+                clear=True), chdir(root):
                 self.config(root, runner.address)
                 logger = sc_agent.logger("consumer-test")
                 self.assertTrue(logger["ok"], logger)
