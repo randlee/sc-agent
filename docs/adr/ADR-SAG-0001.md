@@ -1,7 +1,7 @@
-# Decision: Decision backends implement one trait with one request form
+# Decision: Every provider receives one request form
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -9,7 +9,7 @@
 
 ---
 
-## ADR-SAG-0001: Decision backends implement one trait with one request form
+## ADR-SAG-0001: Every provider receives one request form
 
 **Status:** Approved  
 
@@ -30,28 +30,29 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 ### Decision
 
-Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implements one sans-IO `Backend` trait in `sc-decision-schema`: encode a Jev API request into an HTTP request, and decode an HTTP response into a Jev API response. Callers use one sync `Decision` trait (`decide` for one request, `decide_stream` for many). `sc-decision-runner` implements `Decision` for any `Backend` and transport; the queue, worker threads, holdoff, cancellation and session logging live behind it. Each LLM backend adapts the request internally. `DecisionRequest` (the Jev API request body plus its image parts and long-context flag) is the one request form the backends receive.
+Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static table per provider, and each table names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers use two functions, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
 
 **Key Principles:**
 
-- There is one request form: `DecisionRequest`, the Jev API request body plus its image parts and long-context flag.
-- Adaptation knowledge lives only in the backend that adapts.
-- Backends do no I/O; the transport is separate, so an async transport can be added without changing backends.
-- `decide_stream` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the stream continues.
+- There is one request form: the Jev API request body.
+- Adaptation knowledge lives only in the request-shape adaptation.
+- `send_batch` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the batch continues.
 
 ### Rationale
 
-When every backend receives the same data, their answers are comparable by construction, and shared crates stay free of backend-specific types.
+When every backend receives the same data, their answers are comparable by construction, and shared code stays free of provider-specific types.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Consequences
 
 **Positive:**
 
-- A new backend is added by implementing the trait, with no change to shared types.
+- A new provider is added as a table row, with no change to shared types.
 
 **Negative:**
 
-- Each LLM backend must translate the full Jev request itself.
+- Each request shape must translate the full Jev request.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I do not require results in request order."
 

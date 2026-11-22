@@ -1,7 +1,7 @@
 # Decision: Crate layering and error values
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -31,65 +31,65 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` (over `sc-decision-systemone`, whose Jev encode and decode it reuses) and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decidr` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decidr` CLI. `sc-agent-py` is a thin PyO3 layer over the `decidr` library. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. Every call returns a Result whose error has an id and a message and keeps its cause.
+There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Every call returns a Result; the error is the one core error enum, with an id, a message and an action, and a layer that changes an error keeps the lower error's id and message (REQ-SAG-0002).
 
 **Key Principles:**
 
 - A crate depends only on lower layers.
-- `sc-decision-runner` launches decision models only.
-- `sc-agent-log` takes generic rows, so it needs no decision types; the runner builds decision rows.
-- Backends are chosen and wired in one place, the `decidr` library; `sc-agent-py` adds no wiring of its own.
+- The provider is chosen in one place, `sc-agent`.
 
 ### Rationale
 
-Separate crates keep each launcher small and let a non-decision program use HTTP, providers and logging without decision types. Errors that keep their id, message and cause carry each failure's meaning upward.
+One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them. Errors that keep their id and message carry each failure's meaning upward.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Consequences
 
 **Positive:**
 
-- A new launcher reuses the lower layers without touching decision code.
+- A new launcher reuses `sc-agent` without touching the other launchers.
 
 **Negative:**
 
-- More crates to version and publish.
+- A program that wants only HTTP or logging still links the whole core.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
 
 ### Alternatives Considered
 
-#### Alternative 1: One general engine crate for every launcher
+#### Alternative 1: One crate per layer
 
 **Description:**
 
-Put decision, CLI-agent and SDK-agent launching in one crate.
+Split types, configuration, secrets, logging, HTTP, schema, each backend and the runner into their own crates.
 
 **Pros:**
 
-- Fewer crates.
+- A program can depend on one layer alone.
 
 **Cons:**
 
-- Every launcher pulls in every other launcher's code.
+- Seventeen crates, with traits and wrappers between them, for what about 300 lines of Python did.
 
 **Why Rejected:**
 
-The owner wants decision launching kept separate from other launching.
+The reduction plan replaces it with one core crate written fresh to the spec.
 
-#### Alternative 2: One shared error type
+#### Alternative 2: One error type per crate
 
 **Description:**
 
-Every crate returns the same error enum.
+Each crate returns its own error enum, wrapping the errors of the crates below it.
 
 **Pros:**
 
-- One list of error ids.
+- A crate carries only its own error ids.
 
 **Cons:**
 
-- Crates that never touch a decision model carry decision errors.
+- Wrapper variants and copy-up code in every crate.
 
 **Why Rejected:**
 
-A crate below the decision layer must not carry decision errors (layering).
+The reduction plan has one error enum for the core, logged and returned the same way from the CLI and the wheel.

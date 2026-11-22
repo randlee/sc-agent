@@ -1,7 +1,7 @@
 # Decision: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -41,7 +41,7 @@ Each CLI needs its own settings, some settings must apply to every CLI, and a re
 Configuration has two kinds of scope and two locations.
 
 - The shared scope is the file `sc-agent.json`. It holds settings that apply to every CLI, such as the project/phase (ADR-SAG-0021) and the log root.
-- Each CLI has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, `sitr.json`, and the same pattern for every CLI added later.
+- Each CLI that reads configuration has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.
 - The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform.
 - The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.
 
@@ -50,7 +50,7 @@ The CLIs and the files each one reads are these, and no others:
 | CLI | Global files | Local files | Environment prefix |
 |---|---|---|---|
 | `decidr` | `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
-| `sitr` | `~/.sc-agent/sitr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/sitr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `SITR_`, plus `SC_PROJECT` |
+| `sitr` | none | none | none |
 
 Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.
 
@@ -64,7 +64,7 @@ A setting is looked up in seven layers, and the first layer that sets it wins:
 6. the global `sc-agent.json`;
 7. the built-in default, or a typed error when the setting is required and has no default.
 
-Environment variables are named after the CLI: `DECIDR_<SETTING>`, `SITR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LOCAL_RUNNERS__LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
+Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LOCAL_RUNNERS__LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 
 Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152). `default.json`, `local.json` and the `SC_AGENT__` prefix are removed; nothing reads them. No migration is provided, because no release has users of the old layout.
 
@@ -78,6 +78,8 @@ Configuration files are JSON. TOML will be added when sc-config supports it (ran
 
 One file per CLI keeps each CLI's settings separate and lets a new CLI be added without touching another CLI's file. The shared file gives one place for settings every CLI must agree on. The local location under `.sc/` lets each worktree differ, which matters because worktrees of one repository often work on different phases at the same time. Env vars named after the CLI keep one CLI's override from reaching another.
 
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
 ### Consequences
 
 **Positive:**
@@ -87,7 +89,7 @@ One file per CLI keeps each CLI's settings separate and lets a new CLI be added 
 
 **Negative:**
 
-- A setting can now come from seven places; every CLI's `doctor` reports a `setting | value | source` table; sitr gains a `doctor` command.
+- A setting can now come from seven places; `decidr doctor` reports a `setting | value | source` table.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."

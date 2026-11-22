@@ -1,9 +1,9 @@
 # Requirement: LLM decision backends return the Jev schema
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -20,20 +20,21 @@ Definitions: Decider mode is an LLM such as Haiku or Luna answering a decision r
 
 - In decider mode, Haiku and Luna MUST produce the probabilities and confidence themselves and return answers in the required schema.
 - Each request MUST ask the provider for the required schema through the provider's structured-output feature.
-- A response that does not match the required schema MUST be resent unchanged, up to the configured maximum number of sends, and then returned as `decision.schema_mismatch` with what did not match.
-- Haiku and Luna MUST pass every input the provider API supports, including images, to the provider; an input the provider rejects MUST return the provider's error.
+- A response that does not match the required schema MUST be returned as `decision.schema_mismatch` with what did not match.
+- Haiku and Luna MUST pass the request's inputs to the provider; an input the provider rejects MUST return the provider's error.
 
 ### Rationale
 
 Callers compare Jev and LLM answers directly, so every backend must return the same answer shape.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A Haiku or Luna answer to a choice, score, noul and box question parses as the Jev answer type for that question.
-- [ ] A test provider that first returns a response missing `probabilities`, then a valid one, yields the valid answer after one resend.
-- [ ] A test provider that never returns the schema yields `decision.schema_mismatch` after the maximum number of sends.
+- [ ] A test provider that returns a response missing `probabilities` yields `decision.schema_mismatch`.
 
 ### Dependencies
 
