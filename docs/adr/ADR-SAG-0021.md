@@ -1,9 +1,9 @@
 # Decision: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
 **Status:** Proposed  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-19  
 
@@ -51,7 +51,7 @@ Every record of a process must reach one Logger that the process's entry point o
 | `sitr` CLI | sitr, sc-observability |
 | sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |
 
-There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses. There is no separate sitr wheel.
+There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses. There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both.
 
 **Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. The session logger is optionally injectable; no app injects one today.
 
@@ -67,7 +67,7 @@ There is one Python wheel. A Python process that loads sc-agent has one copy of 
 | `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |
 | `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |
 
-A wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. A plan that adds an entry point, or changes a log one writes, is not approved until it includes a new version of this ADR with that row.
+A wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.
 
 **Session identity.**
 
@@ -96,6 +96,8 @@ The entry point is the only code that knows the process's lifetime, so it is the
 **Negative:**
 
 - Every caller must supply a project/phase before its first request.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
 
 ### Alternatives Considered
 

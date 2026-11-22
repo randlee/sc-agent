@@ -1,9 +1,9 @@
 # Decision: sitr's Python API is built into the sc-decidr wheel; sitr lives in sc-treesitter behind a cli feature
 
 **Status:** Proposed  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -34,7 +34,7 @@ The Python bindings and the CLI need PyO3, clap and sc-observability, but a Rust
 
 ### Decision
 
-`sc-agent-py`, the crate that builds the sc-decidr wheel, depends on `sc-treesitter` with its `python` feature and exposes the sitr Python API as `sc_agent.sitr`; there is no separate sitr wheel and no `sc-treesitter-py` crate (ADR-SAG-0021). `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
+`sc-agent-py`, the crate that builds the sc-decidr wheel, depends on `sc-treesitter` with its `python` feature and exposes the sitr Python API as `sc_agent.sitr`; there is no `sc-treesitter-py` crate (ADR-SAG-0021). There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both. `sc-treesitter` has a `python` feature that enables its PyO3 types and a non-default `cli` feature. The `sitr` binary lives in `sc-treesitter` behind `cli` (`required-features = ["cli"]`). Default features carry no clap and no sc-observability.
 
 **Key Principles:**
 
@@ -55,6 +55,8 @@ Feature gates keep the library's default dependency set small while the PyO3 typ
 **Negative:**
 
 - Installing the wheel always installs both the decidr and sitr APIs.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
 
 ### Alternatives Considered
 
