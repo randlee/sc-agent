@@ -1,9 +1,9 @@
 # Decision: Decision backends implement one trait with one request form
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -37,7 +37,7 @@ Every decision backend (Jev, local Jev-compatible runners, Haiku, Luna) implemen
 - There is one request form: `DecisionRequest`, the Jev API request body plus its image parts and long-context flag.
 - Adaptation knowledge lives only in the backend that adapts.
 - Backends do no I/O; the transport is separate, so an async transport can be added without changing backends.
-- `decide_stream` returns results fastest first, each tagged with its session ULID; a failed request is returned in its result and the stream continues.
+- `decide_stream` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the stream continues.
 
 ### Rationale
 
@@ -52,6 +52,8 @@ When every backend receives the same data, their answers are comparable by const
 **Negative:**
 
 - Each LLM backend must translate the full Jev request itself.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I do not require results in request order."
 
 ### Alternatives Considered
 

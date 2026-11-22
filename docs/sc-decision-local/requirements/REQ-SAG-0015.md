@@ -1,9 +1,9 @@
 # Requirement: Local runner timeouts
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -22,7 +22,6 @@ Definitions: The request timeout bounds one request to a runner. The load timeou
 - Each local runner MUST have a load timeout, configurable per runner in the global config, with a default of 600 seconds.
 - When discovery reports the model is not loaded, sc-agent MUST wait for the model to load before the first send, bounded by the load timeout and ending at once on cancel.
 - For a daemon that loads its model only on its first request, the deadline of that first request MUST be the load timeout plus the request timeout.
-- The request timeout MUST be within 10..=3600 seconds and the load timeout within 10..=7200 seconds, both checked at config load.
 
 **MUST NOT statements:**
 
@@ -33,6 +32,8 @@ Definitions: The request timeout bounds one request to a runner. The load timeou
 
 Local models are slower than remote providers and loading a model can take minutes; counting load time against the request timeout fails requests that would succeed.
 
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
+
 ### Success Criteria
 
 **Acceptance Criteria:**
@@ -42,7 +43,6 @@ Local models are slower than remote providers and loading a model can take minut
 - [ ] A model reported not loaded is waited for, and the request's own timeout starts only after the model reports loaded.
 - [ ] A load that exceeds the load timeout ends with a typed error naming the runner.
 - [ ] Cancelling during the load wait ends it at once.
-- [ ] A request or load timeout outside its bounds fails config load with an error naming the key path.
 
 ### Dependencies
 

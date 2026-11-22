@@ -1,9 +1,9 @@
 # Requirement: Log locations and retention
 
 **Status:** Proposed  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -28,12 +28,13 @@ Definitions: The general log is the diagnostic log of one entry point (ADR-SAG-0
 
 - sc-agent MUST NOT implement its own rotation or retention of the general log.
 - sc-agent MUST NOT rotate, prune or delete a session log.
-- The log root MUST NOT be a configuration setting.
 - A general log MUST NOT be written under `~/.sc-agent/sessions/`, and a session log MUST NOT be written under `~/.sc-agent/logs/`.
 
 ### Rationale
 
 sc-observability already rotates and prunes the general log. Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
 
 ### Success Criteria
 
@@ -41,7 +42,6 @@ sc-observability already rotates and prunes the general log. Session logs are th
 
 - [ ] With nothing configured, decidr writes `~/.sc-agent/logs/decidr.log.jsonl` and sitr writes `~/.sc-agent/logs/sitr.log.jsonl`, and `~/.sc-agent/logs/` holds no session log.
 - [ ] With `DECIDR_LOG_ROOT` set to `<dir>`, decidr writes `<dir>/logs/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
-- [ ] A `log_root` key in any configuration file is rejected as an unknown key.
 - [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
 - [ ] A session log file whose modification time is older than the sc-observability retention age is still present and unchanged after decidr runs a new session.
 

@@ -1,15 +1,15 @@
-# Decision: Crate layering and per-crate error unions
+# Decision: Crate layering and error values
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
 ---
 
-## ADR-SAG-0004: Crate layering and per-crate error unions
+## ADR-SAG-0004: Crate layering and error values
 
 **Status:** Approved  
 
@@ -27,24 +27,22 @@ sc-agent will launch decision models, LLMs, CLI agents and SDK agents. Each need
 
 **Problem Statement:**
 
-Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message without one shared error type for everything.
+Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message.
 
 ### Decision
 
-Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` (over `sc-decision-systemone`, whose Jev encode and decode it reuses) and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decidr` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decidr` CLI. `sc-agent-py` is a thin PyO3 layer over the `decidr` library. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. `sc-agent-types` defines the `ErrorId` trait and `ErrorDetail` (id, message, cause) that every sc-agent crate's error union uses; `sc-treesitter` defines its own. Each crate defines its own error union, except a crate whose public functions all return the error type fixed by a trait it implements (such as `sc-decision-systemone`, which returns `DecisionError` through `Backend`); a union wraps the error of the layer below it; an error from a crate that is not below (such as an LLM error inside a decision error) is carried as its id, message and cause chain.
+Layers from the bottom: `sc-agent-types`; `sc-agent-config`, `sc-agent-secrets` and `sc-agent-log`; `sc-agent-http`; `sc-decision-schema`; the decision backends `sc-decision-systemone`, `sc-decision-local` (over `sc-decision-systemone`, whose Jev encode and decode it reuses) and `sc-decision-llm` (over `sc-llm-provider`); `sc-decision-runner`, which handles decision models only. Above the runner, the `decidr` crate is the top layer for decision models: its library target is the one place a backend is chosen and wired into `sc-decision-runner`, and its binary is the `decidr` CLI. `sc-agent-py` is a thin PyO3 layer over the `decidr` library. CLI agents and SDK agents get their own crates later. `sc-treesitter` stands alone. Every call returns a Result whose error has an id and a message and keeps its cause.
 
 **Key Principles:**
 
 - A crate depends only on lower layers.
 - `sc-decision-runner` launches decision models only.
-- There is no shared error type for all crates; `HttpError` is wrapped by `LlmError` and by `DecisionError`, and an `LlmError` reaches `DecisionError` as its id, message and cause chain.
 - `sc-agent-log` takes generic rows, so it needs no decision types; the runner builds decision rows.
 - Backends are chosen and wired in one place, the `decidr` library; `sc-agent-py` adds no wiring of its own.
-- Exemption: a crate whose public functions all return the error type fixed by a trait it implements needs no error union of its own; `sc-decision-systemone` returns `DecisionError` through `Backend` and defines no union.
 
 ### Rationale
 
-Separate crates keep each launcher small and let a non-decision program use HTTP, providers and logging without decision types. Per-crate errors keep each failure's meaning where it happens while carrying the full chain upward.
+Separate crates keep each launcher small and let a non-decision program use HTTP, providers and logging without decision types. Errors that keep their id, message and cause carry each failure's meaning upward.
 
 ### Consequences
 
@@ -55,6 +53,8 @@ Separate crates keep each launcher small and let a non-decision program use HTTP
 **Negative:**
 
 - More crates to version and publish.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
 
 ### Alternatives Considered
 
@@ -92,4 +92,4 @@ Every crate returns the same error enum.
 
 **Why Rejected:**
 
-Each crate owns its errors and wraps the lower ones.
+A crate below the decision layer must not carry decision errors (layering).
