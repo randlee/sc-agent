@@ -173,7 +173,7 @@ class RenderedWheelLoopback(unittest.TestCase):
             root = Path(temporary)
             client = self.load_clients(root)[1]
             self.assertTrue(callable(getattr(client, "extract", None)))
-            source_path = Path(__file__).resolve()
+            source_path = Path(__file__).resolve().parent / "fixtures" / "sitr_source.py"
             source = source_path.read_text()
             with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
                 os.environ,
@@ -193,7 +193,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 )
                 self.assertTrue(extracted["ok"], extracted)
                 names = [capture["text"] for capture in extracted["value"]]
-                self.assertIn("allow_local_runner", names)
+                self.assertEqual(set(names), {"validate_claim", "summarize_claim"})
                 prompt = "Extracted functions: " + ", ".join(names)
                 request = {
                     "state": "offline-dry-run",
@@ -209,6 +209,9 @@ class RenderedWheelLoopback(unittest.TestCase):
                     [("/v1/systemone", {**request, "model": "loopback"})],
                     "extracted sitr text did not reach the offline prompt",
                 )
+                received_prompt = runner.received[0][1]["questions"]["q"]["instructions"]
+                for name in names:
+                    self.assertIn(name, received_prompt, f"extracted name {name!r} is missing from the sent prompt")
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
     def test_keyboard_interrupt_cancels_the_passed_cancel(self):

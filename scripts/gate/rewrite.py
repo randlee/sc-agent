@@ -110,19 +110,23 @@ check("wheel signatures", (
 ))
 cli_ready = False
 if MANIFEST.exists():
-    metadata = subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps",
-                               "--manifest-path", str(MANIFEST)], cwd=ROOT, text=True,
-                              stdout=subprocess.PIPE, check=False)
-    if metadata.returncode:
-        check("dependencies", [f"cargo metadata exit {metadata.returncode}"])
+    try:
+        metadata = subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps",
+                                   "--manifest-path", str(MANIFEST)], cwd=ROOT, text=True,
+                                  stdout=subprocess.PIPE, check=False, timeout=COMMAND_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        check("dependencies", [f"cargo metadata timed out after {COMMAND_TIMEOUT_SECONDS} seconds"])
     else:
-        packages = json.loads(metadata.stdout)["packages"]
-        local = {p["name"] for p in packages}
-        check("workspace members", sorted(local - PACKAGES))
-        check("dependencies", (
-            f"{p['name']}: {d['name']}" for p in packages for d in p["dependencies"]
-            if d["name"] not in ALLOWED | local
-        ))
+        if metadata.returncode:
+            check("dependencies", [f"cargo metadata exit {metadata.returncode}"])
+        else:
+            packages = json.loads(metadata.stdout)["packages"]
+            local = {p["name"] for p in packages}
+            check("workspace members", sorted(local - PACKAGES))
+            check("dependencies", (
+                f"{p['name']}: {d['name']}" for p in packages for d in p["dependencies"]
+                if d["name"] not in ALLOWED | local
+            ))
     run("format", ["cargo", "fmt", "--check", "--all", "--manifest-path", str(MANIFEST)])
     run("clippy", ["cargo", "clippy", "--locked", "--workspace", "--all-features", "--manifest-path", str(MANIFEST),
                    "--", "-D", "warnings", "-D", "clippy::unwrap_used", "-D", "clippy::expect_used",
