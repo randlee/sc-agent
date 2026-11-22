@@ -232,12 +232,13 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             os.environ["T_LOG_ROOT"] = folder
             try:
                 logger = self.api.logger("t")["value"]
-                self.assertTrue(self.api.log(logger, {"action": "python.own", "fields": {"source": "python"}})["ok"])
+                self.assertTrue(self.api.log(logger, {"action": "python.own", "target": "consumer", "correlation_id": "contract-id", "fields": {"source": "python"}})["ok"])
                 self.error(self.api.send("not JSON", config_dir=folder, project="contract", agent_role="contract", general_log=logger))
                 self.assertTrue(self.api.sitr.languages(general_log=logger)["ok"])
                 self.assertTrue(self.api.flush(logger)["ok"])
                 text = (Path(folder) / "logs/t.log.jsonl").read_text()
-                self.assertIn("python.own", text)
+                own = next(json.loads(line) for line in text.splitlines() if json.loads(line)["action"] == "python.own")
+                self.assertEqual((own["target"], own["correlation_id"]), ("consumer", "contract-id"))
                 self.assertIn("sitr", text)
                 self.assertIn("decision.request_parse", text)
                 self.assertFalse((Path(folder) / "logs/decidr.log.jsonl").exists())

@@ -226,16 +226,17 @@ fn log(
     event: Option<&Bound<'_, PyAny>>,
 ) -> Py<PyAny> {
     respond(py, logger, "decidr", |logger| {
-        let event = decode(required(event)?)?;
-        let action = event
-            .get("action")
-            .and_then(Value::as_str)
-            .ok_or_else(|| invalid("action is required"))?;
-        sc_agent::log(
-            logger,
-            action,
-            event.get("fields").cloned().unwrap_or(json!({})),
-        );
+        let supplied = decode(required(event)?)?;
+        let mut event = json!({"version":"v1", "timestamp":sc_observability::Timestamp::now_utc(),
+                              "service":logger.service_name(), "identity":sc_observability::ProcessIdentity::default(),
+                              "target":"sc-agent", "level":sc_observability::Level::Info, "fields":{}});
+        if let (Some(event), Some(supplied)) = (event.as_object_mut(), supplied.as_object()) {
+            event.extend(supplied.clone());
+        } else {
+            return Err(invalid("event must be an object"));
+        }
+        let event = serde_json::from_value(event).map_err(invalid)?;
+        let _ = logger.log(event);
         Ok(Value::Null)
     })
 }
