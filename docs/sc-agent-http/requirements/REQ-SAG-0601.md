@@ -1,7 +1,7 @@
 # Requirement: Busy resend and holdoff
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -14,18 +14,17 @@
 
 ### Requirement Statement
 
-Definitions: A busy response is a non-quota HTTP 429 or 5xx (including 529). A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds.
+Definitions: A busy response is a non-quota HTTP 429, 502 or 529. A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds.
 
 **MUST statements:**
 
 - A request that receives a busy response MUST be resent unchanged.
 - A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.
-- An invalid response, including a schema mismatch, MUST be resent unchanged with the same holdoff, send limit and cancellation.
-- The maximum number of sends per request MUST be configurable, with a default of 5.
+- The maximum number of sends per request MUST be a fixed count of 5.
 - When the provider gives a `Retry-After`, it MUST set the holdoff.
 - When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.
 - A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.
-- When sends run out on busy replies, the error MUST say busy, with the send count and the last Retry-After.
+- When sends run out on busy replies, the error MUST say busy, with the send count.
 
 **MUST NOT statements:**
 
@@ -40,12 +39,13 @@ Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry 
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
 
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] With the default configuration, a request answered busy every time is sent 5 times and ends with a busy error carrying a send count of 5.
-- [ ] With the maximum set to 2, the same request is sent 2 times.
+- [ ] A request answered busy every time is sent 5 times and ends with a busy error carrying a send count of 5.
 - [ ] A busy response with `Retry-After: 3` holds the request off 3 seconds; with no `Retry-After`, each holdoff is longer than the one before.
 - [ ] Cancelling a held-off request ends its wait at once and returns a cancelled result.
 - [ ] A send that times out is resent unchanged and counts toward the maximum number of sends, and a request whose last attempt timed out ends with the timeout error.

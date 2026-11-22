@@ -1,9 +1,9 @@
 # Requirement: Batches of decision requests run in parallel
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -18,8 +18,8 @@ Definitions: A batch is the decision requests a caller passes in one call: one J
 
 **MUST statements:**
 
-- `sc-decision-runner` MUST run the requests of one batch in parallel across workers.
-- The number of workers MUST be a global configuration setting with a default of 8.
+- `sc-agent`'s `send_batch` MUST run the requests of one batch in parallel across workers.
+- The number of workers MUST be a configuration setting with a default of 8.
 - Results may be returned in any order. Each result MUST carry its session ULID and the input position of the request it answers.
 - A failed request MUST be returned as that request's error result while the rest of the batch continues.
 - Cancelling the batch MUST stop every request that has not finished.
@@ -29,6 +29,8 @@ Definitions: A batch is the decision requests a caller passes in one call: one J
 Tasks send tens of thousands of decisions, and one slow or failed request must not hold up or stop the others.
 
 Owner ruling (2026-11-20), Rand Lee: "I do not require results in request order."
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria
 
