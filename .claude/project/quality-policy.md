@@ -60,6 +60,13 @@ is not a finding.
   `PASS — minor fixes required, no re-QA`
 - `ceremony-finding-screen`: every sprint or plan QA round that has findings,
   before the report is posted
+- `blastr`: after primary reviewers, every QA round with blocking or important
+  findings, over all such findings; include its recommendations in the PR
+  report. Consumer: the lead's fix-or-loosen triage. Defect class: unnecessary
+  code growth from oversized fixes, as documented in the
+  [reduction plan](../../docs/plans/reduction-plan.md). Retire it if two
+  consecutive phases have no `fix-smaller` or `escalate-record-change`
+  recommendation adopted by the lead. It never gates or changes a finding.
 - Phase-end review: initial implementation set plus `flaky-test-qa`
 - Run `flaky-test-qa` earlier when tests changed or instability is suspected
 - `schema-reviewer`: only when Governed Interfaces below names a relevant
