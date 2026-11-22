@@ -7,7 +7,7 @@
 - Return tagged success or error values from the generated client instead of raising exceptions.
 - Share one native sc-observability Logger between each consumer and its wheel calls.
 - Preserve session records up to 1 MiB and support `--version` on both decidr and sitr.
-- Defer crates.io publication until sc-config is released; wheel and binary distribution remain enabled.
+- Pin sc-config to an sc-runtime GitHub tag for source builds; wheels and binaries include it. Crates.io publication remains deferred until sc-config is reworked and released for all consumers; see [prerelease dependencies](docs/integration/prerelease.md#sc-config-dependency).
 - Breaking: remove the `log_root` configuration setting; session rows and the general log both use the fixed `~/.sc-agent` root, which `doctor` reports as a value.
 
 ### Consumer migration

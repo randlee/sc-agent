@@ -30,6 +30,15 @@ The type check covers both generated clients. CLI reference freshness uses the
 pin in [release/docli-pin.toml](../../release/docli-pin.toml) and remains part of
 release preflight. CI runs Cargo formatting and Clippy directly.
 
+## sc-config dependency
+
+sc-config is not on crates.io. It comes from the `sc-config-pin-0.3` GitHub tag
+on [sc-runtime's unmerged PR #153](https://github.com/randlee/sc-runtime/pull/153).
+Wheels and binaries compile it in and need no GitHub access at runtime; sdist and
+source builds fetch the tag. Crates.io publication of sc-agent remains deferred
+until sc-config is reworked for all consumers and released, after which sc-agent
+will be republished.
+
 ## Consumer integration and credential export
 
 The plan-anchor and judge-jev suites verify their installed wheel. Their own
