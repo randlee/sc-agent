@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import threading
+import tomllib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -569,7 +570,9 @@ class Cli(Isolated):
                                  cwd=self.directory.name, text=True, capture_output=True, timeout=20)
             self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
             self.assertIn(name, got.stdout)
-            if flag == "--version": self.assertEqual(got.stdout.strip(), name + " 0.3.0")
+            if flag == "--version":
+                manifest = tomllib.loads((Path(__file__).resolve().parents[2] / "Cargo.toml").read_text())
+                self.assertEqual(got.stdout.strip(), name + " " + manifest["workspace"]["package"]["version"])
 
     def test_cli_size_and_worker_refusals_keep_typed_ids(self):
         # REQ-SAG-0014/0702: CLI refusals preserve the core error id.

@@ -7,7 +7,9 @@ The shared client template is `sc_agent/templates/consumer.py.j2`. Render it fro
 ```bash
 template_root="$(python3 -c 'import importlib.resources; print(importlib.resources.files("sc_agent") / "templates")')"
 sc-compose render --root "$template_root" --file consumer.py.j2 --strict \
-  --var client_name='"my-tool"' --var sitr=true --output decidr_client.py
+  --var client_name='"my-tool"' --var sitr=true \
+  --var sc_decidr_version="\"$(python3 -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')\"" \
+  --output decidr_client.py
 ```
 
 `client_name` sets the logger and session role and the default consent-settings module prefix. `sitr` includes the optional `extract` helper. The named `consent` block is the extension point for a consumer-specific remote-send policy; decision transport, returned errors and batch processing stay shared. Model selectors pass unchanged to the wheel. The generated module imports without loading the optional wheel until a call needs it.
