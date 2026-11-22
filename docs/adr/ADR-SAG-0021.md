@@ -74,7 +74,7 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 - `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.
 - `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it "project/phase".
 
-**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failure of the general log itself is not handled: sc-agent expects it to work.
+**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it.
 
 **Key Principles:**
 

@@ -4,7 +4,7 @@ Owner: Rand Lee. 2026-11-19.
 
 ## Goal
 
-sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of Rust in total (failing above 2,200) across every `.rs` file in the repository, tests, examples and scripts included**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of non-test Rust source, with a hard limit of 2,200 lines across `.rs` files as counted by `scripts/gate/rewrite.py`; Rust test lines are excluded**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
 
 **Wheel.** One Python wheel (`sc-decidr`) holding the decidr and sitr APIs. `logger(name)` returns its Rust Logger, which every decidr and sitr call accepts directly; no callable bridge. The `sitr` and `decidr` CLIs each use their own Logger.
 
@@ -59,11 +59,11 @@ Nothing not in these three is built.
 
 ## Not built
 
-Image parts, the long-context header, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
+Image parts, the long-context header, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge. Failed `log.write` and `log.flush` calls return the Logger's failure as an error value; nothing else handles it.
 
 ## Layout
 
-| Crate | Contents | Guide budget (Rust lines after `cargo fmt`, tests included; the hard limit is the 2,200 total) |
+| Crate | Contents | Guide budget (non-test Rust lines; these per-crate figures are guides, and the hard total limit is 2,200 lines as counted by `scripts/gate/rewrite.py`) |
 |---|---|---|
 | `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
 | `decidr` | CLI | 150 |
