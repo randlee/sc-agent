@@ -62,7 +62,10 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     assert '--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig' in declared["run"]
     assert '--target "$WHEEL_TARGET"' in declared["run"]
     assert declared["env"]["MACOSX_DEPLOYMENT_TARGET"] == "${{ matrix.deployment_target }}"
-    assert 'maturin[zig]==1.9.4' in (root / "actions/setup-python-release-build/action.yml").read_text()
+    setup = yaml.safe_load((root / "actions/setup-python-release-build/action.yml").read_text())
+    installs = {step["name"]: step["run"] for step in setup["runs"]["steps"] if step.get("name", "").startswith("Install maturin")}
+    assert installs["Install maturin with Zig support"] == "python -m pip install maturin==1.16.0 ziglang==0.17.1"
+    assert installs["Install maturin"] == "python -m pip install maturin==1.9.4"
     assert "has_release_binaries" in release["jobs"]["build"]["if"]
     github_release = release["jobs"]["release"]
     assert {"build-python-wheels", "build-python-sdists", "build-npm"} <= set(github_release["needs"])

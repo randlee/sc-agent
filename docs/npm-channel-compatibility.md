@@ -36,7 +36,7 @@ identity and comparison receipts. It performs no network or registry operations.
 
 Existing wheels already worked: sc-compose and atm-core use runner strings,
 native maturin builds, and the existing Python upload channel. sc-compose's
-installed workflow additionally uses `maturin[zig]==1.9.4` and
+installed workflow additionally uses `maturin==1.16.0 ziglang==0.17.1` and
 `--compatibility manylinux2014 --zig` for `ubuntu-24.04-arm`. This change reuses
 that mechanism. Explicit target objects add the missing per-architecture Rust
 target, manylinux level, macOS deployment target, unique artifact ID, and wheel
