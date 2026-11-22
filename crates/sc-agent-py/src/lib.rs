@@ -306,17 +306,22 @@ fn log(
             return Err(invalid("event must be an object"));
         }
         let event = serde_json::from_value(event).map_err(invalid)?;
-        let _ = logger.log(event);
+        logger.log(event).map_err(|e| error("log.write", e))?;
         Ok(Value::Null)
     })
 }
 #[pyfunction(signature=(logger=None))]
 fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
     match required(logger).and_then(|v| handle::<Logger>(v, c"sc_agent.Logger")) {
-        Ok(logger) => {
-            let _ = logger.flush();
-            raw(py, sc_agent::result(Ok(Value::Null)))
-        }
+        Ok(logger) => raw(
+            py,
+            sc_agent::result(
+                logger
+                    .flush()
+                    .map(|()| Value::Null)
+                    .map_err(|e| error("log.flush", e)),
+            ),
+        ),
         Err(error) => respond(py, None, "decidr", |_| Err(error)),
     }
 }

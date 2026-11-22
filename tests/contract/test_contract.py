@@ -141,6 +141,47 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertIn("controlled loader failure", error["message"])
         self.assertIn('"ok":true', error["message"])
 
+    def test_a_key_is_never_sent_to_a_plain_http_host_that_is_not_loopback(self):
+        # REQ-SAG-0013. The refusal comes before any connection or keyring lookup.
+        lookups = []
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            got = self.api.send(json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
+                                general_log=self.api.logger("decidr")["value"], base_url="http://192.0.2.1/v1", keyring_lookup=lookups.append)
+        error = self.error(got)
+        self.assertEqual(error["id"], "http.key_on_plain_http")
+        self.assertNotIn("contract-secret", json.dumps(got))
+        self.assertEqual(lookups, [])
+
+    def test_cancel_ends_a_send_whose_reply_has_not_arrived(self):
+        # REQ-SAG-0011: a send in flight is abandoned on cancel, not waited out to its timeout.
+        release, arrived = threading.Event(), threading.Event()
+        def respond(body):
+            arrived.set()
+            release.wait(10)
+            return 200, {}, ANSWER
+        cancel, results = self.api.Cancel(), []
+        with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            call = threading.Thread(target=lambda: results.append(self.api.send(
+                json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
+                general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel)))
+            call.start()
+            self.assertTrue(arrived.wait(10))
+            cancel.cancel()
+            call.join(5)
+            ended = not call.is_alive()
+            release.set()
+            call.join(10)
+        self.assertTrue(ended, "send waited for the reply after cancel")
+        self.assertEqual(self.error(results[0])["id"], "decision.cancelled")
+
+    def test_log_returns_an_event_the_logger_refuses(self):
+        # REQ-SAG-0002: the logger's refusal is returned, not reported as ok.
+        logger = self.api.logger("decidr")["value"]
+        error = self.error(self.api.log(logger, {"service": "not-decidr", "action": "contract"}))
+        self.assertEqual(error["id"], "log.write")
+        self.assertIn("service", error["message"])
+        self.assertTrue(self.api.log(logger, {"action": "contract"})["ok"])
+
     def test_oversized_requests_and_nonpositive_workers_are_typed_refusals(self):
         # REQ-SAG-0014/0702: typed refusals precede any HTTP or keyring access.
         calls = []

@@ -680,12 +680,25 @@ pub fn send(
                 .trim_end_matches('/'),
             provider.wire
         );
-        let host = url
+        let uri = url
             .parse::<ureq::http::Uri>()
-            .map_err(|e| error("http.network", e))?
+            .map_err(|e| error("http.network", e))?;
+        let host = uri
             .host()
             .ok_or_else(|| error("http.network", "endpoint has no host"))?
             .to_ascii_lowercase();
+        let loopback = host == "localhost"
+            || (host.trim_matches(['[', ']']).parse::<std::net::IpAddr>())
+                .is_ok_and(|ip| ip.is_loopback());
+        if !provider.key.is_empty() && uri.scheme_str() != Some("https") && !loopback {
+            return Err(error(
+                "http.key_on_plain_http",
+                format!(
+                    "{} is never sent to the plain-http host {host}",
+                    provider.key
+                ),
+            ));
+        }
         let pause = host_holdoff(&host)?;
         let key = if provider.key.is_empty() {
             String::new()
@@ -716,20 +729,37 @@ pub fn send(
                 post = post.header("Authorization", format!("Bearer {key}"));
             }
             sends = attempt;
-            let sent = post.send_json(&body);
-            let (status, delay, text) = match sent {
-                Ok(mut reply) => {
-                    let status = reply.status().as_u16();
+            // A send in flight cannot be aborted, so on cancel it is abandoned and the request ends now.
+            let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+            let sending = body.clone();
+            std::thread::spawn(move || {
+                let _ = sender.send(post.send_json(&sending).map(|mut reply| {
                     let delay = reply
                         .headers()
                         .get("Retry-After")
                         .and_then(|h| h.to_str().ok())
                         .and_then(|h| h.parse::<f64>().ok())
                         .and_then(|s| Duration::try_from_secs_f64(s).ok());
-                    let text = reply
-                        .body_mut()
-                        .read_to_string()
-                        .map_err(|e| error("decision.response_parse", e))?;
+                    (
+                        reply.status().as_u16(),
+                        delay,
+                        reply.body_mut().read_to_string(),
+                    )
+                }));
+            });
+            let sent = loop {
+                if cancel.is_cancelled() {
+                    return Err(error("decision.cancelled", "request cancelled"));
+                }
+                match receiver.recv_timeout(Duration::from_millis(20)) {
+                    Ok(sent) => break sent,
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(e) => return Err(error("http.network", e)),
+                }
+            };
+            let (status, delay, text) = match sent {
+                Ok((status, delay, text)) => {
+                    let text = text.map_err(|e| error("decision.response_parse", e))?;
                     (
                         status,
                         delay,
