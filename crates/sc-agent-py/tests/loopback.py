@@ -201,6 +201,51 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertEqual(later["error"].code, "CANCELED")
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
+    def test_wheel_keyboard_interrupt_reaches_each_consumer_cancel_handler(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = self.load_clients(root)[0]
+            with Runner(0) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
+                os.environ,
+                {
+                    "DECIDR_LOG_ROOT": str(root),
+                    "CONSUMER_TEST_LOG_ROOT": str(root),
+                },
+            ):
+                self.config(root, runner.address)
+                logger = sc_agent.logger("consumer-test")
+                self.assertTrue(logger["ok"], logger)
+                options = self.call_options(client, root, logger["value"])
+
+                for method, native_call in ((client.call_result, "send"),
+                                            (client.call_batch_results, "send_batch")):
+                    with self.subTest(native_call=native_call):
+                        cancel = sc_agent.Cancel()
+                        with patch.object(sc_agent, native_call, side_effect=KeyboardInterrupt):
+                            if native_call == "send":
+                                result = method(REQUEST, cancel=cancel, **options)
+                                self.assertFalse(result["ok"], result)
+                                self.assertEqual(result["error"].code, "CANCELED")
+                            else:
+                                result = method([REQUEST], cancel=cancel, **options)
+                                self.assertEqual(result, {"ok": True, "value": []})
+
+                        probe = sc_agent.send(
+                            REQUEST,
+                            model="laya",
+                            project="phase-i-loopback",
+                            agent_role=client.CLIENT_NAME,
+                            config_dir=str(root),
+                            general_log=logger["value"],
+                            timeout_secs=5,
+                            cancel=cancel,
+                        )
+                        self.assertFalse(probe["ok"], probe)
+                        self.assertEqual(probe["error"]["id"], "decision.cancelled")
+
+                self.assertEqual(runner.received, [], "KeyboardInterrupt handlers sent unexpected requests")
+                self.assertTrue(sc_agent.flush(logger["value"])["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()
