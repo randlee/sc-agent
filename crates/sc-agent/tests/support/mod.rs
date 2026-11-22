@@ -215,8 +215,10 @@ impl Drop for Stub {
         }
     }
 }
-pub fn keyring(_: &str) -> Result<String, String> {
-    Err("test must not access keyring".into())
+pub fn keyring(_: &str) -> Result<String, sc_agent::KeyringError> {
+    Err(sc_agent::KeyringError::Read(
+        "test must not access keyring".into(),
+    ))
 }
 pub fn no_wait(_: Duration) {}
 pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send + Sync>> {
