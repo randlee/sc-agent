@@ -209,7 +209,7 @@ mocks do not constitute the live release qualification required above.
 
 Existing `python_distributions[].wheels` runner strings retain their matrix and
 native maturin/setuptools behavior. The proven sc-compose ARM runner path uses
-`maturin[zig]==1.9.4` with `--compatibility manylinux2014 --zig`.
+`maturin==1.16.0 ziglang==0.17.1` with `--compatibility manylinux2014 --zig`.
 For explicit maturin platforms, each wheel may instead be an object:
 
 ```json
