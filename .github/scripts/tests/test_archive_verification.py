@@ -134,8 +134,9 @@ def test_declared_argv_is_executed_without_shell_expansion(tmp_path):
     assert json.loads(result.stdout) == [str(stage), "fixture", str(manifest), "literal; echo unsafe"]
 
 
-def test_windows_bash_uses_git_bash_for_nested_commands(tmp_path, monkeypatch):
-    git = tmp_path / "Git" / "cmd" / "git.exe"
+@pytest.mark.parametrize("git_dir", ["cmd", "ucrt64/bin"])
+def test_windows_bash_uses_git_bash_for_nested_commands(tmp_path, monkeypatch, git_dir):
+    git = tmp_path / "Git" / git_dir / "git.exe"
     bash = tmp_path / "Git" / "bin" / "bash.exe"
     git.parent.mkdir(parents=True); git.touch()
     bash.parent.mkdir(parents=True); bash.touch()

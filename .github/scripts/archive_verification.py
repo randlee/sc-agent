@@ -43,9 +43,11 @@ def verify(manifest_path, stage_dir, target):
         git = shutil.which("git")
         if git is None:
             raise ValueError("archive verification requires Git for Windows")
-        bash = Path(git).resolve().parent.parent / "bin" / "bash.exe"
-        if not bash.is_file():
-            raise ValueError(f"Git Bash not found at {bash}")
+        roots = Path(git).resolve().parents
+        bash = next((root / "bin" / "bash.exe" for root in roots[1:3]
+                     if (root / "bin" / "bash.exe").is_file()), None)
+        if bash is None:
+            raise ValueError(f"Git Bash not found for {git}")
         argv[0] = str(bash)
         env = {**os.environ, "SC_PUBLISH_GIT_BASH": str(bash),
                "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
