@@ -13,6 +13,7 @@ SOURCE = ROOT
 MANIFEST = SOURCE / "Cargo.toml"
 ALLOWED = set("ureq serde serde_json keyring dotenvy ulid sc-sha sc-config ctrlc sc-observability clap pyo3 thiserror tree-sitter tree-sitter-python tree-sitter-rust".split())
 PACKAGES = {"sc-agent", "decidr", "sc-agent-py", "sc-treesitter", "sitr"}
+COMMAND_TIMEOUT_SECONDS = 900
 failed = []
 
 
@@ -27,7 +28,11 @@ def check(name, failures):
 
 def run(name, command):
     print("+ " + " ".join(command), flush=True)
-    result = subprocess.run(command, cwd=ROOT, check=False)
+    try:
+        result = subprocess.run(command, cwd=ROOT, check=False, timeout=COMMAND_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        check(name, [f"timed out after {COMMAND_TIMEOUT_SECONDS} seconds"])
+        return False
     check(name, [] if result.returncode == 0 else [f"exit {result.returncode}"])
     return result.returncode == 0
 
@@ -137,7 +142,9 @@ with tempfile.TemporaryDirectory(prefix="sc-agent-rewrite-") as temporary:
             check("wheel install", [f"expected one wheel, found {len(wheels)}"])
     if installed and cli_ready:
         run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "tests/contract", "-v"])
+        run("rendered wheel loopback contracts", [sys.executable, "crates/sc-agent-py/tests/loopback.py"])
     else:
         check("wheel and CLI contracts", ["not run: current binaries and wheel must build first"])
+        check("rendered wheel loopback contracts", ["not run: current wheel must build first"])
 print("FAILED: " + ", ".join(failed) if failed else "All rewrite gates passed", flush=True)
 sys.exit(bool(failed))

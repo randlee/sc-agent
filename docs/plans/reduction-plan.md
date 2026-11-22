@@ -4,7 +4,7 @@ Owner: Rand Lee. 2026-11-19.
 
 ## Goal
 
-sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of Rust in total (failing above 2,200) across every `.rs` file in the repository, tests, examples and scripts included**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
+sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2` at `0780e60^`: `call_jev`, `http_error`, `run_batch_job`, `stream_batch`/`pump_batch`, the key lookup, the run log) with one Rust core that every tool shares, plus sitr. Today it is about 33,000 lines of Rust source and 23,000 lines of tests in 17 crates. Target: code comparable to the 300 lines of Python plus the model catalog, no unnecessary wrapping, no exceptions thrown. Budget: **about 2,000 lines of non-test Rust source, with a hard limit of 2,200 lines across `.rs` files as counted by `scripts/gate/rewrite.py`; Rust test lines are excluded**. Until the old crates are deleted, the gate counts only the new crates; after deletion it counts the whole repository.
 
 **Wheel.** One Python wheel (`sc-decidr`) holding the decidr and sitr APIs. `logger(name)` returns its Rust Logger, which every decidr and sitr call accepts directly; no callable bridge. The `sitr` and `decidr` CLIs each use their own Logger.
 
@@ -43,7 +43,7 @@ Nothing not in these three is built.
 - **Retry.** Busy (429/502/529) and network errors are resent up to a fixed count, waiting `Retry-After` when given, else a fixed delay; quota-exhausted bodies are not resent. The wait goes through an injected sleep function so tests never sleep.
 - **Keys.** Environment variable, then repo-root `.env` (via `dotenvy`, never written to the process environment), then the OS keyring (via `keyring`, read on a thread with a 15 s `recv_timeout` because keyring has no timeout). The key is a plain `String` that is never put into an error, a log record or a Debug output (a contract test checks the key text appears nowhere).
 - **Config.** sc-config's `layers` module (sc-runtime PR #153), used as a git dependency on `feature/sc-config-layers` until it is released, then the crates.io version; no local copy. sc-agent supplies its files (local then global `decidr.json`, `sc-agent.json`), the `DECIDR` env prefix, `--project`, and its keys. Settings: `project`, `workers`, Laya `host`/`port`/`model`. `decidr doctor` prints setting, value and source from `layers::resolved`.
-- **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; general-log failure not handled.
+- **Logging (ADR-SAG-0021 0.3.0).** One sc-observability `Logger` per process, owned by the entry point; injected into every call; default Logger writes `~/.sc-agent/logs/<name>.log.jsonl`; session rows to `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`; `<CLI>_LOG_ROOT` test override; errors logged once with the same ids everywhere; failed `log.write` and `log.flush` calls return the Logger's failure as an error value, and nothing else handles it.
 - **Errors.** One error enum for the core with stable ids and an action string, logged and returned the same way from the CLI (non-zero exit plus the JSON error) and the wheel (a returned error value, never a raised exception).
 - **Products.** `decidr` CLI (`send`, `models` = print the tables, `doctor` = setting/value/source), `sitr` CLI (its existing commands), and one `sc-decidr` wheel (decidr API, sitr API, `logger(name)` returning the Rust Logger both accept). No `sc-observability` Python dependency, no callable bridge, no forwarding to Python `logging`.
 - **Generated client.** The sc-compose template: obtains one Logger by client name, injects it into every call, hardcodes `agent_role`.
@@ -59,11 +59,11 @@ Nothing not in these three is built.
 
 ## Not built
 
-Image parts, the long-context header, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, logging-failure error types, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge.
+Image parts, the long-context header, keyring location overrides, `VarName` key indirection, a layered config loader of our own (sc-config is used), logger wrappers, lost-row accounting, forwarding to Python `logging`, the `Transport` trait and its test doubles, wrapper request/response types, the `Clock` trait (an injected sleep function replaces it), a separate sitr wheel, a callable logger bridge. Failed `log.write` and `log.flush` calls return the Logger's failure as an error value; nothing else handles it.
 
 ## Layout
 
-| Crate | Contents | Guide budget (Rust lines after `cargo fmt`, tests included; the hard limit is the 2,200 total) |
+| Crate | Contents | Guide budget (non-test Rust lines; these per-crate figures are guides, and the hard total limit is 2,200 lines as counted by `scripts/gate/rewrite.py`) |
 |---|---|---|
 | `sc-agent` | provider tables (model catalog), send/send_batch, retry, keys, config, errors, logging paths, session rows | 700 |
 | `decidr` | CLI | 150 |
@@ -87,7 +87,7 @@ The gate script and the budgets live in a path only the owner changes.
 ```
 SIZE TRIP
 
-Trigger. At a sprint's QA review, total Rust source is over 2,500 lines, or tests are larger than source. Checked once per sprint, not per commit.
+Trigger. At a sprint's QA review, non-test Rust source is over 2,500 lines. Rust test lines are excluded. Checked once per sprint, not per commit.
 
 Effect. The sprint stops. The dev changes nothing in response to the trip: no compressing code, no deleting tests, no moving code elsewhere.
 
