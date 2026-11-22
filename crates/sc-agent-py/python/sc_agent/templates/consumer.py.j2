@@ -178,7 +178,9 @@ def _load_wheel():
     try:
         import sc_agent
     except ImportError as exc:
-        return _failure("DEPENDENCY.SC_DECIDR", str(exc))
+        failed = _failure("DEPENDENCY.SC_DECIDR", str(exc))
+        failed["error"]["action"] = "Install sc-decidr in the active Python environment."
+        return failed
     return {"ok": True, "value": sc_agent}
 
 
@@ -202,7 +204,8 @@ def _result_category(value: dict) -> Optional[str]:
 def wheel_error(detail: dict, *, category_codes=None) -> ClientError:
     category = detail.get("category", "other")
     codes = {**DECIDR_CATEGORY_CODES, **(category_codes or {})}
-    return ClientError(codes.get("context_exceeded" if detail.get("id") == "decision.context_exceeded" else category, codes["other"]), detail.get("message", "invalid result"),
+    code = detail.get("id") if detail.get("id") in {"DEPENDENCY.SC_DECIDR", "DECIDR.INVALID_OPTION"} else codes.get("context_exceeded" if detail.get("id") == "decision.context_exceeded" else category, codes["other"])
+    return ClientError(code, detail.get("message", "invalid result"),
                        category in {"busy", "network"}, detail.get("action"),
                        **error_metadata(detail), data=dict(detail))
 
@@ -300,7 +303,9 @@ def call_batch_results(
     if not loaded["ok"]:
         return decode_result(loaded, category_codes=category_codes)
     sc_agent = loaded["value"]
+    completed = []
     def handle(index: int, line: dict) -> None:
+        completed.append(dict(line, index=index))
         _cancel_if_selected(_result_category(line), abort_on, cancel)
         if on_result is not None:
             on_result(decode_result(dict(line, index=index), category_codes=category_codes))
@@ -324,7 +329,7 @@ def call_batch_results(
         lines = [dict(item["result"], index=item["index"]) for item in batch["value"]] if batch["ok"] else [batch for _ in requests]
     except KeyboardInterrupt:
         cancel.cancel()
-        lines = [_failure("decision.cancelled", "interrupted", "cancelled") for _ in requests]
+        lines = completed
     # The wheel returns input order; callbacks above retain finish order.
     return dict(ok=True, value=[decode_result(line, category_codes=category_codes) for line in lines])
 
