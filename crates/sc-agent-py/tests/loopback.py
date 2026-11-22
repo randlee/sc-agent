@@ -9,6 +9,7 @@ import tempfile
 import threading
 import types
 import unittest
+from contextlib import nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
@@ -84,6 +85,11 @@ def allow_local_runner(client_name, repository_root):
     return patch.dict(sys.modules, {module_name: settings})
 
 
+class UnexpectedSitrAccess:
+    def __getattr__(self, name):
+        raise AssertionError(f"sitr=false called sc_agent.sitr.{name}")
+
+
 class RenderedWheelLoopback(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -117,13 +123,15 @@ class RenderedWheelLoopback(unittest.TestCase):
             for client in clients:
                 with self.subTest(client=client.CLIENT_NAME), tempfile.TemporaryDirectory() as work:
                     root = Path(work)
+                    sitr_guard = (patch.object(sc_agent, "sitr", UnexpectedSitrAccess())
+                                  if client.CLIENT_NAME == "plan-anchor" else nullcontext())
                     with Runner(2) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
                         os.environ,
                         {
                             "DECIDR_LOG_ROOT": str(root),
                             "CONSUMER_TEST_LOG_ROOT": str(root),
                         },
-                    ):
+                    ), sitr_guard:
                         self.config(root, runner.address)
                         logger = sc_agent.logger("consumer-test")
                         self.assertTrue(logger["ok"], logger)
@@ -159,6 +167,49 @@ class RenderedWheelLoopback(unittest.TestCase):
                     log = (root / "logs" / "consumer-test.log.jsonl").read_text()
                     self.assertIn("decision.result", log)
                     self.assertIn("http.auth", log)
+
+    def test_sitr_extract_reaches_offline_request_prompt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = self.load_clients(root)[1]
+            self.assertTrue(callable(getattr(client, "extract", None)))
+            source_path = Path(__file__).resolve()
+            source = source_path.read_text()
+            with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
+                os.environ,
+                {
+                    "DECIDR_LOG_ROOT": str(root),
+                    "CONSUMER_TEST_LOG_ROOT": str(root),
+                },
+            ):
+                self.config(root, runner.address)
+                logger = sc_agent.logger("consumer-test")
+                self.assertTrue(logger["ok"], logger)
+                extracted = client.extract(
+                    "python",
+                    source,
+                    "(function_definition name: (identifier) @name)",
+                    general_log=logger["value"],
+                )
+                self.assertTrue(extracted["ok"], extracted)
+                names = [capture["text"] for capture in extracted["value"]]
+                self.assertIn("allow_local_runner", names)
+                prompt = "Extracted functions: " + ", ".join(names)
+                request = {
+                    "state": "offline-dry-run",
+                    "questions": {
+                        "q": {"type": "noul", "instructions": prompt, "criteria": ["score"]},
+                    },
+                }
+                # The local runner is the dry-run decision endpoint; no remote provider is contacted.
+                result = client.call_result(request, **self.call_options(client, root, logger["value"]))
+                self.assertTrue(result["ok"], result)
+                self.assertEqual(
+                    runner.received,
+                    [("/v1/systemone", {**request, "model": "loopback"})],
+                    "extracted sitr text did not reach the offline prompt",
+                )
+                self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
     def test_keyboard_interrupt_cancels_the_passed_cancel(self):
         with tempfile.TemporaryDirectory() as temporary:
