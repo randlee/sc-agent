@@ -1,0 +1,18 @@
+[package]
+name = "sc-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sc-observability.workspace = true
+ureq = { version = "3.5", features = ["json"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "vendored"] }
+dotenvy = "0.15"
+ulid = "1"
+thiserror = "2"
+sc-sha = "=1.9.0"
+sc-config = { git = "https://github.com/randlee/sc-runtime", tag = "sc-config-pin-0.3" }
+[lints]
+workspace = true

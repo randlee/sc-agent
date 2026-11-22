@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.9.0  
+**Version:** 0.10.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and the one error enum.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`.
 
 **Requirements:**
 
@@ -63,7 +63,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    | --- | --- | --- |
    | Model and provider | `model=` takes a short name or a full model id. With `provider=None` the first provider table, in list order, that has the name is used; among rows that share a short name the most recent wins. | Pass the selector unchanged. Never set `provider`. |
    | API keys | The environment, then the repo-root `.env`, then the OS keyring. | Nothing. |
-   | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. The session logger may be injected (REQ-SAG-0008); with none injected, sessions go to the default location (ADR-SAG-0021). |
+   | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. Sessions are appended to the default session files (REQ-SAG-0008, ADR-SAG-0021); no session Logger is injected. |
    | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
    | Errors | The returned error value: `id`, `message`, `action`, a stored `category` and the send count (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
    | Limits | `timeout_secs`, `workers`, a fixed resend count and cancellation (decision 7). | Pass its own flags through. |
@@ -72,7 +72,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
    - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
-   - Its feature variables are `models` and `sitr` (`true` or `false`). Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
+   - Its variables are `client_name`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are call arguments. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
@@ -80,7 +80,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
 2. **Typed fields: `attempts` and `category`.**
 
-   There is one error enum. Its error value carries `id`, `message` and `action`, and two optional fields. Unset is not written.
+   An error value carries at least `id`, `message` and `action`, and the typed fields below when they apply. It may carry more fields. Unset is not written.
 
    | Field | Meaning |
    | --- | --- |
@@ -208,7 +208,7 @@ The work lands on one branch, `rewrite/v1`, and merges into `develop` in one PR.
 Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
-- The consumer template and the `sc_agent.pyi` stub.
+- The consumer template and the `sc_agent/__init__.pyi` stub.
 - `floors.toml`.
 - The sc-decidr wheel, holding the decidr and sitr APIs, released to PyPI.
 

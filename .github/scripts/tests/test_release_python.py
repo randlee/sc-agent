@@ -62,7 +62,10 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     assert '--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig' in declared["run"]
     assert '--target "$WHEEL_TARGET"' in declared["run"]
     assert declared["env"]["MACOSX_DEPLOYMENT_TARGET"] == "${{ matrix.deployment_target }}"
-    assert 'maturin[zig]==1.9.4' in (root / "actions/setup-python-release-build/action.yml").read_text()
+    setup = yaml.safe_load((root / "actions/setup-python-release-build/action.yml").read_text())
+    installs = {step["name"]: step["run"] for step in setup["runs"]["steps"] if step.get("name", "").startswith("Install maturin")}
+    assert installs["Install maturin with Zig support"] == "python -m pip install maturin==1.16.0 ziglang==0.17.1"
+    assert installs["Install maturin"] == "python -m pip install maturin==1.9.4"
     assert "has_release_binaries" in release["jobs"]["build"]["if"]
     github_release = release["jobs"]["release"]
     assert {"build-python-wheels", "build-python-sdists", "build-npm"} <= set(github_release["needs"])
@@ -199,3 +202,28 @@ def test_existing_forms_unchanged_by_windows_arm64_support():
     assert [item["platform"] for item in wheel_targets(distribution)] == ["", "manylinux_2_28_x86_64", "win_amd64"]
     with pytest.raises(ValueError, match="unsupported explicit wheel target"):
         wheel_targets({"wheels": [{**TARGETS[4], "target": "aarch64-pc-windows-gnullvm"}]})
+
+
+@pytest.mark.parametrize("policy,platform", [("2_34", "manylinux_2_34_x86_64"),
+    ("2_39", "manylinux_2_39_x86_64"), ("2_17", "manylinux_2_17_x86_64.manylinux2014_x86_64")])
+def test_explicit_declared_linux_policies_preserve_exact_asset_platform(policy, platform):
+    row = {**TARGETS[0], "manylinux": policy, "platform": platform}
+    distribution = {"wheels": [row]}
+    assert wheel_targets(distribution, continuity=True)[0]["platform"] == platform
+    verify_platforms(distribution, [Path("example-1.2.3-cp39-abi3-" + platform + ".whl")], continuity=True)
+    with pytest.raises(ValueError):
+        verify_platforms(distribution, [Path("example-1.2.3-cp39-abi3-manylinux_2_28_x86_64.whl")], continuity=True)
+
+
+def test_compound_wheel_platform_cannot_silently_replace_a_single_declared_tag():
+    with pytest.raises(ValueError):
+        verify_platforms({"wheels": [TARGETS[0]]},
+                        [Path("example-1.2.3-cp39-abi3-manylinux_2_28_x86_64.linux_x86_64.whl")], continuity=True)
+
+
+
+def test_nonadopter_preserves_old_linux_policy_and_compound_subset_matching():
+    distribution = {"wheels": [TARGETS[0]]}
+    verify_platforms(distribution, [Path("example-1.2.3-cp39-abi3-manylinux_2_28_x86_64.linux_x86_64.whl")])
+    with pytest.raises(ValueError, match="manylinux=2_28"):
+        wheel_targets({"wheels": [{**TARGETS[0], "manylinux": "2_34", "platform": "manylinux_2_34_x86_64"}]})

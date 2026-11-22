@@ -63,7 +63,7 @@ runs:
     - name: Install maturin with Zig support
       if: ${{ inputs.build_system == 'maturin' && inputs.install_maturin_zig == 'true' }}
       shell: bash
-      run: python -m pip install 'maturin[zig]==1.9.4'
+      run: python -m pip install maturin==1.16.0 ziglang==0.17.1
     - name: Sync Python package version
       shell: bash
       run: |

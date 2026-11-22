@@ -1,83 +1,62 @@
-//! Load tree-sitter grammars and run any query against them.
-//!
-//! [`run_query`] runs one caller-written query against one source with any loaded grammar
-//! ([`languages`], named by a checked [`LanguageId`]) and returns its captures sorted by (start byte, name, end byte). The crate
-//! also ships predefined queries ([`queries`], [`query_source`]), a size-limited file reader
-//! ([`read_source`]) and a JSON encoder ([`to_json_bytes`]).
-//!
-//! The library is stand-alone: synchronous, no threads, no logging, and no sc-agent
-//! dependency. Feature `python` adds the PyO3 support types (module [`python`]) used by the
-//! `sc-treesitter-py` extension crate. The `sitr` CLI is the separate **`sitr`** crate.
-//!
-//! # Examples
-//!
-//! ```
-//! # #[cfg(feature = "grammar-python")] {
-//! let python = sc_treesitter::LanguageId::new("python")?;
-//! let captures = sc_treesitter::run_query(
-//!     python,
-//!     "(identifier) @name",
-//!     b"answer = 42\n",
-//!     None,
-//!     None,
-//! )?;
-//! let json = sc_treesitter::to_json_bytes(&captures)?;
-//! assert!(json.ends_with(b"\n"));
-//! # }
-//! # Ok::<(), sc_treesitter::Error>(())
-//! ```
-#![warn(missing_docs)]
-// PyO3's macro expansions carry `#[allow(unsafe_code)]`, which `forbid` would reject.
-#![cfg_attr(not(feature = "python"), forbid(unsafe_code))]
+use serde_json::{Value, json};
+use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
-mod error;
-mod grammar;
-#[cfg(feature = "python")]
-pub mod python;
-mod query;
-mod run;
-mod source;
-
-#[doc(inline)]
-pub use error::{Error, Limit};
-#[doc(inline)]
-pub use grammar::{LanguageId, languages};
-#[doc(inline)]
-pub use query::{QueryInfo, queries, query_source};
-#[doc(inline)]
-pub use run::{Capture, MATCH_LIMIT, MAX_CAPTURE_TEXT_BYTES, MAX_CAPTURES, run_query};
-#[doc(inline)]
-pub use source::{MAX_SOURCE_BYTES, read_source};
-
-/// Serializes `value` as pretty JSON plus a trailing newline.
-///
-/// # Errors
-///
-/// [`Error::Encode`] when `serde_json` cannot encode `value`.
-pub fn to_json_bytes<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
-    let mut bytes = serde_json::to_vec_pretty(value).map_err(|error| Error::Encode {
-        detail: error.to_string(),
-    })?;
-    bytes.push(b'\n');
-    Ok(bytes)
+use sc_agent::error;
+pub fn languages() -> Value {
+    json!(["python", "rust"])
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// AC: REQ-SAG-0002 errors.
-    #[test]
-    fn to_json_bytes_is_pretty_with_a_trailing_newline() {
-        let bytes = to_json_bytes(&["a", "b"]).expect("encode");
-        assert_eq!(bytes, b"[\n  \"a\",\n  \"b\"\n]\n");
+pub fn language(name: &str) -> Result<Language, sc_agent::Error> {
+    match name {
+        "python" => Ok(tree_sitter_python::LANGUAGE.into()),
+        "rust" => Ok(tree_sitter_rust::LANGUAGE.into()),
+        _ => Err(error(
+            "treesitter.unknown_language",
+            format!("unknown language {name:?}; use sitr languages"),
+        )),
     }
-
-    #[test]
-    fn encode_failure_is_typed() {
-        // serde_json refuses maps whose keys are not strings.
-        let map = std::collections::BTreeMap::from([((1, 2), 3)]);
-        let error = to_json_bytes(&map).expect_err("non-string key");
-        assert_eq!(error.id(), "treesitter.encode");
+}
+pub fn queries(name: &str) -> Result<Value, sc_agent::Error> {
+    language(name)?;
+    Ok(if name == "rust" {
+        json!(["match-arms"])
+    } else {
+        json!(["branches"])
+    })
+}
+pub fn query(language: &Language, source: &str, query: &str) -> Result<Value, sc_agent::Error> {
+    let query = Query::new(language, query).map_err(|e| error("treesitter.query_compile", e))?;
+    let mut parser = Parser::new();
+    parser
+        .set_language(language)
+        .map_err(|e| error("treesitter.parse", e))?;
+    let tree = parser
+        .parse(source, None)
+        .ok_or_else(|| error("treesitter.parse", "tree-sitter parse failed"))?;
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut captures = Vec::new();
+    while let Some(matched) = matches.next() {
+        for capture in matched.captures() {
+            let name = query
+                .capture_names()
+                .get(capture.index as usize)
+                .ok_or_else(|| error("treesitter.capture", "capture name absent"))?;
+            let node = capture.node;
+            captures.push(json!({"name":name,"text":node.utf8_text(source.as_bytes()).map_err(|e|error("treesitter.capture",e))?,"start_byte":node.start_byte(),"end_byte":node.end_byte(),"start_line":node.start_position().row+1,"end_line":node.end_position().row+1}));
+        }
     }
+    Ok(json!(captures))
+}
+pub fn predefined(language_name: &str, name: &str, source: &str) -> Result<Value, sc_agent::Error> {
+    let text = match (language_name, name) {
+        ("rust", "match-arms") => "(match_arm pattern: (_) @arm)",
+        ("python", "branches") => "(case_clause (case_pattern) @arm)",
+        _ => {
+            return Err(error(
+                "treesitter.unknown_query",
+                format!("unknown query {name:?}; use sitr queries"),
+            ));
+        }
+    };
+    query(&language(language_name)?, source, text)
 }

@@ -1,16 +1,16 @@
 # Requirement: The generated client owns its Logger
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0022: The generated client owns its Logger
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
@@ -22,11 +22,11 @@ Definitions: The generated client is the Python module a consumer renders from t
 - The generated client MUST inject the client Logger as the general logger into every wheel call.
 - With nothing injected by the app, the client Logger MUST write to `~/.sc-agent/logs/<client name>.log.jsonl`.
 - The generated client MUST accept an app's Logger in place of the client Logger and inject it into every wheel call.
-- The generated client MUST leave the session logger optional; with none injected, sessions MUST go to the default session log (REQ-SAG-0005).
+- Sessions MUST go to the default session files (REQ-SAG-0005); the generated client does not inject a session Logger.
 
 **MUST NOT statements:**
 
-- The generated client MUST NOT have a log-root variable.
+- The generated client MUST NOT have a log-root setting or argument. `<CLIENT>_LOG_ROOT`, with the client name uppercased and hyphens replaced by underscores, is the test environment override for both its general log and session rows; empty or absent uses `~/.sc-agent/`.
 - The generated client MUST NOT make a wheel call without a general logger.
 
 ### Rationale

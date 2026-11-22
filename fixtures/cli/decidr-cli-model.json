@@ -1,7 +1,7 @@
 {
   "name": "decidr",
-  "version": "0.2.8",
-  "description": "Send TypeSafe (Jev) decision requests.",
+  "version": "0.3.0",
+  "description": "",
   "long_description": "",
   "epilogue": "",
   "usage": "Usage: decidr [OPTIONS] <COMMAND>",
@@ -10,9 +10,22 @@
       "name": "config_dir",
       "long": "--config-dir",
       "short": null,
-      "help": "Configuration directory holding default.json (and local.json); default ~/.sc-agent. Logs go to the configured log_root, else ~/.sc-agent",
+      "help": "",
       "long_help": "",
-      "value_name": "PATH",
+      "value_name": "CONFIG_DIR",
+      "required": false,
+      "default_value": null,
+      "choices": [],
+      "min_values": null,
+      "max_values": null
+    },
+    {
+      "name": "project",
+      "long": "--project",
+      "short": null,
+      "help": "Project/phase for session records",
+      "long_help": "",
+      "value_name": "PROJECT",
       "required": false,
       "default_value": null,
       "choices": [],
@@ -25,7 +38,7 @@
     {
       "name": "doctor",
       "version": null,
-      "description": "List detected keys in use order; warn about provider models missing from the catalog and config models tying a built-in",
+      "description": "",
       "long_description": "",
       "epilogue": "",
       "usage": "Usage: decidr doctor",
@@ -36,43 +49,29 @@
     {
       "name": "models",
       "version": null,
-      "description": "Print the TypeSafe models list (GET /v1/models) of TypeSafe or of a configured local runner",
+      "description": "",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: decidr models [OPTIONS]",
-      "options": [
-        {
-          "name": "runner",
-          "long": "--runner",
-          "short": null,
-          "help": "A configured local runner; TypeSafe when absent",
-          "long_help": "",
-          "value_name": "NAME",
-          "required": false,
-          "default_value": null,
-          "choices": [],
-          "min_values": null,
-          "max_values": null
-        }
-      ],
+      "usage": "Usage: decidr models",
+      "options": [],
       "arguments": [],
       "subcommands": []
     },
     {
       "name": "send",
       "version": null,
-      "description": "Send one request (JSON) or a batch (JSONL, --batch) through the Decision trait",
+      "description": "",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: decidr send [OPTIONS] --model <NAME> --project <SLUG> --agent-role <SLUG> [FILE|-]",
+      "usage": "Usage: decidr send [OPTIONS] --agent-role <AGENT_ROLE>",
       "options": [
         {
           "name": "agent_role",
           "long": "--agent-role",
           "short": null,
-          "help": "Agent-role slug for the session rows (e.g. plan-anchor, judge-jev, sanity)",
+          "help": "",
           "long_help": "",
-          "value_name": "SLUG",
+          "value_name": "AGENT_ROLE",
           "required": true,
           "default_value": null,
           "choices": [],
@@ -83,7 +82,7 @@
           "name": "batch",
           "long": "--batch",
           "short": null,
-          "help": "Input is JSONL: one request per line (a bare Jev request or {\"request\", \"images\", \"long_context\"})",
+          "help": "",
           "long_help": "",
           "value_name": "BATCH",
           "required": false,
@@ -96,31 +95,15 @@
           "max_values": null
         },
         {
-          "name": "images",
-          "long": "--image",
+          "name": "input",
+          "long": "--input",
           "short": null,
-          "help": "Image part NAME read from FILE (png, jpg, jpeg); repeatable; single-request mode only",
+          "help": "",
           "long_help": "",
-          "value_name": "NAME=FILE",
+          "value_name": "INPUT",
           "required": false,
           "default_value": null,
           "choices": [],
-          "min_values": null,
-          "max_values": null
-        },
-        {
-          "name": "long_context",
-          "long": "--long-context",
-          "short": null,
-          "help": "Send TypeSafe-Danger-Zone-Long-Context: true; single-request mode only",
-          "long_help": "",
-          "value_name": "LONG_CONTEXT",
-          "required": false,
-          "default_value": null,
-          "choices": [
-            "true",
-            "false"
-          ],
           "min_values": null,
           "max_values": null
         },
@@ -128,24 +111,11 @@
           "name": "model",
           "long": "--model",
           "short": null,
-          "help": "Short name (jev, haiku, luna, ...), a model id, or a configured local runner name",
+          "help": "",
           "long_help": "",
-          "value_name": "NAME",
-          "required": true,
-          "default_value": null,
-          "choices": [],
-          "min_values": null,
-          "max_values": null
-        },
-        {
-          "name": "project",
-          "long": "--project",
-          "short": null,
-          "help": "Project slug for the session rows",
-          "long_help": "",
-          "value_name": "SLUG",
-          "required": true,
-          "default_value": null,
+          "value_name": "MODEL",
+          "required": false,
+          "default_value": "jev",
           "choices": [],
           "min_values": null,
           "max_values": null
@@ -154,7 +124,7 @@
           "name": "provider",
           "long": "--provider",
           "short": null,
-          "help": "Optional override (typesafe, anthropic, openai, openrouter, nous, together). Absent: chosen by ranking among detected keys (REQ-SAG-0103).",
+          "help": "",
           "long_help": "",
           "value_name": "PROVIDER",
           "required": false,
@@ -167,11 +137,11 @@
           "name": "timeout_secs",
           "long": "--timeout-secs",
           "short": null,
-          "help": "Per-request timeout in seconds (10..=3600)",
+          "help": "",
           "long_help": "",
           "value_name": "TIMEOUT_SECS",
           "required": false,
-          "default_value": null,
+          "default_value": "120",
           "choices": [],
           "min_values": null,
           "max_values": null
@@ -180,7 +150,7 @@
           "name": "workers",
           "long": "--workers",
           "short": null,
-          "help": "Batch worker count; decidr validates it against the supported range",
+          "help": "",
           "long_help": "",
           "value_name": "WORKERS",
           "required": false,
@@ -190,15 +160,7 @@
           "max_values": null
         }
       ],
-      "arguments": [
-        {
-          "name": "input",
-          "help": "Request file, or - for stdin",
-          "required": false,
-          "default_value": "-",
-          "choices": []
-        }
-      ],
+      "arguments": [],
       "subcommands": []
     }
   ]

@@ -1,7 +1,7 @@
 # Decision: Crate layering and error values
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -31,7 +31,7 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Every call returns a Result; the error is the one core error enum, with an id, a message and an action, and a layer that changes an error keeps the lower error's id and message (REQ-SAG-0002).
+There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
 
 **Key Principles:**
 
@@ -40,9 +40,11 @@ There are five crates. `sc-agent` is the bottom layer: the provider tables, `sen
 
 ### Rationale
 
-One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them. Errors that keep their id and message carry each failure's meaning upward.
+One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling (2026-11-21), Rand Lee: "Errors are discriminated unions Result<t,e> I don't care about per crate"; "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
 
 ### Consequences
 
@@ -75,21 +77,3 @@ Split types, configuration, secrets, logging, HTTP, schema, each backend and the
 **Why Rejected:**
 
 The reduction plan replaces it with one core crate written fresh to the spec.
-
-#### Alternative 2: One error type per crate
-
-**Description:**
-
-Each crate returns its own error enum, wrapping the errors of the crates below it.
-
-**Pros:**
-
-- A crate carries only its own error ids.
-
-**Cons:**
-
-- Wrapper variants and copy-up code in every crate.
-
-**Why Rejected:**
-
-The reduction plan has one error enum for the core, logged and returned the same way from the CLI and the wheel.

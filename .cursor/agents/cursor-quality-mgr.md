@@ -556,6 +556,13 @@ Mirror `.claude/skills/quality-management-gh/SKILL.md`:
    spawn gate; publish `findings-report.md.j2` with `reviewer_spawn_gate: fail`
    and explicit list of reviewers the parent must spawn.
 7. Aggregate reviewer findings and deliverable % from handoff fenced JSON only.
+   After primary reviewers return, the parent must run `blastr` on every
+   blocking and important finding in every QA round, including fix rounds, and
+   provide its results for the posted PR report. Include each finding's fix
+   size, net lines and verdict (`fix-as-prescribed`, `fix-smaller`, or
+   `escalate-record-change`), plus record, clause and loss for escalations.
+   Blastr recommends only: never gate, drop or downgrade a finding on its
+   output. If its result is unavailable, report that without fabricating it.
 8. For implementation sprint-end or integration review, run the TODO scan from
    `.claude/skills/todo-triage/SKILL.md` **after** spawn gate passes and reviewer
    JSON is parsed; **union** TODO-scan findings with reviewer findings for open

@@ -1,5 +1,9 @@
 # sc-publish Publish Kit
 
+Optional [publication continuity](docs/publication-continuity.md) checks block
+preflight and release when a previously published item would disappear without
+a reviewed, user-approved deprecation in the manifest.
+
 sc-publish is a vendorable release/publish kit: standardized publisher agents
 plus standardized per-channel GitHub workflows, all driven by one
 repository-specific release manifest. Every kit file is installed
@@ -205,7 +209,7 @@ mocks do not constitute the live release qualification required above.
 
 Existing `python_distributions[].wheels` runner strings retain their matrix and
 native maturin/setuptools behavior. The proven sc-compose ARM runner path uses
-`maturin[zig]==1.9.4` with `--compatibility manylinux2014 --zig`.
+`maturin==1.16.0 ziglang==0.17.1` with `--compatibility manylinux2014 --zig`.
 For explicit maturin platforms, each wheel may instead be an object:
 
 ```json
@@ -339,3 +343,12 @@ Rollout checklist, per consumer (not performed by this change):
   Require a successful immutability check, not merely an admin's earlier result.
 - Review the consumer PR before adoption. Publication is a separate authorization;
   verify final `immutable:true` before authorizing post-release channels.
+
+See [native Go module artifacts](docs/go-modules.md) for optional module bundles,
+native qualification, immutable submodule tags and proxy verification.
+
+See [RC Python compatibility](docs/rc-python-compatibility.md) for an optional
+once-per-candidate interpreter matrix and its required publication evidence.
+
+See [staged archive verification](docs/archive-verification.md) for optional
+consumer checks on each staged release and prerelease CLI archive.

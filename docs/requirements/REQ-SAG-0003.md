@@ -1,16 +1,16 @@
 # Requirement: Log locations and retention
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.6.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0003: Log locations and retention
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
