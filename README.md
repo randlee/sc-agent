@@ -4,6 +4,37 @@ sc-agent provides one synchronous Rust core for decision requests, provider sele
 
 It ships the `decidr` and `sitr` CLIs and one Python wheel, `sc-decidr` (`import sc_agent`, including `sc_agent.sitr`).
 
+## Install
+
+For Python 3.11 or newer, install the wheel containing both the decision and syntax-query APIs:
+
+```bash
+pip install sc-decidr
+```
+
+Import them with `import sc_agent` and `import sc_agent.sitr`. Building from the source distribution requires Rust and Git access to the sc-config dependency; see the [source-build dependency note](docs/integration/prerelease.md#sc-config-dependency).
+
+Install the `decidr` and `sitr` binaries from a matching platform archive on [GitHub Releases](https://github.com/randlee/sc-agent/releases), or use a package manager:
+
+| Channel | Install command |
+|---|---|
+| Homebrew | `brew install randlee/tap/decidr` |
+| Scoop | `scoop bucket add randlee https://github.com/randlee/scoop-bucket`, then `scoop install randlee/decidr` |
+| WinGet | `winget install --id randlee.decidr --exact` |
+
+Each binary package includes both CLIs. Channel names are declared in [the release manifest](release/publish-artifacts.toml).
+
+### Migrating from the separate sitr wheel
+
+PyPI `sitr` 0.2.9 was the last separate sitr wheel. Replace it with the combined wheel:
+
+```bash
+pip uninstall sitr
+pip install sc-decidr
+```
+
+Use `import sc_agent.sitr` for Python queries. Install the `sitr` CLI from the binary release archives or package managers above.
+
 ## The CLIs
 
 ```bash
