@@ -94,6 +94,26 @@ class Wheel(Isolated):
             self.assertIsInstance(value["error"][field], str)
         return value["error"]
 
+    def test_bad_call_signatures_return_errors(self):
+        functions = [self.api.logger, self.api.log, self.api.flush, self.api.digest,
+                     self.api.send, self.api.send_batch, self.api.sitr.languages,
+                     self.api.sitr.queries, self.api.sitr.query, self.api.sitr.run,
+                     self.api.Cancel, self.api.Cancel().cancel]
+        for function in functions:
+            for args, kwargs in [((), {"bogus": 1}), ((None,) * 20, {})]:
+                with self.subTest(function=function.__name__, args=args, kwargs=kwargs):
+                    self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_call")
+        for function, args, kwargs in [
+            (self.api.send, ({},), {"bogus": 1}),
+            (self.api.send_batch, ([],), {"bogus": 1}),
+            (self.api.log, (None, {}, None), {}),
+            (self.api.sitr.languages, (1,), {}),
+            (self.api.logger, ("a", "b"), {}),
+            (self.api.digest, ({},), {"request": {}}),
+        ]:
+            with self.subTest(function=function.__name__):
+                self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_call")
+
     def test_default_logs_and_option_errors_once(self):
         code = r'''
 import json, sys

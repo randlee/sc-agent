@@ -7,10 +7,15 @@ __version__ = _version("sc-decidr")
 __all__ = ["Cancel", "digest", "flush", "log", "logger", "send", "send_batch", "sitr"]
 
 class Cancel:
-    def __init__(self) -> None:
-        self._flag: object = _new_cancel()["value"]
+    def __new__(cls, *args, **kwargs):
+        result = _new_cancel(*args, **kwargs)
+        if not result["ok"]:
+            return result
+        instance = super().__new__(cls)
+        instance._flag = result["value"]
+        return instance
 
-    def cancel(self) -> dict[str, object]:
-        return _cancel(self._flag)
+    def cancel(self, *args, **kwargs) -> dict[str, object]:
+        return _cancel(self._flag, *args, **kwargs)
 
 from . import sitr
