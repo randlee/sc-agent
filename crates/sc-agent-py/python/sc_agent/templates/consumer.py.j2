@@ -22,7 +22,7 @@ when a caller makes a decision request.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Mapping, NamedTuple, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from sc_agent import Cancel
@@ -35,6 +35,126 @@ CategoryCodes = Mapping[str, str]
 AbortOn = frozenset[str]
 BatchItem = str
 _LOGGER = None
+
+DECIDR_CATEGORY_CODES = {
+    "auth": "AUTH.CREDENTIALS", "quota": "DECIDR.RATE_LIMITED", "busy": "DECIDR.OVERLOADED",
+    "network": "DECIDR.NETWORK", "response_invalid": "DECIDR.RESPONSE_INVALID",
+    "validation": "DECIDR.VALIDATION", "cancelled": "CANCELED",
+    "config": "DECIDR.CONFIG", "log": "DECIDR.LOG", "other": "DECIDR.ERROR",
+    "context_exceeded": "DECIDR.CONTEXT_EXCEEDED",
+}
+
+
+class ClientError(RuntimeError):
+    """The shared error for wheel failures and consumer validation/usage errors."""
+
+    def __init__(self, code: str, message: str, retryable: bool = False, action: Optional[str] = None,
+                 *, status: Optional[int] = None, retry_after_ms: Optional[int] = None,
+                 attempts: Optional[int] = None, data: Any = None):
+        super().__init__(code, message)
+        self.code, self._message, self.retryable, self.action = code, message, retryable, action
+        self.status, self.retry_after_ms, self.attempts, self.data = status, retry_after_ms, attempts, data
+
+    @property
+    def message(self):
+        return self._message
+
+    def __str__(self):
+        return self.message
+
+    def to_json(self) -> dict:
+        return {"success": False, "data": self.data,
+                "error": {"code": self.code, "message": self.message, "recoverable": self.retryable,
+                          "suggested_action": self.action}}
+
+
+def _invalid(message):
+    return ClientError("DECIDR.INVALID_RESULT", message,
+                       action="Inspect the invalid sc-decidr result and check the wheel and client versions.")
+
+
+def from_tool_error(error) -> ClientError:
+    """Preserve a tool Result error in the shared client error type."""
+    data = dict(error.data) if getattr(error, "data", None) is not None else None
+    return ClientError(error.code, error.message,
+                       getattr(error, "recoverable", getattr(error, "retryable", False)),
+                       getattr(error, "action", None), status=getattr(error, "status", None),
+                       retry_after_ms=getattr(error, "retry_after_ms", None),
+                       attempts=getattr(error, "attempts", None), data=data)
+
+
+CANCELED_EXIT = 130
+
+
+def canceled_envelope() -> dict:
+    out = ClientError("CANCELED", "interrupted before the command finished", True,
+                      "Rerun the command; nothing partial was reported as complete.").to_json()
+    out.update(canceled=True, aborted_by="user")
+    return out
+
+
+def error_metadata(detail: dict) -> dict:
+    """Read optional nonnegative integer fields without accepting bool as int."""
+    return {key: value if type(value := detail.get(key)) is int and value >= 0 else None
+            for key in ("status", "retry_after_ms", "attempts")}
+
+
+class NoulAnswer(NamedTuple):
+    noul: float
+
+
+class ChoiceAnswer(NamedTuple):
+    choice: str
+    confidence: float
+    probabilities: Mapping[str, float]
+
+
+class ScoreAnswer(NamedTuple):
+    score: float
+    confidence: float
+    legend: Mapping[str, Any]
+    probabilities: Mapping[str, float]
+
+
+class BoxAnswer(NamedTuple):
+    top: float
+    bottom: float
+    left: float
+    right: float
+    confidence: Optional[float]
+
+
+def _typed_answer(answer):
+    """Normalize valid wheel and JSON fixture answers without requiring the wheel offline."""
+    if isinstance(answer, (NoulAnswer, ChoiceAnswer, ScoreAnswer, BoxAnswer)):
+        return answer
+    if isinstance(answer, dict):
+        try:
+            kind = answer.get("type") or next((key for key in ("noul", "choice", "score", "box") if key in answer), None)
+            if kind == "noul":
+                return NoulAnswer(answer["noul"])
+            if kind == "choice":
+                return ChoiceAnswer(answer["choice"], answer["confidence"], answer["probabilities"])
+            if kind == "score":
+                return ScoreAnswer(answer["score"], answer["confidence"], answer["legend"], answer["probabilities"])
+            if kind == "box":
+                box = answer["box"]
+                return BoxAnswer(box["top"], box["bottom"], box["left"], box["right"], answer.get("confidence"))
+        except (KeyError, TypeError):
+            pass
+        return answer
+    if hasattr(answer, "noul"):
+        return NoulAnswer(answer.noul)
+    if hasattr(answer, "choice"):
+        return ChoiceAnswer(answer.choice, answer.confidence, answer.probabilities)
+    if hasattr(answer, "score"):
+        return ScoreAnswer(answer.score, answer.confidence, answer.legend, answer.probabilities)
+    if hasattr(answer, "top"):
+        return BoxAnswer(answer.top, answer.bottom, answer.left, answer.right, answer.confidence)
+    return answer
+
+
+
 
 _ALLOWED_ABORT_ON = (frozenset(), frozenset({"auth"}), frozenset({"auth", "quota"}))
 
@@ -54,6 +174,14 @@ def _validate_abort_on(abort_on: AbortOn) -> Optional[dict]:
     return None
 
 
+def _load_wheel():
+    try:
+        import sc_agent
+    except ImportError as exc:
+        return _failure("DEPENDENCY.SC_DECIDR", str(exc))
+    return {"ok": True, "value": sc_agent}
+
+
 def _logger(sc_agent: Any, injected: Any = None) -> dict:
     global _LOGGER
     if injected is not None:
@@ -71,9 +199,40 @@ def _result_category(value: dict) -> Optional[str]:
     return error.get("category", "other") if isinstance(error, dict) else None
 
 
-def _decode(value: dict, category_codes: CategoryCodes) -> tuple[tuple[str, Optional[str]], Optional[str]]:
-    category = _result_category(value)
-    return (json.dumps(value), category_codes.get(category) if category is not None else None), category
+def wheel_error(detail: dict, *, category_codes=None) -> ClientError:
+    category = detail.get("category", "other")
+    codes = {**DECIDR_CATEGORY_CODES, **(category_codes or {})}
+    return ClientError(codes.get("context_exceeded" if detail.get("id") == "decision.context_exceeded" else category, codes["other"]), detail.get("message", "invalid result"),
+                       category in {"busy", "network"}, detail.get("action"),
+                       **error_metadata(detail), data=dict(detail))
+
+
+def _failed(error):
+    return dict(ok=False, error=error, position=None, line=None, attempts=error.attempts)
+
+
+def decode_result(value, *, category_codes=None) -> dict:
+    """Translate the returned wheel envelope into the consumer's existing result record."""
+    try:
+        envelope = json.loads(value) if isinstance(value, str) else value
+        line = json.dumps(envelope)
+        if not envelope["ok"]:
+            result = _failed(wheel_error(envelope["error"], category_codes=category_codes))
+            body = envelope["error"]
+        else:
+            body = envelope["value"]
+            result = dict(ok=True, value={key: _typed_answer(answer) for key, answer in body["answers"].items()},
+                          usage=body.get("usage"), model_answered=body.get("model"))
+        result.update(position=envelope.get("index"), session_id=body.get("session_id"),
+                      digests=body.get("question_digests", {}), line=line, attempts=body.get("attempts"))
+        return result
+    except (KeyError, TypeError, ValueError) as exc:
+        return _failed(_invalid(f"sc-decidr returned an invalid result: {exc}"))
+
+
+def new_cancel_token():
+    loaded = _load_wheel()
+    return loaded["value"].Cancel() if loaded["ok"] else decode_result(loaded)
 
 
 def _cancel_if_selected(category: Optional[str], abort_on: AbortOn, cancel: Any) -> None:
@@ -81,80 +240,76 @@ def _cancel_if_selected(category: Optional[str], abort_on: AbortOn, cancel: Any)
         cancel.cancel()
 
 
-def call(
-    request: str,
+def call_result(
+    request: Union[str, dict],
     *,
     model: str,
-    project: str,
-    abort_on: AbortOn,
-    category_codes: CategoryCodes,
-    cancel: "Cancel",
+    project: Optional[str] = None,
+    abort_on: AbortOn = frozenset(),
+    category_codes: Optional[CategoryCodes] = None,
+    cancel: Optional["Cancel"] = None,
     config_dir: Optional[str] = None,
     general_log: Any = None,
     timeout_secs: Optional[float] = None,
-) -> tuple[str, Optional[str]]:
-    """Send one decision request and return its result JSON and mapped error code."""
+) -> dict:
+    """Send one decision request and retain the consumer result record."""
     invalid = _validate_abort_on(abort_on)
     if invalid is not None:
-        return (json.dumps(invalid), category_codes.get("validation"))
-    try:
-        import sc_agent
-    except ImportError as exc:
-        return (json.dumps(_failure("DEPENDENCY.SC_DECIDR", str(exc))), category_codes.get("other"))
+        return decode_result(invalid, category_codes=category_codes)
+    loaded = _load_wheel()
+    if not loaded["ok"]:
+        return decode_result(loaded, category_codes=category_codes)
+    sc_agent = loaded["value"]
     created = _logger(sc_agent, general_log)
     if not created["ok"]:
-        return _decode(created, category_codes)[0]
+        return decode_result(created, category_codes=category_codes)
     general_log = created["value"]
+    cancel = cancel if cancel is not None else sc_agent.Cancel()
     kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel,
                   config_dir=config_dir, general_log=general_log)
     if timeout_secs is not None:
         kwargs["timeout_secs"] = timeout_secs
     try:
-        line = sc_agent.send(request, **kwargs)
+        line = sc_agent.send(json.dumps(request) if isinstance(request, dict) else request, **kwargs)
     except KeyboardInterrupt:
         cancel.cancel()
         line = _failure("decision.cancelled", "interrupted", "cancelled")
-    result, category = _decode(line, category_codes)
-    _cancel_if_selected(category, abort_on, cancel)
-    return result
+    _cancel_if_selected(_result_category(line), abort_on, cancel)
+    return decode_result(line, category_codes=category_codes)
 
 
-def call_batch(
+def call_batch_results(
     requests: Sequence[BatchItem],
     *,
     model: str,
-    project: str,
-    abort_on: AbortOn,
-    category_codes: CategoryCodes,
-    cancel: "Cancel",
+    project: Optional[str] = None,
+    abort_on: AbortOn = frozenset(),
+    category_codes: Optional[CategoryCodes] = None,
+    cancel: Optional["Cancel"] = None,
     config_dir: Optional[str] = None,
     general_log: Any = None,
     timeout_secs: Optional[float] = None,
     workers: Optional[int] = None,
-    on_result: Optional[Callable[[str], None]] = None,
-) -> list[tuple[str, Optional[str]]]:
+    on_result: Optional[Callable[[dict], None]] = None,
+) -> dict:
     """Send a batch, preserving wheel result order and mapping each typed category."""
     invalid = _validate_abort_on(abort_on)
     if invalid is not None:
-        return [(json.dumps(invalid), category_codes.get("validation")) for _ in requests]
-    try:
-        import sc_agent
-    except ImportError as exc:
-        return [(json.dumps(_failure("DEPENDENCY.SC_DECIDR", str(exc))), category_codes.get("other")) for _ in requests]
-    def classify(line: dict):
-        return _decode(line, category_codes)
-
+        return decode_result(invalid, category_codes=category_codes)
+    loaded = _load_wheel()
+    if not loaded["ok"]:
+        return decode_result(loaded, category_codes=category_codes)
+    sc_agent = loaded["value"]
     def handle(index: int, line: dict) -> None:
-        line = dict(line, index=index)
-        _, category = classify(line)
-        _cancel_if_selected(category, abort_on, cancel)
+        _cancel_if_selected(_result_category(line), abort_on, cancel)
         if on_result is not None:
-            on_result(json.dumps(line))
+            on_result(decode_result(dict(line, index=index), category_codes=category_codes))
 
     created = _logger(sc_agent, general_log)
     if not created["ok"]:
-        return [_decode(created, category_codes)[0] for _ in requests]
+        return decode_result(created, category_codes=category_codes)
     general_log = created["value"]
+    cancel = cancel if cancel is not None else sc_agent.Cancel()
     kwargs = dict(model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel,
                   on_result=handle, config_dir=config_dir, general_log=general_log)
     if timeout_secs is not None:
@@ -162,21 +317,24 @@ def call_batch(
     if workers is not None:
         kwargs["workers"] = workers
     try:
-        batch = sc_agent.send_batch(requests, **kwargs)
+        batch = sc_agent.send_batch([json.dumps(request) if isinstance(request, dict) else request for request in requests], **kwargs)
+        if not batch["ok"]:
+            _cancel_if_selected(_result_category(batch), abort_on, cancel)
+            return decode_result(batch, category_codes=category_codes)
         lines = [dict(item["result"], index=item["index"]) for item in batch["value"]] if batch["ok"] else [batch for _ in requests]
     except KeyboardInterrupt:
         cancel.cancel()
         lines = [_failure("decision.cancelled", "interrupted", "cancelled") for _ in requests]
     # The wheel returns input order; callbacks above retain finish order.
-    return [classify(line)[0] for line in lines]
+    return dict(ok=True, value=[decode_result(line, category_codes=category_codes) for line in lines])
 
 {% if sitr %}
 def extract(language: str, source: str, query: str, *, general_log: Any = None) -> dict:
     """Run the shared syntax query separately from decision prompt authoring."""
-    try:
-        import sc_agent
-    except ImportError as exc:
-        return _failure("DEPENDENCY.SC_DECIDR", str(exc))
+    loaded = _load_wheel()
+    if not loaded["ok"]:
+        return loaded
+    sc_agent = loaded["value"]
     created = _logger(sc_agent, general_log)
     if not created["ok"]:
         return created
