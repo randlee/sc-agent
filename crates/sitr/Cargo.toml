@@ -10,3 +10,6 @@ serde_json.workspace = true
 clap = { version = "4", features = ["derive"] }
 [lints]
 workspace = true
+
+[dev-dependencies]
+serde.workspace = true

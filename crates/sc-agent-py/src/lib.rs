@@ -8,10 +8,7 @@ use serde_json::{Value, json};
 use std::{
     ffi::CStr,
     path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, mpsc},
     time::Duration,
 };
 
@@ -166,16 +163,16 @@ fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
     }
     Ok(parsed)
 }
-fn cancel_flag(value: Option<&Bound<'_, PyAny>>) -> Result<Arc<AtomicBool>, Error> {
+fn cancel_flag(value: Option<&Bound<'_, PyAny>>) -> Result<Arc<sc_agent::Cancel>, Error> {
     value
         .filter(|v| !v.is_none())
         .map(|v| {
             v.getattr("_flag")
                 .map_err(invalid)
-                .and_then(|v| handle::<AtomicBool>(&v, c"sc_agent.Cancel"))
+                .and_then(|v| handle::<sc_agent::Cancel>(&v, c"sc_agent.Cancel"))
         })
         .transpose()
-        .map(|v| v.unwrap_or_else(|| Arc::new(AtomicBool::new(false))))
+        .map(|v| v.unwrap_or_else(|| Arc::new(sc_agent::Cancel::default())))
 }
 fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error> {
     value
@@ -189,23 +186,62 @@ fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error
         })
         .transpose()
 }
-fn wait(delay: Duration, callback: &Option<Py<PyAny>>) {
+fn wait(delay: Duration, callback: &Option<Py<PyAny>>, cancel: &sc_agent::Cancel) {
     if let Some(callback) = callback {
         Python::attach(|py| {
-            let _ = callback.call1(py, (delay.as_secs_f64(),));
+            if let Err(error) = callback.call1(py, (delay.as_secs_f64(),))
+                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+            {
+                cancel.cancel();
+            }
         });
     } else {
-        std::thread::sleep(delay);
+        cancel.wait(delay);
     }
 }
-fn lookup(name: &str, callback: &Option<Py<PyAny>>) -> Result<String, String> {
+fn interruptible(
+    py: Python<'_>,
+    cancel: &sc_agent::Cancel,
+    run: impl FnOnce() -> Result<Value, Error> + Send,
+) -> Result<Value, Error> {
+    std::thread::scope(|scope| {
+        let (sender, mut receiver) = mpsc::sync_channel(1);
+        scope.spawn(move || {
+            let _ = sender.send(run());
+        });
+        loop {
+            if let Err(error) = py.check_signals()
+                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+            {
+                cancel.cancel();
+            }
+            let receive = &mut receiver;
+            match py.detach(move || receive.recv_timeout(Duration::from_millis(20))) {
+                Ok(value) => return value,
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(error) => return Err(invalid(error)),
+            }
+        }
+    })
+}
+
+fn lookup(
+    name: &str,
+    callback: &Option<Py<PyAny>>,
+    cancel: &sc_agent::Cancel,
+) -> Result<String, String> {
     match callback {
         None => sc_agent::os_keyring(name),
         Some(callback) => Python::attach(|py| {
             callback
                 .call1(py, (name,))
                 .and_then(|v| v.extract::<String>(py))
-                .map_err(|e| e.to_string())
+                .map_err(|e| {
+                    if e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+                        cancel.cancel();
+                    }
+                    e.to_string()
+                })
         }),
     }
 }
@@ -295,14 +331,14 @@ fn send(
         let flag = cancel_flag(cancel)?;
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
-        py.detach(|| {
+        interruptible(py, &flag, || {
             sc_agent::send(
                 &value,
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep),
-                &|name| lookup(name, &keyring),
+                &|delay| wait(delay, &sleep, &flag),
+                &|name| lookup(name, &keyring, &flag),
             )
         })
     })
@@ -352,18 +388,22 @@ fn send_batch(
         let on_result = |index, value: &Value| {
             if let Some(callback) = &completed {
                 Python::attach(|py| {
-                    let _ = callback.call1(py, (index, raw(py, value.clone())));
+                    if let Err(error) = callback.call1(py, (index, raw(py, value.clone())))
+                        && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                    {
+                        flag.cancel();
+                    }
                 });
             }
         };
-        py.detach(|| {
+        interruptible(py, &flag, || {
             sc_agent::batch(
                 &requests,
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep),
-                &|name| lookup(name, &keyring),
+                &|delay| wait(delay, &sleep, &flag),
+                &|name| lookup(name, &keyring, &flag),
                 &on_result,
             )
         })
@@ -371,7 +411,7 @@ fn send_batch(
 }
 #[pyfunction]
 fn _new_cancel(py: Python<'_>) -> Py<PyAny> {
-    match capsule(py, AtomicBool::new(false), c"sc_agent.Cancel") {
+    match capsule(py, sc_agent::Cancel::default(), c"sc_agent.Cancel") {
         Ok(value) => value,
         Err(error) => raw(py, sc_agent::result(Err(error))),
     }
@@ -382,9 +422,9 @@ fn _cancel(py: Python<'_>, flag: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
         py,
         sc_agent::result(
             required(flag)
-                .and_then(|v| handle::<AtomicBool>(v, c"sc_agent.Cancel"))
+                .and_then(|v| handle::<sc_agent::Cancel>(v, c"sc_agent.Cancel"))
                 .map(|flag| {
-                    flag.store(true, Ordering::SeqCst);
+                    flag.cancel();
                     Value::Null
                 }),
         ),

@@ -1,46 +1,18 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use cli::{Cli, Command};
 use serde_json::{Value, json};
 use std::{
     io::{Read, Write},
-    path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, mpsc},
     time::Duration,
 };
-#[derive(Parser)]
-struct Cli {
-    #[arg(long, global = true)]
-    config_dir: Option<PathBuf>,
-    #[arg(long, global = true, help = "Project/phase for session records")]
-    project: Option<String>,
-    #[command(subcommand)]
-    command: Command,
-}
-#[derive(Subcommand)]
-enum Command {
-    Models,
-    Doctor,
-    Send {
-        #[arg(long, default_value = "jev")]
-        model: String,
-        #[arg(long)]
-        provider: Option<String>,
-        #[arg(long, default_value = "decidr")]
-        agent_role: String,
-        #[arg(long)]
-        input: Option<PathBuf>,
-        #[arg(long)]
-        batch: bool,
-        #[arg(long)]
-        workers: Option<usize>,
-        #[arg(long, default_value = "120")]
-        timeout_secs: f64,
-    },
-}
+mod cli;
 fn main() {
-    let value = match sc_agent::default_logger("decidr") {
+    let cancelled = Arc::new(sc_agent::Cancel::default());
+    let flag = cancelled.clone();
+    let signal = ctrlc::set_handler(move || flag.cancel())
+        .map_err(|error| sc_agent::error("decidr.signal", error));
+    let value = match signal.and_then(|()| sc_agent::default_logger("decidr")) {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
             let outcome = (|| -> Result<Value, sc_agent::Error> {
@@ -79,18 +51,34 @@ fn main() {
                 if let Some(workers) = workers {
                     settings.workers = workers;
                 }
-                let mut text = String::new();
-                match input {
-                    Some(path) => {
-                        text = std::fs::read_to_string(path)
-                            .map_err(|e| sc_agent::error("decidr.input_read", e))?
-                    }
-                    None => {
-                        std::io::stdin()
-                            .read_to_string(&mut text)
-                            .map_err(|e| sc_agent::error("decidr.input_read", e))?;
-                    }
+                if cancelled.is_cancelled() {
+                    return Err(sc_agent::error("decision.cancelled", "interrupted"));
                 }
+                let text = match input {
+                    Some(path) => std::fs::read_to_string(path)
+                        .map_err(|e| sc_agent::error("decidr.input_read", e))?,
+                    None => {
+                        let (sender, receiver) = mpsc::sync_channel(1);
+                        std::thread::spawn(move || {
+                            let mut text = String::new();
+                            let read = std::io::stdin().read_to_string(&mut text).map(|_| text);
+                            let _ = sender.send(read);
+                        });
+                        loop {
+                            if cancelled.is_cancelled() {
+                                return Err(sc_agent::error("decision.cancelled", "interrupted"));
+                            }
+                            match receiver.recv_timeout(Duration::from_millis(20)) {
+                                Ok(value) => {
+                                    break value
+                                        .map_err(|e| sc_agent::error("decidr.input_read", e))?;
+                                }
+                                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                                Err(e) => return Err(sc_agent::error("decidr.input_read", e)),
+                            }
+                        }
+                    }
+                };
                 let options = sc_agent::Options {
                     settings,
                     model,
@@ -103,10 +91,6 @@ fn main() {
                     log_root: sc_agent::log_root("decidr")?,
                     repo,
                 };
-                let cancelled = Arc::new(AtomicBool::new(false));
-                let flag = cancelled.clone();
-                ctrlc::set_handler(move || flag.store(true, Ordering::SeqCst))
-                    .map_err(|e| sc_agent::error("decidr.signal", e))?;
                 let result = if batch {
                     let requests = text
                         .lines()
@@ -125,7 +109,7 @@ fn main() {
                         &options,
                         &logger,
                         &cancelled,
-                        &std::thread::sleep,
+                        &|delay| cancelled.wait(delay),
                         &sc_agent::os_keyring,
                         &|_, _| {},
                     )
@@ -137,11 +121,11 @@ fn main() {
                         &options,
                         &logger,
                         &cancelled,
-                        &std::thread::sleep,
+                        &|delay| cancelled.wait(delay),
                         &sc_agent::os_keyring,
                     )
                 };
-                if cancelled.load(Ordering::SeqCst) {
+                if cancelled.is_cancelled() {
                     return Err(sc_agent::error("decision.cancelled", "interrupted"));
                 }
                 result

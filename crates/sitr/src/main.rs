@@ -1,24 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use cli::{Cli, Command};
 use serde_json::Value;
-use std::{io::Write, path::PathBuf};
-#[derive(Parser)]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-#[derive(Subcommand)]
-enum Command {
-    Languages,
-    Queries {
-        #[arg(long)]
-        language: String,
-    },
-    Query {
-        language: String,
-        query: String,
-        file: PathBuf,
-    },
-}
+use std::io::Write;
+mod cli;
 fn main() {
     let value = match sc_agent::default_logger("sitr") {
         Err(error) => sc_agent::result(Err(error)),

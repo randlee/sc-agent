@@ -311,6 +311,7 @@ dependencies = [
  "clap",
  "ctrlc",
  "sc-agent",
+ "serde",
  "serde_json",
 ]
 
@@ -1196,6 +1197,7 @@ dependencies = [
  "clap",
  "sc-agent",
  "sc-treesitter",
+ "serde",
  "serde_json",
 ]
 

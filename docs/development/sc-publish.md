@@ -2,7 +2,7 @@
 
 sc-agent publishes through the shared
 **[sc-publish](https://github.com/randlee/sc-publish)** kit (ADR-SAG-0017,
-ADR-SAG-0018). The kit owns release workflows, scripts, agents, and rendered
+ADR-SAG-0018; [REQ-SAG-0803](../requirements/REQ-SAG-0803.md)). The kit owns release workflows, scripts, agents, and rendered
 manifests. This repository owns the pin, consumer input JSON, and the PR
 dry-run gate.
 
@@ -29,12 +29,9 @@ the pin, then re-run install.
 
 ## Consumer input (current workspace)
 
-- **crates.io** (publish order): `sc-agent-types`, `sc-decision-schema`,
-  `sc-agent-config`, `sc-agent-secrets`, `sc-agent-log`, `sc-agent-http`,
-  `sc-decision-systemone`, `sc-decision-local`, `sc-llm-provider`,
-  `sc-decision-llm`, `sc-decision-runner`, `sc-treesitter`, `decidr`.
-- **PyPI**: `sc-agent` and `sc-treesitter` maturin wheels (see
-  `python_distributions` in consumer input).
+- **crates.io** (publish order): `sc-agent`, `sc-treesitter`, `sitr`, `decidr`.
+  `sc-agent-py` is the fifth workspace crate and ships through the wheel.
+- **PyPI**: one `sc-decidr` wheel containing decisions and sitr.
 - **Release binaries**: `decidr`, `sitr` (five-target matrix in consumer input).
 - **Homebrew / Scoop / WinGet**: configured in consumer input (`Formula/decidr.rb`,
   `bucket/decidr.json`, `randlee.decidr`).

@@ -6,12 +6,33 @@ use std::{
     collections::BTreeMap,
     ffi::OsString,
     path::{Path, PathBuf},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Condvar, Mutex, atomic::Ordering},
     time::Duration,
 };
+
+#[derive(Default)]
+pub struct Cancel {
+    state: Mutex<bool>,
+    changed: Condvar,
+}
+impl Cancel {
+    pub fn cancel(&self) {
+        if let Ok(mut state) = self.state.lock() {
+            *state = true;
+        }
+        self.changed.notify_all();
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.state.lock().map_or(true, |state| *state)
+    }
+    pub fn wait(&self, delay: Duration) {
+        if let Ok(state) = self.state.lock() {
+            let _ = self
+                .changed
+                .wait_timeout_while(state, delay, |state| !*state);
+        }
+    }
+}
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(untagged)]
@@ -575,8 +596,8 @@ pub fn send(
     request: &Value,
     options: &Options,
     logger: &Logger,
-    cancel: &AtomicBool,
-    sleep: &(dyn Fn(Duration) + Sync),
+    cancel: &Cancel,
+    wait: &(dyn Fn(Duration) + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
 ) -> Result<Value, Error> {
     let session_id = ulid::Ulid::new().to_string();
@@ -591,6 +612,9 @@ pub fn send(
         });
     let mut sends = 0;
     let mut outcome = (|| {
+        if cancel.is_cancelled() {
+            return Err(error("decision.cancelled", "request cancelled"));
+        }
         let project = options.settings.project_required()?;
         slug(project)?;
         slug(&options.agent_role)?;
@@ -646,12 +670,12 @@ pub fn send(
             .build()
             .new_agent();
         for attempt in 1..=5 {
-            if cancel.load(Ordering::SeqCst) {
+            if cancel.is_cancelled() {
                 return Err(error("decision.cancelled", "request cancelled"));
             }
             // A busy reply holds off senders to this host through its injected wait.
             drop(pause.lock().map_err(|e| error("http.network", e))?);
-            if cancel.load(Ordering::SeqCst) {
+            if cancel.is_cancelled() {
                 return Err(error("decision.cancelled", "request cancelled"));
             }
             let mut post = agent.post(&url).header("Content-Type", "application/json");
@@ -689,7 +713,7 @@ pub fn send(
                 }
                 Err(e) => {
                     if attempt < 5 {
-                        sleep(Duration::from_secs(2u64.pow(attempt - 1)));
+                        wait(Duration::from_secs(2u64.pow(attempt - 1)));
                         continue;
                     }
                     return Err(Error::Failure {
@@ -724,7 +748,7 @@ pub fn send(
             let busy = [429, 502, 529].contains(&status) && !quota;
             if busy && attempt < 5 {
                 let _hold = pause.lock().map_err(|e| error("http.network", e))?;
-                sleep(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
+                wait(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
                 continue;
             }
             return Err(Error::Failure {
@@ -757,6 +781,9 @@ pub fn send(
         }
         Err(error("http.network", "send count exhausted"))
     })();
+    if cancel.is_cancelled() {
+        outcome = Err(error("decision.cancelled", "request cancelled"));
+    }
     if let Ok(value) = &mut outcome
         && let Some(fields) = value.as_object_mut()
     {
@@ -803,8 +830,8 @@ pub fn batch(
     requests: &[Value],
     options: &Options,
     logger: &Logger,
-    cancel: &AtomicBool,
-    sleep: &(dyn Fn(Duration) + Sync),
+    cancel: &Cancel,
+    wait: &(dyn Fn(Duration) + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
@@ -819,16 +846,13 @@ pub fn batch(
             let next = &next;
             scope.spawn(move || {
                 loop {
-                    if cancel.load(Ordering::SeqCst) {
-                        break;
-                    }
                     let index = next.fetch_add(1, Ordering::SeqCst);
                     let Some(request) = requests.get(index) else {
                         break;
                     };
                     let value = report(
                         logger,
-                        send(request, options, logger, cancel, sleep, keyring),
+                        send(request, options, logger, cancel, wait, keyring),
                     );
                     on_result(index, &value);
                     let _ = sender.send((index, value));
@@ -862,18 +886,26 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
     let origin = git(&["remote", "get-url", "origin"]);
     let remote = origin
         .as_deref()
-        .map(|s| s.trim_end_matches(".git").trim_end_matches('/'))
+        .map(|s| s.trim_end_matches('/').trim_end_matches(".git"))
         .map(|s| s.split_once("://").map(|(_, s)| s).unwrap_or(s))
         .map(|s| s.split_once('@').map(|(_, s)| s).unwrap_or(s))
         .filter(|s| s.contains('/') && !s.starts_with('/'))
         .map(|s| s.replacen(':', "/", 1));
-    let name = remote.unwrap_or_else(|| {
+    let name = if let Some(remote) = remote {
+        remote
+    } else {
         format!(
             "local/{}/{}",
-            std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".into()),
+            std::process::Command::new("hostname")
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| error("config.repo", "host name unavailable"))?,
             root.file_name().unwrap_or_default().to_string_lossy()
         )
-    });
+    };
     if name
         .split('/')
         .any(|part| part.is_empty() || part == "." || part == "..")

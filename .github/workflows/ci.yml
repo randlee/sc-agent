@@ -213,6 +213,16 @@ jobs:
       - name: Build, install and verify the shipped workspace
         run: python scripts/gate/rewrite.py
 
+      - name: Check CLI documentation drift
+        run: |
+          bash scripts/generate-cli-docs.sh
+          git diff --exit-code -- fixtures/cli/ site/cli/
+
+      - name: Check release metadata
+        run: |
+          python .github/scripts/release_artifacts.py validate-manifest --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml
+          python scripts/test_prerelease_tag.py
+
   # Dependency advisories (RustSec) and licenses, from deny.toml (RSH-002).
   # Exact pins such as ureq =3.5.1 are not floated, so this job is how a
   # published advisory against a pinned crate reaches the merge gate.

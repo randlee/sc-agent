@@ -1,5 +1,7 @@
 """Product contracts. Only loopback HTTP, controlled synchronization and temporary files."""
 import importlib
+import _thread
+import signal
 import json
 import os
 import socket
@@ -401,7 +403,58 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                                       cancel=cancel, on_result=completed)
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
-        self.assertEqual([item["index"] for item in got["value"]], [0])
+        self.assertEqual([item["index"] for item in got["value"]], [0, 1, 2])
+        self.assertTrue(got["value"][0]["result"]["ok"])
+        for item in got["value"][1:]:
+            self.assertEqual(self.error(item["result"])["id"], "decision.cancelled")
+        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(sum(row["result"]["ok"] for row in rows), 1)
+
+    def test_keyboard_interrupt_in_callback_cancels_unfinished_results(self):
+        def completed(index, result):
+            if index == 0:
+                raise KeyboardInterrupt
+        with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            got = self.api.send_batch([REQUEST] * 3, workers=1,
+                                      project="contract", agent_role="contract", config_dir=self.directory.name,
+                                      general_log=self.api.logger("decidr")["value"], base_url=url, on_result=completed)
+        self.assertTrue(got["ok"], got)
+        self.assertEqual(len(received), 1)
+        self.assertTrue(got["value"][0]["result"]["ok"])
+        self.assertEqual([self.error(item["result"])["id"] for item in got["value"][1:]], ["decision.cancelled"] * 2)
+
+    def test_pending_python_interrupt_ends_native_busy_wait(self):
+        def respond(body):
+            _thread.interrupt_main()
+            return 429, {"Retry-After": "600"}, {}
+        with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            got = self.api.send_batch([REQUEST] * 3, workers=1,
+                                      project="contract", agent_role="contract", config_dir=self.directory.name,
+                                      general_log=self.api.logger("decidr")["value"], base_url=url)
+        self.assertTrue(got["ok"], got)
+        self.assertEqual(len(received), 1)
+        self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
+        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
+
+    def test_repository_identity_uses_origin_and_real_host(self):
+        logger = self.api.logger("decidr")["value"]
+        def send(url):
+            got = self.api.send(REQUEST, project="contract", agent_role="contract", config_dir=self.directory.name,
+                                general_log=logger, base_url=url)
+            self.assertTrue(got["ok"], got)
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 3) as (url, _):
+            send(url)
+            subprocess.run(["git", "init", "--quiet"], check=True)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True)
+            send(url)
+            subprocess.run(["git", "remote", "set-url", "origin", "git@github.com:example/project.git"], check=True)
+            send(url)
+        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True).stdout.strip()
+        self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
         waits = []
@@ -443,6 +496,33 @@ class Cli(Isolated):
             self.assertEqual(sent.returncode, 0, sent.stderr + sent.stdout)
             self.assertTrue(json.loads(sent.stdout)["ok"])
             self.assertEqual(received[0][0], "/v1/systemone")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX signal delivery")
+    def test_sigint_and_sigterm_cancel_and_flush_all_session_rows(self):
+        binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
+        for interrupt in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signal=interrupt), tempfile.TemporaryDirectory() as folder:
+                def respond(body):
+                    process.send_signal(interrupt)
+                    return 429, {"Retry-After": "600"}, {}
+                with server([None], respond) as (url, received):
+                    port = int(url.split(":")[2].split("/")[0])
+                    Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+                    env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder}
+                    process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya", "--batch", "--workers", "1"],
+                                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=folder, env=env)
+                    try:
+                        stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
+                    finally:
+                        if process.poll() is None:
+                            process.kill()
+                            process.communicate()
+                self.assertNotEqual(process.returncode, 0, stdout + stderr)
+                self.assertEqual(json.loads(stdout)["error"]["id"], "decision.cancelled")
+                self.assertEqual(len(received), 1)
+                rows = [json.loads(line) for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+                self.assertEqual(len(rows), 3)
+                self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
 
     def test_models_and_sitr_queries(self):
         root = Path(__file__).resolve().parents[2]
