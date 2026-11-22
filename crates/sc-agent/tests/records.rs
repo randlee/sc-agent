@@ -147,3 +147,69 @@ fn req_sag_0008_one_mib_jsonl_limit_preserves_accepted_event_and_decision() -> T
     logger.shutdown()?;
     Ok(())
 }
+
+#[test]
+fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    logger.shutdown()?;
+    let cancelled = Cancel::default();
+    cancelled.cancel();
+    let outcome = send(
+        &request(),
+        &options(&root, "http://127.0.0.1:1"),
+        &logger,
+        &cancelled,
+        &no_wait,
+        &|_| panic!("cancelled send read a key"),
+    );
+    let failure = sc_agent::result(outcome);
+    assert_eq!(failure["error"]["id"], "log.flush");
+    let original = logger
+        .flush()
+        .err()
+        .ok_or("closed logger flushed")?
+        .to_string();
+    assert_eq!(failure["error"]["message"], original);
+    let failure = sc_agent::report(
+        &logger,
+        Err(sc_agent::error("test.failure", "reported error")),
+    );
+    assert_eq!(failure["error"]["id"], "log.write");
+    let original =
+        sc_agent::result(sc_agent::log(&logger, "error", json!({})).map(|()| json!(null)));
+    assert_eq!(failure["error"], original["error"]);
+    Ok(())
+}
+
+#[test]
+fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let mut opts = options(&root, "http://127.0.0.1:1");
+    opts.model = "laya".into();
+    let failure = sc_agent::result(send(
+        &request(),
+        &opts,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(failure["error"]["id"], "config.runner");
+    let message = failure["error"]["message"]
+        .as_str()
+        .ok_or("missing message")?;
+    for layer in [
+        "laya",
+        "DECIDR_LAYA__HOST/PORT/MODEL",
+        "local decidr.json",
+        "local sc-agent.json",
+        "global decidr.json",
+        "global sc-agent.json",
+    ] {
+        assert!(message.contains(layer), "{message}");
+    }
+    logger.shutdown()?;
+    Ok(())
+}

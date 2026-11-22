@@ -93,17 +93,25 @@ pub struct Runner {
     pub port: u16,
     pub model: String,
 }
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Settings {
-    #[serde(default)]
     pub project: Option<String>,
-    #[serde(default = "default_workers")]
     pub workers: usize,
-    #[serde(default)]
     pub laya: Option<Runner>,
 }
-fn default_workers() -> usize {
-    8
+fn setting<T: serde::de::DeserializeOwned>(
+    value: &Value,
+    path: &'static str,
+    default: Value,
+) -> Result<T, Error> {
+    let selected = value.pointer(&format!("/{}", path.replace('.', "/")));
+    let source = if selected.is_none() {
+        path.split('.').next().unwrap_or(path)
+    } else {
+        path
+    };
+    serde_json::from_value(selected.cloned().unwrap_or(default))
+        .map_err(|e| error(source, format!("{path}: {e}")))
 }
 impl Settings {
     pub fn project_required(&self) -> Result<&str, Error> {
@@ -148,11 +156,6 @@ pub fn config(
             })
         })
         .collect();
-    let env_keys = KEYS
-        .iter()
-        .copied()
-        .filter(|key| key.path != "project")
-        .collect::<Vec<_>>();
     let flags = project
         .map(|s| ("project".into(), json!(s)))
         .into_iter()
@@ -162,14 +165,32 @@ pub fn config(
             files,
             env_prefix: "DECIDR_",
             env_aliases: &[("SC_PROJECT", "project")],
-            env_accepts: &env_keys,
+            env_accepts: KEYS.get(1..).unwrap_or_default(),
             flags,
             flag_names: BTreeMap::new(),
             keys: KEYS,
             environment,
         },
-        |value| serde_json::from_value::<Settings>(value).map_err(|e| error("config.invalid", e)),
-        |_| None,
+        |value| {
+            let settings = Settings {
+                project: setting(&value, "project", Value::Null)?,
+                workers: setting(&value, "workers", json!(8))?,
+                laya: if value.get("laya").is_some_and(Value::is_object) {
+                    Some(Runner {
+                        host: setting(&value, "laya.host", Value::Null)?,
+                        port: setting(&value, "laya.port", Value::Null)?,
+                        model: setting(&value, "laya.model", Value::Null)?,
+                    })
+                } else {
+                    setting(&value, "laya", Value::Null)?
+                },
+            };
+            if settings.workers == 0 {
+                return Err(error("workers", "must be positive"));
+            }
+            Ok(settings)
+        },
+        |Error::Failure { id, .. }| Some(*id),
     )
     .map_err(|e| error("config.invalid", e))
 }
@@ -777,7 +798,7 @@ pub fn send(
                 .settings
                 .laya
                 .as_ref()
-                .ok_or_else(|| error("config.runner", "Set laya host, port and model"))?;
+                .ok_or_else(|| error("config.runner", "Set laya host, port and model through DECIDR_LAYA__HOST/PORT/MODEL, local decidr.json, local sc-agent.json, global decidr.json, or global sc-agent.json"))?;
             (
                 format!("http://{}:{}/v1", runner.host, runner.port),
                 runner.model.clone(),
@@ -980,7 +1001,7 @@ pub fn send(
         fields.insert("question_digests".into(), json!(digests));
     }
     if let Ok(value) = &outcome {
-        let _ = log(logger, "decision.result", json!({"response":value}));
+        log(logger, "decision.result", json!({"response":value}))?;
     }
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
@@ -1008,10 +1029,10 @@ pub fn send(
             )
         })();
         if let Err(e) = written {
-            let _ = log(logger, "error", json!(error("log.session_write", e)));
+            log(logger, "error", json!(error("log.session_write", e)))?;
         }
     }
-    let _ = logger.flush();
+    logger.flush().map_err(|e| error("log.flush", e))?;
     outcome
 }
 pub fn batch(
@@ -1128,12 +1149,16 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
         &std::env::vars_os().collect::<Vec<_>>(),
         project,
     )?;
-    Ok(json!({"settings":layers::resolved(&loaded,KEYS), "log_root":log_root("decidr")?}))
+    Ok(
+        json!({"settings":layers::resolved(&loaded,KEYS), "files":loaded.files, "log_root":log_root("decidr")?}),
+    )
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
-    if let Err(error) = &outcome {
-        let _ = log(logger, "error", json!(error));
+    if let Err(error) = &outcome
+        && let Err(failure) = log(logger, "error", json!(error))
+    {
+        return result(Err(failure));
     }
     result(outcome)
 }

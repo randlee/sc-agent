@@ -108,11 +108,19 @@ fn respond(
         Err(error) => raw(py, sc_agent::result(Err(error))),
         Ok(logger) => {
             let value = sc_agent::report(&logger, run(&logger));
-            let _ = logger.flush();
-            if owned {
-                let _ = logger.shutdown();
-            }
-            raw(py, value)
+            let flushed = logger.flush().map_err(|e| error("log.flush", e));
+            let finished = if owned {
+                logger.shutdown().map_err(|e| error("log.shutdown", e))
+            } else {
+                Ok(())
+            };
+            raw(
+                py,
+                match flushed.and(finished) {
+                    Ok(()) => value,
+                    Err(e) => sc_agent::result(Err(e)),
+                },
+            )
         }
     }
 }
@@ -477,7 +485,7 @@ fn _cancel(py: Python<'_>, flag: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
 #[pyfunction(signature=(*,general_log=None))]
 fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
-        let _ = sc_agent::log(logger, "sitr.languages", json!({}));
+        sc_agent::log(logger, "sitr.languages", json!({}))?;
         Ok(sc_treesitter::languages())
     })
 }
@@ -489,7 +497,7 @@ fn queries(
 ) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
         let value = sc_treesitter::queries(&text(language)?)?;
-        let _ = sc_agent::log(logger, "sitr.queries", json!({}));
+        sc_agent::log(logger, "sitr.queries", json!({}))?;
         Ok(value)
     })
 }
@@ -507,7 +515,7 @@ fn query(
             &text(source)?,
             &text(query)?,
         )?;
-        let _ = sc_agent::log(logger, "sitr.query", json!({}));
+        sc_agent::log(logger, "sitr.query", json!({}))?;
         Ok(value)
     })
 }
@@ -521,7 +529,7 @@ fn run(
 ) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
         let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
-        let _ = sc_agent::log(logger, "sitr.run", json!({}));
+        sc_agent::log(logger, "sitr.run", json!({}))?;
         Ok(value)
     })
 }

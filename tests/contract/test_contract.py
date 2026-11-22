@@ -637,6 +637,26 @@ class Cli(Isolated):
             self.assertEqual(got.returncode, 0, got.stderr)
             self.assertEqual([item["text"] for item in json.loads(got.stdout)["value"]], ["1", "_"])
 
+    def test_doctor_lists_present_and_missing_local_and_global_layers(self):
+        binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
+        root = Path(self.directory.name).resolve()
+        local, global_config = root / ".sc/sc-agent", root / "global"
+        local.mkdir(parents=True)
+        global_config.mkdir()
+        initialized = subprocess.run(["git", "init", "--quiet", str(root)], env=dict(os.environ), text=True, capture_output=True, timeout=20)
+        self.assertEqual(initialized.returncode, 0, initialized.stderr)
+        (local / "sc-agent.json").write_text('{"project":"local"}')
+        (global_config / "decidr.json").write_text('{"workers":3}')
+        got = subprocess.run([str(binary), "--config-dir", str(global_config), "doctor"], cwd=root,
+                             env=dict(os.environ), text=True, capture_output=True, timeout=20)
+        self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
+        value = json.loads(got.stdout)["value"]
+        self.assertEqual(value["files"], [{"path": str(path), "exists": exists} for path, exists in [
+            (local / "decidr.json", False), (local / "sc-agent.json", True),
+            (global_config / "decidr.json", True), (global_config / "sc-agent.json", False)]])
+        project = next(row for row in value["settings"] if row["path"] == "project")
+        self.assertEqual(project["source"], str(local / "sc-agent.json"))
+
     def test_send_and_doctor(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         with tempfile.TemporaryDirectory() as folder, server([(200, {}, ANSWER)]) as (url, received):
@@ -651,6 +671,10 @@ class Cli(Isolated):
             self.assertEqual(project["source"], str(config))
             self.assertFalse(any(row["path"] == "log_root" for row in json.loads(doctor.stdout)["value"]["settings"]))
             self.assertEqual(json.loads(doctor.stdout)["value"]["log_root"], folder)
+            self.assertEqual(json.loads(doctor.stdout)["value"]["files"], [
+                {"path": str(config), "exists": True},
+                {"path": str(Path(folder) / "sc-agent.json"), "exists": False},
+            ])
             sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya",
                                    "--agent-role", "contract"], input=json.dumps(REQUEST), env=env,
                                   cwd=folder, text=True, capture_output=True, timeout=20)

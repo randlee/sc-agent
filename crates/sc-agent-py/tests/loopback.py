@@ -116,6 +116,39 @@ class RenderedWheelLoopback(unittest.TestCase):
             "timeout_secs": 5,
         }
 
+    def test_client_default_and_injected_logger_owns_every_call(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for injected in (False, True):
+                clients = self.load_clients(Path(temporary))
+                for client in clients:
+                    with self.subTest(client=client.CLIENT_NAME, injected=injected), tempfile.TemporaryDirectory() as work:
+                        root = Path(work)
+                        env = {"PATH": os.environ["PATH"], "DECIDR_LOG_ROOT": work, "SITR_LOG_ROOT": work,
+                               "PLAN_ANCHOR_LOG_ROOT": work, "JUDGE_JEV_LOG_ROOT": work, "CONSUMER_TEST_LOG_ROOT": work}
+                        with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(os.environ, env, clear=True), patch.object(sc_agent, "logger", wraps=sc_agent.logger) as create:
+                            self.config(root, runner.address)
+                            handle = sc_agent.logger("consumer-test")["value"] if injected else None
+                            result = client.call_result(REQUEST, **self.call_options(client, root, handle))
+                            self.assertTrue(result["ok"], result)
+                            if client.CLIENT_NAME == "judge-jev":
+                                self.assertTrue(client.extract("python", "def f(): pass", "(function_definition) @f", general_log=handle)["ok"])
+                                self.assertFalse(client.extract("missing-language", "", "", general_log=handle)["ok"])
+                            self.assertEqual(create.call_count, 1)
+                            self.assertEqual(create.call_args.args, ("consumer-test" if injected else client.CLIENT_NAME,))
+                            owned = handle if injected else client._logger_handle
+                            self.assertTrue(sc_agent.flush(owned)["ok"])
+                        name = "consumer-test" if injected else client.CLIENT_NAME
+                        files = list((root / "logs").glob("*.jsonl"))
+                        self.assertEqual([file.name for file in files], [name + ".log.jsonl"])
+                        events = [json.loads(line) for line in files[0].read_text().splitlines()]
+                        self.assertTrue(any(event["action"] == "decision.result" for event in events), events)
+                        if client.CLIENT_NAME == "judge-jev":
+                            self.assertTrue(any(event["action"] == "sitr.query" for event in events), events)
+                            self.assertTrue(any(event["action"] == "error" for event in events), events)
+                        rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+                        self.assertEqual(len(rows), 1)
+                        self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
+
     def test_rendered_clients_run_against_the_installed_wheel(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -22,7 +22,7 @@ Definitions: The generated client is the Python module a consumer renders from t
 - The generated client MUST inject the client Logger as the general logger into every wheel call.
 - With nothing injected by the app, the client Logger MUST write to `~/.sc-agent/logs/<client name>.log.jsonl`.
 - The generated client MUST accept an app's Logger in place of the client Logger and inject it into every wheel call.
-- The generated client MUST leave the session logger optional; with none injected, sessions MUST go to the default session log (REQ-SAG-0005).
+- Sessions MUST go to the default session files (REQ-SAG-0005); the generated client does not inject a session Logger.
 
 **MUST NOT statements:**
 

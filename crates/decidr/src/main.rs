@@ -145,7 +145,9 @@ fn main() {
                 result
             })();
             let value = sc_agent::report(&logger, outcome);
-            let _ = logger.shutdown();
+            if let Err(error) = logger.shutdown() {
+                eprintln!("{error}");
+            }
             value
         }
     };

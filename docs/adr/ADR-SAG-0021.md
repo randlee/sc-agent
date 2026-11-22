@@ -53,7 +53,7 @@ Every record of a process must reach one Logger that the process's entry point o
 
 There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses. There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both.
 
-**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. The session logger is optionally injectable; no app injects one today.
+**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. Session rows are appended directly to the default session files; no session Logger is injected.
 
 **Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path.
 

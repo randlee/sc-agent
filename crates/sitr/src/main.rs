@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::{Cli, Command};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::io::Write;
 mod cli;
 fn main() {
@@ -38,11 +38,13 @@ fn main() {
                         sc_treesitter::predefined(&language, &query, &source)?
                     }
                 };
-                let _ = sc_agent::log(&logger, "sitr.result", value.clone());
+                sc_agent::log(&logger, "sitr.result", json!({"result":value}))?;
                 Ok(value)
             })();
             let value = sc_agent::report(&logger, result);
-            let _ = logger.shutdown();
+            if let Err(error) = logger.shutdown() {
+                eprintln!("{error}");
+            }
             value
         }
     };

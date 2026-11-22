@@ -40,7 +40,7 @@ Each CLI needs its own settings, some settings must apply to every CLI, and a re
 
 Configuration has two kinds of scope and two locations.
 
-- The shared scope is the file `sc-agent.json`. It holds settings that apply to every CLI, such as the project/phase (ADR-SAG-0021).
+- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.
 - Each CLI that reads configuration has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.
 - The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform.
 - The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.

@@ -53,19 +53,16 @@ import sc_agent
 
 line = sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
 lines = sc_agent.send_batch(requests, model="haiku", project="my-project", agent_role="judge")
-sc_agent.models()
-sc_agent.doctor()
+sc_agent.sitr.languages()
 ```
 
-Every `decidr` operation has a matching Python function. They also accept `images=`, `long_context=`, `cancel=`, `config_dir=`, and the `general_log=` and `session_log=` callables for injecting loggers. `KeyboardInterrupt` cancels the run and is re-raised.
+The wheel exposes decision calls, digests, cancellation and sitr queries. Calls return tagged success or error values. `general_log=` accepts an opaque Logger handle obtained with `sc_agent.logger(name)`; the generated client creates one named Logger and injects it into its decision and sitr calls. `cancel=` accepts `sc_agent.Cancel()`. A keyboard interrupt cancels unfinished work and returns a cancellation error.
 
 ## Configuration, keys and logs
 
-- **Configuration:** read from `~/.sc-agent/default.json`, then `local.json`, then `SC_AGENT__*` overrides. All values are checked when the configuration loads.
+- **Configuration:** first value wins: CLI flag, environment variable, local `decidr.json`, local `sc-agent.json`, global `decidr.json`, global `sc-agent.json`, built-in default. Local files live in `<worktree>/.sc/sc-agent/`; global files live in `~/.sc-agent/`. `SC_PROJECT` sets project/phase; other variables use names such as `DECIDR_WORKERS` and `DECIDR_LAYA__PORT`. `decidr doctor` reports values, sources and layer-file paths/existence without sending a request.
 - **Keys:** read from the environment, then the repository-root `.env`, then the OS keyring; the first source that has the key wins. An attached key is redacted from all error text.
-- **Logs:** everything goes under `<log_root>/logs/` (default `~/.sc-agent/logs/`):
-  - each CLI writes its own general log, rotated by sc-observability;
-  - session logs go to `<log_root>/logs/<repo>/<agent_role>/<project>/sessions.jsonl`, with one row per request; they are never rotated or pruned.
+- **Logs:** the fixed root is `~/.sc-agent/`, with a `<NAME>_LOG_ROOT` environment override for tests; it is not a configuration setting. General logs are `logs/<name>.log.jsonl`, rotated by sc-observability. Session rows append to `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` and are never rotated or pruned.
 
 ## Workspace
 
