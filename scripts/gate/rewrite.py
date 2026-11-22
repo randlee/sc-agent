@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owner's reduction-plan gates; replacement crates live in rewrite/ until cutover."""
+"""Build and verify the shipped five-crate workspace and installed wheel."""
 import json
 from pathlib import Path
 import re
@@ -9,8 +9,7 @@ import tempfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
-STAGED = (ROOT / "crates/sc-agent-types").exists()
-SOURCE = ROOT / "rewrite" if STAGED else ROOT
+SOURCE = ROOT
 MANIFEST = SOURCE / "Cargo.toml"
 ALLOWED = set("ureq serde serde_json keyring dotenvy ulid sc-sha sc-config ctrlc sc-observability clap pyo3 thiserror tree-sitter tree-sitter-python tree-sitter-rust".split())
 PACKAGES = {"sc-agent", "decidr", "sc-agent-py", "sc-treesitter", "sitr"}
@@ -53,7 +52,7 @@ check("Python dependency", (
     if any(re.match(r"sc[-_]observability\b", dep) for dep in
            tomllib.loads(p.read_text()).get("project", {}).get("dependencies", []))
 ))
-python = [p for p in SOURCE.rglob("*.py") if "tests" not in p.parts and "target" not in p.parts]
+python = [p for p in (ROOT / "crates/sc-agent-py/python").rglob("*.py") if "tests" not in p.parts and "target" not in p.parts]
 templates = list(SOURCE.rglob("consumer.py.j2"))
 check("returned errors", (
     str(p.relative_to(ROOT)) for p in python + templates
@@ -79,24 +78,24 @@ if MANIFEST.exists():
             if d["name"] not in ALLOWED | local
         ))
     run("format", ["cargo", "fmt", "--check", "--all", "--manifest-path", str(MANIFEST)])
-    run("clippy", ["cargo", "clippy", "--workspace", "--all-features", "--manifest-path", str(MANIFEST),
+    run("clippy", ["cargo", "clippy", "--locked", "--workspace", "--all-features", "--manifest-path", str(MANIFEST),
                    "--", "-D", "warnings", "-D", "clippy::unwrap_used", "-D", "clippy::expect_used",
                    "-D", "clippy::panic", "-D", "clippy::indexing_slicing"])
-    run("Rust contracts", ["cargo", "test", "--workspace", "--all-features", "--manifest-path", str(MANIFEST)])
-    cli_ready = run("CLI build", ["cargo", "build", "--workspace", "--bins", "--manifest-path", str(MANIFEST)])
+    run("Rust contracts", ["cargo", "test", "--locked", "--workspace", "--all-features", "--manifest-path", str(MANIFEST)])
+    cli_ready = run("CLI build", ["cargo", "build", "--locked", "--workspace", "--bins", "--manifest-path", str(MANIFEST)])
 else:
     check("workspace", [f"missing {MANIFEST.relative_to(ROOT)}"])
 with tempfile.TemporaryDirectory(prefix="sc-agent-rewrite-") as temporary:
-    wheel_manifest = SOURCE / "sc-agent-py/Cargo.toml" if STAGED else SOURCE / "crates/sc-agent-py/Cargo.toml"
+    wheel_manifest = SOURCE / "crates/sc-agent-py/Cargo.toml"
     installed = False
-    if run("wheel build", ["maturin", "build", "--manifest-path", str(wheel_manifest), "--out", temporary]):
+    if run("wheel build", ["maturin", "build", "--locked", "--manifest-path", str(wheel_manifest), "--out", temporary]):
         wheels = list(Path(temporary).glob("*.whl"))
         if len(wheels) == 1:
             installed = run("wheel install", [sys.executable, "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])])
         else:
             check("wheel install", [f"expected one wheel, found {len(wheels)}"])
     if installed and cli_ready:
-        run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "rewrite/tests", "-v"])
+        run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "tests/contract", "-v"])
     else:
         check("wheel and CLI contracts", ["not run: current binaries and wheel must build first"])
 print("FAILED: " + ", ".join(failed) if failed else "All rewrite gates passed", flush=True)
