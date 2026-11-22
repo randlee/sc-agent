@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Render both consumer configurations from the installed wheel and check them in strict pyright mode."""
+import importlib.metadata
 import importlib.resources
 import json
 import os
@@ -14,7 +15,8 @@ def render_consumers(destination):
     rendered = []
     for client, sitr in (("plan-anchor", False), ("judge-jev", True)):
         variables = destination / f"{client}.json"
-        variables.write_text(json.dumps({"client_name": client, "sitr": sitr}))
+        variables.write_text(json.dumps({"client_name": client, "sitr": sitr,
+                                         "sc_decidr_version": importlib.metadata.version("sc-decidr")}))
         output = destination / (client.replace("-", "_") + "_client.py")
         subprocess.run(["sc-compose", "render", "--root", str(template_root), "--file", "consumer.py.j2",
                         "--var-file", str(variables), "--strict", "--output", str(output)], check=True,
