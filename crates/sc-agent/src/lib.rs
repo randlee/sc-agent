@@ -99,12 +99,24 @@ pub struct Settings {
     pub workers: usize,
     pub laya: Option<Runner>,
 }
+fn missing_setting(path: &str) -> Error {
+    error(
+        "config.missing_setting",
+        format!(
+            "Set {path} through DECIDR_{}, local decidr.json, local sc-agent.json, global decidr.json, or global sc-agent.json",
+            path.to_uppercase().replace('.', "__")
+        ),
+    )
+}
 fn setting<T: serde::de::DeserializeOwned>(
     value: &Value,
     path: &'static str,
     default: Value,
 ) -> Result<T, Error> {
     let selected = value.pointer(&format!("/{}", path.replace('.', "/")));
+    if selected.is_none() && path.starts_with("laya.") {
+        return Err(error("laya", missing_setting(path)));
+    }
     let source = if selected.is_none() {
         path.split('.').next().unwrap_or(path)
     } else {
@@ -798,7 +810,7 @@ pub fn send(
                 .settings
                 .laya
                 .as_ref()
-                .ok_or_else(|| error("config.runner", "Set laya host, port and model through DECIDR_LAYA__HOST/PORT/MODEL, local decidr.json, local sc-agent.json, global decidr.json, or global sc-agent.json"))?;
+                .ok_or_else(|| missing_setting("laya.host"))?;
             (
                 format!("http://{}:{}/v1", runner.host, runner.port),
                 runner.model.clone(),
@@ -1000,9 +1012,6 @@ pub fn send(
         fields.insert("session_id".into(), json!(session_id));
         fields.insert("question_digests".into(), json!(digests));
     }
-    if let Ok(value) = &outcome {
-        log(logger, "decision.result", json!({"response":value}))?;
-    }
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
         && slug(&options.agent_role).is_ok()
@@ -1031,6 +1040,9 @@ pub fn send(
         if let Err(e) = written {
             log(logger, "error", json!(error("log.session_write", e)))?;
         }
+    }
+    if let Ok(value) = &outcome {
+        log(logger, "decision.result", json!({"response":value}))?;
     }
     logger.flush().map_err(|e| error("log.flush", e))?;
     outcome
@@ -1149,8 +1161,13 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
         &std::env::vars_os().collect::<Vec<_>>(),
         project,
     )?;
+    let mut keys = KEYS.to_vec();
+    keys.push(Key {
+        path: "laya",
+        env: EnvValue::Json,
+    });
     Ok(
-        json!({"settings":layers::resolved(&loaded,KEYS), "files":loaded.files, "log_root":log_root("decidr")?}),
+        json!({"settings":layers::resolved(&loaded,&keys), "files":loaded.files, "log_root":log_root("decidr")?}),
     )
 }
 

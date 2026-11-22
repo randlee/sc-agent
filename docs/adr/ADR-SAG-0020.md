@@ -34,7 +34,7 @@ Before this decision, every CLI read one shared file pair, `~/.sc-agent/default.
 
 **Problem Statement:**
 
-Each CLI needs its own settings, some settings must apply to every CLI, and a repository or worktree must be able to override both.
+Each CLI needs its own settings, shared defaults may be overridden by a CLI file, and a repository or worktree must be able to override both.
 
 ### Decision
 
@@ -76,7 +76,7 @@ Configuration files are JSON. TOML will be added when sc-config supports it (ran
 
 ### Rationale
 
-One file per CLI keeps each CLI's settings separate and lets a new CLI be added without touching another CLI's file. The shared file gives one place for settings every CLI must agree on. The local location under `.sc/` lets each worktree differ, which matters because worktrees of one repository often work on different phases at the same time. Env vars named after the CLI keep one CLI's override from reaching another.
+One file per CLI keeps each CLI's settings separate and lets a new CLI be added without touching another CLI's file. The shared file gives one place for shared defaults that a CLI file may override. The local location under `.sc/` lets each worktree differ, which matters because worktrees of one repository often work on different phases at the same time. Env vars named after the CLI keep one CLI's override from reaching another.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
@@ -89,7 +89,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Negative:**
 
-- A setting can now come from seven places; `decidr doctor` reports a `setting | value | source` table.
+- A setting can now come from seven places; `decidr doctor` reports a `path | value | source` table.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."

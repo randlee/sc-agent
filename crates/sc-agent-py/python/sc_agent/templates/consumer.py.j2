@@ -32,6 +32,7 @@ import math
 import pathlib
 import re
 import sys
+import threading
 from collections.abc import Callable, Container, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, cast
 
@@ -42,6 +43,7 @@ SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 CLIENT_NAME = "{{ client_name }}"
 Record = dict[str, Any]
 _logger_handle: Any = None
+_logger_lock = threading.Lock()
 
 DECIDR_CATEGORY_CODES = {
     "auth": "AUTH.CREDENTIALS", "quota": "DECIDR.RATE_LIMITED", "busy": "DECIDR.OVERLOADED",
@@ -166,12 +168,13 @@ def load_wheel():
 def _logger(create: Callable[[str], Record], injected: Any) -> Record:
     """The caller's Logger, else this client's one Logger, created on first use."""
     global _logger_handle
-    if injected is None and _logger_handle is None:
-        created = create(CLIENT_NAME)
-        if not created["ok"]:
-            return created
-        _logger_handle = created["value"]
-    return {"ok": True, "value": _logger_handle if injected is None else injected}
+    with _logger_lock:
+        if injected is None and _logger_handle is None:
+            created = create(CLIENT_NAME)
+            if not created["ok"]:
+                return created
+            _logger_handle = created["value"]
+        return {"ok": True, "value": _logger_handle if injected is None else injected}
 
 
 def wheel_error(detail: Record, *, category_codes: Mapping[str, str] | None = None) -> ClientError:

@@ -31,7 +31,7 @@ Definitions: A Logger is an sc-observability crate `Logger`. The general logger 
 - When a Logger is injected, sc-agent MUST NOT build another Logger for that log.
 - sc-agent MUST NOT forward records to Python `logging` or to a Python callable.
 - The wheel MUST NOT depend on the `sc-observability` Python package.
-- Library code MUST NOT close an injected Logger; its entry point closes it.
+- Library code MUST NOT close an injected Logger; each call MUST flush it.
 
 ### Rationale
 

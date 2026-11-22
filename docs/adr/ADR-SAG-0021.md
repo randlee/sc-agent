@@ -35,11 +35,11 @@ sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the
 
 **Problem Statement:**
 
-Every record of a process must reach one Logger that the process's entry point owns, and every log must land at a fixed, known path, with session logs never mixed with general logs.
+Every general-log record of a process must reach one Logger that the process's entry point owns, and every log must land at a fixed, known path, with session logs never mixed with general logs.
 
 ### Decision
 
-**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process, injects it into every sc-agent call, and closes it on exit. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
+**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process, injects it into every sc-agent call, and flushes it after each call; the generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
 
 **The wheel exposes the crate's Logger.** The sc-decidr wheel returns the sc-observability crate's `Logger` to Python, named by the caller. Python may write its own records to it and injects it into every sc-decidr call; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue. The wheel has no dependency on the `sc-observability` Python package.
 
@@ -53,7 +53,7 @@ Every record of a process must reach one Logger that the process's entry point o
 
 There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses. There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both.
 
-**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. Session rows are appended directly to the default session files; no session Logger is injected.
+**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes to disk at the paths below. Every log is on by default and every decision and sitr call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility. Session rows are appended directly to the default session files; no session Logger is injected.
 
 **Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path.
 
@@ -74,17 +74,17 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 - `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.
 - `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it "project/phase".
 
-**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it.
+**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.
 
 **Key Principles:**
 
-- One process, one Logger, one queue, owned by the entry point.
+- One process, one general Logger, one queue, owned by the entry point; session rows are appended separately.
 - Session logs and general logs are never written to the same folder tree.
 - A session is never filed under a guessed project/phase.
 
 ### Rationale
 
-The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it opens before the first record and closes after the last. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob.
+The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob.
 
 ### Consequences
 

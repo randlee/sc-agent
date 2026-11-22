@@ -49,7 +49,7 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
 
 ### Rationale
 
-One file per CLI lets a CLI be added without changing another CLI's file. The shared file holds settings every CLI must agree on. The local folder lets worktrees of one repository hold different settings, such as different phases, and keeps sc files under `.sc/`.
+One file per CLI lets a CLI be added without changing another CLI's file. The shared file holds shared defaults that a CLI file may override. The local folder lets worktrees of one repository hold different settings, such as different phases, and keeps sc files under `.sc/`.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
 

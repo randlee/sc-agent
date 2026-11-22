@@ -108,20 +108,20 @@ fn respond(
         Err(error) => raw(py, sc_agent::result(Err(error))),
         Ok(logger) => {
             let value = sc_agent::report(&logger, run(&logger));
-            let flushed = logger.flush().map_err(|e| error("log.flush", e));
-            let finished = if owned {
-                logger.shutdown().map_err(|e| error("log.shutdown", e))
-            } else {
-                Ok(())
-            };
-            raw(
-                py,
-                match flushed.and(finished) {
-                    Ok(()) => value,
-                    Err(e) => sc_agent::result(Err(e)),
-                },
-            )
+            raw(py, finish(&logger, owned, value))
         }
+    }
+}
+fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
+    let flushed = logger.flush().map_err(|e| error("log.flush", e));
+    let stopped = if owned {
+        logger.shutdown().map_err(|e| error("log.shutdown", e))
+    } else {
+        Ok(())
+    };
+    match flushed.and(stopped) {
+        Ok(()) => value,
+        Err(e) => sc_agent::result(Err(e)),
     }
 }
 fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
@@ -141,7 +141,10 @@ fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
         })
         .transpose()
 }
-fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Options, Error> {
+fn options(
+    named: &[(&str, Option<&Bound<'_, PyAny>>)],
+    logger: &Logger,
+) -> Result<sc_agent::Options, Error> {
     let timeout =
         Duration::try_from_secs_f64(option::<f64>(named, "timeout_secs")?.unwrap_or(120.0))
             .map_err(|e| error("decidr.invalid_request_timeout", e))?;
@@ -172,7 +175,7 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
     if let Some(workers) = workers {
         settings.workers = workers;
     }
-    let log_root = sc_agent::log_root("decidr")?;
+    let log_root = sc_agent::log_root(logger.service_name().as_str())?;
     Ok(sc_agent::Options {
         environment: std::env::vars_os().collect(),
         settings,
@@ -362,15 +365,18 @@ fn send(
 ) -> Py<PyAny> {
     respond(py, general_log, "decidr", |logger| {
         let value = self::request(request)?;
-        let options = options(&[
-            ("model", model),
-            ("provider", provider),
-            ("project", project),
-            ("agent_role", agent_role),
-            ("config_dir", config_dir),
-            ("timeout_secs", timeout_secs),
-            ("base_url", base_url),
-        ])?;
+        let options = options(
+            &[
+                ("model", model),
+                ("provider", provider),
+                ("project", project),
+                ("agent_role", agent_role),
+                ("config_dir", config_dir),
+                ("timeout_secs", timeout_secs),
+                ("base_url", base_url),
+            ],
+            logger,
+        )?;
         let flag = cancel_flag(cancel)?;
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
@@ -414,16 +420,19 @@ fn send_batch(
             .map_err(invalid)?
             .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
             .collect::<Result<Vec<_>, _>>()?;
-        let options = options(&[
-            ("model", model),
-            ("provider", provider),
-            ("project", project),
-            ("agent_role", agent_role),
-            ("config_dir", config_dir),
-            ("timeout_secs", timeout_secs),
-            ("base_url", base_url),
-            ("workers", workers),
-        ])?;
+        let options = options(
+            &[
+                ("model", model),
+                ("provider", provider),
+                ("project", project),
+                ("agent_role", agent_role),
+                ("config_dir", config_dir),
+                ("timeout_secs", timeout_secs),
+                ("base_url", base_url),
+                ("workers", workers),
+            ],
+            logger,
+        )?;
         let flag = cancel_flag(cancel)?;
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
@@ -561,4 +570,32 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         query => c"query", run => c"run",
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn respond_mapping_returns_closed_logger_failure() -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!("wheel-finish-{}", std::process::id()));
+        let mut config = sc_observability::LoggerConfig::default_for(
+            sc_observability::ServiceName::new("wheel-test")?,
+            root.clone(),
+        );
+        config.enable_console_sink = false;
+        let logger = Logger::new(config)?;
+        logger.shutdown()?;
+        let failure = finish(&logger, false, sc_agent::result(Ok(json!("success"))));
+        assert_eq!(failure["error"]["id"], "log.flush");
+        assert_eq!(
+            failure["error"]["message"],
+            logger
+                .flush()
+                .err()
+                .ok_or("closed logger flushed")?
+                .to_string()
+        );
+        let _ = std::fs::remove_dir_all(root);
+        Ok(())
+    }
 }

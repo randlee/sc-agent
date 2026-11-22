@@ -376,3 +376,33 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     assert!(failure.contains("laya.port"), "{failure}");
     Ok(())
 }
+
+#[test]
+fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
+    let root = Temp::new()?;
+    let local = root.0.join("local");
+    fs::create_dir(&local)?;
+    fs::write(
+        local.join("decidr.json"),
+        json!({"laya":{"host":"localhost"}}).to_string(),
+    )?;
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"laya":{"model":"local"}}).to_string(),
+    )?;
+    let failure = config(Some(&local), &root.0, &[], None)
+        .err()
+        .ok_or("partial runner accepted")?
+        .to_string();
+    for term in [
+        "laya.port",
+        "DECIDR_LAYA__PORT",
+        "local decidr.json",
+        "local sc-agent.json",
+        "global decidr.json",
+        "global sc-agent.json",
+    ] {
+        assert!(failure.contains(term), "{failure}");
+    }
+    Ok(())
+}

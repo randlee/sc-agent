@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A CLI is one of sc-agent's command-line programs that reads configuration, such as `decidr`. `<CLI>` is the CLI's program name in upper case with each `-` replaced by `_`, such as `DECIDR`. A key path is the list of key names from the top of a configuration file to a setting. `<KEY>` is a key name in upper case. A shared setting is a setting that applies to every CLI, the kind of setting `sc-agent.json` accepts (REQ-SAG-0019). The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes, and its setting is named `project`. `SC_PROJECT` is the environment variable that sets the project/phase for every CLI (REQ-SAG-0021).
+Definitions: A CLI is one of sc-agent's command-line programs that reads configuration, such as `decidr`. `<CLI>` is the CLI's program name in upper case with each `-` replaced by `_`, such as `DECIDR`. A key path is the list of key names from the top of a configuration file to a setting. `<KEY>` is a key name in upper case. A shared setting is a default that a CLI file may override, the kind of setting `sc-agent.json` accepts (REQ-SAG-0019). The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes, and its setting is named `project`. `SC_PROJECT` is the environment variable that sets the project/phase for every CLI (REQ-SAG-0021).
 
 **MUST statements:**
 

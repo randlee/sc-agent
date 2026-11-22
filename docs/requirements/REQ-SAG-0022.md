@@ -26,7 +26,7 @@ Definitions: The generated client is the Python module a consumer renders from t
 
 **MUST NOT statements:**
 
-- The generated client MUST NOT have a log-root variable.
+- The generated client MUST NOT have a log-root setting or argument. `<CLIENT>_LOG_ROOT`, with the client name uppercased and hyphens replaced by underscores, is the test environment override for both its general log and session rows; empty or absent uses `~/.sc-agent/`.
 - The generated client MUST NOT make a wheel call without a general logger.
 
 ### Rationale

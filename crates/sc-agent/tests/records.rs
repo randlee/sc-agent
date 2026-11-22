@@ -196,13 +196,13 @@ fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
         &no_wait,
         &keyring,
     ));
-    assert_eq!(failure["error"]["id"], "config.runner");
+    assert_eq!(failure["error"]["id"], "config.missing_setting");
     let message = failure["error"]["message"]
         .as_str()
         .ok_or("missing message")?;
     for layer in [
         "laya",
-        "DECIDR_LAYA__HOST/PORT/MODEL",
+        "DECIDR_LAYA__HOST",
         "local decidr.json",
         "local sc-agent.json",
         "global decidr.json",
@@ -210,6 +210,139 @@ fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
     ] {
         assert!(message.contains(layer), "{message}");
     }
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
+fn failed_general_logger_preserves_the_successful_session() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    logger.shutdown()?;
+    let stub = Stub::new(vec![http(200, answer())])?;
+    let failure = sc_agent::result(send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(failure["error"]["id"], "log.write");
+    assert_eq!(stub.finish()?.len(), 1);
+    let sessions = rows(&root)?;
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0]["result"]["ok"], true);
+    assert_eq!(
+        sessions[0]["result"]["value"]["answers"],
+        answer()["answers"]
+    );
+    Ok(())
+}
+
+#[test]
+fn old_session_file_survives_a_new_decision_unchanged() -> Test {
+    let root = Temp::new()?;
+    let old = root.0.join("sessions/example/old/project/sessions.jsonl");
+    std::fs::create_dir_all(old.parent().ok_or("missing parent")?)?;
+    std::fs::write(&old, "{\"old\":true}\n")?;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&old)?
+        .set_times(std::fs::FileTimes::new().set_modified(std::time::UNIX_EPOCH))?;
+    let modified = std::fs::metadata(&old)?.modified()?;
+    let logger = logger(&root)?;
+    let stub = Stub::new(vec![http(200, answer())])?;
+    send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    )?;
+    assert_eq!(stub.finish()?.len(), 1);
+    assert_eq!(std::fs::read_to_string(&old)?, "{\"old\":true}\n");
+    assert_eq!(std::fs::metadata(&old)?.modified()?, modified);
+    assert_eq!(
+        std::fs::read_dir(root.0.join("logs"))?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name() == "sessions.jsonl")
+            .count(),
+        0
+    );
+    logger.shutdown()?;
+    Ok(())
+}
+
+struct Captures {
+    events: std::sync::Mutex<Vec<sc_observability::LogEvent>>,
+    name: sc_observability::SinkName,
+}
+impl sc_observability::v2::LogSink for Captures {
+    fn write(
+        &self,
+        event: &sc_observability::LogEvent,
+    ) -> Result<(), sc_observability::v2::LogSinkError> {
+        self.events
+            .lock()
+            .map(|mut events| events.push(event.clone()))
+            .map_err(|e| sc_observability::v2::LogSinkError::Write {
+                context: Box::new(sc_observability::ErrorContext::new(
+                    sc_observability::error_codes::LOGGER_SINK_WRITE_FAILED,
+                    e.to_string(),
+                    sc_observability::Remediation::not_recoverable("test sink lock poisoned"),
+                )),
+            })
+    }
+    fn health(&self) -> sc_observability::SinkHealth {
+        sc_observability::SinkHealth {
+            name: self.name.clone(),
+            state: sc_observability::SinkHealthState::Healthy,
+            last_error: None,
+        }
+    }
+}
+#[test]
+fn injected_test_sink_receives_every_general_record_without_default_file() -> Test {
+    let root = Temp::new()?;
+    let sink = std::sync::Arc::new(Captures {
+        events: Default::default(),
+        name: sc_observability::SinkName::new("capture")?,
+    });
+    let mut config = sc_observability::LoggerConfig::default_for(
+        sc_observability::ServiceName::new("decidr")?,
+        root.0.clone(),
+    );
+    config.enable_file_sink = false;
+    config.enable_console_sink = false;
+    let mut builder = sc_observability::v2::Logger::builder(config)?;
+    builder.register_sink(sc_observability::SinkRegistration::typed(sink.clone()));
+    let logger = builder.build()?;
+    let stub = Stub::new(vec![http(200, answer())])?;
+    send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    )?;
+    assert_eq!(stub.finish()?.len(), 1);
+    sc_agent::report(
+        &logger,
+        Err(sc_agent::error("test.error", "controlled failure")),
+    );
+    logger.flush()?;
+    let events = sink.events.lock().map_err(|e| e.to_string())?;
+    assert_eq!(events.len(), 2);
+    let serialized = events
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(serialized[0]["action"], "decision.result");
+    assert_eq!(serialized[1]["fields"]["id"], "test.error");
+    assert!(!root.0.join("logs/decidr.log.jsonl").exists());
     logger.shutdown()?;
     Ok(())
 }
