@@ -31,7 +31,7 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
+There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
 
 **Key Principles:**
 
