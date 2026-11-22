@@ -13,6 +13,9 @@ class VersionSync(unittest.TestCase):
         checks = {
             "Cargo.toml": [r'sc-agent\s*=.*?version\s*=\s*"([^"]+)"',
                            r'sc-treesitter\s*=.*?version\s*=\s*"([^"]+)"'],
+            # The release kit (sync-python-version) rewrites a literal
+            # [project].version, so the wheel version stays a literal, not dynamic.
+            "crates/sc-agent-py/pyproject.toml": [r'^version\s*=\s*"([^"]+)"'],
             "fixtures/cli/decidr-cli-model.json": [r'"version"\s*:\s*"([^"]+)"'],
             "fixtures/cli/sitr-cli-model.json": [r'"version"\s*:\s*"([^"]+)"'],
             "site/cli/decidr/index.html": [r'Version ([0-9][^< ]*)', r'"version":"([^"]+)"'],
