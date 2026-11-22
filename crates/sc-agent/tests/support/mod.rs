@@ -77,6 +77,7 @@ pub struct Request {
 type CapturedRequests = Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>>;
 pub struct Stub {
     pub url: String,
+    listener: TcpListener,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<CapturedRequests>>,
 }
@@ -84,6 +85,7 @@ impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let url = format!("http://{}/v1", listener.local_addr()?);
+        let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
         let worker = std::thread::spawn(move || {
@@ -146,6 +148,7 @@ impl Stub {
         });
         Ok(Self {
             url,
+            listener: owned_listener,
             stop,
             worker: Some(worker),
         })
@@ -160,18 +163,17 @@ impl Stub {
     }
     fn stop(&self) {
         self.stop.store(true, Ordering::SeqCst);
-        if let Some(address) = self
-            .url
-            .strip_prefix("http://")
-            .and_then(|s| s.strip_suffix("/v1"))
-        {
+        // Keep a bound listener alive until shutdown finishes; the wake-up can never reach a recycled port.
+        if let Ok(address) = self.listener.local_addr() {
             let _ = TcpStream::connect(address);
         }
     }
 }
 impl Drop for Stub {
     fn drop(&mut self) {
-        self.stop();
+        if self.worker.is_some() {
+            self.stop();
+        }
     }
 }
 pub fn keyring(_: &str) -> Result<String, String> {

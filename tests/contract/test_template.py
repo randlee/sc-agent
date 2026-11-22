@@ -34,6 +34,10 @@ class RenderedClient(unittest.TestCase):
                         result = client.call_result("{}", model="jev", abort_on=abort)
                         self.assertFalse(result["ok"])
                         self.assertEqual(result["error"].code, "DECIDR.INVALID_OPTION")
+                    for value in (object(), None, "x"):
+                        error = client.from_tool_error(value)
+                        self.assertIsInstance(error, client.ClientError)
+                        self.assertEqual((error.code, error.message), ("DECIDR.ERROR", "Unknown tool error"))
                     error = client.ClientError("TEST.ERROR", "failed call", attempts=2)
                     failed = {"ok": False, "error": error, "attempts": 2}
                     job = client.BatchJob("item", None, "candidate", 1, "request", {}, {}, {}, "directive")
@@ -43,3 +47,10 @@ class RenderedClient(unittest.TestCase):
                     self.assertIsNone(line["answers"])
                     self.assertEqual(line["error"]["code"], "TEST.ERROR")
                     self.assertEqual(line["sends"], 2)
+                    for detail in ({"code": "PLAIN.ERROR", "message": "plain failure"}, {}):
+                        record = {"ok": False, "error": detail, "attempts": 2}
+                        line = client.result_line(job, settings, record, [], None, False)
+                        self.assertFalse(line["ok"])
+                        self.assertIsNone(line["answers"])
+                        self.assertEqual(line["error"]["code"], detail.get("code", "DECIDR.ERROR"))
+                        self.assertEqual(line["error"]["message"], detail.get("message", "Unknown tool error"))

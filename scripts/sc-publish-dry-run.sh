@@ -7,7 +7,7 @@
 #   checks   3. validate the rendered manifest and Cargo version lockstep
 #            4. run the kit's consumer preflight runner
 #               and check the rendered Scoop manifest shims every binary
-#   publish  5. cargo publish --dry-run --locked for every manifest crate, in order
+#   publish  5. cargo publish --dry-run --locked for publish-enabled crates, in order
 #   wheel    6. maturin build the single sc-agent-py wheel
 #
 # Usage: bash scripts/sc-publish-dry-run.sh [all|kit|checks|publish|wheel]...
@@ -161,7 +161,10 @@ phase_publish() {
   while IFS='|' read -r package _wait; do
     publish_args+=(-p "$package")
   done < <(python3 .github/scripts/release_artifacts.py list-publish-plan --manifest "$manifest")
-  [[ "${#publish_args[@]}" -gt 0 ]] || die "$manifest lists no crates"
+  if [[ "${#publish_args[@]}" -eq 0 ]]; then
+    echo "No crates marked for publication; skipping crates.io."
+    return
+  fi
   if [[ "${SC_PUBLISH_ALLOW_DIRTY:-0}" == "1" ]]; then
     publish_args+=(--allow-dirty)
   fi

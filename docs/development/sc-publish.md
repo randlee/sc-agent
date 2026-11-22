@@ -29,8 +29,8 @@ the pin, then re-run install.
 
 ## Consumer input (current workspace)
 
-- **crates.io** (publish order): `sc-agent`, `sc-treesitter`, `sitr`, `decidr`.
-  `sc-agent-py` is the fifth workspace crate; all five publish to crates.io, and sc-agent-py also ships through the wheel.
+- **crates.io**: deferred to Bead `agt-vogq` until sc-config is ready for a qualified crates.io release. The consumer input has `crates: []`, so the kit disables its crates.io root channel and publish plan. The five crates remain workspace members; the sc-config git dependency stays unchanged. The pinned kit's publish-plan command ignores `publish = false`, so those entries must stay out of the release input until the deferral ends.
+- **Current release scope**: the `sc-decidr` wheel and `decidr`/`sitr` binaries through PyPI, GitHub Releases, Homebrew, Scoop and WinGet.
 - **PyPI**: one `sc-decidr` wheel containing decisions and sitr.
 - **Release binaries**: `decidr`, `sitr` (five-target matrix in consumer input).
 - **Homebrew / Scoop / WinGet**: configured in consumer input (`Formula/decidr.rb`,
