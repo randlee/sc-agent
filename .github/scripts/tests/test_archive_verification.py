@@ -182,6 +182,12 @@ def test_docli_preflight_executes_generator_with_spaces(tmp_path):
     subprocess.run([str(bash), str(scripts / "release-preflight-docli.sh")], cwd=tmp_path,
                    env=env, check=True, timeout=30)
     assert (tmp_path / "generated.marker").read_text() == "verified"
+    drift = tmp_path / "fixtures/cli/new.json"; drift.parent.mkdir(parents=True)
+    drift.write_text("{}")
+    command = [str(bash), str(scripts / "release-preflight-docli.sh")]
+    assert subprocess.run(command, cwd=tmp_path, env=env, timeout=30).returncode != 0
+    subprocess.run(["git", "add", "fixtures/cli/new.json"], cwd=tmp_path, check=True, timeout=30)
+    assert subprocess.run(command, cwd=tmp_path, env=env, timeout=30).returncode != 0
 
 
 def test_windows_bash_runs_nested_preflight_checks(tmp_path):

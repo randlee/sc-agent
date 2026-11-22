@@ -41,8 +41,11 @@ diff = subprocess.run(
 )
 if diff.returncode != 0:
     sys.exit(diff.returncode)
+staged = subprocess.run(["git", "diff", "--cached", "--exit-code", "--", *drift_paths], cwd=root)
+if staged.returncode != 0:
+    sys.exit(staged.returncode)
 status = subprocess.run(
-    ["git", "status", "--porcelain", "--", *drift_paths],
+    ["git", "ls-files", "--others", "--exclude-standard", "--", *drift_paths],
     cwd=root,
     capture_output=True,
     text=True,

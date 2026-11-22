@@ -76,17 +76,3 @@ jobs:
           PY
             "$BASH" "$RUNNER_TEMP/archive-step.sh"
           done
-      - name: Diagnose documentation drift
-        if: failure()
-        shell: bash
-        run: |
-          git status --porcelain=v2
-          git diff --stat HEAD -- fixtures/cli site/cli
-          python - <<'PY'
-          import difflib, subprocess
-          from pathlib import Path
-          for name in ('fixtures/cli/decidr-cli-model.json', 'fixtures/cli/sitr-cli-model.json', 'site/cli/decidr/index.html', 'site/cli/sitr/index.html'):
-              old = subprocess.check_output(['git', 'show', 'HEAD:' + name]).decode('utf-8').splitlines()
-              new = Path(name).read_text(encoding='utf-8').splitlines()
-              print(''.join(difflib.unified_diff(old, new, fromfile='HEAD:' + name, tofile=name, lineterm='\n'))[:12000])
-          PY
