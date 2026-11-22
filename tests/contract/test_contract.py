@@ -132,6 +132,15 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
         self.assertEqual(len(rows), 3)
 
+    def test_a_result_python_cannot_load_is_an_error_value(self):
+        # REQ-SAG-0002: the loader's error is returned, not dropped as None.
+        with patch("json.loads", side_effect=ValueError("controlled loader failure")):
+            got = self.api.sitr.languages()
+        error = self.error(got)
+        self.assertEqual(error["id"], "sc_agent_py.result_load")
+        self.assertIn("controlled loader failure", error["message"])
+        self.assertIn('"ok":true', error["message"])
+
     def test_oversized_requests_and_nonpositive_workers_are_typed_refusals(self):
         # REQ-SAG-0014/0702: typed refusals precede any HTTP or keyring access.
         calls = []

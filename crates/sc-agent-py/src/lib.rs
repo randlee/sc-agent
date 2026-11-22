@@ -30,7 +30,31 @@ fn raw(py: Python<'_>, value: Value) -> Py<PyAny> {
         .and_then(|m| m.call_method1("loads", (value.to_string(),)))
     {
         Ok(value) => value.unbind(),
-        Err(_) => py.None(),
+        // REQ-SAG-0002: a result Python cannot load comes back as an error value
+        // carrying the loader's message and the whole result text, never as None.
+        Err(e) => {
+            let failure = sc_agent::error("sc_agent_py.result_load", format!("{e}: {value}"));
+            let fields = PyDict::new(py);
+            let detail = PyDict::new(py);
+            let Error::Failure {
+                id,
+                message,
+                action,
+                category,
+                ..
+            } = failure;
+            for (key, text) in [
+                ("id", id),
+                ("message", message.as_str()),
+                ("action", action),
+                ("category", category),
+            ] {
+                let _ = detail.set_item(key, text);
+            }
+            let _ = fields.set_item("ok", false);
+            let _ = fields.set_item("error", detail);
+            fields.into_any().unbind()
+        }
     }
 }
 fn required<'a, 'py>(value: Option<&'a Bound<'py, PyAny>>) -> Result<&'a Bound<'py, PyAny>, Error> {
