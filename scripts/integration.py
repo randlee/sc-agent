@@ -22,8 +22,8 @@ def run(argv, *, timeout=600, **kwargs):
 
 
 def credential_variables():
-    source = ROOT / "crates/sc-agent-secrets/src/vars.rs"
-    return dict(re.findall(r'pub const ([A-Z_]+): &str = "([^"]+)";', source.read_text()))
+    source = ROOT / "crates/sc-agent/src/lib.rs"
+    return {name: name for name in re.findall(r'\bkey:\s*"([A-Z][A-Z0-9_]+)"', source.read_text())}
 
 
 def key_for(provider, variable):
