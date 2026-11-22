@@ -1,0 +1,70 @@
+name: Windows archive verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/archive_verification.py'
+      - '.github/scripts/release-preflight-docli.sh'
+      - '.github/scripts/tests/test_archive_verification.py'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/prerelease-archive.yml'
+      - '.github/workflows/windows-archive-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read release toolchain
+        id: manifest
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path('release/publish-artifacts.toml').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"toolchain={data['project']['rust_toolchain']}\n")
+          PY
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.manifest.outputs.toolchain }}
+          targets: x86_64-pc-windows-msvc
+      - run: python -m pip install PyYAML pytest
+      - name: Test archive verification logic
+        run: python -m pytest -q .github/scripts/tests/test_archive_verification.py -k "windows_bash or docli_preflight"
+      - name: Build manifest-declared binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          bins="$(python .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "$RELEASE_ARTIFACT_MANIFEST")"
+          cargo build --release --target x86_64-pc-windows-msvc $bins
+      - name: Run both release packaging steps without publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in prerelease-archive.yml release.yml; do
+            export CHECK_WORKFLOW="$workflow"
+            python - <<'PY'
+          import os, tomllib, yaml
+          from pathlib import Path
+          workflow = yaml.safe_load(Path('.github/workflows', os.environ['CHECK_WORKFLOW']).read_text())
+          step = next(s for s in workflow['jobs']['build']['steps'] if s.get('name', '').startswith('Package manifest-declared'))
+          version = tomllib.loads(Path('Cargo.toml').read_text())['workspace']['package']['version']
+          body = step['run'].replace('${{ matrix.target }}', 'x86_64-pc-windows-msvc')
+          body = body.replace('${{ needs.plan.outputs.version }}', version)
+          body = body.replace('${{ needs.gate-and-tag.outputs.release_version }}', version)
+          Path(os.environ['RUNNER_TEMP'], 'archive-step.sh').write_text(body, encoding='utf-8')
+          PY
+            "$BASH" "$RUNNER_TEMP/archive-step.sh"
+          done
