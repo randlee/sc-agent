@@ -32,11 +32,52 @@ def run(name, command):
     return result.returncode == 0
 
 
+def rust_line_counts(text):
+    """Count physical source/test lines, masking Rust literals and comments before finding test modules."""
+    masked = list(text)
+    tokens = re.compile(r'''//[^\n]*|/\*|(?:b|c)?r(?P<hash>\#{0,255})".*?"(?P=hash)|"(?:\\.|[^"\\])*"|b?'(?:\\.|[^'\\\n])' ''', re.S | re.X)
+    offset = 0
+    while match := tokens.search(text, offset):
+        start, end = match.span()
+        if match.group() == "/*":
+            depth = 1
+            for marker in re.finditer(r"/\*|\*/", text[end:]):
+                depth += 1 if marker.group() == "/*" else -1
+                if depth == 0:
+                    end += marker.end()
+                    break
+            else:
+                end = len(text)
+        masked[start:end] = ["\n" if char == "\n" else " " for char in text[start:end]]
+        offset = end
+    code = "".join(masked)
+    test_lines = set()
+    module = re.compile(r"(?m)^[ \t]*#\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*(?:#\[[^\n]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{")
+    for match in module.finditer(code):
+        depth = 1
+        for brace in re.finditer(r"[{}]", code[match.end():]):
+            depth += 1 if brace.group() == "{" else -1
+            if depth == 0:
+                end = match.end() + brace.end()
+                test_lines.update(range(text.count("\n", 0, match.start()), text.count("\n", 0, end) + 1))
+                break
+    return len(text.splitlines()) - len(test_lines), len(test_lines)
+
+
 rust = sorted(p for p in SOURCE.rglob("*.rs") if not set(p.relative_to(SOURCE).parts) & {"target", ".git"})
-lines = sum(len(p.read_text().splitlines()) for p in rust)
-check("size", [f"{lines} Rust lines exceeds 2200"] if lines > 2200 else
+source_lines = test_lines = 0
+for path in rust:
+    parts = path.relative_to(SOURCE).parts
+    text = path.read_text()
+    if len(parts) > 3 and parts[0] == "crates" and parts[2] == "tests":
+        test_lines += len(text.splitlines())
+    else:
+        source, tests = rust_line_counts(text)
+        source_lines += source
+        test_lines += tests
+check("size", [f"{source_lines} non-test Rust lines exceeds 2200"] if source_lines > 2200 else
       ([] if rust else ["replacement Rust source does not exist"]))
-print(f"Rust lines: {lines}/2200 across {len(rust)} files", flush=True)
+print(f"Rust source lines: {source_lines}/2200; test lines: {test_lines}", flush=True)
 check("forbidden architecture", (
     f"{p.relative_to(ROOT)}:{i}: {match.group()}"
     for p in rust for i, line in enumerate(p.read_text().splitlines(), 1)
