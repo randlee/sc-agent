@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and the one error enum.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`.
 
 **Requirements:**
 
