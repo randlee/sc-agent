@@ -18,6 +18,7 @@
 
 - The repository MUST pin an exact sc-publish kit revision in `release/sc-publish-pin.toml`.
 - The repository MUST declare a complete `release/sc-publish-consumer-input.json` for sc-agent: every publish-ordered Rust crate, both customer-facing CLI binaries (**decidr** and **sitr**), the PyPI wheel **sc-decidr** (import `sc_agent`, holding the decidr and sitr APIs), and channels **crates.io**, **pypi**, **homebrew**, **scoop**, and **winget**.
+- Until `sc-config` is released on crates.io, the five crates MUST be declared `publish = false` and no crates.io publish MUST be attempted; the other channels publish.
 - The workspace root `Cargo.toml` MUST list every manifest `cargo_toml` path in `[workspace].members` literally so `validate-manifest` succeeds.
 
 ### Rationale
@@ -25,6 +26,8 @@
 Registry publish is manifest-driven via sc-publish; ambiguous workspace globs and missing channel declarations break preflight and release automation.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling 2026-11-21: crates.io is deferred until sc-config is released ("sc-config not ready yet"); the wheel and binaries publish now.
 
 ### Success Criteria
 
