@@ -17,6 +17,11 @@
 - Replace `CancelToken` with `sc_agent.Cancel` and call its `cancel()` method to stop work.
 - Use `jev` instead of `jev-latest` as the Jev model name; an explicit version such as `jev-1.14.0` pins the model.
 
+## 0.2.9
+
+- 0.2.8 was not fully released: only `sc-agent-types` and `sc-agent-config` 0.2.8 reached crates.io; no GitHub Release or other channel was published. 0.2.9 is the first complete 0.2 release and contains everything listed under 0.2.8.
+- Fix crates.io packaging of `sc-agent-secrets`, `sc-agent-http` and `sc-agent-log`: their dev-dependency on the crate itself is now declared by path, so `cargo publish` leaves it out of the published crate.
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.
