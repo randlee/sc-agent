@@ -87,10 +87,32 @@
   ],
   "release_binaries": [
     {
-      "name": "decidr"
+      "name": "decidr",
+      "bundled_paths": [
+        {
+          "source": "site/cli/decidr",
+          "destination": "docs/decidr",
+          "homebrew_destination_components": [
+            "pkgshare",
+            "docs",
+            "decidr"
+          ]
+        }
+      ]
     },
     {
-      "name": "sitr"
+      "name": "sitr",
+      "bundled_paths": [
+        {
+          "source": "site/cli/sitr",
+          "destination": "docs/sitr",
+          "homebrew_destination_components": [
+            "pkgshare",
+            "docs",
+            "sitr"
+          ]
+        }
+      ]
     }
   ],
   "python_packages": [
@@ -251,5 +273,9 @@
     "post_install": "{python} scripts/install_wheels.py --stage \"{stage_dir}\" {wheels}",
     "verify": "{python} scripts/install_wheels.py --verify --stage \"{stage_dir}\" --version {version}"
   },
-  "preflight_checks": []
+  "preflight_checks": [],
+  "archive_verification": [
+    "bash",
+    ".github/scripts/run-consumer-preflight.sh"
+  ]
 }

@@ -1,4 +1,5 @@
 schema_version = 1
+archive_verification = ["bash", ".github/scripts/run-consumer-preflight.sh"]
 
 [project]
 name = "sc-agent"
@@ -85,8 +86,10 @@ verify_registry_visibility = false
 
 [[release_binaries]]
 name = "decidr"
+bundled_paths = [{ source = "site/cli/decidr", destination = "docs/decidr", homebrew_destination_components = ["pkgshare", "docs", "decidr"] }]
 [[release_binaries]]
 name = "sitr"
+bundled_paths = [{ source = "site/cli/sitr", destination = "docs/sitr", homebrew_destination_components = ["pkgshare", "docs", "sitr"] }]
 
 [[python_packages]]
 artifact = "sc-agent-py-wheel"
