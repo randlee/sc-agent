@@ -263,7 +263,7 @@ fn lookup(
     name: &str,
     callback: &Option<Py<PyAny>>,
     cancel: &sc_agent::Cancel,
-) -> Result<String, String> {
+) -> Result<String, sc_agent::KeyringError> {
     match callback {
         None => sc_agent::os_keyring(name),
         Some(callback) => Python::attach(|py| {
@@ -274,7 +274,7 @@ fn lookup(
                     if e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
                         cancel.cancel();
                     }
-                    e.to_string()
+                    sc_agent::KeyringError::Read(e.to_string())
                 })
         }),
     }

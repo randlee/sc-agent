@@ -42,7 +42,7 @@ fn req_sag_0401_env_dotenv_keyring_order_and_invalid_credentials() -> Test {
     }
     assert_eq!(calls.borrow().len(), 1);
     let failure = key("TYPESAFE_API_KEY", &[], &root.0, &|_| {
-        Err("controlled refusal".into())
+        Err(sc_agent::KeyringError::Read("controlled refusal".into()))
     })
     .err()
     .ok_or("keyring failure lost")?;

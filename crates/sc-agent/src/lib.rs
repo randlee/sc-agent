@@ -69,6 +69,9 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         message: message.to_string(),
         category,
         action: match category {
+            "auth" if id == "secrets.keyring_timeout" => {
+                "Approve keychain access, or set the environment variable or .env key."
+            }
             "auth" => "Check the provider API key.",
             "busy" | "network" => "Retry later.",
             _ => "Fix the named input or provider response.",
@@ -214,11 +217,21 @@ pub fn default_logger(name: &str) -> Result<Logger, Error> {
     config.enable_console_sink = false;
     Logger::new(config).map_err(|e| error("config.logger", e))
 }
+#[derive(Debug)]
+pub enum KeyringError {
+    Read(String),
+    Timeout,
+}
+impl From<String> for KeyringError {
+    fn from(value: String) -> Self {
+        Self::Read(value)
+    }
+}
 pub fn key(
     variable: &str,
     environment: &[(OsString, OsString)],
     root: &Path,
-    keyring: &dyn Fn(&str) -> Result<String, String>,
+    keyring: &dyn Fn(&str) -> Result<String, KeyringError>,
 ) -> Result<String, Error> {
     let env = environment
         .iter()
@@ -241,7 +254,10 @@ pub fn key(
         Some(value) => value,
         None => match dotenv()? {
             Some(value) => value,
-            None => keyring(variable).map_err(|e| error("secrets.keyring_read", e))?,
+            None => keyring(variable).map_err(|e| match e {
+                KeyringError::Read(message) => error("secrets.keyring_read", message),
+                KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
+            })?,
         },
     };
     if value.is_empty() {
@@ -258,22 +274,76 @@ pub fn key(
     }
     Ok(value)
 }
-pub fn os_keyring(variable: &str) -> Result<String, String> {
+fn keyring_wait(
+    reader: impl FnOnce() -> Result<String, String> + Send + 'static,
+    timeout: Duration,
+) -> Result<String, KeyringError> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let _ = sender.send(reader());
+    });
+    match receiver.recv_timeout(timeout) {
+        Ok(value) => value.map_err(KeyringError::Read),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(KeyringError::Timeout),
+        Err(error) => Err(KeyringError::Read(error.to_string())),
+    }
+}
+pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
     let variable = variable.to_owned();
     let account = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
-        .map_err(|e| e.to_string())?;
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-    std::thread::spawn(move || {
-        let value = keyring::Entry::new(&variable, &account)
-            .and_then(|entry| entry.get_password())
-            .map_err(|e| e.to_string());
-        let _ = sender.send(value);
-    });
-    receiver
-        .recv_timeout(Duration::from_secs(15))
-        .map_err(|e| e.to_string())?
+        .map_err(|e| KeyringError::Read(e.to_string()))?;
+    keyring_wait(
+        move || {
+            keyring::Entry::new(&variable, &account)
+                .and_then(|entry| entry.get_password())
+                .map_err(|e| e.to_string())
+        },
+        Duration::from_secs(15),
+    )
 }
+
+#[cfg(test)]
+mod keyring_timeout_test {
+    use super::*;
+    #[test]
+    fn nonresponding_reader_is_a_typed_timeout() {
+        let (release, wait) = std::sync::mpsc::channel::<()>();
+        let value = keyring_wait(
+            move || {
+                let _ = wait.recv();
+                Ok("unused".into())
+            },
+            Duration::ZERO,
+        );
+        let result = key(
+            "TYPESAFE_API_KEY",
+            &[],
+            Path::new("/nonexistent"),
+            &|_| match value {
+                Err(KeyringError::Timeout) => Err(KeyringError::Timeout),
+                _ => Err(KeyringError::Read("unexpected".into())),
+            },
+        );
+        let _ = release.send(());
+        let error = serde_json::to_value(result.err()).ok();
+        assert_eq!(
+            error
+                .as_ref()
+                .and_then(|e| e.get("id"))
+                .and_then(Value::as_str),
+            Some("secrets.keyring_timeout")
+        );
+        assert!(
+            error
+                .as_ref()
+                .and_then(|e| e.get("action"))
+                .and_then(Value::as_str)
+                .is_some_and(|s| s.contains(".env"))
+        );
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct Provider {
     pub name: &'static str,
@@ -636,7 +706,7 @@ pub fn send(
     logger: &Logger,
     cancel: &Cancel,
     wait: &(dyn Fn(Duration) + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
+    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
 ) -> Result<Value, Error> {
     let session_id = ulid::Ulid::new().to_string();
     let digests = request
@@ -906,7 +976,7 @@ pub fn batch(
     logger: &Logger,
     cancel: &Cancel,
     wait: &(dyn Fn(Duration) + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
+    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
     requests.iter().try_for_each(validate_request_size)?;

@@ -460,7 +460,7 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
     let keys = std::sync::atomic::AtomicUsize::new(0);
     let got = sc_agent::result(send(&request(), &opts, &logger, &cancel, &no_wait, &|_| {
         keys.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        Err("unexpected lookup".into())
+        Err(sc_agent::KeyringError::Read("unexpected lookup".into()))
     }));
     assert_eq!(got["error"]["id"], "decision.cancelled");
     assert_eq!(keys.load(std::sync::atomic::Ordering::SeqCst), 0);
