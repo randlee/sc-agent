@@ -11,7 +11,7 @@ Every operation returns a result envelope and does not raise for an operation fa
 - `send(request, *, model=None, provider=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, cancel=None, base_url=None, sleep=None, keyring_lookup=None)` sends one JSON request. `request` may be a JSON string or object. `model` accepts a provider short name or model id. If `provider` is omitted, the first provider table containing the selector is used; reseller ids can pass through unchanged. `project` and `agent_role` tag the session record. `config_dir` selects configuration files. `timeout_secs` sets the per-call timeout; `cancel` is a `Cancel` shared with the caller. `base_url`, `sleep`, and `keyring_lookup` inject the endpoint and retry/keyring behavior when needed.
 - `send_batch(requests, *, model=None, provider=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, on_result=None, cancel=None, base_url=None, sleep=None, keyring_lookup=None)` sends a sequence of requests and returns one indexed result for each input. `workers` sets the fan-out, `on_result(index, result)` receives each completed result, and the other options match `send`.
 - `digest(request, question, *, general_log=None)` returns the digest for one question in a request.
-- `Cancel()` creates a reusable cancellation flag. Call `cancel.cancel()` to stop new requests; completed results remain available and unfinished batch entries return a `CANCELED` error.
+- `Cancel()` creates a reusable cancellation flag. Call `cancel.cancel()` to stop new requests; completed results remain available and unfinished batch entries return a `decision.cancelled` error.
 
 ### Logging
 
