@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.9.0  
+**Version:** 0.10.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and the one error enum.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`.
 
 **Requirements:**
 
@@ -80,7 +80,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
 2. **Typed fields: `attempts` and `category`.**
 
-   There is one error enum. Its error value carries `id`, `message` and `action`, and two optional fields. Unset is not written.
+   An error value carries at least `id`, `message` and `action`, and the typed fields below when they apply. It may carry more fields. Unset is not written.
 
    | Field | Meaning |
    | --- | --- |
