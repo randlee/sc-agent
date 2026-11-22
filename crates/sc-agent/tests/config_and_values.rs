@@ -46,7 +46,16 @@ fn req_sag_0401_env_dotenv_keyring_order_and_invalid_credentials() -> Test {
     })
     .err()
     .ok_or("keyring failure lost")?;
-    assert!(failure.to_string().contains("controlled refusal"));
+    let failure = serde_json::to_value(failure)?;
+    assert_eq!(failure["id"], "secrets.keyring_read");
+    let message = failure["message"]
+        .as_str()
+        .ok_or("keyring failure message absent")?;
+    assert!(message.contains("platform keyring is unavailable"));
+    assert!(message.contains("TYPESAFE_API_KEY"));
+    assert!(message.contains("environment"));
+    assert!(message.contains(".env"));
+    assert!(!message.contains("controlled refusal"));
     Ok(())
 }
 
