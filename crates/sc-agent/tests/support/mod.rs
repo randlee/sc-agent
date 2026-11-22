@@ -64,6 +64,7 @@ pub fn answer() -> Value {
 }
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
+    HttpIfComplete(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
     Never,
 }
@@ -143,7 +144,7 @@ impl Stub {
                 stream.set_write_timeout(Some(Duration::from_secs(5)))?;
                 let request = match read_request(&mut stream) {
                     Ok(request) => request,
-                    Err(_) if matches!(&reply, Reply::Never) => {
+                    Err(_) if matches!(&reply, Reply::Never | Reply::HttpIfComplete(..)) => {
                         // A timeout during connect/write is still an attempted send.
                         seen.push(Request {
                             path: String::new(),
@@ -160,7 +161,8 @@ impl Stub {
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
                     Reply::Never => unanswered.push(stream),
-                    Reply::Http(status, headers, body) => {
+                    Reply::Http(status, headers, body)
+                    | Reply::HttpIfComplete(status, headers, body) => {
                         write!(
                             stream,
                             "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",

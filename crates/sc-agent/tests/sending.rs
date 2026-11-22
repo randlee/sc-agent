@@ -108,7 +108,6 @@ fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
         Reply::Never,
     ];
     let stub = Stub::new(replies)?;
-    let configured_timeout = options(&root, &stub.url).timeout;
     let mut overridden = options(&root, &stub.url);
     overridden.timeout = Duration::from_millis(50);
 
@@ -134,22 +133,51 @@ fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
     })?;
     assert_eq!(timed_out["error"]["id"], "http.network");
     assert_eq!(timed_out["error"]["attempts"], 5);
-    assert_eq!(configured_timeout, Duration::from_secs(5));
+    let _ = stub.finish()?;
+    logger.shutdown()?;
+    Ok(())
+}
 
-    let success_stub = Stub::new(vec![http(200, answer())])?;
-    let configured = options(&root, &success_stub.url);
-    assert_eq!(configured.timeout, configured_timeout);
-    let plain = send(
+#[test]
+fn req_sag_0702_later_plain_call_uses_configured_timeout() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let configured_timeout = Duration::ZERO;
+
+    let override_stub = Stub::new(vec![http(200, answer())])?;
+    let mut overridden = options(&root, &override_stub.url);
+    overridden.timeout = Duration::from_secs(5);
+    assert_ne!(overridden.timeout, configured_timeout);
+    let override_result = send(
         &request(),
-        &configured,
+        &overridden,
         &logger,
         &Cancel::default(),
         &no_wait,
         &keyring,
     )?;
-    assert_eq!(plain["answers"], answer()["answers"]);
-    let _ = stub.finish()?;
-    assert_eq!(success_stub.finish()?.len(), 1);
+    assert_eq!(override_result["answers"], answer()["answers"]);
+    assert_eq!(override_stub.finish()?.len(), 1);
+
+    let plain_stub = Stub::new(vec![Reply::HttpIfComplete(
+        200,
+        vec![],
+        answer().to_string(),
+    )])?;
+    let mut plain_options = options(&root, &plain_stub.url);
+    plain_options.timeout = configured_timeout;
+    assert_eq!(plain_options.timeout, configured_timeout);
+    let plain = sc_agent::result(send(
+        &request(),
+        &plain_options,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(plain["error"]["id"], "http.network");
+    assert_eq!(plain["error"]["attempts"], 5);
+    let _ = plain_stub.finish()?;
     logger.shutdown()?;
     Ok(())
 }
