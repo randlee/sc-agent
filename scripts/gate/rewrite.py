@@ -137,7 +137,9 @@ with tempfile.TemporaryDirectory(prefix="sc-agent-rewrite-") as temporary:
             check("wheel install", [f"expected one wheel, found {len(wheels)}"])
     if installed and cli_ready:
         run("wheel and CLI contracts", [sys.executable, "-m", "unittest", "discover", "-s", "tests/contract", "-v"])
+        run("rendered wheel loopback contracts", [sys.executable, "crates/sc-agent-py/tests/loopback.py"])
     else:
         check("wheel and CLI contracts", ["not run: current binaries and wheel must build first"])
+        check("rendered wheel loopback contracts", ["not run: current wheel must build first"])
 print("FAILED: " + ", ".join(failed) if failed else "All rewrite gates passed", flush=True)
 sys.exit(bool(failed))

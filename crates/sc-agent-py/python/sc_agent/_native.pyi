@@ -2,11 +2,11 @@
 
 Every function returns a result value, never raises: {"ok": True, "value": ...} or
 {"ok": False, "error": {"id", "message", "action", "category", ...}}.
+The public Cancel class and sitr package module are declared by sc_agent/__init__.pyi.
 """
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from sc_agent import Cancel
 
 Envelope = dict[str, Any]
 Request = str | dict[str, Any]
@@ -25,7 +25,7 @@ def send(
     config_dir: str | None = None,
     general_log: object = None,
     timeout_secs: float | None = None,
-    cancel: Cancel | None = None,
+    cancel: object | None = None,
     base_url: str | None = None,
     sleep: Callable[[float], object] | None = None,
     keyring_lookup: Callable[[str], str] | None = None,
@@ -42,7 +42,7 @@ def send_batch(
     timeout_secs: float | None = None,
     workers: int | None = None,
     on_result: Callable[[int, Envelope], object] | None = None,
-    cancel: Cancel | None = None,
+    cancel: object | None = None,
     base_url: str | None = None,
     sleep: Callable[[float], object] | None = None,
     keyring_lookup: Callable[[str], str] | None = None,
