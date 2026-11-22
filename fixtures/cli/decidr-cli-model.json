@@ -63,7 +63,7 @@
       "description": "",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: decidr send [OPTIONS]",
+      "usage": "Usage: decidr send [OPTIONS] --agent-role <AGENT_ROLE>",
       "options": [
         {
           "name": "agent_role",
@@ -72,8 +72,8 @@
           "help": "",
           "long_help": "",
           "value_name": "AGENT_ROLE",
-          "required": false,
-          "default_value": "decidr",
+          "required": true,
+          "default_value": null,
           "choices": [],
           "min_values": null,
           "max_values": null
