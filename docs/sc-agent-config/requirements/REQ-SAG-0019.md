@@ -1,16 +1,16 @@
 # Requirement: Configuration file locations and lookup order
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0019: Configuration file locations and lookup order
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 

@@ -1,9 +1,9 @@
 # Decision: sitr's Python API is built into the sc-decidr wheel; sitr is its own crate
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0005: sitr's Python API is built into the sc-decidr wheel; sitr is its own crate
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Related Documents
 

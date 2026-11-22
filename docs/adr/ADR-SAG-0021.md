@@ -1,9 +1,9 @@
 # Decision: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.4.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-19  
 
@@ -11,7 +11,7 @@
 
 ## ADR-SAG-0021: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Related Documents
 

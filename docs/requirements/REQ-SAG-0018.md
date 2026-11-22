@@ -3,7 +3,7 @@
 **Status:** Approved  
 **Version:** 0.7.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
@@ -56,7 +56,7 @@ Definitions:
 - The consumer module MUST call only the permitted API.
 - Every decision call in the consumer module MUST pass a `Cancel`.
 - The consumer module MUST cancel that `Cancel` on `KeyboardInterrupt`.
-- The public API MUST stay documented in `sc_agent.pyi`.
+- The public API MUST stay documented in `sc_agent/__init__.pyi`.
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
 - The wheel README MUST give the consumer template's render command.

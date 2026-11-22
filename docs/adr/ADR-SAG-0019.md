@@ -3,7 +3,7 @@
 **Status:** Approved  
 **Version:** 0.9.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -208,7 +208,7 @@ The work lands on one branch, `rewrite/v1`, and merges into `develop` in one PR.
 Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
-- The consumer template and the `sc_agent.pyi` stub.
+- The consumer template and the `sc_agent/__init__.pyi` stub.
 - `floors.toml`.
 - The sc-decidr wheel, holding the decidr and sitr APIs, released to PyPI.
 

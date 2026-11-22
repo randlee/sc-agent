@@ -1,16 +1,16 @@
 # Requirement: Logger injection into the Rust API and the wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0008: Logger injection into the Rust API and the wheel
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 

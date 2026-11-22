@@ -1,16 +1,16 @@
 # Requirement: The generated client owns its Logger
 
-**Status:** Proposed  
+**Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-19  
+**Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
 
 ---
 
 ## REQ-SAG-0022: The generated client owns its Logger
 
-**Status:** Proposed  
+**Status:** Approved  
 
 ### Requirement Statement
 
