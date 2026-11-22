@@ -173,7 +173,7 @@ jobs:
 
   # Product contracts exercise the installed wheel and built CLIs over loopback HTTP.
   sc-agent-py:
-    name: sc-agent-py wheel and pytest
+    name: sc-decidr wheel and CLI contracts
     needs: [detect, fmt]
     if: ${{ needs.detect.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
@@ -191,6 +191,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy,rustfmt
 
       - name: Cache cargo
         uses: actions/cache@v4
