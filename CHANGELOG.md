@@ -12,6 +12,7 @@
 
 ### Consumer migration
 
+- For an existing separate `sitr` wheel installation, follow the [sitr migration instructions](README.md#migrating-from-the-separate-sitr-wheel).
 - For plan-anchor and judge-jev, render the shared `consumer.py.j2` template from the installed, pinned sc-decidr wheel with the consumer's `client_name` and `sitr` settings. Handle returned errors instead of catching client exceptions.
 - Obtain the logger handle from `sc_agent.logger`'s success value and pass that same handle as `general_log` to decision, batch and sitr calls; use the wheel's logging API for consumer events.
 - Replace `CancelToken` with `sc_agent.Cancel` and call its `cancel()` method to stop work.
