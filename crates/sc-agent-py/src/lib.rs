@@ -1,6 +1,6 @@
 use pyo3::{
     prelude::*,
-    types::{PyCapsule, PyDict},
+    types::{PyCFunction, PyCapsule, PyDict, PyTuple},
 };
 use sc_agent::{Error, error};
 use sc_observability::v2::Logger;
@@ -164,11 +164,7 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
     if let Some(workers) = workers {
         settings.workers = workers;
     }
-    let log_root = settings
-        .log_root
-        .clone()
-        .map(Ok)
-        .unwrap_or_else(|| sc_agent::log_root("decidr"))?;
+    let log_root = sc_agent::log_root("decidr")?;
     Ok(sc_agent::Options {
         environment: std::env::vars_os().collect(),
         settings,
@@ -531,17 +527,30 @@ fn run(
 }
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(logger, module)?)?;
-    module.add_function(wrap_pyfunction!(log, module)?)?;
-    module.add_function(wrap_pyfunction!(flush, module)?)?;
-    module.add_function(wrap_pyfunction!(digest, module)?)?;
-    module.add_function(wrap_pyfunction!(send, module)?)?;
-    module.add_function(wrap_pyfunction!(send_batch, module)?)?;
-    module.add_function(wrap_pyfunction!(_new_cancel, module)?)?;
-    module.add_function(wrap_pyfunction!(_cancel, module)?)?;
-    module.add_function(wrap_pyfunction!(languages, module)?)?;
-    module.add_function(wrap_pyfunction!(queries, module)?)?;
-    module.add_function(wrap_pyfunction!(query, module)?)?;
-    module.add_function(wrap_pyfunction!(run, module)?)?;
+    macro_rules! register {
+        ($($function:ident => $name:expr),* $(,)?) => {$({
+            let function = wrap_pyfunction!($function, module)?.unbind();
+            module.add_function(PyCFunction::new_closure(
+                module.py(), Some($name), None,
+                move |args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>| {
+                    let py = args.py();
+                    match function.bind(py).call(args, kwargs) {
+                        Ok(value) => value.unbind(),
+                        Err(failure) => {
+                            let given = kwargs.and_then(|v| v.get_item("general_log").ok().flatten());
+                            let name = if matches!(stringify!($function), "languages" | "queries" | "query" | "run") { "sitr" } else { "decidr" };
+                            respond(py, given.as_ref(), name, |_| Err(error("sc_agent_py.invalid_call", failure)))
+                        },
+                    }
+                },
+            )?)?;
+        })*};
+    }
+    register!(
+        logger => c"logger", log => c"log", flush => c"flush", digest => c"digest",
+        send => c"send", send_batch => c"send_batch", _new_cancel => c"_new_cancel",
+        _cancel => c"_cancel", languages => c"languages", queries => c"queries",
+        query => c"query", run => c"run",
+    );
     Ok(())
 }

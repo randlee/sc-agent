@@ -97,8 +97,6 @@ pub struct Settings {
     #[serde(default = "default_workers")]
     pub workers: usize,
     #[serde(default)]
-    pub log_root: Option<PathBuf>,
-    #[serde(default)]
     pub laya: Option<Runner>,
 }
 fn default_workers() -> usize {
@@ -110,10 +108,6 @@ impl Settings {
     }
 }
 pub const KEYS: &[Key] = &[
-    Key {
-        path: "log_root",
-        env: EnvValue::String,
-    },
     Key {
         path: "project",
         env: EnvValue::String,
@@ -1014,7 +1008,7 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
         &std::env::vars_os().collect::<Vec<_>>(),
         project,
     )?;
-    Ok(json!({"settings":layers::resolved(&loaded,KEYS)}))
+    Ok(json!({"settings":layers::resolved(&loaded,KEYS), "log_root":log_root("decidr")?}))
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {

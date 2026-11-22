@@ -43,7 +43,6 @@ pub fn options(root: &Temp, url: &str) -> Options {
         settings: Settings {
             project: Some("phase-b".into()),
             workers: 1,
-            log_root: None,
             laya: None,
         },
         model: "jev".into(),
