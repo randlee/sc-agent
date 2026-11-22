@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.9.0  
+**Version:** 0.10.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
@@ -80,7 +80,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
 2. **Typed fields: `attempts` and `category`.**
 
-   There is one error enum. Its error value carries `id`, `message` and `action`, and two optional fields. Unset is not written.
+   An error value carries at least `id`, `message` and `action`, and the typed fields below when they apply. It may carry more fields. Unset is not written.
 
    | Field | Meaning |
    | --- | --- |

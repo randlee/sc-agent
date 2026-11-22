@@ -1,7 +1,7 @@
 # Requirement: Error values carry the send count and category as typed fields
 
 **Status:** Approved  
-**Version:** 0.8.0  
+**Version:** 0.9.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
@@ -16,8 +16,8 @@
 
 Definitions:
 
-- An error value is the `error` object that the CLI, the Python binding, session rows and result lines carry. It has an `id`, a `message` and an `action`.
-- The typed fields are two optional fields of an error value:
+- An error value is the `error` object that the CLI, the Python binding, session rows and result lines carry. It has at least an `id`, a `message` and an `action`, and may carry more fields.
+- The typed fields are these optional fields of an error value:
   - `attempts`, the sends made with the first included;
   - `category`, the error category that REQ-SAG-0017 assigns.
 
@@ -32,6 +32,8 @@ Definitions:
 **MUST NOT statements:**
 
 - A consumer MUST NOT need to parse message text to obtain a send count or category.
+
+Owner ruling (2026-11-21), Rand Lee: "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
 
 ### Rationale
 
