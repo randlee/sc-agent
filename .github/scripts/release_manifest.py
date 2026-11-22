@@ -67,6 +67,20 @@ def load_manifest(path: Path, *, with_channel_contracts: bool = False) -> dict:
         "npm_packages": data.get("npm_packages", []),
         "channels": data.get("channels", {}),
     }
+    if "archive_verification" in data:
+        from archive_verification import configuration
+        manifest["archive_verification"] = configuration(data)
+    if "rc_python_compatibility" in data:
+        from rc_python_compatibility import configuration
+        configuration(data)
+        manifest["rc_python_compatibility"] = data["rc_python_compatibility"]
+    if "go_modules" in data:
+        from go_release import configuration
+        manifest["go_modules"] = configuration(data)
+    if "publication_continuity" in data:
+        from publication_continuity import configuration
+        configuration(data)
+        manifest["publication_continuity"] = data["publication_continuity"]
     # Optional: the prerelease skill's table is validated only when declared.
     if "prerelease" in data:
         manifest["prerelease"] = data["prerelease"]
@@ -656,6 +670,8 @@ def check_version_publication(
     }
     unexpected, preserved = [], []
     for crate in manifest["crates"]:
+        if not crate.get("publish", True):
+            continue
         check = _public_registry_checks(
             manifest["channel_contracts"], "crates_io", crate["package"], version
         )[0]
@@ -731,6 +747,12 @@ def _channel_preflight_result(
             "requirements": [requirement],
             "status": _preflight_outcome_status(outcomes.get(outcome_key)),
         })
+    if channel.get("publication_continuity"):
+        checks.append({
+            "kind": "publication_continuity",
+            "requirements": ["preserve previous publications or record user-approved deprecations"],
+            "status": _preflight_outcome_status(outcomes.get("publication_continuity")),
+        })
     for key, outcome_key, fallback_key in (
         ("repository_secrets", "repository_secret_channels", "repository_secrets"),
         ("environment_secrets", "environment_secrets", None),
@@ -771,6 +793,8 @@ def cmd_list_publish_plan(args: object) -> int:
     """Render the ordered plan, retaining the legacy fields unless requested."""
     manifest = load_manifest(Path(args.manifest))
     for crate in manifest["crates"]:
+        if not crate.get("publish", True):
+            continue
         row = f"{crate['package']}|{crate['wait_after_publish_seconds']}"
         if args.include_manifest:
             row += f"|{crate['cargo_toml']}"

@@ -14,6 +14,7 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
+from unittest.mock import patch
 
 import pytest
 from test_fail_closed_probes import extract_run_block
@@ -248,6 +249,10 @@ def scripts_root() -> Path:
     return repo_root() / ".github" / "scripts"
 
 
+sys.path.insert(0, str(scripts_root()))
+import release_manifest as release_manifest_module
+
+
 def test_release_artifact_cli_stays_below_the_script_line_ceiling() -> None:
     cli_lines = (scripts_root() / "release_artifacts.py").read_text(
         encoding="utf-8"
@@ -287,6 +292,10 @@ def run_release_archive_packager(
         "}))\n",
         encoding="utf-8",
     )
+    (scripts_dir / "archive_verification.py").write_bytes((scripts_root() / "archive_verification.py").read_bytes())
+    fixture_manifest = tmp_path / "release" / "manifest.toml"
+    fixture_manifest.parent.mkdir()
+    fixture_manifest.write_text("schema_version = 1\n", encoding="utf-8")
     release_dir = tmp_path / "target" / target_name / "release"
     release_dir.mkdir(parents=True)
     (release_dir / expected_filename).write_text("fixture", encoding="utf-8")
@@ -310,6 +319,7 @@ def run_release_archive_packager(
         check=False,
         timeout=TEST_COMMAND_TIMEOUT_SECONDS,
     )
+    assert result.returncode == 0, result.stderr
     assert output.read_text(encoding="utf-8").startswith("ARCHIVE=fixture_1.5.0_")
     return result
 
@@ -508,14 +518,9 @@ def run_release_gate_readiness(
 
 def release_tag_step_shell() -> str:
     """Extract the executed shell body that creates or safely reuses a release tag."""
-    workflow = release_workflow_text()
-    step = workflow.split("      - name: Ensure tag is correct or create it\n", 1)[1].split(
-        "\n  build:\n", 1
-    )[0]
-    body = step.split("        run: |\n", 1)[1]
-    lines = body.splitlines()
-    assert all(not line or line.startswith("          ") for line in lines)
-    return "\n".join(line[10:] if line else "" for line in lines)
+    import yaml
+    steps = yaml.safe_load(release_workflow_text())["jobs"]["gate-and-tag"]["steps"]
+    return next(step["run"] for step in steps if step.get("id") == "release-ref")
 
 
 def run_release_tag_step(
@@ -696,6 +701,7 @@ def run_release_preflight_channel_results_shell(
         **os.environ,
         "OWNERSHIP": "success",
         "IMMUTABLE_RELEASES": "success",
+        "PUBLICATION_CONTINUITY": "success",
         "RELEASE_METADATA": "success",
         "RELEASE_TAG": "v1.5.0",
         "REPOSITORY_SECRETS": "success",
@@ -930,7 +936,7 @@ def test_crates_leg_is_separate_and_independently_retryable() -> None:
     crates_text = crates_publish_workflow_text()
 
     # The GitHub Release leg must not depend on crates.io publication.
-    assert "needs: [gate-and-tag, build, build-python-wheels, build-python-sdists, build-npm]" in release_text
+    assert "needs: [gate-and-tag, build, build-python-wheels, build-python-sdists, build-npm, go-verified]" in release_text
     assert "needs: [gate-and-tag, build, publish," not in release_text
 
     assert "workflow_dispatch:" in crates_text
@@ -976,6 +982,23 @@ def test_release_archive_packager_executes_windows_suffix_logic(
         assert packaged.namelist() == [
             f"fixture_1.5.0_{target_name}/bin/{expected_filename}"
         ]
+
+
+@pytest.mark.parametrize(("target_name", "expected_filename"), [
+    ("x86_64-pc-windows-gnu", "fixture.exe"),
+    ("x86_64-pc-windows-msvc", "fixture.exe"),
+    ("x86_64-unknown-linux-gnu", "fixture"),
+])
+def test_suffix_fixture_supports_installed_archive_verifier(tmp_path, monkeypatch, target_name, expected_filename):
+    monkeypatch.syspath_prepend(str(scripts_root()))
+    from archive_verification import extend_workflow
+    original = release_workflow_text()
+    opted = extend_workflow(original, {"archive_verification": ["unused-consumer-verifier", "{stage_dir}"]})
+    monkeypatch.setattr(sys.modules[__name__], "release_workflow_text", lambda: opted)
+    result = run_release_archive_packager(tmp_path, target_name=target_name, expected_filename=expected_filename)
+    assert result.returncode == 0, result.stderr
+    with zipfile.ZipFile(tmp_path / f"fixture_1.5.0_{target_name}.zip") as archive:
+        assert archive.namelist() == [f"fixture_1.5.0_{target_name}/bin/{expected_filename}"]
 
 
 def test_github_release_leg_is_detect_and_skip(tmp_path: Path) -> None:
@@ -1046,6 +1069,11 @@ def test_no_single_repo_concerns_leak_into_kit_workflows_actions_or_scripts() ->
     )
     kit_scripts = (
         "bootstrap_sc_compose.py",
+        "publication_continuity.py",
+        "go_release.py",
+        "archive_verification.py",
+        "rc_python_compatibility.py",
+        "publication_inventory.py",
         "setup_sc_lint_source.py",
         "release_artifacts.py",
         "release_manifest.py",
@@ -1747,10 +1775,10 @@ def test_verify_python_release_assets_accepts_manifest_declared_wheels_and_sdist
 
 
 def assert_manifest_crates_and_channels(manifest: dict) -> None:
-    """Check ordered crate declarations and every configured channel."""
-    crates = [entry for entry in manifest["crates"] if entry.get("publish", True)]
+    """Check declared publish order, independent of TOML declaration order."""
+    crates = sorted((entry for entry in manifest["crates"] if entry.get("publish", True)),
+                    key=lambda entry: entry["publish_order"])
     orders = [entry["publish_order"] for entry in crates]
-    assert orders == sorted(orders)
     assert len(orders) == len(set(orders))
     names = [entry["package"] for entry in crates]
     positions = {name: names.index(name) for name in names}
@@ -1778,8 +1806,9 @@ def test_release_manifest_publishes_sc_sha_before_its_consumers() -> None:
     assert_manifest_crates_and_channels(require_manifest_crates())
 
 
+@pytest.mark.parametrize("reverse", [False, True])
 @pytest.mark.parametrize("channels", [None, {}, {"pypi": {"workflow": "publish.yml", "dispatch_inputs": {}}}])
-def test_manifest_crate_checks_accept_optional_and_configured_channels(channels: dict | None) -> None:
+def test_manifest_crate_checks_accept_optional_and_configured_channels(channels: dict | None, reverse: bool) -> None:
     crates = [
         {"artifact": name, "package": name, "cargo_toml": f"{name}/Cargo.toml",
          "publish_order": order, "wait_after_publish_seconds": 0}
@@ -1788,6 +1817,8 @@ def test_manifest_crate_checks_accept_optional_and_configured_channels(channels:
     manifest = {"crates": crates}
     if channels is not None:
         manifest["channels"] = channels
+    if reverse:
+        manifest["crates"] = list(reversed(crates))
     assert_manifest_crates_and_channels(manifest)
     crates[1]["publish_order"] = 1
     with pytest.raises(AssertionError):
@@ -2296,7 +2327,8 @@ def test_public_registry_check_plan_assigns_named_agents_and_normalizes_python_n
     crates = [entry for entry in checks if entry["channel"] == "crates_io"]
     pypi = [entry for entry in checks if entry["channel"] == "pypi"]
     assert [entry["name"] for entry in crates] == [
-        entry["package"] for entry in manifest["crates"]
+        entry["package"] for entry in sorted(manifest["crates"], key=lambda entry: (entry["publish_order"], entry["artifact"]))
+        if entry.get("publish", True)
     ]
     assert all(entry["agent"] == "crates-io-publisher" for entry in crates)
     assert all(entry["version_policy"] == "must_be_absent" for entry in crates)
@@ -2306,6 +2338,29 @@ def test_public_registry_check_plan_assigns_named_agents_and_normalizes_python_n
         assert all(entry["agent"] == "pypi-publisher" for entry in pypi)
         assert all("_" not in entry["normalized_name"] for entry in pypi)
         assert any(entry["version_policy"] == "informational" for entry in pypi)
+
+
+def test_registry_plan_obeys_publish_order_with_shuffled_declarations(tmp_path):
+    _, manifest = write_repo_fixture(tmp_path, manifest_wheels=["ubuntu-latest"], include_python=False)
+    text = manifest.read_text()
+    blocks = re.findall(r"\[\[crates\]\]\n.*?(?=\n\[|\Z)", text, re.S)
+    assert len(blocks) == 2
+    unpublished = blocks[0].replace('sc-composer', 'unpublished').replace('publish = true', 'publish = false').replace('publish_order = 1', 'publish_order = 0')
+    text = text.replace(blocks[0], 'CRATE_PLACEHOLDER').replace(blocks[1], blocks[0]).replace('CRATE_PLACEHOLDER', unpublished + "\n" + blocks[1])
+    manifest.write_text(text)
+    assert_manifest_crates_and_channels(tomllib.loads(text))
+    result = run_fixture_command(tmp_path, "public-registry-check-plan", "--version", "1.4.2", manifest=manifest)
+    assert result.returncode == 0, result.stderr
+    checks = json.loads(result.stdout)["checks"]
+    assert [entry["name"] for entry in checks if entry["channel"] == "crates_io"] == ["sc-composer", "sc-compose"]
+    plan = run_fixture_command(tmp_path, "list-publish-plan", manifest=manifest)
+    assert plan.returncode == 0, plan.stderr
+    assert plan.stdout.splitlines() == ["sc-composer|0", "sc-compose|0"]
+    # An unpublished crate must not trigger even a registry lookup.
+    with patch.object(release_manifest_module, "registry_version_state", return_value="absent") as lookup:
+        assert release_manifest_module.check_version_publication(manifest, "1.4.2", "") == ([], [])
+    assert lookup.call_count == 2
+    assert all("unpublished" not in call.args[0] for call in lookup.call_args_list)
 
 
 def test_public_registry_inquiry_plan_is_contract_derived_and_read_only() -> None:
@@ -2682,7 +2737,12 @@ def test_root_release_workflow_threads_retry_provenance_and_builds_from_main() -
     assert 'git tag "$tag" "$main_sha"' in workflow
     assert "build_ref: ${{ steps.release-ref.outputs.build_ref }}" in workflow
     assert workflow.count('echo "build_ref=$main_sha" >> "$GITHUB_OUTPUT"') == 1
-    assert workflow.count("needs.gate-and-tag.outputs.build_ref") == 10
+    import yaml
+    jobs = yaml.safe_load(workflow)["jobs"]
+    for name in ("build", "publish", "release-plan", "build-python-wheels", "build-python-sdists",
+                 "build-npm", "publish-testpypi", "release", "go-plan", "build-go-modules", "go-verified"):
+        checkout = next(step for step in jobs[name]["steps"] if step.get("uses", "").startswith("actions/checkout@"))
+        assert checkout["with"]["ref"] == "${{ needs.gate-and-tag.outputs.build_ref }}", name
     assert "gate-and-tag.outputs.release_ref" not in workflow
     assert "ref: ${{ needs.gate-and-tag.outputs.release_tag }}" not in workflow
     assert "ref: ${{ needs.gate-and-tag.outputs.release_ref }}" not in workflow

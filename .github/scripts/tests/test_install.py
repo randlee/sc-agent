@@ -946,7 +946,7 @@ class PreflightWorkflowTests(unittest.TestCase):
         self.assertEqual(after["jobs"]["preflight"], before["jobs"]["preflight"])
         self.assertEqual(
             list(after["jobs"]),
-            ["preflight", "consumer_workflow_install-matrix", "consumer_workflow_artifact_verify",
+            ["preflight", "go-plan", "build-go-modules", "go-verified", "consumer_workflow_install-matrix", "consumer_workflow_artifact_verify",
              "consumer_workflows"],
         )
         matrix = after["jobs"]["consumer_workflow_install-matrix"]

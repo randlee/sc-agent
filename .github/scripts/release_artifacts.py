@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, explicit_asset_patterns
-
 import re
 import shutil
 import tarfile
@@ -172,6 +171,9 @@ def cmd_channel_preflight_results(args: argparse.Namespace) -> int:
             for channel_name in _channel_names(manifest)
         ],
     ]
+    if "publication_continuity" in manifest:
+        for channel in contracts:
+            channel["publication_continuity"] = True
     tag = args.tag or None
     results = [
         _channel_preflight_result(channel, outcomes, tag) for channel in contracts
@@ -185,7 +187,7 @@ def cmd_public_registry_check_plan(args: argparse.Namespace) -> int:
     manifest = load_manifest(Path(args.manifest), with_channel_contracts=True)
     checks: list[dict[str, str | None]] = []
 
-    for crate in manifest["crates"]:
+    for crate in (entry for entry in manifest["crates"] if entry.get("publish", True)):
         checks.extend(
             _public_registry_checks(
                 manifest["channel_contracts"], "crates_io", crate["package"], args.version
@@ -405,7 +407,7 @@ def cmd_validate_manifest(args: argparse.Namespace) -> int:
         if not isinstance(distribution["sdist"], bool):
             raise SystemExit(f"[[python_distributions]] #{index}: sdist must be a boolean")
         wheels = distribution["wheels"]
-        wheel_targets(distribution)
+        wheel_targets(distribution, continuity="publication_continuity" in manifest)
         cargo_manifest = distribution.get("cargo_manifest")
         if cargo_manifest and not (Path(cargo_manifest)).is_file():
             raise SystemExit(
@@ -473,6 +475,8 @@ def cmd_release_asset_patterns(args: argparse.Namespace) -> int:
         print(pattern)
     for package in manifest.get("npm_packages", []):
         print("^" + re.escape(package["name"].replace("@", "").replace("/", "-")) + r"-[0-9].*\.tgz$")
+    from go_release import print_asset_patterns
+    print_asset_patterns(manifest)
     return 0
 
 
@@ -676,7 +680,7 @@ def cmd_verify_python_release_assets(args: argparse.Namespace) -> int:
             f"expected {expected}, found {found}"
         )
     for distribution in _python_distribution_entries(manifest):
-        verify_platforms(distribution, wheel_paths[distribution["name"]])
+        verify_platforms(distribution, wheel_paths[distribution["name"]], continuity="publication_continuity" in manifest)
     print(f"verified Python release assets: {expected}")
     return 0
 

@@ -6,6 +6,7 @@ archive_prefix = "sc-agent"
 description = "TypeSafe decision client (decidr), sitr tree-sitter CLI, workspace crates, and Python bindings for Synaptic Canvas agents"
 homepage = "https://github.com/randlee/sc-agent"
 license = "MIT"
+readme_dependency_crate = "decidr"
 renderer_archive_path = "bin/decidr"
 workspace_toml = "Cargo.toml"
 rust_toolchain = "1.99.0"
@@ -41,6 +42,46 @@ target = "x86_64-pc-windows-msvc"
 os = "windows-latest"
 archive = "zip"
 
+[[crates]]
+artifact = "sc-agent"
+package = "sc-agent"
+cargo_toml = "crates/sc-agent/Cargo.toml"
+publish = false
+publish_order = 0
+wait_after_publish_seconds = 0
+verify_registry_visibility = false
+[[crates]]
+artifact = "sc-treesitter"
+package = "sc-treesitter"
+cargo_toml = "crates/sc-treesitter/Cargo.toml"
+publish = false
+publish_order = 0
+wait_after_publish_seconds = 0
+verify_registry_visibility = false
+[[crates]]
+artifact = "sitr"
+package = "sitr"
+cargo_toml = "crates/sitr/Cargo.toml"
+publish = false
+publish_order = 0
+wait_after_publish_seconds = 0
+verify_registry_visibility = false
+[[crates]]
+artifact = "decidr"
+package = "decidr"
+cargo_toml = "crates/decidr/Cargo.toml"
+publish = false
+publish_order = 0
+wait_after_publish_seconds = 0
+verify_registry_visibility = false
+[[crates]]
+artifact = "sc-agent-py"
+package = "sc-agent-py"
+cargo_toml = "crates/sc-agent-py/Cargo.toml"
+publish = false
+publish_order = 0
+wait_after_publish_seconds = 0
+verify_registry_visibility = false
 
 [[release_binaries]]
 name = "decidr"
