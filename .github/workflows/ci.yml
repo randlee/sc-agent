@@ -210,6 +210,9 @@ jobs:
       - name: Install wheel build tool
         run: python -m pip install "maturin>=1.9,<2" "pyright==1.1.414"
 
+      - name: Install the consumer template renderer
+        run: cargo install sc-compose --version 1.9.0 --locked
+
       - name: Build, install and verify the shipped workspace
         run: python scripts/gate/rewrite.py
 
