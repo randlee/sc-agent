@@ -254,11 +254,16 @@ def call_result(
     config_dir: Optional[str] = None,
     general_log: Any = None,
     timeout_secs: Optional[float] = None,
+    repository_root: str = ".",
+    consent_what: str = "The request text",
 ) -> dict:
     """Send one decision request and retain the consumer result record."""
     invalid = _validate_abort_on(abort_on)
     if invalid is not None:
         return decode_result(invalid, category_codes=category_codes)
+    allowed = remote_preflight(repository_root, consent_what)
+    if not allowed["ok"]:
+        return allowed
     loaded = _load_wheel()
     if not loaded["ok"]:
         return decode_result(loaded, category_codes=category_codes)
@@ -292,6 +297,8 @@ def call_batch_results(
     config_dir: Optional[str] = None,
     general_log: Any = None,
     timeout_secs: Optional[float] = None,
+    repository_root: str = ".",
+    consent_what: str = "The request text",
     workers: Optional[int] = None,
     on_result: Optional[Callable[[dict], None]] = None,
 ) -> dict:
@@ -299,6 +306,9 @@ def call_batch_results(
     invalid = _validate_abort_on(abort_on)
     if invalid is not None:
         return decode_result(invalid, category_codes=category_codes)
+    allowed = remote_preflight(repository_root, consent_what)
+    if not allowed["ok"]:
+        return allowed
     loaded = _load_wheel()
     if not loaded["ok"]:
         return decode_result(loaded, category_codes=category_codes)
@@ -332,6 +342,371 @@ def call_batch_results(
         lines = completed
     # The wheel returns input order; callbacks above retain finish order.
     return dict(ok=True, value=[decode_result(line, category_codes=category_codes) for line in lines])
+
+REMOTE_JUDGE_SETTING = ".sc/{{ client_name }}/settings.yaml"
+REMOTE_JUDGE_SET = "python3 scripts/{{ client_name | replace("-", "_") }}_settings.py set allow_remote_judge true|false"
+REPO_ROOT_HELP = (f"any path inside the repository; the nearest {REMOTE_JUDGE_SETTING} at or above it holds "
+                  "allow_remote_judge (read for live Jev calls only; default .)")
+def remote_judge_consent(repository_root: str = ".", what: str = "The request text") -> None:
+    """Require an affirmative, repository-local consent setting before any remote send."""
+    try:
+        import importlib
+        import pathlib
+        settings = importlib.import_module("{{ client_name | replace("-", "_") }}_settings")
+    except ImportError as exc:
+        return _failed(ClientError("DEPENDENCY.SETTINGS", f"the consent settings module could not be imported: {exc}",
+                          action="Install the consumer's settings module before making a live Jev call."))
+    start = pathlib.Path(repository_root or ".").resolve()
+    root = settings.find_repo_root(start)
+    if not root.ok:
+        return _failed(from_tool_error(root.error))
+    answer = settings.remote_judge_consent(start)
+    if answer.ok and answer.value is True:
+        return {"ok": True, "value": None}
+    disabled = f"Sending text to TypeSafe is disabled. {what} would leave this machine."
+    if answer.ok:
+        return _failed(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+                          f"{disabled} {REMOTE_JUDGE_SETTING} sets allow_remote_judge: false.",
+                          action="The user declined remote judging; only the user changes this setting and commits it. Use --dry-run to inspect the request instead."))
+    if answer.error.code == "SETTINGS.REMOTE_JUDGE_UNSET":
+        return _failed(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+                          f"{disabled} {REMOTE_JUDGE_SETTING} does not set allow_remote_judge.",
+                          action=f"Ask the user once whether this text may be sent to TypeSafe (Jev), record the answer with `{REMOTE_JUDGE_SET}`, and commit {REMOTE_JUDGE_SETTING}. Never infer consent from prior runs. Use --dry-run to inspect the request instead."))
+    return _failed(from_tool_error(answer.error))
+
+
+def remote_preflight(repository_root: str = ".", what: str = "The request text") -> None:
+    """Shared send gate; callers cannot inject or override the consent value."""
+    return remote_judge_consent(repository_root, what)
+
+
+BATCH_RESULT_SCHEMA = "jev-batch-result/1"
+BATCH_MAX_WORKERS = 4
+BATCH_RETRIES = 1
+BATCH_FIXTURE_ERROR = "__error__"
+BATCH_ID_RE = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+
+
+class BatchSettings(NamedTuple):
+    gate: str
+    model: str
+    repeat: int
+    prefix: str
+    threshold: float
+    timeout: float
+    max_workers: int
+    max_request_bytes: int
+    dry_run: bool
+
+
+class BatchJob(NamedTuple):
+    item_id: str
+    anchor_id: Optional[str]
+    candidate_id: str
+    repeat: int
+    request_id: str
+    body: dict
+    questions: dict
+    roles: dict
+    kind: str
+
+
+class BatchInputError(Exception):
+    def __init__(self, error: ClientError):
+        super().__init__(error.message)
+        self.error = error
+
+
+class StreamedResult(NamedTuple):
+    failed: list
+    attempts: int
+
+
+def batch_request_id(prefix: str, item_id: str, anchor_id: Optional[str], candidate_id: str, repeat: int) -> str:
+    if anchor_id is None:
+        return f"{prefix}/{item_id}/{candidate_id}/r{repeat}"
+    return f"{prefix}/{item_id}/{anchor_id}/{candidate_id}/r{repeat}"
+
+
+def questions_digest(questions: dict) -> str:
+    """Keep the canonical questions digest; run IDs are derived separately from request IDs."""
+    import hashlib
+    import json
+    canonical = json.dumps(questions, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def batch_run_id(request_id: str) -> str:
+    """Keep run IDs stable: first 16 hex digits of SHA-256 over the unchanged request ID."""
+    import hashlib
+    return hashlib.sha256(request_id.encode("utf-8")).hexdigest()[:16]
+
+
+def _safe_id(value, what: str) -> str:
+    import re
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", value):
+        return _failed(ClientError("VALIDATION.INPUT", f"{what} {value!r} is not a safe id (letters, digits and _.:- only)",
+                          action="See the consumer's Jev batch request schema."))
+    return {"ok": True, "value": value}
+
+
+def _fixture_keys(job: BatchJob) -> tuple[str, ...]:
+    return (f"{job.item_id}/{job.candidate_id}/r{job.repeat}",
+            f"{job.item_id}/{job.candidate_id}", job.candidate_id, "*")
+
+
+def _fixture_missing(keys: tuple[str, ...]) -> ClientError:
+    return ClientError("FIXTURE.MISSING",
+                       f"answers fixture has no entry for {keys[0]} (or {keys[1]}, {keys[2]}, '*')",
+                       action=f"Add an entry for {keys[0]} to the answers file.")
+
+
+def _fixture_attempt(job: BatchJob, fixture: dict, attempt: int, *, transient_codes=frozenset()) -> dict:
+    keys = _fixture_keys(job)
+    entry = next((fixture[key] for key in keys if key in fixture), None)
+    if entry is None:
+        return _failed(_fixture_missing(keys))
+    if isinstance(entry, list):
+        if not entry:
+            return _failed(ClientError("FIXTURE.MISSING", f"answers fixture entry for {keys[0]} is an empty list"))
+        entry = entry[min(attempt, len(entry)) - 1]
+    if isinstance(entry, dict) and BATCH_FIXTURE_ERROR in entry:
+        code = str(entry[BATCH_FIXTURE_ERROR])
+        return _failed(ClientError(code, f"fixture failure {code}", code in transient_codes))
+    if not isinstance(entry, dict):
+        return _failed(ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object"))
+    answers = {key: _typed_answer(answer) for key, answer in entry.items()}
+    if set(answers) != set(job.questions):
+        return _failed(ClientError("DECIDR.RESPONSE_INVALID", "fixture answer IDs do not match question IDs"))
+    for key, answer in answers.items():
+        if not _valid_fixture_answer(answer, job.questions[key]):
+            return _failed(ClientError("DECIDR.RESPONSE_INVALID", f"invalid fixture answer for {key}"))
+    return {"ok": True, "value": {"model": "fixture", "answers": answers}}
+
+
+def _valid_fixture_answer(answer, question):
+    """Accept the wheel's JSON answer shapes; reject malformed fixtures before consumers read them."""
+    import math
+    def number(value):
+        try:
+            return type(value) in (int, float) and math.isfinite(value)
+        except OverflowError:
+            return False
+
+    probability = lambda value: number(value) and 0 <= value <= 1
+    probabilities = lambda value: isinstance(value, Mapping) and all(
+        isinstance(key, str) and probability(item) for key, item in value.items())
+    if not isinstance(question, Mapping):
+        return False
+    kind = question.get("type", "choice")
+    if isinstance(answer, NoulAnswer):
+        return kind == "noul" and probability(answer.noul)
+    if isinstance(answer, ChoiceAnswer):
+        options = question.get("criteria")
+        if not (kind == "choice" and isinstance(answer.choice, str) and probability(answer.confidence)
+                and probabilities(answer.probabilities)):
+            return False
+        if isinstance(options, Mapping) and options and (
+                answer.choice not in options or set(answer.probabilities) != set(options)):
+            return False
+        return abs(sum(answer.probabilities.values()) - 1) <= 0.01 * max(len(answer.probabilities), 1)
+    if isinstance(answer, ScoreAnswer):
+        return (kind == "score" and number(answer.score) and probability(answer.confidence)
+                and isinstance(answer.legend, Mapping) and probabilities(answer.probabilities))
+    if isinstance(answer, BoxAnswer):
+        return kind == "box" and all(number(value) for value in (answer.top, answer.bottom, answer.left, answer.right)) and (
+            answer.confidence is None or probability(answer.confidence))
+    return False
+
+
+def batch_settings(args, prefix: str, *, check_threshold: Callable, request_cap: Callable):
+    """Assemble common batch settings while consumers supply their threshold and gate-cap rules."""
+    if getattr(args, "repeat", 1) < 1:
+        return _failed(ClientError("VALIDATION.INPUT", "--repeat must be at least 1"))
+    if not 1 <= args.max_workers <= BATCH_MAX_WORKERS:
+        return _failed(ClientError("VALIDATION.INPUT", f"--max-workers must be between 1 and {BATCH_MAX_WORKERS}"))
+    if not isinstance(prefix, str) or not prefix.strip() or any(char.isspace() for char in prefix):
+        return _failed(ClientError("VALIDATION.INPUT", "--request-prefix must be non-empty and contain no whitespace"))
+    threshold = check_threshold(getattr(args, "threshold", 0.6))
+    if not threshold.ok:
+        return _failed(from_tool_error(threshold.error))
+    cap = request_cap(getattr(args, "gate", "plan"), getattr(args, "max_request_bytes", None))
+    if not cap.ok:
+        return _failed(from_tool_error(cap.error))
+    return {"ok": True, "value": BatchSettings(getattr(args, "gate", "plan"), args.model, getattr(args, "repeat", 1), prefix,
+                         threshold.value, args.timeout, args.max_workers, cap.value, bool(args.dry_run))}
+
+
+def _line(job: BatchJob, settings: BatchSettings, raw, attempts: list, error, dry_run: bool, *,
+          result_fields: Optional[Callable[[BatchJob, BatchSettings, Any], dict]] = None,
+          error_message_limit: Optional[int] = None) -> dict:
+    """The single durable batch result shape; differences in gating or error clipping are explicit parameters."""
+    native_sends = None
+    if isinstance(raw, dict) and type(raw.get("ok")) is bool and "attempts" in raw:
+        native_sends = raw.get("attempts")
+        if raw["ok"] and "value" in raw:
+            raw = {"model": raw.get("model_answered"), "answers": raw["value"], "sends": native_sends}
+        elif not raw["ok"]:
+            error = error if error is not None else raw.get("error")
+            raw = None
+    if native_sends is None and error is not None:
+        native_sends = getattr(error, "attempts", None)
+    if native_sends is None and isinstance(raw, dict):
+        native_sends = raw.get("sends")
+    if type(native_sends) is not int or native_sends < 0:
+        native_sends = None
+    fields = result_fields(job, settings, raw) if result_fields is not None else {}
+    message = None if error is None else error.message
+    if message is not None and error_message_limit is not None:
+        message = message[:error_message_limit]
+    import hashlib
+    import json
+    request_text = json.dumps(job.body, allow_nan=False)
+    line = {
+        "schema": BATCH_RESULT_SCHEMA, "request_id": job.request_id, "run_id": batch_run_id(job.request_id),
+        "item_id": job.item_id, "anchor_id": job.anchor_id, "candidate_id": job.candidate_id, "repeat": job.repeat,
+        "request_sha256": hashlib.sha256(request_text.encode("utf-8")).hexdigest(),
+        "questions_sha256": questions_digest(job.questions), "request": job.body, "roles": job.roles, "kind": job.kind,
+        "dry_run": dry_run, "ok": raw is not None, "raw_response": raw,
+        "answers": raw.get("answers") if isinstance(raw, dict) else None,
+        "model_answered": raw.get("model") if isinstance(raw, dict) else None,
+        "sends": native_sends,
+        "threshold": settings.threshold, "verdict": None, "min_confidence": None, "leaning": None,
+        "retry_count": max((native_sends if native_sends is not None else len(attempts)) - 1, 0), "attempts": attempts,
+        "error": None if error is None else {"code": error.code, "message": message,
+                                               "recoverable": getattr(error, "recoverable", getattr(error, "retryable", False))},
+    }
+    if error is not None and getattr(error, "action", None) is not None:
+        line["error"]["suggested_action"] = error.action
+    line.update(fields)
+    return line
+
+
+def validate_request_lines(lines: list, settings: BatchSettings, question_sets,
+                           make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> int:
+    """Validate all input before sending; consumer question sets and parser are explicit callbacks."""
+    total, request_ids = 0, set()
+    for number, line in enumerate(lines, start=1):
+        jobs = make_jobs(line, number, settings, question_sets)
+        if not jobs.ok:
+            return _failed(from_tool_error(jobs.error))
+        for job in jobs.value:
+            if job.request_id in request_ids:
+                return _failed(ClientError("VALIDATION.INPUT", f"request {job.request_id} appears twice in the stream",
+                                  action="Pair each item, anchor and candidate once; use --repeat for repeats."))
+            request_ids.add(job.request_id)
+        total += len(jobs.value)
+    return {"ok": True, "value": total}
+
+
+def check_fixture_coverage(lines: list, settings: BatchSettings, question_sets, make_jobs: Callable, fixture):
+    """Check every fixture key before the first request, so an incomplete fixture cannot partially run."""
+    if fixture is None or settings.dry_run:
+        return {"ok": True, "value": None}
+    validated = validate_request_lines(lines, settings, question_sets, make_jobs)
+    if not validated["ok"]:
+        return validated
+    for number, line in enumerate(lines, start=1):
+        jobs = make_jobs(line, number, settings, question_sets)
+        if not jobs.ok:
+            return _failed(from_tool_error(jobs.error))
+        for job in jobs.value:
+            keys = _fixture_keys(job)
+            if not any(key in fixture for key in keys):
+                return _failed(_fixture_missing(keys))
+    return {"ok": True, "value": None}
+
+
+def load_answers_fixture(path: str, keyed_by: str, loader: Callable, *, validate_envelope: Optional[Callable] = None):
+    """Load the consumer's answer fixture using its strict JSON/question schema parser."""
+    if not path:
+        return {"ok": True, "value": None}
+    loaded = loader(path, "answers fixture")
+    if not loaded.ok:
+        return _failed(from_tool_error(loaded.error))
+    fixture = loaded.value
+    if not isinstance(fixture, dict):
+        return _failed(ClientError("INPUT.MALFORMED", f"answers fixture must be an object keyed by {keyed_by} (or '*')"))
+    if validate_envelope is not None:
+        error = validate_envelope(fixture, f"answers fixture {path}")
+        if error is not None:
+            return _failed(from_tool_error(error))
+    return {"ok": True, "value": fixture}
+
+
+def write_stdout_line(text: str) -> None:
+    """Write a UTF-8 JSONL record without Windows text-mode newline translation."""
+    import sys
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+        return
+    sys.stdout.flush()
+    buffer.write(text.encode("utf-8"))
+    buffer.flush()
+
+
+def _answer_json(answer):
+    """Convert wheel answer objects to the corresponding JSON wire shape."""
+    answer = _typed_answer(answer)
+    if isinstance(answer, NoulAnswer):
+        return {"type": "noul", "noul": answer.noul}
+    if isinstance(answer, ChoiceAnswer):
+        return {"type": "choice", "choice": answer.choice, "confidence": answer.confidence,
+                "probabilities": dict(answer.probabilities)}
+    if isinstance(answer, ScoreAnswer):
+        return {"type": "score", "score": answer.score, "confidence": answer.confidence,
+                "legend": dict(answer.legend), "probabilities": dict(answer.probabilities)}
+    if isinstance(answer, BoxAnswer):
+        return {"type": "box", "box": {"top": answer.top, "bottom": answer.bottom,
+                                       "left": answer.left, "right": answer.right},
+                "confidence": answer.confidence}
+    return _failure("DECIDR.INVALID_RESULT", f"Object of type {type(answer).__name__} is not JSON serializable")
+
+
+def _json_answers(value):
+    if not isinstance(value, (dict, list, tuple, str, int, float, bool, type(None))):
+        value = _typed_answer(value)
+    if isinstance(value, (NoulAnswer, ChoiceAnswer, ScoreAnswer, BoxAnswer)):
+        return _answer_json(value)
+    if isinstance(value, dict):
+        return {key: _json_answers(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_answers(item) for item in value]
+    return value
+
+
+def encode_result_line(line: dict, *, redact: Optional[Callable[[dict], dict]] = None) -> str:
+    import json
+    serializable = _json_answers(line)
+    return json.dumps(redact(serializable) if redact is not None else serializable,
+                      ensure_ascii=False, default=_answer_json) + "\n"
+
+
+def _add_attempts(results: list) -> int:
+    total = 0
+    for result in results:
+        sends = result.get("sends")
+        if type(sends) is int and sends >= 0:
+            total += sends
+        else:
+            attempts = result.get("attempts")
+            total += len(attempts) if isinstance(attempts, list) else 0
+    return total
+
+
+def _total_attempts(results: list) -> int:
+    return _add_attempts(results)
+
+
+def streamed_result(results: list) -> StreamedResult:
+    return StreamedResult([line for line in results if not line.get("ok") and not line.get("dry_run")],
+                          _total_attempts(results))
+
+
+
+
 
 {% if sitr %}
 def extract(language: str, source: str, query: str, *, general_log: Any = None) -> dict:
