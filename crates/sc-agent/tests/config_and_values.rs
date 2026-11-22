@@ -306,19 +306,21 @@ fn req_sag_0702_nonpositive_worker_counts_are_typed_errors() -> Test {
 }
 
 #[test]
-fn req_sag_0020_doctor_log_root_resolves_through_injected_environment() -> Test {
+fn adr_sag_0021_log_root_is_not_a_configuration_setting() -> Test {
     let root = Temp::new()?;
     let path = root.0.join("logs-from-env");
     let env = vec![("DECIDR_LOG_ROOT".into(), path.as_os_str().to_owned())];
     let loaded = config(None, &root.0, &env, None)?;
-    assert_eq!(loaded.config.log_root, Some(path.clone()));
     let rows = sc_config::layers::resolved(&loaded, sc_agent::KEYS);
-    let row = rows
-        .iter()
-        .find(|row| row.path == "log_root")
-        .ok_or("doctor omitted log_root")?;
-    assert_eq!(row.value, path.to_string_lossy());
-    assert_eq!(row.source, "DECIDR_LOG_ROOT");
+    assert!(rows.iter().all(|row| row.path != "log_root"));
+    std::fs::write(
+        root.0.join("decidr.json"),
+        json!({"log_root": path}).to_string(),
+    )?;
+    let failure = config(None, &root.0, &env, None)
+        .err()
+        .ok_or("accepted log_root setting")?;
+    assert!(failure.to_string().contains("log_root"));
     assert!(!path.exists());
     Ok(())
 }

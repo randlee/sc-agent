@@ -48,19 +48,13 @@ def server(replies, respond=None):
             self.end_headers()
             self.wfile.write(data)
 
-    # handle_request has no polling loop or shutdown sleep.
     http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    http.timeout = 10
-
-    def serve():
-        for _ in replies:
-            http.handle_request()
-
-    thread = threading.Thread(target=serve)
+    thread = threading.Thread(target=http.serve_forever)
     thread.start()
     try:
         yield f"http://127.0.0.1:{http.server_port}/v1", received
     finally:
+        http.shutdown()
         thread.join(15)
         http.server_close()
         if thread.is_alive():
@@ -113,6 +107,31 @@ class Wheel(Isolated):
         ]:
             with self.subTest(function=function.__name__):
                 self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_call")
+
+    def test_bad_signature_logs_once_to_injected_logger(self):
+        logger = self.api.logger("decidr")["value"]
+        result = self.api.send({}, bogus=1, general_log=logger)
+        self.assertEqual(self.error(result)["id"], "sc_agent_py.invalid_call")
+        rows = [json.loads(line) for line in (Path(self.directory.name) / "logs/decidr.log.jsonl").read_text().splitlines()]
+        self.assertEqual(sum(row["fields"].get("id") == "sc_agent_py.invalid_call" for row in rows), 1)
+
+    def test_session_and_general_log_share_fixed_root(self):
+        root = Path(self.directory.name)
+        (root / "decidr.json").write_text(json.dumps({"project": "contract"}))
+        code = """
+import json, sys
+from pathlib import Path
+import sc_agent
+root = Path(sys.argv[1])
+result = sc_agent.send({}, model="jev", project="contract", agent_role="contract", config_dir=str(root), keyring_lookup=lambda *args: "")
+assert not result["ok"], result
+assert (root / "logs/decidr.log.jsonl").is_file()
+rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+assert len(rows) == 1, rows
+"""
+        got = subprocess.run([sys.executable, "-c", code, str(root)], env=dict(os.environ),
+                             cwd=root, text=True, capture_output=True, timeout=20)
+        self.assertEqual(got.returncode, 0, got.stderr)
 
     def test_default_logs_and_option_errors_once(self):
         code = r'''
@@ -630,14 +649,16 @@ class Cli(Isolated):
             self.assertFalse((Path(folder) / "logs").exists())
             project = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "project")
             self.assertEqual(project["source"], str(config))
-            log_root = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "log_root")
-            self.assertEqual((log_root["value"], log_root["source"]), (folder, "DECIDR_LOG_ROOT"))
+            self.assertFalse(any(row["path"] == "log_root" for row in json.loads(doctor.stdout)["value"]["settings"]))
+            self.assertEqual(json.loads(doctor.stdout)["value"]["log_root"], folder)
             sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya",
                                    "--agent-role", "contract"], input=json.dumps(REQUEST), env=env,
                                   cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(sent.returncode, 0, sent.stderr + sent.stdout)
             self.assertTrue(json.loads(sent.stdout)["ok"])
             self.assertEqual(received[0][0], "/v1/systemone")
+            self.assertTrue((Path(folder) / "logs/decidr.log.jsonl").is_file())
+            self.assertEqual(len(list((Path(folder) / "sessions").rglob("sessions.jsonl"))), 1)
 
     def test_send_requires_agent_role(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"

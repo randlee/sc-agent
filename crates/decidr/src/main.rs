@@ -91,11 +91,7 @@ fn main() {
                         }
                     }
                 };
-                let log_root = settings
-                    .log_root
-                    .clone()
-                    .map(Ok)
-                    .unwrap_or_else(|| sc_agent::log_root("decidr"))?;
+                let log_root = sc_agent::log_root("decidr")?;
                 let options = sc_agent::Options {
                     environment: std::env::vars_os().collect(),
                     settings,

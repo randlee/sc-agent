@@ -164,11 +164,7 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
     if let Some(workers) = workers {
         settings.workers = workers;
     }
-    let log_root = settings
-        .log_root
-        .clone()
-        .map(Ok)
-        .unwrap_or_else(|| sc_agent::log_root("decidr"))?;
+    let log_root = sc_agent::log_root("decidr")?;
     Ok(sc_agent::Options {
         environment: std::env::vars_os().collect(),
         settings,
@@ -540,7 +536,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
                     let py = args.py();
                     match function.bind(py).call(args, kwargs) {
                         Ok(value) => value.unbind(),
-                        Err(failure) => raw(py, sc_agent::result(Err(error("sc_agent_py.invalid_call", failure)))),
+                        Err(failure) => {
+                            let given = kwargs.and_then(|v| v.get_item("general_log").ok().flatten());
+                            let name = if matches!(stringify!($function), "languages" | "queries" | "query" | "run") { "sitr" } else { "decidr" };
+                            respond(py, given.as_ref(), name, |_| Err(error("sc_agent_py.invalid_call", failure)))
+                        },
                     }
                 },
             )?)?;

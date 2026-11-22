@@ -20,7 +20,7 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 
 - The environment variable for a CLI setting MUST be `<CLI>_` followed by the key path's keys in upper case joined by `__`, such as `DECIDR_WORKERS` for `workers` and `DECIDR_LAYA__PORT` for `laya.port`.
 - Every CLI MUST take the project/phase from the `SC_PROJECT` environment variable.
-- When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_LOG_ROOT` and `SITR_LOG_ROOT`.
+- When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_WORKERS`.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
 - A failed validation of an environment value MUST name the environment variable.
 
@@ -43,7 +43,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - [ ] With `DECIDR_LAYA__PORT=9000` set, `decidr doctor` reports the setting `laya.port` with value 9000 and source `DECIDR_LAYA__PORT`.
 - [ ] With `DECIDR_WORKERS=3` set, `decidr doctor` reports the setting `workers` with value 3 and source `DECIDR_WORKERS`.
 - [ ] With `SC_PROJECT=phase-d` set, `decidr doctor` reports the setting `project` with value `phase-d` and source `SC_PROJECT`.
-- [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the setting `log_root` with value `/tmp/x` and source `DECIDR_LOG_ROOT`.
+- [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the fixed log root as the value `log_root: "/tmp/x"`, separately from configuration settings (ADR-SAG-0021).
 - [ ] With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `"workers": 0` in the local `decidr.json` it exits with the same check's error naming that file and `workers`.
 
 ### Dependencies
