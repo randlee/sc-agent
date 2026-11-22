@@ -1,0 +1,56 @@
+"""REQ-SAG-0018: render the installed wheel's client for each consumer and check returned failures."""
+import importlib.resources
+import importlib.util
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from check_consumer_template import render_consumers
+
+
+class RenderedClient(unittest.TestCase):
+    def test_consumer_variables_public_helpers_and_returned_failures(self):
+        package = importlib.resources.files("sc_agent")
+        self.assertTrue((package / "_native.pyi").is_file())
+        self.assertTrue((package / "py.typed").is_file())
+        with tempfile.TemporaryDirectory() as directory:
+            for path in render_consumers(Path(directory)):
+                with self.subTest(consumer=path.stem):
+                    spec = importlib.util.spec_from_file_location(path.stem, path)
+                    client = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(client)
+                    self.assertEqual(client.CLIENT_NAME, path.stem.removesuffix("_client").replace("_", "-"))
+                    self.assertEqual(hasattr(client, "extract"), client.CLIENT_NAME == "judge-jev")
+                    for name in ("result_line", "safe_id", "fixture_attempt", "json_answers", "typed_answer", "total_attempts"):
+                        self.assertTrue(callable(getattr(client, name)))
+                    for value in (None, 1, [], {}, "not JSON", {"ok": "yes", "value": {"answers": {}}},
+                                  {"ok": True, "value": {"answers": None}}, {"ok": False, "error": []}):
+                        failed = client.decode_result(value)
+                        self.assertFalse(failed["ok"])
+                        self.assertEqual(failed["error"].code, "DECIDR.INVALID_RESULT")
+                    for abort in (None, 42, [{}], {"unknown"}):
+                        result = client.call_result("{}", model="jev", abort_on=abort)
+                        self.assertFalse(result["ok"])
+                        self.assertEqual(result["error"].code, "DECIDR.INVALID_OPTION")
+                    for value in (object(), None, "x"):
+                        error = client.from_tool_error(value)
+                        self.assertIsInstance(error, client.ClientError)
+                        self.assertEqual((error.code, error.message), ("DECIDR.ERROR", "Unknown tool error"))
+                    error = client.ClientError("TEST.ERROR", "failed call", attempts=2)
+                    failed = {"ok": False, "error": error, "attempts": 2}
+                    job = client.BatchJob("item", None, "candidate", 1, "request", {}, {}, {}, "directive")
+                    settings = client.BatchSettings("plan", "jev", 1, "prefix", 0.6, 1, 1, 100, False)
+                    line = client.result_line(job, settings, failed, [], None, False)
+                    self.assertFalse(line["ok"])
+                    self.assertIsNone(line["answers"])
+                    self.assertEqual(line["error"]["code"], "TEST.ERROR")
+                    self.assertEqual(line["sends"], 2)
+                    for detail in ({"code": "PLAIN.ERROR", "message": "plain failure"}, {}):
+                        record = {"ok": False, "error": detail, "attempts": 2}
+                        line = client.result_line(job, settings, record, [], None, False)
+                        self.assertFalse(line["ok"])
+                        self.assertIsNone(line["answers"])
+                        self.assertEqual(line["error"]["code"], detail.get("code", "DECIDR.ERROR"))
+                        self.assertEqual(line["error"]["message"], detail.get("message", "Unknown tool error"))

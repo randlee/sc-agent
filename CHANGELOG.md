@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Replace the former seventeen-crate workspace with five crates: sc-agent, decidr, sc-agent-py, sc-treesitter and sitr.
+- Ship one `sc-decidr` wheel with the decision and sitr APIs under `sc_agent`; sitr is no longer a separate wheel.
+- Return tagged success or error values from the generated client instead of raising exceptions.
+- Share one native sc-observability Logger between each consumer and its wheel calls.
+- Preserve session records up to 1 MiB and support `--version` on both decidr and sitr.
+- Defer crates.io publication until sc-config is released; wheel and binary distribution remain enabled.
+
+### Consumer migration
+
+- For plan-anchor and judge-jev, render the shared `consumer.py.j2` template from the installed, pinned sc-decidr wheel with the consumer's `client_name` and `sitr` settings. Handle returned errors instead of catching client exceptions.
+- Obtain the logger handle from `sc_agent.logger`'s success value and pass that same handle as `general_log` to decision, batch and sitr calls; use the wheel's logging API for consumer events.
+- Replace `CancelToken` with `sc_agent.Cancel` and call its `cancel()` method to stop work.
+- Use `jev` instead of `jev-latest` as the Jev model name; an explicit version such as `jev-1.14.0` pins the model.
+
 ## 0.2.8
 
 - Let consumers stop shared batch submission with an optional result predicate, draining submitted jobs before executor shutdown.

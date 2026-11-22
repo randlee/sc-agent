@@ -171,6 +171,20 @@ def load_install_values(path: Path) -> dict[str, object]:
     if values.get("schema_version") != 1:
         raise argparse.ArgumentTypeError("schema_version must be 1")
 
+    if "publication_continuity" in values:
+        from publication_continuity import configuration as continuity_configuration
+        try:
+            continuity_configuration(values)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(str(error)) from error
+
+    if "go_modules" in values:
+        from go_release import configuration as go_configuration
+        try:
+            go_configuration(values)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(str(error)) from error
+
     project = _require_mapping(values.get("project"), "project")
     for field in ("name", "archive_prefix", "description", "homepage", "license"):
         _require_string(project.get(field), f"project.{field}")
@@ -274,7 +288,7 @@ def load_install_values(path: Path) -> dict[str, object]:
     for position, distribution in enumerate(distributions, start=1):
         _require_boolean(distribution.get("sdist"), f"python_distributions[{position}].sdist")
         try:
-            wheel_targets(distribution)
+            wheel_targets(distribution, continuity="publication_continuity" in values)
         except (ValueError, KeyError) as error:
             raise argparse.ArgumentTypeError(f"python_distributions[{position}]: {error}") from error
         cargo_manifest = distribution.get("cargo_manifest")
@@ -452,6 +466,18 @@ def load_install_values(path: Path) -> dict[str, object]:
                 _require_string(docli["sc_docli_version"], "docli.sc_docli_version")
 
     values["preflight_workflows"] = _load_preflight_workflows(values.get("preflight_workflows", []))
+    if "archive_verification" in values:
+        from archive_verification import configuration
+        try:
+            configuration(values)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(str(error)) from error
+    if "rc_python_compatibility" in values:
+        from rc_python_compatibility import configuration
+        try:
+            configuration(values)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(str(error)) from error
     return values
 
 
@@ -539,13 +565,25 @@ def install_sources(
 ) -> list[tuple[Path, Path]]:
     """Return copy sources, extending release-preflight.yml only when workflows are declared."""
     jobs = preflight_workflow_jobs(_require_array(values.get("preflight_workflows", []), "preflight_workflows"))
-    if not jobs:
+    rc = "rc_python_compatibility" in values
+    archive = "archive_verification" in values
+    if not jobs and not rc and not archive:
         return copies
     sources = []
     for source, relative in copies:
-        if relative == PREFLIGHT_WORKFLOW:
+        if jobs and relative == PREFLIGHT_WORKFLOW:
             extended = directory / PREFLIGHT_WORKFLOW.name
             extended.write_bytes(source.read_bytes() + jobs.encode("utf-8"))
+            source = extended
+        if archive and relative.as_posix() in {".github/workflows/release.yml", ".github/workflows/prerelease-archive.yml"}:
+            from archive_verification import extend_workflow
+            extended = directory / relative.name
+            extended.write_text(extend_workflow(source.read_text(), values), encoding="utf-8")
+            source = extended
+        if rc and str(relative) in {".github/workflows/release.yml", ".github/workflows/release-candidate.yml"}:
+            from rc_python_compatibility import extend_workflow
+            extended = directory / relative.name
+            extended.write_text(extend_workflow(source.read_text(), relative.as_posix(), values), encoding="utf-8")
             source = extended
         sources.append((source, relative))
     return sources
@@ -698,6 +736,14 @@ def template_values(values: dict[str, object]) -> dict[str, object]:
         "has_rust_toolchain": "rust_toolchain" in project,
         "has_sc_lint_source_revision": "sc_lint_source_revision" in project,
         "has_prerelease": "prerelease" in values,
+        "has_archive_verification": "archive_verification" in values,
+        "archive_verification": _toml_literal(values.get("archive_verification", [])),
+        "has_rc_python_compatibility": "rc_python_compatibility" in values,
+        "rc_python_compatibility": _toml_literal(values.get("rc_python_compatibility", {})),
+        "has_go_modules": bool(values.get("go_modules")),
+        "go_modules": _toml_literal(values.get("go_modules", [])),
+        "has_continuity": "publication_continuity" in values,
+        "publication_continuity": _toml_literal(values.get("publication_continuity", {})),
         "has_docli": has_docli,
         "docli": template_docli,
         "preflight_checks": preflight_checks,
