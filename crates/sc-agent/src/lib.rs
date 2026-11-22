@@ -324,6 +324,20 @@ mod keyring_timeout_test {
         assert_eq!(
             error
                 .as_ref()
+                .and_then(|e| e.get("category"))
+                .and_then(Value::as_str),
+            Some("auth")
+        );
+        assert!(
+            error
+                .as_ref()
+                .and_then(|e| e.get("action"))
+                .and_then(Value::as_str)
+                .is_some_and(|s| s.contains("Approve"))
+        );
+        assert_eq!(
+            error
+                .as_ref()
                 .and_then(|e| e.get("id"))
                 .and_then(Value::as_str),
             Some("secrets.keyring_timeout")
@@ -335,6 +349,42 @@ mod keyring_timeout_test {
                 .and_then(Value::as_str)
                 .is_some_and(|s| s.contains(".env"))
         );
+    }
+
+    #[test]
+    fn reader_failure_keeps_read_error() {
+        let value = keyring_wait(|| Err("controlled refusal".into()), Duration::from_secs(60));
+        let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
+            Err(match &value {
+                Err(KeyringError::Read(message)) => KeyringError::Read(message.clone()),
+                _ => KeyringError::Timeout,
+            })
+        });
+        let error = serde_json::to_value(result.err()).ok();
+        assert_eq!(
+            error
+                .as_ref()
+                .and_then(|e| e.get("id"))
+                .and_then(Value::as_str),
+            Some("secrets.keyring_read")
+        );
+        assert!(
+            error
+                .as_ref()
+                .and_then(|e| e.get("message"))
+                .and_then(Value::as_str)
+                .is_some_and(|s| s.contains("controlled refusal"))
+        );
+    }
+
+    #[test]
+    fn production_timeout_is_fifteen_seconds() {
+        let source = include_str!("lib.rs");
+        let production = source
+            .split("pub fn os_keyring(")
+            .nth(1)
+            .and_then(|s| s.split("#[cfg(test)]").next());
+        assert!(production.is_some_and(|s| s.contains("Duration::from_secs(15)")));
     }
 }
 
