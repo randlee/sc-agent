@@ -887,10 +887,16 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
     let remote = origin
         .as_deref()
         .map(|s| s.trim_end_matches('/').trim_end_matches(".git"))
-        .map(|s| s.split_once("://").map(|(_, s)| s).unwrap_or(s))
-        .map(|s| s.split_once('@').map(|(_, s)| s).unwrap_or(s))
-        .filter(|s| s.contains('/') && !s.starts_with('/'))
-        .map(|s| s.replacen(':', "/", 1));
+        .map(|s| {
+            s.split_once("://")
+                .map_or_else(|| s.replacen(':', "/", 1), |(_, s)| s.to_owned())
+        })
+        .and_then(|s| {
+            let s = s.split_once('@').map(|(_, s)| s).unwrap_or(&s);
+            let (host, path) = s.split_once('/')?;
+            let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
+            (!host.is_empty()).then(|| format!("{host}/{path}"))
+        });
     let name = if let Some(remote) = remote {
         remote
     } else {

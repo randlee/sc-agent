@@ -445,16 +445,17 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             got = self.api.send(REQUEST, project="contract", agent_role="contract", config_dir=self.directory.name,
                                 general_log=logger, base_url=url)
             self.assertTrue(got["ok"], got)
-        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 3) as (url, _):
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 5) as (url, _):
             send(url)
             subprocess.run(["git", "init", "--quiet"], check=True)
             subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True)
             send(url)
-            subprocess.run(["git", "remote", "set-url", "origin", "git@github.com:example/project.git"], check=True)
-            send(url)
+            for origin in ("git@github.com:example/project.git", "https://example.com:8443/o/r.git", "ssh://git@example.com:2222/o/r.git"):
+                subprocess.run(["git", "remote", "set-url", "origin", origin], check=True)
+                send(url)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
         host = subprocess.run(["hostname"], check=True, text=True, capture_output=True).stdout.strip()
-        self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project"]))
+        self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project", "example.com/o/r", "example.com/o/r"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
         waits = []
