@@ -64,6 +64,7 @@ pub fn answer() -> Value {
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
+    Never,
 }
 pub fn http(status: u16, body: Value) -> Reply {
     Reply::Http(status, vec![], body.to_string())
@@ -90,6 +91,7 @@ impl Stub {
         let stopped = stop.clone();
         let worker = std::thread::spawn(move || {
             let mut seen = vec![];
+            let mut unanswered = vec![];
             for reply in replies {
                 let (mut stream, _) = listener.accept()?;
                 if stopped.load(Ordering::SeqCst) {
@@ -124,6 +126,7 @@ impl Stub {
                     .parse()?;
                 let mut body = vec![0; length];
                 reader.read_exact(&mut body)?;
+                drop(reader);
                 seen.push(Request {
                     path,
                     headers,
@@ -131,6 +134,7 @@ impl Stub {
                 });
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
+                    Reply::Never => unanswered.push(stream),
                     Reply::Http(status, headers, body) => {
                         write!(
                             stream,
@@ -144,6 +148,7 @@ impl Stub {
                     }
                 }
             }
+            drop(unanswered);
             Ok(seen)
         });
         Ok(Self {

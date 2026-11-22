@@ -97,6 +97,55 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
 }
 
 #[test]
+fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let replies = vec![
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+    ];
+    let stub = Stub::new(replies)?;
+    let configured_timeout = options(&root, &stub.url).timeout;
+    let mut overridden = options(&root, &stub.url);
+    overridden.timeout = Duration::from_millis(50);
+
+    let timed_out = sc_agent::report(
+        &logger,
+        send(
+            &request(),
+            &overridden,
+            &logger,
+            &Cancel::default(),
+            &no_wait,
+            &keyring,
+        ),
+    );
+    assert_eq!(timed_out["error"]["id"], "http.network");
+    assert_eq!(timed_out["error"]["attempts"], 5);
+    assert_eq!(configured_timeout, Duration::from_secs(5));
+
+    let success_stub = Stub::new(vec![http(200, answer())])?;
+    let configured = options(&root, &success_stub.url);
+    assert_eq!(configured.timeout, configured_timeout);
+    let plain = send(
+        &request(),
+        &configured,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    )?;
+    assert_eq!(plain["answers"], answer()["answers"]);
+    assert_eq!(stub.finish()?.len(), 5);
+    assert_eq!(success_stub.finish()?.len(), 1);
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
 fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> Test {
     for status in [429, 502, 529] {
         let root = Temp::new()?;
