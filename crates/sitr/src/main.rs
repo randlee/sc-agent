@@ -41,7 +41,7 @@ fn main() {
                 sc_agent::log(&logger, "sitr.result", json!({"result":value}))?;
                 Ok(value)
             })();
-            let value = sc_agent::report(&logger, result);
+            let value = flushed(sc_agent::report(&logger, result), logger.flush());
             let _ = logger.shutdown();
             value
         }
@@ -55,4 +55,32 @@ fn main() {
         std::process::exit(1);
     }
     std::process::exit(status);
+}
+
+fn flushed(value: Value, result: Result<(), impl ToString>) -> Value {
+    match result {
+        Ok(()) => value,
+        Err(e) => sc_agent::result(Err(sc_agent::error("log.flush", e))),
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn closed_logger_flush_returns_the_original_failure() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let logger = sc_agent::default_logger("sitr-flush-test")?;
+        logger.shutdown()?;
+        let failed = flushed(sc_agent::result(Ok(json!("success"))), logger.flush());
+        assert_eq!(failed["error"]["id"], "log.flush");
+        assert_eq!(
+            failed["error"]["message"],
+            logger
+                .flush()
+                .err()
+                .ok_or("closed logger flushed")?
+                .to_string()
+        );
+        Ok(())
+    }
 }

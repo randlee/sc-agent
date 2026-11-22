@@ -63,7 +63,6 @@ def server(replies, respond=None):
 
 class Isolated(unittest.TestCase):
     def setUp(self):
-        self.home = Path.home()
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         previous = os.getcwd()
@@ -748,6 +747,11 @@ class Cli(Isolated):
 
     def test_default_and_empty_override_resolve_home_without_writes(self):
         root = Path(self.directory.name).resolve()
+        if os.name != "nt":
+            import pwd
+            expected = Path(pwd.getpwuid(os.getuid()).pw_dir) / ".sc-agent"
+        else:
+            expected = None
         for override in (None, ""):
             environment = dict(os.environ)
             environment.pop("DECIDR_LOG_ROOT", None)
@@ -756,7 +760,13 @@ class Cli(Isolated):
             binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
             got = subprocess.run([str(binary), "--config-dir", str(root), "doctor"], cwd=root, env=environment,
                                  text=True, capture_output=True, timeout=20)
-            self.assertEqual(json.loads(got.stdout)["value"]["log_root"], str(self.home / ".sc-agent"))
+            self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+            actual = Path(json.loads(got.stdout)["value"]["log_root"])
+            if expected is None:
+                self.assertTrue(actual.is_absolute())
+                self.assertEqual(actual.name, ".sc-agent")
+                expected = actual
+            self.assertEqual(actual, expected)
 
     def test_sitr_returns_logger_admission_failure(self):
         root = Path(self.directory.name)

@@ -64,7 +64,7 @@ A setting is looked up in seven layers, and the first layer that sets it wins:
 6. the global `sc-agent.json`;
 7. the built-in default, or a typed error when the setting is required and has no default.
 
-Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LOCAL_RUNNERS__LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
+Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 
 Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152). `default.json`, `local.json` and the `SC_AGENT__` prefix are removed; nothing reads them. No migration is provided, because no release has users of the old layout.
 
