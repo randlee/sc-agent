@@ -23,8 +23,10 @@ ANSWER = {"model": "loopback", "answers": {"q": {"type": "noul", "noul": 0.75}}}
 
 
 class Runner:
-    def __init__(self, count):
+    def __init__(self, expected_count):
+        self.expected_count = expected_count
         self.received = []
+        self.lock = threading.Lock()
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_args):
@@ -32,8 +34,12 @@ class Runner:
 
             def do_POST(handler):
                 body = json.loads(handler.rfile.read(int(handler.headers["Content-Length"])))
-                self.received.append((handler.path, body))
-                if body.get("state") == "unauthorized":
+                with self.lock:
+                    ordinal = len(self.received)
+                    self.received.append((handler.path, body))
+                if ordinal >= self.expected_count:
+                    status, result = 500, {"error": "unexpected surplus request"}
+                elif body.get("state") == "unauthorized":
                     status, result = 401, {"error": "controlled auth refusal"}
                 else:
                     status, result = 200, ANSWER
@@ -45,8 +51,7 @@ class Runner:
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
-        self.server.timeout = 10
-        self.thread = threading.Thread(target=lambda: [self.server.handle_request() for _ in range(count)])
+        self.thread = threading.Thread(target=self.server.serve_forever)
 
     @property
     def address(self):
@@ -57,10 +62,9 @@ class Runner:
         return self
 
     def __exit__(self, *_args):
-        self.thread.join(12)
+        self.server.shutdown()
+        self.thread.join(5)
         self.server.server_close()
-        if self.thread.is_alive():
-            raise AssertionError("loopback runner did not finish its controlled request count")
 
 
 def rendered(path):
@@ -103,6 +107,7 @@ class RenderedWheelLoopback(unittest.TestCase):
             "repository_root": str(root),
             "config_dir": str(root),
             "general_log": logger,
+            "timeout_secs": 5,
         }
 
     def test_rendered_clients_run_against_the_installed_wheel(self):
@@ -133,7 +138,12 @@ class RenderedWheelLoopback(unittest.TestCase):
                         )
                         self.assertFalse(failure["ok"])
                         self.assertEqual(failure["error"].code, "TEST.AUTH")
-                        self.assertEqual([path for path, _ in runner.received], ["/v1/systemone"] * 2)
+                        self.assertEqual(
+                            runner.received,
+                            [("/v1/systemone", {**REQUEST, "model": "loopback"}),
+                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "loopback"})],
+                            "loopback runner received unexpected requests",
+                        )
                         self.assertEqual(callable(getattr(client, "extract", None)), client.CLIENT_NAME == "judge-jev")
                         self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
@@ -176,6 +186,11 @@ class RenderedWheelLoopback(unittest.TestCase):
                     on_result=interrupt_after_first_result,
                     **self.call_options(client, root, logger["value"]),
                 )
+                self.assertEqual(
+                    runner.received,
+                    [("/v1/systemone", {**REQUEST, "model": "loopback"})],
+                    "cancelled batch sent a surplus loopback request",
+                )
                 self.assertTrue(batch["ok"], batch)
                 self.assertEqual(len(batch["value"]), 3)
                 self.assertTrue(batch["value"][0]["ok"], batch["value"][0])
@@ -184,7 +199,6 @@ class RenderedWheelLoopback(unittest.TestCase):
                 later = client.call_result(REQUEST, cancel=cancel, **self.call_options(client, root, logger["value"]))
                 self.assertFalse(later["ok"])
                 self.assertEqual(later["error"].code, "CANCELED")
-                self.assertEqual(len(runner.received), 1)
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
 

@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 
+SUBPROCESS_TIMEOUT_SECONDS = 60
+
 
 def render_consumers(destination):
     template_root = Path(str(importlib.resources.files("sc_agent") / "templates"))
@@ -20,7 +22,8 @@ def render_consumers(destination):
         output = destination / (client.replace("-", "_") + "_client.py")
         subprocess.run(["sc-compose", "render", "--root", str(template_root), "--file", "consumer.py.j2",
                         "--var-file", str(variables), "--strict", "--output", str(output)], check=True,
-                       env={**os.environ, "SC_COMPOSE_LOG_ROOT": str(destination)})
+                       env={**os.environ, "SC_COMPOSE_LOG_ROOT": str(destination)},
+                       timeout=SUBPROCESS_TIMEOUT_SECONDS)
         rendered.append(output)
     return rendered
 
@@ -33,7 +36,8 @@ def main():
         config.write_text(json.dumps({"include": [path.name for path in files],
                                       "typeCheckingMode": "strict", "pythonVersion": "3.11"}))
         checked = subprocess.run([sys.executable, "-m", "pyright", "--project", str(config),
-                                  "--pythonpath", sys.executable, "--outputjson"], text=True, stdout=subprocess.PIPE)
+                                  "--pythonpath", sys.executable, "--outputjson"], text=True,
+                                 stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT_SECONDS)
         report = json.loads(checked.stdout)
         summary = report["summary"]
         if checked.returncode:

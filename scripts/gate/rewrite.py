@@ -13,6 +13,7 @@ SOURCE = ROOT
 MANIFEST = SOURCE / "Cargo.toml"
 ALLOWED = set("ureq serde serde_json keyring dotenvy ulid sc-sha sc-config ctrlc sc-observability clap pyo3 thiserror tree-sitter tree-sitter-python tree-sitter-rust".split())
 PACKAGES = {"sc-agent", "decidr", "sc-agent-py", "sc-treesitter", "sitr"}
+COMMAND_TIMEOUT_SECONDS = 900
 failed = []
 
 
@@ -27,7 +28,11 @@ def check(name, failures):
 
 def run(name, command):
     print("+ " + " ".join(command), flush=True)
-    result = subprocess.run(command, cwd=ROOT, check=False)
+    try:
+        result = subprocess.run(command, cwd=ROOT, check=False, timeout=COMMAND_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        check(name, [f"timed out after {COMMAND_TIMEOUT_SECONDS} seconds"])
+        return False
     check(name, [] if result.returncode == 0 else [f"exit {result.returncode}"])
     return result.returncode == 0
 
