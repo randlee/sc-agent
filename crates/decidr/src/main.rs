@@ -12,11 +12,23 @@ fn main() {
     let flag = cancelled.clone();
     let signal = ctrlc::set_handler(move || flag.cancel())
         .map_err(|error| sc_agent::error("decidr.signal", error));
+    let parsed = Cli::try_parse();
+    if let Err(error) = &parsed
+        && matches!(
+            error.kind(),
+            clap::error::ErrorKind::DisplayVersion | clap::error::ErrorKind::DisplayHelp
+        )
+    {
+        if error.print().is_err() {
+            std::process::exit(1);
+        }
+        return;
+    }
     let value = match signal.and_then(|()| sc_agent::default_logger("decidr")) {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
             let outcome = (|| -> Result<Value, sc_agent::Error> {
-                let cli = Cli::try_parse().map_err(|e| sc_agent::error("decidr.usage", e))?;
+                let cli = parsed.map_err(|e| sc_agent::error("decidr.usage", e))?;
                 if matches!(cli.command, Command::Models) {
                     return Ok(json!(sc_agent::PROVIDERS));
                 }
@@ -49,7 +61,7 @@ fn main() {
                     return Ok(Value::Null);
                 };
                 if let Some(workers) = workers {
-                    settings.workers = workers;
+                    settings.workers = sc_agent::workers(workers)?;
                 }
                 if cancelled.is_cancelled() {
                     return Err(sc_agent::error("decision.cancelled", "interrupted"));
@@ -79,7 +91,13 @@ fn main() {
                         }
                     }
                 };
+                let log_root = settings
+                    .log_root
+                    .clone()
+                    .map(Ok)
+                    .unwrap_or_else(|| sc_agent::log_root("decidr"))?;
                 let options = sc_agent::Options {
+                    environment: std::env::vars_os().collect(),
                     settings,
                     model,
                     provider,
@@ -88,7 +106,7 @@ fn main() {
                         .map_err(|e| sc_agent::error("decidr.invalid_request_timeout", e))?,
                     base_url: None,
                     root,
-                    log_root: sc_agent::log_root("decidr")?,
+                    log_root,
                     repo,
                 };
                 let result = if batch {

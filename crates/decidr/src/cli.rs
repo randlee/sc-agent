@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 #[derive(Parser)]
+#[command(version)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub config_dir: Option<PathBuf>,
@@ -24,8 +25,8 @@ pub enum Command {
         input: Option<PathBuf>,
         #[arg(long)]
         batch: bool,
-        #[arg(long)]
-        workers: Option<usize>,
+        #[arg(long, allow_hyphen_values = true)]
+        workers: Option<i64>,
         #[arg(long, default_value = "120")]
         timeout_secs: f64,
     },

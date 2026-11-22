@@ -4,11 +4,23 @@ use serde_json::Value;
 use std::io::Write;
 mod cli;
 fn main() {
+    let parsed = Cli::try_parse();
+    if let Err(error) = &parsed
+        && matches!(
+            error.kind(),
+            clap::error::ErrorKind::DisplayVersion | clap::error::ErrorKind::DisplayHelp
+        )
+    {
+        if error.print().is_err() {
+            std::process::exit(1);
+        }
+        return;
+    }
     let value = match sc_agent::default_logger("sitr") {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
             let result = (|| -> Result<Value, sc_agent::Error> {
-                let cli = Cli::try_parse().map_err(|e| sc_agent::error("treesitter.usage", e))?;
+                let cli = parsed.map_err(|e| sc_agent::error("treesitter.usage", e))?;
                 let value = match cli.command {
                     Command::Languages => sc_treesitter::languages(),
                     Command::Queries { language } => sc_treesitter::queries(&language)?,
@@ -26,7 +38,7 @@ fn main() {
                         sc_treesitter::predefined(&language, &query, &source)?
                     }
                 };
-                sc_agent::log(&logger, "sitr.result", value.clone());
+                let _ = sc_agent::log(&logger, "sitr.result", value.clone());
                 Ok(value)
             })();
             let value = sc_agent::report(&logger, result);

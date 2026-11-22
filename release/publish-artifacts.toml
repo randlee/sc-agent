@@ -78,10 +78,10 @@ verify_registry_visibility = true
 artifact = "sc-agent-py"
 package = "sc-agent-py"
 cargo_toml = "crates/sc-agent-py/Cargo.toml"
-publish = false
-publish_order = 0
+publish = true
+publish_order = 5
 wait_after_publish_seconds = 0
-verify_registry_visibility = false
+verify_registry_visibility = true
 
 [[release_binaries]]
 name = "decidr"

@@ -45,6 +45,8 @@ pub enum Error {
         category: &'static str,
         #[serde(skip_serializing_if = "Option::is_none")]
         attempts: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        session_id: Option<String>,
     },
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
@@ -72,6 +74,7 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
             _ => "Fix the named input or provider response.",
         },
         attempts: None,
+        session_id: None,
     }
 }
 pub fn result(value: Result<Value, Error>) -> Value {
@@ -94,6 +97,8 @@ pub struct Settings {
     #[serde(default = "default_workers")]
     pub workers: usize,
     #[serde(default)]
+    pub log_root: Option<PathBuf>,
+    #[serde(default)]
     pub laya: Option<Runner>,
 }
 fn default_workers() -> usize {
@@ -105,6 +110,10 @@ impl Settings {
     }
 }
 pub const KEYS: &[Key] = &[
+    Key {
+        path: "log_root",
+        env: EnvValue::String,
+    },
     Key {
         path: "project",
         env: EnvValue::String,
@@ -456,6 +465,7 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
 }
 
 pub struct Options {
+    pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
     pub model: String,
     pub provider: Option<String>,
@@ -466,14 +476,13 @@ pub struct Options {
     pub log_root: PathBuf,
     pub repo: String,
 }
-pub fn log(logger: &Logger, action: &str, fields: Value) {
+pub fn log(logger: &Logger, action: &str, fields: Value) -> Result<(), Error> {
     let event = serde_json::from_value(
         json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),"level":if action=="error" {sc_observability::Level::Error}else{sc_observability::Level::Info},"service":logger.service_name(),"target":"sc-agent","action":action,"identity":sc_observability::ProcessIdentity::default(),"fields":fields}),
-    );
-    if let Ok(event) = event {
-        let _ = logger.log(event);
-    }
+    ).map_err(|e| error("log.invalid_event", e))?;
+    logger.log(event).map_err(|e| error("log.write", e))
 }
+
 fn answer_schema(question: &Value) -> Value {
     let kind = question.get("type").and_then(Value::as_str).unwrap_or("");
     let names = if kind == "choice" {
@@ -592,6 +601,35 @@ fn response(request: &Value, raw: Value, wire: &str) -> Result<Value, Error> {
 static HOLDOFFS: Mutex<BTreeMap<String, Arc<Mutex<()>>>> = Mutex::new(BTreeMap::new());
 static SESSION_APPEND: Mutex<()> = Mutex::new(());
 
+pub fn host_holdoff(host: &str) -> Result<Arc<Mutex<()>>, Error> {
+    Ok(HOLDOFFS
+        .lock()
+        .map_err(|e| error("http.network", e))?
+        .entry(host.to_owned())
+        .or_default()
+        .clone())
+}
+
+pub fn validate_request_size(request: &Value) -> Result<(), Error> {
+    if serde_json::to_vec(request)
+        .map_err(|e| error("decision.encode", e))?
+        .len()
+        > 8 * 1024 * 1024
+    {
+        return Err(error(
+            "decision.request_too_large",
+            "request exceeds the 8 MiB serialized input limit",
+        ));
+    }
+    Ok(())
+}
+pub fn workers(value: i64) -> Result<usize, Error> {
+    usize::try_from(value)
+        .ok()
+        .filter(|v| *v > 0)
+        .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
+}
+
 pub fn send(
     request: &Value,
     options: &Options,
@@ -612,6 +650,7 @@ pub fn send(
         });
     let mut sends = 0;
     let mut outcome = (|| {
+        validate_request_size(request)?;
         if cancel.is_cancelled() {
             return Err(error("decision.cancelled", "request cancelled"));
         }
@@ -647,21 +686,11 @@ pub fn send(
             .host()
             .ok_or_else(|| error("http.network", "endpoint has no host"))?
             .to_ascii_lowercase();
-        let pause = HOLDOFFS
-            .lock()
-            .map_err(|e| error("http.network", e))?
-            .entry(host)
-            .or_default()
-            .clone();
+        let pause = host_holdoff(&host)?;
         let key = if provider.key.is_empty() {
             String::new()
         } else {
-            key(
-                provider.key,
-                &std::env::vars_os().collect::<Vec<_>>(),
-                &options.root,
-                keyring,
-            )?
+            key(provider.key, &options.environment, &options.root, keyring)?
         };
         let body = wire(request, &model, provider.wire);
         let agent = ureq::Agent::config_builder()
@@ -726,6 +755,7 @@ pub fn send(
                         },
                         category: "network",
                         attempts: Some(attempt),
+                        session_id: None,
                     });
                 }
             };
@@ -762,7 +792,9 @@ pub fn send(
                     "decision.api_status"
                 },
                 message: text,
-                action: if status == 401 {
+                action: if busy {
+                    "Retry later."
+                } else if status == 401 {
                     "Check the provider API key."
                 } else {
                     "Check the provider response."
@@ -777,12 +809,24 @@ pub fn send(
                     "other"
                 },
                 attempts: Some(attempt),
+                session_id: None,
             });
         }
         Err(error("http.network", "send count exhausted"))
     })();
     if cancel.is_cancelled() {
         outcome = Err(error("decision.cancelled", "request cancelled"));
+    }
+    if let Err(Error::Failure {
+        session_id: id,
+        attempts,
+        ..
+    }) = &mut outcome
+    {
+        *id = Some(session_id.clone());
+        if cancel.is_cancelled() {
+            *attempts = Some(sends);
+        }
     }
     if let Ok(value) = &mut outcome
         && let Some(fields) = value.as_object_mut()
@@ -792,7 +836,7 @@ pub fn send(
         fields.insert("question_digests".into(), json!(digests));
     }
     if let Ok(value) = &outcome {
-        log(logger, "decision.result", json!({"response":value}));
+        let _ = log(logger, "decision.result", json!({"response":value}));
     }
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
@@ -820,7 +864,7 @@ pub fn send(
             )
         })();
         if let Err(e) = written {
-            return Err(error("log.session_write", e));
+            let _ = log(logger, "error", json!(error("log.session_write", e)));
         }
     }
     let _ = logger.flush();
@@ -835,6 +879,7 @@ pub fn batch(
     keyring: &(dyn Fn(&str) -> Result<String, String> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
+    requests.iter().try_for_each(validate_request_size)?;
     if options.settings.workers == 0 {
         return Err(error("decidr.invalid_workers", "workers must be positive"));
     }
@@ -884,8 +929,18 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         .map(PathBuf::from)
         .unwrap_or(cwd);
     let origin = git(&["remote", "get-url", "origin"]);
+    let host = std::process::Command::new("hostname")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| error("config.repo", "host name unavailable"))?;
+    let name = repository_identity(origin.as_deref(), &host, &root)?;
+    Ok((root, name))
+}
+pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Result<String, Error> {
     let remote = origin
-        .as_deref()
         .map(|s| s.trim_end_matches('/').trim_end_matches(".git"))
         .map(|s| {
             s.split_once("://")
@@ -897,28 +952,19 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
             let host = host.split_once(':').map(|(host, _)| host).unwrap_or(host);
             (!host.is_empty()).then(|| format!("{host}/{path}"))
         });
-    let name = if let Some(remote) = remote {
-        remote
-    } else {
+    let name = remote.unwrap_or_else(|| {
         format!(
-            "local/{}/{}",
-            std::process::Command::new("hostname")
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| error("config.repo", "host name unavailable"))?,
+            "local/{host}/{}",
             root.file_name().unwrap_or_default().to_string_lossy()
         )
-    };
+    });
     if name
         .split('/')
         .any(|part| part.is_empty() || part == "." || part == "..")
     {
         return Err(error("config.repo", "invalid repository identity"));
     }
-    Ok((root, name))
+    Ok(name)
 }
 
 pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
@@ -943,7 +989,7 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
     if let Err(error) = &outcome {
-        log(logger, "error", json!(error));
+        let _ = log(logger, "error", json!(error));
     }
     result(outcome)
 }

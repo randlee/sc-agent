@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use std::{
     ffi::CStr,
     path::PathBuf,
-    sync::{Arc, mpsc},
+    sync::{Arc, Mutex, mpsc},
     time::Duration,
 };
 
@@ -102,8 +102,10 @@ fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
         .and_then(|(_, v)| *v)
         .filter(|v| !v.is_none())
         .map(|v| {
-            v.extract::<T>()
-                .map_err(|_| invalid(format!("invalid {key}")))
+            v.extract::<T>().map_err(|error| {
+                let error: PyErr = error.into();
+                invalid(format!("invalid {key}: {error}"))
+            })
         })
         .transpose()
 }
@@ -111,7 +113,9 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
     let timeout =
         Duration::try_from_secs_f64(option::<f64>(named, "timeout_secs")?.unwrap_or(120.0))
             .map_err(|e| error("decidr.invalid_request_timeout", e))?;
-    let workers = option::<usize>(named, "workers")?;
+    let workers = option::<i64>(named, "workers")?
+        .map(sc_agent::workers)
+        .transpose()?;
     let agent_role =
         option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
     let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
@@ -136,7 +140,13 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
     if let Some(workers) = workers {
         settings.workers = workers;
     }
+    let log_root = settings
+        .log_root
+        .clone()
+        .map(Ok)
+        .unwrap_or_else(|| sc_agent::log_root("decidr"))?;
     Ok(sc_agent::Options {
+        environment: std::env::vars_os().collect(),
         settings,
         model,
         provider,
@@ -145,7 +155,7 @@ fn options(named: &[(&str, Option<&Bound<'_, PyAny>>)]) -> Result<sc_agent::Opti
         base_url: option(named, "base_url")?,
         root,
         repo,
-        log_root: sc_agent::log_root("decidr")?,
+        log_root,
     })
 }
 fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
@@ -385,18 +395,23 @@ fn send_batch(
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
         let completed = callback(on_result)?;
+        let callback_error = Mutex::new(None);
         let on_result = |index, value: &Value| {
             if let Some(callback) = &completed {
                 Python::attach(|py| {
-                    if let Err(error) = callback.call1(py, (index, raw(py, value.clone())))
-                        && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
-                    {
+                    if let Err(error) = callback.call1(py, (index, raw(py, value.clone()))) {
                         flag.cancel();
+                        if !error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                            && let Ok(mut first) = callback_error.lock()
+                            && first.is_none()
+                        {
+                            *first = Some(sc_agent::error("sc_agent_py.callback", error));
+                        }
                     }
                 });
             }
         };
-        interruptible(py, &flag, || {
+        let result = interruptible(py, &flag, || {
             sc_agent::batch(
                 &requests,
                 &options,
@@ -406,7 +421,11 @@ fn send_batch(
                 &|name| lookup(name, &keyring, &flag),
                 &on_result,
             )
-        })
+        });
+        match callback_error.into_inner().map_err(invalid)? {
+            Some(error) => Err(error),
+            None => result,
+        }
     })
 }
 #[pyfunction]
@@ -433,7 +452,7 @@ fn _cancel(py: Python<'_>, flag: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
 #[pyfunction(signature=(*,general_log=None))]
 fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
-        sc_agent::log(logger, "sitr.languages", json!({}));
+        let _ = sc_agent::log(logger, "sitr.languages", json!({}));
         Ok(sc_treesitter::languages())
     })
 }
@@ -445,7 +464,7 @@ fn queries(
 ) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
         let value = sc_treesitter::queries(&text(language)?)?;
-        sc_agent::log(logger, "sitr.queries", json!({}));
+        let _ = sc_agent::log(logger, "sitr.queries", json!({}));
         Ok(value)
     })
 }
@@ -463,7 +482,7 @@ fn query(
             &text(source)?,
             &text(query)?,
         )?;
-        sc_agent::log(logger, "sitr.query", json!({}));
+        let _ = sc_agent::log(logger, "sitr.query", json!({}));
         Ok(value)
     })
 }
@@ -477,7 +496,7 @@ fn run(
 ) -> Py<PyAny> {
     respond(py, general_log, "sitr", |logger| {
         let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
-        sc_agent::log(logger, "sitr.run", json!({}));
+        let _ = sc_agent::log(logger, "sitr.run", json!({}));
         Ok(value)
     })
 }

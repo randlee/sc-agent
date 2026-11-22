@@ -208,10 +208,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install wheel build tool
-        run: python -m pip install "maturin>=1.9,<2"
+        run: python -m pip install "maturin>=1.9,<2" "pyright==1.1.414"
 
       - name: Build, install and verify the shipped workspace
         run: python scripts/gate/rewrite.py
+
+      - name: Type-check both installed-wheel consumer renders
+        run: python scripts/check_consumer_template.py
 
       - name: Check CLI documentation drift
         run: |

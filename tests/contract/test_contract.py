@@ -117,6 +117,39 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 got = subprocess.run([sys.executable, "-c", code, folder, order], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
                 self.assertEqual(got.returncode, 0, got.stderr)
 
+    def test_callback_exception_is_a_returned_error_with_its_message(self):
+        # REQ-SAG-0016: caller exceptions must not vanish behind an ok return.
+        def completed(index, value):
+            raise ValueError("controlled caller failure")
+        with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            got = self.api.send_batch([REQUEST] * 3, workers=1, project="contract", agent_role="contract",
+                                      config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                                      base_url=url, on_result=completed)
+        error = self.error(got)
+        self.assertEqual(error["id"], "sc_agent_py.callback")
+        self.assertIn("ValueError: controlled caller failure", error["message"])
+        self.assertEqual(len(received), 1)
+        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 3)
+
+    def test_oversized_requests_and_nonpositive_workers_are_typed_refusals(self):
+        # REQ-SAG-0014/0702: typed refusals precede any HTTP or keyring access.
+        calls = []
+        def keyring(name):
+            calls.append(name)
+            return "unused"
+        kwargs = dict(project="contract", agent_role="contract", config_dir=self.directory.name,
+                      general_log=self.api.logger("decidr")["value"], base_url="http://127.0.0.1:1/v1", keyring_lookup=keyring)
+        large = {**REQUEST, "state": "x" * (8 * 1024 * 1024)}
+        for result in (self.api.send(large, **kwargs), self.api.send_batch([REQUEST, large], **kwargs)):
+            self.assertEqual(self.error(result)["id"], "decision.request_too_large")
+        for workers in (-1, 0):
+            self.assertEqual(self.error(self.api.send_batch([], workers=workers, **kwargs))["id"], "decidr.invalid_workers")
+        bad = self.error(self.api.send(REQUEST, timeout_secs="bad", **kwargs))
+        self.assertIn("invalid timeout_secs:", bad["message"])
+        self.assertIn("TypeError:", bad["message"])
+        self.assertEqual(calls, [])
+
     def test_key_precedence_and_redaction_through_send(self):
         keyring_calls = []
         def keyring(name):
@@ -471,6 +504,36 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
 
 
 class Cli(Isolated):
+    def test_decidr_version_and_help_succeed(self):
+        # REQ-SAG-0803: installed prerelease binary version verification.
+        self.check_version_and_help("decidr")
+
+    def test_sitr_version_and_help_succeed(self):
+        # REQ-SAG-0803: installed prerelease binary version verification.
+        self.check_version_and_help("sitr")
+
+    def check_version_and_help(self, name):
+        binary = Path(__file__).resolve().parents[2] / "target/debug" / name
+        for flag in ("--version", "--help"):
+            got = subprocess.run([str(binary), flag], env={"PATH": os.defpath, name.upper() + "_LOG_ROOT": self.directory.name},
+                                 cwd=self.directory.name, text=True, capture_output=True, timeout=20)
+            self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
+            self.assertIn(name, got.stdout)
+            if flag == "--version": self.assertEqual(got.stdout.strip(), name + " 0.3.0")
+
+    def test_cli_size_and_worker_refusals_keep_typed_ids(self):
+        # REQ-SAG-0014/0702: CLI refusals preserve the core error id.
+        binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
+        Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1, "model": "local"}}))
+        cases = [(["--batch", "--workers", str(workers)], "{}", "decidr.invalid_workers") for workers in (-1, 0)]
+        cases.append(([], json.dumps({**REQUEST, "state": "x" * (8 * 1024 * 1024)}), "decision.request_too_large"))
+        for flags, text, expected in cases:
+            got = subprocess.run([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya", *flags],
+                                 input=text, env={"PATH": os.defpath, "DECIDR_LOG_ROOT": self.directory.name},
+                                 cwd=self.directory.name, text=True, capture_output=True, timeout=20)
+            self.assertNotEqual(got.returncode, 0)
+            self.assertEqual(json.loads(got.stdout)["error"]["id"], expected)
+
     def test_sitr_query(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/sitr"
         with tempfile.TemporaryDirectory() as folder:
@@ -493,6 +556,8 @@ class Cli(Isolated):
             self.assertFalse((Path(folder) / "logs").exists())
             project = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "project")
             self.assertEqual(project["source"], str(config))
+            log_root = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "log_root")
+            self.assertEqual((log_root["value"], log_root["source"]), (folder, "DECIDR_LOG_ROOT"))
             sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya"], input=json.dumps(REQUEST), env=env, cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(sent.returncode, 0, sent.stderr + sent.stdout)
             self.assertTrue(json.loads(sent.stdout)["ok"])

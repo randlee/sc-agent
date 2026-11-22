@@ -30,7 +30,7 @@ the pin, then re-run install.
 ## Consumer input (current workspace)
 
 - **crates.io** (publish order): `sc-agent`, `sc-treesitter`, `sitr`, `decidr`.
-  `sc-agent-py` is the fifth workspace crate and ships through the wheel.
+  `sc-agent-py` is the fifth workspace crate; all five publish to crates.io, and sc-agent-py also ships through the wheel.
 - **PyPI**: one `sc-decidr` wheel containing decisions and sitr.
 - **Release binaries**: `decidr`, `sitr` (five-target matrix in consumer input).
 - **Homebrew / Scoop / WinGet**: configured in consumer input (`Formula/decidr.rb`,
@@ -59,3 +59,14 @@ publish_python="$(python3 .sc-publish-kit/plugins/sc-publish/.github/scripts/boo
 bash scripts/sc-publish-dry-run.sh
 SC_PUBLISH_ALLOW_DIRTY=1 bash scripts/sc-publish-dry-run.sh   # with uncommitted kit output
 ```
+
+## Bump the kit pin
+
+Set `release/sc-publish-pin.toml` to the qualified upstream 40-character commit SHA. Fetch and check out that same revision in `.sc-publish-kit/`, edit `release/sc-publish-consumer-input.json` for this workspace, then render the manifests:
+
+```bash
+python3 .sc-publish-kit/plugins/sc-publish/install.py --input release/sc-publish-consumer-input.json .
+python3 .sc-publish-kit/plugins/sc-publish/install.py --dry-run --input release/sc-publish-consumer-input.json .
+```
+
+Review the pin, consumer input and generated diff together. The kit derives its crates.io root channel from the crate entries; `channels` in consumer input lists only post-release channels. Run `python3 .github/scripts/release_artifacts.py validate-manifest --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`, then `bash scripts/sc-publish-dry-run.sh` before release. Commit the qualified pin and generated changes in the same PR.
