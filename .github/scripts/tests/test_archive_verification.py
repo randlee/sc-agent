@@ -150,6 +150,7 @@ def test_windows_bash_uses_git_bash_for_nested_commands(tmp_path, monkeypatch):
         hook.verify(manifest, stage, "x86_64-pc-windows-msvc")
     assert calls[0][0] == [str(bash), "check.sh"]
     assert calls[0][1]["env"]["PATH"].split(os.pathsep)[0] == str(bash.parent)
+    assert calls[0][1]["env"]["SC_PUBLISH_GIT_BASH"] == str(bash)
     assert calls[0][1]["check"] is True
 
 
@@ -175,8 +176,28 @@ def test_docli_preflight_executes_generator_with_spaces(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=30)
     bash = Path(shutil.which("git")).resolve().parent.parent / "bin/bash.exe" if sys.platform == "win32" else Path(shutil.which("bash"))
     env = {**os.environ, "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
+    if sys.platform == "win32":
+        env["SC_PUBLISH_GIT_BASH"] = str(bash)
     subprocess.run([str(bash), str(scripts / "release-preflight-docli.sh")], cwd=tmp_path,
                    env=env, check=True, timeout=30)
+    assert (tmp_path / "generated.marker").read_text() == "verified"
+
+
+def test_windows_bash_runs_nested_preflight_checks(tmp_path):
+    scripts = tmp_path / ".github/scripts"; scripts.mkdir(parents=True)
+    for name in ("run-consumer-preflight.sh", "release-preflight-docli.sh"):
+        shutil.copy2(Path(__file__).parents[1] / name, scripts)
+    (tmp_path / "release").mkdir()
+    (tmp_path / "release/publish-preflight.toml").write_text(
+        '[docli]\ngenerate_script = "scripts/generate docs.sh"\ndrift_paths = ["fixtures/cli"]\n'
+        '[[checks]]\nid = "docli"\nrun = "bash .github/scripts/release-preflight-docli.sh"\n')
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/generate docs.sh").write_text('printf verified > generated.marker\n')
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=30)
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text('archive_verification = ["bash", ' + json.dumps(str(scripts / "run-consumer-preflight.sh")) + ']')
+    stage = tmp_path / "stage"; stage.mkdir()
+    hook.verify(manifest, stage, "x86_64-pc-windows-msvc")
     assert (tmp_path / "generated.marker").read_text() == "verified"
 
 

@@ -47,7 +47,8 @@ def verify(manifest_path, stage_dir, target):
         if not bash.is_file():
             raise ValueError(f"Git Bash not found at {bash}")
         argv[0] = str(bash)
-        env = {**os.environ, "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
+        env = {**os.environ, "SC_PUBLISH_GIT_BASH": str(bash),
+               "PATH": str(bash.parent) + os.pathsep + os.environ.get("PATH", "")}
     subprocess.run(argv, check=True, timeout=900, env=env)
 
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/scripts/archive_verification.py'
+      - '.github/scripts/run-consumer-preflight.sh'
       - '.github/scripts/release-preflight-docli.sh'
       - '.github/scripts/tests/test_archive_verification.py'
       - '.github/workflows/release.yml'

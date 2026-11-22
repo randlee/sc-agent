@@ -7,6 +7,7 @@ MANIFEST="${ROOT}/release/publish-preflight.toml"
 
 cd "$ROOT"
 python3 - "$MANIFEST" <<'PY'
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -33,7 +34,7 @@ if not isinstance(drift_paths, list) or not all(isinstance(path, str) and path f
     print("release-preflight-docli: docli.drift_paths must be a non-empty string array", file=sys.stderr)
     sys.exit(1)
 
-subprocess.run(["bash", generate_script], cwd=root, check=True)
+subprocess.run([os.environ.get("SC_PUBLISH_GIT_BASH", "bash"), generate_script], cwd=root, check=True)
 diff = subprocess.run(
     ["git", "diff", "--exit-code", "--", *drift_paths],
     cwd=root,
