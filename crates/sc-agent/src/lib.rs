@@ -72,6 +72,12 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
             "auth" if id == "secrets.keyring_timeout" => {
                 "Approve keychain access, or set the environment variable or .env key."
             }
+            "auth" if id == "secrets.keyring_read" => {
+                "Restore platform keyring access, or set the key in the environment or repository .env."
+            }
+            "auth" if id == "secrets.key_missing" => {
+                "Set the key in the environment, repository .env, or platform keyring."
+            }
             "auth" => "Check the provider API key.",
             "busy" | "network" => "Retry later.",
             _ => "Fix the named input or provider response.",
@@ -282,7 +288,10 @@ pub fn key(
         None => match dotenv()? {
             Some(value) => value,
             None => keyring(variable).map_err(|e| match e {
-                KeyringError::Read(message) => error("secrets.keyring_read", message),
+                KeyringError::Read(_) => error(
+                    "secrets.keyring_read",
+                    format!("The platform keyring is unavailable for {variable}. Set {variable} in the environment or repository .env."),
+                ),
                 KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
             })?,
         },
@@ -290,7 +299,9 @@ pub fn key(
     if value.is_empty() {
         return Err(error(
             "secrets.key_missing",
-            format!("Set {variable}, repo-root .env, or the OS keyring"),
+            format!(
+                "{variable} was not found in the environment, repository .env, or platform keyring."
+            ),
         ));
     }
     if !value.is_ascii() || value.bytes().any(|b| b <= 32 || b == 127) {
@@ -300,6 +311,13 @@ pub fn key(
         ));
     }
     Ok(value)
+}
+fn keyring_result(result: Result<String, keyring::Error>) -> Result<String, String> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(keyring::Error::NoEntry) => Ok(String::new()),
+        Err(error) => Err(error.to_string()),
+    }
 }
 fn keyring_wait(
     reader: impl FnOnce() -> Result<String, String> + Send + 'static,
@@ -322,9 +340,9 @@ pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
         .map_err(|e| KeyringError::Read(e.to_string()))?;
     keyring_wait(
         move || {
-            keyring::Entry::new(&variable, &account)
-                .and_then(|entry| entry.get_password())
-                .map_err(|e| e.to_string())
+            let result =
+                keyring::Entry::new(&variable, &account).and_then(|entry| entry.get_password());
+            keyring_result(result)
         },
         Duration::from_secs(15),
     )
@@ -385,7 +403,7 @@ mod keyring_timeout_test {
     }
 
     #[test]
-    fn reader_failure_keeps_read_error() {
+    fn reader_failure_keeps_read_error() -> Result<(), Box<dyn std::error::Error>> {
         let value = keyring_wait(|| Err("controlled refusal".into()), Duration::from_secs(60));
         let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
             Err(match &value {
@@ -401,13 +419,75 @@ mod keyring_timeout_test {
                 .and_then(Value::as_str),
             Some("secrets.keyring_read")
         );
-        assert!(
+        let message = error
+            .as_ref()
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+            .ok_or("keyring read message absent")?;
+        assert!(message.contains("platform keyring is unavailable"));
+        assert!(message.contains("TYPESAFE_API_KEY"));
+        assert!(message.contains(".env"));
+        assert!(!message.contains("controlled refusal"));
+        Ok(())
+    }
+
+    #[test]
+    fn missing_key_names_environment_dotenv_and_keyring() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let value = keyring_result(Err(keyring::Error::NoEntry));
+        assert!(matches!(&value, Ok(value) if value.is_empty()));
+        let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
+            value.clone().map_err(KeyringError::Read)
+        });
+        let error = serde_json::to_value(result.err()).ok();
+        assert_eq!(
             error
                 .as_ref()
-                .and_then(|e| e.get("message"))
-                .and_then(Value::as_str)
-                .is_some_and(|s| s.contains("controlled refusal"))
+                .and_then(|e| e.get("id"))
+                .and_then(Value::as_str),
+            Some("secrets.key_missing")
         );
+        let message = error
+            .as_ref()
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+            .ok_or("missing-key message absent")?;
+        assert!(message.contains("TYPESAFE_API_KEY"));
+        assert!(message.contains("environment"));
+        assert!(message.contains(".env"));
+        assert!(message.contains("keyring"));
+        Ok(())
+    }
+
+    #[test]
+    fn unavailable_platform_keyring_has_env_and_dotenv_fallbacks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let errors = [
+            keyring::Error::NoStorageAccess(Box::new(std::io::Error::other("denied"))),
+            keyring::Error::PlatformFailure(Box::new(std::io::Error::other("missing service"))),
+        ];
+        for cause in errors {
+            let detail = keyring_result(Err(cause))
+                .err()
+                .ok_or("keyring error lost")?;
+            let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
+                Err(KeyringError::Read(detail.clone()))
+            });
+            let error = serde_json::to_value(result.err())?;
+            assert_eq!(error["id"], "secrets.keyring_read");
+            let message = error["message"].as_str().ok_or("keyring message absent")?;
+            assert!(message.contains("platform keyring is unavailable"));
+            assert!(message.contains("TYPESAFE_API_KEY"));
+            assert!(message.contains(".env"));
+            assert!(!message.contains("denied"));
+            assert!(!message.contains("missing service"));
+            assert!(
+                error["action"]
+                    .as_str()
+                    .is_some_and(|action| action.contains(".env"))
+            );
+        }
+        Ok(())
     }
 
     #[test]
