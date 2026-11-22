@@ -1,38 +1,38 @@
-# Requirement: Model catalog: built-in models plus global configuration
+# Requirement: Model catalog: static provider tables
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
 
-## REQ-SAG-0102: Model catalog: built-in models plus global configuration
+## REQ-SAG-0102: Model catalog: static provider tables
 
 **Status:** Approved  
 
 ### Requirement Statement
 
-Definitions: The model catalog is the union of the models built into sc-agent and the models read from the global configuration, each with its line and release date.
+Definitions: The model catalog is the provider tables built into `sc-agent`. Each table lists its models as (short name, model id, release date).
 
 **MUST statements:**
 
-- The catalog type in `sc-agent-types` MUST accept additional models read from the global configuration by a higher layer; `sc-agent-types` itself reads no files.
-- A user MUST be able to add a model to the global configuration without upgrading any crate.
-- A short name MUST resolve to the model of its line with the latest release date across the union of built-in and global-configuration models.
+- A short name MUST resolve to the row with that short name and the latest release date.
+- A full model id MUST select its row exactly.
 - Each built-in model MUST carry the model's published release date.
 
 ### Rationale
 
 When a new model is released, short names such as `haiku`, `luna`, `opus` and `sol` must launch it immediately.
 
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] After a user adds to the global configuration a `haiku` model with a release date later than every built-in `haiku` model, `haiku` resolves to it with no rebuild.
-- [ ] A user-added model with an earlier release date does not change what its short name resolves to.
+- [ ] When two rows share a short name, the short name resolves to the row with the later release date.
 
 ### Dependencies
 

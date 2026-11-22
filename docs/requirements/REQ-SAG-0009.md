@@ -1,9 +1,9 @@
 # Requirement: Low-level crates work without tokio
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: tokio is the Rust async runtime. The low-level crates are `sc-agent-types`, `sc-agent-config`, `sc-agent-secrets`, `sc-decision-schema`, `sc-agent-http`, the decision backends, `sc-agent-log` and `sc-decision-runner`.
+Definitions: tokio is the Rust async runtime. The low-level crates are `sc-agent` and `sc-treesitter`.
 
 **MUST statements:**
 
@@ -23,6 +23,8 @@ Definitions: tokio is the Rust async runtime. The low-level crates are `sc-agent
 ### Rationale
 
 sc-agent may use tokio, but a CLI built on the low-level crates must work without it.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria
 
