@@ -9,6 +9,7 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, Sender},
     },
     thread::JoinHandle,
     time::Duration,
@@ -63,7 +64,9 @@ pub fn answer() -> Value {
 }
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
+    HttpIfComplete(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
+    Never,
 }
 pub fn http(status: u16, body: Value) -> Reply {
     Reply::Http(status, vec![], body.to_string())
@@ -75,11 +78,49 @@ pub struct Request {
     pub body: Value,
 }
 type CapturedRequests = Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>>;
+fn read_request(
+    stream: &mut TcpStream,
+) -> Result<Request, Box<dyn std::error::Error + Send + Sync>> {
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+    reader.read_line(&mut line)?;
+    let path = line
+        .split_whitespace()
+        .nth(1)
+        .ok_or("missing HTTP path")?
+        .to_owned();
+    let mut headers = vec![];
+    loop {
+        line.clear();
+        reader.read_line(&mut line)?;
+        if line == "\r\n" {
+            break;
+        }
+        let (key, value) = line.split_once(':').ok_or("missing header separator")?;
+        headers.push((key.to_ascii_lowercase(), value.trim().to_owned()));
+    }
+    let length: usize = headers
+        .iter()
+        .find(|(key, _)| key == "content-length")
+        .ok_or("missing content length")?
+        .1
+        .parse()?;
+    let mut body = vec![0; length];
+    reader.read_exact(&mut body)?;
+    drop(reader);
+    Ok(Request {
+        path,
+        headers,
+        body: serde_json::from_slice(&body)?,
+    })
+}
 pub struct Stub {
     pub url: String,
     listener: TcpListener,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<CapturedRequests>>,
+    observed: Receiver<()>,
+    notify: Sender<()>,
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -88,8 +129,11 @@ impl Stub {
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
+        let (notify, observed) = mpsc::channel();
+        let server_notify = notify.clone();
         let worker = std::thread::spawn(move || {
             let mut seen = vec![];
+            let mut unanswered = vec![];
             for reply in replies {
                 let (mut stream, _) = listener.accept()?;
                 if stopped.load(Ordering::SeqCst) {
@@ -98,40 +142,27 @@ impl Stub {
                 // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
                 stream.set_read_timeout(Some(Duration::from_secs(5)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-                let mut reader = BufReader::new(&mut stream);
-                let mut line = String::new();
-                reader.read_line(&mut line)?;
-                let path = line
-                    .split_whitespace()
-                    .nth(1)
-                    .ok_or("missing HTTP path")?
-                    .to_owned();
-                let mut headers = vec![];
-                loop {
-                    line.clear();
-                    reader.read_line(&mut line)?;
-                    if line == "\r\n" {
-                        break;
+                let request = match read_request(&mut stream) {
+                    Ok(request) => request,
+                    Err(_) if matches!(&reply, Reply::Never | Reply::HttpIfComplete(..)) => {
+                        // A timeout during connect/write is still an attempted send.
+                        seen.push(Request {
+                            path: String::new(),
+                            headers: vec![],
+                            body: Value::Null,
+                        });
+                        let _ = server_notify.send(());
+                        continue;
                     }
-                    let (key, value) = line.split_once(':').ok_or("missing header separator")?;
-                    headers.push((key.to_ascii_lowercase(), value.trim().to_owned()));
-                }
-                let length: usize = headers
-                    .iter()
-                    .find(|(key, _)| key == "content-length")
-                    .ok_or("missing content length")?
-                    .1
-                    .parse()?;
-                let mut body = vec![0; length];
-                reader.read_exact(&mut body)?;
-                seen.push(Request {
-                    path,
-                    headers,
-                    body: serde_json::from_slice(&body)?,
-                });
+                    Err(error) => return Err(error),
+                };
+                seen.push(request);
+                let _ = server_notify.send(());
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
-                    Reply::Http(status, headers, body) => {
+                    Reply::Never => unanswered.push(stream),
+                    Reply::Http(status, headers, body)
+                    | Reply::HttpIfComplete(status, headers, body) => {
                         write!(
                             stream,
                             "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -144,6 +175,7 @@ impl Stub {
                     }
                 }
             }
+            drop(unanswered);
             Ok(seen)
         });
         Ok(Self {
@@ -151,7 +183,15 @@ impl Stub {
             listener: owned_listener,
             stop,
             worker: Some(worker),
+            observed,
+            notify,
         })
+    }
+    pub fn wait_for_request(&self) -> Result<(), mpsc::RecvError> {
+        self.observed.recv()
+    }
+    pub fn request_signal(&self) -> Sender<()> {
+        self.notify.clone()
     }
     pub fn finish(mut self) -> Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>> {
         self.stop();

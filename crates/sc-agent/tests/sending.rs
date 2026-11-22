@@ -97,6 +97,92 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
 }
 
 #[test]
+fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let replies = vec![
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+        Reply::Never,
+    ];
+    let stub = Stub::new(replies)?;
+    let mut overridden = options(&root, &stub.url);
+    overridden.timeout = Duration::from_millis(50);
+
+    let signal = stub.request_signal();
+    let timed_out = std::thread::scope(|scope| {
+        let logger_ref = &logger;
+        let overridden_ref = &overridden;
+        let client = scope.spawn(move || {
+            let outcome = send(
+                &request(),
+                overridden_ref,
+                logger_ref,
+                &Cancel::default(),
+                &no_wait,
+                &keyring,
+            );
+            let _ = signal.send(());
+            outcome
+        });
+        stub.wait_for_request()?;
+        let outcome = client.join().map_err(|_| "send thread panicked")?;
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(sc_agent::report(&logger, outcome))
+    })?;
+    assert_eq!(timed_out["error"]["id"], "http.network");
+    assert_eq!(timed_out["error"]["attempts"], 5);
+    let _ = stub.finish()?;
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
+fn req_sag_0702_later_plain_call_uses_configured_timeout() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let configured_timeout = Duration::ZERO;
+
+    let override_stub = Stub::new(vec![http(200, answer())])?;
+    let mut overridden = options(&root, &override_stub.url);
+    overridden.timeout = Duration::from_secs(5);
+    assert_ne!(overridden.timeout, configured_timeout);
+    let override_result = send(
+        &request(),
+        &overridden,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    )?;
+    assert_eq!(override_result["answers"], answer()["answers"]);
+    assert_eq!(override_stub.finish()?.len(), 1);
+
+    let plain_stub = Stub::new(vec![Reply::HttpIfComplete(
+        200,
+        vec![],
+        answer().to_string(),
+    )])?;
+    let mut plain_options = options(&root, &plain_stub.url);
+    plain_options.timeout = configured_timeout;
+    assert_eq!(plain_options.timeout, configured_timeout);
+    let plain = sc_agent::result(send(
+        &request(),
+        &plain_options,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(plain["error"]["id"], "http.network");
+    assert_eq!(plain["error"]["attempts"], 5);
+    let _ = plain_stub.finish()?;
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
 fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> Test {
     for status in [429, 502, 529] {
         let root = Temp::new()?;

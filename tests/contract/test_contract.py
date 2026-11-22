@@ -581,7 +581,8 @@ class Cli(Isolated):
         cases = [(["--batch", "--workers", str(workers)], "{}", "decidr.invalid_workers") for workers in (-1, 0)]
         cases.append(([], json.dumps({**REQUEST, "state": "x" * (8 * 1024 * 1024)}), "decision.request_too_large"))
         for flags, text, expected in cases:
-            got = subprocess.run([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya", *flags],
+            got = subprocess.run([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya",
+                                 "--agent-role", "contract", *flags],
                                  input=text, env={"PATH": os.defpath, "DECIDR_LOG_ROOT": self.directory.name},
                                  cwd=self.directory.name, text=True, capture_output=True, timeout=20)
             self.assertNotEqual(got.returncode, 0)
@@ -611,10 +612,23 @@ class Cli(Isolated):
             self.assertEqual(project["source"], str(config))
             log_root = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "log_root")
             self.assertEqual((log_root["value"], log_root["source"]), (folder, "DECIDR_LOG_ROOT"))
-            sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya"], input=json.dumps(REQUEST), env=env, cwd=folder, text=True, capture_output=True, timeout=20)
+            sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya",
+                                   "--agent-role", "contract"], input=json.dumps(REQUEST), env=env,
+                                  cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(sent.returncode, 0, sent.stderr + sent.stdout)
             self.assertTrue(json.loads(sent.stdout)["ok"])
             self.assertEqual(received[0][0], "/v1/systemone")
+
+    def test_send_requires_agent_role(self):
+        binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
+        with tempfile.TemporaryDirectory() as folder:
+            got = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya"],
+                                 input=json.dumps(REQUEST), env={"PATH": os.defpath, "DECIDR_LOG_ROOT": folder},
+                                 cwd=folder, text=True, capture_output=True, timeout=20)
+            self.assertNotEqual(got.returncode, 0)
+            error = json.loads(got.stdout)["error"]
+            self.assertEqual(error["id"], "decidr.usage")
+            self.assertIn("--agent-role", error["message"])
 
     @unittest.skipUnless(os.name == "posix", "POSIX signal delivery")
     def test_sigint_and_sigterm_cancel_and_flush_all_session_rows(self):
@@ -628,7 +642,8 @@ class Cli(Isolated):
                     port = int(url.split(":")[2].split("/")[0])
                     Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
                     env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder}
-                    process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya", "--batch", "--workers", "1"],
+                    process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya",
+                                                 "--agent-role", "contract", "--batch", "--workers", "1"],
                                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=folder, env=env)
                     try:
                         stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
