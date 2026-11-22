@@ -35,6 +35,9 @@ agents:
   ceremony-finding-screen:
     version: 0.1.0
     path: .claude/agents/ceremony-finding-screen.md
+  blastr:
+    version: 1.1.0-sc.1
+    path: .claude/agents/blastr.md
   rust-architect:
     version: 0.12.0
     path: .claude/agents/rust-architect.md
