@@ -89,6 +89,22 @@ class Wheel(Isolated):
             self.assertIsInstance(value["error"][field], str)
         return value["error"]
 
+    def test_sc_agent_home_supplies_wheel_config_and_project(self):
+        root = Path(self.directory.name)
+        user = root / "user"
+        user.mkdir()
+        (user / "decidr.local.json").write_text('{"project":"from-home","workers":2}')
+        with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {
+                "SC_AGENT_HOME": str(user), "TYPESAFE_API_KEY": "contract-secret"}):
+            got = self.api.send(REQUEST, agent_role="contract", base_url=url,
+                                general_log=self.api.logger("decidr")["value"])
+        self.assertTrue(got["ok"], got)
+        self.assertEqual(len(received), 1)
+        rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl")
+                for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["project"], "from-home")
+
     def test_bad_call_signatures_return_errors(self):
         functions = [self.api.logger, self.api.log, self.api.flush, self.api.digest,
                      self.api.send, self.api.send_batch, self.api.sitr.languages,
@@ -662,8 +678,8 @@ class Cli(Isolated):
         self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
         value = json.loads(got.stdout)["value"]
         self.assertEqual(value["files"], [{"path": str(path), "exists": exists} for path, exists in [
-            (local / "decidr.json", False), (local / "sc-agent.json", True),
-            (global_config / "decidr.json", True), (global_config / "sc-agent.json", False)]])
+            (local / "decidr.local.json", False), (local / "decidr.json", False), (local / "sc-agent.json", True),
+            (global_config / "decidr.local.json", False), (global_config / "decidr.json", True), (global_config / "sc-agent.json", False)]])
         project = next(row for row in value["settings"] if row["path"] == "project")
         self.assertEqual(project["source"], str(local / "sc-agent.json"))
 
@@ -702,6 +718,27 @@ class Cli(Isolated):
                                     text=True, capture_output=True, timeout=20)
         self.assertEqual(json.loads(overridden.stdout)["error"]["id"], "decidr.invalid_workers")
 
+    def test_sc_agent_home_relocates_config_without_changing_log_root(self):
+        root = Path(self.directory.name).resolve()
+        user = root / "user"
+        user.mkdir()
+        override = user / "decidr.local.json"
+        override.write_text('{"project":"relocated","workers":6}')
+        binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
+        environment = {"PATH": os.defpath, "SC_AGENT_HOME": str(user),
+                       "DECIDR_LOG_ROOT": str(root / "logs"),
+                       "GIT_CEILING_DIRECTORIES": str(root.parent)}
+        got = subprocess.run([str(binary), "doctor"], cwd=root, env=environment,
+                             capture_output=True, text=True, timeout=20)
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        value = json.loads(got.stdout)["value"]
+        rows = {row["path"]: row for row in value["settings"]}
+        self.assertEqual((rows["project"]["value"], rows["project"]["source"]), ("relocated", str(override)))
+        self.assertEqual(rows["workers"]["value"], "6")
+        self.assertEqual(value["log_root"], str(root / "logs"))
+        self.assertEqual(len(value["files"]), 3)
+        self.assertEqual(list((root / "logs").rglob("*")), [])
+
     def test_doctor_environment_sources(self):
         root = Path(self.directory.name).resolve()
         (root / "global").mkdir()
@@ -729,7 +766,7 @@ class Cli(Isolated):
         (root / ".sc/sc-agent/decidr.json").write_text("must not be read")
         got = self.doctor(root)
         self.assertEqual(got.returncode, 0, got.stdout)
-        self.assertEqual(len(json.loads(got.stdout)["value"]["files"]), 2)
+        self.assertEqual(len(json.loads(got.stdout)["value"]["files"]), 3)
 
     def test_local_load_errors_name_full_path_and_key(self):
         root = Path(self.directory.name).resolve()
@@ -795,6 +832,7 @@ class Cli(Isolated):
             self.assertFalse(any(row["path"] == "log_root" for row in json.loads(doctor.stdout)["value"]["settings"]))
             self.assertEqual(json.loads(doctor.stdout)["value"]["log_root"], folder)
             self.assertEqual(json.loads(doctor.stdout)["value"]["files"], [
+                {"path": str(Path(folder) / "decidr.local.json"), "exists": False},
                 {"path": str(config), "exists": True},
                 {"path": str(Path(folder) / "sc-agent.json"), "exists": False},
             ])

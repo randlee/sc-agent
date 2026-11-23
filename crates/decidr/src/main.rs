@@ -39,14 +39,10 @@ fn main() {
                     return sc_agent::doctor(cli.config_dir.as_deref(), cli.project.as_deref());
                 }
                 let (root, repo) = sc_agent::repository()?;
-                let global = cli
-                    .config_dir
-                    .or_else(|| std::env::home_dir().map(|p| p.join(".sc-agent")))
-                    .ok_or_else(|| sc_agent::error("config.home", "Home directory unavailable"))?;
                 let local = root.join(".sc/sc-agent");
                 let mut settings = sc_agent::config(
                     root.join(".git").exists().then_some(local.as_path()),
-                    &global,
+                    cli.config_dir.as_deref(),
                     &std::env::vars_os().collect::<Vec<_>>(),
                     cli.project.as_deref(),
                 )?

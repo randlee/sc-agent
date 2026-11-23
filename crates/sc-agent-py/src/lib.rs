@@ -157,17 +157,14 @@ fn options(
     let provider = option::<String>(named, "provider")?;
     sc_agent::model(&model, provider.as_deref())?;
     let (root, repo) = sc_agent::repository()?;
-    let global = option::<String>(named, "config_dir")?
-        .map(PathBuf::from)
-        .or_else(|| std::env::home_dir().map(|p| p.join(".sc-agent")))
-        .ok_or_else(|| error("config.home", "Home directory unavailable"))?;
+    let global = option::<String>(named, "config_dir")?.map(PathBuf::from);
     let project = option::<String>(named, "project")?;
     let mut settings = sc_agent::config(
         root.join(".git")
             .exists()
             .then_some(root.join(".sc/sc-agent"))
             .as_deref(),
-        &global,
+        global.as_deref(),
         &std::env::vars_os().collect::<Vec<_>>(),
         project.as_deref(),
     )?
