@@ -42,27 +42,29 @@ Configuration has two kinds of scope and two locations.
 
 - The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.
 - Each CLI that reads configuration has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.
-- The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform.
+- The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.
 - The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.
 
 The CLIs and the files each one reads are these, and no others:
 
 | CLI | Global files | Local files | Environment prefix |
 |---|---|---|---|
-| `decidr` | `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
+| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.local.json`, `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
 | `sitr` | none | none | none |
 
 Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.
 
-A setting is looked up in seven layers, and the first layer that sets it wins:
+A setting is looked up in nine layers, and the first layer that sets it wins:
 
 1. the CLI flag;
 2. the environment variable;
-3. the local `<cli>.json`;
-4. the local `sc-agent.json`;
-5. the global `<cli>.json`;
-6. the global `sc-agent.json`;
-7. the built-in default, or a typed error when the setting is required and has no default.
+3. the local `<cli>.local.json`;
+4. the local `<cli>.json`;
+5. the local `sc-agent.json`;
+6. the global `<cli>.local.json`;
+7. the global `<cli>.json`;
+8. the global `sc-agent.json`;
+9. the built-in default, or a typed error when the setting is required and has no default.
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 
@@ -89,7 +91,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Negative:**
 
-- A setting can now come from seven places; `decidr doctor` reports a `path | value | source` table.
+- A setting can now come from nine places; `decidr doctor` reports a `path | value | source` table.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."

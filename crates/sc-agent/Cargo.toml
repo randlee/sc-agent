@@ -13,6 +13,6 @@ dotenvy = "0.15"
 ulid = "1"
 thiserror = "2"
 sc-sha = "=1.9.0"
-sc-config = { git = "https://github.com/randlee/sc-runtime", tag = "sc-config-pin-0.3" }
+sc-config = { git = "https://github.com/randlee/sc-runtime", rev = "f19b22e04d300025b9f3d2079386b32be25eab64" }
 [lints]
 workspace = true
