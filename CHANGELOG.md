@@ -4,6 +4,8 @@
 
 ## 0.4.0
 
+- Fixed: restore the sc-decidr wheel's MIT license metadata, bundled license file and package summary.
+
 - Replace the former seventeen-crate workspace with five crates: sc-agent, decidr, sc-agent-py, sc-treesitter and sitr.
 - Ship one `sc-decidr` wheel with the decision and sitr APIs under `sc_agent`; sitr is no longer a separate wheel.
 - Return tagged success or error values from the generated client instead of raising exceptions.
