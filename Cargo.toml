@@ -5,6 +5,9 @@ resolver = "3"
 version = "0.3.0"
 edition = "2024"
 license = "MIT"
+rust-version = "1.98.1"
+repository = "https://github.com/randlee/sc-agent"
+readme = "README.md"
 [workspace.dependencies]
 sc-agent = { path = "crates/sc-agent", version = "0.3.0" }
 sc-treesitter = { path = "crates/sc-treesitter", version = "0.3.0" }

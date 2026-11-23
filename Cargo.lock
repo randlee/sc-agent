@@ -1077,8 +1077,9 @@ dependencies = [
 
 [[package]]
 name = "sc-config"
-version = "0.2.0"
-source = "git+https://github.com/randlee/sc-runtime?rev=f19b22e04d300025b9f3d2079386b32be25eab64#f19b22e04d300025b9f3d2079386b32be25eab64"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88839829c5885dc2b82f9bb802230095d0638c49706708abe6b3c51c90a1bf80"
 dependencies = [
  "serde",
  "serde_json",
