@@ -7,7 +7,7 @@
 - Return tagged success or error values from the generated client instead of raising exceptions.
 - Share one native sc-observability Logger between each consumer and its wheel calls.
 - Preserve session records up to 1 MiB and support `--version` on both decidr and sitr.
-- Adopt sc-runtime's merged sc-config engine, pinned by Git revision for source builds; wheels and binaries include it. Add `decidr.local.json` override layers and relocate global configuration with `SC_AGENT_HOME`. Environment values parse as JSON when possible, otherwise as strings. Crates.io publication remains deferred until sc-config is reworked and released for all consumers; see [prerelease dependencies](docs/integration/prerelease.md#sc-config-dependency).
+- Adopt sc-runtime's merged sc-config engine, released on crates.io for source builds; wheels and binaries include it. Add `decidr.local.json` override layers and relocate global configuration with `SC_AGENT_HOME`. Environment values parse as JSON when possible, otherwise as strings. Publish sc-agent, sc-treesitter, sitr and decidr on crates.io; the PyO3 binding stays wheel-only.
 - Breaking: remove the `log_root` configuration setting; session rows and the general log both use the fixed `~/.sc-agent` root, which `doctor` reports as a value.
 
 ### Consumer migration
