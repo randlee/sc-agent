@@ -3,7 +3,10 @@ requires = ["maturin>=1.8,<2"]
 build-backend = "maturin"
 [project]
 name = "sc-decidr"
-version = "0.3.0"
+license = "MIT"
+license-files = ["LICENSE"]
+description = "The sc-agent Python API: decision requests, cancellation, logging and tree-sitter syntax queries through sc_agent and sc_agent.sitr."
+version = "0.4.0"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
