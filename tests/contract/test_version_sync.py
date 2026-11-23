@@ -1,6 +1,10 @@
 """Keep checked-in CLI metadata synchronized with the Cargo workspace release."""
 from pathlib import Path
 import re
+import importlib.metadata
+import subprocess
+import sys
+import tempfile
 import tomllib
 import unittest
 
@@ -32,3 +36,24 @@ class VersionSync(unittest.TestCase):
                 mismatches.extend(f"{relative}:{number}: {actual!r} != workspace {version!r}"
                                   for number, actual in matches if actual != version)
         self.assertFalse(mismatches, "Version literals are out of sync:\n" + "\n".join(mismatches))
+
+    def test_installed_wheel_license_summary_and_version_rewrite(self):
+        # The gate installs the wheel it just built before running this suite.
+        distribution = importlib.metadata.distribution("sc-decidr")
+        metadata = distribution.metadata
+        source = (ROOT / "crates/sc-agent-py/pyproject.toml").read_text()
+        project = tomllib.loads(source)["project"]
+        self.assertEqual(metadata["License-Expression"], "MIT")
+        self.assertIn("LICENSE", metadata.get_all("License-File", []))
+        self.assertTrue(metadata["Summary"])
+        self.assertEqual(metadata["Summary"], project["description"])
+        self.assertEqual(distribution.read_text("licenses/LICENSE"), (ROOT / "LICENSE").read_text())
+        with tempfile.TemporaryDirectory() as temporary:
+            pyproject = Path(temporary) / "pyproject.toml"
+            pyproject.write_text(source.replace(f'version = "{project["version"]}"', 'version = "0.0.0"', 1))
+            rewritten = subprocess.run([
+                sys.executable, str(ROOT / ".github/scripts/release_artifacts.py"),
+                "sync-python-version", "--workspace-toml", str(ROOT / "Cargo.toml"),
+                "--pyproject", str(pyproject)], text=True, capture_output=True, timeout=20)
+            self.assertEqual(rewritten.returncode, 0, rewritten.stdout + rewritten.stderr)
+            self.assertEqual(pyproject.read_text(), source)
