@@ -1,4 +1,7 @@
-use sc_config::layers::{self, EnvValue, FileLayer, Inputs, Key, Layered};
+use sc_config::{
+    AppName, ConfigError, EnvSource, FileSource, Layer, LayerSource, Resolved, Slot, SourceKind,
+    StandardContext, StandardLayers,
+};
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -109,108 +112,173 @@ fn missing_setting(path: &str) -> Error {
     error(
         "config.missing_setting",
         format!(
-            "Set {path} through DECIDR_{}, local decidr.json, local sc-agent.json, global decidr.json, or global sc-agent.json",
+            "Set {path} through DECIDR_{}, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json",
             path.to_uppercase().replace('.', "__")
         ),
     )
 }
 fn setting<T: serde::de::DeserializeOwned>(
-    value: &Value,
+    resolved: &Resolved,
     path: &'static str,
     default: Value,
 ) -> Result<T, Error> {
-    let selected = value.pointer(&format!("/{}", path.replace('.', "/")));
+    let selected = resolved
+        .value
+        .pointer(&format!("/{}", path.replace('.', "/")));
     if selected.is_none() && path.starts_with("laya.") {
-        return Err(error("laya", missing_setting(path)));
+        return Err(invalid_setting(resolved, "laya", missing_setting(path)));
     }
-    let source = if selected.is_none() {
-        path.split('.').next().unwrap_or(path)
-    } else {
-        path
-    };
     serde_json::from_value(selected.cloned().unwrap_or(default))
-        .map_err(|e| error(source, format!("{path}: {e}")))
+        .map_err(|e| invalid_setting(resolved, path, e))
 }
 impl Settings {
     pub fn project_required(&self) -> Result<&str, Error> {
-        self.project.as_deref().filter(|s| !s.is_empty()).ok_or_else(||error("config.missing_project", "Set project/phase through --project, SC_PROJECT, local decidr.json, local sc-agent.json, global decidr.json, or global sc-agent.json"))
+        self.project.as_deref().filter(|s| !s.is_empty()).ok_or_else(||error("config.missing_project", "Set project/phase through --project, SC_PROJECT, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json"))
     }
 }
-pub const KEYS: &[Key] = &[
-    Key {
-        path: "project",
-        env: EnvValue::String,
-    },
-    Key {
-        path: "workers",
-        env: EnvValue::Json,
-    },
-    Key {
-        path: "laya.host",
-        env: EnvValue::String,
-    },
-    Key {
-        path: "laya.port",
-        env: EnvValue::Json,
-    },
-    Key {
-        path: "laya.model",
-        env: EnvValue::String,
-    },
-];
+const KEYS: &[&str] = &["project", "workers", "laya.host", "laya.port", "laya.model"];
+pub struct Configuration {
+    pub config: Settings,
+    pub rows: Vec<Value>,
+    pub files: Vec<Value>,
+}
+struct ConfigEnv(Vec<(OsString, OsString)>);
+impl LayerSource for ConfigEnv {
+    fn load(&self, base: &Value) -> Result<Option<Layer>, ConfigError> {
+        let variables = self
+            .0
+            .iter()
+            .filter(|(name, _)| {
+                let key = name
+                    .to_str()
+                    .and_then(|name| name.strip_prefix("DECIDR_"))
+                    .and_then(|key| key.split("__").next())
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                !matches!(key.as_str(), "log_root" | "project")
+            })
+            .cloned()
+            .collect();
+        EnvSource::new("DECIDR_", variables)
+            .alias("SC_PROJECT", ["project"])
+            .load(base)
+    }
+}
+fn config_error(failure: ConfigError) -> Error {
+    let id = match failure.code() {
+        "APP.INVALID_NAME" => "config.name",
+        _ => "config.invalid",
+    };
+    error(id, failure)
+}
+fn invalid_setting(resolved: &Resolved, path: &str, failure: impl ToString) -> Error {
+    let sources = resolved
+        .rows()
+        .into_iter()
+        .filter(|row| {
+            let key = row.path.join(".");
+            key == path || key.starts_with(&format!("{path}."))
+        })
+        .map(|row| row.source.name)
+        .collect::<Vec<_>>()
+        .join(", ");
+    error(
+        "config.invalid",
+        format!("{path} from {sources}: {}", failure.to_string()),
+    )
+}
 pub fn config(
     local: Option<&Path>,
-    global: &Path,
+    global: Option<&Path>,
     environment: &[(OsString, OsString)],
     project: Option<&str>,
-) -> Result<Layered<Settings>, Error> {
-    let files = local
-        .into_iter()
-        .chain(std::iter::once(global))
-        .flat_map(|folder| {
-            ["decidr.json", "sc-agent.json"].map(|name| FileLayer {
-                path: folder.join(name),
-                accepts: KEYS,
+) -> Result<Configuration, Error> {
+    let global = global
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            environment
+                .iter()
+                .find(|(name, value)| name == "SC_AGENT_HOME" && !value.is_empty())
+                .map(|(_, value)| PathBuf::from(value))
+        })
+        .or_else(|| std::env::home_dir().map(|home| home.join(".sc-agent")))
+        .ok_or_else(|| error("config.home", "Home directory unavailable"))?;
+    let context = StandardContext::new(
+        AppName::new("sc-agent").map_err(config_error)?,
+        vec![],
+        vec![],
+    );
+    let mut layers = StandardLayers::new(context).defaults(json!({"workers":8}));
+    let mut files = Vec::new();
+    for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
+        if let Some(folder) = folder {
+            for name in ["sc-agent.json", "decidr.json", "decidr.local.json"] {
+                let path = folder.join(name);
+                files.push(json!({"path":path,"exists":path.exists()}));
+                layers = layers.insert(
+                    slot,
+                    FileSource::new(path)
+                        .optional()
+                        .accepts(KEYS.iter().map(|key| key.split('.').collect::<Vec<_>>())),
+                );
+            }
+        }
+    }
+    let flags = project
+        .map(|project| json!({"project":project}))
+        .unwrap_or(json!({}));
+    let resolved = layers
+        .insert(Slot::Env, ConfigEnv(environment.to_vec()))
+        .flags(flags)
+        .resolve()
+        .map_err(config_error)?;
+    let config = Settings {
+        project: setting(&resolved, "project", Value::Null)?,
+        workers: setting(&resolved, "workers", json!(8))?,
+        laya: if resolved.value.get("laya").is_some_and(Value::is_object) {
+            Some(Runner {
+                host: setting(&resolved, "laya.host", Value::Null)?,
+                port: setting(&resolved, "laya.port", Value::Null)?,
+                model: setting(&resolved, "laya.model", Value::Null)?,
             })
+        } else {
+            setting(&resolved, "laya", Value::Null)?
+        },
+    };
+    if config.workers == 0 {
+        return Err(invalid_setting(&resolved, "workers", "must be positive"));
+    }
+    let provenance = resolved.rows();
+    let rows = KEYS
+        .iter()
+        .map(|key| {
+            let row = provenance.iter().find(|row| row.path.join(".") == *key);
+            let value = row.map_or_else(
+                || "unset".into(),
+                |row| {
+                    row.value
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| row.value.to_string())
+                },
+            );
+            let source = row.map_or_else(
+                || "default".into(),
+                |row| match row.source.kind {
+                    SourceKind::Default => "default".into(),
+                    SourceKind::Flag => "--project".into(),
+                    _ => row.source.name.clone(),
+                },
+            );
+            json!({"path":key,"value":value,"source":source})
         })
         .collect();
-    let flags = project
-        .map(|s| ("project".into(), json!(s)))
-        .into_iter()
-        .collect();
-    layers::load(
-        &Inputs {
-            files,
-            env_prefix: "DECIDR_",
-            env_aliases: &[("SC_PROJECT", "project")],
-            env_accepts: KEYS.get(1..).unwrap_or_default(),
-            flags,
-            flag_names: BTreeMap::new(),
-            keys: KEYS,
-            environment,
-        },
-        |value| {
-            let settings = Settings {
-                project: setting(&value, "project", Value::Null)?,
-                workers: setting(&value, "workers", json!(8))?,
-                laya: if value.get("laya").is_some_and(Value::is_object) {
-                    Some(Runner {
-                        host: setting(&value, "laya.host", Value::Null)?,
-                        port: setting(&value, "laya.port", Value::Null)?,
-                        model: setting(&value, "laya.model", Value::Null)?,
-                    })
-                } else {
-                    setting(&value, "laya", Value::Null)?
-                },
-            };
-            if settings.workers == 0 {
-                return Err(error("workers", "must be positive"));
-            }
-            Ok(settings)
-        },
-        |Error::Failure { id, .. }| Some(*id),
-    )
-    .map_err(|e| error("config.invalid", e))
+    files.reverse();
+    Ok(Configuration {
+        config,
+        rows,
+        files,
+    })
 }
 pub fn slug(value: &str) -> Result<(), Error> {
     if value.is_empty()
@@ -1227,28 +1295,14 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
 pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
     let (root, _) = repository()?;
     let local = root.join(".sc/sc-agent");
-    let global = config_dir
-        .map(Path::to_path_buf)
-        .map(Ok)
-        .unwrap_or_else(|| {
-            std::env::home_dir()
-                .map(|p| p.join(".sc-agent"))
-                .ok_or_else(|| error("config.home", "Home directory unavailable"))
-        })?;
+
     let loaded = config(
         root.join(".git").exists().then_some(local.as_path()),
-        &global,
+        config_dir,
         &std::env::vars_os().collect::<Vec<_>>(),
         project,
     )?;
-    let mut keys = KEYS.to_vec();
-    keys.push(Key {
-        path: "laya",
-        env: EnvValue::Json,
-    });
-    Ok(
-        json!({"settings":layers::resolved(&loaded,&keys), "files":loaded.files, "log_root":log_root("decidr")?}),
-    )
+    Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root("decidr")?}))
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {

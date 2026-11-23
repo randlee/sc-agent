@@ -32,10 +32,10 @@ release preflight. CI runs Cargo formatting and Clippy directly.
 
 ## sc-config dependency
 
-sc-config is not on crates.io. It comes from the `sc-config-pin-0.3` GitHub tag
-on [sc-runtime's unmerged PR #153](https://github.com/randlee/sc-runtime/pull/153).
+sc-config is not on crates.io. It comes from sc-runtime's merged layered engine,
+using the Git revision pinned in [the sc-agent manifest](../../crates/sc-agent/Cargo.toml).
 Wheels and binaries compile it in and need no GitHub access at runtime; sdist and
-source builds fetch the tag. Crates.io publication of sc-agent remains deferred
+source builds fetch that revision. Crates.io publication of sc-agent remains deferred
 until sc-config is reworked for all consumers and released, after which sc-agent
 will be republished.
 
