@@ -9,7 +9,8 @@
 Usage:
   sanity-split --task <sanity bead> --bead <dev bead> --worktree <path>
                --branch <branch> --commit <commit> --base <base>
-               --lint-command '<cmd>' --scratch <dir> [--layer-pr <n> ...]
+               (--lint-command '<cmd>' | --recheck-of <earlier manifest>)
+               --scratch <dir> [--layer-pr <n> ...]
                [--bead-json <file>] [--split-only] [--template <path>]
                [--lint-timeout-seconds <n>]
   sanity-split lint-supervisor --worktree <path> --command '<cmd>' --log <file>
@@ -31,6 +32,14 @@ worktree, and prints one JSON manifest to stdout:
    assignments: [{number, assignment: <rendered object>}]}
 
 `--split-only` parses and renders only: no git pinning and no lint.
+
+`--recheck-of <manifest>` is the re-check of a cleanly rebased layer (a
+`<sanity bead>-r<N>` bead): it pins and lists changed files as above but starts
+no lint. It carries the earlier run's passed lint instead, `lint: {carried: true,
+command, log, exit_file, exit_code: 0, commit, run_id, sanity_bead, manifest}`
+(the run that actually linted, followed through an earlier re-check), sets
+`recheck: true` and the roster `[sanity-jev, sanity-selected]`. It refuses an
+earlier run for another dev bead (exit 7) or whose lint did not exit 0 (exit 6).
 
 The lint command runs under `lint-supervisor`, a detached process (its pid is
 `lint.pid`) that runs the command in a process group of its own, redirects the
@@ -58,6 +67,8 @@ Exit codes (the code and message are printed on stderr):
   3  SANITY.TARGET_UNREADABLE worktree, commit, base or remote unreadable
   4  SANITY.COMMIT_MISMATCH   HEAD, branch, dirty tree, or branch not pushed at SHA
   5  RENDER_FAILED            sc-compose could not render an assignment
+  6  SANITY.RECHECK_LINT_NOT_PASSED  the --recheck-of run's lint did not exit 0
+  7  SANITY.RECHECK_BEAD_MISMATCH    the --recheck-of run checked another dev bead
 """
 import argparse
 from dataclasses import dataclass
@@ -85,7 +96,8 @@ from operation_models import matches_typeddict  # noqa: E402
 from sprint_index_common import JsonObject, JsonValue, is_json_object, is_json_value  # noqa: E402
 
 TEMPLATE = HERE.parent / "templates" / "dev-sanity-assignment.json.j2"
-CODES = {2: "SANITY.PLAN_INVALID", 3: "SANITY.TARGET_UNREADABLE", 4: "SANITY.COMMIT_MISMATCH", 5: "RENDER_FAILED"}
+CODES = {2: "SANITY.PLAN_INVALID", 3: "SANITY.TARGET_UNREADABLE", 4: "SANITY.COMMIT_MISMATCH", 5: "RENDER_FAILED",
+         6: "SANITY.RECHECK_LINT_NOT_PASSED", 7: "SANITY.RECHECK_BEAD_MISMATCH"}
 
 
 class Fail(Exception):
@@ -101,7 +113,8 @@ class SplitArguments(argparse.Namespace):
     branch: str
     commit: str
     base: str
-    lint_command: str
+    lint_command: str | None
+    recheck_of: Path | None
     scratch: str
     bead_json: str | None
     close_context: Path | None
@@ -110,6 +123,52 @@ class SplitArguments(argparse.Namespace):
     split_only: bool
     template: Path
     lint_timeout_seconds: int
+
+
+class CarriedLint(TypedDict):
+    carried: bool
+    command: str
+    log: str
+    exit_file: str
+    exit_code: int
+    commit: str
+    run_id: str | None
+    sanity_bead: str
+    manifest: str
+
+
+def carried_lint(path: Path, dev_bead: str) -> CarriedLint:
+    """The earlier run's passed lint, for a re-check that starts none: refused unless that run checked `dev_bead`
+    and its lint exited 0. An earlier re-check passes on the lint it carried."""
+    try:
+        earlier = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise Fail(1, f"cannot read --recheck-of {path}: {error}") from error
+    if not is_json_object(earlier):
+        raise Fail(1, f"--recheck-of {path} is not a sanity-split manifest object")
+    if earlier.get("dev_bead") != dev_bead:
+        raise Fail(7, f"--recheck-of {path} checked dev bead {earlier.get('dev_bead')!r}, not {dev_bead}")
+    lint = earlier.get("lint")
+    if not is_json_object(lint):
+        raise Fail(6, f"--recheck-of {path} ran no lint (a --split-only manifest)")
+    if lint.get("carried") is True:
+        carried = {key: lint.get(key) for key in CarriedLint.__required_keys__}
+        if not matches_typeddict(carried, CarriedLint) or carried["exit_code"] != 0:
+            raise Fail(6, f"--recheck-of {path} carries no passed lint: {json.dumps(lint)}")
+        return carried
+    command, log, exit_name, sha = lint.get("command"), lint.get("log"), lint.get("exit_file"), earlier.get("sha")
+    run_id, sanity_bead = earlier.get("run_id"), earlier.get("sanity_bead")
+    if not (isinstance(command, str) and isinstance(log, str) and isinstance(exit_name, str) and isinstance(sha, str)
+            and isinstance(sanity_bead, str) and (run_id is None or isinstance(run_id, str))):
+        raise Fail(1, f"--recheck-of {path} lacks sha, sanity_bead or lint command/log/exit_file")
+    try:
+        state = Path(exit_name).read_text().strip()
+    except OSError as error:
+        raise Fail(6, f"--recheck-of {path}: lint exit file {exit_name} unreadable (still running or removed): {error}") from error
+    if state != "0":
+        raise Fail(6, f"--recheck-of {path}: lint at {sha} exited {state!r}, not 0; see {log}")
+    return {"carried": True, "command": command, "log": log, "exit_file": exit_name, "exit_code": 0,
+            "commit": sha, "run_id": run_id, "sanity_bead": sanity_bead, "manifest": str(path)}
 
 
 class SupervisorArguments(argparse.Namespace):
@@ -446,6 +505,7 @@ def render(template: Path, variables: JsonObject) -> JsonObject:
 
 
 def start_lint(args: SplitArguments) -> LintRun:
+    assert args.lint_command is not None
     scratch = Path(args.scratch)
     scratch.mkdir(parents=True, exist_ok=True)
     log = scratch / f"{args.task}-lint.log"
@@ -548,8 +608,11 @@ def supervise(argv: list[str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=True)
-    for flag in ("--task", "--bead", "--worktree", "--branch", "--commit", "--base", "--lint-command", "--scratch"):
+    for flag in ("--task", "--bead", "--worktree", "--branch", "--commit", "--base", "--scratch"):
         parser.add_argument(flag, required=True)
+    lint_source = parser.add_mutually_exclusive_group(required=True)
+    lint_source.add_argument("--lint-command")
+    lint_source.add_argument("--recheck-of", type=Path, help="earlier run's manifest; carry its passed lint, start none")
     parser.add_argument("--bead-json")
     parser.add_argument("--close-context", type=Path)
     parser.add_argument("--layer-pr", action="append", default=[])
@@ -561,18 +624,21 @@ def main() -> int:
         args = parser.parse_args(namespace=SplitArguments())
     except SystemExit as error:
         return 0 if error.code == 0 else 1
+    if args.recheck_of and args.split_only:
+        return die(1, "--recheck-of pins the commit and lists changed files; it cannot be combined with --split-only")
     try:
+        carried = carried_lint(args.recheck_of, args.bead) if args.recheck_of else None
         bead = load_bead(args)
         source = plan_source(args, bead)
         own = bead.description
         deliverables = parse_deliverables(own if DELIVERABLES.search(own) else source.description)
         owned = bead.owned_paths or source.owned_paths
+        lint: LintRun | CarriedLint | None = None
         if args.split_only:
-            sha, base_sha, files, lint = args.commit, args.base, [], None
+            sha, base_sha, files = args.commit, args.base, []
         else:
             sha, base_sha = pin(args)
             files = layer_files(args.worktree, args.layer_pr, sha) if args.layer_pr else changed_files(args.worktree, base_sha, sha)
-            lint = None
         outside = outside_fence(files, owned)
         try:
             close_context: JsonValue = json.loads(args.close_context.read_text()) if args.close_context else {}
@@ -597,12 +663,15 @@ def main() -> int:
                 "worktree_path": args.worktree, "branch": args.branch, "commit": sha, "base_sha": base_sha,
             }
             assignments.append({"number": item["number"], "assignment": render(args.template, variables)})
-        if not args.split_only:
+        if carried is not None:
+            lint = carried
+        elif not args.split_only:
             lint = start_lint(args)
     except Fail as exc:
         return die(exc.code, str(exc))
-    json.dump({"run_id": str(uuid.uuid4()),
-               "reviewers": ["sanity-llm", "sanity-jev", "sanity-selected"],
+    recheck: JsonObject = {"recheck": True} if carried is not None else {}
+    json.dump({"run_id": str(uuid.uuid4()), **recheck,
+               "reviewers": ["sanity-jev", "sanity-selected"] if carried else ["sanity-llm", "sanity-jev", "sanity-selected"],
                "operational_reviewer": "sanity-selected",
                "sha": sha, "base_sha": base_sha, "sanity_bead": args.task, "dev_bead": bead.id,
                "branch": args.branch, "worktree_path": args.worktree, "deliverables_total": len(deliverables),

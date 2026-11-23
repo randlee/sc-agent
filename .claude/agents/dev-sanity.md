@@ -88,6 +88,13 @@ as --final-verdict, or CANNOT_RUN if selection cannot run. The scripts derive
 elapsed fields, API_FAILURE rows, exact fallback envelopes and receipts.
 The merge carries checked bead data, so history needs no new bead lookup.
 
+A re-check sanity bead (`<sanity bead>-r<N>`, a clean rebase of a passed layer)
+runs Jev only and never reruns lint: run sanity-split with `--recheck-of
+<earlier run's manifest>` instead of --lint-command. It refuses (exit 6/7) when
+that run's lint did not pass or it checked another dev bead; send that refusal
+to the lead. Dispatch only sc-sanity-jev children, merge sanity-jev, then
+sanity-selected with --jev-vars alone, and append only the Jev history row.
+
 ## Daemon-mode verification override
 
 For daemon-mode assignments, sanity only inspects deliverables and developer
@@ -147,7 +154,8 @@ Only after successful PASS close, hand stack-input.json unchanged to
 sanity-stack. One handoff at a time avoids concurrent stack writes but never
 blocks another sanity close. With one handoff it may run inline:
 sanity-stack-link --input <stack-input.json>.
-For not_reproducible fixes, skip the stack handoff. The script sends the lead
+For not_reproducible fixes, skip the stack handoff; a PASS closes the QA bead
+too and no QA is dispatched. The script sends the lead
 notice for `stack_failed`, `lock_timeout` and `rebase_required`; leave the
 sanity task closed for each stack outcome. Do not send a duplicate notice.
 

@@ -128,6 +128,14 @@ QA policy (`policy_path`) requires for the change, for example a schema
 reviewer when a governed interface is in scope, as `quality-mgr.md`
 ("Reviewer Selection") says.
 
+After primary reviewers return, run `blastr` on every blocking and important
+finding in every QA round, including plan reviews and fix verification. Include
+each finding's fix size, net lines and verdict (`fix-as-prescribed`,
+`fix-smaller`, or `escalate-record-change`) in the posted PR review, or the
+task-close report when there is no plan PR; include the record, clause and loss
+for an escalation. This advisory triage neither gates nor changes findings,
+and does not expand the fix-verification scope.
+
 `flaky-test-qa` is mandatory, whatever the repository policy says, in every
 round whose layer changes test code: a sprint review and a fix round alike.
 Test code is a file under a `tests/` or `test/` directory, a `test_*` or

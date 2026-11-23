@@ -15,7 +15,7 @@
 #   (then, per codex member: atm teams update-member sc-ai <name> --harness codex-cli)
 #
 # Orchestration: pass `--var lead=ai-lead` and dispatch QA to `ai-qa`
-# (quality-mgr role; prompt file remains `.claude/agents/quality-mgr.md`).
+# (quality-mgr role; its directive is the package role named in [startup.ai-qa]).
 #
 # Codex panes run with --no-daemon: under codex 0.16x the shared app-server
 # does not inherit the pane environment, so ATM_IDENTITY/BEADS_ACTOR arrive
@@ -97,3 +97,9 @@ env = { ATM_IDENTITY = "ai-publisher", ATM_TEAM = "sc-ai", CLAUDE_CODE_TASK_LIST
 
 [startup.ai-publisher]
 all = ["Read .claude/agents/publisher.md for your directive and run the publishing skill (.claude/skills/publishing): you are ai-publisher, and you act only when ai-lead dispatches you"]
+
+[startup.ai-qa]
+all = ["Operate under .claude/skills/atm-bd-orchestration/roles/quality-mgr.md for every task until told otherwise. Read it now."]
+
+[startup.ai-sanity]
+all = ["Operate under .claude/agents/dev-sanity.md for every task until told otherwise. Read it now."]

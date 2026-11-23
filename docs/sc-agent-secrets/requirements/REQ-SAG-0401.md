@@ -1,39 +1,42 @@
-# Requirement: Credential variable names live in the secrets crate
+# Requirement: Credential resolution order and keyring defaults
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
 
-## REQ-SAG-0401: Credential variable names live in the secrets crate
+## REQ-SAG-0401: Credential resolution order and keyring defaults
 
 **Status:** Approved  
 
 ### Requirement Statement
 
+Definitions: A *provider* is a language-model service whose API key `sc-agent` resolves, one per provider table. A *credential* is the API key for one provider. A *credential-variable name* is the name of the environment variable that holds a provider's credential. The *keyring service* and the *keyring account* are the two components that identify a provider's entry in the platform keyring. The *resolution order* is the process environment, then the repository-root `.env` file, then the platform keyring (the OS credential store: Keychain on macOS, Credential Manager on Windows, Secret Service on Linux). A credential is *present* in a source when the source holds a value under the provider's credential-variable name; a blank platform-keyring value counts as absent. The *current OS account* is the user name of the operating-system user running the process.
+
 **MUST statements:**
 
-- Credential environment-variable names such as `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` MUST be defined in `sc-agent-secrets`.
-- Any other crate that needs a credential variable name MUST obtain it from `sc-agent-secrets`.
-- `sc-agent-secrets` MUST resolve a key from the repository-root `.env` file first, then the process environment, then the platform keyring.
-
-- A present but invalid credential in a higher-priority source MUST be authoritative and MUST NOT fall back to a lower-priority source.
-
-- Callers MUST be able to override keyring service and account independently per provider. An omitted service MUST default to that provider's credential-variable name; an omitted account MUST default to the current OS account.
-- Each provided keyring component MUST contain 1–255 UTF-8 bytes, validated before network I/O. Errors MUST name the option and bound without retaining its supplied value.
-- Overrides for one provider MUST NOT affect another provider.
-
-- Python calls supplying either keyring override MUST name `provider`; otherwise they MUST return `sc_agent_py.invalid_option` before network I/O. Calls without overrides MUST retain automatic provider selection.
+- `sc-agent` MUST resolve a key from the sources in the resolution order.
+- The first source that has the variable MUST win.
+- The keyring service MUST be that provider's credential-variable name.
+- The keyring account MUST be the current OS account.
 
 ### Rationale
 
-Credential handling stays in one crate, so redaction and key lookup cannot disagree about which variables hold secrets.
+Credential handling stays in one place, so redaction and key lookup cannot disagree about which variables hold secrets.
+
+Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic."
+
+Owner ruling (2026-11-20), Rand Lee: "Isn't ENV > .env > keyring (or win/linux equivalent) standard order?" A variable already set in the environment wins over `.env`, which is also dotenvy's default.
+
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Keyring is super basic."
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A workspace search finds credential variable names as string literals only in `sc-agent-secrets`.
+- [ ] With a valid key in the environment, a different valid key in the repository-root `.env` and another in the keyring, the environment key is used; with none in the environment, the `.env` key is used; with neither, the keyring key is used.

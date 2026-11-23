@@ -332,6 +332,59 @@ class ClosedQaRecoveryTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "BEAD_GROUPS_ROUND_CAP")
 
 
+class FixRoundBranchTests(unittest.TestCase):
+    """A round-N fix is a new layer: it never reuses round 1's branch or any branch in the stack ledger."""
+
+    def setUp(self):
+        from test_bead_pour_plan import PlanFixture, groups as pour_groups
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.groups = pour_groups
+        self.fixture = PlanFixture(Path(temporary.name))
+        self.sprint = self.fixture.sprint()
+        self.qa = f"{self.sprint}.group-qa"
+        self.finding = {"ref": "qa1-f3", "severity": "blocking", "reviewer": "req-qa", "title": "issue", "remedy": "fix"}
+        self.fixture.rows["t-phase-x.stack"]["metadata"]["layers"] = [
+            {"branch": "fix/x-1-qa1-f3", "pr": 7, "head": "a" * 40, "base": "integrate/phase-x", "linked": True},
+            {"branch": "fix/x-1-qa1-f9", "pr": 8, "head": "b" * 40, "base": "fix/x-1-qa1-f3", "linked": True}]
+        self.worktrees = Path(self.fixture.runner.config["worktree_base"])
+
+    def pour(self, round_):
+        target = self.fixture.findings(self.sprint, self.qa, self.finding, round_=round_)[0]
+        self.assertNotIsInstance(target, self.groups.TargetError)
+        return target["compose"]
+
+    def existing(self, round_, branch):
+        bead = self.groups.attach_id(self.sprint, f"qa1-f3-r{round_}", "fix")
+        self.fixture.rows[bead] = {"id": bead, "status": "open", "labels": ["stage:fix"],
+                                   "metadata": {"branch": branch, "worktree": f"/old/{branch}", "pr_target": "old-top",
+                                                "difficulty": "normal"}}
+
+    def test_round_one_branch_is_unchanged(self):
+        compose = self.pour(1)
+        self.assertEqual(compose["branch"], "fix/x-1-qa1-f3")
+        self.assertEqual(compose["worktree"], str(self.worktrees / "fix/x-1-qa1-f3"))
+        self.assertEqual(compose["pr_target"], "fix/x-1-qa1-f9")
+
+    def test_round_two_gets_its_own_branch_cut_from_the_stack_top(self):
+        compose = self.pour(2)
+        self.assertEqual(compose["branch"], "fix/x-1-qa1-f3-r2")
+        self.assertEqual(compose["worktree"], str(self.worktrees / "fix/x-1-qa1-f3-r2"))
+        self.assertEqual(compose["pr_target"], "fix/x-1-qa1-f9")
+
+    def test_repour_recomputes_an_existing_cut_whose_branch_is_a_stack_layer(self):
+        self.existing(2, "fix/x-1-qa1-f3")
+        compose = self.pour(2)
+        self.assertEqual((compose["branch"], compose["worktree"], compose["pr_target"]),
+                         ("fix/x-1-qa1-f3-r2", str(self.worktrees / "fix/x-1-qa1-f3-r2"), "fix/x-1-qa1-f9"))
+
+    def test_repour_keeps_an_existing_cut_whose_branch_is_not_a_layer(self):
+        self.existing(2, "fix/x-1-qa1-f3-custom")
+        compose = self.pour(2)
+        self.assertEqual((compose["branch"], compose["worktree"], compose["pr_target"]),
+                         ("fix/x-1-qa1-f3-custom", "/old/fix/x-1-qa1-f3-custom", "old-top"))
+
+
 class SprintGroupReviewersTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("sc-compose"), "sc-compose is required to render bead formulas")
     def test_sprint_group_qa_step_carries_configured_reviewers(self):

@@ -1,9 +1,9 @@
 # Requirement: Local decision runners come from configuration
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -14,30 +14,29 @@
 
 ### Requirement Statement
 
-Definitions: A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. Discovery is asking a runner whether it is up and which models it has loaded.
+Definitions: A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. sc-agent has one, Laya, the `local` provider table's `laya` model.
 
 **MUST statements:**
 
-- Each local decision runner MUST be defined in the global configuration by name, host, port and model.
-- A local decision runner MUST be selectable by its configured name wherever a decision model is selected.
-- `sc-decision-local` MUST send requests to a local decision runner in the Jev API format.
-- `sc-decision-local` MUST report, through discovery, whether a configured runner is up and whether its configured model is loaded.
+- The local decision runner MUST be defined in configuration by host, port and model (`laya.host`, `laya.port`, `laya.model`).
+- The local decision runner MUST be selectable by the name `laya` wherever a decision model is selected.
+- `sc-agent` MUST send requests to the local decision runner in the Jev API format.
 
 **MUST NOT statements:**
 
-- `sc-decision-local` MUST NOT hard-code the host or port of any runner.
+- `sc-agent` MUST NOT hard-code the host or port of any runner.
 
 ### Rationale
 
 People are building local runners that duplicate the Jev API, and they differ only in where they run and how they report their loaded models.
 
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A runner added to the global configuration is selected by its name with no rebuild.
-- [ ] Discovery reports a runner that is not listening as down.
-- [ ] Discovery reports a runner that is up without the configured model as up with the model not loaded.
+- [ ] A Laya host, port and model set in configuration are used with no rebuild.
 - [ ] A workspace search finds no host or port literal for a local runner outside tests.
 
 ### Dependencies

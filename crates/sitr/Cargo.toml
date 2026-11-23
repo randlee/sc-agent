@@ -1,43 +1,20 @@
 [package]
-repository.workspace = true
-homepage.workspace = true
-authors.workspace = true
 name = "sitr"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 license.workspace = true
-description = "sitr CLI: run predefined tree-sitter queries (product binary for sc-treesitter)."
-include = ["Cargo.toml", "README.md", "LICENSE", "src/**", "examples/**"]
-
+rust-version.workspace = true
+repository.workspace = true
+publish = true
+description = "Command-line tree-sitter syntax queries for Python and Rust."
+readme.workspace = true
+[dependencies]
+sc-agent.workspace = true
+sc-treesitter.workspace = true
+serde_json.workspace = true
+clap = { version = "4", features = ["derive"] }
 [lints]
 workspace = true
 
-[features]
-default = ["grammar-python", "grammar-rust"]
-grammar-python = ["sc-treesitter/grammar-python"]
-grammar-rust = ["sc-treesitter/grammar-rust"]
-
-[dependencies]
-sc-treesitter = { workspace = true, default-features = false }
-clap = { version = "4", features = ["derive"] }
-sc-observability = "=1.5.0"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-[[bin]]
-name = "sitr"
-path = "src/main.rs"
-
-[[test]]
-name = "cli"
-path = "tests/cli.rs"
-
 [dev-dependencies]
-sc-agent-testkit = { workspace = true }
-tempfile = "3"
-
-[[example]]
-name = "gen-cli-model"
-path = "examples/gen-cli-model.rs"
-test = true
+serde.workspace = true

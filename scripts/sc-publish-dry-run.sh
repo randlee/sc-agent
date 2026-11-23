@@ -7,8 +7,8 @@
 #   checks   3. validate the rendered manifest and Cargo version lockstep
 #            4. run the kit's consumer preflight runner
 #               and check the rendered Scoop manifest shims every binary
-#   publish  5. cargo publish --dry-run --locked for every manifest crate, in order
-#   wheel    6. maturin build sc-agent-py and sc-treesitter-py wheels
+#   publish  5. cargo publish --dry-run --locked for publish-enabled crates, in order
+#   wheel    6. maturin build the single sc-agent-py wheel
 #
 # Usage: bash scripts/sc-publish-dry-run.sh [all|kit|checks|publish|wheel]...
 # With no argument every phase runs in order. CI runs one phase per step so
@@ -161,7 +161,10 @@ phase_publish() {
   while IFS='|' read -r package _wait; do
     publish_args+=(-p "$package")
   done < <(python3 .github/scripts/release_artifacts.py list-publish-plan --manifest "$manifest")
-  [[ "${#publish_args[@]}" -gt 0 ]] || die "$manifest lists no crates"
+  if [[ "${#publish_args[@]}" -eq 0 ]]; then
+    echo "No crates marked for publication; skipping crates.io."
+    return
+  fi
   if [[ "${SC_PUBLISH_ALLOW_DIRTY:-0}" == "1" ]]; then
     publish_args+=(--allow-dirty)
   fi
@@ -238,10 +241,8 @@ phase_wheel() {
   command -v maturin >/dev/null 2>&1 ||
     die "maturin is required (pip install 'maturin==1.16.0', the CI pin)"
   prepare_wheel_dir
-  for manifest in crates/sc-agent-py/Cargo.toml crates/sc-treesitter-py/Cargo.toml; do
-    bounded "$build_timeout" "maturin build $manifest" \
-      maturin build --release --locked -m "$manifest" -o "$wheel_dir"
-  done
+  bounded "$build_timeout" "maturin build sc-agent-py" \
+    maturin build --release --locked -m crates/sc-agent-py/Cargo.toml -o "$wheel_dir"
   shopt -s nullglob
   wheels=("$wheel_dir"/*.whl)
   shopt -u nullglob

@@ -12,6 +12,7 @@ fi
 
 cd "$ROOT"
 python3 - "$MANIFEST" <<'PY'
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -44,7 +45,8 @@ for entry in checks:
     check_id = entry.get("id", entry.get("name"))
     run = entry.get("run")
     print(f"run-consumer-preflight: running {check_id} ({run})", flush=True)
-    result = subprocess.run(run, shell=True, cwd=root)
+    bash = os.environ.get("SC_PUBLISH_GIT_BASH")
+    result = subprocess.run([bash, "-c", run] if bash else run, shell=not bool(bash), cwd=root)
     print(f"run-consumer-preflight: {check_id}: exit {result.returncode}", flush=True)
     if result.returncode != 0:
         failures.append(f"{check_id}: exit {result.returncode}")

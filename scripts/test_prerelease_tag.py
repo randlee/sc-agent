@@ -205,12 +205,12 @@ class ReleaseContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             tag.next_version("0.1.0-beta", set())
 
-    def test_both_wheel_metadata_and_ci_use_python_311_floor(self):
-        for package in ["sc-agent-py", "sc-treesitter-py"]:
+    def test_single_wheel_metadata_and_ci_use_python_311_floor(self):
+        for package in ["sc-agent-py"]:
             data = tomllib.loads((ROOT / "crates" / package / "pyproject.toml").read_text())
             self.assertEqual(data["project"]["requires-python"], ">=3.11")
         ci = (ROOT / ".github/workflows/ci.yml").read_text()
-        self.assertEqual(ci.count('python-version: "3.11"'), 2)
+        self.assertEqual(ci.count('python-version: "3.11"'), 1)
         self.assertNotIn('python-version: "3.12"', ci)
 
 

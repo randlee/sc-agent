@@ -1,9 +1,9 @@
 # Requirement: No sleep()
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-20  
 **Owner:** Rand Lee  
 
 ---
@@ -20,7 +20,9 @@
 
 ### Rationale
 
-A sleeping thread cannot react to cancellation or new work; waits are made on events or deadlines that cancellation can end.
+A sleeping thread cannot react to cancellation or new work; waits are made on events or deadlines that cancellation can end. This requirement is met by a timed wait that cancellation can end, such as a wait on a channel or condition variable. It does not require a clock abstraction or an injected time source.
+
+Owner ruling (2026-11-20), Rand Lee: "No sleep (is async requirement)."
 
 ### Success Criteria
 

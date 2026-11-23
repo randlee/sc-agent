@@ -1,31 +1,17 @@
 {
   "name": "sitr",
-  "version": "0.2.9",
-  "description": "Run predefined tree-sitter queries.",
+  "version": "0.3.0",
+  "description": "",
   "long_description": "",
   "epilogue": "",
-  "usage": "Usage: sitr [OPTIONS] <COMMAND>",
-  "options": [
-    {
-      "name": "log_root",
-      "long": "--log-root",
-      "short": null,
-      "help": "The log root: the general log is written to `<PATH>/logs/sitr.log.jsonl` instead of `~/.sc-agent/logs/sitr.log.jsonl` (for tests and operators)",
-      "long_help": "",
-      "value_name": "PATH",
-      "required": false,
-      "default_value": null,
-      "choices": [],
-      "min_values": null,
-      "max_values": null
-    }
-  ],
+  "usage": "Usage: sitr <COMMAND>",
+  "options": [],
   "arguments": [],
   "subcommands": [
     {
       "name": "languages",
       "version": null,
-      "description": "Print the loaded grammars as a JSON array of language ids",
+      "description": "",
       "long_description": "",
       "epilogue": "",
       "usage": "Usage: sitr languages",
@@ -36,19 +22,19 @@
     {
       "name": "queries",
       "version": null,
-      "description": "Print the predefined queries as a JSON array of {language, query}",
+      "description": "",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: sitr queries [OPTIONS]",
+      "usage": "Usage: sitr queries --language <LANGUAGE>",
       "options": [
         {
           "name": "language",
           "long": "--language",
           "short": null,
-          "help": "Only list queries for this language",
+          "help": "",
           "long_help": "",
-          "value_name": "L",
-          "required": false,
+          "value_name": "LANGUAGE",
+          "required": true,
           "default_value": null,
           "choices": [],
           "min_values": null,
@@ -61,43 +47,29 @@
     {
       "name": "query",
       "version": null,
-      "description": "Run a predefined query on a file and print its captures as JSON",
+      "description": "",
       "long_description": "",
       "epilogue": "",
-      "usage": "Usage: sitr query [OPTIONS] <LANGUAGE> <QUERY> <FILE>",
-      "options": [
-        {
-          "name": "captures",
-          "long": "--captures",
-          "short": null,
-          "help": "Comma-separated allow-list of capture names",
-          "long_help": "",
-          "value_name": "NAME,NAME",
-          "required": false,
-          "default_value": null,
-          "choices": [],
-          "min_values": null,
-          "max_values": null
-        }
-      ],
+      "usage": "Usage: sitr query <LANGUAGE> <QUERY> <FILE>",
+      "options": [],
       "arguments": [
         {
           "name": "file",
-          "help": "Source file to query",
+          "help": "",
           "required": true,
           "default_value": null,
           "choices": []
         },
         {
           "name": "language",
-          "help": "Grammar id (see `sitr languages`)",
+          "help": "",
           "required": true,
           "default_value": null,
           "choices": []
         },
         {
           "name": "query",
-          "help": "Predefined query name (see `sitr queries`)",
+          "help": "",
           "required": true,
           "default_value": null,
           "choices": []
