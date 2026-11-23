@@ -16,7 +16,7 @@
 
 **MUST statements:**
 
-- The release process MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate declared publishable (none while crates.io is deferred, REQ-SAG-0130) and the maturin wheel build for the **sc-decidr** PyPI package in CI or a documented local recipe.
+- The release process MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate declared publishable and the maturin wheel build for the **sc-decidr** PyPI package in CI or a documented local recipe.
 - Production registry uploads and version tags remain out of scope until the owner dispatches a release.
 
 ### Rationale

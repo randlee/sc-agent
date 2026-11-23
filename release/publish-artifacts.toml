@@ -47,34 +47,34 @@ archive = "zip"
 artifact = "sc-agent"
 package = "sc-agent"
 cargo_toml = "crates/sc-agent/Cargo.toml"
-publish = false
-publish_order = 0
+publish = true
+publish_order = 1
 wait_after_publish_seconds = 0
-verify_registry_visibility = false
+verify_registry_visibility = true
 [[crates]]
 artifact = "sc-treesitter"
 package = "sc-treesitter"
 cargo_toml = "crates/sc-treesitter/Cargo.toml"
-publish = false
-publish_order = 0
+publish = true
+publish_order = 2
 wait_after_publish_seconds = 0
-verify_registry_visibility = false
+verify_registry_visibility = true
 [[crates]]
 artifact = "sitr"
 package = "sitr"
 cargo_toml = "crates/sitr/Cargo.toml"
-publish = false
-publish_order = 0
+publish = true
+publish_order = 3
 wait_after_publish_seconds = 0
-verify_registry_visibility = false
+verify_registry_visibility = true
 [[crates]]
 artifact = "decidr"
 package = "decidr"
 cargo_toml = "crates/decidr/Cargo.toml"
-publish = false
-publish_order = 0
+publish = true
+publish_order = 4
 wait_after_publish_seconds = 0
-verify_registry_visibility = false
+verify_registry_visibility = true
 [[crates]]
 artifact = "sc-agent-py"
 package = "sc-agent-py"

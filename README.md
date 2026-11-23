@@ -12,7 +12,7 @@ For Python 3.11 or newer, install the wheel containing both the decision and syn
 pip install sc-decidr
 ```
 
-Import them with `import sc_agent` and `import sc_agent.sitr`. Building from the source distribution requires Rust and Git access to the sc-config dependency; see the [source-build dependency note](docs/integration/prerelease.md#sc-config-dependency).
+Import them with `import sc_agent` and `import sc_agent.sitr`. Building from the source distribution requires Rust; dependencies are fetched from crates.io.
 
 Install the `decidr` and `sitr` binaries from a matching platform archive on [GitHub Releases](https://github.com/randlee/sc-agent/releases), or use a package manager:
 

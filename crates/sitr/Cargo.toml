@@ -3,6 +3,11 @@ name = "sitr"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = true
+description = "Command-line tree-sitter syntax queries for Python and Rust."
+readme.workspace = true
 [dependencies]
 sc-agent.workspace = true
 sc-treesitter.workspace = true
