@@ -1,6 +1,6 @@
 ---
 name: fix-strategy
-version: 0.2.0
+version: 0.7.0
 description: How to fix a REQ, NFR or ADR record that fails Jev or passes below the confidence gate - ask Jev why with the diagnostic tree, pick strategies from the table, run one proposer per strategy in parallel, measure, accept and freeze. Rules, stop conditions, commit and report format.
 ---
 
@@ -34,10 +34,10 @@ Two commands do all the measuring. Each is one step: paste it whole.
 cp "$F" "$W/<v>.md"
 "$RAPTOR/.venv/bin/python" "$RAPTOR/scripts/extract.py" --project-root . --output "$W/index-<v>.json" | jq '.issues'   # must print 0
 for r in 1 2 3; do uv run -q --script "$J" quality --$KIND "$ID" --index "$W/index-<v>.json" --run-name "$ID-<v>-r$r" > "$W/<v>-r$r.json" & done; wait
-python3 "$G" --threshold "$T" "$W"/<v>-r1.json "$W"/<v>-r2.json "$W"/<v>-r3.json | jq -r 'if .success | not then "ERROR \(.error.code): \(.error.message)" else .data.records[] | "\(.id) pass=\(.pass) verdicts=\(.verdicts | join(",")) lowest=\(.lowest.median // "n/a")", (.low[] | "  s\(.statement // "-") \(.question)=\(.choice) median \(.median) \(.confidences)" + (if .runner_up then "\n      nearly: \(.runner_up.choice) (\(.runner_up.probability)) \(.runner_up.criterion)" else "" end)) end'
+python3 "$G" --threshold "$T" "$W"/<v>-r1.json "$W"/<v>-r2.json "$W"/<v>-r3.json | jq -r 'if .success | not then "ERROR \(.error.code): \(.error.message)" else .data.records[] | "\(.id) pass=\(.pass) verdicts=\(.verdicts | join(",")) lowest=\(.lowest.median // "n/a")", (.answers[] | "  s\(.statement // "-") \(.question)=\(.choice) median \(.median) runs=\(.runs | tojson)") end'
 ```
 
-It prints one line for the record and, for each gate answer whose median is below `T`, the answer and the option Jev nearly chose instead (`nearly:`), with that option's probability and its criterion. Read `nearly:` first: a low confidence is Jev torn between its choice and that option, so it says what the statement is being read as, and its criterion often names the fix (`obligations=1` nearly `2`: the statement reads as two obligations; `check=inspection or grep` nearly `CLI run`: it does not say whether a file or a run decides it). `pass=true` is the only pass. `ERROR` is a tool error, not a verdict: rerun once, then report the code and message verbatim.
+It prints each gate answer's median and per-run reasons (`runs`, with `runner_up`). Only `pass=true` passes; read failing verdicts' reasons in all three run files. On `ERROR`, rerun once, then report the code and message verbatim.
 
 `diagnose <v>`: ask Jev why, once, for the variant `verify` just snapshotted.
 
@@ -46,13 +46,13 @@ uv run -q --script "$J" quality --$KIND "$ID" --index "$W/index-<v>.json" --ques
 jq -r 'if .success | not then "ERROR \(.error.code): \(.error.message)" else .data.results[] | .waves[] | .reason[] | if has("statement") then "s\(.statement.index): \(.statement.text)", (.answers[] | "    \(.id)=\(.choice) @\(.confidence)") else "  \(.id)=\(.choice) @\(.confidence)" end end' "$W/<v>-diag.json"
 ```
 
-`diag-<kind>.json` is the shipped gate tree with `d_*` diagnostic questions appended. Its gate questions and verdict rules are the shipped ones. Run it when `nearly:` does not settle the cause, and read the `d_*` answers of the statements `verify` listed. Every answer in a `quality` result also carries `probabilities` (every option) and `runner_up`. The gate itself is always `verify`, never this run.
+`diag-<kind>.json` appends `d_*` questions to the shipped tree. Diagnose every failing record; read its `d_*` answers. Only `verify` gates.
 
 ## 1. Verify, then diagnose
 
-`verify base`. If it prints `pass=true`, go to step 5. Otherwise read each `nearly:` line, `diagnose base` where the cause is still open, and append `{"round": n, "step": "diagnose", "low": [...]}` to `$W/state.jsonl`.
+`verify base`. If it prints `pass=true`, go to step 5. Otherwise `diagnose base`. If a statement answers `obligations` `2` or more with `joined_by` `and-list`, `alternatives` or `obligation+rationale`, or three or more statements are weak, do not edit: have the record written from its tenets (`references/write-records.md`). Otherwise read the per-run reasons and append `{"round": n, "step": "diagnose", "low": [...]}` to `$W/state.jsonl`.
 
-If a cause is still unclear, copy `$D`, add up to 10 choice questions of your own under `.nodes["wave-1"].questions` (same shape as the `d_*` ones), and run the `diagnose` command with `--questions <copy>`. Ask them all in one call. A question costs a fraction of a cent; a minute of your reasoning costs more than a thousand of them. Never edit a gate question, a criterion or a verdict rule.
+If a cause is still unclear, copy `$D`, add up to 10 choice questions of your own under `.nodes["wave-1"].questions` (same shape as the `d_*` ones), and run the `diagnose` command with `--questions <copy>`. Ask them all in one call. A question costs a fraction of a cent; a minute of your reasoning costs more than a thousand of them.
 
 ## 2. Pick strategies
 
@@ -98,7 +98,7 @@ Launch one `jev-fix-proposer` per statement and strategy, all in one message, wi
 }
 ```
 
-Each returns one candidate. If no agent can be launched, write the candidates yourself, one per strategy. Append each candidate to `$W/state.jsonl` as `{"round", "step": "candidate", "id", "statement", "strategy", "old", "new"}`.
+Each returns one candidate. Append each candidate to `$W/state.jsonl` as `{"round", "step": "candidate", "id", "statement", "strategy", "old", "new"}`.
 
 ## 4. Measure
 
@@ -119,21 +119,21 @@ PY
 
 For each remaining candidate `c<n>`: apply it to `$F`, `verify c<n>`, then `cp "$W/base.md" "$F"`.
 
-For each statement keep the candidate that lifts its lowest median highest without pushing any other answer in the record below `T`. Apply the kept candidates together and `verify comb`. If `comb` is worse than its parts, drop the weakest candidate and verify again. Append `{"round", "step": "measure", "kept": [...], "lowest": x}`. If the record improved, `cp "$W/comb.md" "$W/base.md"`: the next round starts from it.
+Compare candidates with base using all `verify` medians. Reject other answers dropping over 0.05 or newly below `T`. Gain is the median rise of the candidate's own weak answer; a changed choice gains only with a present criterion lacking `Fix:` and median at least `T`, otherwise it worsens. Prefer changed-choice gains, then greatest median gain per statement. If any are kept, apply them; `verify comb`. While comb loses a gain, drop the smallest-gain candidate and reverify. If gains hold, copy `$W/comb.md` to `$W/base.md`; otherwise restore base to `$F`. Append `{"round", "step": "measure", "kept": [...], "lowest": x}`.
 
 ## 5. Accept and freeze
 
 A record is accepted when `verify` prints `pass=true`. Otherwise start the next round at step 1 on the current text, with the rejected edits in `blocked`.
 
-When a record is accepted, run the guard on `$W/original.md` against `$F` and read `diff -u "$W/original.md" "$F"` against rule 1. Then append `{"id", "sha256": "<of the record text>", "runs": [...], "lowest": x}` to `.sc/judge-jev/accepted.jsonl`. An accepted record is frozen: do not judge it again unless its text changes. Re-judging unchanged text only finds chance failures.
+When a record is accepted, run the guard on `$W/original.md` against `$F` and read `diff -u "$W/original.md" "$F"` against rule 1. Then append `{"id", "sha256": "<of the record text>", "runs": [...], "lowest": x}` to `.sc/judge-jev/accepted.jsonl`.
 
-Three rounds at most. A statement still below `T` after round 3 is unresolved: keep the best text reached and list it.
+Keep running rounds until the record passes, or until two rounds in a row keep no candidate. Then the record is unresolved: keep the best text reached and list it. An unresolved record goes to `references/write-records.md` once.
 
 ## Rules
 
 1. **Obligations do not change.** No obligation is added, dropped, narrowed, widened or made stricter, and no rationale becomes a MUST. A fix that needs any of these is not applied: list it for the owner with both texts.
 2. **Nothing is invented.** Every number, definition and alternative comes from the record or the repository. Cite the file and line in your report, never in the record.
-3. **A statement never names how it is checked.**
+3. **Never append a checked-by clause.**
 4. **The gate is not edited.** Diagnostic questions are appended; gate questions, criteria, verdict rules and `T` stay as shipped.
 5. **No record is deleted, and no statement is removed, to make a record pass.**
 
@@ -169,6 +169,6 @@ Result: lowest <before> to <after>
 
 ## Report
 
-One table, only measured results: record, accepted or unresolved, lowest gate answer before and after, strategies that worked, statements added or removed. Then, for each unresolved statement: its text, Jev's gate and `d_*` answers verbatim, what was tried with its measured result, and the one fact needed from the owner. Then every change that rule 1 sent to the owner, with both texts.
+One table: record, accepted or unresolved, lowest median before and after, strategies and statements changed. For each failing or weak answer, quote each run's choice, confidence, criterion, runner-up, probability and criterion, plus `d_*` answers; mark missing fields unavailable. Include tried edits, results, owner facts and rule 1 changes with both texts.
 
-Leave `$W` and `.sc/judge-jev/accepted.jsonl` in place. Every Jev request and answer is logged under `~/.judge-jev/<repository name>/<UTC date>/logs/`, outside the repository; never delete it.
+Leave `$W` and `.sc/judge-jev/accepted.jsonl` in place. Jev requests and answers are logged to `~/.sc-agent/logs/judge-jev.log.jsonl`; pruning follows the sc-observability retention policy.

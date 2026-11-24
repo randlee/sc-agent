@@ -35,7 +35,7 @@ class Transport(Protocol):
     """Sends the request lines of one wave; returns their result lines, in request order.
 
     A line in and a line out are the batch request and result JSON objects, unchanged. An ``Err`` carries the
-    ``JudgeError`` of a failure that stopped the whole send; a line that got no answer is a result line with
+    ``ClientError`` of a failure that stopped the whole send; a line that got no answer is a result line with
     ``ok`` false and its own ``error``.
     """
 
@@ -63,17 +63,17 @@ class GraphStore(Protocol):
 class PythonCoreTransport:
     """``Transport`` over the Python core: ``pump`` is ``jev_judge.pump_batch``, injected so this module never imports it.
 
-    ``send`` runs ``pump(lines, settings, api_key, fixture, log, echo, fields)``; the settings, key, fixture (an answers
-    fixture, or None for a live call), run log and log fields are the caller's, fixed at construction.
+    ``send`` runs ``pump(lines, settings, fixture, log, echo, fields)``; the settings, fixture (an answers fixture,
+    or None for a live call), run log and log fields are the caller's, fixed at construction.
     """
 
-    def __init__(self, pump: Callable[..., Result], settings: Any, api_key: str, fixture: Any, log: Any,
+    def __init__(self, pump: Callable[..., Result], settings: Any, fixture: Any, log: Any,
                  echo: bool = False, fields: Optional[dict] = None):
-        self._pump, self._settings, self._api_key = pump, settings, api_key
+        self._pump, self._settings = pump, settings
         self._fixture, self._log, self._echo, self._fields = fixture, log, echo, fields
 
     def send(self, lines: list[dict]) -> Result[list[dict], Any]:
-        return self._pump(lines, self._settings, self._api_key, self._fixture, self._log, self._echo, self._fields)
+        return self._pump(lines, self._settings, self._fixture, self._log, self._echo, self._fields)
 
 
 class FixtureTransport:
@@ -97,8 +97,8 @@ class FixtureTransport:
         for line in lines:
             key = line.get("request_id") or _request_key(line)
             if key not in self._responses:
-                from jev_judge import JudgeError  # lazy: the error type lives with the Python core
-                return Err(JudgeError("INPUT.MISSING", f"FixtureTransport has no result line for {key!r}",
+                from decidr_client import ClientError  # lazy: the error type lives with the Python core
+                return Err(ClientError("INPUT.MISSING", f"FixtureTransport has no result line for {key!r}",
                                       action="Add the request id to the fixture's responses."))
             out.append(self._responses[key])
         return Ok(out)
@@ -138,8 +138,8 @@ class OxigraphGraphStore:
         except jev_graph.TreeInvalid as exc:
             return Err(exc.error)
         except KeyError:
-            from jev_judge import JudgeError
-            return Err(JudgeError("VALIDATION.INPUT", f"the tree has no wave {node_id!r}",
+            from decidr_client import ClientError
+            return Err(ClientError("VALIDATION.INPUT", f"the tree has no wave {node_id!r}",
                                   action="Pass the id of a wave of the tree."))
 
     def load_definitions(self, paths: Iterable[str]) -> Result[int, Any]:
@@ -168,20 +168,20 @@ class OxigraphGraphStore:
             self.store.extend(list(triples))
             return Ok(len(self.store) - before)
         except (TypeError, ValueError, OSError, RuntimeError) as exc:
-            from jev_judge import JudgeError
-            return Err(JudgeError("VALIDATION.INPUT", f"record_run needs pyoxigraph quads: {type(exc).__name__}: {exc}",
+            from decidr_client import ClientError
+            return Err(ClientError("VALIDATION.INPUT", f"record_run needs pyoxigraph quads: {type(exc).__name__}: {exc}",
                                   action="Pass the quads jev_runs makes."))
 
     def query(self, sparql: str) -> Result[list[dict], Any]:
         import pyoxigraph
-        from jev_judge import JudgeError
+        from decidr_client import ClientError
         try:
             solutions = self.store.query(sparql)
             if not isinstance(solutions, pyoxigraph.QuerySolutions):
-                return Err(JudgeError("VALIDATION.INPUT", "only a SPARQL SELECT query is supported here, not ASK, CONSTRUCT or DESCRIBE",
+                return Err(ClientError("VALIDATION.INPUT", "only a SPARQL SELECT query is supported here, not ASK, CONSTRUCT or DESCRIBE",
                                       action="Rewrite the query as a SELECT."))
             variables = [v.value for v in solutions.variables]
             rows = [{name: solution[name].value for name in variables if solution[name] is not None} for solution in solutions]
         except Exception as exc:  # pyoxigraph raises SyntaxError, ValueError, OSError, RuntimeError, TypeError (a non-str query)
-            return Err(JudgeError("VALIDATION.INPUT", f"SPARQL query failed: {type(exc).__name__}: {exc}", action="Fix the query."))
+            return Err(ClientError("VALIDATION.INPUT", f"SPARQL query failed: {type(exc).__name__}: {exc}", action="Fix the query."))
         return Ok(rows)

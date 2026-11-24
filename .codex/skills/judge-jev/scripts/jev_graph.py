@@ -46,7 +46,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import pyoxigraph as ox  # noqa: E402
 from result import Err, Ok, Result  # noqa: E402
-from jev_errors import JudgeError  # noqa: E402
+from decidr_client import ClientError  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 SHAPES_PATH = HERE.parent / "assets" / "shapes" / "quality-tree.shacl.ttl"
@@ -59,8 +59,8 @@ MAX_TREE_BYTES = 128 * 1024  # a tree file over 128 KiB is refused before it is 
 MAX_DEFINITIONS_BYTES = MAX_TREE_BYTES  # a definitions file takes the tree limit and is refused before it is parsed
 
 
-def _fail(code: str, message: str, action: str = "", data: Optional[dict] = None) -> Err[JudgeError]:
-    error = JudgeError(code, message, action=action)
+def _fail(code: str, message: str, action: str = "", data: Optional[dict] = None) -> Err[ClientError]:
+    error = ClientError(code, message, action=action)
     error.data = data
     return Err(error)
 
@@ -78,9 +78,9 @@ class TreeGraph:
 
 
 class TreeInvalid(Exception):
-    """Raised by ``tree_to_quality_json`` and ``compile_wave`` for a graph that does not validate; ``.error`` is the Err's JudgeError."""
+    """Raised by ``tree_to_quality_json`` and ``compile_wave`` for a graph that does not validate; ``.error`` is the Err's ClientError."""
 
-    def __init__(self, error: "JudgeError"):
+    def __init__(self, error: "ClientError"):
         super().__init__(error.message)
         self.error = error
 
@@ -89,7 +89,7 @@ def _jj(name: str) -> ox.NamedNode:
     return ox.NamedNode(JJ + name)
 
 
-def _load_ttl(path: Any, what: str, limit: int, size_code: str, action_file: str) -> Result[TreeGraph, JudgeError]:
+def _load_ttl(path: Any, what: str, limit: int, size_code: str, action_file: str) -> Result[TreeGraph, ClientError]:
     """The shared loader of a tree file and a definitions file: size, then UTF-8, then Turtle; every failure typed."""
     if not isinstance(path, (str, os.PathLike)):
         return _fail("INPUT.MISSING", f"{what} path must be a str or a path, got {type(path).__name__}",
@@ -118,7 +118,7 @@ def _load_ttl(path: Any, what: str, limit: int, size_code: str, action_file: str
     return Ok(TreeGraph(store, str(path)))
 
 
-def load_tree(path: Any) -> Result[TreeGraph, JudgeError]:
+def load_tree(path: Any) -> Result[TreeGraph, ClientError]:
     """Parse the TTL file at ``path`` into a TreeGraph. Nothing is checked beyond the size and the syntax: see ``validate_tree``.
 
     ``path`` is a str or a path-like; anything else (None, bytes, a number) is ``INPUT.MISSING``. A file over
@@ -127,7 +127,7 @@ def load_tree(path: Any) -> Result[TreeGraph, JudgeError]:
     return _load_ttl(path, "quality tree", MAX_TREE_BYTES, "QUALITY.TREE", "tree file")
 
 
-def load_definitions(path: Any) -> Result[TreeGraph, JudgeError]:
+def load_definitions(path: Any) -> Result[TreeGraph, ClientError]:
     """Parse the definitions file at ``path`` into a TreeGraph (its own store, never a tree's). Same rules as ``load_tree``:
     ``INPUT.MISSING`` for a missing path, ``INPUT.MALFORMED`` for non-UTF-8 or unparsable Turtle, and ``DEFINITIONS.INVALID``
     for a file over ``MAX_DEFINITIONS_BYTES``, refused before it is parsed."""
@@ -282,7 +282,7 @@ def _ensure_valid(tree: TreeGraph) -> None:
 def tree_to_quality_json(tree: TreeGraph) -> dict:
     """The JSON quality tree equivalent to the graph, in the format of ``assets/questions/quality-*.json``.
 
-    The graph is validated first (once); raises ``TreeInvalid`` (``.error`` is the ``QUALITY.TREE`` JudgeError) when it does not conform.
+    The graph is validated first (once); raises ``TreeInvalid`` (``.error`` is the ``QUALITY.TREE`` ClientError) when it does not conform.
     """
     _ensure_valid(tree)
     root = _trees(tree)[0]
@@ -367,7 +367,7 @@ def iri_index(tree: TreeGraph) -> GraphIris:
     return GraphIris(tree)
 
 
-def tree_digest(tree: TreeGraph) -> Result[str, JudgeError]:
+def tree_digest(tree: TreeGraph) -> Result[str, ClientError]:
     """``Ok`` of the SHA-256 (lower-case hex) of the tree's RDFC-1.0 canonical N-Quads, one quad per line in sorted order.
 
     The tree is validated first (once): the shapes are closed, every subject is a shaped class, every ``rdf:type`` object
@@ -505,7 +505,7 @@ def _stray_types(tree: TreeGraph, classes: tuple = SHAPED_CLASSES) -> list:
     return sorted(_describe_ox(tree.store, row["c"]) for row in tree.store.query(query))
 
 
-def validate_tree(tree: TreeGraph) -> Result[None, JudgeError]:
+def validate_tree(tree: TreeGraph) -> Result[None, ClientError]:
     """Ok(None) when the graph conforms to the shapes; else ``QUALITY.TREE`` with each violation (``data["violations"]``).
 
     What rdflib logs while reading or checking the graph (an ill-typed literal, say) is not printed: it is appended to the
@@ -559,7 +559,7 @@ def validate_tree(tree: TreeGraph) -> Result[None, JudgeError]:
 # --------------------------------------------------------------------------- #
 # definitions (ADR-JEV-0008)
 # --------------------------------------------------------------------------- #
-def validate_definitions(defs: TreeGraph) -> Result[list, JudgeError]:
+def validate_definitions(defs: TreeGraph) -> Result[list, ClientError]:
     """``Ok`` of the warnings (a list of violation dicts with ``severity`` "warning", sorted) when the definitions graph has
     no violation; else ``DEFINITIONS.INVALID`` with every violation in ``data["violations"]``.
 
@@ -601,7 +601,7 @@ def validate_definitions(defs: TreeGraph) -> Result[list, JudgeError]:
     return Ok([v for v in found if v["severity"] == "warning"])
 
 
-def _definitions_error(defs: TreeGraph, violations: list, action: str, log: list) -> Err[JudgeError]:
+def _definitions_error(defs: TreeGraph, violations: list, action: str, log: list) -> Err[ClientError]:
     listed = "; ".join(_violation_text(v) for v in violations[:MAX_LISTED_VIOLATIONS])
     more = f"; and {len(violations) - MAX_LISTED_VIOLATIONS} more" if len(violations) > MAX_LISTED_VIOLATIONS else ""
     noted = f" (rdflib reported: {'; '.join(log)})" if log else ""

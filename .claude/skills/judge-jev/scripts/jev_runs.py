@@ -19,11 +19,13 @@ identical to the original:
   scheme is assumed). For a quality JSON dict, which has no IRIs, ``JsonIris`` mints the names the shipped trees use
   (the question IRI ``urn:judge-jev:question:<kind>.<id>``).
 
-Standard library at import; ``pyoxigraph`` is imported where triples are built and ``sc_observability`` where the log is read.
+Standard library at import; ``pyoxigraph`` is imported where triples are built. History reads the supplied JSONL file,
+defaulting to ``~/.sc-agent/logs/judge-jev.log.jsonl``.
 """
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import sys
@@ -39,7 +41,6 @@ XSD_DOUBLE = "http://www.w3.org/2001/XMLSchema#double"
 XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer"
 UNKNOWN_REPOSITORY = "urn:raptor:repo:unknown"
 LOG_SERVICE = "judge-jev"
-LOG_LIMIT = 1000  # the most events one sc-observability query returns
 
 TRACE_QUERY = """\
 PREFIX jj: <urn:judge-jev:ontology#>
@@ -140,7 +141,7 @@ def run_iri(run: dict) -> str:
 
 
 def _choice(ans: dict) -> tuple:
-    """(choice, confidence) of an answer, as jev_judge.answer_choice reads it (a noul answer is yes at p >= 0.5)."""
+    """Read persisted JSON records (including historical logs), not provider responses."""
     noul = ans.get("type") == "noul" or ("type" not in ans and "noul" in ans)
     if noul:
         value = next((ans[k] for k in ("noul", "probability", "p") if k in ans), None)
@@ -192,6 +193,9 @@ def run_triples(tree: Any, run: dict, result_lines: list, walk: dict) -> list:
     (``node``, ``request_id`` or, per statement, ``request_ids`` and ``reason`` = [{statement, ...}]).
     """
     import pyoxigraph as ox
+    # Durable graph projection reads the shared JSON record form, including historical logs.
+    import decidr_client
+    result_lines = decidr_client.json_answers(result_lines)
     quality = _quality_json(tree)
     iris = _iris(tree, quality)
     ranks = _rule_ranks(tree)
@@ -251,52 +255,33 @@ def run_triples(tree: Any, run: dict, result_lines: list, walk: dict) -> list:
     return sorted(quads, key=str)
 
 
-def _plain(value):
-    """An sc-observability stored value as plain JSON data (its own ``sc_observability.*`` fields dropped)."""
-    if hasattr(value, "items"):
-        return {k: _plain(v) for k, v in value.items() if not k.startswith("sc_observability.")}
-    if isinstance(value, (tuple, list)):
-        return [_plain(v) for v in value]
-    if getattr(value, "kind", None) == "null":
-        return None
-    if hasattr(value, "kind") and hasattr(value, "value"):
-        return _plain(value.value)
-    return value
-
-
-def read_run_events(log_root, run_name: str) -> Result[dict, Any]:
-    """The run's ``result``, ``statement``, ``wave`` and ``verdict`` events, oldest first, through sc-observability's query
-    API: {action: [fields]}. One query per action, matched on the run name; a query holds at most LOG_LIMIT events, so a
-    run with more of one action is refused rather than silently cut."""
-    import sc_observability as sco
-    created = sco.create_logger(sco.LoggerConfig(service=LOG_SERVICE, log_root=str(log_root)))
-    if isinstance(created, sco.Err):
-        return _log_error(f"could not open the log under {log_root}: {created.error}")
-    logger, out = created.value, {}
+def read_run_events(run_name: str, log_file: Optional[pathlib.Path] = None) -> Result[dict, Any]:
+    """The run's result, statement, wave and verdict fields from the supplied JSONL file, oldest first."""
+    source = pathlib.Path(log_file) if log_file is not None else pathlib.Path.home() / ".sc-agent/logs/judge-jev.log.jsonl"
+    out = {action: [] for action in ("result", "statement", "wave", "verdict")}
     try:
-        for action in ("result", "statement", "wave", "verdict"):
-            got = logger.query(sco.LogQuery(service=LOG_SERVICE, action=action, limit=LOG_LIMIT,
-                                            field_matches=(sco.FieldMatch(field="run", value=run_name),)))
-            if isinstance(got, sco.Err):
-                return _log_error(f"log query failed: {got.error}")
-            if len(got.value.events) >= LOG_LIMIT:
-                return _log_error(f"run {run_name} has {LOG_LIMIT} or more {action} events; one query returns at most {LOG_LIMIT}")
-            out[action] = [_plain(e.fields) for e in got.value.events]
-    finally:
-        logger.shutdown()
+        with source.open(encoding="utf-8") as stream:
+            for line in stream:
+                event = json.loads(line)
+                fields = event["fields"]
+                if event["service"] == LOG_SERVICE and event["action"] in out and fields.get("run") == run_name:
+                    out[event["action"]].append(fields)
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        return _log_error(f"could not read {source}: {type(exc).__name__}: {exc}")
     return Ok(out)
 
 
 def _log_error(message: str) -> Err:
-    from jev_judge import JudgeError
-    return Err(JudgeError("LOG.READ", message, action="Pass the --run-dir of a finished quality run."))
+    from decidr_client import ClientError
+    return Err(ClientError("LOG.READ", message, action="Pass the --run-name of a finished quality run."))
 
 
-def rebuild_from_log(log_root, run_name: str, tree: Any, repository: Optional[str] = None) -> Result[list, Any]:
+def rebuild_from_log(run_name: str, tree: Any, repository: Optional[str] = None, *,
+                     log_file: Optional[pathlib.Path] = None) -> Result[list, Any]:
     """The run's triples (every record under the run name) rebuilt from the sc-observability log alone: its ``result``
     events are the result lines, its ``statement`` and ``wave`` events the walk, its ``verdict`` event the verdict.
     ``repository`` is the Raptor repository URN when the log does not carry it (it does not today)."""
-    events = read_run_events(log_root, run_name)
+    events = read_run_events(run_name, log_file)
     if isinstance(events, Err):
         return events
     records: dict = {}

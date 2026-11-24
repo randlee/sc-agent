@@ -1,6 +1,6 @@
 ---
 name: quality-workflow
-version: 0.2.0
+version: 0.7.0
 description: Judge whether REQ, NFR and ADR records are well written - the quality command, reading its verdict and answers, definitions files with compare-definition, and the offline checks validate, doctor and --dry-run.
 ---
 
@@ -14,7 +14,7 @@ description: Judge whether REQ, NFR and ADR records are well written - the quali
 uv run -q --script "$J" quality --req REQ-ABC-0001 --nfr NFR-ABC-0001 --adr ADR-ABC-0001 --index index.json --run-name <name> > <name>.json
 ```
 
-`--req`, `--nfr` and `--adr` repeat and mix. Every request and answer is also logged to `~/.judge-jev/<repository name>/<UTC date>/logs/judge-jev.log.jsonl`: one folder per repository and day, outside the repository and shared by all its worktrees (`--run-dir <folder>` logs elsewhere). Each answer in the result carries `probabilities`, the probability of every option, and `runner_up`, the option Jev nearly chose with its probability and criterion; each wave carries `models`, the Jev versions that answered.
+`--req`, `--nfr` and `--adr` repeat and mix. Every request and answer is also logged to `~/.sc-agent/logs/judge-jev.log.jsonl`, shared by runs and identified by `--run-name`. Each answer in the result carries `probabilities`, the probability of every option, and `runner_up`, the option Jev nearly chose with its probability and criterion; each wave carries `models`, the Jev versions that answered.
 
 ## 2. Read the result
 
@@ -38,7 +38,7 @@ A verdict of `yes` can still hold an unclear statement: an answer whose top choi
 
 ## 3. Fix a failing record
 
-Read `references/fix-strategy.md` and follow it.
+Follow `references/fix-strategy.md`; report per SKILL.md.
 
 ## Definitions files
 

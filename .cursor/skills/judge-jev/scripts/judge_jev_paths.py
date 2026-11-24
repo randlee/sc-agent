@@ -29,12 +29,6 @@ from the working directory, nearest first, and stop before the home directory.
     determinable home directory only the machine-wide directories are known
     to be global, and they are still refused.
 
-  - ``central_log_root(start)``: ``~/.judge-jev/<repository name>/<UTC date>``,
-    the per-user folder every judge-jev run of a repository logs under, whatever
-    worktree or scratch directory it ran in. ``repository_name(start)`` is the
-    name of the main checkout: a linked worktree reports the checkout it belongs
-    to. None when the home directory is unknown.
-
 No lookup raises because the home directory is unknown.
 
 Standard library only; importing it has no side effects.
@@ -42,10 +36,8 @@ Standard library only; importing it has no side effects.
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import os
-import re
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
 
@@ -214,51 +206,3 @@ def lock_names(root: Path, script: Path) -> Tuple[bool, str]:
     if key not in files:
         return False, f"{lock} does not list {key}: the copy was not written by the judge-jev installer"
     return True, f"{lock} lists {key}"
-
-
-CENTRAL_LOG_DIRNAME = ".judge-jev"
-
-
-def repository_name(start: Path, home: Optional[Path] = None) -> str:
-    """The name of the repository ``start`` is in: the folder of its main checkout.
-
-    The nearest ancestor holding ``.git`` decides. A ``.git`` directory is a main checkout: its folder's name. A ``.git``
-    file is a linked worktree (``gitdir: <main>/.git/worktrees/<name>``): the name of ``<main>``, so every worktree of a
-    repository shares one name. With no ``.git`` above ``start`` the name is ``start``'s own. Characters outside
-    ``A-Za-z0-9._-`` become ``_``.
-    """
-    origin = _resolve(start)
-    if origin.is_file():
-        origin = origin.parent
-    chosen = origin
-    for directory in ancestors(origin, home):
-        marker = directory / ".git"
-        if marker.is_dir():
-            chosen = directory
-            break
-        if marker.is_file():
-            chosen = directory
-            try:
-                text = marker.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                break
-            match = re.match(r"gitdir:\s*(.+?)\s*$", text, re.MULTILINE)
-            if match:
-                parts = Path(match.group(1)).parts
-                if ".git" in parts:
-                    main = Path(*parts[:parts.index(".git")])
-                    if main.name:
-                        chosen = main
-            break
-    name = re.sub(r"[^A-Za-z0-9._-]", "_", chosen.name).strip(".")
-    return name or "repository"
-
-
-def central_log_root(start: Path, home: Optional[Path] = None, today: Optional[_dt.date] = None) -> Optional[Path]:
-    """``~/.judge-jev/<repository name>/<UTC date>``: where a judge-jev run of the repository at ``start`` logs by default.
-    None when the home directory cannot be determined."""
-    home = _home(home)
-    if home is None:
-        return None
-    day = today or _dt.datetime.now(_dt.timezone.utc).date()
-    return home / CENTRAL_LOG_DIRNAME / repository_name(start, home) / day.isoformat()

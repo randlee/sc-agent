@@ -2,7 +2,7 @@
 name: plan-anchoring
 description: Capture the facts a user states while planning as numbered anchors (ANC-001...), one clear, testable requirement each, with the user's verbatim words kept as provenance, alongside existing requirements (REQ) and ADRs. Turn them into Jev-judged questions, tune and test the questions per anchor, and enforce them at two gates with a triage-apply-rerun loop. The planning gate checks each plan bead still says what the user said; the development gate checks the delivered sprint work followed it. Use when planning a phase or sprint with beads, when the user says "anchor this", "lock this", "don't let this drift", or "remember I said", when re-opening a plan after context compression, or when reviewing a sprint against its plan. Not for general code review, and not a replacement for plan hardening.
 metadata:
-  version: "0.11.0"
+  version: "0.13.0"
 ---
 
 # Plan Anchoring
@@ -16,7 +16,7 @@ This file is the table of contents; read the reference for the step you are on.
 Run before any capture, delegation, or gate. On a missing dependency, surface the gap and stop.
 
 ```bash
-which python3 && python3 --version          # 3.9 or newer
+which python3 && python3 --version          # 3.11 or newer
 python3 -c 'import yaml; print("PyYAML", yaml.__version__)'   # anchor_tracker.py only; python3 -m pip install pyyaml
 which jq && jq --version                    # gate agents parse question overrides with jq
 T="<this skill's directory>/scripts/anchor_tracker.py"
@@ -24,6 +24,7 @@ python3 "$T" resolve > /tmp/anchor-tracker.json; jq '{success, error: .error.cod
 ANCHOR_TRACKER="$(jq -r '.data.tracker // empty' /tmp/anchor-tracker.json)"
 which "$ANCHOR_TRACKER" && "$ANCHOR_TRACKER" --version
 which sc-compose && sc-compose --version    # 1.8.0 or newer
+python3 -c 'import sc_agent'               # sc-decidr wheel; version in scripts/decidr_client.py; live Jev calls only
 test -n "$TYPESAFE_API_KEY" && echo "TYPESAFE_API_KEY set (preferred)" || echo "TYPESAFE_API_KEY absent; live Jev may use the documented platform credential store"
 python3 "<this skill's directory>/scripts/plan_anchor_settings.py" show | jq '.data.allow_remote_judge'   # true, false, or null (never asked)
 ```
@@ -58,6 +59,8 @@ python3 "$S" --help
 
 Every command below uses `$S`, `$P` and `$A`; every agent invocation passes `$S` as `script` and `$A` as `anchors_path`.
 
+If `plan_anchor_settings.py show` reports a `repo_guidelines_path`, read that repository-owned file before the workflow; it supplements the intent and anchors and never overrides them (`references/anchor-document.md`).
+
 ## Select the workflow
 
 After dependency verification, read only the row for the current operation.
@@ -72,7 +75,7 @@ contracts only when that operation needs them.
 | Review delivered sprint work | `references/development-review-workflow.md` |
 | Report a planning round's changes to the owner (after the drift review) | `references/change-report.md` |
 
-**Iterate fast, then drift-review** (tuning and both gates; `references/triage-and-iteration.md`). Apply many small clarity changes yourself (plan text, anchor wording, scope, fixtures, exclusions, tuner authority recommendations), batch every fix a run found, and re-run immediately; never wait for user approval before testing a clarity change, and do not report issues one by one. Get the anchors and gates passing first. Then review every changed anchor and plan passage against the approved intent and the verbatim quotes, revert or escalate only material drift, and record the review as JSON (`assets/schemas/drift-review.schema.json`). Then generate the change report (`scripts/change_report.py`, `references/change-report.md`) and send it to the user.
+**Ask Jev first, edit once, then drift-review** (tuning and both gates; `references/triage-and-iteration.md`). Jev is a reviewer you can question, not a function to debug: when a cell fails, read its triage answers and ask Jev why with `--extra-questions` before changing anything. A few thousand queries a run is fine; they cost about a hundredth of a cent each. Once the cause is located, apply the fix yourself (plan text, anchor wording, scope, fixtures, exclusions, tuner authority recommendations), batch every located fix, and re-run; never wait for user approval before testing a clarity change, and do not report issues one by one. Get the anchors and gates passing first. Then review every changed anchor and plan passage against the approved intent and the verbatim quotes, revert or escalate only material drift, and record the review as JSON (`assets/schemas/drift-review.schema.json`). Then generate the change report (`scripts/change_report.py`, `references/change-report.md`) and send it to the user.
 
 Why did an anchor fail? Run `judge` on the item; every failing cell carries triage answers and a route (`exclude`, `plan`, `question`, `human`); `report --run <run>` shows them.
 

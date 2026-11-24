@@ -1,6 +1,6 @@
 ---
 name: jev-fix-proposer
-version: 0.2.0
+version: 0.7.0
 description: Writes one candidate edit for one weak statement of a REQ, NFR or ADR record, using the one strategy it is given and keeping the record's obligations. Read-only; never calls Jev. Launch one per statement and strategy, in parallel, with no shared context.
 model: opus
 color: green
@@ -50,7 +50,7 @@ One fenced JSON object:
 1. Read `answers`. Find the words the `d_*` answers point at.
 2. If the strategy needs a fact (what a term means, a number, an alternative), read it in `sources` and note the file and line.
 3. Write the one edit the strategy names. Keep it as small as it can be.
-4. Check it against `original_text`. Return `unfixable` if it would add, drop, narrow, widen or tighten an obligation, turn rationale into a MUST, add a condition the original lacked, name how the statement is checked, or state a fact you cannot cite.
+4. Check it against `original_text`. Return `unfixable` if it would add, drop, narrow, widen or tighten an obligation, turn rationale into a MUST, add a condition the original lacked, add a 'checked by' clause, or state a fact you cannot cite.
 
 ## Output Format
 
