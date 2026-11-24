@@ -42,7 +42,8 @@ Keys (all optional except ``schema_version``)
 Command line (the JSON envelope ``{success, data, error}``; exit 0, or 2 with a
 typed error, including ``VALIDATION.INPUT`` for bad arguments)
   show [--repository-root PATH]
-      read-only: the parsed settings and where they live
+      read-only: the parsed settings and where they live; ``repo_guidelines_path``
+      is the nearest ``.sc/plan-anchor/plan-anchor-repo-guidelines.md`` or null
   set allow_remote_judge true|false [--repository-root PATH]
       record the user's answer, keeping every other key; commit the file
   set plan_dir docs/plans/phase-<id> [--repository-root PATH]
@@ -67,10 +68,11 @@ from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from plan_anchor_paths import find_settings  # noqa: E402
-from result import Err, Ok, Result, ToolError, err, run_main, utf8_stdio  # noqa: E402
+from plan_anchor_paths import find_guidelines, find_settings  # noqa: E402
+from result import Err, Ok, Result, ToolError, err, run_main  # noqa: E402
 
 SCHEMA_VERSION = 1
+GIT_TIMEOUT_SECONDS = 30
 SETTINGS_RELPATH = ".sc/plan-anchor/settings.yaml"
 TRACKERS = ("bd",)
 ALLOWED_KEYS = ("schema_version", "anchor_tracker", "allow_remote_judge", "plan_dir", "issue_url_template")
@@ -150,19 +152,22 @@ def load_yaml() -> Result[ModuleType, ToolError]:
         )
 
 
-def _git_toplevel(start: Path) -> Optional[Path]:
+def _git_toplevel(start: Path) -> Result[Optional[Path], ToolError]:
     try:
         proc = subprocess.run(
             ["git", "-C", str(start), "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, encoding="utf-8", check=False,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, timeout=GIT_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired:
+        return err("REPO.NOT_FOUND", f"git rev-parse did not finish within {GIT_TIMEOUT_SECONDS} s",
+                   "Check that Git responds in this repository, then retry repository discovery.")
     except OSError:
-        return None
+        return Ok(None)
     out = proc.stdout.strip()
     if proc.returncode != 0 or not out:
-        return None
-    return Path(out).resolve()
+        return Ok(None)
+    return Ok(Path(out).resolve())
 
 
 def find_repo_root(start: Path) -> Result[Path, ToolError]:
@@ -175,8 +180,10 @@ def find_repo_root(start: Path) -> Result[Path, ToolError]:
     if start.is_file():
         start = start.parent
     top = _git_toplevel(start)
-    if top is not None:
-        return Ok(top)
+    if not top.ok:
+        return top
+    if top.value is not None:
+        return Ok(top.value)
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists():
             return Ok(candidate)
@@ -353,7 +360,10 @@ def git_ignored(root: Path, rel: str) -> Result[bool, str]:
     """Whether git ignores ``rel``; ``Err(reason)`` when git cannot say (reported, not fatal)."""
     try:
         proc = subprocess.run(["git", "-C", str(root), "check-ignore", "-q", "--", rel],
-                              capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL)
+                              capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL,
+                              timeout=GIT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return Err(f"git check-ignore did not finish within {GIT_TIMEOUT_SECONDS} s")
     except OSError as exc:
         return Err(f"git could not start: {type(exc).__name__}: {exc}")
     if proc.returncode in (0, 1):
@@ -468,6 +478,7 @@ def show(start: Path) -> Result[dict, ToolError]:
     if not current.ok:
         return current
     s, path = current.value.settings, current.value.path
+    guidelines = find_guidelines(start.resolve())
     return Ok({
         "repository_root": str(root.value),
         "settings_path": str(path) if path is not None else str(settings_path(root.value)),
@@ -479,6 +490,7 @@ def show(start: Path) -> Result[dict, ToolError]:
         "allow_remote_judge": s.allow_remote_judge if s is not None else None,
         "plan_dir": s.plan_dir if s is not None else None,
         "issue_url_template": s.issue_url_template if s is not None else None,
+        "repo_guidelines_path": str(guidelines) if guidelines is not None else None,
     })
 
 

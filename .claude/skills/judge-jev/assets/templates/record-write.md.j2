@@ -1,0 +1,137 @@
+---
+name: judge-jev-record-write
+version: 0.7.0
+format: markdown
+description: Ask a writer for N complete candidate texts of a REQ, NFR or ADR record that impose a given list of tenets, agree with the PRD clauses given and are written to pass the judge-jev quality tree. The writer never sees the old record. Render with sc-compose and a variables file; see references/write-records.md.
+required_variables:
+  - record_id
+  - kind
+  - title
+  - tenets
+  - prd_clauses
+defaults:
+  n: 3
+  threshold: 0.6
+  rationale: []
+  terms: []
+  must_not_say: []
+  avoid: []
+---
+# Write {{ record_id }}: {{ title }}
+
+Write {{ n }} complete candidate texts for the {{ kind | upper }} record `{{ record_id }}`. Each candidate stands alone. Each must require every tenet below and nothing else.
+
+## Tenets: what the record must require
+
+{% for t in tenets %}
+- **{{ t.id }}** [{{ t.part if kind == "adr" else t.modal }}] {{ t.text }}{{ " (" ~ (t.prd | join(", ")) ~ ")" if t.prd else "" }}
+{% endfor %}
+{% if rationale %}
+
+Reasons the record may give under Rationale, and nowhere else:
+
+{% for r in rationale %}
+- {{ r }}
+{% endfor %}
+{% endif %}
+
+## PRD clauses it must agree with
+
+{% for c in prd_clauses %}
+- **{{ c.id }}** {{ c.text }}
+{% endfor %}
+{% if must_not_say %}
+
+The record must not say:
+
+{% for m in must_not_say %}
+- {{ m }}
+{% endfor %}
+{% endif %}
+{% if terms %}
+
+## Terms
+
+Define each term you use inside the record, with this meaning. Do not use a term whose meaning is `null`; say the thing in plain words.
+
+{% for t in terms %}
+- `{{ t.name }}`: {{ t.meaning }}
+{% endfor %}
+{% endif %}
+
+## How it is judged
+
+A judge reads this record and nothing else: a definition anywhere else does not count. It answers the questions below with a choice and a confidence. The record passes when every answer is a passing choice at confidence {{ threshold }} or higher.
+{% if kind == "adr" %}
+
+| Question | Passing choice | Failing choices |
+| --- | --- | --- |
+| `context`: does its context name the problem and the forces behind the decision? | `problem and forces` | `background only`, `missing` |
+| `alternatives`: does it name the alternatives considered? | `named with reasons rejected` | `named only`, `none` |
+| `consequences`: does it name the decision's consequences? | `positive and negative` | `positive only`, `missing` |
+
+So: Context states the problem and each force; every alternative says why it was rejected; Consequences names at least one cost.
+{% else %}
+
+For every MUST and MUST NOT statement:
+
+| Question | Passing choices | Failing choices |
+| --- | --- | --- |
+| `obligations`: how many independent obligations does this statement impose? | `1` | `2`, `3`, `4+` |
+| `joined_by`: what joins its obligations? | `none`, `condition+obligation` | `and-list`, `alternatives`, `obligation+rationale` |
+| `term`: what kind of term in this statement is unclear? | `none`, `project term defined in a linked record` | `project term defined nowhere`, `vague qualifier`, `undefined acronym` |
+| `check`: what would check this statement? | `unit test`, `CLI run`, `inspection or grep` | `needs a measure`, `none` |
+
+So:
+
+- Each tenet gets its own MUST, MUST NOT or SHOULD statement. Never join two tenets with "and", "or" or a list.
+- A statement holds no reason: reasons go under Rationale.
+- Every project term and acronym a statement uses is defined in the record. No qualifier such as fast, clear or robust without a number.
+- Every statement says something a test, a command or a look at a named file can show to be true or false. Do not write how it is checked.
+- Name every thing in full: no "it", "that type", "the above", "as follows".
+{% endif %}
+{% if avoid %}
+
+Wording the judge has already scored low for this record. Do not repeat it:
+
+{% for a in avoid %}
+- {{ a }}
+{% endfor %}
+{% endif %}
+
+## Format
+
+Write only the sections named here, each under its `###` heading, in this order. Do not write the record's title line, its Status, Version, Created, Last Updated or Owner lines, or any other section.
+{% if kind == "adr" %}
+
+- `### Context`: the problem and each force.
+- `### Decision`: what was decided.
+- `### Rationale`: why.
+- `### Consequences`: a `**Positive:**` list and a `**Negative:**` list, one bullet each.
+- `### Alternatives Considered`: for each alternative, `#### Alternative <number>: <name>`, then `**Description:**` and `**Why Rejected:**`, each followed by its text on the next line.
+{% else %}
+
+- `### Requirement Statement`: first one paragraph that starts `Definitions:` when the record defines a term; then the statements, one bullet each, under the labels `**MUST statements:**`, `**SHOULD statements:**` and `**MUST NOT statements:**`. Leave out a label that has no statement.
+- `### Rationale`: the reasons, as prose.
+- `### Success Criteria`: what shows the record is met, as prose.
+
+Each bullet under a label uses that label's modal exactly once, in capitals. No bullet uses another modal word such as SHALL or MAY.
+{% endif %}
+
+## Make the {{ n }} candidates differ
+
+Each candidate differs from the others in at least one of these. Say which in `varies`.
+
+- **check**: what would show a statement true: a unit test, a command's output, or the content of a named file.
+- **grain**: one statement per tenet as listed, or one defined term that names several parts with one statement requiring each part.
+- **definitions**: terms defined in the `Definitions:` paragraph, or spelled out in plain words in each statement.
+
+## Return
+
+One JSON object and nothing else:
+
+    {"record_id": "{{ record_id }}",
+     "candidates": [{"n": 1, "varies": "<what differs>", "text": "<the complete text, from the first section heading>", "covers": {"T1": [1], "T2": [2]}}],
+     "cannot": [{"tenet": "T3", "why": "<what stops it being stated so that it can be checked>"}]}
+
+{% if kind == "adr" %}`covers` maps every tenet id to the names of the sections that state it, in place of numbers.{% else %}`covers` maps every tenet id to the numbers of the statements that require it; number the statements 1, 2, 3 in the order they appear.{% endif %} Do not call the judge. Do not edit files. Do not ask how to word something. A tenet that cannot be written to pass goes under `cannot`, and the candidates are written without it.
