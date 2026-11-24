@@ -7,10 +7,8 @@ runs. A record passes when its verdict is ``yes`` in more than half of the runs 
 every gate answer's median is at or above the threshold. Answers whose id starts
 with ``d_`` are diagnostic and never gate.
 
-Each answer below the gate is listed with its ``runner_up``: the option Jev most
-nearly chose instead, with the median of its probability and its criterion. A low
-confidence is Jev torn between its choice and that option, so the runner-up says
-what the statement is being read as.
+Every gate answer carries its median and the original choice, criterion, confidence
+and runner-up from each run. Missing reason fields are null, not inferred.
 
 Runs are comparable only on identical text: a record whose statements differ
 between runs, or that is missing from a run, is reported with ``comparable: false``
@@ -80,8 +78,8 @@ def runner_up(entries: list, choice: str):
     best = min(medians, key=lambda option: (-medians[option], option))
     if medians[best] <= 0:
         return None
-    criterion = next((entry["runner_up"].get("criterion", "") for entry in entries
-                      if isinstance(entry.get("runner_up"), dict) and entry["runner_up"].get("choice") == best), "")
+    criterion = next((entry["runner_up"].get("criterion") for entry in entries
+                      if isinstance(entry.get("runner_up"), dict) and entry["runner_up"].get("choice") == best), None)
     return {"choice": best, "probability": medians[best], "criterion": criterion}
 
 
@@ -96,14 +94,25 @@ def gate(runs: list, threshold: float) -> dict:
         kind = (present[0].get("record") or {}).get("kind")
         texts = [{key: value[2] for key, value in found.items()} for found in answers]
         comparable = len(present) == len(runs) and all(text == texts[0] for text in texts)
-        low, lowest = [], None
+        low, all_answers, lowest = [], [], None
         for key in sorted(answers[0], key=lambda k: (k[0] or 0, k[1])) if comparable else []:
             confidences = [found[key][1] for found in answers]
             median = round(statistics.median(confidences), 4)
             choice = Counter(found[key][0] for found in answers).most_common(1)[0][0]
-            entry = {"statement": key[0] or None, "question": key[1], "choice": choice,
-                     "median": median, "confidences": confidences,
-                     "runner_up": runner_up([found[key][3] for found in answers], choice)}
+            originals = [found[key][3] for found in answers]
+            criterion = next((item.get("criterion") for item in originals
+                              if item.get("choice") == choice and item.get("criterion") is not None), None)
+            per_run = []
+            for item in originals:
+                alternative = item.get("runner_up")
+                per_run.append({"choice": item.get("choice"), "criterion": item.get("criterion"),
+                                "confidence": item.get("confidence"),
+                                "runner_up": {key: alternative.get(key) for key in ("choice", "probability", "criterion")}
+                                if isinstance(alternative, dict) else None})
+            entry = {"statement": key[0] or None, "question": key[1], "choice": choice, "criterion": criterion,
+                     "median": median, "confidences": confidences, "runs": per_run,
+                     "runner_up": runner_up(originals, choice)}
+            all_answers.append(entry)
             if lowest is None or median < lowest["median"]:
                 lowest = entry
             if median < threshold:
@@ -111,7 +120,7 @@ def gate(runs: list, threshold: float) -> dict:
         yes = sum(1 for verdict in verdicts if verdict == "yes")
         passed = comparable and yes * 2 > len(runs) and not low
         records.append({"id": record_id, "kind": kind, "pass": passed, "comparable": comparable,
-                        "verdicts": verdicts, "lowest": lowest, "low": low})
+                        "verdicts": verdicts, "lowest": lowest, "low": low, "answers": all_answers})
     return {"threshold": threshold, "runs": len(runs),
             "passed": sum(1 for record in records if record["pass"]),
             "failed": sum(1 for record in records if not record["pass"]),

@@ -1,8 +1,4 @@
-"""jev_errors.py: the one ``JudgeError`` every script returns in ``Err``, and the redaction its envelope goes through.
-
-``jev_judge`` and ``jev_graph`` import this module, so an error built in the graph layer reaches the CLI envelope as it is:
-same class, same code, message, action and data. Standard library only.
-"""
+"""Redaction for judge-jev output. Standard library only."""
 
 from __future__ import annotations
 
@@ -53,36 +49,3 @@ def redact_sensitive(value):
             out[child_key] = _redact_text(child)
         else:
             out.append(_redact_text(child))
-
-
-class JudgeError:
-    """An expected failure, carried in Err. Never raised: main() turns it into the error envelope and exit 2."""
-
-    def __init__(self, code: str, message: str, recoverable: bool = False, action: str = "",
-                 status=None, retry_after=None):
-        self.code = code
-        self.message = message
-        self.recoverable = recoverable
-        self.action = action
-        self.status = status            # HTTP status when the error came from Jev
-        self.retry_after = retry_after  # parsed Retry-After header, seconds, or None
-        self.meta = {}                  # attempt / shortening bookkeeping, filled by judge_with_policy
-        self.data = None                # optional facts that explain the error (PLAN.TOO_LARGE carries the bead's shape)
-
-    def __str__(self) -> str:
-        return self.message
-
-    def __repr__(self) -> str:
-        return f"JudgeError({self.code!r}, {self.message!r})"
-
-    def to_json(self) -> dict:
-        return redact_sensitive({
-            "success": False,
-            "data": self.data,
-            "error": {
-                "code": self.code,
-                "message": str(self),
-                "recoverable": self.recoverable,
-                "suggested_action": self.action,
-            },
-        })

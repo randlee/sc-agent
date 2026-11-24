@@ -1,6 +1,6 @@
 ---
 name: installation-and-troubleshooting
-version: 0.2.0
+version: 0.7.0
 description: Installing judge-jev into a repository or a parent folder with the judge-jev-installer skill (install.py), per-repository overrides and per-folder upgrades, the CLIs and credentials judge-jev depends on (python3, PyYAML, TypeSafe API key), minimum versions, PATH issues in Claude Code, Codex and Cursor environment policy, and known issues.
 ---
 
@@ -11,10 +11,16 @@ description: Installing judge-jev into a repository or a parent folder with the 
 ```bash
 which python3 && python3 --version
 python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
-test -n "$TYPESAFE_API_KEY" && echo "environment key set (preferred)" || echo "environment key absent; check the documented platform credential store"
+if [ -f .env ]; then
+  echo "repository .env present (key not verified)"
+elif [ -n "${TYPESAFE_API_KEY:-}" ]; then
+  echo "process key set"
+else
+  echo "sc-agent may use the platform credential store"
+fi
 ```
 
-The environment-key message is informational: a documented local platform credential can also satisfy live Jev authentication.
+These messages are informational: an existing `.env` does not prove it contains a key, and a documented local platform credential can also satisfy live Jev authentication.
 
 ## Install judge-jev into a folder
 
@@ -31,6 +37,8 @@ uv run "<installer plugin>/install.py" --dest <folder> --allow-remote-judge|--no
 **Parent-folder installs and overrides.** The trusted `jev_judge.py` is the one in the nearest `<dir>/.claude|.codex|.cursor/skills/judge-jev/scripts/`, walking up from the working directory and stopping before the home directory, and only when `<dir>/.sc/judge-jev/install-lock.json` lists that script: a copy the installer did not write (hand-copied, or with the lock removed), a copy under `.agents/`, or a copy in a global location fails with `VALIDATION.PATH`; rerun the installer to fix it. Settings follow the same walk, starting at the working directory even inside a repository: the nearest `.sc/judge-jev/settings.yaml` wins whole (files are not merged), so a repository under a parent install can override `allow_remote_judge` with its own file. Whether a harness discovers a skill installed above the repository it was started in is the harness's own rule; Claude Code and Codex document skill discovery up to the repository root, so start the session in the folder that holds the install, or install into the repository.
 
 **Upgrade.** An upgrade is a rerun of the same command for that folder; each install folder is upgraded on its own. `install.py --dest <folder> --status` reports, read-only, the installed and installer versions (for example `installed 0.1.0, installer 0.2.0`). A rerun replaces only files that are unchanged since the installer wrote them, removes files this version no longer ships (agents, scripts, references, tests left inside the skill directory) when unchanged, and refuses, naming the file, when one was modified; `--overwrite` moves such a file to `<folder>/.backup/<UTC time>/<path>` and installs over it. It never writes over a file it does not own. Every check runs before anything is written; `--dry-run` prints the plan (writes, replacements, removals, settings) and writes nothing. Output is the JSON envelope `{success, data, error}`; exit 0 when the command ran, 2 on any error. The installer plugin's SessionStart hook prints one line when the nearest install is older than the plugin, and stays silent otherwise.
+
+**Uninstall.** Read `<folder>/.sc/judge-jev/install-lock.json` and remove the files listed in its `files` object, then remove the lock itself. Remove any folders left empty and any `__pycache__` directories the scripts created. Remove `<folder>/.sc/judge-jev/settings.yaml` if you choose to discard the repository's consent setting. Logs may be removed from `~/.judge-jev/<repository name>/` (on Windows, under `%USERPROFILE%`) when no run is active.
 
 **Settings file.** Synaptic Canvas packages keep settings at `<folder>/.sc/<package>/settings.yaml`: YAML, snake_case keys, committed to git, never secrets. The file in effect is the nearest one at or above the working directory, stopping before the home directory: the repository's own file, else a parent folder's (see Parent-folder installs). `judge_jev_settings.py set` changes the file in effect (or creates one at the repository root, `git rev-parse --show-toplevel`). For this package:
 
@@ -66,11 +74,11 @@ allow_remote_judge: true
 
 **TypeSafe API key**
 
-The live judge looks for the key in this order: `TYPESAFE_API_KEY` in the process environment, then the platform credential store. An invalid environment value fails closed; it does not silently select another credential. The platform entry is local-interactive convenience only—cloud, CI, and remote agents should use their platform secret injection.
+sc-agent resolves the key in this order: the repository `.env` file, `TYPESAFE_API_KEY` in the process environment, then the platform credential store. judge-jev does not read, validate, or retry credentials itself. An invalid higher-priority value fails closed. Cloud, CI, and remote agents should use their platform secret injection.
 
-- macOS: Keychain generic-password item with service `plan-anchor` and account `typesafe-api-key`.
-- Windows: Credential Manager generic credential with target `plan-anchor:typesafe-api-key`.
-- Linux: Secret Service item returned by `secret-tool lookup service plan-anchor account typesafe-api-key`. Create it without putting the key on a command line with `secret-tool store --label="plan-anchor TypeSafe API key" service plan-anchor account typesafe-api-key` and enter the value on standard input.
+- macOS: Keychain generic-password item with service `TYPESAFE_API_KEY` and the current OS account.
+- Windows: Credential Manager generic credential with target `TYPESAFE_API_KEY` for the current OS account.
+- Linux: Secret Service item returned by `secret-tool lookup service TYPESAFE_API_KEY`. Create it without putting the key on a command line with `secret-tool store --label="TypeSafe API key" service TYPESAFE_API_KEY` and enter the value on standard input.
 
 - Create a key at typesafe.ai. Read it silently so it does not appear in the command line, shell history, or terminal output, then export it in the shell that launches Claude Code or Codex:
   ```bash
@@ -83,7 +91,7 @@ The live judge looks for the key in this order: `TYPESAFE_API_KEY` in the proces
   echo '[ -r "$HOME/.config/typesafe/env" ] && . "$HOME/.config/typesafe/env"' >> ~/.zshenv   # and ~/.bash_profile for bash
   ```
   GUI-launched apps do not read shell files; use `launchctl setenv TYPESAFE_API_KEY "$TYPESAFE_API_KEY"` (macOS, until reboot). Never commit or echo the key.
-- Under Codex, `TYPESAFE_API_KEY` matches the default `*KEY*` exclusion for command environments. If you restrict `[shell_environment_policy]` in `config.toml`, keep `ignore_default_excludes = true`, and with an allowlist under `[shell_environment_policy.filters]` add `"TYPESAFE_API_KEY" = "include"`.
+- Under Codex, `TYPESAFE_API_KEY` matches the default `*KEY*` exclusion for command environments. If you restrict `[shell_environment_policy]` in `config.toml`, keep `ignore_default_excludes = true`, and with an allowlist under `[shell_environment_policy.filters]` add `"TYPESAFE_API_KEY" = "include"`. A repository `.env` is read by sc-agent.
 - Cursor's agent shell uses the environment of the Cursor app. A GUI launch does not read shell rc files, so set `TYPESAFE_API_KEY` with `launchctl setenv` (macOS, until reboot) before starting Cursor. A plugin variable does not export into `python3 jev_judge.py`.
 - Live Jev calls also need the user's committed answer `allow_remote_judge: true` in `.sc/judge-jev/settings.yaml`. Record it once, at install time with `--allow-remote-judge` (or `--no-remote-judge`), or later with `python3 <skill>/scripts/judge_jev_settings.py set allow_remote_judge true|false`, and commit the file.
 

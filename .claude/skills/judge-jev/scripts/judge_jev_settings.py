@@ -52,7 +52,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from judge_jev_paths import find_settings  # noqa: E402
-from result import Err, Ok, Result, ToolError, err, run_main, utf8_stdio  # noqa: E402
+from result import Err, Ok, Result, ToolError, err, run_main  # noqa: E402
 
 SCHEMA_VERSION = 1
 SETTINGS_RELPATH = ".sc/judge-jev/settings.yaml"

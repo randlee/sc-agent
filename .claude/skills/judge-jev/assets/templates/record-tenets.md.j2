@@ -1,0 +1,66 @@
+---
+name: judge-jev-record-tenets
+version: 0.7.0
+format: markdown
+description: Ask one writer who knows the PRD to list what a REQ, NFR or ADR record requires, one tenet per obligation. The reply is the input to record-write.md.j2. Render with sc-compose and a variables file; see references/write-records.md.
+required_variables:
+  - record_id
+  - kind
+  - title
+  - record_text
+  - prd_clauses
+defaults:
+  original_text: ""
+---
+# List what {{ record_id }} requires
+
+`{{ record_id }}` ({{ kind | upper }}): {{ title }}
+
+List every separate thing this record requires, one tenet each. Do not write, improve or review the record. Another writer will write a new record from your list alone and will never see the text below, so anything you leave out is lost and anything you add becomes a requirement.
+
+## The record
+
+{{ record_text }}
+{% if original_text %}
+
+## The record as its author first wrote it
+
+Where the two texts disagree about what is required, this one decides.
+
+{{ original_text }}
+{% endif %}
+
+## PRD clauses that govern it
+
+{% for c in prd_clauses %}
+- **{{ c.id }}** {{ c.text }}
+{% endfor %}
+
+## Rules
+
+1. One tenet is one obligation: one thing a single test, command or file inspection could show to be true or false. A statement with a list gives one tenet per item. "A and B" gives two. A condition with its obligation ("when X, the server does Y") is one tenet; keep the condition in it.
+2. Keep every obligation the record imposes. Do not add, drop, narrow, widen or strengthen one.
+3. A reason or purpose is not a tenet. Put it under `rationale`.
+4. Write each tenet in plain words and name every thing in full: no "it", "that type", "the above", "as follows".
+5. Keep every name, number, path, command and code identifier exactly as the record has it, in backticks.
+6. For each tenet give the PRD clauses it serves (`prd`), or an empty list. A tenet that contradicts a clause stays in `tenets` and is also listed under `conflicts`.
+7. Under `terms`, list every project term a tenet uses with its meaning, taken from the record or the repository (`source`: the file and line). No meaning found: `"meaning": null`.
+8. Under `must_not_say`, list what the clauses above forbid a record from saying, where this record could be tempted to say it.
+{% if kind == "adr" %}
+
+For an ADR, give each tenet a `part` in place of a modal: `decision` (what was decided), `problem` (the problem that forced a decision), `force` (a constraint that shaped it), `alternative` (an option considered, with why it was rejected), `benefit` or `cost` (a consequence).
+{% else %}
+
+Give each tenet the `modal` its statement carries: `MUST`, `MUST NOT` or `SHOULD`.
+{% endif %}
+
+## Return
+
+One JSON object and nothing else:
+
+    {"record_id": "{{ record_id }}",
+     "tenets": [{"id": "T1", {% if kind == "adr" %}"part": "decision"{% else %}"modal": "MUST"{% endif %}, "text": "<one obligation in plain words>", "from": "<statement number or section>", "prd": ["<clause id>"]}],
+     "rationale": ["<a reason the record gives>"],
+     "terms": [{"name": "<term>", "meaning": "<meaning or null>", "source": "<file:line>"}],
+     "must_not_say": ["<what a clause forbids>"],
+     "conflicts": [{"tenet": "T1", "clause": "<clause id>", "why": "<how they disagree>"}]}

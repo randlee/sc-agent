@@ -1,5 +1,5 @@
 ---
-version: 0.11.0
+version: 0.13.0
 ---
 
 # Reference catalog
@@ -16,7 +16,7 @@ version: 0.11.0
 ## References
 
 - `references/anchor-capture.md` - detecting, proposing, confirming, and wording anchors
-- `references/anchor-document.md` - intent.md, anchors.json schema, anchors.md, IDs, lifecycle
+- `references/anchor-document.md` - intent.md, anchors.json schema, anchors.md, IDs, lifecycle, the optional repository guidelines file
 - `references/bead-layout.md` - the anchor bead tree, bd commands, labels, overrides in beads, reading beads
 - `references/question-tuning.md` - the testability rubric, per-anchor question overrides, proving the wording
 - `references/triage-and-iteration.md` - the run, triage, apply, re-run, diff loop and the stop conditions
