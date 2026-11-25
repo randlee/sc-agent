@@ -29,7 +29,7 @@ Definitions: sc-agent is this project's client library and command-line tool tha
 
 **MUST NOT statements:**
 
-- A short name MUST NOT contain a provider name.
+- A short name MUST NOT encode its provider.
 - A request MUST NOT require the caller to name a provider.
 
 ### Rationale
@@ -43,7 +43,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 **Acceptance Criteria:**
 
 - [ ] Unit test: every model-table row stores its provider in a field separate from its model.
-- [ ] Unit test: no short name in the model table contains a provider name.
+- [ ] Unit test: a short name served by two providers is the same string for both rows.
 - [ ] Unit test: the short name `haiku` selects the same model through two different providers, and each sends its own id: `claude-haiku-5-5` through `anthropic` and `anthropic/claude-haiku-5.5` through `openrouter`.
 - [ ] Unit test: with `openrouter` configured for `haiku` and the `anthropic` key also found, a `haiku` request goes to `openrouter`.
 - [ ] Unit test: with no provider configured, a model served by a keyless provider and a keyed provider goes to the keyless one.

@@ -68,8 +68,6 @@ The wheel is the one consumer boundary. Decision numbers are stable; there is no
 
    **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.
 
-   **`sc_agent.testing.seed_session`** writes one session row and its run link through the real session writer, so offline tests can be served from the result cache.
-
 2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).
 
 4. **Breaking minor release.** The error type and call API change, which breaks SemVer for Rust; below 1.0 a minor bump is the breaking bump, and for Python the change only adds things. All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`), enforced by `verify-version-lockstep`; sc-decidr is the one wheel and holds the sitr API, so decidr and sitr always share a version.
@@ -78,7 +76,7 @@ The wheel is the one consumer boundary. Decision numbers are stable; there is no
 
 6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.
 
-7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; a send that times out is resent up to 5 sends in all, the first included (REQ-SAG-0601). REQ-SAG-0702 holds the rules.
+7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; a send that times out is resent up to 5 sends in all, the first included (REQ-SAG-0601); busy and network errors are resent up to a fixed count. REQ-SAG-0702 holds the rules.
 
 8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).
 
@@ -96,9 +94,8 @@ The wheel is the one consumer boundary. Decision numbers are stable; there is no
 
     - Everything that does not change between a command's calls is resolved once at creation and held by the Run: tool identity, model, cache policy, project/phase, configuration, worker count, send timeout, log root and credential sources. The Run owns the general Logger or borrows the one given, and flushes after each call and on exit.
     - The cancel flag belongs to the Run. An interrupt (Ctrl-C, SIGINT, SIGTERM in decidr; KeyboardInterrupt in sc-agent-py) cancels the Run whose call is running; Python has no separate cancel object.
-    - The model, and optionally a default `agent_role`, are set on the Run. Per call a caller passes only the request or requests and optionally `agent_role`, a `cache` override and, for a batch, `on_result`; there is no per-job cache (REQ-SAG-0703). `run.cancel()` cancels the Run's calls; a call after close returns `decision.run_closed` (category `validation`), sends nothing and writes no session row or link record.
-    - The request hash is the SHA-256 digest (sc-sha) of the exact request body bytes sent. The Run's cache policy is the configuration key `cache` unless `Run(cache=)` overrides it; a call's `cache` override applies to that call only, every job included, and each batch job is a hit or a miss on its own (REQ-SAG-0703). A cache hit returns the row's result with `cached: true`, its `session_id` and `attempts: 0`; every other send result, an error value included, carries `cached: false`.
-    - Creating a Run never raises: an invalid creation value is held and returned by each call with no send, no session row and no link record; a missing project/phase is instead `config.missing_project` per call.
+    - The model, and optionally a default `agent_role`, are set on the Run. `run.cancel()` cancels the Run's calls.
+    - The request hash is the SHA-256 digest (sc-sha) of the exact request body bytes sent. The Run's cache policy is the configuration key `cache` unless `Run(cache=)` overrides it; a call's `cache` override applies to that call only, every job included, and each batch job is a hit or a miss on its own (REQ-SAG-0703).
     - One send path: `send` and `send_batch` call one private sender, and `decidr` creates one Run per command.
 
 15. **One owner (NFR-SAG-0004).** ULID minting, the provider table and its credential list, the model table and the session-log layout are owned by the sc-agent Rust crate and exposed through the decidr CLI and the wheel, which exports the provider-key list, the session-row reader and the Run that mints `run_id`; the consumer template and every consumer call them and hold no copy.

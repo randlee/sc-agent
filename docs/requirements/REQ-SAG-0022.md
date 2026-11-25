@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The generated client is the Python module a consumer renders from the sc-decidr wheel's sc-compose template (REQ-SAG-0018). The client name is the consumer's product name, a constant in the generated client, and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`. The client Logger is the Logger the generated client obtains from the wheel under the client name (REQ-SAG-0008). A wheel call is a call the generated client makes to the sc-decidr wheel's decidr or sitr API.
+Definitions: The generated client is the Python module a consumer renders from the sc-decidr wheel's sc-compose template (REQ-SAG-0018). The client name is the consumer's product name, a constant in the generated client, and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`. The client Logger is the Logger the generated client obtains from the wheel under the client name (REQ-SAG-0008). A wheel call is a call the generated client makes to the sc-decidr wheel's decidr or sitr API. `<CLIENT>_LOG_ROOT` is the environment variable named by the client name uppercased with hyphens replaced by underscores.
 
 **MUST statements:**
 
@@ -24,6 +24,7 @@ Definitions: The generated client is the Python module a consumer renders from t
 - When an app gives the generated client its own Logger, the generated client MUST inject that Logger, in place of the client Logger, into every wheel call.
 - The generated client MUST leave session rows to the default session files (REQ-SAG-0005).
 - The generated client MUST read session rows only through the wheel.
+- When `<CLIENT>_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.
 
 **MUST NOT statements:**
 
@@ -32,7 +33,7 @@ Definitions: The generated client is the Python module a consumer renders from t
 
 ### Rationale
 
-The generated client does not inject a session Logger. `<CLIENT>_LOG_ROOT`, with the client name uppercased and hyphens replaced by underscores, is the test environment override for both its general log and session rows; empty or absent uses `~/.sc-agent/`.
+The generated client does not inject a session Logger.
 
 One Logger per client puts an app's records and all its decidr and sitr calls in one file, and default logs under `~/.sc-agent/` give the owner every log in one place for audit.
 
@@ -42,6 +43,7 @@ One Logger per client puts an app's records and all its decidr and sitr calls in
 
 - [ ] With nothing injected, judge-jev's generated client makes one sc-decidr call, one sitr call and one failed sitr call; all three calls' records are in `~/.sc-agent/logs/judge-jev.log.jsonl`, the session rows are in `~/.sc-agent/sessions/<repo>/judge-jev/<project>/sessions.jsonl`, and no `decidr.log.jsonl` or `sitr.log.jsonl` is written.
 - [ ] With nothing injected, plan-anchor's generated client makes one sc-decidr call and its records are in `~/.sc-agent/logs/plan-anchor.log.jsonl`.
+- [ ] A unit test sets `<CLIENT>_LOG_ROOT` to a test folder, makes one sc-decidr call, and finds the general log and session rows under that folder and nothing under `~/.sc-agent/`.
 - [ ] A scan of both rendered generated clients finds no session-log path literal.
 - [ ] A test injects its own Logger into a generated client, makes one sc-decidr call and one sitr call, and finds both calls' records in that Logger and no default general log written.
 

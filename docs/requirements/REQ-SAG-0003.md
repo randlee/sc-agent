@@ -46,7 +46,9 @@ sc-observability already rotates and prunes the general log, so sc-agent does no
 **Acceptance Criteria:**
 
 - [ ] A CLI run of decidr with nothing configured writes `~/.sc-agent/logs/decidr.log.jsonl`.
+- [ ] A CLI run of sitr with nothing configured writes `~/.sc-agent/logs/sitr.log.jsonl`.
 - [ ] A CLI run of decidr with `DECIDR_LOG_ROOT` set to `<dir>` writes `<dir>/logs/decidr.log.jsonl`.
+- [ ] A CLI run of decidr with `DECIDR_LOG_ROOT` set to `<dir>` writes its session log under `<dir>/sessions/`.
 - [ ] A CLI run of decidr with nothing configured writes its session log under `~/.sc-agent/sessions/`.
 - [ ] A Rust unit test shows a session row is written through sc-observability.
 - [ ] A Rust unit test shows a link record is written through sc-observability.
