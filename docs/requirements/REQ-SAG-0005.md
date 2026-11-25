@@ -1,7 +1,7 @@
 # Requirement: Session log rows and run links
 
 **Status:** Approved  
-**Version:** 0.8.0  
+**Version:** 0.8.1  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -29,7 +29,7 @@ Definitions: A query is one decision request sent through `send`, or one request
 
 Every query from every tool lands in the session log, so a tool references a row by `session_id` instead of copying the query or the response, and the run log records which Run each row answered because one row can answer many Runs through cache hits. The session log records what happened: a query gets its row whether or not a response arrived and whichever model answered. When the answering model differs from the requested one, the call returns `decision.model_mismatch` and its row is an error row, which is never a cache hit (REQ-SAG-0703). Busy resends of a query belong to its one row (REQ-SAG-0003, REQ-SAG-0601).
 
-The rest of what a row holds is listed in agt-j-2 deliverable J2-2. The 1 MiB limit is in ADR-SAG-0021 (Errors): a session event of at most 1 MiB is written whole, and a larger event or a failed write writes no row and returns `log.session_write`. That the session log and the run log are always on and never rotated or pruned is in ADR-SAG-0021 (Session log) and REQ-SAG-0003.
+The rest of what a row holds is in ADR-SAG-0021 (Session log). The 1 MiB limit is in ADR-SAG-0021 (Errors): a session event of at most 1 MiB is written whole, and a larger event or a failed write writes no row and returns `log.session_write`. That the session log and the run log are always on and never rotated or pruned is in ADR-SAG-0021 (Session log) and REQ-SAG-0003.
 
 ### Success Criteria
 
