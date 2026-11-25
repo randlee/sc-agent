@@ -1,7 +1,7 @@
 # Requirement: Result cache: a repeated request returns the existing session's result without a model call
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -23,7 +23,10 @@ Definitions: A query is one decision request sent through `send`, or one request
 - `sc_agent.Run` MUST accept an optional cache policy, `cache`, that overrides the configured flag for that Run.
 - `run.send` and `run.send_batch` MUST accept an optional per-call `cache` argument.
 - A call's `cache` MUST override the Run's cache policy for that call only, and for every job of that call.
+- The cache key MUST be the request hash together with the requested model, which is the resolved model's fixed id; a query's model MUST stay in its session row and its cache lookup, and in its request text whenever the provider's wire carries `model`.
 - Before each model call whose cache flag is on, sc-agent MUST look for a matching row in the query's session log.
+- When the query's session log cannot be read, the lookup MUST return the error value `session.unreadable` (REQ-SAG-0022) and the query MUST NOT be sent.
+- A cache hit's result MUST carry `attempts: 0`.
 - On a cache hit, sc-agent MUST return the most recent matching row's result with `cached: true`.
 - On a cache hit, the returned `session_id` MUST be the most recent matching row's `session_id`.
 - On a cache hit, sc-agent MUST append a link record with the Run's `run_id`, the returned `session_id` and `cached: true` to the run log (REQ-SAG-0005).
@@ -47,6 +50,8 @@ Tools resend the same request often, for example when only items 2 and 5 of a 10
 
 Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: result cache, a flag, default on; before each model call, if the sha256 of the full text sent to Jev and the model already have a session row, that row's result is returned and no API call is made; it applies per item for batches and streamed input. Round 3: a cache hit still writes a link record with `cached: true`, but no session row.
 
+Owner ruling 2026-11-24, Rand Lee: "cache keys require model."
+
 Lead ruling (2026-11-24, round 3), recorded in the same design doc: a cache hit returns the most recent successful matching row; error rows are never hits.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one cache policy per call, on the Run or overridden per call; a caller needing both sends two batches; caching still checks each item individually.
@@ -63,6 +68,9 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one 
 - [ ] A Run created with `cache=False` sends a request that has a matching row; a call through it with `cache=True` returns the hit.
 - [ ] With the configuration key `cache` set to `false`, a request that has a matching row makes a model call.
 - [ ] A matching row in another project's session log is not a cache hit.
+- [ ] Two queries with the same request text to the two decider rows (2b and 4b) are two different cache keys, and each key holds that row's fixed id even though the decider's request body carries no `model`.
+- [ ] With the query's session log unreadable, a send with cache on returns `session.unreadable` and makes no model call.
+- [ ] A cache hit's result carries `attempts: 0`.
 - [ ] When the only row with the same request hash and requested model is an error row, a send with cache on makes a model call and writes a new row.
 - [ ] With two successful matching rows, a cache hit returns the result and `session_id` of the one with the later `session_id`.
 - [ ] A cache hit through a Run with `run_id` R adds one link record `{run_id: R, session_id: <matching row's>, cached: true}` to the run log and no session row.

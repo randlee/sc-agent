@@ -1,7 +1,7 @@
 # Requirement: Configuration environment variable names
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -36,6 +36,8 @@ A per-CLI prefix keeps an override meant for one CLI from changing another. The 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a local endpoint's model id moved from `laya.model` to the model entry `models.laya.id` (REQ-SAG-0019), so the example names the new key path.
+
+Owner ruling 2026-11-24 (supersedes the optional or configured local model id above): laya and decider have fixed model ids in the model table, like every other model. laya's row id is `laya:en`; decider has one fixed-id row per server (2b, 4b), and selecting `decider` resolves to its latest row, as for `haiku`. Whether a request body carries `model` is a property of the provider's wire, not of the model id. Cache keys always use the resolved fixed id.
 
 ### Success Criteria
 

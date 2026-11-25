@@ -1,7 +1,7 @@
 # Requirement: Configuration file locations and lookup order
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -32,6 +32,7 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
 - `sc-agent.json` MUST accept the shared defaults for `project`, `workers`, `cache`, `models` and the optional local endpoints `laya` and `decider`; a CLI file may override them.
 - A local endpoint MUST be configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.
 - A model entry's `provider` MUST name a built-in provider; any other value MUST produce a typed error naming the file and key path.
+- A model entry MUST be set only in a configuration file; no flag or environment variable sets a `models.<alias>` key.
 - A model entry MUST override the built-in model row for its alias: its `provider` selects the provider and its `id` the model id.
 - `cache` MUST be a boolean with the default `true` (REQ-SAG-0703).
 - `decidr doctor` MUST report `cache`, every model entry and every local endpoint key in the settings table.
@@ -63,6 +64,8 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): global model configuration `models.<alias> = {provider, id}` overrides the built-in table; configuration may only choose among built-in providers and set ids; laya and decider are local endpoints configured by host and port; `cache` is a configuration key (REQ-SAG-0703).
 
+Owner ruling 2026-11-24 (supersedes the optional or configured local model id above): laya and decider have fixed model ids in the model table, like every other model. laya's row id is `laya:en`; decider has one fixed-id row per server (2b, 4b), and selecting `decider` resolves to its latest row, as for `haiku`. Whether a request body carries `model` is a property of the provider's wire, not of the model id. Cache keys always use the resolved fixed id. A model entry does not supply a local model's id.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
@@ -80,7 +83,7 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): global model configuration 
 - [ ] A malformed local `decidr.json` fails the load with an error naming that file.
 - [ ] With `"models": {"luna": {"provider": "nous"}}` in the global `sc-agent.json`, `luna` resolves to the `nous` provider, and `decidr doctor` reports the row `models.luna.provider | nous | <that file>`.
 - [ ] A model entry whose `provider` is not a built-in provider fails the load with a typed error naming the file and `models.<alias>.provider`.
-- [ ] With `decider.host` and `decider.port` set and no `models.decider.id`, `decidr doctor` reports both endpoint rows and `cache | true | default`.
+- [ ] With a decider endpoint's host and port set, `decidr doctor` reports both endpoint rows and `cache | true | default`.
 
 ### Dependencies
 

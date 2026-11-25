@@ -1,7 +1,7 @@
 # Requirement: Values passed together are one Rust struct
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -40,11 +40,13 @@ A collection passed as separate parameters, tuples or keyed tables is repeated a
 
 Owner ruling 2026-11-24: any set of variables passed together up or down the call stack is a Rust struct, one type per collection, never parallel parameters, tuples, string-keyed option tables or dicts.
 
+Lead ruling 2026-11-24, pending owner confirmation: the Run's send entry points are methods of the Run (`Run::send`, `Run::batch`), not free functions taking the Run (ADR-SAG-0019 decision 14). A single value (the run's ULID, the cache policy) is not a collection and needs no newtype.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] `sc_agent::send` and `sc_agent::batch` take the Run struct and the per-call values; the logger, cancel flag, wait function and keyring lookup are fields of the Run or of its test-seam struct, not separate parameters.
+- [ ] `Run::send` and `Run::batch` are methods of the Run struct and take only the per-call values; the logger, cancel flag, wait function and keyring lookup are fields of the Run or of its test-seam struct, not separate parameters.
 - [ ] Key resolution takes one struct holding the environment snapshot, the repository root and the keyring lookup; model resolution returns one struct holding the provider and the model id; configuration loading takes one struct holding the local folder, the global folder, the environment snapshot and the project; repository discovery returns one struct holding the root and the identity.
 - [ ] The PyO3 layer has no function that looks up an option by name, and no `PyCapsule`.
 - [ ] QA reports a new parallel parameter list, collection tuple or string-keyed option table in a sprint's diff as a blocking finding.

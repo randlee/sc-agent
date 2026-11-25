@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -50,9 +50,11 @@ Definitions:
 - An intentional resend is a send of a request identical to one already sent, made on purpose: a repeat, a stability or variance check, or a near-threshold re-ask.
 - The run log and its link records are defined in REQ-SAG-0005.
 - A provider key is the credential name of a provider in the Rust provider table, as the provider-key export returns it.
-- The secret redaction is the consumer template's code that replaces the environment value of each provider key with a placeholder before text is logged, written or shown. Provider keys read from the `.env` file or the keyring stay in Rust, which redacts them from its own error text.
+- The secret redaction is the consumer template's code that replaces the environment value of each provider key, and every `Bearer <token>`, with the placeholder `[redacted]` before text is logged, written or shown. Provider keys read from the `.env` file or the keyring stay in Rust, which redacts them from its own error text.
 - A copy is defined in NFR-SAG-0004.
 - A tool is a consumer whose module is rendered from the consumer template.
+- A fixture run is a run whose answers come from a fixture file given on the command line instead of from sends.
+- The consent gate is the template's check of the consumer's remote-judge consent before a send.
 - The loopback provider stub is a test HTTP server on the loopback interface that answers as a provider.
 
 **MUST statements:**
@@ -77,7 +79,7 @@ Definitions:
 - The wheel README MUST name the consumer template.
 - The wheel README MUST give the consumer template's render command.
 - The consumer module MUST create one Run per run, before the run's first decision call, and close it after the run's last decision call.
-- Every result line of a run MUST carry that Run's `run_id`.
+- Every result line of a run MUST carry that Run's `run_id`, or null when the Run failed creation.
 - The consumer template MUST write every result line with the schema tag `jev-batch-result/2`.
 - A result line MUST carry the generic result fields.
 - A result line's `session_id` MUST be the `session_id` its send returned, or null when the send returned none.
@@ -94,6 +96,7 @@ Definitions:
 - Every tool MUST complete a decision call with `--model luna` when `TYPESAFE_API_KEY` is absent and the provider key of a provider that serves `luna` is present.
 - The secret redaction MUST cover the value of every provider key.
 - The secret redaction MUST get the provider keys by calling the provider-key export.
+- The consent gate MUST ask for consent only when the resolved model value's provider is the wheel's TypeSafe provider constant (`sc_agent.TYPESAFE`); a refused consent MUST send nothing.
 
 **MUST NOT statements:**
 
@@ -113,6 +116,8 @@ Definitions:
 - A dry run MUST NOT write a run record or a tool record.
 - A dry run MUST NOT write a link record.
 - A dry run MUST NOT create a Run.
+- A fixture run MUST NOT create a Run.
+- A fixture run MUST NOT write a result line, a session row or a link record.
 - A tool MUST NOT require `TYPESAFE_API_KEY` for a `haiku` or `luna` decision call.
 - A test of this requirement MUST NOT use a real provider key, read the platform keyring or set `HOME`.
 
@@ -134,6 +139,10 @@ Owner rulings (2026-11-24, round 3), Rand Lee, recorded in the same design doc: 
 
 Owner rulings 2026-11-24 (plan review, ADR-SAG-0003): no copying, every piece of logic or data has one owner and the consumer calls it (NFR-SAG-0004). A run is a context object, `sc_agent.Run`, created once per command and closed when its calls are done; creating it mints `run_id` in Rust, and it carries the tool identity, the cache policy, the resolved configuration and the Logger, so calls through it take no `run_id`, `tool` or `tool_version`. A model selection is resolved once into a typed model value that carries the provider; there is no `provider` argument. The wheel owns ULID minting, the session-row reader and the provider-key list, which covers every provider in the Rust table. One cache policy per call; a caller needing both sends two batches.
 
+Owner ruling 2026-11-24: allow_remote_judge is consent for TypeSafe (Jev) only; haiku, luna and the local endpoints are not gated by it.
+
+Lead ruling 2026-11-24 (plan review): a fixture run answers in process and opens no Run, so it writes nothing a live run would; a Run that failed creation has no `run_id`, so its result lines carry null.
+
 Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared consumer code; `attempts` is session data, read from the session row.
 
 ### Success Criteria
@@ -149,7 +158,7 @@ Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared c
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
 - [ ] A rendered module with `sitr` false makes no `sc_agent.sitr` call.
 - [ ] A `KeyboardInterrupt` during a rendered module's batch cancels its Run, and the batch returns cancelled results.
-- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `Run`, `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`.
+- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `Run`, `Model`, `TestSeams`, `TYPESAFE`, `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command.
 - [ ] A rendered module's batch against the loopback runner writes one `jev-batch-result/2` line per query, each with exactly the generic result fields, one shared ULID `run_id` equal to the Run's `run_id`, and a `session_id` that `session_rows` finds in the session log.
 - [ ] Two runs of the same command carry different `run_id`s.
@@ -161,6 +170,10 @@ Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared c
 - [ ] With `TYPESAFE_API_KEY` unset and only `OPENAI_API_KEY` set to a dummy value, each rendered module's `--model luna` call completes against the loopback provider stub.
 - [ ] With every provider key that `provider_keys()` returns set to a distinct dummy value, a rendered module's general log, result lines, dry-run output and stdout contain none of those values.
 - [ ] A contract test shows `provider_keys()` equals the credential names of the Rust provider table, and a scan of both rendered modules finds no provider-key name, no ULID minting and no session-log path literal.
+- [ ] A rendered module's call whose model value's provider is TypeSafe asks the consent block, and a refusal sends nothing; a `haiku` call configured to a non-TypeSafe provider sends without asking.
+- [ ] A rendered module's fixture run creates no Run and adds no result line, session row or link record.
+- [ ] Result lines written through a Run that failed creation carry `run_id` null.
+- [ ] With a provider key set to a dummy value and a `Bearer <token>` in an error text, a rendered module's output shows `[redacted]` for both.
 - [ ] A result line's `project` equals the Run's resolved project/phase when the project came from configuration.
 
 ### Dependencies

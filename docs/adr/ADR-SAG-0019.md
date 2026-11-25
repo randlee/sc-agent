@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -163,9 +163,9 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 13. **A provider is an endpoint; models are rows that reference it.**
 
     - A provider is a base address, a wire and an optional credential name. The base address is a fixed remote URL or a host and port read from configuration (the local endpoints `laya` and `decider`).
-    - The model table has one row per model: short name, model id, release date and the provider it references. A local endpoint's row may have no built-in id; its id comes from configuration, and when none is set the request body carries no `model` (decider).
+    - The model table has one row per model: short name, model id, release date and the provider it references. Every row has a fixed model id, local endpoints included: laya's is `laya:en`, and decider has one fixed-id row per server (2b, 4b), so `decider` resolves to its latest row as `haiku` does. Whether a request body carries `model` is a property of the provider's wire (the decider's wire sends none), not of the model id.
     - sc-agent never branches on a provider's or a model's name. Adding a model is one row plus configuration.
-    - Configuration key `models.<alias>` with `provider` and `id` overrides the built-in row for that alias (REQ-SAG-0019). It may only name a built-in provider; it cannot add a provider, a credential or a remote address.
+    - Configuration key `models.<alias>` with `provider` and `id` overrides the built-in row for that alias (REQ-SAG-0019); it is not how a local model gets its id. It may only name a built-in provider; it cannot add a provider, a credential or a remote address.
     - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise, taking the sources of REQ-SAG-0401 in order, the first provider in table order that serves the alias and whose credential that source holds; a keyless provider always qualifies. When none qualifies, the error names every candidate's credential.
     - A model selection is resolved once, at the boundary (a CLI flag, Run creation, or a per-call override), into one typed value, `ResolvedModel { alias, id, provider }`, where `provider` references the provider constant (base address, wire, credential). That value is what flows through the send, the cache key, the session row's `model_requested` and `provider`, and the redaction; no model name and provider name pair is passed down the stack or resolved again. There is no `provider` argument or `--provider` flag: `models.<alias>.provider` in configuration and the rule above choose the provider. In Python the Run holds the default model value, and a per-call override is a model value obtained once from the Run with `run.model(selector)`, because resolution reads the Run's configuration and credential sources.
     - The haiku and luna rows include Nous: `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`.
@@ -176,11 +176,12 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - Everything that does not change between the calls of one command is resolved once, when the Run is created, and held by it: the tool identity, the cache policy, the project/phase, the configuration directory and the layered settings, the worker count, the send timeout, the repository identity, the log root and the credential sources. The Run owns the general Logger, or borrows the Logger given at creation; it flushes after each call and on exit.
     - Per call, a caller passes only what may vary between calls: the request or requests, and optionally `model`, `agent_role`, a `cache` override for that call, and `on_result` for a batch. Defaults for `model` and `agent_role` may be set on the Run.
     - `run.cancel()` cancels the Run's calls. A call after the Run is closed returns a typed error value.
-    - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a missing project/phase, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. `run.model(selector)` returns a model value or an error value.
-    - `run.send` is `run.send_batch` with one request: one code path.
+    - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. A missing project/phase is not a creation error: each call returns `project_required`. `run.model(selector)` returns a model value or an error value.
+    - In Python, the Run's keyword arguments are read through one keyword catch-all, so an argument of the wrong type or an unknown keyword (including `provider=`) is held or returned as `sc_agent_py.invalid_option` and does not raise (Lead ruling 2026-11-24, pending owner confirmation).
+    - One send path: in Rust, `Run::send` and `Run::batch` both call one private sender; in Python, `run.send` is `run.send_batch` with one request (Lead ruling 2026-11-24, pending owner confirmation).
     - There is no per-job cache: a caller that needs both policies sends two batches; each job is still looked up on its own (REQ-SAG-0703).
     - The test seams (provider base URL, the wait function and the keyring lookup) are given once, when the Run is created, as one typed value; they are not call arguments.
-    - In Rust the Run is one struct holding newtypes (`RunId`, `ToolIdentity { tool, tool_version }`, `CachePolicy`) and the resolved values above; `sc_agent::send` and `sc_agent::batch` take the Run and the per-call values, and `decidr` creates one Run per command. In Python the Run and the Logger are `#[pyclass]` types with typed fields; no capsule and no string-keyed option table crosses the boundary. The Python Run's exit flushes the Logger.
+    - In Rust the Run is one struct holding the resolved values above; the run's ULID, the tool identity and the cache policy are plain fields, since a single value needs no newtype (NFR-SAG-0005). `Run::send` and `Run::batch` are methods that take the per-call values (Lead ruling 2026-11-24, pending owner confirmation), and `decidr` creates one Run per command. In Python the Run and the Logger are `#[pyclass]` types with typed fields; no capsule and no string-keyed option table crosses the boundary. The Python Run's exit flushes the Logger.
 
 15. **One owner (NFR-SAG-0004).**
 
@@ -194,7 +195,11 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): this ADR is amended in place. Every piece of logic or data has one owner and everything else calls it. A provider is an endpoint and models are table rows that reference provider constants, with no name-string branching; laya and decider are models on configured local endpoints, and decider's model id is optional. The run is a typed context object that mints `run_id` in Rust; everything that does not vary between its calls (configuration, project, repository, log root, Logger, cancel flag, limits, test seams) is resolved once at its creation, and per call only the request, model, agent role, cache override and batch callback are passed. Values passed together are one Rust struct (NFR-SAG-0005). The wheel owns ULID minting, the session-row reader and the provider-key list. One cache policy per call, no per-job cache list. A model selection is resolved once at the boundary into one typed value that carries the provider; there is no separate `provider` argument. Session logging writes one row per query sent to a model; a cache hit writes a link record and no row.
 
-Lead ruling 2026-11-24, pending owner confirmation: the resolution order of decision 13 (configuration wins, else the first provider whose credential resolves).
+Owner ruling 2026-11-24 (supersedes the optional or configured local model id above): laya and decider have fixed model ids in the model table, like every other model. laya's row id is `laya:en`; decider has one fixed-id row per server (2b, 4b), and selecting `decider` resolves to its latest row, as for `haiku`. Whether a request body carries `model` is a property of the provider's wire, not of the model id. Cache keys always use the resolved fixed id.
+
+Lead ruling 2026-11-24, pending owner confirmation: the resolution order of decision 13 (configuration wins, else the first provider whose credential resolves). The alternative under owner review is provider-major: the first serving provider in table order that is keyless or whose credential resolves.
+
+Lead ruling 2026-11-24, pending owner confirmation: decision 14's send entry points are Run methods over one private sender, single values are plain fields rather than newtypes, and the PyO3 Run reads its keywords through a catch-all so that a bad keyword returns `sc_agent_py.invalid_option` instead of raising.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
