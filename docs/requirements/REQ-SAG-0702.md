@@ -32,6 +32,7 @@ Definitions:
 
 - A Run MUST accept an optional send timeout.
 - A Run MUST accept an optional worker count.
+- A Run's `timeout_secs` MUST replace the 120 s default send timeout for that Run.
 - When a Run has an override, every call through that Run MUST use the override in place of the configured value.
 - When a Run has no override, every call through that Run MUST use the configured value.
 - When a Run is given an invalid send timeout, it MUST return the error value `decidr.invalid_request_timeout`.
@@ -49,7 +50,7 @@ Definitions:
 
 ### Rationale
 
-Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. The selected model's context is the only size rule for a request; for haiku and luna it is known exactly, and for Jev it is an estimate. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.
+Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. The selected model's context is the only size rule for a request. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.
 
 Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order."
 
@@ -58,6 +59,7 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 **Acceptance Criteria:**
 
 - [ ] A Rust unit test builds a Run with a 10 s send timeout and checks the transport timeout is 10 s.
+- [ ] A Rust unit test builds a Run with `timeout_secs` of 30 s and checks its sends use 30 s, not 120 s.
 - [ ] A Rust unit test builds a Run with a worker count of 2 and checks the batch runs 2 workers.
 - [ ] A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run's send timeout is 10 s and its worker count is 2.
 - [ ] A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.

@@ -37,6 +37,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The consumer template MUST carry the shared consumer code.
 - The consumer module MUST contain the error mapping.
 - The consumer template MUST be tested against the sc-decidr wheel of the same release.
+- The consumer module MUST call only the public API.
 - The consumer template MUST ship in the sc-decidr wheel as package data.
 - PyPI MUST hold the sc-decidr wheel of every covered release.
 - The consumer module MUST use `sc_agent.sitr` only inside the sitr section.
@@ -52,6 +53,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 **MUST NOT statements:**
 
 - The consumer module MUST NOT contain consumer logic.
+- The consumer module MUST NOT set a provider.
 - The consumer module MUST NOT parse error message text.
 - A dry run MUST NOT write any record.
 
@@ -68,7 +70,8 @@ The owner requires every Python consumer to integrate identically, for errors, A
 - [ ] A unit test renders plan-anchor and judge-jev and finds the two modules identical outside their extension points.
 - [ ] A unit test finds each part of the shared consumer code in the consumer template.
 - [ ] A loopback test of each rendered module returns the mapped consumer code for an error's category.
-- [ ] A loopback test runs each rendered module against the wheel built from the same commit and gets a success response.
+- [ ] A loopback test runs each rendered module against the wheel built from the same commit and gets a success response with one session-log record per query.
+- [ ] A unit test scans both renders and finds only public-API references.
 - [ ] A unit test finds the consumer template in the built wheel's package data.
 - [ ] A CI run installs the released sc-decidr wheel from PyPI.
 - [ ] A unit test renders with `sitr` false and finds no `sc_agent.sitr` call.
@@ -81,6 +84,7 @@ The owner requires every Python consumer to integrate identically, for errors, A
 - [ ] A CLI run of each consumer with the TypeSafe key unset and `--model luna` completes.
 - [ ] A loopback test finds consent asked for a TypeSafe Run and not asked for a `haiku` Run.
 - [ ] A unit test finds no prompt text or result handling in the consumer template outside its extension points.
+- [ ] A unit test scans both renders and finds no provider argument.
 - [ ] A unit test scans both renders and finds no read of an error's message.
 - [ ] A unit test finds no new file or log record after a dry run.
 
