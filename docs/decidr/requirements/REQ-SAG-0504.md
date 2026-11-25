@@ -1,9 +1,9 @@
 # Requirement: Invalid batch input fails fast
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,11 +14,15 @@
 
 ### Requirement Statement
 
-Definitions: A batch is the JSONL requests passed to `decidr` in one call.
+Definitions: JSONL is newline-delimited JSON (one JSON object per line). API means application programming interface. A batch is the JSONL requests passed to `decidr` in one call. An invalid batch contains a request that does not match the Jev API request schema. The field is the field in that request that fails schema validation.
 
 **MUST statements:**
 
-- When a request in a batch does not match the Jev API request schema, `decidr` MUST stop before sending any request and return an error naming the line, the field and what was wrong.
+- For an invalid batch, `decidr` MUST stop before sending any request.
+- For an invalid batch, `decidr` MUST return an error.
+- `decidr` MUST include the line in the invalid-batch error.
+- `decidr` MUST include the field in the invalid-batch error.
+- `decidr` MUST include the reason for the schema mismatch in the invalid-batch error.
 
 ### Rationale
 
@@ -28,7 +32,7 @@ A schema error in a large batch should be reported at once with enough detail to
 
 **Acceptance Criteria:**
 
-- [ ] A 1,000-line batch whose line 412 has a `score` question without `criteria` returns an error naming line 412, `criteria` and the reason, and sends no request.
+- [ ] A unit test verifies that a 1,000-line batch whose line 412 has a `score` question without `criteria` returns an error naming line 412, `criteria` and the reason, and sends no request.
 
 ### Dependencies
 
