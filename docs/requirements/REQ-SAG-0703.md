@@ -1,7 +1,7 @@
 # Requirement: Result cache: a repeated request returns the existing session's result without a model call
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.4.1  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -52,7 +52,7 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 
 Owner ruling 2026-11-24, Rand Lee: "cache keys require model."
 
-Lead ruling (2026-11-24, round 3), recorded in the same design doc: a cache hit returns the most recent successful matching row; error rows are never hits.
+Owner ruling (2026-11-24), recorded in the same design doc: a cache hit returns the most recent successful matching row; error rows are never hits.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one cache policy per call, on the Run or overridden per call; a caller needing both sends two batches; caching still checks each item individually.
 
