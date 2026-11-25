@@ -64,7 +64,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 **MUST NOT statements:**
 
 - The consumer module MUST NOT contain consumer logic.
-- The consumer module MUST NOT set a provider.
+- The consumer module MUST NOT pass a `provider` argument to a decision call.
 - The consumer module MUST NOT parse error message text.
 - A dry run MUST NOT write any record.
 
