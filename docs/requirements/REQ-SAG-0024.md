@@ -20,6 +20,13 @@ The shared client MUST record arbitrary injected decision-tree walks as linked s
 
 Linked records support different tools and trees without duplicating session data (D3, D8, D12).
 
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] Two injected trees produce linked start, step and end records with session references.
+- [ ] Walk records contain no copied queries or answers.
+
 ### Dependencies
 
 **Related:**
