@@ -12,7 +12,10 @@ and runner-up from each run. Missing reason fields are null, not inferred.
 
 Runs are comparable only on identical text: a record whose statements differ
 between runs, or that is missing from a run, is reported with ``comparable: false``
-and does not pass. Exit 0 whenever the gate was computed (failing records
+and does not pass. A gate answer that only some runs asked (a later wave that runs
+only for some answers, such as ``joined_by`` after ``obligations`` 2+) is scored over
+the runs that asked it, carries ``asked`` (how many did), and gates only when more
+than half of the runs asked it; otherwise it is listed with ``gating: false``. Exit 0 whenever the gate was computed (failing records
 included); exit 2 with the typed error envelope when a run file cannot be used.
 
 Standard library only. Calls no Jev and needs no key.
@@ -92,14 +95,18 @@ def gate(runs: list, threshold: float) -> dict:
         answers = [gate_answers(result) for result in present]
         verdicts = [result.get("verdict") for result in present]
         kind = (present[0].get("record") or {}).get("kind")
-        texts = [{key: value[2] for key, value in found.items()} for found in answers]
-        comparable = len(present) == len(runs) and all(text == texts[0] for text in texts)
+        keys = set().union(*(set(found) for found in answers))
+        # comparable: every run present, and every answer any two runs share judged the same statement text
+        comparable = len(present) == len(runs) and all(
+            len({found[key][2] for found in answers if key in found}) == 1 for key in keys)
         low, all_answers, lowest = [], [], None
-        for key in sorted(answers[0], key=lambda k: (k[0] or 0, k[1])) if comparable else []:
-            confidences = [found[key][1] for found in answers]
+        for key in sorted(keys, key=lambda k: (k[0] or 0, k[1])) if comparable else []:
+            asking = [found for found in answers if key in found]  # a later wave may ask a key in some runs only
+            gating = len(asking) * 2 > len(runs)
+            confidences = [found[key][1] for found in asking]
             median = round(statistics.median(confidences), 4)
-            choice = Counter(found[key][0] for found in answers).most_common(1)[0][0]
-            originals = [found[key][3] for found in answers]
+            choice = Counter(found[key][0] for found in asking).most_common(1)[0][0]
+            originals = [found[key][3] for found in asking]
             criterion = next((item.get("criterion") for item in originals
                               if item.get("choice") == choice and item.get("criterion") is not None), None)
             per_run = []
@@ -111,8 +118,10 @@ def gate(runs: list, threshold: float) -> dict:
                                 if isinstance(alternative, dict) else None})
             entry = {"statement": key[0] or None, "question": key[1], "choice": choice, "criterion": criterion,
                      "median": median, "confidences": confidences, "runs": per_run,
-                     "runner_up": runner_up(originals, choice)}
+                     "runner_up": runner_up(originals, choice), "asked": len(asking), "gating": gating}
             all_answers.append(entry)
+            if not gating:
+                continue
             if lowest is None or median < lowest["median"]:
                 lowest = entry
             if median < threshold:

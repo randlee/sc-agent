@@ -336,9 +336,12 @@ class Wave(Closed):
     per: Literal["statement"] = None
     statements: NonBlank = None
     modals: Annotated[list[str], Field(min_length=1)] = None
+    only_matched: bool = None  # per-statement wave reached by a next rule: ask only the statements that rule matched
 
     @model_validator(mode="after")
     def _rules_and_per(self):
+        if self.only_matched and self.per != "statement":
+            raise ValueError("only_matched needs per statement")
         if (self.next is None) == (self.verdict_rules is None):
             raise ValueError("needs exactly one of next or verdict_rules")
         if self.per is None:
@@ -1374,14 +1377,16 @@ def wave_line(record: dict, node_id: str, node: Wave, statement=None, definition
     return line
 
 
-def wave_lines(record: dict, node_id: str, node: Wave, definitions=(), location=None) -> Result[tuple, ClientError]:
-    """The wave's request lines and their statements: one line (statements [None]), or one per statement."""
+def wave_lines(record: dict, node_id: str, node: Wave, definitions=(), location=None, matched=None) -> Result[tuple, ClientError]:
+    """The wave's request lines and their statements: one line (statements [None]), or one per statement; an
+    ``only_matched`` wave keeps the statements (1-based indexes in ``matched``) the rule that led to it matched."""
     if node.per != "statement":
         return Ok(([wave_line(record, node_id, node, None, definitions, location)], [None]))
     statements = record_statements(record, node)
     if isinstance(statements, Err):
         return statements
-    return Ok(([wave_line(record, node_id, node, s, definitions, location) for s in statements.value], statements.value))
+    kept = [s for s in statements.value if not node.only_matched or matched is None or s["index"] in matched]
+    return Ok(([wave_line(record, node_id, node, s, definitions, location) for s in kept], kept))
 
 
 def quality_settings(dry_run: bool) -> BatchSettings:
@@ -1597,7 +1602,7 @@ def walk_tree(tree: QualityTree, record: dict, settings: BatchSettings, fixture,
     request, answers and selected branch or verdict; the verdict is logged with the path."""
     import sc_agent
     node_id, path, waves = tree.start, [], []
-    verdict, decided_rank = None, None
+    verdict, decided_rank, carried_match = None, None, None
     while verdict is None:
         node = tree.nodes[node_id]
         if isinstance(node, Leaf):
@@ -1607,7 +1612,7 @@ def walk_tree(tree: QualityTree, record: dict, settings: BatchSettings, fixture,
         if node_id in path:
             return _tree_error(tree.path, f"the answers lead back to {node_id}: the tree has a cycle")
         path.append(node_id)
-        lines = wave_lines(record, node_id, node, definitions, location)
+        lines = wave_lines(record, node_id, node, definitions, location, carried_match)
         if isinstance(lines, Err):
             return lines
         lines, statements = lines.value
@@ -1648,6 +1653,7 @@ def walk_tree(tree: QualityTree, record: dict, settings: BatchSettings, fixture,
             sc_agent.log(log, {"target": LOG_TARGET, "action": action, "correlation_id": correlation_id, "fields": redact_sensitive(decidr_client.json_answers(event_fields))})
 
         waves.append(wave)
+        carried_match = {statements[i]["index"] for i in matched} if node.per == "statement" else None
         node_id = nxt
     sc_agent.log(log, {"target": LOG_TARGET, "action": "verdict", "correlation_id": None, "fields": redact_sensitive(decidr_client.json_answers({**fields, "verdict": verdict, "path": path,
                                    **({} if decided_rank is None else {"rule_rank": decided_rank})}))})

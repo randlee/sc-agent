@@ -2,7 +2,7 @@
 name: judge-jev
 description: Judge whether REQ, NFR and ADR records are well written with TypeSafe's Jev, reading them through Raptor, and fix failing records until they pass without changing what they require. Use when the user asks to check, judge, score, tune or fix requirements, NFRs or ADRs, asks whether a record is testable, vague or well written, or asks to add or test a definition for a record's term. Also use when asked whether a prompt, skill, agent, task template or code meets its REQ, NFR or ADR; that mode is not in this release, and the skill says so. Not for parsing records (Raptor does that) and not for general code review.
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
 ---
 
 # judge-jev

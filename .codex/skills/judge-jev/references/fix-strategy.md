@@ -1,6 +1,6 @@
 ---
 name: fix-strategy
-version: 0.7.0
+version: 0.8.0
 description: How to fix a REQ, NFR or ADR record that fails Jev or passes below the confidence gate - ask Jev why with the diagnostic tree, pick strategies from the table, run one proposer per strategy in parallel, measure, accept and freeze. Rules, stop conditions, commit and report format.
 ---
 
@@ -61,13 +61,13 @@ For each weak statement, take every row whose trigger matches, three at most.
 | Strategy | Trigger: gate answer weak or failing, with these `d_*` answers | The one edit |
 | --- | --- | --- |
 | `name-referent` | `term`; `d_term_where` or `d_ambiguous` = `reference`, or `d_term_fix` = `replace reference` | Replace the back-reference ("that type", "as follows", "it", "the same") with the full noun phrase or the named table. |
-| `define-term` | `term` = `project term defined nowhere` or `undefined acronym`; `d_term_fix` = `define in record` | One sentence in the record's `Definitions:` paragraph (first paragraph under `### Requirement Statement`; create it if absent), built from facts already in the record or the repository. Only the term Jev blames. Jev sees only this record. |
+| `define-term` | `term` = `no`; `d_term_kind` = `project term defined nowhere` or `undefined acronym`, or `d_term_fix` = `define in record` | One sentence in the record's `Definitions:` paragraph (first paragraph under `### Requirement Statement`; create it if absent), built from facts already in the record or the repository. Only the term Jev blames. Jev sees only this record. |
 | `plain-words` | `term`; `d_term_fix` = `plain words`, or `d_term_where` = `qualifier` | Replace the jargon or qualifier with plain words that say the same thing. A vague qualifier takes the number the code or tests use; no number in the repository means unresolved. |
-| `observable` | `check`; `d_check_kind` = `runtime` or `unclear`; `d_check_why` = `observable` or `trigger` | State what can be observed in place of an internal property: "use the base URL" becomes "each request goes to the URL ...". |
-| `inspect-target` | `check`; `d_check_kind` = `static`; `d_check_why` = `location` or `test kind` | Name the file or command to inspect and what it shows. Do not recast the statement as behaviour: that adds a condition and reads as two obligations. Never write "checked by ...". |
+| `observable` | `checkable` weak or not `yes`; `d_check_method` = `needs a measure` or `none`, or `d_check_kind` = `runtime` or `unclear`; `d_check_why` = `observable` or `trigger` | State what can be observed in place of an internal property: "use the base URL" becomes "each request goes to the URL ...". |
+| `inspect-target` | `checkable` weak or not `yes`; `d_check_kind` = `static`; `d_check_why` = `location` or `test kind` | Name the file or command to inspect and what it shows. Do not recast the statement as behaviour: that adds a condition and reads as two obligations. Never write "checked by ...". |
 | `split` | `obligations` 2+ with `and-list`; `d_obligations_why` = `list` | One statement per item, same subject and modal, every item and gloss kept. |
 | `collapse-to-term` | Same as `split`, when the items are the parts of one named thing (a call chain, a field set) | Define the thing once, listing every part, and require the thing. |
-| `one-choice` | `joined_by` = `alternatives` | Define the set and require exactly one member. |
+| `one-choice` | `joined_by` = `alternatives` (asked only of statements with `obligations` 2+) | Define the set and require exactly one member. |
 | `move-rationale` | `joined_by` = `obligation+rationale`; `d_obligations_why` = `purpose` | Move the reason to `### Rationale`. |
 | `lift-condition` | `d_obligations_why` = `condition`, `ordering` or `default` | Lead with the condition ("When ...,"), or state the default and its exception as two statements. |
 | `siblings` | Two or more near-identical statements in the record are weak on the same answer | One candidate that edits all of them the same way. Fixing one alone makes the others fail. |
@@ -92,7 +92,7 @@ Launch one `jev-fix-proposer` per statement and strategy, all in one message, wi
   "record_text": "<the record as it is now>",
   "original_text": "<the record as its author wrote it>",
   "statement": {"index": 3, "text": "<statement text>"},
-  "answers": "term=none median 0.41, nearly project term defined nowhere (0.38); check=CLI run @0.94; d_term_where=reference @0.83; d_term_fix=replace reference @0.80",
+  "answers": "term=none median 0.41, nearly project term defined nowhere (0.38); checkable=yes @0.94; d_term_where=reference @0.83; d_term_fix=replace reference @0.80",
   "blocked": ["<an edit rejected in an earlier round, with the reason>"],
   "sources": ["docs/", "src/"]
 }

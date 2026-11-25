@@ -1,6 +1,6 @@
 ---
 name: judge-jev-record-write
-version: 0.7.0
+version: 0.8.0
 format: markdown
 description: Ask a writer for N complete candidate texts of a REQ, NFR or ADR record that impose a given list of tenets, agree with the PRD clauses given and are written to pass the judge-jev quality tree. The writer never sees the old record. Render with sc-compose and a variables file; see references/write-records.md.
 required_variables:
@@ -77,10 +77,10 @@ For every MUST and MUST NOT statement:
 
 | Question | Passing choices | Failing choices |
 | --- | --- | --- |
-| `obligations`: how many independent obligations does this statement impose? | `1` | `2`, `3`, `4+` |
-| `joined_by`: what joins its obligations? | `none`, `condition+obligation` | `and-list`, `alternatives`, `obligation+rationale` |
-| `term`: what kind of term in this statement is unclear? | `none`, `project term defined in a linked record` | `project term defined nowhere`, `vague qualifier`, `undefined acronym` |
-| `check`: what would check this statement? | `unit test`, `CLI run`, `inspection or grep` | `needs a measure`, `none` |
+| `obligations`: how many independent obligations does this statement impose? | `1`, `2`, `3`, `4+` (with 2 or more, joined_by is asked) | none |
+| `term`: is every term in this statement common usage, defined in this record, or defined in a linked record? | `yes` | `no` |
+| `checkable`: can a tester decide whether this statement holds? | `yes` | `needs a measure`, `no` |
+| `joined_by`: asked only when obligations is 2 or more, what joins its obligations? | `none`, `condition+obligation` | `and-list`, `alternatives`, `obligation+rationale` |
 
 So:
 

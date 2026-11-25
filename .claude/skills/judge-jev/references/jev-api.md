@@ -1,6 +1,6 @@
 ---
 name: jev-api
-version: 0.7.0
+version: 0.8.0
 description: How jev_judge.py calls TypeSafe's Jev through sc-agent - request and response shape, validation, limits, context handling, errors and flags, model pinning, and the committed allow_remote_judge setting that gates every call.
 ---
 

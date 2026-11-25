@@ -1,6 +1,6 @@
 ---
 name: quality-workflow
-version: 0.7.0
+version: 0.8.0
 description: Judge whether REQ, NFR and ADR records are well written - the quality command, reading its verdict and answers, definitions files with compare-definition, and the offline checks validate, doctor and --dry-run.
 ---
 
@@ -19,16 +19,16 @@ uv run -q --script "$J" quality --req REQ-ABC-0001 --nfr NFR-ABC-0001 --adr ADR-
 ## 2. Read the result
 
 ```bash
-jq -r 'if .success | not then "ERROR \(.error.code): \(.error.message)" else .data.results[] | "\(.record.id) verdict=\(.verdict)", (.waves[] | . as $w | .reason[] | if has("statement") then (select($w.verdict == "no" and (.statement.index as $i | any($w.matched_statements[]; . == $i))) | "  s\(.statement.index): \(.statement.text | gsub("\\s+"; " "))", (.answers[] | "    \(.id)=\(.choice) @\(.confidence) | \(.criterion)")) else "  \(.id)=\(.choice) @\(.confidence) | \(.criterion)" end) end' <name>.json
+jq -r 'if .success | not then "ERROR \(.error.code): \(.error.message)" else .data.results[] | "\(.record.id) verdict=\(.verdict)", (.waves[] | . as $w | .reason[] | if has("statement") then (select(($w.verdict == "no" or $w.next == "no") and (.statement.index as $i | any($w.matched_statements[]; . == $i))) | "  s\(.statement.index): \(.statement.text | gsub("\\s+"; " "))", (.answers[] | "    \(.id)=\(.choice) @\(.confidence) | \(.criterion)")) else "  \(.id)=\(.choice) @\(.confidence) | \(.criterion)" end) end' <name>.json
 ```
 
-It prints each record's verdict and, for a failing REQ or NFR, every failing statement (`s<index>`) with all four answers as `question=choice @confidence | criterion`. For an ADR it prints its three answers.
+It prints each record's verdict and, for a failing REQ or NFR, every failing statement (`s<index>`) with every answer of the wave that failed it as `question=choice @confidence | criterion`. For an ADR it prints its three answers.
 
 What fails a statement (REQ, NFR):
 
-- `obligations` is 2, 3 or 4+ **and** `joined_by` is `and-list`, `alternatives` or `obligation+rationale`;
-- `term` is `project term defined nowhere`, `vague qualifier` or `undefined acronym`;
-- `check` is `needs a measure` or `none`.
+- `term` is `no`;
+- `checkable` is `needs a measure` or `no`;
+- `obligations` is 2, 3 or 4+ **and** `joined_by` is `and-list`, `alternatives` or `obligation+rationale` (`joined_by` is asked in wave-2, only of statements with 2 or more obligations).
 
 What fails an ADR: `context` is `background only` or `missing`; `alternatives` is `named only` or `none`; `consequences` is `positive only` or `missing`.
 

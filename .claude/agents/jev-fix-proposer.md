@@ -1,6 +1,6 @@
 ---
 name: jev-fix-proposer
-version: 0.7.0
+version: 0.8.0
 description: Writes one candidate edit for one weak statement of a REQ, NFR or ADR record, using the one strategy it is given and keeping the record's obligations. Read-only; never calls Jev. Launch one per statement and strategy, in parallel, with no shared context.
 model: opus
 color: green
