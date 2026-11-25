@@ -1,9 +1,9 @@
 # Requirement: Return values are not rounded
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -18,7 +18,8 @@ Definitions: A decision value is a value a decision model returns (a Jev probabi
 
 **MUST statements:**
 
-- sc-agent MUST return decision values at the precision it received or computed them, using floating-point types where values are fractional.
+- sc-agent MUST return decision values at the precision it received or computed them.
+- sc-agent MUST use floating-point types for fractional decision values.
 
 **MUST NOT statements:**
 

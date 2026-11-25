@@ -1,9 +1,9 @@
 # Decision: Requirements and decisions are Raptor records
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -22,6 +22,7 @@
 ### Context
 
 Requirements, non-functional requirements and architecture decisions are read by agents and by Raptor.
+The problem is that free-form records cannot be reliably imported into Raptor for tools to query and judge.
 
 ### Decision
 
