@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.3.0  
+**Version:** 1.3.1  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -178,7 +178,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - Per call, a caller passes only what may vary between calls: the request or requests, and optionally `agent_role`, a `cache` override for that call, and `on_result` for a batch. The model is set on the Run; a default `agent_role` may be.
     - `run.cancel()` cancels the Run's calls. A call after the Run is closed returns a typed error value.
     - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. A missing project/phase is not a creation error: each call returns `project_required`.
-    - In Python, the Run's keyword arguments are read through one keyword catch-all, so an argument of the wrong type or an unknown keyword (including `provider=`) is held or returned as `sc_agent_py.invalid_option` and does not raise (Lead ruling 2026-11-24, pending owner confirmation).
+    - In Python, the Run's keyword arguments are read through one keyword catch-all, so an argument of the wrong type or an unknown keyword (including `provider=`) is held or returned as `sc_agent_py.invalid_option` and does not raise (owner ruling 2026-11-24: PyO3 calls never raise).
     - One send path: in Rust, `Run::send` and `Run::batch` both call one private sender; in Python, `run.send` is `run.send_batch` with one request (Lead ruling 2026-11-24, pending owner confirmation).
     - There is no per-job cache: a caller that needs both policies sends two batches; each job is still looked up on its own (REQ-SAG-0703).
     - The test seams (provider base URL, the wait function and the keyring lookup) are given once, when the Run is created, as one typed value; they are not call arguments.
@@ -198,9 +198,9 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): this ADR is amended in plac
 
 Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
 
-Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." Owner ruling 2026-11-24: consumers do not hard-code model names (`sc_agent.model("haiku")` is a "red flag for inefficient/hardcoded inflexible design"); a caller runs jev or haiku or luna or laya or decider, one model per Run. Lead ruling 2026-11-24, pending owner confirmation: `decider` resolves to `decider-4b-v2.1`, the decider row listed first.
+Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." Owner ruling 2026-11-24: consumers do not hard-code model names (`sc_agent.model("haiku")` is a "red flag for inefficient/hardcoded inflexible design"); a caller runs jev or haiku or luna or laya or decider, one model per Run. Owner ruling 2026-11-24: `decider` defaults to 4b; `decider-4b-v2.1` is the decider row listed first, so `decider` resolves to it.
 
-Lead ruling 2026-11-24, pending owner confirmation: decision 14's send entry points are Run methods over one private sender, single values are plain fields rather than newtypes, and the PyO3 Run reads its keywords through a catch-all so that a bad keyword returns `sc_agent_py.invalid_option` instead of raising.
+Lead ruling 2026-11-24, pending owner confirmation: decision 14's send entry points are Run methods over one private sender, and single values are plain fields rather than newtypes. Owner ruling 2026-11-24: PyO3 calls never raise; an unknown or mistyped keyword, read through the `**rest` catch-all or an `Option<&Bound>` argument, returns `sc_agent_py.invalid_option`.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 

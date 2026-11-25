@@ -1,7 +1,7 @@
 # Requirement: Model catalog: static provider tables
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.5.1  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -47,7 +47,7 @@ Owner ruling 2026-11-24 (supersedes the optional or configured local model id an
 
 Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." A credential source read error counts as not held.
 
-Lead ruling 2026-11-24, pending owner confirmation: the two decider rows share a release date, so `decider` resolves to the row listed first, `decider-4b-v2.1`.
+Owner ruling 2026-11-24: `decider` defaults to 4b. The two decider rows share a release date, so `decider-4b-v2.1` is listed before `decider-2b-v11` and `decider` resolves to it.
 
 ### Success Criteria
 
