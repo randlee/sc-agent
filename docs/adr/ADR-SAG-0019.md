@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.7.0  
+**Version:** 1.8.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -97,7 +97,8 @@ The wheel is the one consumer boundary. Decision numbers are stable; there is no
 14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.
 
     - Everything that does not change between a command's calls is resolved once at creation and held by the Run: tool identity, cache policy, project/phase, configuration and layered settings, worker count, send timeout, repository identity, log root, credential sources and the test seams (one typed value; not call arguments). The Run owns the general Logger or borrows the one given, and flushes after each call and on exit.
-    - The model, and optionally a default `agent_role`, are set on the Run. Per call a caller passes only the request or requests and optionally `agent_role`, a `cache` override and, for a batch, `on_result`; there is no per-job cache (REQ-SAG-0703). `run.cancel()` cancels the Run's calls; a call after close returns a typed error value.
+    - The model, and optionally a default `agent_role`, are set on the Run. Per call a caller passes only the request or requests and optionally `agent_role`, a `cache` override and, for a batch, `on_result`; there is no per-job cache (REQ-SAG-0703). `run.cancel()` cancels the Run's calls; a call after close returns `decision.run_closed` (category `validation`), sends nothing and writes no session row or link record.
+    - The Run's cache policy is the configuration key `cache` unless `Run(cache=)` overrides it; a call's `cache` override applies to that call only, every job included, and each batch job is a hit or a miss on its own (REQ-SAG-0703). A cache hit returns the row's result with `cached: true`, its `session_id` and `attempts: 0`; every other send result, an error value included, carries `cached: false`.
     - Creating a Run never raises: an invalid creation value is held and returned by each call with no send, no session row and no link record; a missing project/phase is instead `config.missing_project` per call. In Python an unknown or mistyped keyword, `provider=` included, returns `sc_agent_py.invalid_option` (agt-j-1 J1-12).
     - One send path: `Run::send` and `Run::batch` call one private sender, and in Python `run.send` is `run.send_batch` with one request (agt-j-1 J1-2), and `decidr` creates one Run per command. In Rust the Run is one struct whose single values are plain fields (NFR-SAG-0005); in Python the Run and Logger are `#[pyclass]` types, with no capsule or string-keyed option table crossing the boundary (agt-j-1 J1-1, J1-12).
 

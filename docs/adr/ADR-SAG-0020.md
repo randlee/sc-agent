@@ -1,7 +1,7 @@
 # Decision: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -21,6 +21,7 @@
 - REQ-SAG-0019
 - REQ-SAG-0020
 - REQ-SAG-0021
+- NFR-SAG-0005
 
 **Architecture Decisions:**
 
@@ -69,6 +70,8 @@ A setting is looked up in nine layers, and the first layer that sets it wins:
 One exception: `models.<alias>` keys are set only in configuration files, layers 3 to 8, because each entry is a structured model row (`provider`, `id`, `released`) that a flag or a flat environment variable cannot express as one value (owner ruling 2026-11-24). No flag or environment variable sets them, and an environment variable under `DECIDR_MODELS__` fails the load with a typed error (REQ-SAG-0019, REQ-SAG-0020).
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
+
+In Rust, configuration is loaded from one value, `ConfigSources { local, global, environment, project }`, built only by `ConfigSources::new` (NFR-SAG-0005).
 
 Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152). `default.json`, `local.json` and the `SC_AGENT__` prefix are removed; nothing reads them. No migration is provided, because no release has users of the old layout.
 
