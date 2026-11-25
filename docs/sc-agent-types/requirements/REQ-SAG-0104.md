@@ -18,6 +18,7 @@ Definitions: `Cancel` is the Rust type in the `sc-agent` crate that carries one 
 
 **MUST statements:**
 
+- `sc-agent` MUST provide a `Cancel` type.
 - Cancelling a `Cancel` MUST stop an operation that holds it and runs in another crate.
 - The `sc-agent` command-line tool MUST stop a running operation when the user interrupts it.
 - The PyO3 bindings MUST let Python code stop a running operation.

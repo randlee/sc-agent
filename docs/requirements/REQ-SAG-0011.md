@@ -21,7 +21,7 @@ Definitions: `decidr` is the decision CLI, and `sc-agent-py` is the Python wheel
 - When `decidr` receives an interrupt, it MUST cancel the batch.
 - When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.
 - After an interrupt, every unfinished request MUST end with `decision.cancelled`.
-- The session log MUST hold every row of the batch when `decidr` exits or the Python call returns.
+- The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.
 - A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
 - After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.
 - `decidr` MUST exit non-zero after an interrupt.
