@@ -1,7 +1,7 @@
 # Requirement: Result cache: a repeated request returns the existing session's result without a model call
 
 **Status:** Approved  
-**Version:** 0.4.1  
+**Version:** 0.5.0  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -42,6 +42,7 @@ Definitions: A query is one decision request sent through `send`, or one request
 - The cache MUST NOT use a row from another repo, agent role or project.
 - The cache MUST NOT use the question digest of REQ-SAG-0202 as its key.
 - An error row MUST NOT be a cache hit.
+- A row written for a send that returned `decision.model_mismatch` (REQ-SAG-0801) MUST NOT be a cache hit: the requested model has no entry, so repeating the request is a cache miss.
 - `run.send_batch` MUST NOT accept a cache flag per job.
 
 ### Rationale
@@ -52,9 +53,11 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 
 Owner ruling 2026-11-24, Rand Lee: "cache keys require model."
 
+Owner ruling 2026-11-24 (cache layer), Rand Lee: "When a different model responds than expected, repeating the mistake would be a cache miss because the requested model does not have an entry."
+
 Owner ruling (2026-11-24), recorded in the same design doc: a cache hit returns the most recent successful matching row; error rows are never hits.
 
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one cache policy per call, on the Run or overridden per call; a caller needing both sends two batches; caching still checks each item individually.
+Owner ruling 2026-11-24 (plan review; recorded in ADR-SAG-0019 decision 14): no per-job cache list; one cache policy per call, on the Run or overridden per call; a caller needing both sends two batches; caching still checks each item individually.
 
 ### Success Criteria
 
@@ -73,6 +76,7 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one 
 - [ ] A cache hit's result carries `attempts: 0`.
 - [ ] When the only row with the same request hash and requested model is an error row, a send with cache on makes a model call and writes a new row.
 - [ ] With two successful matching rows, a cache hit returns the result and `session_id` of the one with the later `session_id`.
+- [ ] After a decider stub replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request, the same request sent again with cache on makes a model call.
 - [ ] A cache hit through a Run with `run_id` R adds one link record `{run_id: R, session_id: <matching row's>, cached: true}` to the run log and no session row.
 
 ### Dependencies

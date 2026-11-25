@@ -1,7 +1,7 @@
 # Requirement: Session log identity: repo, agent role, project and tool
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.5.1  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -69,7 +69,7 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): `tool` and `tool_version` a
 - [ ] A CLI call and a PyO3 call with the same `project` and `agent_role` write rows with the same values in those fields.
 - [ ] A `project` of `Phase B` is rejected with an error and no row is written.
 - [ ] A request with no `agent_role` is rejected with an error and no row is written.
-- [ ] A PyO3 `send` with no `tool`, and one with no `tool_version`, each returns an error, makes no model call and writes no row.
+- [ ] A PyO3 `send` through a Run created with an empty `tool`, and one through a Run created with an empty `tool_version`, each returns `decision.missing_tool` with category `validation`, makes no model call and writes no row.
 - [ ] Every session written by the plan-anchor generated client carries `agent_role` `plan-anchor`, and every session written by the judge-jev generated client carries `agent_role` `judge-jev`.
 - [ ] A `decidr send` row carries `tool` `decidr` and the CLI's version; a row written by the judge-jev generated client carries `tool` `judge-jev` and judge-jev's released version.
 

@@ -1,7 +1,7 @@
 # Requirement: Local decision runners come from configuration
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -30,7 +30,6 @@ Definitions: A local decision runner is a daemon on the user's machine or networ
 **MUST NOT statements:**
 
 - `sc-agent` MUST NOT hard-code the host or port of any runner.
-- A send that returns `decision.model_mismatch` MUST NOT write a session row.
 
 ### Rationale
 
@@ -44,13 +43,15 @@ Owner ruling 2026-11-24 (supersedes the optional or configured local model id an
 
 Owner ruling 2026-11-24 (configuration model rows): configuration can add rows for the local endpoints, and a local server that echoes its id (decider) must echo the resolved row's id; a mismatch is a typed error and writes no session row, so the cache never answers from it. laya already validates the requested id.
 
+Owner ruling 2026-11-24 (supersedes "writes no session row" above; logging is REQ-SAG-0005 and the cache is REQ-SAG-0703): "the software ... should work in layers. When a different model responds than expected, repeating the mistake would be a cache miss because the requested model does not have an entry. Whether you should accept/return the answer is a different question than what is logged. Session log logs what happened. It has no control over a misconfigured computer."
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A laya host and port set in configuration are used with no rebuild, and a `laya` request carries `laya:en`.
 - [ ] With both decider endpoints configured, `--model decider` resolves by the REQ-SAG-0102 rule and sends a Jev API request carrying that row's id as `model` to that row's endpoint; `--model decider-4b-v2.1` sends to the 4b endpoint; each session row's `model_requested` is the row's fixed id.
-- [ ] A decider stub that replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request makes the send return `decision.model_mismatch` with category `response_invalid` naming both ids, and no session row is written.
+- [ ] A decider stub that replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request makes the send return `decision.model_mismatch` with category `response_invalid` naming both ids.
 - [ ] A local endpoint selection whose host or port is unset returns a missing-setting error naming every layer.
 - [ ] A search of sc-agent's source (`crates/`, outside tests) finds no host or port literal for a local runner. Documentation of the owner's integration cases may name configured values.
 

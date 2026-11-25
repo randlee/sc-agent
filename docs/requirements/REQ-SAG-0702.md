@@ -1,7 +1,7 @@
 # Requirement: A Run may override the send timeout and the worker count for its own calls only
 
 **Status:** Approved  
-**Version:** 0.6.0  
+**Version:** 0.6.1  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -29,7 +29,7 @@ Definitions:
 - A bad override value MUST be returned as an error value by every call through that Run:
   - `decidr.invalid_request_timeout` for a bad timeout;
   - `decidr.invalid_workers` for a bad worker count.
-- A send that exceeds the timeout MUST be resent up to the fixed send count.
+- A send that exceeds the timeout MUST be resent up to the fixed send count of 5 sends in all, the first included (REQ-SAG-0601).
 - `run.send_batch` MUST return one result per request, each with its input position, while `on_result` receives each line as it finishes.
 
 **MUST NOT statements:**

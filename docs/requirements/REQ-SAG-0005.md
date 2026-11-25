@@ -1,7 +1,7 @@
 # Requirement: Session log JSONL layout and row content
 
 **Status:** Approved  
-**Version:** 0.7.0  
+**Version:** 0.7.1  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the fixed model id of the query's resolved model (REQ-SAG-0102). `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`. A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). `run_id` is the ULID that identifies one Run; it is minted in Rust when the Run is created. The run log is the file `runs.jsonl` in the session directory. A link record is the JSON object `{run_id, session_id, cached}` written to the run log for one query. A session sink is defined in REQ-SAG-0003.
+Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set and non-empty (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the fixed model id of the query's resolved model (REQ-SAG-0102). `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`. A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). `run_id` is the ULID that identifies one Run; it is minted in Rust when the Run is created. The run log is the file `runs.jsonl` in the session directory. A link record is the JSON object `{run_id, session_id, cached}` written to the run log for one query. A session sink is defined in REQ-SAG-0003.
 
 **MUST statements:**
 
@@ -56,6 +56,8 @@ Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set
 
 Directory separation lets tools select a repository, role or project with a path glob without opening files. Every Jev query from every tool lands in the session log, so tool records reference a row by `session_id` instead of copying the query or the response. Runs and sessions are many-to-many: one run uses many sessions, and through cache hits one session serves many runs, so the session row cannot hold the run. The run log holds the link; the link with `cached: false` names the run that created the session.
 
+Owner ruling 2026-11-24 (session log layer): "the software ... should work in layers. When a different model responds than expected, repeating the mistake would be a cache miss because the requested model does not have an entry. Whether you should accept/return the answer is a different question than what is logged. Session log logs what happened. It has no control over a misconfigured computer."
+
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): `run_id` is minted in Rust when a Run is created; consumers never mint it.
 
 Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written through sc-observability, which accepts events up to 1 MiB; the row carries the model, provider and token usage; the ULID carries the time. Round 3: the session row carries no `run_id`; `send` and `send_batch` take the caller's `run_id`, and sc-agent appends `{run_id, session_id, cached}` to `runs.jsonl` beside `sessions.jsonl`, written the same way and never rotated, on a cache miss and on a cache hit.
@@ -67,6 +69,7 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 - [ ] After a session with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b`, its rows are in a file in `<log_root>/sessions/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl`.
 - [ ] A `send_batch` of 3 requests against the loopback runner adds exactly 3 rows, each with `schema` `sc-agent-session/2`, `model_requested`, `provider`, `model_answered` and `usage`.
 - [ ] A loopback response that reports no token usage gives a row whose `usage` is null.
+- [ ] A decider stub that replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request adds one row whose `model_requested` is `decider-4b-v2.1` and whose `model_answered` is `decider-2b-v11`.
 - [ ] A request whose session event is just under 1 MiB is written whole; a request whose session event is over 1 MiB returns `log.session_write` and adds no row.
 - [ ] A cache hit (REQ-SAG-0703) adds no row.
 - [ ] A `send_batch` of 3 requests with `run_id` R against the loopback runner adds 3 link records to `runs.jsonl` in the same session directory, each with `run_id` R, its row's `session_id` and `cached: false`, and none of the 3 session rows has a `run_id` field.
