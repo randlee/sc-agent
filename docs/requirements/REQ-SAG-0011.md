@@ -14,14 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is defined in REQ-SAG-0001. A batch is the set of requests sent by one `decidr` command or one `sc-agent-py` call. An unfinished request is a request of the batch that has no result when the interrupt arrives. `decision.cancelled` is the error id given to a cancelled request.
+Definitions: `decidr` is the decision CLI, and `sc-agent-py` is the Python wheel that holds the decidr API. An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is the JSONL file `sessions.jsonl` that holds one row for each request sent to a model (REQ-SAG-0005). A batch is the set of requests sent by one `decidr` command or one `sc-agent-py` call. The Python call is the `sc-agent-py` call that sent the batch. An unfinished request is a request of the batch that has no result when the interrupt arrives. `decision.cancelled` is the error id given to a cancelled request.
 
 **MUST statements:**
 
 - When `decidr` receives an interrupt, it MUST cancel the batch.
 - When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.
 - After an interrupt, every unfinished request MUST end with `decision.cancelled`.
-- The session log MUST be flushed before `decidr` exits or the Python call returns.
+- The session log MUST hold every row of the batch when `decidr` exits or the Python call returns.
 - A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
 - After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.
 - `decidr` MUST exit non-zero after an interrupt.
