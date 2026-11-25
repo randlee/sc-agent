@@ -21,8 +21,8 @@ Definitions: an injected tree is caller-owned tree data identified by `tree_id` 
 - It MUST write one `walk.step` per visited node, with `walk_id`, zero-based `seq`, `prev_seq` (null initially), `node_id`, returned `session_id`s in statement order, `matched_rule`, `next_node` and a terminal `verdict` when present. Cached queries MUST reference the older session id actually returned.
 - It MUST write `walk.end` with `walk_id`, the terminal verdict, rule rank and visited-node path. Failure/cancellation MUST end with its error code and the completed path; a failed callback MUST NOT fabricate a successful verdict.
 - All three records MUST use the Run's common header and Logger. A tool-specific record MUST link the walk to the tool's judged item; the shared record MUST NOT contain a tool item id.
-- Rust MUST mint walk ids; Python MUST NOT implement ULID generation. Fields passed across the wheel boundary MUST use named Rust types and typed pyclasses.
-- Tool records MUST reference sessions; they MUST NOT duplicate requests, answers or attempts. Dry runs MUST write no walk event. Existing tree decision semantics MUST remain owned by the consumer callback.
+- Rust MUST mint walk ids; Python MUST NOT implement ULID generation. Collections of fields passed across the wheel boundary MUST use named Rust types and typed pyclasses; a single walk id MUST remain a ULID in Rust and a string in Python, without a newtype.
+- Tool records MUST reference sessions; they MUST NOT duplicate requests, answers or attempts. Offline fixture replay and dry runs MUST create no Run and write no walk event. Existing tree decision semantics MUST remain owned by the consumer callback.
 - Invalid walk definitions or callback results MUST return `audit.invalid_walk`, category `validation`, naming the invalid node or field, with action to correct the injected tree/callback. Log failures MUST preserve the original log error.
 
 ### Rationale
