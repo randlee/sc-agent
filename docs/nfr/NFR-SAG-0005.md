@@ -1,7 +1,7 @@
 # Requirement: Values passed together are one Rust struct
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -16,7 +16,7 @@
 
 Definitions:
 
-- A collection is two or more values that are passed together through two or more functions, as parameters or as a returned value. A free-form value is not a collection: the request text (REQ-SAG-0703), a session row (REQ-SAG-0005), a returned result value, or a general-log event's caller fields.
+- A collection is two or more values that are passed together through two or more functions, as parameters or as a returned value. A free-form value is not a collection: the request text (REQ-SAG-0703), a session row (REQ-SAG-0005), a wheel function's result value (`{ok, value}` or `{ok: false, error}`), or a general-log event's caller fields (the `fields` a caller passes to `log`).
 - The sc-agent workspace is sc-agent's Rust crates, the sc-decidr wheel and the wheel's Python surface; consumer code, including generated consumer clients and the tools that use them, is not part of it.
 
 **MUST statements:**
@@ -32,8 +32,8 @@ A collection passed as separate parameters, tuples or keyed tables is repeated a
 
 **Acceptance Criteria:**
 
-- [ ] `git grep -n PyCapsule crates/sc-agent-py/src` prints nothing. Today it prints `lib.rs:3`, `lib.rs:73` and `lib.rs:91`, because the PyO3 layer is still pre-phase-j.
-- [ ] No function in crates/sc-agent/src returns a tuple or takes a parallel parameter list: planned in agt-j-1 deliverable J1-3.
+- [ ] `git grep -n PyCapsule crates/sc-agent-py/src` prints nothing: planned in agt-j-1 deliverable J1-12.
+- [ ] No function in crates/sc-agent/src returns a tuple or takes a collection as separate parameters: planned in agt-j-1 deliverable J1-3.
 - [ ] The Python `Run`, `Model`, `Logger` and `TestSeams` are `#[pyclass]` types: planned in agt-j-1 deliverable J1-12.
 
 ### Dependencies
