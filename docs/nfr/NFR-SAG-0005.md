@@ -40,7 +40,7 @@ A collection passed as separate parameters, tuples or keyed tables is repeated a
 
 Owner ruling 2026-11-24: any set of variables passed together up or down the call stack is a Rust struct, one type per collection, never parallel parameters, tuples, string-keyed option tables or dicts.
 
-Lead ruling 2026-11-24, pending owner confirmation: the Run's send entry points are methods of the Run (`Run::send`, `Run::batch`), not free functions taking the Run (ADR-SAG-0019 decision 14). A single value (the run's ULID, the cache policy) is not a collection and needs no newtype.
+Owner ruling 2026-11-24: calls go through the Run (`run.send` / `run.send_batch`): the Run's send entry points are methods of the Run (`Run::send`, `Run::batch`), not free functions taking the Run (ADR-SAG-0019 decision 14). Lead ruling 2026-11-24: a single value (the run's ULID, the cache policy) is not a collection and needs no newtype.
 
 ### Success Criteria
 
