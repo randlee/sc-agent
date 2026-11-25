@@ -25,7 +25,7 @@ Definitions:
 - The Run is the wheel's `sc_agent.Run` context object (ADR-SAG-0019 decision 14). It is created with the tool identity, the cache policy and the values that do not change between calls; creating it mints the run's ULID `run_id` in Rust, readable as `run.run_id`; it has `send`, `send_batch` and `cancel`, and closing it flushes its Logger.
 - The session-row reader is the wheel's `sc_agent.session_rows`, which returns session rows by `session_id` (REQ-SAG-0022).
 - The provider-key export is the wheel's `sc_agent.provider_keys()`, which returns the credential name of every provider in the Rust provider table.
-- The public API is `Run`, `Model`, `TYPESAFE`, `TestSeams` (for tests), `session_rows`, `provider_keys`, `digest`, `logger`, `log` and `flush`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section.
+- The public API is `Run`, `Model`, `TYPESAFE`, `TestSeams` (for tests), `session_rows`, `provider_keys`, `digest`, `logger`, `log` and `flush`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section. Phase-k additions are the Run methods `header`, `log_record`, `walk_id` and `finish`, and the native audit collection types `AuditHeader`, `RunOutcome`, `WalkDefinition`, `MatchedRule`, `WalkStep`, `ApplicationRecord`, `NoulAnswer`, `ChoiceAnswer`, `ScoreAnswer` and `BoxAnswer` (REQ-SAG-0023/0024); single ids remain strings.
 - The session tags are the Run's `project` and each decision call's `agent_role`. They tag each session-log record with the consumer's repository and the calling agent's role.
 - The session log is the wheel's record of every query and response, written to the wheel's default location.
 - The logging wiring is the consumer module's code that obtains one Logger with `logger(client name)`, or takes the consumer's own Logger, and gives it to every Run and every sitr call.
@@ -99,7 +99,7 @@ Definitions:
 - The consent gate MUST ask for consent only when the resolved model value's provider is the wheel's TypeSafe provider constant (`sc_agent.TYPESAFE`); a refused consent MUST send nothing.
 
 
-- Every application record written to a general log MUST carry `schema`, `tool`, `tool_version`, `run_id`, `project` and `agent_role` from its Run. Records tied to one query MUST carry that query's `session_id`; non-query records omit it. A batch result that failed before a session exists retains the existing nullable `session_id` field of `jev-batch-result/2`.
+- Every application record written to a general log MUST carry `schema`, `tool`, `tool_version`, `run_id`, `project` and `agent_role` from its Run. The project may be null when the Run has no configured project (the call returns `config.missing_project` through `project_required()`); failed Run creation writes no lifecycle record. Records tied to one query MUST carry that query's `session_id`; non-query records omit it. A batch result that failed before a session exists retains the existing nullable `session_id` field of `jev-batch-result/2`.
 - The Rust Run MUST own construction of that header; the generated client MUST obtain it through the wheel. Tool-specific payloads stay in tool records, with no second copy of request, answers, attempts, sends or model response (NFR-SAG-0004).
 - `jev-batch-result/2` MUST remain the batch-result tag; there is no second batch schema bump in phase k.
 - One shared `log_result_line` in the generated client MUST write generic batch-result events for both tools. compare, drift and plan-anchor run summaries MUST use the same header with their own schema tags and tool-owned derived fields.
@@ -167,7 +167,7 @@ Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared c
 - [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
 - [ ] A rendered module with `sitr` false makes no `sc_agent.sitr` call.
 - [ ] A `KeyboardInterrupt` during a rendered module's batch cancels its Run, and the batch returns cancelled results.
-- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `Run`, `Model`, `TestSeams`, `TYPESAFE`, `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`.
+- [ ] Scanning both rendered modules finds only wheel references to the permitted API defined above, including its phase-k audit collection types and Run methods.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command.
 - [ ] A rendered module's batch against the loopback runner writes one `jev-batch-result/2` line per query, each with exactly the generic result fields, one shared ULID `run_id` equal to the Run's `run_id`, and a `session_id` that `session_rows` finds in the session log.
 - [ ] Two runs of the same command carry different `run_id`s.
