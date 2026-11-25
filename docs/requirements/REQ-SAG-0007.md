@@ -1,4 +1,4 @@
-# Requirement: Return values are not rounded
+# Requirement: Preserve returned decision values
 
 **Status:** Approved  
 **Version:** 0.3.1  
@@ -8,7 +8,7 @@
 
 ---
 
-## REQ-SAG-0007: Return values are not rounded
+## REQ-SAG-0007: Preserve returned decision values
 
 **Status:** Approved  
 
@@ -23,7 +23,7 @@ Definitions: A decision value is a value a decision model returns (a Jev probabi
 
 ### Rationale
 
-Rounding is the consumer's concern. A value rounded inside sc-agent loses information no consumer can recover.
+Consumers need the decision values returned by the model. Rounding or casting a value to an integer inside sc-agent can lose information no consumer can recover.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Don't round % to int."
 
