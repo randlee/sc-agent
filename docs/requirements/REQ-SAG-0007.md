@@ -14,20 +14,16 @@
 
 ### Requirement Statement
 
-Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one. A transport timing hint, such as `retry_after` in an error detail, is not a decision value; it is kept as a Duration (ADR-SAG-0019).
-
-**MUST statements:**
-
-- sc-agent MUST return each decision value unchanged from the value it received or computed.
+Definitions: A returned float is any floating-point value sc-agent returns, such as a Jev probability, confidence or score.
 
 **MUST NOT statements:**
 
-- sc-agent MUST NOT round any decision value it returns.
-- sc-agent MUST NOT cast any decision value it returns to an integer.
+- sc-agent MUST NOT round a returned float.
+- sc-agent MUST NOT convert a returned float to an integer type.
 
 ### Rationale
 
-Rounding is the consumer's concern. A value rounded inside sc-agent loses information no consumer can recover.
+This requirement stops an implementation from rounding or casting a value and so hiding information from the end user. Rounding is the consumer's concern: a value rounded inside sc-agent loses information no consumer can recover.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Don't round % to int."
 
