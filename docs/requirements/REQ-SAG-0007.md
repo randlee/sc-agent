@@ -16,6 +16,10 @@
 
 Definitions: A decision value is a value a decision model returns (a Jev probability, confidence or score) or a value sc-agent computes from one. A transport timing hint, such as `retry_after` in an error detail, is not a decision value; it is kept as a Duration (ADR-SAG-0019).
 
+**MUST statements:**
+
+- sc-agent MUST return each decision value from the model unchanged.
+
 **MUST NOT statements:**
 
 - sc-agent MUST NOT round any decision value it returns.
