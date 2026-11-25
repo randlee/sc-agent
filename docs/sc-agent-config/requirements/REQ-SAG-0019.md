@@ -40,7 +40,7 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
-- Configuration files MUST be JSON.
+- Each configuration file MUST use JSON format.
 - Each CLI MUST have a `<cli> doctor` command (`decidr doctor`).
 - `<cli> doctor` MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.
