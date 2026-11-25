@@ -1,7 +1,7 @@
 # Requirement: Session log JSONL layout and row content
 
 **Status:** Approved  
-**Version:** 0.7.1  
+**Version:** 0.7.2  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -69,7 +69,7 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 - [ ] After a session with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b`, its rows are in a file in `<log_root>/sessions/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl`.
 - [ ] A `send_batch` of 3 requests against the loopback runner adds exactly 3 rows, each with `schema` `sc-agent-session/2`, `model_requested`, `provider`, `model_answered` and `usage`.
 - [ ] A loopback response that reports no token usage gives a row whose `usage` is null.
-- [ ] A decider stub that replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request adds one row whose `model_requested` is `decider-4b-v2.1` and whose `model_answered` is `decider-2b-v11`.
+- [ ] A decider stub that replies with `"model": "decider-2b-v11"` to a `decider-4b-v2.1` request adds one row whose `model_requested` is `decider-4b-v2.1`, whose `model_answered` is `decider-2b-v11` and whose `error` is `decision.model_mismatch`.
 - [ ] A request whose session event is just under 1 MiB is written whole; a request whose session event is over 1 MiB returns `log.session_write` and adds no row.
 - [ ] A cache hit (REQ-SAG-0703) adds no row.
 - [ ] A `send_batch` of 3 requests with `run_id` R against the loopback runner adds 3 link records to `runs.jsonl` in the same session directory, each with `run_id` R, its row's `session_id` and `cached: false`, and none of the 3 session rows has a `run_id` field.

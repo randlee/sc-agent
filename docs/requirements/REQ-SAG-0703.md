@@ -1,7 +1,7 @@
 # Requirement: Result cache: a repeated request returns the existing session's result without a model call
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.5.1  
 **Created:** 2026-11-24  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -42,7 +42,7 @@ Definitions: A query is one decision request sent through `send`, or one request
 - The cache MUST NOT use a row from another repo, agent role or project.
 - The cache MUST NOT use the question digest of REQ-SAG-0202 as its key.
 - An error row MUST NOT be a cache hit.
-- A row written for a send that returned `decision.model_mismatch` (REQ-SAG-0801) MUST NOT be a cache hit: the requested model has no entry, so repeating the request is a cache miss.
+- A row written for a send that returned `decision.model_mismatch` (REQ-SAG-0801) MUST NOT be a cache hit. This holds because a session row records what happened, including the error value returned (REQ-SAG-0016), so a mismatch row is an error row; repeating the request is a cache miss.
 - `run.send_batch` MUST NOT accept a cache flag per job.
 
 ### Rationale
