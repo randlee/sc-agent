@@ -19,8 +19,8 @@ Definitions: A batch is the decision requests a caller passes in one call: one J
 **MUST statements:**
 
 - `sc-agent`'s `send_batch` MUST run the requests of one batch in parallel across workers.
-- The number of workers MUST be set by configuration.
-- When configuration does not set the number of workers, the number of workers MUST be 8.
+- The number of workers MUST be the `workers` setting.
+- When `workers` is not set, the number of workers MUST be 8.
 - Each result MUST carry the session ULID of the request it answers.
 - Each result MUST carry the input position of the request it answers.
 - On a cache hit (REQ-SAG-0703), a result MUST carry the `session_id` of the existing session row that holds its result.
