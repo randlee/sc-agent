@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are written in Rust through sc-observability to the default session files (ADR-SAG-0021, REQ-SAG-0003). The default session files are the JSONL files under `~/.sc-agent/sessions/`. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives. A Python callable is any Python object that can be called, such as a function, method, lambda or object with `__call__`.
+Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are written in Rust through sc-observability to the default session files (ADR-SAG-0021, REQ-SAG-0003). The default session files are the JSONL files under `~/.sc-agent/sessions/`. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives. A Python callable is any Python object that can be called, such as a function, method, lambda or object with `__call__`. To forward a log record to a destination means sc-agent passes that record to the destination.
 
 **MUST statements:**
 
