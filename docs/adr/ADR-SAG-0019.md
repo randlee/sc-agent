@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.3.1  
+**Version:** 1.5.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`. Amended 2026-11-24 (decisions 1, 13, 14 and 15): REQ-SAG-0005 and REQ-SAG-0703 (session rows, run log and result cache), REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0801 and REQ-SAG-0019 (providers as endpoints, model rows and model configuration), REQ-SAG-0022 (the session-row reader) and NFR-SAG-0004 (one owner). ADR-SAG-0021 sets the log paths and the session sink.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`. Amended 2026-11-24 (decisions 1, 13, 14 and 15): REQ-SAG-0005 and REQ-SAG-0703 (session rows, run log and result cache), REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0801 and REQ-SAG-0019 (providers as endpoints, model rows and model configuration), REQ-SAG-0022 (the session-row reader) and NFR-SAG-0004 (one owner). ADR-SAG-0021 sets the log paths and the session sink. Amended 2026-11-24 (decisions 1 and 14, plan review round 2): the render variables, the result types inside the consumer template, the consent settings module, the complete category-to-code map, the `sc_agent.testing` module and the `config.missing_project` error id.
 
 **Requirements:**
 
@@ -84,12 +84,17 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
-   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
-   - Its variables are `client_name`, `tool_version`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are call arguments. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
+   - The template covers the decision call, model pass-through, logging wiring, cancellation, the error-to-category-to-code mapping and the CLI envelope helpers. Prompt authoring and the consumer's domain handling of results stay in the consumer.
+   - Its variables are `client_name`, `tool_version`, `sitr` (`true` or `false`), `sc_decidr_version` and `legacy_result_schemas`; model selectors are call arguments. `legacy_result_schemas` is the list of result-line schema tags, besides `jev-batch-result/1`, whose lines the module still reads; it is empty for a consumer that has none.
+   - The result types `Ok`, `Err` and `Result` and the CLI envelope helpers `ToolError`, `err`, `utf8_stdio`, `canceled_envelope` and `run_main` are defined inside `consumer.py.j2`. The wheel ships no other template for the consumer module.
+   - The remote-judge consent setting is read by the consumer's own consent settings module, which the template names through an extension point. The template contains no settings reader.
+   - The template's category-to-code map has an entry for every category of decision 6. A category outside that list maps to the consumer's generic error code, the code the map gives for `other`. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
    **The lower-level API stays the contract.** `Run` (with its `send` and `send_batch`), `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public. The generated code uses only them and the standard library.
+
+   **`sc_agent.testing` is a public test module of the wheel.** It holds `FakeRun`, a stand-in for a Run that records the arguments it was opened with and the requests sent through it and returns scripted results, and `fake_open_run(script)`, which installs a `FakeRun` for a rendered module and answers that module's `session_rows` calls from the script's rows, for consumers' tests. The generated code does not import it.
 
 2. **Typed fields: `attempts` and `category`.**
 
@@ -167,7 +172,8 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - sc-agent never branches on a provider's or a model's name. Adding a model is one row plus configuration.
     - Configuration key `models.<alias>` with `provider` and `id` overrides the built-in row for that alias (REQ-SAG-0019); it is not how a local model gets its id. It may only name a built-in provider; it cannot add a provider, a credential or a remote address.
     - The model table is sorted by release date, newest first, and a unit test verifies the order.
-    - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise the first row in table order that serves the alias and whose provider is keyless or has its credential in a source of REQ-SAG-0401. When none qualifies, the error names every candidate's credential.
+    - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise the first row in table order that serves the alias and whose provider is keyless or has its credential in a source of REQ-SAG-0401. When none qualifies and a candidate's keyring read failed, resolution returns that keyring error (a `secrets.*` id); otherwise, when none qualifies, the error names every candidate's credential.
+    - A full model id selects exactly the row with that id.
     - A model selection is resolved once, at the boundary (a CLI flag or Run creation), into one typed value, `ResolvedModel { alias, id, provider }`, where `provider` references the provider constant (base address, wire, credential). That value is what flows through the send, the cache key, the session row's `model_requested` and `provider`, and the redaction; no model name and provider name pair is passed down the stack or resolved again. There is no `provider` argument or `--provider` flag: `models.<alias>.provider` in configuration and the rule above choose the provider. In Python the Run holds its model value, readable as the property `run.model`; there is no per-call model and no selector method. A caller that needs another model opens another Run. Consumers take the selector from their caller (`--model` or configuration) and never name a model in code; fan-out across models is the caller's job (owner ruling 2026-11-24).
     - The haiku and luna rows include Nous: `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`.
 
@@ -177,7 +183,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - Everything that does not change between the calls of one command is resolved once, when the Run is created, and held by it: the tool identity, the cache policy, the project/phase, the configuration directory and the layered settings, the worker count, the send timeout, the repository identity, the log root and the credential sources. The Run owns the general Logger, or borrows the Logger given at creation; it flushes after each call and on exit.
     - Per call, a caller passes only what may vary between calls: the request or requests, and optionally `agent_role`, a `cache` override for that call, and `on_result` for a batch. The model is set on the Run; a default `agent_role` may be.
     - `run.cancel()` cancels the Run's calls. A call after the Run is closed returns a typed error value.
-    - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. A missing project/phase is not a creation error: each call returns `project_required`.
+    - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. A missing project/phase is not a creation error: each call returns `config.missing_project`.
     - In Python, the Run's keyword arguments are read through one keyword catch-all, so an argument of the wrong type or an unknown keyword (including `provider=`) is held or returned as `sc_agent_py.invalid_option` and does not raise (owner ruling 2026-11-24: PyO3 calls never raise).
     - One send path: in Rust, `Run::send` and `Run::batch` both call one private sender; in Python, `run.send` is `run.send_batch` with one request (Owner ruling 2026-11-24: calls go through the Run (`run.send` / `run.send_batch`)).
     - There is no per-job cache: a caller that needs both policies sends two batches; each job is still looked up on its own (REQ-SAG-0703).
@@ -203,6 +209,8 @@ Owner ruling 2026-11-24 (supersedes the optional or configured local model id an
 Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." Owner ruling 2026-11-24: consumers do not hard-code model names (`sc_agent.model("haiku")` is a "red flag for inefficient/hardcoded inflexible design"); a caller runs jev or haiku or luna or laya or decider, one model per Run. Owner ruling 2026-11-24: `decider` defaults to 4b; `decider-4b-v2.1` is the decider row listed first, so `decider` resolves to it.
 
 Owner ruling 2026-11-24: calls go through the Run (`run.send` / `run.send_batch`): decision 14's send entry points are Run methods over one private sender. Lead ruling 2026-11-24: single values are plain fields rather than newtypes (NFR-SAG-0005 covers collections of two or more values). Owner ruling 2026-11-24: PyO3 calls never raise; an unknown or mistyped keyword, read through the `**rest` catch-all or an `Option<&Bound>` argument, returns `sc_agent_py.invalid_option`.
+
+Lead ruling 2026-11-24 (plan review round 2): `Ok`, `Err` and `Result` move into `consumer.py.j2` instead of a sibling template; each consumer keeps its consent settings reader, so no settings template or YAML parser enters the wheel; `sc_agent.testing.FakeRun` replaces each consumer's own Run double.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
@@ -259,7 +267,7 @@ The work lands on one branch, `rewrite/v1`, and merges into `develop` in one PR.
 Deliverables beyond the code:
 
 - `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
-- The consumer template and the `sc_agent/__init__.pyi` stub.
+- The consumer template, `sc_agent/testing.py` and the `sc_agent/__init__.pyi` stub.
 - `floors.toml`.
 - The sc-decidr wheel, holding the decidr and sitr APIs, released to PyPI.
 

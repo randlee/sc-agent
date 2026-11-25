@@ -1,7 +1,7 @@
 # Requirement: Configuration file locations and lookup order
 
 **Status:** Approved  
-**Version:** 0.6.0  
+**Version:** 0.7.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -29,20 +29,31 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   8. `sc-agent.json` in the global folder;
   9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
-- `sc-agent.json` MUST accept the shared defaults for `project`, `workers`, `cache`, `model`, `models` and the optional local endpoints.
-- `model` MUST be a string selector with the built-in default `jev`; a model request with no model named MUST use it.
+- `sc-agent.json` MUST accept the shared default for `project`.
+- `sc-agent.json` MUST accept the shared default for `workers`.
+- `sc-agent.json` MUST accept the shared default for `cache`.
+- `sc-agent.json` MUST accept the shared default for `model`.
+- `sc-agent.json` MUST accept model entries under `models`.
+- `sc-agent.json` MUST accept the host and port of each local endpoint.
+- `model` MUST be a string selector with the built-in default `jev`.
+- A model request that names no model MUST use the `model` setting.
 - A local endpoint MUST be configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.
-- A model entry's `provider` MUST name a built-in provider; any other value MUST produce a typed error naming the file and key path.
+- A model entry's `provider` MUST name a built-in provider.
+- A model entry whose `provider` names no built-in provider MUST produce a typed error naming the file and key path.
 - A model entry MUST be set only in a configuration file; no flag or environment variable sets a `models.<alias>` key.
-- A model entry MUST override the built-in model row for its alias: its `provider` selects the provider and its `id` the model id.
+- A model entry's `provider` MUST select the provider for its alias.
+- A model entry's `id` MUST select the model id for its alias when its provider is not a local endpoint; a local endpoint's model keeps its fixed id.
 - `cache` MUST be a boolean with the default `true` (REQ-SAG-0703).
 - `decidr doctor` MUST report `cache`, `model`, every model entry and every local endpoint key in the settings table.
-- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings.
+- `<cli>.json` MUST accept that CLI's settings.
+- `<cli>.local.json` MUST accept that CLI's settings.
+- `<cli>.json` MUST accept the shared settings.
+- `<cli>.local.json` MUST accept the shared settings.
 - An unknown file key MUST produce a typed error naming that file and key path.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
-- Configuration files MUST be JSON.
+- Each configuration file MUST use JSON format.
 - Each CLI MUST have a `<cli> doctor` command, such as `decidr doctor`.
 - `<cli> doctor` MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.
@@ -88,6 +99,7 @@ Owner ruling 2026-11-24 (plan review): with no `--model`, the model is `jev`, an
 - [ ] With `"models": {"luna": {"provider": "nous"}}` in the global `sc-agent.json`, `luna` resolves to the `nous` provider, and `decidr doctor` reports the row `models.luna.provider | nous | <that file>`.
 - [ ] A model entry whose `provider` is not a built-in provider fails the load with a typed error naming the file and `models.<alias>.provider`.
 - [ ] With a decider endpoint's host and port set, `decidr doctor` reports both endpoint rows and `cache | true | default`.
+- [ ] With `"models": {"laya": {"id": "x"}}` in the global `sc-agent.json`, a laya request still carries `laya:en`.
 - [ ] With no `model` set in any layer, `decidr doctor` reports `model | jev | default`, and `decidr send` with no `--model` resolves `jev`; with `"model": "haiku"` in the global `sc-agent.json`, `decidr send` with no `--model` resolves `haiku`.
 
 ### Dependencies

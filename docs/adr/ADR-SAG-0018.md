@@ -1,9 +1,9 @@
 # Decision: sc-publish kit owns release surface
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-11  
-**Last Updated:** 2026-11-11  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-11  
 
@@ -24,6 +24,7 @@
 ### Context
 
 Release workflows, channel contracts, and `publish-artifacts.toml` are rendered from consumer input by [sc-publish](https://github.com/randlee/sc-publish).
+The problem is keeping the rendered release files consistent with that input and the pinned kit.
 
 ### Decision
 
@@ -47,3 +48,11 @@ Edit `release/sc-publish-consumer-input.json` and re-run `install.py` from the p
 **Negative:**
 
 - Drift between JSON and rendered TOML is a hard fail until re-install.
+
+### Alternatives Considered
+
+#### Alternative 1: Ad-hoc workflow edits
+
+**Description:** Edit release workflows directly rather than use sc-publish.
+
+**Why Rejected:** The pinned kit owns the rendered release files; direct edits can drift from its consumer input.
