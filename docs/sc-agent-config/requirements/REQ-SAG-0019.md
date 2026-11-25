@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A CLI is an sc-agent command-line program that reads configuration, such as `decidr`; `<cli>` is its program name. `sitr` reads no configuration. The shared file is `sc-agent.json`. A CLI file is `<cli>.json`; its optional override file is `<cli>.local.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, relocated to the folder named by `SC_AGENT_HOME` when that variable is nonempty. An explicit `--config-dir` (or wheel `config_dir`) takes precedence over that variable. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. A typed error is an error value (REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `laya.port`. The shared settings are the defaults for configuration-reading CLIs that `sc-agent.json` holds. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `path`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it. A local endpoint is a keyless provider whose host and port come from configuration, such as laya and decider. A model entry is the configuration object `models.<alias>`; it adds a model row named `<alias>`.
+Definitions: A CLI is an sc-agent command-line program that reads configuration, such as `decidr`; `<cli>` is its program name. `sitr` reads no configuration. The shared file is `sc-agent.json`. A CLI file is `<cli>.json`; its optional override file is `<cli>.local.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, relocated to the folder named by `SC_AGENT_HOME` when that variable is nonempty. An explicit `--config-dir` (or wheel `config_dir`) takes precedence over that variable. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. A typed error is an error value (REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `laya.port`. The shared settings are the defaults for configuration-reading CLIs that `sc-agent.json` holds. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `path`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it. A local endpoint is a keyless provider that runs a local model, such as laya and decider; its address is its host and port. A paid API is a remote model provider that requires an API key; its key is sent only to that provider's built-in base address. The failure location of a load error is the file path and the key path. A model entry is the configuration object `models.<alias>`; it adds a model row named `<alias>`.
 
 **MUST statements:**
 
@@ -29,29 +29,16 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   8. `sc-agent.json` in the global folder;
   9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
-- `sc-agent.json` MUST accept the shared setting `project`.
-- `sc-agent.json` MUST accept the shared setting `workers`.
-- `sc-agent.json` MUST accept the optional shared setting `laya`.
-- `<cli>.json` MUST accept that CLI's settings.
-- `<cli>.json` MUST accept the shared settings.
-- `<cli>.local.json` MUST accept that CLI's settings.
-- `<cli>.local.json` MUST accept the shared settings.
 - When a configuration file holds an unknown key, the load MUST fail with a typed error.
 - The `cache` setting MUST default to `true`.
 - A model entry MUST add one row to the model table.
-- A local endpoint's host MUST be settable in configuration.
-- A local endpoint's port MUST be settable in configuration.
-- `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
-- `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
+- A local endpoint's address MUST be settable in configuration.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
-- Configuration files MUST be JSON.
-- Each CLI MUST have a `<cli> doctor` command (`decidr doctor`).
-- `<cli> doctor` MUST report the settings table.
+- Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.
 - `<cli> doctor` MUST report the path of every file in the nine layers.
 - For each file in the nine layers, `<cli> doctor` MUST report whether it exists.
-- When a CLI fails to load a configuration file, its error MUST name the file.
-- When a CLI fails to load a configuration file at a key, its error MUST name the key path.
+- When a CLI fails to load a configuration file, its error MUST name the failure location.
 
 **MUST NOT statements:**
 
@@ -59,9 +46,8 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
 - While it loads configuration, a CLI MUST NOT write to any configuration file.
 - `<cli> doctor` MUST NOT send a model request.
 - `<cli> doctor` MUST NOT write a file.
-- Configuration MUST NOT change where a paid API's key is sent.
+- Configuration MUST NOT change a paid API's base address.
 - A model entry MUST NOT change a built-in row.
-- A model entry MUST NOT remove a built-in row.
 
 ### Rationale
 
