@@ -14,11 +14,34 @@
 
 ### Requirement Statement
 
-Each repository MUST have one append-only SQLite audit database in WAL mode, with typed core and tool-extension tables, JSON extension columns, and a shared schema-version toolset. judge-jev and plan-anchor MUST store their results there and render their HTML reports from that database using the existing sc-compose pattern; the general log stays JSONL.
+- Each repository MUST have one SQLite audit database.
+- The audit database MUST use WAL mode.
+- Audit records MUST remain immutable outside schema maintenance.
+- Core audit tables MUST have typed columns.
+- Tool-extension audit tables MUST have typed columns.
+- Audit tables MUST provide JSON columns for extension data.
+- A tool MUST be able to add extension tables after release.
+- The core schema MUST use major versions.
+- A tool-extension schema MUST use minor versions on its core schema's major version.
+- Tools MUST use the shared schema-version toolset.
+- judge-jev and plan-anchor MUST store their results in the audit database.
+- Reports MUST read the audit database.
+- Reports MUST render HTML using the existing sc-compose report pattern.
+- The general log MUST remain JSONL.
 
 ### Rationale
 
 One repository store supports consistent audit queries and reports across tools (D25–D30).
+
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] Each repository has one WAL-mode audit database whose audit rows resist runtime mutation.
+- [ ] Core and tool-extension tables have typed columns and JSON extension columns; tool extensions can be added after release.
+- [ ] Core-major and tool-minor versions follow the shared schema toolset.
+- [ ] Both tools store their results in the database and render HTML reports from it through sc-compose.
+- [ ] General logs remain JSONL.
 
 ### Dependencies
 

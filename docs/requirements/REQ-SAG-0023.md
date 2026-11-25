@@ -20,6 +20,13 @@ Every tool MUST log each run’s start with its model and mode, and its end with
 
 A common lifecycle makes tool runs comparable (D11).
 
+### Success Criteria
+
+**Acceptance Criteria:**
+
+- [ ] Each tool records a run start containing model and mode.
+- [ ] Each tool records a run end containing outcome, elapsed time and an error code on failure.
+
 ### Dependencies
 
 **Related:**
