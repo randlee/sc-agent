@@ -40,7 +40,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] A unit test sets a laya host and port in configuration and checks the request goes to them with no rebuild.
+- [ ] A unit test sets `laya.host` and `laya.port` in configuration and checks the request goes to them with no rebuild.
 - [ ] A unit test finds a fixed model id in the model-table row of every local decision runner model.
 - [ ] A unit test resolves `decider` to the 4b decider row.
 - [ ] A CLI run of each command that selects a decision model accepts `--model laya` and `--model decider`.
