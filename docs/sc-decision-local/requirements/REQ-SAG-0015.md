@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The request timeout bounds one request to a runner. A local runner is a local decision runner (REQ-SAG-0801), `laya` or `decider`, at the host and port from configuration. Holdoff is a wait a `Run` (ADR-SAG-0001) makes before sending a request.
+Definitions: The request timeout bounds one request to a runner. A local runner is a local decision runner (REQ-SAG-0801), `laya` or `decider`, at the host and port from configuration. Holdoff is a wait a `Run` (ADR-SAG-0001) makes before sending a request. A sleep function is `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function (REQ-SAG-0010).
 
 **MUST statements:**
 
@@ -22,7 +22,7 @@ Definitions: The request timeout bounds one request to a runner. A local runner 
 
 **MUST NOT statements:**
 
-- Holdoff MUST NOT use sleep().
+- Holdoff MUST NOT call a sleep function.
 
 ### Rationale
 
@@ -42,6 +42,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Related:**
 
+- REQ-SAG-0702
 - REQ-SAG-0801
 - REQ-SAG-0013
 - REQ-SAG-0601
