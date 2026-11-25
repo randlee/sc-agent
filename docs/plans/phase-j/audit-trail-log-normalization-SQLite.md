@@ -18,7 +18,7 @@ The work is three phases. Each is meant to be small.
 | --- | --- | --- | --- |
 | j | Fix the existing logs in place, and clean up the calling interface first so later sprints build on it | j-1 clean-up and providers (sc-agent) → j-2 session log (sc-agent) and j-3 client template (sc-agent), in parallel → j-4 plan-anchor and j-5 judge-jev, in parallel | Phase 1 below, plus what the owner added on 2026-11-24: the result cache, run links, the `Run` context, decider and Nous, config model rows |
 | k | Give every tool the same record shapes while the logs are still JSONL | planned on `integrate/phase-k` (five sprints) | Phase 2 below: run start/end events, typed answers, tree-walk records, plan-anchor result logging |
-| l | Per-repo SQLite, extension tables, importer, HTML reports | not planned yet | Phase 3 below |
+| l | Per-repo SQLite, extension tables, importer, HTML reports | planned on `integrate/phase-l` (six sprints) | Phase 3 below |
 
 Phase j is no longer "no new storage": the owner added the result cache and the run-link file (D8, D9). Everything else in phase j is Phase 1 as first written.
 
@@ -91,7 +91,7 @@ Owner decisions, 2026-11-24, from the design review and the phase-j planning ses
 
 1. **NFR-SAG-0005** ("Values passed together are one Rust struct", 3 MUST statements). The lead wrote it from D21. The owner did not ask for a record. Until the owner says otherwise it is carried in the sprint beads, not as a record.
 2. **Phase k** was planned against an earlier phase-j plan and reconciled once (to plan v6). The `Run` context it was to introduce (2.2) now arrives in j-1, so phase k keeps only the start/end events from 2.2. It needs one more reconcile against the final phase j before review.
-3. **Phase l.** The line limit for phase l (a new crate, or a budget change) is not decided. Three questions from the first draft are still open: whether the JSONL session log stays after the dual-write period; whether a purely additive core change may be a minor version; whether the importer loads all history.
+3. **Phase l** is planned on `integrate/phase-l` (six sprints), written while phase j was still changing. The line limit for phase l (a new crate, or a budget change) is not decided. Three questions from the first draft are still open: whether the JSONL session log stays after the dual-write period; whether a purely additive core change may be a minor version; whether the importer loads all history.
 4. **Releases.** Whether j, k and l ship as one release or one each is not stated; D38 says they should not wait on each other.
 
 **Lead rulings, not owner decisions.** These fill gaps the decisions leave. They belong in the sprint beads unless the owner confirms them: a cache hit returns the most recent successful matching row and an error row is never a hit; fixture (`--answers-file`) runs are treated like dry runs; the `laya.model` setting is removed; `project` may be empty in a result line when it came from configuration; the general log's `decision.result` carries `session_id` and `cached`, not the answer; an integration test whose key is absent reports "not run".
