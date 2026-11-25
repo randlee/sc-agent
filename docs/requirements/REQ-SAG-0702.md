@@ -25,6 +25,7 @@ Definitions:
 - An invalid worker count is a worker count below 1.
 - The configured send timeout is 120 s unless configuration sets another value (REQ-SAG-0015).
 - A model's context is the largest request, in tokens, that the model accepts.
+- The provider's error is the error value `decision.api_status` whose message is the provider's reply text.
 - The fixed send count is the number of sends defined in REQ-SAG-0601.
 - A batch result is the result of one request of a batch, carrying that request's input position.
 - The batch callback is the function a caller passes with a batch to receive results while the batch runs.
