@@ -24,7 +24,7 @@ Definitions:
 
 **MUST statements:**
 
-- Every shared fact MUST have exactly one owner.
+- Every shared fact MUST have a single owner.
 - Code that needs a shared fact MUST obtain it by calling its owner.
 
 **MUST NOT statements:**
