@@ -20,9 +20,9 @@ The result cache is specified by REQ-SAG-0703. Its key is the hash of the full r
 
 **MUST statements:**
 
-- For every question sent to a decision model, sc-agent MUST compute a question digest over 100% of the information sent plus that single question.
+- When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.
 - The question digest MUST be computed by sc-sha.
-- The question digest MUST be recorded with that question's response.
+- sc-agent MUST record each question digest with the decision model's response to the question the digest was computed from.
 
 **MUST NOT statements:**
 

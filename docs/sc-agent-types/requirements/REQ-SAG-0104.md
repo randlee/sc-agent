@@ -14,6 +14,8 @@
 
 ### Requirement Statement
 
+Definitions: `Cancel` is the Rust type in the `sc-agent` crate that carries one cancellation signal; code cancels it, and every operation holding it stops. An operation is a streaming call or a launch that `sc-agent` runs. A crate is a Rust package in this repository. PyO3 is the Rust library that builds the `sc_agent` Python module from Rust code; the PyO3 bindings are that module.
+
 **MUST statements:**
 
 - `sc-agent` MUST provide a `Cancel` type whose cancellation stops an operation running in another crate.

@@ -16,6 +16,7 @@
 
 Definitions:
 
+- sc-agent is this repository: its Rust crates, the sc-decidr wheel and its scripts.
 - A shared fact is a piece of logic or data that more than one program needs, such as the provider table, the provider-key list, the model table, the session-log layout or ULID minting.
 - The owner of a shared fact is the one function, constant or table that holds it.
 - A copy is a second implementation of a shared fact, or a literal list or table that repeats an owner's values. A test fixture that asserts an owner's output is not a copy.
@@ -41,10 +42,10 @@ Two consumers each rebuilt the wheel boundary and the copies diverged (ADR-SAG-0
 **Acceptance Criteria:**
 
 - [ ] A unit test in the sc-agent Rust crate asserts that each listed shared fact (provider table, provider-key list, model table, session-log layout, ULID minting) is defined by one owner.
-- [ ] A unit test asserts that the sc-decidr wheel's provider-key list, session-row reader and `run_id` minting return the Rust owners' values, so callers obtain them by calling the owner.
-- [ ] A unit test searches sc-agent, outside test fixtures, and finds no literal provider-key name, session-log path layout or ULID minting outside their owners.
-- [ ] A unit test searches the consumer template and finds no literal provider-key name, session-log path layout or ULID minting.
-- [ ] A unit test renders a consumer module from the template and finds no literal provider-key name, session-log path layout or ULID minting in it.
+- [ ] A unit test calls the sc-decidr wheel's provider-key list, session-row reader and `run_id` minting and asserts each returns the value of its owner in the sc-agent Rust crate.
+- [ ] Inspection: `rg -n` over sc-agent for the provider-key names, the session-log path layout and ULID minting, outside test fixtures, returns matches only in their owners.
+- [ ] Inspection: `rg -n` over `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.
+- [ ] Inspection: `rg -n` over a consumer module rendered from `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.
 
 ### Dependencies
 

@@ -20,9 +20,9 @@ Definitions: sc-agent is the Rust core that sends decision requests and writes s
 
 - Every session row MUST carry its identity.
 - sc-agent MUST refuse every query whose identity is not valid.
-- In a git repository, the repository part MUST be the `origin` URL written as `<host>/<owner>/<repo>`.
-- Outside a git repository, the repository part MUST be `local/<host>/<folder-name>`.
-- The project MUST be resolved as REQ-SAG-0021 states.
+- In a git repository, a query's repository MUST be written as `<host>/<owner>/<repo>` taken from the `origin` URL.
+- Outside a git repository, a query's repository MUST be `local/<host>/<folder-name>`.
+- A query's project MUST be the project that REQ-SAG-0021 resolves for it.
 - The `decidr` CLI MUST accept an agent role from its user.
 - The Python bindings of sc-agent MUST accept an agent role from their caller.
 - A generated consumer client MUST set the agent role to the client's product name.
@@ -47,6 +47,10 @@ Session logs are separated and analysed by repository, by type of work and by pr
 - [ ] CLI run: `decidr send --agent-role sanity` writes a row with agent role `sanity`.
 - [ ] Unit test `tests/contract/test_contract.py`: a Python bindings call with agent role `sanity` writes a row with that agent role.
 - [ ] Unit test of the generated plan-anchor client: its rows carry agent role `plan-anchor`.
+- [ ] Unit test `crates/sc-agent/tests/config_and_values.rs`: a `project` of `Phase B` is refused and no row is written.
+- [ ] Unit test `tests/contract/test_contract.py`: `decidr send` with no agent role is refused and no row is written.
+- [ ] Unit test `tests/contract/test_contract.py`: a CLI call and a Python bindings call with the same `project` and `agent_role` write rows with the same values in those fields.
+- [ ] Unit test of the generated judge-jev client: its rows carry agent role `judge-jev`.
 - [ ] Unit test of the generated plan-anchor client: its call signature has no agent role parameter.
 
 ### Dependencies

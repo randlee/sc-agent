@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A CLI is one of the command-line programs decidr or sitr. The general log is the diagnostic log of one entry point (ADR-SAG-0021); decidr's is `decidr.log.jsonl` and sitr's is `sitr.log.jsonl`. A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. A link record ties one run to one session (REQ-SAG-0005). A run log is the file of link records that sits beside a session log in the same directory. The retained-log policy is the rotation and retention built into sc-observability. To remove a log is to rotate, prune or delete it.
+Definitions: sc-agent is the crates and CLIs of this repository. A CLI is one of the command-line programs decidr or sitr; `<cli>` is its name in lower case and `<CLI>` in upper case. A Logger is an sc-observability logger that a caller passes to a CLI's library entry point. The general log is the diagnostic log of one entry point (ADR-SAG-0021); decidr's is `decidr.log.jsonl` and sitr's is `sitr.log.jsonl`. A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. A link record ties one run to one session (REQ-SAG-0005). A run log is the file of link records that sits beside a session log in the same directory. The retained-log policy is the rotation and retention built into sc-observability. To remove a log is to rotate, prune or delete it.
 
 **MUST statements:**
 
@@ -29,7 +29,7 @@ Definitions: A CLI is one of the command-line programs decidr or sitr. The gener
 
 **MUST NOT statements:**
 
-- sc-agent MUST NOT implement its own rotation or retention of the general log.
+- sc-agent MUST NOT contain code that removes a general log.
 - sc-agent MUST NOT remove a session log.
 - sc-agent MUST NOT remove a run log.
 - The retained-log policy MUST NOT apply to a session log.
@@ -55,13 +55,13 @@ sc-observability already rotates and prunes the general log, so sc-agent does no
 - [ ] A Rust unit test shows the general log rotates under the sc-observability retained-log policy.
 - [ ] A Rust unit test shows a session log older than the sc-observability retention age is still present after a new session.
 - [ ] A Rust unit test shows a run log older than the sc-observability retention age is still present after a new session.
-- [ ] A source search finds no rotation or retention code for the general log in any sc-agent crate.
+- [ ] Inspection of `rg -n 'rotat|prune|retention' crates/` shows no code that removes a general log.
 - [ ] A Rust unit test shows a session log is unchanged and present after decidr runs a new session.
 - [ ] A Rust unit test shows a run log's earlier lines are unchanged after decidr runs a new session.
 - [ ] A Rust unit test shows a session log past the sc-observability rotation size has no rotated copy after a new session.
 - [ ] A Rust unit test shows a run log past the sc-observability rotation size has no rotated copy after a new session.
-- [ ] A CLI run of decidr leaves no general log under `~/.sc-agent/sessions/`.
-- [ ] A CLI run of decidr leaves no session log under `~/.sc-agent/logs/`.
+- [ ] A Rust unit test runs a decidr session and finds no general log under `~/.sc-agent/sessions/`.
+- [ ] A Rust unit test runs a decidr session and finds no session log under `~/.sc-agent/logs/`.
 
 ### Dependencies
 

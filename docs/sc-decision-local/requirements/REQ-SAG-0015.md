@@ -18,7 +18,7 @@ Definitions: The request timeout bounds one request to a runner. A local runner 
 
 **MUST statements:**
 
-- A local runner MUST use the same request timeout as the remote providers: 120 seconds, or the call's `timeout_secs` (REQ-SAG-0702).
+- A local runner MUST use the request timeout that REQ-SAG-0702 sets for the remote providers.
 
 **MUST NOT statements:**
 
@@ -36,7 +36,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] A Laya request and a decider request with no `timeout_secs` each use a 120-second request timeout; with `timeout_secs` on the Run each uses that value.
+- [ ] A Rust unit test sends a Laya request and a decider request through a Run with no `timeout_secs` and checks each uses a 120-second request timeout, then through a Run with `timeout_secs` and checks each uses that value.
 
 ### Dependencies
 

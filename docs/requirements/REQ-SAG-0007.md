@@ -35,6 +35,9 @@ Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiri
 
 **Acceptance Criteria:**
 
-- [ ] A unit test passes a Jev probability of 0.123456789 through sc-agent and asserts the returned value equals 0.123456789 exactly.
-- [ ] A unit test asserts the Rust type of each fractional decision value field is `f64`.
+- [ ] Rust API: a unit test sends a request whose Jev probability is 0.123456789 to a stub server and asserts `send` returns 0.123456789 exactly.
+- [ ] CLI: a CLI run of `decidr send` against a stub server whose Jev probability is 0.123456789 prints 0.123456789 exactly in its JSON output.
+- [ ] Python bindings: a Python test calls `send` against a stub server whose Jev probability is 0.123456789 and asserts the returned value is 0.123456789 exactly.
+- [ ] Inspection: `rg -n 'f32|Decimal|i64' crates/sc-agent/src` shows no fractional decision value held in a type other than `f64`.
 - [ ] A unit test passes a Jev confidence of 0.875 through sc-agent and asserts the returned value is 0.875, not 1 or 0.88.
+- [ ] Inspection: `rg -n 'round' crates/` finds no rounding of a returned decision value.

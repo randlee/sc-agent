@@ -18,12 +18,12 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 
 **MUST statements:**
 
-- The environment variable for a CLI setting MUST be `<CLI>_` followed by the key path's keys in upper case joined by `__`, such as `DECIDR_WORKERS` for `workers` and `DECIDR_LAYA__PORT` for `laya.port`.
+- The environment variable name for a CLI setting MUST be `<CLI>_` followed by the key path joined by `__` in upper case.
 - Every CLI MUST take the project/phase from the `SC_PROJECT` environment variable.
 - When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_WORKERS`.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
 - A failed validation of an environment value MUST name the environment variable.
-- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string. For example, `DECIDR_LAYA__HOST=1` is a number, like `"host": 1` in a file, and fails the string host validation; a quoted JSON string is accepted.
+- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string.
 
 **MUST NOT statements:**
 
@@ -44,6 +44,9 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - [ ] With `SC_PROJECT=phase-d` set, `decidr doctor` reports the setting `project` with value `phase-d` and source `SC_PROJECT`.
 - [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the fixed log root as the value `log_root: "/tmp/x"`, separately from configuration settings (ADR-SAG-0021).
 - [ ] With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `"workers": 0` in the local `decidr.json` it exits with the same check's error naming that file and `workers`.
+- [ ] A unit test checks that the environment variable name for `workers` in decidr is `DECIDR_WORKERS` and for `laya.port` is `DECIDR_LAYA__PORT`.
+- [ ] A unit test sets `DECIDR_LAYA__HOST=1` and checks the load fails the string host validation, and sets `DECIDR_LAYA__HOST="h"` and checks the host is `h`.
+- [ ] A unit test sets `workers` under another CLI's prefix and checks decidr's loaded `workers` keeps its default.
 
 ### Dependencies
 

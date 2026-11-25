@@ -38,7 +38,7 @@ Definitions:
 - When a Run is given an invalid send timeout, it MUST return the error value `decidr.invalid_request_timeout`.
 - When a Run is given an invalid worker count, it MUST return the error value `decidr.invalid_workers`.
 - A request MUST fit the selected model's context.
-- When a send exceeds the send timeout, the Run MUST resend it until the fixed send count is reached.
+- When a send exceeds the send timeout, the Run MUST resend it until it has made 5 sends in all, the first included.
 - A batch MUST return one batch result per request.
 - The batch callback MUST receive each result when that result finishes.
 
@@ -64,7 +64,11 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 - [ ] A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run's send timeout is 10 s and its worker count is 2.
 - [ ] A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.
 - [ ] A Rust unit test gives a Run a negative send timeout and checks the result is the error value `decidr.invalid_request_timeout`.
+- [ ] A Rust unit test gives a Run a NaN send timeout and checks the result is the error value `decidr.invalid_request_timeout`.
 - [ ] A Rust unit test gives a Run a worker count of 0 and checks the result is the error value `decidr.invalid_workers`.
+- [ ] A Rust unit test gives a Run a worker count of -1 and checks the result is the error value `decidr.invalid_workers`.
+- [ ] A Python unit test builds `sc_agent.Run` with `timeout_secs` and `workers` and checks a batch through it uses both values.
+- [ ] A Python unit test checks that `run.send` and `run.send_batch` have no `timeout_secs` or `workers` parameter.
 - [ ] A Rust unit test sends a request larger than the selected model's context and checks the result is an error value and no send is made.
 - [ ] A Rust unit test with a loopback runner that never answers checks the result has the error id `http.network` and `attempts` equal to the fixed send count.
 - [ ] A Rust unit test sends a batch and checks it returns one result per request, each with its input position.
