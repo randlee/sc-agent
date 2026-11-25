@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: the cache flag is a setting that turns the result cache on or off. The request hash is the SHA-256 digest of the full text sc-agent sends to the model. A cache hit is a query, with the cache flag on, whose request hash and requested model match an existing session row. The cached result is the matching session row's result together with that row's session identifier. A batch is one call that sends several requests; each request is an item.
+Definitions: the cache flag is a setting that turns the result cache on or off. The request hash is the SHA-256 digest of the full text sc-agent sends to the model. A cache hit is a query, with the cache flag on, whose request hash and requested model match an existing session row. The cached result is the matching session row's result together with that row's session identifier. A session row records an error when its result is an error rather than a value. A batch is one call that sends several requests; each request is an item.
 
 **MUST statements:**
 
