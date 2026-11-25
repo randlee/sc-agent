@@ -30,7 +30,7 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 ### Decision
 
-Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static provider table and one static model table; each provider names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers open one `Run` per command and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
+Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static provider table and one static model table; each provider names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
 
 **Key Principles:**
 
@@ -43,8 +43,6 @@ Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the sam
 When every backend receives the same data, their answers are comparable by construction, and shared code stays free of provider-specific types.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): providers are endpoints and models are rows of one model table; the send methods are `Run.send` and `Run.send_batch` (ADR-SAG-0019 decision 14).
 
 Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order."
 

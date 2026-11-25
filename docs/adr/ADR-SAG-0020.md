@@ -21,7 +21,6 @@
 - REQ-SAG-0019
 - REQ-SAG-0020
 - REQ-SAG-0021
-- NFR-SAG-0005
 
 **Architecture Decisions:**
 
@@ -67,11 +66,9 @@ A setting is looked up in nine layers, and the first layer that sets it wins:
 8. the global `sc-agent.json`;
 9. the built-in default, or a typed error when the setting is required and has no default.
 
-One exception: `models.<alias>` keys are set only in configuration files, layers 3 to 8, because each entry is a structured model row (`provider`, `id`, `released`) that a flag or a flat environment variable cannot express as one value (owner ruling 2026-11-24). No flag or environment variable sets them, and an environment variable under `DECIDR_MODELS__` fails the load with a typed error (REQ-SAG-0019, REQ-SAG-0020).
+Model entries, `models.<alias>`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express, and an environment variable under `DECIDR_MODELS__` fails the load with a typed error. `<alias>` becomes the row's short name. A row's provider is one sc-agent already has, so configuration can add a model, including a local model on another computer, but cannot change where a paid API's key is sent. A local endpoint (laya and the two decider endpoints) is configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
-
-In Rust, configuration is loaded from one value, `ConfigSources { local, global, environment, project }`, built only by `ConfigSources::new` (NFR-SAG-0005).
 
 Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152). `default.json`, `local.json` and the `SC_AGENT__` prefix are removed; nothing reads them. No migration is provided, because no release has users of the old layout.
 

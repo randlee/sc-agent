@@ -14,40 +14,41 @@
 
 ### Requirement Statement
 
-Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are written in Rust through sc-agent's session sink, an sc-observability `JsonlFileSink` on the default session file (ADR-SAG-0021, REQ-SAG-0003). Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives.
+Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are written in Rust through sc-observability to the default session files (ADR-SAG-0021, REQ-SAG-0003). Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives.
 
 **MUST statements:**
 
-- The general log and session files MUST be separate; session files do not use the general Logger.
-- The Rust API MUST let its caller inject the general logger.
-- Session rows MUST be written through sc-agent's session sink to the default session files.
-- The wheel MUST return, to a Python caller that names it, a Logger built from the sc-observability crate the wheel links.
-- The wheel MUST accept a Logger it returned as the injected general logger of every decidr and sitr call.
-- When a Logger is injected, every record of its log MUST be written through that Logger.
-- When no general Logger is injected, sc-agent MUST write the general log through its default Logger.
+- sc-agent MUST write session rows to the default session files.
+- The Rust API MUST accept an injected general Logger.
+- The wheel MUST return a Logger, built from the sc-observability crate it links, to a Python caller that names the Logger.
+- Every decidr and sitr call in the wheel MUST accept, as its injected general Logger, a Logger the wheel returned.
+- When a general Logger is injected, sc-agent MUST write every general-log record of the call through that Logger.
+- When no general Logger is injected, sc-agent MUST write the general log through the default general Logger.
+- When a general Logger is injected, each sc-agent call MUST flush that Logger before it returns.
 
 **MUST NOT statements:**
 
-- The Rust API and the wheel MUST NOT accept a session Logger or a session sink from the caller.
-- When a Logger is injected, sc-agent MUST NOT build another Logger for that log.
-- sc-agent MUST NOT forward records to Python `logging` or to a Python callable.
+- sc-agent MUST NOT write session rows through the general Logger.
+- When a general Logger is injected, sc-agent MUST NOT build another general Logger.
+- sc-agent MUST NOT forward log records to Python `logging`.
+- sc-agent MUST NOT forward log records to a Python callable.
 - The wheel MUST NOT depend on the `sc-observability` Python package.
-- Library code MUST NOT close an injected Logger; each call MUST flush it.
+- sc-agent library code MUST NOT close an injected Logger.
 
 ### Rationale
 
-The entry point owns the process's one Logger (ADR-SAG-0021). The wheel already links the sc-observability crate, so it hands that crate's Logger to Python and receives the same object back: one Logger, one queue, no bridge.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): session rows and link records are written through the session sink, an sc-observability `JsonlFileSink` that never rotates or prunes; there is no internal session Logger.
+The entry point owns the process's one Logger (ADR-SAG-0021). The wheel already links the sc-observability crate, so it hands that crate's Logger to Python and receives the same object back: one Logger, one queue, no bridge. Session rows stay out of the general log so every tool's session log is the same (written in Rust through sc-observability). The caller owns an injected Logger's lifetime, so library code flushes it but never closes it.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] The `decidr` CLI with no injected Logger writes its general log to `~/.sc-agent/logs/decidr.log.jsonl` and its session rows under `~/.sc-agent/sessions/`.
-- [ ] A Rust caller that injects a general Logger with a test sink finds every general-log record of the call in that sink and no `decidr.log.jsonl` written.
-- [ ] A Python program obtains a Logger named `t` from the wheel, writes one record to it, injects it into one sc-decidr call, and finds its own record and the call's records in `~/.sc-agent/logs/t.log.jsonl`.
-- [ ] In a fresh virtual environment, `pip install sc-decidr` installs no `sc-observability` package.
+- [ ] CLI run: `decidr` with no injected Logger writes its session rows under `~/.sc-agent/sessions/`.
+- [ ] CLI run: `decidr` with no injected Logger writes its general log to `~/.sc-agent/logs/decidr.log.jsonl` and no session row in it.
+- [ ] Unit test: a Rust caller injects a general Logger with a test sink and finds every general-log record of the call in that sink, no `decidr.log.jsonl` written, and the sink flushed and still open after the call.
+- [ ] Python test: a program obtains a Logger named `t` from the wheel, writes one record, injects it into one decidr call and one sitr call, and finds its record and the calls' records in `~/.sc-agent/logs/t.log.jsonl`.
+- [ ] Python test: with a `logging` handler and no callable registered, one sc-decidr call delivers no record to Python `logging`.
+- [ ] Install check: in a fresh virtual environment, `pip install sc-decidr` installs no `sc-observability` package.
 
 ### Dependencies
 

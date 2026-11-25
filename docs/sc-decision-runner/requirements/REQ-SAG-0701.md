@@ -14,15 +14,17 @@
 
 ### Requirement Statement
 
-Definitions: A batch is the decision requests a caller passes in one call: one JSONL file, one stdin stream or one Python call. A worker sends one request at a time.
+Definitions: A batch is the decision requests a caller passes in one call: one JSONL file, one stdin stream or one Python call. A worker sends one request at a time. A session ULID (Universally Unique Lexicographically Sortable Identifier) is the `session_id` of the session row that records a request's result. Results may be returned in any order.
 
 **MUST statements:**
 
 - `sc-agent`'s `send_batch` MUST run the requests of one batch in parallel across workers.
 - The number of workers MUST be a configuration setting with a default of 8.
-- Results may be returned in any order. Each result MUST carry its session ULID and the input position of the request it answers.
+- Each result MUST carry the session ULID of the request it answers.
+- Each result MUST carry the input position of the request it answers.
 - On a cache hit (REQ-SAG-0703), a result MUST carry the `session_id` of the existing session row that holds its result.
-- A failed request MUST be returned as that request's error result while the rest of the batch continues.
+- A failed request MUST be returned as that request's error result.
+- When one request fails, the other requests of the batch MUST still run.
 - Cancelling the batch MUST stop every request that has not finished.
 
 ### Rationale
@@ -39,9 +41,10 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 - [ ] With the default of 8 workers, a batch of 40 requests sent to a test server that holds every reply until 8 requests are in flight completes, and the server never sees more than 8 requests in flight.
 - [ ] With workers set to 1, the test server never sees more than one request in flight from the same batch.
+- [ ] In a batch of 3 requests, each result carries the input position (0, 1 or 2) of the request it answers.
 - [ ] A batch in which one request fails returns that error tagged with its session ULID and returns every other result.
 - [ ] Cancelling a running batch returns cancelled results for every unfinished request.
-- [ ] A batch request that is a cache hit returns the `session_id` of the row that already holds its result, and no new row is written.
+- [ ] A batch request that is a cache hit returns the `session_id` of the row that already holds its result.
 
 ### Dependencies
 

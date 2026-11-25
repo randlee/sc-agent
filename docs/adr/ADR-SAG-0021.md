@@ -1,9 +1,9 @@
 # Decision: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
 **Status:** Approved  
-**Version:** 0.8.0  
+**Version:** 0.9.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-19  
 
@@ -57,9 +57,9 @@ There is one Python wheel. A Python process that loads sc-agent has one copy of 
 
 **Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.
 
-**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink: an sc-observability `JsonlFileSink` that sc-agent opens on the session file at the path below, with a retained-log policy that never rotates or prunes the file. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row has schema `sc-agent-session/2`, carries `provider` and `usage` (`null` when the reply reports none), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.
+**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink: an sc-observability `JsonlFileSink` that sc-agent opens on the session file at the path below, with a retained-log policy that never rotates or prunes the file. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row has schema `sc-agent-session/2`, carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. When the two models differ the call returns `decision.model_mismatch` and the row is an error row, which is never a cache hit. Callers inject no session Logger and cannot replace the session sink.
 
-**Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set and non-empty (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `session_rows` is the one reader of the session-log layout: a generated client reads session rows only through it and has no log-root argument (REQ-SAG-0022, NFR-SAG-0004).
+**Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set and non-empty (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (REQ-SAG-0022, NFR-SAG-0004).
 
 - A general log is `~/.sc-agent/logs/<name>.log.jsonl`, the path sc-observability 1.5.0 writes for a Logger of that name.
 - Session logs are `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, and each one's run log is `runs.jsonl` in the same directory. `sessions/` sits beside `logs/` and holds nothing but session logs and run logs.
@@ -79,7 +79,7 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 - `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).
 - `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it "project/phase".
 
-**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value. A session row is written as one sc-observability event of at most 1 MiB, the event wrapper included; the largest request that fits is recorded whole. When a session event is larger than 1 MiB, or the session write fails, no row is written and the call returns a `log.session_write` error. A call whose session log cannot be read returns `session.unreadable` (category `log`) and sends nothing.
+**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value. When the session write fails, no row is written and the call returns a `log.session_write` error. A call whose session log cannot be read returns `session.unreadable` (category `log`) and sends nothing.
 
 **Key Principles:**
 
@@ -91,12 +91,6 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 
 The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.
 
-Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written in Rust through sc-observability, which accepts events up to 1 MiB; the session log is never rotated or pruned.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): session rows and link records are written through the session sink, an sc-observability `JsonlFileSink` that never rotates or prunes; there is no internal session Logger. The wheel owns the session-row reader; nothing else reads the session-log layout.
-
-Owner ruling (2026-11-24, round 3), Rand Lee, recorded in the same design doc: the session row carries no `run_id`; `send` and `send_batch` take the caller's `run_id`, and sc-agent appends `{run_id, session_id, cached}` to `runs.jsonl` beside `sessions.jsonl`, written the same way and never rotated, on a cache miss and on a cache hit.
-
 ### Consequences
 
 **Positive:**
@@ -107,7 +101,6 @@ Owner ruling (2026-11-24, round 3), Rand Lee, recorded in the same design doc: t
 **Negative:**
 
 - Every caller must supply a project/phase before its first request.
-- A query whose session event exceeds 1 MiB gets no session row.
 
 ### Alternatives Considered
 

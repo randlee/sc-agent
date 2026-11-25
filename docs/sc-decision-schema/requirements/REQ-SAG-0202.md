@@ -22,8 +22,7 @@ The result cache is specified by REQ-SAG-0703. Its key is the hash of the full r
 
 - For every question sent to a decision model, sc-agent MUST compute a question digest over 100% of the information sent plus that single question.
 - The question digest MUST be computed by sc-sha.
-- The question digest MUST stay a hash of content only, with no model id added.
-- The question digest MUST be recorded with that question's response, so the response can be retrieved by its digest.
+- The question digest MUST be recorded with that question's response.
 
 **MUST NOT statements:**
 
@@ -31,16 +30,16 @@ The result cache is specified by REQ-SAG-0703. Its key is the hash of the full r
 
 ### Rationale
 
-A response must be retrievable from the exact information and question that produced it. Computing every digest with one library keeps digests from different crates and tools equal.
+Recording the digest with the response lets a response be retrieved from the exact information and question that produced it. Computing every digest with one library keeps digests from different crates and tools equal.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] Two sends of the same information and the same single question record the same question digest.
-- [ ] Changing any part of the information, or the question, changes the question digest.
-- [ ] A request with three questions records three question digests, one per question.
-- [ ] A workspace search finds SHA-256 computed only through sc-sha.
+- [ ] A unit test shows two sends of the same information and the same single question record the same question digest.
+- [ ] A unit test shows that changing any part of the information, or the question, changes the question digest.
+- [ ] A unit test shows a request with three questions records three question digests, one per question.
+- [ ] A unit test that searches the workspace sources finds SHA-256 computed only through sc-sha.
 
 ### Dependencies
 

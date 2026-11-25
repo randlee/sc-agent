@@ -3,7 +3,7 @@
 **Status:** Approved  
 **Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -16,24 +16,20 @@
 
 **MUST statements:**
 
-- `sc-agent` MUST provide the cancel flag type, `Cancel`.
-- Each Run MUST own one cancel flag, which the CLI's interrupt handler and the PyO3 `Run.cancel()` method cancel.
-
-**MUST NOT statements:**
-
-- The PyO3 bindings MUST NOT expose the cancel flag as its own Python object.
+- `sc-agent` MUST provide a `Cancel` type whose cancellation stops an operation running in another crate.
+- The `sc-agent` command-line tool MUST stop a running operation when the user interrupts it.
+- The PyO3 bindings MUST let Python code stop a running operation.
 
 ### Rationale
 
-Streaming and launches in several crates must agree on one cancellation signal.
+Streaming and launches in several crates must agree on one cancellation signal, so a cancel from the CLI or from Python reaches every crate doing the work.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): the cancel flag belongs to the Run (ADR-SAG-0019 decision 14); Python cancels through `run.cancel()`.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A cancel flag created in one crate stops an operation in another crate when cancelled.
-- [ ] `run.cancel()` in Python stops the Run's running batch, and `sc_agent` exports no `Cancel`.
+- [ ] A unit test creates a `Cancel` in one crate, cancels it, and shows an operation in another crate stops.
+- [ ] A CLI run interrupted by the user stops its running operation and exits.
+- [ ] A Python test cancels a running operation through the bindings and shows it stops.

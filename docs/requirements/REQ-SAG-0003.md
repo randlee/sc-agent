@@ -14,52 +14,52 @@
 
 ### Requirement Statement
 
-Definitions: The general log is the diagnostic log of one entry point (ADR-SAG-0021). A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. The retained-log policy is the rotation and retention built into sc-observability. A session sink is an sc-observability `JsonlFileSink` that sc-agent opens on one session log or one run log, with a policy that never rotates or prunes; there is no session Logger (ADR-SAG-0021). A run log is the `runs.jsonl` file of link records that sits beside a `sessions.jsonl` in the same directory (REQ-SAG-0005).
+Definitions: A CLI is one of the command-line programs decidr or sitr. The general log is the diagnostic log of one entry point (ADR-SAG-0021); decidr's is `decidr.log.jsonl` and sitr's is `sitr.log.jsonl`. A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. A link record ties one run to one session (REQ-SAG-0005). A run log is the file of link records that sits beside a session log in the same directory. The retained-log policy is the rotation and retention built into sc-observability. To remove a log is to rotate, prune or delete it.
 
 **MUST statements:**
 
-- With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`: `decidr.log.jsonl` for decidr, `sitr.log.jsonl` for sitr.
+- With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`.
 - When `<CLI>_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.
 - Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).
-- Session rows MUST be written in Rust through sc-observability, by a session sink.
-- A session sink MUST append to its session log file.
-- Link records MUST be written in Rust through sc-observability, by a session sink.
-- A session sink MUST append to its run log file.
-- A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+- Session rows MUST be written by the sc-observability Rust crate.
+- Link records MUST be written by the sc-observability Rust crate.
 - The general log MUST use the sc-observability retained-log policy.
 - A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+- A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.
 
 **MUST NOT statements:**
 
 - sc-agent MUST NOT implement its own rotation or retention of the general log.
-- sc-agent MUST NOT rotate, prune or delete a session log.
+- sc-agent MUST NOT remove a session log.
+- sc-agent MUST NOT remove a run log.
 - The retained-log policy MUST NOT apply to a session log.
-- A session sink MUST NOT rotate or prune a session log.
-- sc-agent MUST NOT rotate, prune or delete a run log.
 - The retained-log policy MUST NOT apply to a run log.
-- sc-agent MUST NOT offer any setting, argument or environment variable that turns the run log off.
-- A general log MUST NOT be written under `~/.sc-agent/sessions/`, and a session log MUST NOT be written under `~/.sc-agent/logs/`.
+- A general log MUST NOT be written under `~/.sc-agent/sessions/`.
+- A session log MUST NOT be written under `~/.sc-agent/logs/`.
 
 ### Rationale
 
-sc-observability already rotates and prunes the general log. Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data.
-
-Owner ruling (2026-11-24, round 3), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: `runs.jsonl` sits beside `sessions.jsonl`, in the same directory, is written the same way and is never rotated.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): rows and link records are written through session sinks, sc-observability `JsonlFileSink`s that never rotate or prune; there is no internal session Logger.
+sc-observability already rotates and prunes the general log, so sc-agent does not repeat that work. Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data. Link records are append-only and immutable, so the run log is kept the same way.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] With nothing configured, decidr writes `~/.sc-agent/logs/decidr.log.jsonl` and sitr writes `~/.sc-agent/logs/sitr.log.jsonl`, and `~/.sc-agent/logs/` holds no session log.
-- [ ] With `DECIDR_LOG_ROOT` set to `<dir>`, decidr writes `<dir>/logs/decidr.log.jsonl` and its session log under `<dir>/sessions/`.
-- [ ] The general log rotates under the sc-observability retained-log policy, and no sc-agent crate contains rotation or pruning code.
-- [ ] A Rust test shows session rows reach the session log through a session sink, with no Logger between them.
-- [ ] After a session log grows past the sc-observability rotation size, decidr's next session appends to the same `sessions.jsonl`, and no rotated copy of it exists.
-- [ ] A session log file whose modification time is older than the sc-observability retention age is still present and unchanged after decidr runs a new session.
-- [ ] After decidr runs a session, `runs.jsonl` is in the same directory as that session's `sessions.jsonl`, and a Rust test shows its link records reach it through the session sink.
-- [ ] A run log file whose modification time is older than the sc-observability retention age is still present after decidr runs a new session, with its earlier lines unchanged.
+- [ ] A CLI run of decidr with nothing configured writes `~/.sc-agent/logs/decidr.log.jsonl`.
+- [ ] A CLI run of decidr with `DECIDR_LOG_ROOT` set to `<dir>` writes `<dir>/logs/decidr.log.jsonl`.
+- [ ] A CLI run of decidr with nothing configured writes its session log under `~/.sc-agent/sessions/`.
+- [ ] A Rust unit test shows a session row is written through sc-observability.
+- [ ] A Rust unit test shows a link record is written through sc-observability.
+- [ ] A Rust unit test shows the general log rotates under the sc-observability retained-log policy.
+- [ ] A Rust unit test shows a session log older than the sc-observability retention age is still present after a new session.
+- [ ] A Rust unit test shows a run log older than the sc-observability retention age is still present after a new session.
+- [ ] A source search finds no rotation or retention code for the general log in any sc-agent crate.
+- [ ] A Rust unit test shows a session log is unchanged and present after decidr runs a new session.
+- [ ] A Rust unit test shows a run log's earlier lines are unchanged after decidr runs a new session.
+- [ ] A Rust unit test shows a session log past the sc-observability rotation size has no rotated copy after a new session.
+- [ ] A Rust unit test shows a run log past the sc-observability rotation size has no rotated copy after a new session.
+- [ ] A CLI run of decidr leaves no general log under `~/.sc-agent/sessions/`.
+- [ ] A CLI run of decidr leaves no session log under `~/.sc-agent/logs/`.
 
 ### Dependencies
 

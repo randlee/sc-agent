@@ -35,5 +35,6 @@ Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiri
 
 **Acceptance Criteria:**
 
-- [ ] A Jev probability of 0.123456789 is returned as 0.123456789 by the Rust API, the CLI and the PyO3 bindings.
-- [ ] A workspace search finds no rounding of returned decision values.
+- [ ] A unit test passes a Jev probability of 0.123456789 through sc-agent and asserts the returned value equals 0.123456789 exactly.
+- [ ] A unit test asserts the Rust type of each fractional decision value field is `f64`.
+- [ ] A unit test passes a Jev confidence of 0.875 through sc-agent and asserts the returned value is 0.875, not 1 or 0.88.

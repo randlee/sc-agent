@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The request timeout bounds one request to a runner. A local runner is a local decision runner (REQ-SAG-0801), `laya` or `decider`, at the host and port from configuration.
+Definitions: The request timeout bounds one request to a runner. A local runner is a local decision runner (REQ-SAG-0801), `laya` or `decider`, at the host and port from configuration. Holdoff is a wait a `Run` (ADR-SAG-0001) makes before sending a request.
 
 **MUST statements:**
 
@@ -31,8 +31,6 @@ Local models are slower than remote providers and loading a model can take minut
 Owner ruling (2026-11-21), Rand Lee: "Use time structs for time."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): decider is a local runner beside laya.
 
 ### Success Criteria
 

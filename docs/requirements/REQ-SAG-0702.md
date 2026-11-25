@@ -1,9 +1,9 @@
 # Requirement: A Run may override the send timeout and the worker count for its own calls only
 
 **Status:** Approved  
-**Version:** 0.6.1  
+**Version:** 0.7.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -17,51 +17,52 @@
 Definitions:
 
 - The send timeout is the deadline for one HTTP send of a decision request: connect, headers and body.
-- A Run is the wheel's and the Rust crate's run context object (ADR-SAG-0019 decision 14); `decidr send` creates one per command.
+- The worker count is the number of requests of one batch that are sent at the same time.
+- A Run is the run context a tool creates, uses for its calls and then disposes. `decidr send` creates one Run per command from its `--timeout-secs` and `--workers` options.
+- An override is a send timeout or a worker count given to a Run.
+- An invalid override is a send timeout that is not a finite positive duration, or a worker count below 1.
+- The fixed send count is the number of sends defined in REQ-SAG-0601.
+- A batch result is the result of one request of a batch, carrying that request's input position.
+- The batch callback is the function a caller passes with a batch to receive results while the batch runs.
 
 **MUST statements:**
 
-- `sc_agent.Run` and `decidr send` MUST accept an optional send timeout (a Duration), `timeout_secs` (`--timeout-secs` on the CLI).
-- `timeout_secs` MUST replace the default 120 s for every send of the Run.
-- `sc_agent.Run` and `decidr send --batch` MUST accept an optional worker count, `workers` (`--workers` on the CLI).
-- A worker count below or above the configured `workers` MUST be honored.
-- An override MUST apply to its own Run only. An absent override MUST mean the configured value.
-- A bad override value MUST be returned as an error value by every call through that Run:
-  - `decidr.invalid_request_timeout` for a bad timeout;
-  - `decidr.invalid_workers` for a bad worker count.
-- A send that exceeds the timeout MUST be resent up to the fixed send count of 5 sends in all, the first included (REQ-SAG-0601).
-- `run.send_batch` MUST return one result per request, each with its input position, while `on_result` receives each line as it finishes.
+- A Run MUST accept an optional send timeout.
+- A Run MUST accept an optional worker count.
+- When a Run has an override, every call through that Run MUST use the override in place of the configured value.
+- When a Run has no override, every call through that Run MUST use the configured value.
+- When a Run is given an invalid override, it MUST return an error value.
+- When a send exceeds the send timeout, the Run MUST resend it until the fixed send count is reached.
+- A batch MUST return one batch result per request.
+- The batch callback MUST receive each result when that result finishes.
 
 **MUST NOT statements:**
 
-- An override MUST NOT be clamped.
-- An override MUST NOT change the configuration or any other Run.
-- `run.send` and `run.send_batch` MUST NOT accept `timeout_secs` or `workers`.
+- A Run MUST NOT clamp an override.
+- An override MUST NOT change the configuration.
+- A single call through a Run MUST NOT accept an override.
 
 ### Rationale
 
-Different callers in one process need different parallelism and different patience. Without per-call overrides both are fixed by configuration, so consumers refuse or ignore their own flags.
+Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.
 
-Owner ruling (2026-11-21), Rand Lee: "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order."
-
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): values that do not vary between the calls of one command, the send timeout and the worker count among them, are set once on the Run; per call only the request, model, agent role, cache override and batch callback are passed (ADR-SAG-0019 decision 14).
-
-Owner ruling 2026-11-24 (plan review; supersedes `model` in the per-call list above): one model per Run, chosen by the caller; the model is set once on the Run and no call passes a model.
+Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order."
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A Rust test shows a Run with `workers` 2 runs 2 workers.
-- [ ] `workers` of 0 or -1 returns an error value `decidr.invalid_workers`.
-- [ ] `decidr send --timeout-secs 10` and `--batch --workers 2` reach the effective timeout and worker count, as shown by Rust tests.
-- [ ] With a loopback runner that never answers, `timeout_secs` returns a line with the error id `http.network` and `attempts` equal to the sends made.
-- [ ] `timeout_secs` of NaN or a negative value returns an error value `decidr.invalid_request_timeout`.
-- [ ] Rust tests show the override is the transport timeout.
-- [ ] A Run with overrides followed by a Run without shows the second uses the configured values.
-- [ ] `run.send_batch` returns one result per request, each carrying its input position, while `on_result` sees finish order.
+- [ ] A Rust unit test builds a Run with a 10 s send timeout and checks the transport timeout is 10 s.
+- [ ] A Rust unit test builds a Run with a worker count of 2 and checks the batch runs 2 workers.
+- [ ] A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run's send timeout is 10 s and its worker count is 2.
+- [ ] A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.
+- [ ] A Rust unit test gives a Run a worker count of 0 and checks the result is the error value `decidr.invalid_workers`, and gives a negative timeout and checks `decidr.invalid_request_timeout`.
+- [ ] A Rust unit test with a loopback runner that never answers checks the result has the error id `http.network` and `attempts` equal to the fixed send count.
+- [ ] A Rust unit test sends a batch and checks it returns one result per request, each with its input position.
+- [ ] A Rust unit test sends a batch whose requests finish out of order and checks the callback sees finish order.
+- [ ] A Rust unit test gives a Run a worker count above the configured one and checks that many workers run.
+- [ ] A Rust unit test checks the configuration is unchanged after a Run with overrides.
+- [ ] A Rust unit test checks that the per-call send and batch signatures have no override parameter.
 
 ### Dependencies
 

@@ -14,36 +14,33 @@
 
 ### Requirement Statement
 
-Definitions: A Run is the context object through which every query is sent; it owns the cancel flag (ADR-SAG-0019 decision 14). An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running.
+Definitions: An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is defined in REQ-SAG-0001.
 
 **MUST statements:**
 
-- Ctrl-C, SIGINT or SIGTERM received by `decidr` MUST cancel the running Run's cancel flag.
-- A `KeyboardInterrupt` in `sc-agent-py` MUST cancel the Run whose call is running.
+- Ctrl-C, SIGINT or SIGTERM received by `decidr` MUST cancel the running work.
+- A `KeyboardInterrupt` in `sc-agent-py` MUST cancel the running work.
 - Every request not finished when the interrupt arrives MUST end with `decision.cancelled`.
 - The session log MUST be flushed before `decidr` exits or the Python call returns.
-- A `KeyboardInterrupt` in `sc-agent-py` MUST be caught; the Python call MUST return its results, with every unfinished request as a `decision.cancelled` error value.
+- A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
+- After a `KeyboardInterrupt`, the Python call MUST return a result for every request, each unfinished request as a `decision.cancelled` error value.
 - `decidr` MUST exit non-zero after an interrupt.
 
 ### Rationale
 
 An interrupted batch must leave a complete, readable session log and a clear failure status instead of lost rows and a silent exit.
 
-Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (return error) so app doesn't crash."
-
-Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info"
-
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): the cancel flag belongs to the Run; an interrupt cancels the Run, and Python has no separate cancel object.
-
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] Sending SIGINT to `decidr` during a batch makes every unfinished request end with `decision.cancelled`, flushes the session log, and exits non-zero.
-- [ ] Sending SIGTERM to `decidr` during a batch has the same result as SIGINT.
-- [ ] Raising `KeyboardInterrupt` during an `sc-agent-py` batch cancels the Run, ends unfinished requests with `decision.cancelled`, flushes the session log, and returns the results without raising.
+- [ ] CLI run: sending SIGINT to `decidr` during a batch stops the in-flight requests.
+- [ ] CLI run: sending SIGTERM to `decidr` during a batch stops the in-flight requests.
+- [ ] CLI run: after SIGINT during a batch, every unfinished request in the output ends with `decision.cancelled`.
+- [ ] CLI run: after SIGINT during a batch, the session log holds a row for every request that finished before the signal.
+- [ ] Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch does not raise out of the call.
+- [ ] Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the call returns one result per request, each unfinished one a `decision.cancelled` error value.
+- [ ] CLI run: `decidr` exits non-zero after SIGINT during a batch.
 
 ### Dependencies
 

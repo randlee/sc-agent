@@ -1,9 +1,9 @@
 # Requirement: Model catalog: static provider tables
 
 **Status:** Approved  
-**Version:** 0.7.0  
+**Version:** 0.8.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -14,59 +14,56 @@
 
 ### Requirement Statement
 
-Definitions: The model catalog is the provider table and the model table built into `sc-agent`. A provider is an endpoint: a base address (a fixed remote URL, or a host and port from configuration), a wire and an optional credential-variable name. The model table has one row per model: short name, fixed model id, release date and the provider the row references. A provider serves a short name when the model table has a row for that short name referencing it. A model entry is the configuration object `models.<alias>` (REQ-SAG-0019); it adds one row to the model table. A configuration row is a row a model entry adds; a built-in row is a row of the table built into `sc-agent`. The merged table is the built-in rows together with the configuration rows. A credential source is one of the sources of REQ-SAG-0401, in its resolution order. A resolved model is the typed value a selector resolves to: alias, model id and provider.
+Definitions: The model catalog is the provider table and the model table built into `sc-agent`. A provider is an endpoint: a base address, a wire and an optional credential-variable name. A keyed provider is a provider with a credential-variable name; a keyless provider has none. The model table has one row per model: short name, fixed model id, release date and provider. A provider serves a short name when the model table has a row for that short name referencing it. A configuration row is a model row added by configuration; a built-in row is a row built into `sc-agent`. The merged table is the built-in rows together with the configuration rows. The configured provider is the provider a configuration file names for a model. A resolved model is the typed value a model selector resolves to: short name, fixed model id and provider.
 
 **MUST statements:**
 
-- The merged table MUST be sorted by release date, newest first; rows that share a release date keep their table order, built-in rows before configuration rows.
-- A configuration row whose `id` equals a built-in row's id MUST be refused with the error value `config.invalid`, naming the file and key path (REQ-SAG-0019).
-- A short name MUST resolve to the first row, in merged-table order, that has that short name and whose provider is keyless or has its credential in one of the credential sources.
-- A credential source that fails to read MUST count as not holding that credential.
-- When no provider qualifies and a keyring read failed during resolution, resolution MUST return the keyring's error value.
-- Otherwise, when no provider qualifies, resolution MUST return the error value `secrets.key_missing`, with category `auth`, naming every candidate's credential-variable name.
-- Every model row, local endpoints included, MUST carry a fixed model id.
-- The `nous` provider MUST serve `haiku` as `anthropic/claude-haiku-5.5` and `luna` as `openai/gpt-6-luna`.
-- A model selector MUST be resolved once, at the CLI flag or at Run creation, and the resolved model MUST be what the send, the cache key and the session row use; the cache key uses the resolved row's fixed id.
+- The merged table MUST be sorted by release date, newest first.
+- A short name MUST resolve to its newest row in the merged table.
+- When several providers serve a short name, the configured provider MUST be selected.
+- When several providers serve a short name and none is configured, a keyless provider MUST be selected over a keyed provider.
+- When only keyed providers serve a short name, the first provider whose key is found MUST be selected.
+- Every model row MUST carry a fixed model id.
+- `decider` MUST resolve to the row `decider-4b-v2.1`.
+- The `nous` provider MUST serve `haiku`.
+- The `nous` provider MUST serve `luna`.
+- A model selector MUST be resolved once, into a resolved model.
+- After resolution, every use of the model MUST take the resolved model's fixed model id.
 - A full model id MUST select its row exactly.
-- Each built-in model MUST carry the model's published release date.
+- Each built-in row MUST carry the model's published release date.
 
 **MUST NOT statements:**
 
 - sc-agent MUST NOT branch on a provider's or a model's name.
-- A model selector MUST NOT be resolved again after its resolved model is created.
-- A configuration row MUST NOT change or remove a built-in row.
+- A configuration row MUST NOT override a built-in row.
+- Configuration MUST NOT change the base address of a keyed built-in provider.
 
 ### Rationale
 
-When a new model is released, short names such as `haiku`, `luna`, `opus` and `sol` must launch it immediately.
+When a new model is released, short names such as `haiku`, `luna`, `opus` and `sol` must launch it immediately. Hard-coded rows go stale quickly, so configuration can add rows, and a newer configuration row wins its short name. Configuration can add a local model that runs on another computer, but it cannot send a paid API's key to a different address. Provider and model are values, not names to branch on, so a model is resolved once and the send, the cache key and the session row all use the same fixed id. Local models such as `laya` and `decider` are named the way `haiku` is.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a provider is an endpoint, models are rows that reference provider constants, and there is no name-string branching. A model selection is resolved once into a typed value that carries the provider. Nous serves haiku and luna.
-
-Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
-
-Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." A credential source read error counts as not held.
-
-Lead ruling 2026-11-24 (phase j plan review): a model entry that names a provider without a row for its alias needs an `id`; without one the alias is unknown for that provider.
-
-Owner ruling 2026-11-24 (configuration model rows; supersedes the configured-provider rule and the lead ruling on a model entry's `id` above): configuration can add model rows, because hard-coded rows go stale. Configuration rows merge with the built-in table, the merged table is sorted newest first and the sort unit test covers it, and short-name resolution runs over the merged table, so a configuration row with a newer `released` wins its short name. Built-in rows cannot be edited or removed.
-
-Owner ruling 2026-11-24: `decider` defaults to 4b. The two decider rows share a release date, so `decider-4b-v2.1` is listed before `decider-2b-v11` and `decider` resolves to it.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A unit test verifies that the merged table, with a configuration row added, is sorted by release date, newest first.
-- [ ] When two rows of one provider share a short name, the short name resolves to the row with the later release date.
-- [ ] With only `ANTHROPIC_API_KEY` in the environment, `haiku` resolves to `anthropic`; with only `NOUS_API_KEY`, `haiku` resolves to `nous` with id `anthropic/claude-haiku-5.5` and `luna` to `nous` with id `openai/gpt-6-luna`, even though the nous rows tie with the first-table rows on release date.
-- [ ] With `ANTHROPIC_API_KEY` in the environment and a `haiku` configuration row on `anthropic` with id `claude-haiku-5-6` and a `released` later than every built-in `haiku` row, `haiku` resolves to `anthropic` with id `claude-haiku-5-6`.
-- [ ] With keys for two providers that serve `haiku`, the provider of the earlier row in table order wins wherever each key is held.
-- [ ] With both decider endpoints configured, `decider` resolves to the first decider row in table order.
-- [ ] With both decider endpoints configured and a `decider` configuration row on a decider endpoint whose `released` is later than 2026-09-24, `decider` resolves to that row's id; a configuration row whose `id` is `decider-4b-v2.1` fails the load with `config.invalid` naming the file and `models.decider.id`.
-- [ ] With no credential for any provider that serves `haiku`, resolution returns `secrets.key_missing` with category `auth`, naming every candidate's credential-variable name.
+- [ ] A unit test verifies that, of two rows sharing a short name, the short name resolves to the row with the later release date.
+- [ ] A unit test verifies that, with keys for two providers serving `haiku`, the configured provider is selected.
+- [ ] A unit test verifies that, with a keyless and a keyed provider serving a short name and none configured, the keyless provider is selected.
+- [ ] A unit test verifies that, with two keyed providers serving `haiku` and only the second provider's key present, the second provider is selected.
+- [ ] A unit test verifies that every row of the merged table has a non-empty model id.
+- [ ] A unit test verifies that `decider` resolves to `decider-4b-v2.1`.
+- [ ] A unit test verifies that, with only `NOUS_API_KEY` present, `haiku` resolves to the `nous` provider.
+- [ ] A unit test verifies that, with only `NOUS_API_KEY` present, `luna` resolves to the `nous` provider.
+- [ ] A unit test verifies that a send resolves its model selector exactly once.
+- [ ] A unit test verifies that a send with a short name records the resolved fixed model id in its cache key.
+- [ ] A unit test verifies that selecting a built-in row's full model id returns that row.
+- [ ] A unit test verifies that every built-in row has a release date.
 - [ ] A search of `crates/sc-agent/src` finds no comparison of a provider or model name with a string literal outside the model and provider tables.
+- [ ] A unit test verifies that a configuration row whose `id` equals a built-in row's id fails the load with `config.invalid`.
+- [ ] A unit test verifies that a configuration entry that changes the base address of a keyed built-in provider fails the load with `config.invalid`.
 
 ### Dependencies
 
