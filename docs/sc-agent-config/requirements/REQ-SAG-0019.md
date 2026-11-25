@@ -29,7 +29,7 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   8. `sc-agent.json` in the global folder;
   9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
-- `sc-agent.json` MUST accept the shared defaults for `project`, `workers`, `cache`, `model`, `models` and the optional local endpoints; a CLI file may override them.
+- `sc-agent.json` MUST accept the shared defaults for `project`, `workers`, `cache`, `model`, `models` and the optional local endpoints.
 - `model` MUST be a string selector with the built-in default `jev`; a model request with no model named MUST use it.
 - A local endpoint MUST be configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.
 - A model entry's `provider` MUST name a built-in provider; any other value MUST produce a typed error naming the file and key path.
@@ -37,17 +37,18 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
 - A model entry MUST override the built-in model row for its alias: its `provider` selects the provider and its `id` the model id.
 - `cache` MUST be a boolean with the default `true` (REQ-SAG-0703).
 - `decidr doctor` MUST report `cache`, `model`, every model entry and every local endpoint key in the settings table.
-- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings; an unknown file key MUST produce a typed error naming that file and key path.
+- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings.
+- An unknown file key MUST produce a typed error naming that file and key path.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
 - Configuration files MUST be JSON.
-- Each CLI MUST have a `<cli> doctor` command (`decidr doctor`).
+- Each CLI MUST have a `<cli> doctor` command, such as `decidr doctor`.
 - `<cli> doctor` MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.
 - `<cli> doctor` MUST report the path of every file in the nine layers.
 - For each file in the nine layers, `<cli> doctor` MUST report whether it exists.
-- When a CLI fails to load a configuration file, its error MUST name the file and the key path.
+- When a CLI fails to load a configuration file, its error MUST name the file, and the key path when the failure is at a key.
 
 **MUST NOT statements:**
 
