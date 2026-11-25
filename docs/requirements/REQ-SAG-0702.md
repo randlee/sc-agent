@@ -1,7 +1,7 @@
 # Requirement: A Run may override the send timeout and the worker count for its own calls only
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -47,6 +47,8 @@ Owner ruling (2026-11-21), Rand Lee: "Use time structs for time." "always return
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): values that do not vary between the calls of one command, the send timeout and the worker count among them, are set once on the Run; per call only the request, model, agent role, cache override and batch callback are passed (ADR-SAG-0019 decision 14).
+
+Owner ruling 2026-11-24 (plan review; supersedes `model` in the per-call list above): one model per Run, chosen by the caller; the model is set once on the Run and no call passes a model.
 
 ### Success Criteria
 

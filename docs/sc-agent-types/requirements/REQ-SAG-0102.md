@@ -1,7 +1,7 @@
 # Requirement: Model catalog: static provider tables
 
 **Status:** Approved  
-**Version:** 0.5.1  
+**Version:** 0.6.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -19,7 +19,8 @@ Definitions: The model catalog is the provider table and the model table built i
 **MUST statements:**
 
 - The model table MUST be sorted by release date, newest first; rows that share a release date keep their table order.
-- When a model entry names a provider for an alias, the alias MUST resolve to that provider, with the entry's `id` when set.
+- When a model entry names a provider for an alias, the alias MUST resolve to that provider, with the entry's `id` when set; a local endpoint's row always uses its fixed id (REQ-SAG-0019).
+- When a model entry names a provider that has no row for the alias and the entry sets no `id`, resolution MUST return the error value `types.unknown_short_name`, with category `validation`, naming the alias and the provider.
 - Otherwise, a short name MUST resolve to the first row, in model-table order, that has that short name and whose provider is keyless or has its credential in one of the credential sources.
 - A credential source that fails to read MUST count as not holding that credential.
 - When no provider qualifies and a keyring read failed during resolution, resolution MUST return the keyring's error value.
@@ -47,6 +48,8 @@ Owner ruling 2026-11-24 (supersedes the optional or configured local model id an
 
 Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." A credential source read error counts as not held.
 
+Lead ruling 2026-11-24 (phase j plan review): a model entry that names a provider without a row for its alias needs an `id`; without one the alias is unknown for that provider.
+
 Owner ruling 2026-11-24: `decider` defaults to 4b. The two decider rows share a release date, so `decider-4b-v2.1` is listed before `decider-2b-v11` and `decider` resolves to it.
 
 ### Success Criteria
@@ -59,6 +62,7 @@ Owner ruling 2026-11-24: `decider` defaults to 4b. The two decider rows share a 
 - [ ] With `ANTHROPIC_API_KEY` in the environment and `models.haiku.provider` set to `openrouter`, `haiku` resolves to `openrouter`.
 - [ ] With keys for two providers that serve `haiku`, the provider of the earlier row in table order wins wherever each key is held.
 - [ ] With both decider endpoints configured, `decider` resolves to the first decider row in table order.
+- [ ] With `models.haiku.provider` set to `typesafe` and no `models.haiku.id`, resolution returns `types.unknown_short_name` naming `haiku` and `typesafe`; with `models.haiku.id` also set, `haiku` resolves to `typesafe` with that id.
 - [ ] With no credential for any provider that serves `haiku`, resolution returns `secrets.key_missing` with category `auth`, naming every candidate's credential-variable name.
 - [ ] A search of `crates/sc-agent/src` finds no comparison of a provider or model name with a string literal outside the model and provider tables.
 

@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.2.0  
+**Version:** 1.3.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -25,7 +25,7 @@ Definitions:
 - The Run is the wheel's `sc_agent.Run` context object (ADR-SAG-0019 decision 14). It is created with the tool identity, the cache policy and the values that do not change between calls; creating it mints the run's ULID `run_id` in Rust, readable as `run.run_id`; it has `send`, `send_batch` and `cancel`, and closing it flushes its Logger.
 - The session-row reader is the wheel's `sc_agent.session_rows`, which returns session rows by `session_id` (REQ-SAG-0022).
 - The provider-key export is the wheel's `sc_agent.provider_keys()`, which returns the credential name of every provider in the Rust provider table.
-- The public API is `Run`, `session_rows`, `provider_keys`, `digest`, `logger`, `log` and `flush`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section.
+- The public API is `Run`, `Model`, `TYPESAFE`, `TestSeams` (for tests), `session_rows`, `provider_keys`, `digest`, `logger`, `log` and `flush`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section.
 - The session tags are the Run's `project` and each decision call's `agent_role`. They tag each session-log record with the consumer's repository and the calling agent's role.
 - The session log is the wheel's record of every query and response, written to the wheel's default location.
 - The logging wiring is the consumer module's code that obtains one Logger with `logger(client name)`, or takes the consumer's own Logger, and gives it to every Run and every sitr call.

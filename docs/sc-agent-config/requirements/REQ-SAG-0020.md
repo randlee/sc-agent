@@ -1,7 +1,7 @@
 # Requirement: Configuration environment variable names
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -23,7 +23,8 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 - When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_WORKERS`.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
 - A failed validation of an environment value MUST name the environment variable.
-- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string. For example, `DECIDR_MODELS__LAYA__ID=1` is a number, like `"id": 1` in a file, and fails the string id validation; a quoted JSON string is accepted.
+- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string. For example, `DECIDR_LAYA__HOST=1` is a number, like `"host": 1` in a file, and fails the string host validation; a quoted JSON string is accepted.
+- An environment variable whose key path starts with `models`, such as `DECIDR_MODELS__LAYA__ID`, MUST fail the load with a typed error naming that variable, because a model entry is set only in a configuration file (REQ-SAG-0019).
 
 **MUST NOT statements:**
 
@@ -37,6 +38,8 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a local endpoint's model id moved from `laya.model` to the model entry `models.laya.id` (REQ-SAG-0019), so the example names the new key path.
 
+Lead ruling 2026-11-24 (phase j plan review): `models.*` is set only in configuration files (REQ-SAG-0019), so an environment variable under `<CLI>_MODELS__` is rejected and the parsing example uses `laya.host` instead.
+
 Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
 
 ### Success Criteria
@@ -45,6 +48,8 @@ Owner ruling 2026-11-24 (supersedes the optional or configured local model id an
 
 - [ ] With `DECIDR_LAYA__PORT=9000` set, `decidr doctor` reports the setting `laya.port` with value 9000 and source `DECIDR_LAYA__PORT`.
 - [ ] With `DECIDR_WORKERS=3` set, `decidr doctor` reports the setting `workers` with value 3 and source `DECIDR_WORKERS`.
+- [ ] With `DECIDR_MODEL=haiku` set, `decidr doctor` reports the setting `model` with value `haiku` and source `DECIDR_MODEL`.
+- [ ] With `DECIDR_MODELS__LAYA__ID="x"` set, decidr exits with `config.invalid` naming `DECIDR_MODELS__LAYA__ID`.
 - [ ] With `SC_PROJECT=phase-d` set, `decidr doctor` reports the setting `project` with value `phase-d` and source `SC_PROJECT`.
 - [ ] With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the fixed log root as the value `log_root: "/tmp/x"`, separately from configuration settings (ADR-SAG-0021).
 - [ ] With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `"workers": 0` in the local `decidr.json` it exits with the same check's error naming that file and `workers`.
