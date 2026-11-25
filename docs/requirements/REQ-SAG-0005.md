@@ -1,7 +1,7 @@
 # Requirement: Session log JSONL layout and row content
 
 **Status:** Approved  
-**Version:** 0.6.0  
+**Version:** 0.7.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the model id of the query's resolved model (REQ-SAG-0102), or its alias when the resolved model has no id (decider with no configured id). `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`. A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). `run_id` is the ULID that identifies one Run; it is minted in Rust when the Run is created. The run log is the file `runs.jsonl` in the session directory. A link record is the JSON object `{run_id, session_id, cached}` written to the run log for one query. A session sink is defined in REQ-SAG-0003.
+Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the fixed model id of the query's resolved model (REQ-SAG-0102). `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`. A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). `run_id` is the ULID that identifies one Run; it is minted in Rust when the Run is created. The run log is the file `runs.jsonl` in the session directory. A link record is the JSON object `{run_id, session_id, cached}` written to the run log for one query. A session sink is defined in REQ-SAG-0003.
 
 **MUST statements:**
 
