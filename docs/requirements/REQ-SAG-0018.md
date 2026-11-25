@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.3.0  
+**Version:** 1.4.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -20,7 +20,12 @@ Definitions:
 - The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
 - The sc-decidr wheel holds both the decidr and the sitr Python API (ADR-SAG-0021), so they always have the same version.
 - The consumer module is the Python file a consumer renders from the consumer template.
-- The template variables are `client_name`, `tool_version` (the consumer's released version), `sitr` (`true` or `false`, selecting the syntax-query section), and `sc_decidr_version`. Model selectors are passed unchanged as call arguments.
+- The template variables are `client_name`, `tool_version` (the consumer's released version), `sitr` (`true` or `false`, selecting the syntax-query section), `sc_decidr_version`, and `legacy_result_schemas`. Model selectors are passed unchanged as call arguments.
+- `legacy_result_schemas` is the template variable listing the result-line schema tags, besides `jev-batch-result/1`, whose lines the consumer module still reads. It is empty for a consumer that has none.
+- The result types are the classes `Ok`, `Err` and `Result` that the consumer module returns from its calls.
+- The consent settings module is the consumer's own module that reads the consumer's remote-judge consent setting. The consumer template names it through an extension point.
+- The generic error code is the consumer code that the category-to-code map gives for the category `other`.
+- The test fake is `sc_agent.testing.FakeRun`, a class in the wheel's public test module `sc_agent.testing`. It stands in for a Run in consumers' tests: it records the arguments it was opened with and the requests sent through it, and returns scripted results.
 - The client name is the template variable `client_name`. It names the consumer module's Logger and is the `agent_role` the module passes.
 - The Run is the wheel's `sc_agent.Run` context object (ADR-SAG-0019 decision 14). It is created with the tool identity, the cache policy and the values that do not change between calls; creating it mints the run's ULID `run_id` in Rust, readable as `run.run_id`; it has `send`, `send_batch` and `cancel`, and closing it flushes its Logger.
 - The session-row reader is the wheel's `sc_agent.session_rows`, which returns session rows by `session_id` (REQ-SAG-0022).
@@ -65,6 +70,11 @@ Definitions:
 - Every decision call in the consumer module MUST pass the session tags.
 - The consumer module MUST contain the logging wiring.
 - The consumer module MUST contain the error mapping.
+- The category-to-code map MUST have an entry for each category of REQ-SAG-0017.
+- The error mapping MUST map a category that is not in REQ-SAG-0017 to the generic error code.
+- The consumer template MUST define the result types.
+- The consent gate MUST read the consent setting through the consent settings module.
+- The sc-decidr wheel MUST ship the test fake.
 - Extension points MUST be the only template inputs that change the consumer module's code.
 - The consumer template MUST carry the shared consumer code.
 - A consumer-specific value MUST reach the consumer module only through an extension point.
@@ -104,6 +114,9 @@ Definitions:
 - The consumer module MUST NOT contain consumer logic.
 - The consumer module MUST NOT choose a provider.
 - The consumer template MUST NOT contain a copy.
+- The sc-decidr wheel MUST NOT ship a template other than the consumer template for the consumer module.
+- The consumer template MUST NOT contain the consent settings module.
+- The consumer module MUST NOT import `sc_agent.testing`.
 - The consumer module MUST NOT mint a `run_id` or any other ULID.
 - The consumer module MUST NOT compute a session-log path or parse a session-log file.
 - The consumer module MUST NOT parse error message text.
@@ -144,6 +157,8 @@ Owner ruling 2026-11-24: allow_remote_judge is consent for TypeSafe (Jev) only; 
 
 Lead ruling 2026-11-24 (plan review): a fixture run answers in process and opens no Run, so it writes nothing a live run would; a Run that failed creation has no `run_id`, so its result lines carry null.
 
+Lead ruling 2026-11-24 (plan review round 2): the result types live inside the consumer template, not in a sibling template; each consumer keeps its consent settings module, so the wheel ships no settings reader and no YAML parser; the wheel ships `sc_agent.testing.FakeRun` so consumers stop writing their own Run doubles; the category-to-code map covers every category, with the generic error code as the fallback.
+
 Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared consumer code; `attempts` is session data, read from the session row.
 
 ### Success Criteria
@@ -176,6 +191,10 @@ Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared c
 - [ ] Result lines written through a Run that failed creation carry `run_id` null.
 - [ ] With a provider key set to a dummy value and a `Bearer <token>` in an error text, a rendered module's output shows `[redacted]` for both.
 - [ ] A result line's `project` equals the Run's resolved project/phase when the project came from configuration.
+- [ ] Each rendered module maps an error of each of the ten categories of REQ-SAG-0017 to that category's code in the passed map, and an error whose `category` is not one of the ten to the generic error code.
+- [ ] Each rendered module defines `Ok`, `Err` and `Result`, and `consumer.py.j2` is the only consumer-module template in the installed wheel.
+- [ ] A rendered module's consent gate reads the consent setting through the consent settings module given through the extension point, and the rendered module does not contain the consent settings module.
+- [ ] `sc_agent.testing.FakeRun` imports from the installed wheel; it records its open arguments and the requests sent through it and returns its scripted results.
 
 ### Dependencies
 
