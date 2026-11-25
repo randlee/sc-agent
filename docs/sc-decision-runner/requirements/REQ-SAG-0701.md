@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: A batch is the decision requests a caller passes in one call: one JSONL file, one stdin stream or one Python call. A worker sends one request at a time. A session ULID (Universally Unique Lexicographically Sortable Identifier) is the `session_id` of the session row that records a request's result. Results may be returned in any order. `send_batch` is the sc-agent function that takes a batch and returns one result per request. A session row is the record sc-agent stores for each answered request. A request's input position is its zero-based index in the batch. An error result is a result that carries the request's error in place of an answer. A cache hit is a request whose successful result is served from an existing session row (REQ-SAG-0703).
+Definitions: A batch is the decision requests a caller passes in one call: one JSONL file, one stdin stream or one Python call. A worker sends one request at a time. A session ULID (Universally Unique Lexicographically Sortable Identifier) is the `session_id` of the session row that records a request's result. Results may be returned in any order. `send_batch` is the sc-agent function that takes a batch and returns one result per request. A session row is the record sc-agent stores for each answered request. A request's input position is its zero-based index in the batch. An error result is a result that carries the request's error in place of an answer. A cache hit is a request whose successful result is served from an existing session row (REQ-SAG-0703). Cancelling the batch is calling `cancel()` on the `Cancel` object passed to `send_batch` as its `cancel` argument; `decidr` does this when it receives Ctrl-C.
 
 **MUST statements:**
 
