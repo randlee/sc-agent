@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 0.10.0  
+**Version:** 1.0.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-22  
 **Owner:** Rand Lee  
@@ -153,6 +153,8 @@ Two consumers rebuilt the wheel boundary and the copies diverged, so every conce
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
+
 ### Consequences
 
 **Positive:**
@@ -166,8 +168,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 - This is a breaking release for Rust dependents: the error type and the call API change.
 - The wheel moves to maturin's mixed layout.
-
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
 ### Alternatives Considered
 

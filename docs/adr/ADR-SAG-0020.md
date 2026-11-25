@@ -82,6 +82,8 @@ One file per CLI keeps each CLI's settings separate and lets a new CLI be added 
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
+Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
+
 ### Consequences
 
 **Positive:**
@@ -93,8 +95,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 - A setting can now come from nine places; `decidr doctor` reports a `path | value | source` table.
 - Existing `default.json` or `local.json` files are ignored and must be moved by hand.
-
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
 
 ### Alternatives Considered
 

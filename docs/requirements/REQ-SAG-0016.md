@@ -33,8 +33,6 @@ Definitions:
 
 - A consumer MUST NOT need to parse message text to obtain a send count or category.
 
-Owner ruling (2026-11-21), Rand Lee: "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
-
 ### Rationale
 
 Consumers decide whether to resubmit from the category and the send count. Without typed fields these values exist only in English message text.
@@ -48,6 +46,8 @@ Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (retur
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info"
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling (2026-11-21), Rand Lee: "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
 
 ### Success Criteria
 
