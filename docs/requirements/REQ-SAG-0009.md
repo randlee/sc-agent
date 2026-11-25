@@ -1,9 +1,9 @@
 # Requirement: Low-level crates work without tokio
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -30,7 +30,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] `cargo tree` for each low-level crate with default features lists no tokio crate.
+- [ ] A CLI run of `cargo tree` for each low-level crate with default features lists no tokio crate.
 
 ### Dependencies
 

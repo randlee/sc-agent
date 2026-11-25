@@ -1,9 +1,9 @@
 # Requirement: No sleep()
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-20  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,9 +14,11 @@
 
 ### Requirement Statement
 
+`sc-agent` is this project. A sleep function includes `std::thread::sleep`, `std::thread::sleep_until` and `tokio::time::sleep`.
+
 **MUST NOT statements:**
 
-- sc-agent source code MUST NOT call `std::thread::sleep`, `std::thread::sleep_until`, `tokio::time::sleep` or any other sleep function.
+- The source code of this project MUST NOT call any sleep function.
 
 ### Rationale
 

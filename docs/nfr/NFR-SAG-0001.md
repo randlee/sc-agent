@@ -1,9 +1,9 @@
 # Requirement: Session logging at 40,000 sessions per task
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,11 +14,11 @@
 
 ### Requirement Statement
 
-Definitions: A task is one caller run. A session is one model request with its own ULID `session_id`; every send of that request, including busy resends, belongs to the same session. One task of the owner's produced 40,000 sessions, each one Jev query.
+Definitions: A task is one caller run. A session is one model request with its own ULID `session_id`; every send of that request, including busy resends, belongs to the same session. `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name. `agent_role` is a caller-supplied name for the type of work done or the agent that did it (REQ-SAG-0004). One task of the owner's produced 40,000 sessions, each one Jev query.
 
 **MUST statements:**
 
-- All sessions of one repo, agent role and project MUST go to one file.
+- All sessions of one repo, agent role and project MUST be written to one session log file.
 
 **MUST NOT statements:**
 
@@ -32,7 +32,7 @@ The owner analyses 10,000 to 20,000 or more decisions at a time to tune consumer
 
 **Acceptance Criteria:**
 
-- [ ] A test task of many sessions with one repo, agent role and project writes one row per session, each with a distinct `session_id`, to one file.
+- [ ] A load test verifies that a task of many sessions with one repo, agent role and project writes one row per session, each with a distinct `session_id`, to one file.
 
 ### Dependencies
 
